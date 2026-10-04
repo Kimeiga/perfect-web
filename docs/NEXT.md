@@ -260,6 +260,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
         bounded too; E7's record recorded again.
     15. ~~A `<link>` the head holds, written in markup~~ (ADR-0189,
         `just e14-links`): PW5035; corpus C12.
+    16. ~~Every page that binds a query, served at its route~~ (ADR-0190,
+        `just e14-pages`): E14-Q's next slice; the store's cart as a page of
+        its own, kept current beside the store's.
+    17. **Every page speculates**, from the module `pw build` writes it
+        (ADR-0172), as the store's does: the cart page shows a press when the
+        server answers. Then a list of stores as the store's home page, which
+        needs a stores query and its shared list kept current (ADR-0190's
+        alternatives).
 
      Next: E14-E's design, ready for the owner's choice of models and
      budget, and the owner's decisions logged in ADR-0182 (axe-core) and

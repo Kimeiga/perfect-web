@@ -105,8 +105,10 @@ MUTANTS = [
     (
         "the cart's count is no live region",
         APP,
-        '<p aria-live="polite" aria-atomic="true">Items in cart:',
-        "<p>Items in cart:",
+        # Re-anchored by ADR-0190: the store's page's count, by its indent,
+        # as the cart's page has one too.
+        '                <p aria-live="polite" aria-atomic="true">Items in cart:',
+        "                <p>Items in cart:",
     ),
     (
         "a control is first in the keyboard's order",

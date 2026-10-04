@@ -1622,3 +1622,12 @@ a page's runtime is bounded as it is sent, in every run.
   reads them. PW5035: a `<link>` in markup has only body-ok relations
   (`stylesheet`, `preload`, `preconnect`...) or is an item's property.
 - Corpus C12: R-053, A-028; generality 38 / 38.
+
+[ADR-0190](DECISIONS/ADR-0190-every-page-that-binds-a-query-is-served-at-its-route.md):
+every page that binds a query is served at its route.
+- E14-Q's next slice. Only the store's page could bind a query: the server
+  read the store's plan in 21 places. Now each document records its page,
+  and is read, rendered and kept current by its own plan and template.
+- The menu's fragment and the speculation stay the store's page's. The store
+  gains a second page, its cart at `/cart`: a change made on either page
+  reaches the other while both are open.

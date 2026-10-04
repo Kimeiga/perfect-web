@@ -365,7 +365,8 @@ fn a_module_and_its_event_part_name_one_handler() {
     let units = store_units();
     let modules = modules(&units);
     let parts = event_parts(&units);
-    assert_eq!(parts.len(), 5, "{parts:?}");
+    // The store's page's five, and its cart's page's four (ADR-0190).
+    assert_eq!(parts.len(), 9, "{parts:?}");
     for (name, identity, captures) in &parts {
         let m = &modules[name];
         assert_eq!(&m.identity, identity, "{name}: one identity");

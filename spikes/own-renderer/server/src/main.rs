@@ -572,6 +572,11 @@ struct Server {
     /// which store it shows. Registered with its subscriber, before it is
     /// read, and forgotten with it.
     params: Mutex<BTreeMap<Doc, Params>>,
+    /// **Each document's page** (ADR-0190), by its template path: which
+    /// plan its values are read by and which template renders it.
+    /// Registered and forgotten with its parameters; a document not in it
+    /// is the store's.
+    pages: Mutex<BTreeMap<Doc, String>>,
     /// **Each session's order, by its status's case** (E14, T04): what
     /// `store:data/orders#current` answers. The kitchen sets it through
     /// `/bench/order`; no order is `None`.
@@ -973,6 +978,7 @@ impl Server {
             shown: Mutex::new(BTreeMap::new()),
             documents: std::sync::atomic::AtomicU64::new(1),
             params: Mutex::new(BTreeMap::new()),
+            pages: Mutex::new(BTreeMap::new()),
             orders: Mutex::new(BTreeMap::new()),
             recommender: Mutex::new(Recommender::default()),
             estimators: Mutex::new(BTreeMap::new()),
@@ -1633,6 +1639,12 @@ impl Server {
                 params.remove(doc);
             }
         }
+        {
+            let mut pages = self.pages.lock().expect("pages");
+            for doc in &documents {
+                pages.remove(doc);
+            }
+        }
         for session in forgotten {
             self.materializer.evict(&self.cart_key(&session));
             // And the query values kept for it alone (ADR-0127): a private
@@ -2063,10 +2075,17 @@ impl Server {
         // stream, whose answer is kept too (ADR-0148). Until 2026-10-03 only
         // a `let`'s was found, so an event never reached a stream's kept
         // answer (ADR-0165).
+        // On any page: until 2026-10-04 only the store's was read, and a
+        // query another page binds kept its stale answer (ADR-0190). A
+        // query's policy is its own, wherever it is read.
         let policy_of = |resource: &str| {
-            ["bindings", "streams"]
-                .into_iter()
-                .flat_map(|k| self.plan[k].as_array().into_iter().flatten())
+            std::iter::once(&self.plan)
+                .chain(self.plans.values())
+                .flat_map(|plan| {
+                    ["bindings", "streams"]
+                        .into_iter()
+                        .flat_map(move |k| plan[k].as_array().into_iter().flatten())
+                })
                 .find(|b| b["resource"] == resource)
                 .map(|b| b["policy"].clone())
         };
@@ -2255,7 +2274,8 @@ impl Server {
 
     /// The bindings whose names `wanted` takes, each run by its policies, a
     /// binding a signal keys read for the key `keys` says (ADR-0152), and
-    /// what `document` shows (ADR-0161).
+    /// what `document` shows (ADR-0161). The bindings are `document`'s page's
+    /// (ADR-0190), or the store's for none.
     fn bindings_where(
         &self,
         session: &str,
@@ -2263,12 +2283,17 @@ impl Server {
         wanted: impl Fn(&str) -> bool,
         keys: &Keys,
     ) -> Result<BTreeMap<String, Val>, Unread> {
+        let page = document.map_or_else(
+            || self.store_page().to_string(),
+            |d| self.page_of(&(session.to_string(), d)),
+        );
+        let plan = self.plan_of(&page);
         let mut out = BTreeMap::new();
-        for b in self.plan["bindings"].as_array().into_iter().flatten() {
+        for b in plan["bindings"].as_array().into_iter().flatten() {
             if !wanted(b["binding"].as_str().unwrap_or_default()) {
                 continue;
             }
-            let args = self.args_of(session, document, b, keys)?;
+            let args = self.args_of(plan, session, document, b, keys)?;
             out.insert(
                 b["binding"].as_str().unwrap_or_default().to_string(),
                 self.fetch_binding(session, b, &args)?,
@@ -2283,6 +2308,7 @@ impl Server {
     /// (ADR-0152), as `document` shows it (ADR-0161).
     fn args_of(
         &self,
+        plan: &serde_json::Value,
         session: &str,
         document: Option<u64>,
         b: &serde_json::Value,
@@ -2303,7 +2329,7 @@ impl Server {
                 // A page parameter, as the document's address gave it
                 // (ADR-0162).
                 Some(name)
-                    if self.plan["params"]
+                    if plan["params"]
                         .as_array()
                         .is_some_and(|ps| ps.iter().any(|p| p == name)) =>
                 {
@@ -2335,23 +2361,12 @@ impl Server {
                                 .and_then(|r| r.shown.get(signal).cloned())
                         }),
                     }
-                    .unwrap_or_else(|| self.first_value(signal));
+                    .unwrap_or_else(|| first_value(plan, signal));
                     key_val(&value).ok_or_else(|| format!("`{signal}` is no key: {value}"))
                 }
                 other => Err(format!("an argument this server cannot compute: {other:?}")),
             })
             .collect()
-    }
-
-    /// A page signal's first value, as the build computed it (ADR-0130).
-    fn first_value(&self, signal: &str) -> serde_json::Value {
-        self.plan["signals"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .find(|s| s["name"] == signal)
-            .map(|s| s["initial"].clone())
-            .unwrap_or(serde_json::Value::Null)
     }
 
     /// **A part's value**, by the steps the compiler planned: a record field,
@@ -2398,12 +2413,17 @@ impl Server {
     /// **A binding's value as the renderer reads it** (ADR-0169): each row
     /// of a list with what it reads of its item through a member, which the
     /// member's component computes. The renderer reads the rest by field.
-    fn rendered_value(&self, binding: &str, value: &Val) -> Result<Value, String> {
+    fn rendered_value(
+        &self,
+        plan: &serde_json::Value,
+        binding: &str,
+        value: &Val,
+    ) -> Result<Value, String> {
         let mut out = val_to_value(value);
         // Each list in the binding's value whose rows read through a member:
         // the value itself, or a list inside it, `cart.lines` (ADR-0170).
         let mut lists: BTreeMap<&str, Vec<&serde_json::Value>> = BTreeMap::new();
-        for read in self.plan["rows"].as_array().into_iter().flatten() {
+        for read in plan["rows"].as_array().into_iter().flatten() {
             let Some(collection) = read["collection"].as_str() else {
                 continue;
             };
@@ -2604,11 +2624,14 @@ impl Server {
         let mut read = Vec::new();
         for doc in documents {
             let store = self.store_of(&doc);
-            let now = self
-                .bindings(session, doc.1)
-                .and_then(|bindings| Ok((self.showing(session, &store, &bindings)?, bindings)));
+            // Each by its own page's plan (ADR-0190): the store's, or a cart
+            // page's, which reads the same cart.
+            let page = self.page_of(&doc);
+            let now = self.bindings(session, doc.1).and_then(|bindings| {
+                Ok((self.showing(&page, session, &store, &bindings)?, bindings))
+            });
             match now {
-                Ok((now, bindings)) => read.push((doc, store, bindings, now)),
+                Ok((now, bindings)) => read.push((doc, page, store, bindings, now)),
                 Err(why) => self.unshowable(&doc, &why),
             }
         }
@@ -2621,22 +2644,24 @@ impl Server {
         let version = self.version(session);
         let mut failed = Vec::new();
         let mut queue = self.pending.lock().expect("pending");
-        for (doc, store, bindings, now) in read {
+        for (doc, page, store, bindings, now) in read {
             // And the value itself, to a page that speculates on it
             // (ADR-0122), from the snapshot the patches are derived from.
+            // Only the store's page carries a speculation (ADR-0190).
             // Until 2026-10-03 it was read again after the table was let go,
             // and pushed in a second hold: a page could be sent one change in
             // two batches, and a command committed in between gave the frame
             // a value later than its version.
             let value = self
                 .speculates_on_cart()
+                .filter(|_| page == self.store_page())
                 .and_then(|binding| bindings.get(&binding))
                 .map(val_to_json);
             // Against what the document shows. With none served, none shows.
             let patches = {
                 let mut shown = self.shown.lock().expect("shown");
                 match shown.get(&doc) {
-                    Some(was) => match self.derive(session, &store, &bindings, was, &now) {
+                    Some(was) => match self.derive(&page, session, &store, &bindings, was, &now) {
                         Ok(patches) => {
                             shown.insert(doc.clone(), now);
                             patches
@@ -2730,6 +2755,23 @@ impl Server {
         .keyed("own-renderer-spike-key")
     }
 
+    /// **The identity domain a session's document of `page` is rendered in**
+    /// (ADR-0190): the store's as before, and any other page's by its path,
+    /// as a page of signals is (ADR-0130).
+    fn domain_of(&self, page: &str, session: &str) -> IdentityDomain {
+        if page == self.store_page() {
+            return self.domain(session);
+        }
+        IdentityDomain::document(
+            page,
+            Partition::Session {
+                id: session.to_string(),
+            },
+            BUILD,
+        )
+        .keyed("own-renderer-spike-key")
+    }
+
     /// The menu fragment's OWN identity domain — public, and the same for
     /// every reader.
     ///
@@ -2781,7 +2823,7 @@ impl Server {
             .cloned()
             .ok_or_else(|| "the store's page binds no menu".to_string())?;
         let menu = self.fetch_binding("", &binding, &[Val::String(store.to_string())])?;
-        self.rendered_value("menu", &menu)
+        self.rendered_value(&self.plan, "menu", &menu)
     }
 
     /// The menu fragment's bytes, materialized once and reused, and the rows
@@ -2963,10 +3005,16 @@ impl Server {
         // To each document that shows the store (§15.6 test 11): another
         // store's menu is not this one's.
         let params = self.params.lock().expect("params");
+        // A document of another page, an order's with `id` 47, shows no menu
+        // (ADR-0190).
+        let pages = self.pages.lock().expect("pages");
         let readers = |doc: &Doc| {
-            params
+            pages
                 .get(doc)
-                .is_some_and(|p| p.get("id").map(String::as_str) == Some(store))
+                .is_none_or(|page| page.as_str() == self.store_page())
+                && params
+                    .get(doc)
+                    .is_some_and(|p| p.get("id").map(String::as_str) == Some(store))
         };
         for (_, waiting) in queue.iter_mut().filter(|(doc, _)| readers(doc)) {
             waiting.push(StreamFrame::ResourceChanged {
@@ -3075,7 +3123,7 @@ impl Server {
         &self,
         session: &str,
     ) -> Result<(String, u64, serde_json::Value), String> {
-        self.serve_document_settled(session, &store_params(STORE_ID), &[])
+        self.serve_document_settled(session, self.store_page(), &store_params(STORE_ID), &[])
             .map(|(html, cursor, entries, _)| (html, cursor, entries))
             .map_err(String::from)
     }
@@ -3084,7 +3132,7 @@ impl Server {
     /// could not be read (ADR-0163).
     #[cfg(test)]
     fn serve_store_document(&self, session: &str, id: &str) -> Result<(String, u64), Unread> {
-        self.serve_document_settled(session, &store_params(id), &[])
+        self.serve_document_settled(session, self.store_page(), &store_params(id), &[])
             .map(|(html, cursor, _, _)| (html, cursor))
     }
 
@@ -3095,6 +3143,7 @@ impl Server {
     fn serve_document_settled(
         &self,
         session: &str,
+        page: &str,
         params: &Params,
         settled: &[(u32, Settled)],
     ) -> Result<(String, u64, serde_json::Value, Env), Unread> {
@@ -3102,8 +3151,10 @@ impl Server {
         self.forget_idle_subscribers();
         // The store's menu brought to its query's value first, and the pages
         // that show it told (ADR-0178), before this document is a reader:
-        // it is then rendered from what they show.
-        if let Some(store) = params.get("id")
+        // it is then rendered from what they show. Another page shows no
+        // menu fragment (ADR-0190).
+        if page == self.store_page()
+            && let Some(store) = params.get("id")
             && let Err(why) = self.refresh_menu(store)
             && std::env::var("PW_TRACE").is_ok()
         {
@@ -3123,15 +3174,20 @@ impl Server {
             self.documents
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
-        // Its parameters with it (ADR-0162): which store it reads.
+        // Its parameters with it (ADR-0162): which store it reads. And its
+        // page (ADR-0190).
         self.params
             .lock()
             .expect("params")
             .insert(doc.clone(), params.clone());
+        self.pages
+            .lock()
+            .expect("pages")
+            .insert(doc.clone(), page.to_string());
         let served = (|| {
             for _ in 1..DOCUMENT_ATTEMPTS {
                 let pushed = self.subscribed(&doc);
-                let read = self.render_store_document(&doc, settled)?;
+                let read = self.render_document(&doc, settled)?;
                 let mut queue = self.pending.lock().expect("pending");
                 if let Some(served) = self.installed(&mut queue, &doc, read, Some(pushed)) {
                     return Ok(served);
@@ -3141,7 +3197,7 @@ impl Server {
             // was before: nothing can reach the session between the read and
             // the install, so a page is always served.
             let mut queue = self.pending.lock().expect("pending");
-            let read = self.render_store_document(&doc, settled)?;
+            let read = self.render_document(&doc, settled)?;
             Ok(self
                 .installed(&mut queue, &doc, read, None)
                 .expect("nothing reaches a session inside the table"))
@@ -3151,6 +3207,7 @@ impl Server {
         if served.is_err() {
             self.pending.lock().expect("pending").remove(&doc);
             self.params.lock().expect("params").remove(&doc);
+            self.pages.lock().expect("pages").remove(&doc);
         }
         served
     }
@@ -3410,7 +3467,7 @@ impl Server {
             .lock()
             .expect("params")
             .insert(doc.clone(), store_params(STORE_ID));
-        let read = self.render_store_document(&doc, &[]);
+        let read = self.render_document(&doc, &[]);
         self.params.lock().expect("params").remove(&doc);
         read.map(|(html, shown, _)| (html, shown))
             .map_err(String::from)
@@ -3426,6 +3483,49 @@ impl Server {
         })
     }
 
+    /// **The store's page's path**, the page this server was built around:
+    /// what a document not given another page shows (ADR-0190).
+    fn store_page(&self) -> &str {
+        self.plan["page"].as_str().unwrap_or_default()
+    }
+
+    /// **A page's plan, by its path** (ADR-0190): the store's where this
+    /// build planned no such page, as a server made for one page's tests
+    /// plans no other.
+    fn plan_of(&self, page: &str) -> &serde_json::Value {
+        self.plans.get(page).unwrap_or(&self.plan)
+    }
+
+    /// **A page's template, by its path** (ADR-0190): the store's where this
+    /// build has no such template.
+    fn template_of(&self, page: &str) -> &Template {
+        self.templates
+            .iter()
+            .find(|t| t.path == page)
+            .unwrap_or_else(|| self.store_template())
+    }
+
+    /// **The page a document shows** (ADR-0190): as it was served, or the
+    /// store's.
+    fn page_of(&self, doc: &Doc) -> String {
+        self.pages
+            .lock()
+            .expect("pages")
+            .get(doc)
+            .cloned()
+            .unwrap_or_else(|| self.store_page().to_string())
+    }
+
+    /// **Whether a page binds a query** with `let` (ADR-0190): its values are
+    /// then read, kept current and patched as the store's page's are. One
+    /// that binds none is a page of signals and streams (ADR-0130).
+    fn binds_a_query(&self, page: &str) -> bool {
+        self.plans
+            .get(page)
+            .and_then(|plan| plan["bindings"].as_array())
+            .is_some_and(|b| !b.is_empty())
+    }
+
     /// The store a document shows (ADR-0162): its `id`.
     fn store_of(&self, doc: &Doc) -> String {
         self.params
@@ -3436,34 +3536,36 @@ impl Server {
             .unwrap_or_else(|| STORE_ID.to_string())
     }
 
-    /// The store's document, what it shows, and the environment it was
-    /// rendered in, with what its streams' queries settled to (ADR-0148). A
-    /// streamed region not given is rendered pending, with its placeholder.
-    fn render_store_document(
+    /// A document, what it shows, and the environment it was rendered in,
+    /// with what its streams' queries settled to (ADR-0148): the store's, or
+    /// any page that binds a query, by its own plan and template (ADR-0190).
+    /// A streamed region not given is rendered pending, with its placeholder.
+    fn render_document(
         &self,
         doc: &Doc,
         settled: &[(u32, Settled)],
     ) -> Result<(String, Shown, Env), Unread> {
         let session = doc.0.as_str();
         let store = self.store_of(doc);
-        let template = self.store_template();
+        let page = self.page_of(doc);
+        let template = self.template_of(&page);
         // Every value is a query's (ADR-0125): each binding runs its compiled
         // component, and each part reads the binding's value by the steps the
-        // compiler planned. The menu's items are the `Menu` query's.
+        // compiler planned. The store's menu's items are the `Menu` query's.
         // A new document's keys are its signals' first values, as the
         // browser holds them when it loads (ADR-0152).
         let bindings = self
             .bindings_where(session, Some(doc.1), |_| true, &Keys::First)
-            .map_err(|e| e.of("the store page's queries"))?;
+            .map_err(|e| e.of(&format!("`{}`'s queries", template.name)))?;
         let shown = self
-            .showing(session, &store, &bindings)
-            .map_err(|e| format!("the store page's values: {e}"))?;
-        let mut env = self.document_env(session, &store, &bindings);
+            .showing(&page, session, &store, &bindings)
+            .map_err(|e| format!("`{}`'s values: {e}", template.name))?;
+        let mut env = self.document_env(&page, session, &store, &bindings);
         for (part, outcome) in settled {
             env = env.settle(PartId(*part), outcome.clone());
         }
         let html = pw_render::render(template, &env, &self.templates)
-            .map_err(|b| format!("the store page does not render: {b:?}"))?;
+            .map_err(|b| format!("`{}` does not render: {b:?}", template.name))?;
         Ok((html, shown, env))
     }
 
@@ -3484,7 +3586,9 @@ impl Server {
         key: &BTreeMap<String, serde_json::Value>,
         left: &(dyn Fn() -> bool + Sync),
     ) -> Result<KeyOutcome, String> {
-        let b = self.plan["bindings"]
+        // The binding of the document's page (ADR-0190).
+        let plan = self.plan_of(&self.page_of(&(session.to_string(), document)));
+        let b = plan["bindings"]
             .as_array()
             .into_iter()
             .flatten()
@@ -3518,7 +3622,7 @@ impl Server {
             return Ok(KeyOutcome::Superseded);
         }
         let asked = Keys::Asked { binding, key };
-        let args = self.args_of(session, Some(document), b, &asked)?;
+        let args = self.args_of(plan, session, Some(document), b, &asked)?;
         let flight = self.answer_key(session, b, &args)?;
         let cancel = b["policy"]["on_key_change"] == "cancel";
         let keep = b["policy"]["on_key_change"] == "keep";
@@ -3592,7 +3696,8 @@ impl Server {
             self.bindings_where(session, Some(document), |n| n != binding, &Keys::Shown)?;
         bindings.insert(binding.to_string(), value);
         let store = self.store_of(&doc);
-        let now = self.showing(session, &store, &bindings)?;
+        let page = self.page_of(&doc);
+        let now = self.showing(&page, session, &store, &bindings)?;
         let mut queue = self.pending.lock().expect("pending");
         let mut keyed = self.keyed.lock().expect("keyed");
         let Some(read) = keyed
@@ -3607,7 +3712,7 @@ impl Server {
             let Some(was) = shown.get(&doc) else {
                 return Ok(KeyOutcome::Superseded);
             };
-            let patches = self.derive(session, &store, &bindings, was, &now)?;
+            let patches = self.derive(&page, session, &store, &bindings, was, &now)?;
             shown.insert(doc.clone(), now);
             patches
         };
@@ -3778,40 +3883,54 @@ impl Server {
             .expect("StorePage")
     }
 
-    /// **What the store's document renders from**: each binding's whole
-    /// value, its parts' values, the menu's public fragment, and its signals
-    /// at their first values, in the session's identity domain. A list a
-    /// session's query fills is its binding's value: until 2026-10-03 it was
-    /// set a second time, from what the document shows, which since ADR-0146
-    /// is the same value under the same name.
-    fn document_env(&self, session: &str, store: &str, bindings: &BTreeMap<String, Val>) -> Env {
+    /// **What a document of `page` renders from** (ADR-0190): each binding's
+    /// whole value, its parts' values, and its signals at their first values,
+    /// in the session's identity domain; and on the store's page, the menu's
+    /// public fragment. A list a session's query fills is its binding's
+    /// value: until 2026-10-03 it was set a second time, from what the
+    /// document shows, which since ADR-0146 is the same value under the same
+    /// name.
+    fn document_env(
+        &self,
+        page: &str,
+        session: &str,
+        store: &str,
+        bindings: &BTreeMap<String, Val>,
+    ) -> Env {
+        let plan = self.plan_of(page);
         // Both bound BEFORE the chain. A `MutexGuard` produced inside a method
         // argument lives until the end of the whole STATEMENT, so locking the
         // menu inside the chain and locking it again inside `menu_fragment`
         // deadlocked a non-reentrant mutex against itself — presenting as a
         // request that simply never returned.
-        let rows = self
-            .rendered_value("menu", &bindings["menu"])
-            .unwrap_or_else(|e| panic!("the menu's rows: {e}"));
-        // The rows the fragment shows, which the open pages do (ADR-0178).
-        let (fragment, rows) = self.menu_fragment(store, &rows);
+        let menu = (page == self.store_page()).then(|| {
+            let rows = self
+                .rendered_value(plan, "menu", &bindings["menu"])
+                .unwrap_or_else(|e| panic!("the menu's rows: {e}"));
+            // The rows the fragment shows, which the open pages do
+            // (ADR-0178).
+            self.menu_fragment(store, &rows)
+        });
         // Each binding's whole value, so a block a query decides, and what is
         // inside it, reads any field of it (ADR-0146), and each row what it
         // reads through a member (ADR-0169).
         let mut env = Env::new();
         for (name, value) in bindings {
             let rendered = self
-                .rendered_value(name, value)
+                .rendered_value(plan, name, value)
                 .unwrap_or_else(|e| panic!("`{name}`: {e}"));
             env = env.set(name, rendered);
         }
-        let mut env = env
-            .set("menu", rows)
-            // The public fragment, EMITTED rather than rendered. Its instance
-            // tokens are the fragment's own, so every reader's document
-            // contains the same bytes and one patch addresses all of them.
-            .materialized(self.menu_part().1, &fragment);
-        for part in self.plan["parts"].as_array().into_iter().flatten() {
+        if let Some((fragment, rows)) = menu {
+            env = env
+                .set("menu", rows)
+                // The public fragment, EMITTED rather than rendered. Its
+                // instance tokens are the fragment's own, so every reader's
+                // document contains the same bytes and one patch addresses
+                // all of them.
+                .materialized(self.menu_part().1, &fragment);
+        }
+        for part in plan["parts"].as_array().into_iter().flatten() {
             let path = part["path"].as_str().unwrap_or_default();
             let value = self
                 .read_part(bindings, part)
@@ -3819,27 +3938,31 @@ impl Server {
             env = env.set(path, val_to_value(&value));
         }
         // Its signals, at their first values (ADR-0140).
-        with_signals(env, &self.plan)
+        with_signals(env, plan)
             // A page, not a materialization: its domain is the route identity
             // and its partition. The generation is carried whatever the
             // partition is — the two are orthogonal.
-            .in_domain(self.domain(session))
+            .in_domain(self.domain_of(page, session))
     }
 
-    /// **The lists a session's queries fill** (ADR-0145): each collection
-    /// the page iterates whose binding is not cached shared. A shared one is
-    /// a fragment every reader shares, patched once for all of them (the
-    /// menu, E7-P).
-    fn own_lists(&self) -> Vec<String> {
+    /// **The lists a document of `page` keeps current itself** (ADR-0145):
+    /// each collection the page iterates, but on the store's page one whose
+    /// binding is cached shared, a fragment every reader shares, patched once
+    /// for all of them (the menu, E7-P). No other page has a fragment
+    /// (ADR-0190).
+    fn own_lists(&self, page: &str) -> Vec<String> {
+        let plan = self.plan_of(page);
+        let fragments = page == self.store_page();
         let shared = |name: &str| {
-            self.plan["bindings"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .any(|b| b["binding"] == name && b["policy"]["cache"] == "shared")
+            fragments
+                && plan["bindings"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .any(|b| b["binding"] == name && b["policy"]["cache"] == "shared")
         };
         // A list by its path, whose binding is its first name (ADR-0170).
-        self.plan["collections"]
+        plan["collections"]
             .as_array()
             .into_iter()
             .flatten()
@@ -3853,12 +3976,14 @@ impl Server {
     /// (ADR-0145): each part's text, and each list a session's query fills.
     fn showing(
         &self,
+        page: &str,
         session: &str,
         store: &str,
         bindings: &BTreeMap<String, Val>,
     ) -> Result<Shown, String> {
+        let plan = self.plan_of(page);
         let mut shown = Shown::default();
-        for part in self.plan["parts"].as_array().into_iter().flatten() {
+        for part in plan["parts"].as_array().into_iter().flatten() {
             let id = part["part"].as_u64().unwrap_or_default() as u32;
             let value = val_to_value(&self.read_part(bindings, part)?);
             let text = text_of(&value).ok_or_else(|| format!("part {id} has no text form"))?;
@@ -3867,23 +3992,23 @@ impl Server {
         // Each list by its path: a binding's value, or a list inside it,
         // `cart.lines` (ADR-0170). Until 2026-10-03 the binding was asked
         // for, and `cart` is no list.
-        for list in self.own_lists() {
+        for list in self.own_lists(page) {
             let mut path = list.split('.');
             let binding = path.next().unwrap_or_default();
             let fields: Vec<&str> = path.collect();
             let value = bindings
                 .get(binding)
                 .ok_or_else(|| format!("no binding `{binding}`"))?;
-            let mut rendered = self.rendered_value(binding, value)?;
+            let mut rendered = self.rendered_value(plan, binding, value)?;
             let Some(Value::List(items)) = value_at_mut(&mut rendered, &fields) else {
                 return Err(format!("`{list}` is not a list"));
             };
             shown.lists.insert(list.clone(), std::mem::take(items));
         }
         // Each block a query decides, as it renders now (ADR-0146).
-        let env = self.document_env(session, store, bindings);
-        let template = self.store_template();
-        for block in self.plan["blocks"].as_array().into_iter().flatten() {
+        let env = self.document_env(page, session, store, bindings);
+        let template = self.template_of(page);
+        for block in plan["blocks"].as_array().into_iter().flatten() {
             let id = block.as_u64().unwrap_or_default() as u32;
             let html = pw_render::render_part(template, PartId(id), &env, &self.templates)
                 .map_err(|b| format!("block {id}: {b:?}"))?;
@@ -3892,7 +4017,7 @@ impl Server {
         // Each attribute at the top of the page that reads a query's value,
         // written by the function the page's render writes it with
         // (ADR-0171).
-        for attribute in self.plan["attributes"].as_array().into_iter().flatten() {
+        for attribute in plan["attributes"].as_array().into_iter().flatten() {
             let id = attribute.as_u64().unwrap_or_default() as u32;
             let part = find_part(&template.chunks, id)
                 .ok_or_else(|| format!("the plan's attribute {id} is no part"))?;
@@ -3902,7 +4027,7 @@ impl Server {
             shown.attributes.insert(id, written);
         }
         // The page's title, as the document's head writes it (ADR-0183).
-        if let Some(id) = self.plan["title"].as_u64() {
+        if let Some(id) = plan["title"].as_u64() {
             let title = pw_render::title_text(template, &env)
                 .map_err(|b| format!("the title: {b:?}"))?
                 .ok_or_else(|| format!("the plan's title {id} is no part"))?;
@@ -3916,13 +4041,14 @@ impl Server {
     /// keyed operations.
     fn derive(
         &self,
+        page: &str,
         session: &str,
         store: &str,
         bindings: &BTreeMap<String, Val>,
         was: &Shown,
         now: &Shown,
     ) -> Result<Vec<Targeted>, String> {
-        let template = self.store_template();
+        let template = self.template_of(page);
         let schema = TemplateSchemaId(template.schema.clone());
         let mut out = Vec::new();
         for (id, text) in &now.texts {
@@ -3945,7 +4071,7 @@ impl Server {
                 },
             });
         }
-        let env = self.document_env(session, store, bindings);
+        let env = self.document_env(page, session, store, bindings);
         for (list, items) in &now.lists {
             // A list at the top of the page only. One inside a block would
             // have no range while the block is not shown, and patching it
@@ -5666,6 +5792,10 @@ fn handle(server: &Server, mut stream: TcpStream) {
         ("GET", route) if route.starts_with("/page/") => {
             let path = route.trim_start_matches("/page/");
             match server.page_params(path, query) {
+                // One that binds a query as the store's is (ADR-0190).
+                Ok(params) if server.binds_a_query(path) => {
+                    serve_bound(server, &mut stream, &session, fresh, path, params)
+                }
                 Ok(params) => serve_page(server, &mut stream, &session, fresh, path, params),
                 Err(why) => respond(
                     &mut stream,
@@ -5739,7 +5869,15 @@ fn handle(server: &Server, mut stream: TcpStream) {
                     server.queries.invalidate("store.page.Menu");
                 }
             }
-            serve_store(server, &mut stream, &session, fresh, store_params(STORE_ID));
+            let page = server.store_page().to_string();
+            serve_bound(
+                server,
+                &mut stream,
+                &session,
+                fresh,
+                &page,
+                store_params(STORE_ID),
+            );
         }
         // A command this server does not host, including the address-resolving
         // `/command/add_to_cart?instance=..` route E10 deleted. Named, rather
@@ -5755,14 +5893,14 @@ fn handle(server: &Server, mut stream: TcpStream) {
         ),
         // **A page at its route** (ADR-0162): the store at `/stores/{id}`,
         // its parameters as the address gives them, and any other page that
-        // declares one.
+        // declares one; one that binds a query as the store's is (ADR-0190).
         ("GET", _)
             if routed
                 .as_ref()
-                .is_some_and(|(page, _)| server.plan["page"] == *page) =>
+                .is_some_and(|(page, _)| server.binds_a_query(page)) =>
         {
-            let (_, params) = routed.expect("matched");
-            serve_store(server, &mut stream, &session, fresh, params)
+            let (page, params) = routed.expect("matched");
+            serve_bound(server, &mut stream, &session, fresh, &page, params)
         }
         ("GET", _) if routed.is_some() => {
             let (page, params) = routed.expect("matched");
@@ -5970,15 +6108,20 @@ fn stream_frames(
     );
 }
 
-/// **The store's page, at the parameters `params` give it** (ADR-0162):
-/// `/StorePage.html` and `/` for store 47, and `/stores/{id}` for any.
-fn serve_store(
+/// **A page that binds a query, at the parameters `params` give it**
+/// (ADR-0162, ADR-0190): the store's, at `/StorePage.html` and `/` for store
+/// 47 and `/stores/{id}` for any, and any other at its route. Until
+/// 2026-10-04 only the store's page was served so: another page that bound
+/// a query was refused, and read queries through streams alone.
+fn serve_bound(
     server: &Server,
     stream: &mut TcpStream,
     session: &str,
     fresh: bool,
+    page: &str,
     params: Params,
 ) {
+    let template = server.template_of(page);
     let unavailable = |stream: &mut TcpStream, why: Unread| match why {
         // A page whose address names nothing, as the page declares it
         // (ADR-0163), is not found.
@@ -5998,13 +6141,13 @@ fn serve_store(
             "text/plain; charset=utf-8",
             session,
             fresh,
-            format!("the store page cannot be shown: {why}").as_bytes(),
+            format!("`{}` cannot be shown: {why}", template.name).as_bytes(),
         ),
     };
     // Each stream's query, started before the document is rendered
     // (ADR-0148): the page waits for the ones it is declared to wait
     // for, and the rest fill their regions in the same response.
-    let runs = match stream_runs(&server.plan, session, &params) {
+    let runs = match stream_runs(server.plan_of(page), session, &params) {
         Ok(runs) => runs,
         Err(why) => return unavailable(stream, Unread::Failed(why)),
     };
@@ -6018,54 +6161,60 @@ fn serve_store(
         // deferred to the first poll would silently drop every change
         // that raced it.
         let (rendered, cursor, entries, env) =
-            match server.serve_document_settled(session, &params, &settled) {
+            match server.serve_document_settled(session, page, &params, &settled) {
                 Ok(served) => served,
                 Err(why) => return unavailable(stream, why),
             };
-        let speculation = server.speculation.as_ref().and_then(|m| {
-            let module = m["module"].as_str()?;
-            // Each part the browser renders again with a speculation
-            // (ADR-0172), whose template the document carries.
-            let regions: Vec<u32> = m["regions"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(|r| r.as_u64().map(|r| r as u32))
-                .collect();
-            Some((format!("/speculation/{module}"), entries, regions))
-        });
+        // The store's page alone speculates (ADR-0190).
+        let speculating = page == server.store_page();
+        let speculation = server
+            .speculation
+            .as_ref()
+            .filter(|_| speculating)
+            .and_then(|m| {
+                let module = m["module"].as_str()?;
+                // Each part the browser renders again with a speculation
+                // (ADR-0172), whose template the document carries.
+                let regions: Vec<u32> = m["regions"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|r| r.as_u64().map(|r| r as u32))
+                    .collect();
+                Some((format!("/speculation/{module}"), entries, regions))
+            });
         // The page's title, from the values it was rendered with
         // (ADR-0183). A store's program that states none, the benchmark's
-        // copy, is titled as every store's page was.
-        let title = match pw_render::title_text(server.store_template(), &env) {
-            Ok(title) => title.unwrap_or_else(|| "Store".to_string()),
+        // copy, is titled as every store's page was, and another page that
+        // states none by its name, as a page of signals is.
+        let title = match pw_render::title_text(template, &env) {
+            Ok(title) => title.unwrap_or_else(|| {
+                if speculating {
+                    "Store".to_string()
+                } else {
+                    template.name.clone()
+                }
+            }),
             Err(why) => return unavailable(stream, Unread::Failed(format!("its title: {why:?}"))),
         };
         // And what it says of itself to what reads it unshown (ADR-0186).
-        let metadata = match pw_render::head_metadata(server.store_template(), &env) {
+        let metadata = match pw_render::head_metadata(template, &env) {
             Ok(metadata) => metadata,
             Err(why) => {
                 return unavailable(stream, Unread::Failed(format!("its metadata: {why:?}")));
             }
         };
-        let page = document(
+        let html = document(
             &rendered,
             &title,
             &metadata,
+            template,
             &server.templates,
-            &server.plan,
+            server.plan_of(page),
             cursor,
             speculation,
         );
-        server.respond_streaming(
-            stream,
-            session,
-            fresh,
-            &page,
-            server.store_template(),
-            &env,
-            &mut settling,
-        );
+        server.respond_streaming(stream, session, fresh, &html, template, &env, &mut settling);
     });
 }
 
@@ -6260,6 +6409,18 @@ fn with_signals(mut env: Env, plan: &serde_json::Value) -> Env {
     env
 }
 
+/// A page signal's first value, as the build computed it (ADR-0130), by the
+/// page's plan (ADR-0190).
+fn first_value(plan: &serde_json::Value, signal: &str) -> serde_json::Value {
+    plan["signals"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|s| s["name"] == signal)
+        .map(|s| s["initial"].clone())
+        .unwrap_or(serde_json::Value::Null)
+}
+
 /// **A page that binds no query, as a document** (ADR-0130, ADR-0148): its
 /// values are its signals and its streams' parts.
 ///
@@ -6373,19 +6534,17 @@ fn resume_manifest(templates: &[Template]) -> serde_json::Value {
 
 /// The document shell, with the parts manifest and the runtime: titled as
 /// the page states (ADR-0183).
+#[allow(clippy::too_many_arguments)]
 fn document(
     body: &str,
     title: &str,
     metadata: &str,
+    template: &Template,
     templates: &[Template],
     plan: &serde_json::Value,
     cursor: u64,
     speculation: Option<(String, serde_json::Value, Vec<u32>)>,
 ) -> String {
-    let template = templates
-        .iter()
-        .find(|t| t.name == "StorePage")
-        .expect("StorePage");
     let manifest = serde_json::json!({
         "template": template.path,
         "schema": template.schema,
@@ -6792,7 +6951,7 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         let refused = s
             .serve_document_with_entries("a")
             .expect_err("a page that cannot be shown");
-        assert!(refused.contains("the store page's queries"), "{refused}");
+        assert!(refused.contains("`StorePage`'s queries"), "{refused}");
         // Nothing was left held: another session's page is served.
         let (other, _) = s.serve_document("b");
         assert!(visible(&other).contains("No order yet."), "{other}");
@@ -7627,7 +7786,7 @@ public query Store(",
             .expect("params")
             .insert(doc.clone(), store_params(STORE_ID));
         let pushed = s.subscribed(&doc);
-        let before = s.render_store_document(&doc, &[]).expect("the page reads");
+        let before = s.render_document(&doc, &[]).expect("the page reads");
         s.command(ADD, "a", &add("espresso", 1), false)
             .expect("the command commits");
         let mut queue = s.pending.lock().expect("pending");
@@ -8101,7 +8260,8 @@ public query Store(",
     fn the_menu_is_no_session_s_list() {
         // A shared list is one fragment for every reader, patched once for
         // all of them (E7-P); a session's lists are the private ones.
-        assert_eq!(lines_server().own_lists(), ["lines".to_string()]);
+        let s = lines_server();
+        assert_eq!(s.own_lists(s.store_page()), ["lines".to_string()]);
     }
 
     #[test]
@@ -9895,6 +10055,135 @@ public query Store(",
         assert_eq!((sets(blue) - before.0, sets(harbor) - before.1), (1, 1));
     }
 
+    /// The cart page's path (ADR-0190).
+    const CART_PAGE: &str = "store.page.CartPage";
+
+    /// **A second page that binds a query is served at its route** (ADR-0190),
+    /// by its own template and plan: the cart page reads the session's cart.
+    /// Until 2026-10-04 it was refused, as only the store's page bound one.
+    #[test]
+    fn a_page_that_binds_a_query_is_served_at_its_route() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let page = |path: &str, session: &str| -> String {
+            fetched_as(&s, path, Some(session))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        for path in ["/cart", "/page/store.page.CartPage"] {
+            let cart = page(path, "a");
+            assert!(cart.starts_with("HTTP/1.1 200"), "{path}: {cart}");
+            assert!(cart.contains("<title>Your cart</title>"), "{path}: {cart}");
+            assert!(
+                cart.contains("\"template\":\"store.page.CartPage\""),
+                "{cart}"
+            );
+            assert!(visible(&cart).contains("Your cart is empty."), "{cart}");
+            // The store's page alone speculates.
+            assert!(!cart.contains("\"speculation\""), "{cart}");
+        }
+        // The session's cart, and not another's.
+        s.command(ADD, "a", &add_shown("espresso", 2), false)
+            .expect("the command commits");
+        let a = visible(&page("/cart", "a"));
+        assert!(
+            a.contains("Espresso") && a.contains("Items in cart: 2"),
+            "{a}"
+        );
+        let b = visible(&page("/cart", "b"));
+        assert!(b.contains("Your cart is empty."), "{b}");
+    }
+
+    /// **A change reaches every page of the session that reads it**
+    /// (ADR-0190): a press on the store's page sends the cart page the
+    /// difference, derived from the cart page's own plan and addressed to its
+    /// own template, and the store's page its own.
+    #[test]
+    fn a_change_reaches_each_page_that_reads_it_by_its_own_plan() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        s.serve_store_document("a", STORE_ID).expect("served");
+        s.serve_document_settled("a", CART_PAGE, &Params::new(), &[])
+            .expect("served");
+        let docs = documents_of(&s.pending.lock().expect("pending"), "a");
+        let (store, cart) = (docs[0].clone(), docs[1].clone());
+        s.command(ADD, "a", &add_shown("espresso", 2), false)
+            .expect("the command commits");
+        let set = |doc: &Doc| -> PatchSet {
+            s.pending.lock().expect("pending")[doc]
+                .frames
+                .iter()
+                .rev()
+                .find_map(|(_, f)| match f {
+                    StreamFrame::PatchSet(set) if !set.patches.is_empty() => Some(set.clone()),
+                    _ => None,
+                })
+                .expect("a patch set")
+        };
+        let schema = |page: &str| TemplateSchemaId(s.template_of(page).schema.clone());
+        let (to_store, to_cart) = (set(&store), set(&cart));
+        assert!(
+            to_cart
+                .patches
+                .iter()
+                .all(|p| p.target.template == schema(CART_PAGE)),
+            "{to_cart:?}"
+        );
+        assert!(
+            to_store
+                .patches
+                .iter()
+                .all(|p| p.target.template == schema(s.store_page())),
+            "{to_store:?}"
+        );
+        // The count, at the cart page's own part.
+        let count = s
+            .template_of(CART_PAGE)
+            .manifest()
+            .into_iter()
+            .find(|e| e.value == "cart.line_count")
+            .expect("the cart page's count")
+            .id;
+        assert!(
+            to_cart.patches.iter().any(|p| p.target.part == count
+                && matches!(&p.operation, PatchOp::ReplaceText { text } if text == "2")),
+            "{to_cart:?}"
+        );
+        // And the speculated value to the page that speculates alone.
+        let values = |doc: &Doc| {
+            s.pending.lock().expect("pending")[doc]
+                .frames
+                .iter()
+                .filter(|(_, f)| matches!(f, StreamFrame::EntryValue { .. }))
+                .count()
+        };
+        assert_eq!((values(&store) > 0, values(&cart)), (true, 0));
+    }
+
+    /// **A page other than the store's is told nothing of its menu**
+    /// (ADR-0190): a cart page's document has no menu, though its session
+    /// reads store 47's.
+    #[test]
+    fn a_page_without_the_menu_is_told_nothing_of_it() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        s.serve_store_document("a", STORE_ID).expect("served");
+        s.serve_document_settled("a", CART_PAGE, &store_params(STORE_ID), &[])
+            .expect("served");
+        let docs = documents_of(&s.pending.lock().expect("pending"), "a");
+        s.broadcast_menu(MenuOp::Rename {
+            id: "espresso".to_string(),
+            name: "Espresso Doppio".to_string(),
+        })
+        .expect("the menu changes");
+        let patched = |doc: &Doc| {
+            s.pending.lock().expect("pending")[doc]
+                .frames
+                .iter()
+                .any(|(_, f)| matches!(f, StreamFrame::Patch(_) | StreamFrame::PatchSet(_)))
+        };
+        assert!(patched(&docs[0]), "the store's page was not told");
+        assert!(!patched(&docs[1]), "the cart page was told of the menu");
+    }
+
     /// **A change to store 47's menu drops store 47's kept menu, and only
     /// it** (§15.6 test 11, ADR-0164). The change is `MenuChanged(47)`, and
     /// it reaches the entries whose queries declare `invalidates_on
@@ -10781,6 +11070,7 @@ public query Store(",
         let bindings = s.bindings("a", doc.1).expect("read");
         let changed = s
             .derive(
+                s.store_page(),
                 "a",
                 STORE_ID,
                 &bindings,
@@ -10802,6 +11092,7 @@ public query Store(",
         );
         let same = s
             .derive(
+                s.store_page(),
                 "a",
                 STORE_ID,
                 &bindings,
@@ -11074,7 +11365,16 @@ public query Store(",
         assert!(body.contains("<p id=\"shown\">open</p>"), "{body}");
         // ... and the document says what the browser holds and renders again.
         let templates = vec![template];
-        let manifest = manifest_of(&document(&body, "Store", "", &templates, &plan, 3, None));
+        let manifest = manifest_of(&document(
+            &body,
+            "Store",
+            "",
+            &templates[0],
+            &templates,
+            &plan,
+            3,
+            None,
+        ));
         assert_eq!(manifest["signals"], serde_json::json!({ "open": true }));
         assert_eq!(manifest["live"][0]["part"], 0);
         assert!(manifest["blocks"]["0"]["then"].is_array(), "{manifest}");
@@ -11083,6 +11383,7 @@ public query Store(",
             &body,
             "Store",
             "",
+            &templates[0],
             &templates,
             &serde_json::json!({}),
             3,
@@ -11098,7 +11399,13 @@ public query Store(",
     fn the_store_renders_its_signals_at_their_first_values() {
         let mut templates: Vec<Template> =
             serde_json::from_str(include_str!("../../store-ir.json")).expect("the template IR");
-        templates[0].chunks.push(
+        // The store's, by its name: the IR holds the cart's page too
+        // (ADR-0190).
+        let store = templates
+            .iter()
+            .position(|t| t.name == "StorePage")
+            .expect("the store's template");
+        templates[store].chunks.push(
             serde_json::from_value(serde_json::json!({ "chunk": "dynamic", "value": {
                 "part": "conditional", "id": 99, "value": "open",
                 "then": [{ "chunk": "static", "value": "<p id=\"shown\">open</p>" }],

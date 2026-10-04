@@ -22,7 +22,8 @@ MUTANTS = [
     (
         "the store renders without its signals",
         SERVER,
-        "        // Its signals, at their first values (ADR-0140).\n        with_signals(env, &self.plan)\n",
+        # Re-anchored by ADR-0190: by its page's plan.
+        "        // Its signals, at their first values (ADR-0140).\n        with_signals(env, plan)\n",
         "        // Its signals, at their first values (ADR-0140).\n        env\n",
     ),
     (

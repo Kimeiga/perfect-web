@@ -184,8 +184,10 @@ refused by name:
     in one, or a view holding one.
   - **`fallback` is not executed for a stream's query**: the plan refuses a
     page with one.
-  - **The development server serves a page with a stream and a `let` only on
-    the store's route.** Any other page reads queries through streams alone.
+  - **Every page that binds a query is served and kept current by its own
+    plan** (ADR-0190), but the store's page alone speculates, and alone has
+    its shared list, the menu, kept as one fragment for every reader. A
+    change to public data other than the menu reaches no open page.
   - **A query's budget bounds the region, not the query.** The query runs on
     after its region is given the host's failure, and what it answers is
     kept as its policy says.

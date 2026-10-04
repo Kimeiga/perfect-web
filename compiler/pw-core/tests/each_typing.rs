@@ -216,10 +216,12 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
     // and `clear_cart`, which captures nothing and is resumable all the same.
     // E7-L needed a second handler: with one, "the exact handler was fetched"
     // is satisfied by any fetch at all.
+    // And the cart's own page's four (ADR-0190): a line's three and its
+    // clear.
     assert_eq!(
         pairs.len(),
-        5,
-        "the store page declares five resumable handlers"
+        9,
+        "the store's page declares five resumable handlers, its cart's page four"
     );
     for (m, a) in &pairs {
         assert_eq!(

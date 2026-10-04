@@ -321,8 +321,9 @@ MUTANTS = [
         "the store's metadata is rendered from no values",
         "server",
         SERVER,
-        "        let metadata = match pw_render::head_metadata(server.store_template(), &env) {\n",
-        "        let metadata = match pw_render::head_metadata(server.store_template(), &Env::new()) {\n",
+        # Re-anchored by ADR-0190: by its page's template.
+        "        let metadata = match pw_render::head_metadata(template, &env) {\n",
+        "        let metadata = match pw_render::head_metadata(template, &Env::new()) {\n",
     ),
 ]
 

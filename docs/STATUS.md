@@ -13,6 +13,22 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0190, 2026-10-04: every page that binds a query is served at its
+route** (E14-Q's next slice). A store like DoorDash's is several pages that
+read queries. Only the store's page could: the server read its plan and
+template wherever a page's values were read, and refused any other page that
+bound a query.
+- Each document records its page. It is read, rendered and kept current by
+  its own plan and template, and a change is derived for each document of a
+  session from its own plan.
+- The menu's public fragment and the speculation stay the store's page's.
+- The store gains a second page, its cart at `/cart`, and links to it. A
+  press on either page reaches the other while both are open, in three
+  engines.
+
+9 mutants (`just e14-pages`). Not yet: a page other than the store's
+speculating, and public data other than the menu kept current.
+
 **ADR-0189, 2026-10-04: a `<link>` is written where HTML allows it.**
 `<link rel="canonical">` and `rel="icon"` written in markup checked and
 built. They went into the body, where HTML does not allow them and nothing

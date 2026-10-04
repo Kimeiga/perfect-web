@@ -154,7 +154,14 @@ MUTANTS = [
         "the store's page is titled \"Store\"",
         "server",
         SERVER,
-        '            Ok(title) => title.unwrap_or_else(|| "Store".to_string()),\n',
+        # Re-anchored by ADR-0190: another page is titled by its name.
+        '            Ok(title) => title.unwrap_or_else(|| {\n'
+        '                if speculating {\n'
+        '                    "Store".to_string()\n'
+        '                } else {\n'
+        '                    template.name.clone()\n'
+        '                }\n'
+        '            }),\n',
         '            Ok(_) => "Store".to_string(),\n',
     ),
     (

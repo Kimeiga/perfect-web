@@ -118,11 +118,12 @@ fn the_store_builds_every_artifact_from_source() {
         ]
     );
 
-    assert_eq!(b.templates.len(), 1, "StorePage");
+    assert_eq!(b.templates.len(), 2, "StorePage, and CartPage (ADR-0190)");
     assert_eq!(
         b.handlers.len(),
-        5,
-        "add_to_cart, clear_cart, and a line's three (ADR-0172)"
+        9,
+        "add_to_cart, clear_cart, and a line's three (ADR-0172); and the cart \
+         page's clear and a line's three (ADR-0190)"
     );
     assert_eq!(
         b.contracts.len(),

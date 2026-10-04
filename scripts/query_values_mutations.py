@@ -55,9 +55,10 @@ MUTANTS = [
         "a page whose queries fail stops the server",
         "server",
         SERVER,
-        # Re-anchored by ADR-0163: a failure keeps its kind.
-        "            .map_err(|e| e.of(\"the store page's queries\"))?;\n",
-        "            .unwrap_or_else(|e| panic!(\"the store page's queries: {e}\"));\n",
+        # Re-anchored by ADR-0163: a failure keeps its kind. And by ADR-0190:
+        # it names its page.
+        "            .map_err(|e| e.of(&format!(\"`{}`'s queries\", template.name)))?;\n",
+        "            .unwrap_or_else(|e| panic!(\"`{}`'s queries: {e}\", template.name));\n",
     ),
     (
         "a served page whose values fail is not told",

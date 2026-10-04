@@ -67,10 +67,30 @@ fn node(dir: &std::path::Path, script: &str) -> String {
 #[test]
 fn the_stores_transitions_run_and_its_parts_read_the_result() {
     let compiled = compile(&store(None)).expect("the store checks");
-    assert_eq!(compiled.len(), 1, "one page speculates");
-    let Encoding::Encoded(m) = &compiled[0].module else {
-        panic!("not compiled: {}", compiled[0].module);
+    // The store's page, and its cart's own page (ADR-0190): each presses a
+    // command that speculates.
+    let pages: Vec<&str> = compiled.iter().map(|c| c.page.as_str()).collect();
+    assert_eq!(pages, ["store.page.StorePage", "store.page.CartPage"]);
+    let of = |page: &str| {
+        let c = compiled
+            .iter()
+            .find(|c| c.page == page)
+            .expect("the page's module");
+        match &c.module {
+            Encoding::Encoded(m) => m,
+            other => panic!("not compiled: {other}"),
+        }
     };
+    // The cart page adds nothing: it changes, removes and clears.
+    assert_eq!(
+        of("store.page.CartPage").commands,
+        [
+            "store.page.decrease_in_cart",
+            "store.page.increase_in_cart",
+            "store.page.remove_from_cart"
+        ]
+    );
+    let m = of("store.page.StorePage");
     assert_eq!(m.page, "store.page.StorePage");
     assert_eq!(
         m.commands,
@@ -173,7 +193,11 @@ fn a_speculated_value_read_inside_a_block_is_refused_by_name() {
         "<span>{item.name}</span><span>{cart.line_count}</span>",
     ))))
     .expect("the store still checks");
-    match &compiled[0].module {
+    let store = compiled
+        .iter()
+        .find(|c| c.page == "store.page.StorePage")
+        .expect("the store's module");
+    match &store.module {
         Encoding::Unsupported { construct, .. } => {
             assert_eq!(*construct, "a speculated value read inside a block")
         }

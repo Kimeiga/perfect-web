@@ -127,6 +127,12 @@
       ]
     },
     {
+      "path": "store.page.CartPage",
+      "name": "CartPage",
+      "node": "page",
+      "params": []
+    },
+    {
       "path": "store.page.Estimate",
       "name": "Estimate",
       "node": "resource",
@@ -290,6 +296,14 @@
       "kind": "invalidated_by",
       "key": [
         "session"
+      ]
+    },
+    {
+      "from": "store.page.CartPage",
+      "to": "store.page.Cart",
+      "kind": "reads",
+      "key": [
+        "current_session()"
       ]
     },
     {

@@ -365,6 +365,8 @@ session page StorePage(id: StoreId) {
                 >
                     Clear
                 </button>
+                <!-- The cart as a page of its own (ADR-0190). -->
+                <p><a id="cart-page" href="/cart">Go to your cart</a></p>
             </section>
 
             <section aria-label="Recommendations">
@@ -380,6 +382,85 @@ session page StorePage(id: StoreId) {
                     <failed><p>No recommendations right now</p></failed>
                 </stream>
             </section>
+        </main>
+    }
+}
+
+// **The cart, as a page of its own** (ADR-0190): the session's lines, each
+// one's quantity changed or the line removed, and the cart cleared. The
+// store's page shows the same cart beside its menu, and a change made on
+// either reaches the other while both are open: each reads
+// `Cart(current_session())`, and the server derives what each shows from its
+// own plan. Until 2026-10-04 a page that bound a query was served only at the
+// store's route.
+session page CartPage() {
+    route        "/cart"
+    placement    origin
+    cache        private
+
+    let cart = query Cart(current_session())
+    // What the cart last had to say: a line that could not be changed.
+    signal notice: String = ""
+
+    view {
+        <title>Your cart</title>
+        <main>
+            <h1 id="cart-heading" tabindex="-1">Your cart</h1>
+            <p aria-live="polite" aria-atomic="true">Items in cart: <span id="cart-count">{cart.line_count}</span></p>
+            <p id="cart-empty" hidden={cart.lines}>Your cart is empty.</p>
+            <ul id="cart-lines">
+                {#each cart.lines as line (line.item_id)}
+                    <li>
+                        <span>{line.name}</span>
+                        <button
+                            type="button"
+                            aria-label="Decrease quantity of {line.name}"
+                            on:press={resumable(captures = { line }) => match decrease_in_cart(line.item_id) {
+                                Ok(_) => notice = "",
+                                Err(_) => notice = "That line could not be changed.",
+                            }}
+                        >
+                            −
+                        </button>
+                        <span>{line.quantity.count}</span>
+                        <button
+                            type="button"
+                            aria-label="Increase quantity of {line.name}"
+                            on:press={resumable(captures = { line }) => match increase_in_cart(line.item_id) {
+                                Ok(_) => notice = "",
+                                Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
+                                Err(_) => notice = "That line could not be changed.",
+                            }}
+                        >
+                            +
+                        </button>
+                        <span>{line.total.display}</span>
+                        <button
+                            type="button"
+                            aria-label="Remove {line.name}"
+                            on:press={resumable(captures = { line }) => match remove_from_cart(line.item_id) {
+                                Ok(_) => notice = "",
+                                Err(_) => notice = "That line could not be removed.",
+                            }}
+                        >
+                            Remove
+                        </button>
+                    </li>
+                {/each}
+            </ul>
+            <p>Subtotal: <span id="cart-subtotal">{cart.subtotal.display}</span></p>
+            {#if cart.lines}<p id="cart-fees">Delivery fee and taxes are added at checkout.</p>{/if}
+            <p id="cart-notice" role="status">{notice}</p>
+            <button
+                id="clear-cart"
+                type="button"
+                on:press={resumable() => match clear_cart() {
+                    Ok(_) => notice = "",
+                    Err(_) => notice = "The cart could not be cleared.",
+                }}
+            >
+                Clear
+            </button>
         </main>
     }
 }

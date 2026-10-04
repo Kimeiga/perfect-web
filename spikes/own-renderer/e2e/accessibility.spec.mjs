@@ -181,6 +181,24 @@ test("another store, and a store that is not there, keep every rule", async ({ p
   expect(await audit(page), "not found").toEqual([]);
 });
 
+test("the cart's own page keeps every rule, empty and with lines", async ({ context }) => {
+  // ADR-0190: a second page that binds a query, audited as the store's is.
+  const store = await context.newPage();
+  const cart = await context.newPage();
+  await ready(cart, "/cart");
+  expect(await audit(cart), "empty").toEqual([]);
+  await ready(store, "/stores/47");
+  await store.getByRole("button", { name: "Add Espresso" }).click();
+  await expect(lines(cart)).toHaveCount(1);
+  expect(await audit(cart), "a line added on the store's page").toEqual([]);
+  await cart.getByRole("button", { name: "Increase quantity of Espresso" }).click();
+  await expect(cart.locator("#cart-count")).toHaveText("2");
+  expect(await audit(cart), "its quantity increased here").toEqual([]);
+  await cart.locator("#clear-cart").click();
+  await expect(lines(cart)).toHaveCount(0);
+  expect(await audit(cart), "cleared").toEqual([]);
+});
+
 test("each page is titled by what it is, and a change to its title is shown once", async ({
   page,
 }) => {
@@ -265,6 +283,9 @@ test("the tree a screen reader reads is the page's", async ({ page, request }) =
         - paragraph: "Subtotal: $0.00"
         - status
         - button "Clear"
+        - paragraph:
+          - link "Go to your cart":
+            - /url: /cart
       - region "Recommendations":
         - list:
           - listitem: Cortado
@@ -297,6 +318,9 @@ test("the tree a screen reader reads is the page's", async ({ page, request }) =
       - paragraph: Delivery fee and taxes are added at checkout.
       - status: That item just sold out.
       - button "Clear"
+      - paragraph:
+        - link "Go to your cart":
+          - /url: /cart
   `);
 });
 
@@ -320,6 +344,8 @@ test("every control is reached from the keyboard, in the order it is read, and s
     "Increase quantity of Espresso",
     "Remove Espresso",
     "Clear",
+    // The cart's own page (ADR-0190).
+    "Go to your cart",
   ]);
   const reached = [];
   for (let i = 0; i < stops.length; i += 1) {

@@ -142,7 +142,8 @@ MUTANTS = [
         "the failure loses its kind on the way up",
         "server",
         SERVER,
-        "            .map_err(|e| e.of(\"the store page's queries\"))?;\n",
+        # Re-anchored by ADR-0190: a failure names its page.
+        "            .map_err(|e| e.of(&format!(\"`{}`'s queries\", template.name)))?;\n",
         "            .map_err(|e| Unread::Failed(e.to_string()))?;\n",
     ),
     (

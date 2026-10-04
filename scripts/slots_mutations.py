@@ -61,12 +61,11 @@ MUTANTS = [
         "an event never reaches a stream's kept answer",
         "server",
         SERVER,
-        "            [\"bindings\", \"streams\"]\n"
-        "                .into_iter()\n"
-        "                .flat_map(|k| self.plan[k].as_array().into_iter().flatten())\n",
-        "            [\"bindings\"]\n"
-        "                .into_iter()\n"
-        "                .flat_map(|k| self.plan[k].as_array().into_iter().flatten())\n",
+        # Re-anchored by ADR-0190: a query's policy is read on every page.
+        "                    [\"bindings\", \"streams\"]\n"
+        "                        .into_iter()\n",
+        "                    [\"bindings\"]\n"
+        "                        .into_iter()\n",
     ),
     (
         "every store is recommended store 47's menu",
