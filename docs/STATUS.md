@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `7c7aba4`, with ADR-0183.
+**Reviewed:** 2026-10-04, against master `3e35870`, with ADR-0184.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2481,11 +2481,12 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`7c7aba4` (2026-10-04, ADR-0183): `just ci` passes locally, the workspace's
-1876 tests pass, and the browser suite passes 642 in three engines, with 3
-skipped. Its evidence is `docs/evidence/E14/titles.txt`, recorded at that
-commit: 16 of 16 mutants killed, and the corpus at C9. ADR-0182's is
-`accessibility.txt`, at `bbb4a1b`; ADR-0181's is `menu-categories.txt`, at
+`3e35870` (2026-10-04, ADR-0184): `just ci` passes locally, the workspace's
+1878 tests pass, and the browser suite passes 648 in three engines, with 3
+skipped. Its evidence is `docs/evidence/E14/shared-output.txt`, recorded at
+that commit: 6 of 6 mutants killed. ADR-0183's is `titles.txt`, at
+`7c7aba4`, with the corpus at C9; ADR-0182's is `accessibility.txt`, at
+`bbb4a1b`; ADR-0181's is `menu-categories.txt`, at
 `bb63cb5`; ADR-0180's is `estimate-range.txt`,
 at `6ef776a`; ADR-0179's `invariants.txt`, at `30f5b45`; ADR-0178's `availability.txt`, at `344f331`; ADR-0177's `last-known-good.txt`, at `257b1a5`; ADR-0176's
 `materializer-failure.txt`, at `2c5366e`;
