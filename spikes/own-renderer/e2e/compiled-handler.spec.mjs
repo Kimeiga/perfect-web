@@ -37,8 +37,12 @@ test("the module the browser loads is the compiled handler body", async ({ page 
   expect(add).toContain('(context.captures["item"])');
   expect(add).toContain('await context.command("store.page.add_to_cart", [');
 
+  // Sent again where no answer came, as the command's `retry` clause says
+  // (ADR-0173).
   const clear = await (await page.request.get(`/handler/${ids.clear_cart}.mjs`)).text();
-  expect(clear).toContain('await context.command("store.page.clear_cart", [])');
+  expect(clear).toContain(
+    'await context.command("store.page.clear_cart", [], { retry: { max: 2, backoff: "exponential", jitter: true } })',
+  );
 });
 
 test("each Add button carries exactly what its handler reads", async ({ page }) => {
