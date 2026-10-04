@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `a8b95af`, with ADR-0186.
+**Reviewed:** 2026-10-04, against master `bdb3330`, with ADR-0187.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2542,13 +2542,15 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`a8b95af` (2026-10-04, ADR-0186): `just ci` passes locally, the
-workspace's 1894 tests pass, and the browser suite passes 651 in three
-engines, with 3 skipped. Its evidence is `docs/evidence/E14/metadata.txt`,
-recorded at that commit: 34 of 34 mutants killed, the corpus at C11, and
-every program the repository checks clean. ADR-0183's `titles.txt` is
-recorded again at that commit, as ADR-0186 numbers the title before the
-metadata: 16 of 16 mutants killed. ADR-0185's is `ids.txt`, at `f19ce5a`,
+`bdb3330` (2026-10-04, ADR-0187): `just ci` passes locally, the
+workspace's 1894 tests pass, and the browser suite passes 671 in three
+engines, with 7 skipped. Its evidence is
+`docs/evidence/E14/stable-layout.txt`, recorded at that commit: the page in
+three engines, E7's gate item 10 alone in Chromium, and 6 of 6 mutants
+killed. ADR-0186's `metadata.txt` and ADR-0182's `accessibility.txt` are
+recorded again at that commit, their mutants re-anchored on the moved
+style: 34 of 34 and 14 of 14 killed. ADR-0183's `titles.txt` is at
+`a8b95af`, 16 of 16 killed. ADR-0185's is `ids.txt`, at `f19ce5a`,
 with the corpus at C10; ADR-0184's is `shared-output.txt`, at `3e35870`;
 ADR-0182's is `accessibility.txt`, at
 `bbb4a1b`; ADR-0181's is `menu-categories.txt`, at
