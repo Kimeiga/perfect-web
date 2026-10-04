@@ -239,9 +239,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
         build's file names no session, and the shared caches are the same
         whether or not anyone pressed.
 
-     **Every gap of the charter §15 audit is closed.** Next: E14-E's design,
-     ready for the owner's choice of models and budget, and the owner's
-     decisions logged in ADR-0182 (axe-core) and here.
+     **Every gap of the charter §15 audit is closed.**
+    11. ~~Ids and the ARIA that names them, checked at build~~ (ADR-0185,
+        `just e14-ids`): charter §8.2's duplicate ids and invalid ARIA
+        relations, PW5031 to PW5033; corpus C10.
+
+     Next: E14-E's design, ready for the owner's choice of models and
+     budget, and the owner's decisions logged in ADR-0182 (axe-core).
 
      The benchmark's store is its own copy since ADR-0156, so the canonical
      store grows without re-basing the tasks. Then E14-E's design, ready for

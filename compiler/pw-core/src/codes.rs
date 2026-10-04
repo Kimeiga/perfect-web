@@ -482,6 +482,16 @@ codes! {
         "a page served at a route states its title";
     TITLE_MISPLACED = "PW5030" / title_misplaced / 1, Markup,
         "a title is the page's: once, at the top of its view, written as text and values";
+    // ADR-0185: charter §8.2 names duplicate ids and invalid ARIA relations
+    // among the compiler's checks; until 2026-10-04 they were the browser's
+    // to find (ADR-0182's audit), and a misspelt `aria-labeledby` was
+    // ignored by every browser without a word.
+    DUPLICATE_ID = "PW5031" / duplicate_id / 1, Markup,
+        "an id names one element of its page";
+    REFERENCE_NAMES_NOTHING = "PW5032" / reference_names_nothing / 1, Markup,
+        "an id reference names an element its page shows whenever the referrer is shown";
+    ARIA_UNKNOWN = "PW5033" / aria_unknown / 1, Markup,
+        "an ARIA attribute, its value and a role are ones WAI-ARIA defines";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

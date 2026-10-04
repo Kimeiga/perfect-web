@@ -1,0 +1,26 @@
+// @status: NEIGHBOUR
+// @invariant: duplicate_id
+// @dimension: valid neighbour — one id in two arms of a block, and a row's from its key
+//
+// Two elements with one id in the two arms of a block are one element, since
+// one arm is shown; and a row's id written from the row's key is each row's
+// own.
+
+module generality.unique_ids
+
+import domain.{ CartLine }
+
+view CartLines(lines: List<CartLine>) !{} {
+    <section aria-labelledby="cart-state">
+        {#if lines}
+            <h2 id="cart-state">Your cart</h2>
+        {:else}
+            <h2 id="cart-state">Your cart is empty</h2>
+        {/if}
+        <ul>
+            {#each lines as line (line.item_id)}
+                <li id="line-{line.item_id}">{line.name}</li>
+            {/each}
+        </ul>
+    </section>
+}

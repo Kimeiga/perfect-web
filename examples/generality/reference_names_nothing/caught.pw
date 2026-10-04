@@ -1,0 +1,19 @@
+// @status: GENERAL
+// @invariant: reference_names_nothing
+//
+// Structurally different from R-050: the element the reference names is
+// there, but only in one arm of a block the field is outside of. When the
+// hint is not shown, the field's description names nothing.
+
+module generality.reference_in_one_arm
+
+view NoteField(hint: Bool) !{} {
+    <form>
+        <label for="note">Note</label>
+        <input id="note" name="note" type="text" aria-describedby="note-hint" />
+        {#if hint}
+            <p id="note-hint">Gate codes, and where to leave it.</p>
+        {/if}
+        <button type="submit">Save</button>
+    </form>
+}

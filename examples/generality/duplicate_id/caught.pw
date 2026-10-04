@@ -1,0 +1,17 @@
+// @status: GENERAL
+// @invariant: duplicate_id
+//
+// Structurally different from R-049: one element, written once, inside a
+// loop. Every row has its id, and a reference to it reaches the first row.
+
+module generality.duplicate_row_id
+
+import domain.{ CartLine }
+
+view CartLines(lines: List<CartLine>) !{} {
+    <ul aria-label="Cart">
+        {#each lines as line (line.item_id)}
+            <li id="cart-line">{line.name}</li>
+        {/each}
+    </ul>
+}

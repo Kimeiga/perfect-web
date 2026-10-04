@@ -1,0 +1,25 @@
+// @corpus: rejected
+// @id: R-050
+// @category: ARIA relation names nothing
+// @rule: PW5032
+// @invariant: reference_names_nothing
+// @charter: §8.2
+// @milestone: 14
+// @expect-error: `aria-describedby` names `delivery-help`, which no element of `DeliveryForm` has
+// @expect-error: an id reference names an element its page shows whenever the referrer is shown
+//
+// A relation to nothing. The field was to be described by its help text,
+// whose id was renamed: the browser drops the reference without a word, and
+// a screen reader says the field with none of what would tell a person how
+// to fill it in.
+
+module store.delivery_form
+
+view DeliveryForm() !{} {
+    <form>
+        <label for="note">Note for the driver</label>
+        <input id="note" name="note" type="text" aria-describedby="delivery-help" />
+        <p id="delivery-hint">Gate codes, and where to leave it.</p>
+        <button type="submit">Save</button>
+    </form>
+}

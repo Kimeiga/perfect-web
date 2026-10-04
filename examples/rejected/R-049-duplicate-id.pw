@@ -1,0 +1,23 @@
+// @corpus: rejected
+// @id: R-049
+// @category: duplicate id
+// @rule: PW5031
+// @invariant: duplicate_id
+// @charter: §8.2
+// @milestone: 14
+// @expect-error: `cart-count` names two elements of `CartPanel`
+// @expect-error: an id names one element of its page
+//
+// Two elements with one id. A label, an ARIA relation or a link to the page
+// names the first, and the second is named by nothing: a screen reader is
+// told about the wrong element, and a fragment link lands on the wrong one.
+
+module store.cart_panel
+
+view CartPanel() !{} {
+    <section aria-labelledby="cart-heading">
+        <h2 id="cart-heading">Cart</h2>
+        <p id="cart-count">0 items</p>
+        <p id="cart-count">No subtotal yet</p>
+    </section>
+}

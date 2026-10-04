@@ -621,3 +621,36 @@ R-023's C0 entry in `EXPECTED_TO_PASS` is retired. Its old text declared no
 route, so its link was dead relative to nothing. A-025 now declares a route
 in the program every old text is checked in, so the old link is dead
 relative to it, and the C0 text is caught for its invariant again.
+
+## C10: ids and ARIA, checked at build, 2026-10-04
+
+Opened because the specification changed: an id names one element of its
+page (`PW5031`), a reference names an element its page shows whenever the
+referrer is shown (`PW5032`), and ARIA is what WAI-ARIA defines (`PW5033`).
+[ADR-0185](DECISIONS/ADR-0185-ids-and-the-aria-that-names-them-checked-at-build.md)
+is the decision. No invariant is retired, and no `@expect-error` line
+changed.
+
+```text
+Corpus version:            C10
+Accepted programs:         26
+Rejected programs:         51
+Charter categories:        26/26 accepted, 51/51 rejected
+Generality at open:        36/36 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-026 | added: ids, references and roles written right, an id in both arms of a block among them | new category, `ids and the ARIA that names them` |
+| R-049 | added: two elements with one id (`PW5031`) | new category |
+| R-050 | added: `aria-describedby` naming nothing (`PW5032`) | new category |
+| R-051 | added: `aria-labeledby` (`PW5033`) | new category |
+| `control_without_label/labelledby-nothing.pw` | moved to `reference_names_nothing`: its defect is the reference, and PW5014 no longer reports the field it leaves unnamed | invariant moved |
+| `control_without_label/label-for-another.pw` | its label names another control's id, not a missing one | missing context |
+| `duplicate_id`, `reference_names_nothing`, `aria_unknown` | a GENERAL and a NEIGHBOUR witness each | new invariants |
+
+The two witnesses' old texts are in `examples/history/C10/`.
+`corpus_history.rs` checks them:
+- `label-for-another.pw`'s is reported for both its defects, each where it
+  is;
+- `labelledby-nothing.pw`'s for the reference alone.

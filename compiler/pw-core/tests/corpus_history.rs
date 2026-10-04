@@ -460,6 +460,42 @@ fn the_c9_texts_are_still_caught_for_their_invariant_and_refused_for_the_title()
     }
 }
 
+/// **C10: ids and ARIA, checked at build** (ADR-0185, `docs/CORPUS.md`
+/// §C10).
+///
+/// Two `control_without_label` witnesses named an id nothing had. Since
+/// ADR-0185 a reference to nothing is reported as itself (PW5032), and a
+/// field it leaves unnamed is not reported again. Their old texts:
+/// - `label-for-another.pw`'s label named a missing id, beside a field
+///   nothing names: both are reported, each where it is;
+/// - `labelledby-nothing.pw`'s field named itself by a missing id: the
+///   reference is reported, and the witness moved to
+///   `reference_names_nothing`, where it is that invariant's.
+#[test]
+fn the_c10_texts_are_reported_where_their_defects_are() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/history/C10/generality/control_without_label");
+    let symbols = |name: &str| -> Vec<&'static str> {
+        let src = std::fs::read_to_string(root.join(name)).expect(name);
+        let mut got: Vec<&'static str> = check_sources(&c8_program(name, &src))
+            .into_iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, d)| d.iter().map(|d| d.symbol()).collect())
+            .unwrap_or_default();
+        got.sort();
+        got.dedup();
+        got
+    };
+    assert_eq!(
+        symbols("label-for-another.pw"),
+        ["control_without_label", "reference_names_nothing"]
+    );
+    assert_eq!(
+        symbols("labelledby-nothing.pw"),
+        ["reference_names_nothing"]
+    );
+}
+
 /// A C8 fixture's program: the library, the accepted modules it imports, and
 /// the fixture. The same assembly `checking_source.rs` uses for the current
 /// rejected corpus, so the old and new texts are asked one question.

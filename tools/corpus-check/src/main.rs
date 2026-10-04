@@ -50,6 +50,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     // the compiler gained, which by the architect's ruling of 2026-08-06
     // (below) has its canonical accepted and rejected specification.
     "page states its title",
+    // ADR-0185, corpus C10: charter §8.2's ids and ARIA relations.
+    "ids and the ARIA that names them",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -117,6 +119,10 @@ const REJECTED_CATEGORIES: &[&str] = &[
     // ADR-0183, corpus C9: PW5029 and PW5030.
     "page served at a route without a title",
     "title outside the top of a page's view",
+    // ADR-0185, corpus C10: PW5031, PW5032 and PW5033.
+    "duplicate id",
+    "ARIA relation names nothing",
+    "unknown ARIA attribute or role",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

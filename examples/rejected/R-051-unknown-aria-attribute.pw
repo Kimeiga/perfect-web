@@ -1,0 +1,22 @@
+// @corpus: rejected
+// @id: R-051
+// @category: unknown ARIA attribute or role
+// @rule: PW5033
+// @invariant: aria_unknown
+// @charter: §8.2
+// @milestone: 14
+// @expect-error: `aria-labeledby` is no ARIA attribute
+// @expect-error: an ARIA attribute, its value and a role are ones WAI-ARIA defines
+//
+// One letter short. `aria-labeledby` is not `aria-labelledby`, and a browser
+// ignores an attribute ARIA does not define: the section is no region a
+// reader can go to by name, and nothing says so.
+
+module store.cart_region
+
+view CartRegion() !{} {
+    <section aria-labeledby="cart-heading">
+        <h2 id="cart-heading">Cart</h2>
+        <p>Your cart is empty.</p>
+    </section>
+}

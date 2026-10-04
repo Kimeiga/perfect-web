@@ -1,0 +1,14 @@
+// @status: GENERAL
+// @invariant: reference_names_nothing
+// @dimension: indirect invalid — `aria-labelledby` names an element that is not there
+//
+// Moved from `control_without_label` by ADR-0185: the reference is the
+// defect, and the unnamed field its consequence, reported once.
+module generality.label_labelledby_nothing
+
+view SearchForm() !{} {
+    <form>
+        <input type="search" name="q" aria-labelledby="search-title" />
+        <button type="submit">Search</button>
+    </form>
+}

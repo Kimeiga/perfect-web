@@ -1,0 +1,12 @@
+// @status: GENERAL
+// @invariant: aria_unknown
+//
+// Structurally different from R-051: the attribute is ARIA's, and its value
+// is not one it takes. A browser reads `politely` as no live region at all,
+// and the count changes without a word.
+
+module generality.aria_live_value
+
+view CartCount(count: Int) !{} {
+    <p aria-live="politely" aria-atomic="true">Items in cart: {count}</p>
+}

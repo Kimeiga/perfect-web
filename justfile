@@ -2464,6 +2464,34 @@ e14-shared-output:
      } > docs/evidence/E14/shared-output.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/shared-output.txt
 
+# ADR-0185: ids, and the ARIA that names them, checked at build (charter
+# §8.2). The compiler's tests, the corpus at C10, every program clean, and the
+# mutation controls.
+e14-ids:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0185 - ids, and the ARIA that names them, checked at build"; echo; \
+       echo "produced by: just e14-ids"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rules (compiler/pw-core/tests/ids_and_aria.rs, labels.rs)"; echo; \
+       cargo test --locked -p pw-core --test ids_and_aria --test labels 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus at C10 (corpus-check, corpus_history.rs, generality.rs, checking_source.rs)"; echo; \
+       cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
+       cargo test --locked -p pw-core --test corpus_history --test generality --test checking_source 2>&1 \
+         | grep -E '^test (the_c10|the_c9|the_pre_change|generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result'; \
+       echo; echo "== every program the repository checks"; echo; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         benchmarks/baselines/pleris/domain.pw benchmarks/baselines/pleris/lib/*.pw benchmarks/baselines/pleris/store/*.pw 2>&1 | tail -1; \
+       echo; echo "== mutation controls (scripts/ids_mutations.py)"; echo; \
+       python3 scripts/ids_mutations.py; \
+     } > docs/evidence/E14/ids.txt
+    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/ids.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

@@ -1,15 +1,11 @@
 // @status: GENERAL
 // @invariant: control_without_label
 // @dimension: indirect invalid — a label, for a different `id`
-//
-// Since ADR-0185 the label's `id` is another control's, which it names: a
-// `for` that named nothing would be PW5032's, the reference to nothing.
 module generality.label_for_another
 
 view AddressForm() !{} {
     <form>
         <label for="country">Country</label>
-        <select id="country" name="country"><option>US</option></select>
         <select id="region" name="region"><option>CA</option></select>
         <button type="submit">Save</button>
     </form>

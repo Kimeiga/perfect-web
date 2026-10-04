@@ -1,0 +1,17 @@
+// @status: NEIGHBOUR
+// @invariant: aria_unknown
+// @dimension: valid neighbour — roles, tokens and numbers WAI-ARIA defines
+//
+// A live region, a status, a progress bar, and a DPUB role, each written as
+// WAI-ARIA defines it.
+
+module generality.aria_written_right
+
+view CartCount(count: Int) !{} {
+    <section aria-label="Cart">
+        <p aria-live="polite" aria-atomic="true">Items in cart: {count}</p>
+        <p role="status" aria-relevant="additions text"></p>
+        <div role="progressbar" aria-label="Order" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2"></div>
+        <aside role="doc-tip" aria-hidden="false">Four items or more ship free.</aside>
+    </section>
+}

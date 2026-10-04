@@ -88,8 +88,10 @@ fn an_id_names_nothing_by_itself() {
         r#"<input id="q" type="text" name="q" placeholder="Query" />"#,
         "no `<label for=\"q\">` in `V` names this `id`",
     );
+    // The other `id` is there: a `for` that names nothing is PW5032's since
+    // ADR-0185.
     refused(
-        r#"<label for="other">Query</label><input id="q" type="text" name="q" />"#,
+        r#"<label for="other">Query</label><p id="other">Other</p><input id="q" type="text" name="q" />"#,
         "no `<label for=\"q\">` in `V` names this `id`",
     );
     // Controls: a label for it, before or after it.
@@ -181,9 +183,15 @@ fn which_control_a_label_names_must_not_depend_on_what_renders() {
 
 #[test]
 fn aria_labelledby_must_reach_an_element_with_text() {
-    refused(
-        r#"<input type="text" name="q" aria-labelledby="nowhere" />"#,
-        "no element in `V` with text has one of these ids",
+    // Since ADR-0185 a reference to nothing is PW5032's, the defect, and the
+    // field it leaves unnamed is not reported again.
+    assert_eq!(
+        reported(&view(
+            r#"<input type="text" name="q" aria-labelledby="nowhere" />"#
+        )),
+        [
+            "PW5032 `aria-labelledby` names `nowhere`, which no element of `V` has | `V` renders this"
+        ]
     );
     refused(
         r#"<p id="h"></p><input type="text" name="q" aria-labelledby="h" />"#,
@@ -195,7 +203,16 @@ fn aria_labelledby_must_reach_an_element_with_text() {
     );
     // Controls: one IDREF that reaches text is enough (accname 1.2, 2B).
     clean(r#"<h2 id="h">Query</h2><input type="text" name="q" aria-labelledby="h" />"#);
-    clean(r#"<h2 id="h">Query</h2><input type="text" name="q" aria-labelledby="nowhere h" />"#);
+    // The field is named by `h`; the id that names nothing is a reference to
+    // nothing all the same, PW5032's since ADR-0185.
+    assert_eq!(
+        reported(&view(
+            r#"<h2 id="h">Query</h2><input type="text" name="q" aria-labelledby="nowhere h" />"#
+        )),
+        [
+            "PW5032 `aria-labelledby` names `nowhere`, which no element of `V` has | `V` renders this"
+        ]
+    );
     clean(r#"<p id="h" aria-label="Query"></p><input type="text" name="q" aria-labelledby="h" />"#);
 }
 
@@ -221,10 +238,14 @@ fn a_blank_aria_label_names_nothing() {
 
 #[test]
 fn a_label_names_the_first_element_with_its_id() {
-    // HTML: `for` names the first element in tree order with that `id`.
-    refused(
-        r#"<p id="q">Note</p><label for="q">Query</label><input id="q" type="text" name="q" />"#,
-        "an earlier element has `id=\"q\"`, and a `<label for>` names that one",
+    // HTML: `for` names the first element in tree order with that `id`. Since
+    // ADR-0185 the `id` two elements have is the defect, PW5031's, and the
+    // field the label misses is not reported again.
+    assert_eq!(
+        reported(&view(
+            r#"<p id="q">Note</p><label for="q">Query</label><input id="q" type="text" name="q" />"#
+        )),
+        ["PW5031 `q` names two elements of `V` | `q` is this element's too"]
     );
     // A computed `id` cannot be matched to a `for`.
     refused(
@@ -236,9 +257,13 @@ fn a_label_names_the_first_element_with_its_id() {
 #[test]
 fn an_id_inside_each_names_no_one_row() {
     // Every row has the `id`, so a `for` names only the first row's control.
-    refused(
-        r#"{#each names as n (n)}<label for="qty">{n}</label><input id="qty" type="text" name="qty" />{/each}"#,
-        "every row of the `{#each}` has `id=\"qty\"`",
+    // Since ADR-0185 the row's `id` is the defect, PW5031's, and the field is
+    // not reported again.
+    assert_eq!(
+        reported(&view(
+            r#"{#each names as n (n)}<label for="qty">{n}</label><input id="qty" type="text" name="qty" />{/each}"#
+        )),
+        ["PW5031 `qty` names every row of a list in `V` | `V` renders this"]
     );
     // Control: each row's label wraps its own control.
     clean(r#"{#each names as n (n)}<label>{n} <input type="text" name="qty" /></label>{/each}"#);

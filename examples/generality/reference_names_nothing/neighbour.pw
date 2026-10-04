@@ -1,0 +1,21 @@
+// @status: NEIGHBOUR
+// @invariant: reference_names_nothing
+// @dimension: valid neighbour — the element is in every arm of the block
+//
+// The same field, its description in both arms of the block: whichever is
+// shown, the reference names it.
+
+module generality.reference_in_every_arm
+
+view NoteField(hint: Bool) !{} {
+    <form>
+        <label for="note">Note</label>
+        <input id="note" name="note" type="text" aria-describedby="note-hint" />
+        {#if hint}
+            <p id="note-hint">Gate codes, and where to leave it.</p>
+        {:else}
+            <p id="note-hint">Anything the driver should know.</p>
+        {/if}
+        <button type="submit">Save</button>
+    </form>
+}

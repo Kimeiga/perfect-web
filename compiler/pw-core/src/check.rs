@@ -137,6 +137,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(comment_as_text(&u.hir));
         // ADR-0183: a page states its title.
         per_unit.extend(titles(&u.hir));
+        // ADR-0185: an id names one element, a reference names one shown
+        // with it, and ARIA is what WAI-ARIA defines.
+        per_unit.extend(ids_and_aria(&u.hir));
         // ADR-0089: a policy's value is one its domain has.
         per_unit.extend(policy_values(&workspace, i, &u.hir));
         // ADR-0107: a cache key names each parameter its entry depends on.
@@ -2191,6 +2194,774 @@ fn bound_names(body: &Body, pat: crate::hir::PatternId) -> Vec<(String, crate::h
 /// in HTML and JSX. A line of text that begins with one reads as a comment
 /// and would be shown, so it is refused, as `eslint-plugin-react`'s
 /// `jsx-no-comment-textnodes` refuses it in JSX.
+/// **Ids, and what names them** (ADR-0185, charter §8.2's "duplicate IDs"
+/// and "invalid ARIA relationships"). Until 2026-10-04 the browser was left
+/// to find these (ADR-0182's audit found none on the store, and would have
+/// found them only on a page it read):
+/// - PW5031: an id names one element of its page. Two elements with one id,
+///   unless they are in two arms of one block, of which only one is shown;
+///   and an id written as text inside an `{#each}`, which every row has.
+/// - PW5032: an id reference names an element the page shows whenever the
+///   referrer is shown: in the referrer's own arm, or in every arm of a
+///   block around it.
+/// - PW5033: an ARIA attribute, its value and a role are ones WAI-ARIA
+///   defines. A browser ignores one it does not know, and says nothing.
+///
+/// Within the declaration that renders them, as PW5014 reads a label
+/// (ADR-0143). An id or a reference the program computes is not read.
+fn ids_and_aria(hir: &Hir) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (decl_id, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let mut roots = Vec::new();
+        for e in body.walk() {
+            if let Expr::Template { roots: r, .. } = body.expr(e) {
+                roots.extend(r.iter().copied());
+            }
+        }
+        if roots.is_empty() {
+            continue;
+        }
+        let mut places = BTreeMap::new();
+        markup_places(
+            body,
+            &roots,
+            &mut Vec::new(),
+            &mut vec![roots.clone()],
+            false,
+            &mut places,
+        );
+        let ids = Ids::of(body, places.keys());
+        duplicate_ids(hir, decl_id, decl, body, &places, &ids, &mut out);
+        references(hir, decl_id, decl, body, &places, &ids, &mut out);
+        aria_values(hir, decl_id, decl, body, &places, &mut out);
+    }
+    out
+}
+
+/// Where an element is: the arms of the blocks around it, outermost first,
+/// as (block, arm); the node lists of those arms, the root's first, whose
+/// content is shown whenever the element is; and whether it is inside an
+/// `{#each}`, so that every row has it.
+struct Place {
+    arms: Vec<(hir::NodeId, usize)>,
+    scopes: Vec<Vec<hir::NodeId>>,
+    repeated: bool,
+}
+
+fn markup_places(
+    body: &Body,
+    nodes: &[hir::NodeId],
+    arms: &mut Vec<(hir::NodeId, usize)>,
+    scopes: &mut Vec<Vec<hir::NodeId>>,
+    repeated: bool,
+    out: &mut BTreeMap<hir::NodeId, Place>,
+) {
+    for &n in nodes {
+        match body.node(n) {
+            Node::Element { tag, children, .. } => {
+                out.insert(
+                    n,
+                    Place {
+                        arms: arms.clone(),
+                        scopes: scopes.clone(),
+                        repeated,
+                    },
+                );
+                if tag == "stream" {
+                    for (i, arm) in stream_arms(body, children).into_iter().enumerate() {
+                        arms.push((n, i));
+                        scopes.push(arm.clone());
+                        markup_places(body, &arm, arms, scopes, repeated, out);
+                        scopes.pop();
+                        arms.pop();
+                    }
+                } else {
+                    markup_places(body, children, arms, scopes, repeated, out);
+                }
+            }
+            Node::Block {
+                directive,
+                children,
+                ..
+            } => {
+                let each = directive.trim_start().starts_with("{#each");
+                for (i, arm) in block_arms(body, children).into_iter().enumerate() {
+                    arms.push((n, i));
+                    scopes.push(arm.clone());
+                    markup_places(body, &arm, arms, scopes, repeated || each, out);
+                    scopes.pop();
+                    arms.pop();
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// A block's arms: its children between its markers, `{:else}` and a
+/// `{#match}`'s cases.
+fn block_arms(body: &Body, children: &[hir::NodeId]) -> Vec<Vec<hir::NodeId>> {
+    let mut arms = vec![Vec::new()];
+    for &c in children {
+        if matches!(body.node(c), Node::Branch { .. }) {
+            arms.push(Vec::new());
+        } else if let Some(arm) = arms.last_mut() {
+            arm.push(c);
+        }
+    }
+    arms
+}
+
+/// A `<stream>`'s arms: its placeholder's, its ready's and its failed's
+/// content, of which one is shown (ADR-0148).
+fn stream_arms(body: &Body, children: &[hir::NodeId]) -> Vec<Vec<hir::NodeId>> {
+    children
+        .iter()
+        .filter_map(|c| match body.node(*c) {
+            Node::Element { children, .. } => Some(children.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Whether an element with `id` is shown whenever `nodes` are: one of them
+/// has it, outside any block; or a block among them has it in every arm,
+/// and shows one of them whatever its subject is.
+fn always_shows(body: &Body, nodes: &[hir::NodeId], id: &str) -> bool {
+    nodes.iter().any(|&n| match body.node(n) {
+        Node::Element { tag, attrs, children, .. } => {
+            static_attr(attrs, "id") == Some(id)
+                || if tag == "stream" {
+                    let arms = stream_arms(body, children);
+                    !arms.is_empty() && arms.iter().all(|a| always_shows(body, a, id))
+                } else {
+                    always_shows(body, children, id)
+                }
+        }
+        Node::Block {
+            directive,
+            children,
+            ..
+        } => {
+            let d = directive.trim_start();
+            // An `{#if}` with an `{:else}` shows one of its arms, and a
+            // `{#match}` covers every case (PW0305); a loop may show none.
+            let complete = if d.starts_with("{#if") {
+                children.iter().any(|c| {
+                    matches!(body.node(*c), Node::Branch { marker, .. } if marker.trim() == "{:else}")
+                })
+            } else {
+                d.starts_with("{#match")
+            };
+            complete
+                && block_arms(body, children)
+                    .iter()
+                    .skip(usize::from(d.starts_with("{#match")))
+                    .all(|a| always_shows(body, a, id))
+        }
+        _ => false,
+    })
+}
+
+/// The ids a declaration writes: each written as text, by its elements; and
+/// whether any is computed, `id={x}` or `id="row-{x}"`, which a reference
+/// may name and this does not know.
+struct Ids<'b> {
+    written: BTreeMap<&'b str, Vec<hir::NodeId>>,
+    computed: Vec<(&'b str, &'b str)>,
+    anything: bool,
+}
+
+impl<'b> Ids<'b> {
+    /// The ids `nodes` write, each an element of the declaration's markup.
+    fn of<'n>(body: &'b Body, nodes: impl IntoIterator<Item = &'n hir::NodeId>) -> Ids<'b> {
+        let mut ids = Ids {
+            written: BTreeMap::new(),
+            computed: Vec::new(),
+            anything: false,
+        };
+        for &n in nodes {
+            let Node::Element { attrs, .. } = body.node(n) else {
+                continue;
+            };
+            let Some(a) = attrs.iter().find(|a| a.name == "id") else {
+                continue;
+            };
+            match &a.value {
+                AttrValue::Static(_) => {
+                    let v = static_attr(attrs, "id").unwrap_or_default();
+                    match (v.find('{'), v.rfind('}')) {
+                        (Some(open), Some(close)) => {
+                            ids.computed.push((&v[..open], &v[close + 1..]))
+                        }
+                        _ => ids.written.entry(v).or_default().push(n),
+                    }
+                }
+                AttrValue::Expr(_) => ids.anything = true,
+                AttrValue::None => {}
+            }
+        }
+        ids
+    }
+
+    /// Whether a computed id might be `id` when the page runs.
+    fn may_be(&self, id: &str) -> bool {
+        self.anything
+            || self.computed.iter().any(|(before, after)| {
+                id.len() > before.len() + after.len()
+                    && id.starts_with(before)
+                    && id.ends_with(after)
+            })
+    }
+}
+
+fn duplicate_ids(
+    hir: &Hir,
+    decl_id: hir::DeclId,
+    decl: &Decl,
+    body: &Body,
+    places: &BTreeMap<hir::NodeId, Place>,
+    ids: &Ids<'_>,
+    out: &mut Vec<Diagnostic>,
+) {
+    let diagnostic = |n: hir::NodeId, message: String, related: Vec<Related>| Diagnostic {
+        code: crate::codes::DUPLICATE_ID.id,
+        invariant: crate::codes::DUPLICATE_ID.invariant,
+        reason: "duplicate_id",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message,
+        primary_span: body.node_span(n),
+        related,
+        explanation: Some(
+            "An id is how a label, an ARIA relation, a fragment link and the page's \
+             own runtime find one element. With two, each finds the first, and the \
+             second is named by nothing: a screen reader is told about the wrong \
+             element, and a link lands on the wrong one."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "give each its own id; in a list, write the row's key into it: \
+                          `id=\"line-{line.item_id}\"`"
+                .to_string(),
+            replacement: None,
+        }],
+    };
+    for (id, nodes) in &ids.written {
+        for (i, &n) in nodes.iter().enumerate() {
+            let place = &places[&n];
+            if place.repeated {
+                out.push(diagnostic(
+                    n,
+                    format!("`{id}` names every row of a list in `{}`", decl.name),
+                    vec![Related {
+                        span: hir.decl_span(decl_id),
+                        label: format!("`{}` renders this", decl.name),
+                    }],
+                ));
+                continue;
+            }
+            // Two in two arms of one block are one element: one arm is shown.
+            let together = nodes[..i].iter().find(|&&m| {
+                let other = &places[&m];
+                !other.repeated && {
+                    let same = place
+                        .arms
+                        .iter()
+                        .zip(&other.arms)
+                        .take_while(|(a, b)| a == b)
+                        .count();
+                    !matches!(
+                        (place.arms.get(same), other.arms.get(same)),
+                        (Some((x, _)), Some((y, _))) if x == y
+                    )
+                }
+            });
+            if let Some(&first) = together {
+                out.push(diagnostic(
+                    n,
+                    format!("`{id}` names two elements of `{}`", decl.name),
+                    vec![Related {
+                        span: body.node_span(first),
+                        label: format!("`{id}` is this element's too"),
+                    }],
+                ));
+            }
+        }
+    }
+}
+
+/// The attributes whose value is an id, or ids, that a reference names.
+const ID_REFERENCES: &[&str] = &[
+    "aria-activedescendant",
+    "aria-controls",
+    "aria-describedby",
+    "aria-details",
+    "aria-errormessage",
+    "aria-flowto",
+    "aria-labelledby",
+    "aria-owns",
+    "commandfor",
+    "for",
+    "form",
+    "headers",
+    "list",
+    "popovertarget",
+];
+
+fn references(
+    hir: &Hir,
+    decl_id: hir::DeclId,
+    decl: &Decl,
+    body: &Body,
+    places: &BTreeMap<hir::NodeId, Place>,
+    ids: &Ids<'_>,
+    out: &mut Vec<Diagnostic>,
+) {
+    for (&n, place) in places {
+        let Node::Element { tag, attrs, .. } = body.node(n) else {
+            continue;
+        };
+        for attr in ID_REFERENCES {
+            let Some(value) = static_attr(attrs, attr) else {
+                continue;
+            };
+            if value.contains('{') {
+                continue;
+            }
+            for token in value.split_ascii_whitespace() {
+                let written = ids.written.get(token);
+                // An id every row has is PW5031's: the row is the defect.
+                if written.is_some_and(|w| w.iter().all(|t| places[t].repeated)) {
+                    continue;
+                }
+                let message = match written {
+                    None if ids.may_be(token) => continue,
+                    None => format!(
+                        "`{attr}` names `{token}`, which no element of `{}` has",
+                        decl.name
+                    ),
+                    Some(_) => {
+                        if place.scopes.iter().any(|s| always_shows(body, s, token)) {
+                            continue;
+                        }
+                        format!(
+                            "`{attr}` names `{token}`, which `{}` does not always show with \
+                             its `<{tag}>`",
+                            decl.name
+                        )
+                    }
+                };
+                let attribute = attrs
+                    .iter()
+                    .find(|a| a.name == *attr)
+                    .map(|a| a.span.clone())
+                    .unwrap_or_else(|| body.node_span(n));
+                out.push(Diagnostic {
+                    code: crate::codes::REFERENCE_NAMES_NOTHING.id,
+                    invariant: crate::codes::REFERENCE_NAMES_NOTHING.invariant,
+                    reason: "reference_names_nothing",
+                    detector: Detector::DeclarationRule,
+                    severity: Severity::Error,
+                    message,
+                    primary_span: attribute,
+                    related: vec![Related {
+                        span: hir.decl_span(decl_id),
+                        label: format!("`{}` renders this", decl.name),
+                    }],
+                    explanation: Some(
+                        "A browser drops a reference to an id the page does not have, and \
+                         says nothing: a field loses its description, a section its name, a \
+                         label its control. One to an element shown only some of the time \
+                         names nothing the rest of it."
+                            .to_string(),
+                    ),
+                    repairs: vec![Repair {
+                        description: format!(
+                            "give the element it means `id=\"{token}\"`, or name the id that \
+                             element has; and write it where it is shown whenever this is"
+                        ),
+                        replacement: None,
+                    }],
+                });
+            }
+        }
+    }
+}
+
+/// What an ARIA attribute's value may be (WAI-ARIA 1.2, §6.6 and §6.7).
+enum AriaValue {
+    Text,
+    Ids,
+    Tokens(&'static [&'static str]),
+    TokenList(&'static [&'static str]),
+    Integer,
+    Number,
+}
+
+/// **WAI-ARIA's states and properties**: 1.2's, and 1.3's
+/// `aria-description`, `aria-braille*` and `*indextext`, with what each
+/// value may be.
+const ARIA_ATTRIBUTES: &[(&str, AriaValue)] = {
+    use AriaValue::*;
+    const TRUE_FALSE: &[&str] = &["true", "false"];
+    const OPTIONAL: &[&str] = &["true", "false", "undefined"];
+    const TRISTATE: &[&str] = &["true", "false", "mixed", "undefined"];
+    &[
+        ("aria-activedescendant", Ids),
+        ("aria-atomic", Tokens(TRUE_FALSE)),
+        (
+            "aria-autocomplete",
+            Tokens(&["inline", "list", "both", "none"]),
+        ),
+        ("aria-braillelabel", Text),
+        ("aria-brailleroledescription", Text),
+        ("aria-busy", Tokens(TRUE_FALSE)),
+        ("aria-checked", Tokens(TRISTATE)),
+        ("aria-colcount", Integer),
+        ("aria-colindex", Integer),
+        ("aria-colindextext", Text),
+        ("aria-colspan", Integer),
+        ("aria-controls", Ids),
+        (
+            "aria-current",
+            Tokens(&["page", "step", "location", "date", "time", "true", "false"]),
+        ),
+        ("aria-describedby", Ids),
+        ("aria-description", Text),
+        ("aria-details", Ids),
+        ("aria-disabled", Tokens(TRUE_FALSE)),
+        (
+            "aria-dropeffect",
+            TokenList(&["copy", "execute", "link", "move", "none", "popup"]),
+        ),
+        ("aria-errormessage", Ids),
+        ("aria-expanded", Tokens(OPTIONAL)),
+        ("aria-flowto", Ids),
+        ("aria-grabbed", Tokens(OPTIONAL)),
+        (
+            "aria-haspopup",
+            Tokens(&["false", "true", "menu", "listbox", "tree", "grid", "dialog"]),
+        ),
+        ("aria-hidden", Tokens(OPTIONAL)),
+        (
+            "aria-invalid",
+            Tokens(&["grammar", "false", "spelling", "true"]),
+        ),
+        ("aria-keyshortcuts", Text),
+        ("aria-label", Text),
+        ("aria-labelledby", Ids),
+        ("aria-level", Integer),
+        ("aria-live", Tokens(&["assertive", "off", "polite"])),
+        ("aria-modal", Tokens(TRUE_FALSE)),
+        ("aria-multiline", Tokens(TRUE_FALSE)),
+        ("aria-multiselectable", Tokens(TRUE_FALSE)),
+        (
+            "aria-orientation",
+            Tokens(&["horizontal", "undefined", "vertical"]),
+        ),
+        ("aria-owns", Ids),
+        ("aria-placeholder", Text),
+        ("aria-posinset", Integer),
+        ("aria-pressed", Tokens(TRISTATE)),
+        ("aria-readonly", Tokens(TRUE_FALSE)),
+        (
+            "aria-relevant",
+            TokenList(&["additions", "all", "removals", "text"]),
+        ),
+        ("aria-required", Tokens(TRUE_FALSE)),
+        ("aria-roledescription", Text),
+        ("aria-rowcount", Integer),
+        ("aria-rowindex", Integer),
+        ("aria-rowindextext", Text),
+        ("aria-rowspan", Integer),
+        ("aria-selected", Tokens(OPTIONAL)),
+        ("aria-setsize", Integer),
+        (
+            "aria-sort",
+            Tokens(&["ascending", "descending", "none", "other"]),
+        ),
+        ("aria-valuemax", Number),
+        ("aria-valuemin", Number),
+        ("aria-valuenow", Number),
+        ("aria-valuetext", Text),
+    ]
+};
+
+/// **WAI-ARIA's roles** that a page may write: 1.2's, but for the abstract
+/// ones; 1.3's `comment`, `image`, `mark` and `suggestion`; and the roles of
+/// the Graphics and DPUB modules.
+const ARIA_ROLES: &[&str] = &[
+    "alert",
+    "alertdialog",
+    "application",
+    "article",
+    "banner",
+    "blockquote",
+    "button",
+    "caption",
+    "cell",
+    "checkbox",
+    "code",
+    "columnheader",
+    "combobox",
+    "comment",
+    "complementary",
+    "contentinfo",
+    "definition",
+    "deletion",
+    "dialog",
+    "directory",
+    "document",
+    "emphasis",
+    "feed",
+    "figure",
+    "form",
+    "generic",
+    "grid",
+    "gridcell",
+    "group",
+    "heading",
+    "image",
+    "img",
+    "insertion",
+    "link",
+    "list",
+    "listbox",
+    "listitem",
+    "log",
+    "main",
+    "mark",
+    "marquee",
+    "math",
+    "menu",
+    "menubar",
+    "menuitem",
+    "menuitemcheckbox",
+    "menuitemradio",
+    "meter",
+    "navigation",
+    "none",
+    "note",
+    "option",
+    "paragraph",
+    "presentation",
+    "progressbar",
+    "radio",
+    "radiogroup",
+    "region",
+    "row",
+    "rowgroup",
+    "rowheader",
+    "scrollbar",
+    "search",
+    "searchbox",
+    "separator",
+    "slider",
+    "spinbutton",
+    "status",
+    "strong",
+    "subscript",
+    "suggestion",
+    "superscript",
+    "switch",
+    "tab",
+    "table",
+    "tablist",
+    "tabpanel",
+    "term",
+    "textbox",
+    "time",
+    "timer",
+    "toolbar",
+    "tooltip",
+    "tree",
+    "treegrid",
+    "treeitem",
+    "graphics-document",
+    "graphics-object",
+    "graphics-symbol",
+    "doc-abstract",
+    "doc-acknowledgments",
+    "doc-afterword",
+    "doc-appendix",
+    "doc-backlink",
+    "doc-biblioentry",
+    "doc-bibliography",
+    "doc-biblioref",
+    "doc-chapter",
+    "doc-colophon",
+    "doc-conclusion",
+    "doc-cover",
+    "doc-credit",
+    "doc-credits",
+    "doc-dedication",
+    "doc-endnote",
+    "doc-endnotes",
+    "doc-epigraph",
+    "doc-epilogue",
+    "doc-errata",
+    "doc-example",
+    "doc-footnote",
+    "doc-foreword",
+    "doc-glossary",
+    "doc-glossref",
+    "doc-index",
+    "doc-introduction",
+    "doc-noteref",
+    "doc-notice",
+    "doc-pagebreak",
+    "doc-pagefooter",
+    "doc-pageheader",
+    "doc-pagelist",
+    "doc-part",
+    "doc-preface",
+    "doc-prologue",
+    "doc-pullquote",
+    "doc-qna",
+    "doc-subtitle",
+    "doc-tip",
+    "doc-toc",
+];
+
+fn aria_values(
+    hir: &Hir,
+    decl_id: hir::DeclId,
+    decl: &Decl,
+    body: &Body,
+    places: &BTreeMap<hir::NodeId, Place>,
+    out: &mut Vec<Diagnostic>,
+) {
+    let mut say = |span: crate::diagnostics::Span, message: String, repair: String| {
+        out.push(Diagnostic {
+            code: crate::codes::ARIA_UNKNOWN.id,
+            invariant: crate::codes::ARIA_UNKNOWN.invariant,
+            reason: "aria_unknown",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message,
+            primary_span: span,
+            related: vec![Related {
+                span: hir.decl_span(decl_id),
+                label: format!("`{}` renders this", decl.name),
+            }],
+            explanation: Some(
+                "A browser ignores an ARIA attribute it does not know, a value its \
+                 attribute does not take, and a role WAI-ARIA does not define, and says \
+                 nothing: the element is read as if it were never written, and a \
+                 one-letter slip, `aria-labeledby`, takes a section's name away."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: repair,
+                replacement: None,
+            }],
+        });
+    };
+    for &n in places.keys() {
+        let Node::Element { attrs, .. } = body.node(n) else {
+            continue;
+        };
+        for a in attrs {
+            if a.name == "role" {
+                let Some(roles) = static_attr(attrs, "role") else {
+                    continue;
+                };
+                if roles.contains('{') {
+                    continue;
+                }
+                for role in roles.split_ascii_whitespace() {
+                    if !ARIA_ROLES.contains(&role) {
+                        say(
+                            a.span.clone(),
+                            format!("`role=\"{role}\"` is no ARIA role"),
+                            "write a role WAI-ARIA defines, or the element HTML has for it: \
+                             `<button>` rather than `role=\"button\"`"
+                                .to_string(),
+                        );
+                    }
+                }
+                continue;
+            }
+            if !a.name.starts_with("aria-") {
+                continue;
+            }
+            let Some((_, kind)) = ARIA_ATTRIBUTES.iter().find(|(name, _)| *name == a.name) else {
+                let near = ARIA_ATTRIBUTES
+                    .iter()
+                    .map(|(name, _)| *name)
+                    .min_by_key(|name| edit_distance(name, &a.name))
+                    .unwrap_or("aria-label");
+                say(
+                    a.span.clone(),
+                    format!("`{}` is no ARIA attribute", a.name),
+                    format!("write one WAI-ARIA defines: `{near}`?"),
+                );
+                continue;
+            };
+            let value = match &a.value {
+                AttrValue::Static(_) => static_attr(attrs, &a.name).unwrap_or_default(),
+                AttrValue::None => "",
+                AttrValue::Expr(_) => continue,
+            };
+            if value.contains('{') {
+                continue;
+            }
+            let fits = match kind {
+                AriaValue::Text | AriaValue::Ids => true,
+                AriaValue::Tokens(allowed) => allowed.contains(&value),
+                AriaValue::TokenList(allowed) => {
+                    !value.trim().is_empty()
+                        && value.split_ascii_whitespace().all(|t| allowed.contains(&t))
+                }
+                AriaValue::Integer => {
+                    let v = value.strip_prefix('-').unwrap_or(value);
+                    !v.is_empty() && v.bytes().all(|b| b.is_ascii_digit())
+                }
+                AriaValue::Number => value.trim().parse::<f64>().is_ok_and(f64::is_finite),
+            };
+            if !fits {
+                let allowed = match kind {
+                    AriaValue::Tokens(t) | AriaValue::TokenList(t) => t
+                        .iter()
+                        .map(|t| format!("`{t}`"))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    AriaValue::Integer => "an integer".to_string(),
+                    AriaValue::Number => "a number".to_string(),
+                    AriaValue::Text | AriaValue::Ids => String::new(),
+                };
+                say(
+                    a.span.clone(),
+                    format!("`{}=\"{value}\"` is no value of `{}`", a.name, a.name),
+                    format!("`{}` takes {allowed}", a.name),
+                );
+            }
+        }
+    }
+}
+
+/// How many single-character edits make `a` of `b` (Levenshtein): which
+/// ARIA attribute a misspelt one meant.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut previous = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let here = row[j + 1];
+            row[j + 1] = (previous + usize::from(ca != *cb))
+                .min(row[j] + 1)
+                .min(here + 1);
+            previous = here;
+        }
+    }
+    row[b.len()]
+}
+
 /// **A page states its title** (ADR-0183): `<title>` at the top of its view,
 /// beside `<main>`, as text and the values the page reads. The host writes
 /// it into the document's head. Until 2026-10-04 a page could not say what
@@ -6857,6 +7628,18 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
                     if named.contains(&id) {
                         continue;
                     }
+                    // Named by a reference to ids the declaration does not
+                    // have: the reference is the defect, PW5032's, and the
+                    // control is not reported twice (ADR-0185).
+                    if labelled_by_nothing(body, &order, attrs) {
+                        continue;
+                    }
+                    // Its `id` is two elements', or every row's, so a
+                    // `<label for>` names another: the id is the defect,
+                    // PW5031's (ADR-0185).
+                    if labelled_but_for_its_id(body, &order, id, attrs) {
+                        continue;
+                    }
                     let mut related = vec![Related {
                         span: hir.decl_span(decl_id_of(hir, decl)),
                         label: format!("`{}` renders this control", decl.name),
@@ -6949,6 +7732,47 @@ fn named_controls(body: &Body, order: &[hir::NodeId]) -> BTreeSet<hir::NodeId> {
         }
     }
     named
+}
+
+/// Whether a control's `aria-labelledby` names ids no element of the
+/// declaration has, and none it computes could be (ADR-0185).
+fn labelled_by_nothing(body: &Body, order: &[hir::NodeId], attrs: &[hir::Attr]) -> bool {
+    let Some(value) = static_attr(attrs, "aria-labelledby") else {
+        return false;
+    };
+    if value.contains('{') || value.trim().is_empty() {
+        return false;
+    }
+    let ids = Ids::of(body, order);
+    value
+        .split_ascii_whitespace()
+        .all(|token| !ids.written.contains_key(token) && !ids.may_be(token))
+}
+
+/// Whether a `<label for>` names a control's `id`, and the `id` is also an
+/// earlier element's, or every row's, so that the label names another
+/// (ADR-0185).
+fn labelled_but_for_its_id(
+    body: &Body,
+    order: &[hir::NodeId],
+    control: hir::NodeId,
+    attrs: &[hir::Attr],
+) -> bool {
+    let Some(id) = static_attr(attrs, "id").filter(|id| !id.contains('{')) else {
+        return false;
+    };
+    let has = |n: hir::NodeId, name: &str| match body.node(n) {
+        Node::Element { attrs, .. } => static_attr(attrs, name) == Some(id),
+        _ => false,
+    };
+    let labelled = order.iter().any(|&n| {
+        matches!(body.node(n), Node::Element { tag, .. } if tag == "label") && has(n, "for")
+    });
+    let earlier = order
+        .iter()
+        .take_while(|&&n| n != control)
+        .any(|&n| has(n, "id"));
+    labelled && (earlier || inside_each(body, order).contains(&control))
 }
 
 /// An attribute's value when it is written as text, its quotes removed.

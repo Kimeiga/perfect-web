@@ -555,6 +555,14 @@ not-found view yet, for this or for an address no route names, which the
 development server answers 404 as plain text. A keyed read that answers the
 case after the page is shown fails as any read does.
 
+**Ids and references are read in the declaration that renders them**
+(ADR-0185), as a label is (below). Not read:
+- a reference or an id across a page and the views it composes;
+- what the program computes;
+- whether an ARIA attribute is allowed on its element's role, and what a
+  role requires: ADR-0182's audit reads these at run time;
+- a `<label for>` that names an element that is not a control.
+
 **A form control is named only in the declaration that renders it**
 (ADR-0143). PW5014 matches a `<label for>`, a wrapping `<label>` and an
 `aria-labelledby`, written as text in the same view or page. These are not
@@ -581,8 +589,8 @@ Not covered:
 - **Forced colors, text spacing, and text zoomed alone.**
 - **The other pages**: the demos' and the kiokun slice's.
 - **A phone's layout in Firefox**, which Playwright does not emulate.
-- **Duplicate ids and ARIA references at build.** Charter §8.2 gives these
-  to the compiler, which checks only what names a form control (PW5014).
+- **Duplicate ids and ARIA references at build** are checked since
+  ADR-0185, within the declaration that renders them.
 
 **A handler that is not a lambda is refused at build** (ADR-0134).
 `on:submit={save}` has no code to run until the event is passed to a

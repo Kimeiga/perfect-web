@@ -1562,3 +1562,14 @@ what a cache may keep holds nothing of a session's.
   session. What the query runtime keeps for every reader, and the
   materializer's public fragments, are the same whether or not anyone
   pressed.
+
+[ADR-0185](DECISIONS/ADR-0185-ids-and-the-aria-that-names-them-checked-at-build.md):
+ids, and the ARIA that names them, checked at build.
+- Charter §8.2's "duplicate IDs" and "invalid ARIA relationships". PW5031: an
+  id names one element of its page, none in a loop. PW5032: a reference
+  names an element its page shows whenever the referrer is shown. PW5033:
+  ARIA attributes, values and roles are WAI-ARIA's; `aria-labeledby` is
+  refused, with `aria-labelledby` offered.
+- One mistake, one report: a field left unnamed by such a reference or id is
+  not reported again by PW5014. Corpus C10: R-049 to R-051, A-026;
+  generality 36 / 36.

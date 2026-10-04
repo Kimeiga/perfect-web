@@ -13,6 +13,20 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0185, 2026-10-04: ids, and the ARIA that names them, checked at
+build** (charter §8.2). Until now these were the browser's to find, on a
+page someone read (ADR-0182's audit).
+- PW5031: an id names one element of its page, and none is written inside a
+  loop.
+- PW5032: a reference, from `aria-describedby` to `for`, names an element
+  the page shows whenever the referrer is shown.
+- PW5033: ARIA attributes, values and roles are WAI-ARIA's. `aria-labeledby`
+  is refused, and `aria-labelledby` offered.
+
+A field left unnamed by such a mistake is not reported again by PW5014.
+Corpus C10: R-049 to R-051 and A-026; **generality is 36 / 36**. 12 mutants
+(`just e14-ids`).
+
 **ADR-0184, 2026-10-04: what a cache may keep holds nothing of a
 session's** (charter §15.6 tests 2 and 13, the audit's tenth and last gap).
 Reading the running store's output found two ways one person's data could

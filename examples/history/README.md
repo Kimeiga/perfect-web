@@ -22,6 +22,7 @@ with the reason written next to it. There are six, each with its reason
 there; R-023's left it in C9, when A-025 gave the program a route table its
 old link is dead relative to.
 
-`C8/` holds the texts before the value relations' first run, and `C9/` the
-routed pages' before each stated its title (ADR-0183). Each version is
-recorded in `docs/CORPUS.md`.
+`C8/` holds the texts before the value relations' first run, `C9/` the
+routed pages' before each stated its title (ADR-0183), and `C10/` two
+witnesses' before a reference to nothing was its own defect (ADR-0185). Each
+version is recorded in `docs/CORPUS.md`.

@@ -1,0 +1,43 @@
+// @corpus: accepted
+// @id: A-026
+// @category: ids and the ARIA that names them
+// @charter: §8.2
+// @milestone: 14
+//
+// Each id names one element, each reference names an element the page shows
+// whenever the referrer is shown, and each ARIA attribute, value and role is
+// one WAI-ARIA defines (ADR-0185). The same id in the two arms of a block is
+// one element, as only one arm is shown; a row's id is written from its key,
+// so each row's is its own.
+
+module store.cart_page
+
+import capability.{ Session, SessionId }
+import context.{ current_session }
+import Resources.{ Cart }
+
+page CartPage() {
+    route "/cart"
+
+    let cart = query Cart(current_session())
+
+    view {
+        <title>Your cart</title>
+        <main>
+            <section aria-labelledby="cart-heading">
+                <h2 id="cart-heading">Cart</h2>
+                {#if cart.lines}
+                    <p id="cart-state" role="status">Items in your cart</p>
+                {:else}
+                    <p id="cart-state" role="status">Your cart is empty</p>
+                {/if}
+                <ul aria-describedby="cart-state">
+                    {#each cart.lines as line (line.item_id)}
+                        <li id="line-{line.item_id}">{line.name}</li>
+                    {/each}
+                </ul>
+                <p aria-live="polite" aria-atomic="true">Items: {cart.line_count}</p>
+            </section>
+        </main>
+    }
+}
