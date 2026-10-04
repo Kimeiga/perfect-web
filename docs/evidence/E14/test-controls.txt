@@ -1,0 +1,34 @@
+ADR-0174 - a store delay, a cart delay, and a one-shot database error
+
+produced by: just e14-test-controls
+commit: d22928f17ca61a89301914c87447fa72267f3bce
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the development server (pw-dev-server)
+
+test tests::a_delay_slows_what_it_names_and_nothing_else ... ok
+test tests::a_one_shot_read_error_fails_the_next_read_once ... ok
+test tests::a_one_shot_write_error_fails_the_next_write_once ... ok
+test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.33s
+
+== the controls, and a rolled-back command, in three engines
+
+  48 passed (39.2s)
+
+== mutation controls (scripts/test_controls_mutations.py)
+
+baseline (server): 89 passed, 0 failed
+baseline (browser): 16 passed, 0 failed
+a fault is not consumed [server]: KILLED (2 of 89 tests fail)
+another session's fault is taken [server]: KILLED (3 of 89 tests fail)
+a write's fault is taken by a read [server]: KILLED (2 of 89 tests fail)
+the cart's delay is not waited [server]: KILLED (1 of 89 tests fail)
+every session waits a cart's delay [server]: KILLED (1 of 1 tests fail)
+the store's delay is not waited [server]: KILLED (1 of 89 tests fail)
+a drain reads the cart when nothing changed [server]: KILLED (1 of 89 tests fail)
+`next=write` arms nothing [browser]: KILLED (2 of 13 tests fail)
+`/bench/cart` sets another session's delay [browser]: KILLED (1 of 15 tests fail)
+`/bench/store` leaves the kept store in place [browser]: KILLED (1 of 16 tests fail)
+10 of 10 mutants killed
