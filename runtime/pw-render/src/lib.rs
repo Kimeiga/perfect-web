@@ -473,23 +473,41 @@ pub fn render_instance(
     env: &Env,
     others: &[Template],
 ) -> Result<String, Blocked> {
-    let Some(Part::Each {
-        id,
-        binding,
-        key,
-        body,
-        ..
-    }) = find_part(&t.chunks, each)
-    else {
+    let Some(part @ Part::Each { .. }) = find_part(&t.chunks, each) else {
         return Err(Blocked::UnrepresentedConstruct {
             reason: format!("part {each} is not a keyed loop in `{}`", t.path),
             at: t.path.clone(),
         });
     };
+    each_instance(part, item, env, others, &t.path)
+}
+
+/// One instance of the keyed loop `part`, rendered in `env`, where the loop
+/// is: inside another loop's instance, `env` is scoped to it (ADR-0181).
+fn each_instance(
+    part: &Part,
+    item: &Value,
+    env: &Env,
+    others: &[Template],
+    at: &str,
+) -> Result<String, Blocked> {
+    let Part::Each {
+        id,
+        binding,
+        key,
+        body,
+        ..
+    } = part
+    else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: "only a loop has instances".into(),
+            at: at.to_string(),
+        });
+    };
     let Some(field) = key else {
         return Err(Blocked::UnrepresentedConstruct {
             reason: "an unkeyed loop has no addressable instance to render".into(),
-            at: t.path.clone(),
+            at: at.to_string(),
         });
     };
 
@@ -521,6 +539,176 @@ pub enum InstanceChange {
     /// An attribute's new value as the document writes it, or `None` for a
     /// boolean attribute now absent.
     Attribute { name: String, value: Option<String> },
+    /// A keyed loop inside the instance, changed: its own operations, each
+    /// inside the instance (ADR-0181). Until 2026-10-04 a list inside a row
+    /// rendered the row again.
+    List(Vec<ListChange>),
+}
+
+/// **One change to a keyed list, as an operation on the document**
+/// (ADR-0145, ADR-0181). An instance whose key stayed keeps its nodes: a
+/// focus, a scroll, and anything a test marked on it stay.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ListChange {
+    /// The instance whose key left the list.
+    Remove(InstanceToken),
+    /// An item new to the list, rendered, after the instance named.
+    InsertAfter { after: InstanceToken, html: String },
+    /// An item new to the list with none before it: before the instance
+    /// named, the first, or into the list where it is empty.
+    InsertBefore {
+        before: Option<InstanceToken>,
+        html: String,
+    },
+    /// An item out of place: after the instance named, or to the front.
+    Move {
+        instance: InstanceToken,
+        after: Option<InstanceToken>,
+    },
+    /// An item whose value changed, each part set where it is.
+    Set {
+        instance: InstanceToken,
+        changes: Vec<(PartId, InstanceChange)>,
+    },
+}
+
+/// **The changes that take the keyed loop `each` from `old` to `new`**
+/// (ADR-0145, ADR-0181), in `env`, where the loop is rendered:
+/// - an item whose key left is removed;
+/// - a new one is inserted where it now is;
+/// - one out of place is moved;
+/// - one whose value changed has each part set where it is, a list inside
+///   it diffed in turn, or is rendered again where it is when anything else
+///   changed.
+///
+/// One derivation, for a session's list, the shared menu, and a list inside
+/// a row of either. It was the development server's, for the top of a page
+/// alone, until 2026-10-04.
+pub fn list_changes(
+    t: &Template,
+    each: PartId,
+    old: &[Value],
+    new: &[Value],
+    env: &Env,
+    others: &[Template],
+) -> Result<Vec<ListChange>, Blocked> {
+    let Some(part @ Part::Each { .. }) = find_part(&t.chunks, each) else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: format!("part {each} is not a keyed loop in `{}`", t.path),
+            at: t.path.clone(),
+        });
+    };
+    each_changes(part, old, new, env, others, &t.path)
+}
+
+fn each_changes(
+    part: &Part,
+    old: &[Value],
+    new: &[Value],
+    env: &Env,
+    others: &[Template],
+    at: &str,
+) -> Result<Vec<ListChange>, Blocked> {
+    let Part::Each {
+        id, key: Some(key), ..
+    } = part
+    else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: "an unkeyed loop has no addressable instance to change".into(),
+            at: at.to_string(),
+        });
+    };
+    let token = |v: &Value| env.domain.instance_token(&env.path, *id, &key_of(v, key));
+    let render = |v: &Value| each_instance(part, v, env, others, at);
+    let wanted: Vec<InstanceToken> = new.iter().map(token).collect();
+    let mut out = Vec::new();
+    // What the document holds, as each operation leaves it.
+    let mut current: Vec<(InstanceToken, Value)> = Vec::new();
+    for v in old {
+        let t = token(v);
+        if wanted.contains(&t) {
+            current.push((t, v.clone()));
+        } else {
+            out.push(ListChange::Remove(t));
+        }
+    }
+    let mut prev: Option<InstanceToken> = None;
+    for (i, item) in new.iter().enumerate() {
+        let t = wanted[i].clone();
+        match current.iter().position(|(c, _)| *c == t) {
+            None => {
+                let html = render(item)?;
+                out.push(match (&prev, current.first()) {
+                    (Some(after), _) => ListChange::InsertAfter {
+                        after: after.clone(),
+                        html,
+                    },
+                    (None, first) => ListChange::InsertBefore {
+                        before: first.map(|(f, _)| f.clone()),
+                        html,
+                    },
+                });
+                current.insert(i, (t.clone(), item.clone()));
+            }
+            Some(found) => {
+                if found != i {
+                    out.push(ListChange::Move {
+                        instance: t.clone(),
+                        after: prev.clone(),
+                    });
+                    let moved = current.remove(found);
+                    current.insert(i, moved);
+                }
+                if current[i].1 != *item {
+                    let was = current[i].1.clone();
+                    match row_changes(part, &was, item, env, others, at)? {
+                        Some(changes) => out.push(ListChange::Set {
+                            instance: t.clone(),
+                            changes,
+                        }),
+                        // More than its parts: rendered again, where it is.
+                        None => {
+                            out.push(ListChange::Remove(t.clone()));
+                            let html = render(item)?;
+                            out.push(match &prev {
+                                Some(after) => ListChange::InsertAfter {
+                                    after: after.clone(),
+                                    html,
+                                },
+                                None => ListChange::InsertBefore { before: None, html },
+                            });
+                        }
+                    }
+                    current[i].1 = item.clone();
+                }
+            }
+        }
+        prev = Some(t);
+    }
+    Ok(out)
+}
+
+/// **The environment inside one instance of the keyed loop `each`**
+/// (ADR-0181): the item bound to the loop's name, and the instance's frame
+/// on the path, as a render of it has. What a loop inside it is rendered and
+/// changed in.
+pub fn instance_env(t: &Template, each: PartId, item: &Value, env: &Env) -> Result<Env, Blocked> {
+    let Some(Part::Each {
+        id,
+        binding,
+        key: Some(field),
+        ..
+    }) = find_part(&t.chunks, each)
+    else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: format!("part {each} is not a keyed loop in `{}`", t.path),
+            at: t.path.clone(),
+        });
+    };
+    let token = env
+        .domain
+        .instance_token(&env.path, *id, &key_of(item, field));
+    Ok(env.with(binding, item.clone()).within(*id, token))
 }
 
 /// **What changed in one instance of the keyed loop `each`, from `was` to
@@ -540,17 +728,35 @@ pub fn instance_changes(
     env: &Env,
     others: &[Template],
 ) -> Result<Option<Vec<(PartId, InstanceChange)>>, Blocked> {
-    let Some(Part::Each {
+    let Some(part @ Part::Each { key: Some(_), .. }) = find_part(&t.chunks, each) else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: format!("part {each} is not a keyed loop in `{}`", t.path),
+            at: t.path.clone(),
+        });
+    };
+    row_changes(part, was, now, env, others, &t.path)
+}
+
+/// [`instance_changes`], for the loop `part` itself.
+fn row_changes(
+    part: &Part,
+    was: &Value,
+    now: &Value,
+    env: &Env,
+    others: &[Template],
+    at: &str,
+) -> Result<Option<Vec<(PartId, InstanceChange)>>, Blocked> {
+    let Part::Each {
         id,
         binding,
         key: Some(field),
         body,
         ..
-    }) = find_part(&t.chunks, each)
+    } = part
     else {
         return Err(Blocked::UnrepresentedConstruct {
-            reason: format!("part {each} is not a keyed loop in `{}`", t.path),
-            at: t.path.clone(),
+            reason: "only a keyed loop's instance changes".into(),
+            at: at.to_string(),
         });
     };
     let scoped = |item: &Value| {
@@ -565,7 +771,7 @@ pub fn instance_changes(
     let mut handlers: BTreeMap<ElementId, Vec<&Part>> = BTreeMap::new();
     handlers_within(body, &mut handlers);
     let mut out = Vec::new();
-    if !changes_within(body, &before, &after, &handlers, others, &mut out)? {
+    if !changes_within(body, &before, &after, &handlers, others, at, &mut out)? {
         return Ok(None);
     }
     Ok(Some(out))
@@ -591,12 +797,14 @@ fn handlers_within<'t>(chunks: &'t [Chunk], out: &mut BTreeMap<ElementId, Vec<&'
 /// where they are (ADR-0178): until 2026-10-04 any change inside a block
 /// rendered the row again, and a renamed item whose Add sat in one lost its
 /// button's node.
+#[allow(clippy::too_many_arguments)]
 fn changes_within(
     chunks: &[Chunk],
     before: &Env,
     after: &Env,
     handlers: &BTreeMap<ElementId, Vec<&Part>>,
     others: &[Template],
+    at: &str,
     out: &mut Vec<(PartId, InstanceChange)>,
 ) -> Result<bool, Blocked> {
     let rendered = |c: &Chunk, e: &Env| -> Result<String, Blocked> {
@@ -677,8 +885,36 @@ fn changes_within(
                     return Ok(false);
                 }
                 let branch = if x { then } else { otherwise };
-                if !changes_within(branch, before, after, handlers, others, out)? {
+                if !changes_within(branch, before, after, handlers, others, at, out)? {
                     return Ok(false);
+                }
+            }
+            // A keyed loop inside the row, over a list in its item: diffed
+            // where it is, each of its instances kept (ADR-0181).
+            Part::Each {
+                id,
+                collection,
+                key: Some(_),
+                ..
+            } => {
+                let list = |e: &Env| match e.get(collection) {
+                    Some(Value::List(items)) => Some(items.clone()),
+                    _ => None,
+                };
+                match (list(before), list(after)) {
+                    (Some(x), Some(y)) => {
+                        if x != y {
+                            let changes = each_changes(p, &x, &y, after, others, at)?;
+                            if !changes.is_empty() {
+                                out.push((*id, InstanceChange::List(changes)));
+                            }
+                        }
+                    }
+                    _ => {
+                        if rendered(c, before)? != rendered(c, after)? {
+                            return Ok(false);
+                        }
+                    }
                 }
             }
             _ => {

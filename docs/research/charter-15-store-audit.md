@@ -43,13 +43,13 @@ are fixed (ADR-0155):
 |---|---|
 | Store.id, name, hours | met (`domain.pw`; the server fills `hours`) |
 | Store.description | met since ADR-0166 |
-| Store.menu_version | missing (the materializer's entry version stands in) |
+| Store.menu_version | met by the runtime, by ADR-0181's ruling: the menu's materialized entry's version, which every patch to it carries; not a second field |
 | MenuItem.id, name | met |
 | MenuItem.description | met since ADR-0166 |
 | MenuItem.price | met since ADR-0169: `Money<USD>`, shown in each row as `item.price.display`, and the price the data layer gives a cart's line (it gave every line 450 until then) |
 | MenuItem.available | met since ADR-0178: what `menus#is-available` answers, shown in each row before the press |
-| MenuItem.store_id, category | missing; a category exists only in T07's setup |
-| Cart.id, consumer_id, version | missing as fields: a cart is keyed by its session, and its version is the runtime's entry version |
+| MenuItem.store_id, category | met since ADR-0181: the store's `Menu` answers `MenuSection`s, and the page gives each category a heading and its items |
+| Cart.id, consumer_id, version | met by the runtime, by ADR-0181's ruling: a cart is its session's entry, keyed by the session, and its version is the entry's |
 | Cart.items | partial: `lines: List<CartLine>` |
 | CartLine.item_id, unit_price | met (`Money<USD>`) |
 | CartLine.quantity: PositiveInt | met since ADR-0179: `PositiveInt` states `value >= 1`; every construction is shown to hold it at build, and the host checks a command's quantity and every cart a data layer answers |
@@ -141,11 +141,11 @@ are fixed (ADR-0155):
    ADR-0173.
 6. ~~**§15.5's missing controls.**~~ Met by ADR-0174 to ADR-0176.
 7. ~~**Last-known-good** (test 18)~~: met by ADR-0177.
-8. **§15.1's fields.** The descriptions are met by ADR-0166, the price by
+8. ~~**§15.1's fields.**~~ The descriptions are met by ADR-0166, the price by
    ADR-0169, `available` by ADR-0178, `PositiveInt` checked at every
-   construction and boundary by ADR-0179, and `DeliveryEstimate`'s range by
-   ADR-0180. Still missing: `MenuItem.category` and `store_id`, and
-   `Store.menu_version`.
+   construction and boundary by ADR-0179, `DeliveryEstimate`'s range by
+   ADR-0180, and a category and a store for each item by ADR-0181, which
+   rules a menu's version and a cart's identity the runtime's.
 9. **Accessibility** (test 14): an automated audit. Each Add named by its
    item, and a live region for the count, are met by ADR-0168.
 10. **Tests 2 and 13** against the running store's shared output.

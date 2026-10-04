@@ -30,6 +30,21 @@ test("each store is served at its route", async ({ page }) => {
   await expect(names(page)).toHaveText(["Espresso", "Cortado", "Cold Brew"]);
 });
 
+test("a store's menu is grouped by its category", async ({ page }) => {
+  // ADR-0181, charter §15.1: each category a heading and its items, in the
+  // order the store lists them.
+  await ready(page, "/stores/48");
+  const menu = page.locator("#menu");
+  await expect(menu.getByRole("heading", { level: 2 })).toHaveText(["Drinks", "Bakery"]);
+  await expect(menu.locator("ul").nth(0).locator("li span")).toHaveText([
+    "Drip Coffee",
+    "Matcha Latte",
+  ]);
+  await expect(menu.locator("ul").nth(1).locator("li span")).toHaveText(["Blueberry Scone"]);
+  await ready(page, "/stores/47");
+  await expect(menu.getByRole("heading", { level: 2 })).toHaveText(["Coffee"]);
+});
+
 test("a store that is not there is not found", async ({ page }) => {
   // The page declares `not_found_on StoreError.NotFound`: 404, where a page
   // whose values cannot be read is 503 (ADR-0147).

@@ -213,17 +213,19 @@ MUTANTS = [
         "a row is given its item's fields alone",
         "server",
         SERVER,
-        "                    fields.insert(within.to_string(), val_to_value(&read_value));\n",
-        "                    let _ = (within, read_value);\n",
+        # Re-anchored by ADR-0181, whose rows may be inside another list's.
+        "                fields.insert(within.to_string(), val_to_value(&read_value));\n",
+        "                let _ = (within, read_value);\n",
     ),
     (
         "a menu change is rendered from the rows before it",
         "server",
         SERVER,
+        # Re-anchored by ADR-0181.
         "        let items = self.menu_rows(STORE_ID)?;\n"
-        "        let (template, part) = self.menu_part();\n",
+        "        let (template, _) = self.menu_part();\n",
         "        let items = before.clone();\n"
-        "        let (template, part) = self.menu_part();\n",
+        "        let (template, _) = self.menu_part();\n",
     ),
     (
         "a line is priced 450 whatever its item",

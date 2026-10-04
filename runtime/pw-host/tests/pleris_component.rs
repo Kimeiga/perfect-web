@@ -102,6 +102,7 @@ fn cart(item: &str, quantity: i64) -> Val {
 fn item(id: &str) -> Val {
     Val::Record(vec![
         ("id".into(), Val::String(id.into())),
+        ("store-id".into(), Val::String("47".into())),
         ("name".into(), Val::String("Cortado".into())),
         ("description".into(), Val::String("Short.".into())),
         (
@@ -109,6 +110,13 @@ fn item(id: &str) -> Val {
             Val::Record(vec![("minor-units".into(), Val::S64(375))]),
         ),
         ("available".into(), Val::Bool(true)),
+        (
+            "category".into(),
+            Val::Record(vec![
+                ("id".into(), Val::String("coffee".into())),
+                ("name".into(), Val::String("Coffee".into())),
+            ]),
+        ),
     ])
 }
 
@@ -529,10 +537,12 @@ fn json_arguments_are_typed_by_the_export_they_are_for() {
     let sent = |price: serde_json::Value| {
         serde_json::json!({
             "id": "cortado",
+            "store_id": "47",
             "name": "Cortado",
             "description": "Short.",
             "price": price,
             "available": true,
+            "category": { "id": "coffee", "name": "Coffee" },
         })
     };
     let cortado = sent(serde_json::json!({ "minor_units": 375 }));
@@ -619,10 +629,12 @@ fn a_quantity_that_is_no_positive_int_is_refused_as_the_arguments_are_decoded() 
     let located = c.exports[0].component.clone().expect("located");
     let cortado = serde_json::json!({
         "id": "cortado",
+        "store_id": "47",
         "name": "Cortado",
         "description": "Short.",
         "price": { "minor_units": 375 },
         "available": true,
+        "category": { "id": "coffee", "name": "Coffee" },
     });
     for forged in [0, -3, i64::MIN] {
         let json = [cortado.clone(), serde_json::json!(forged)];

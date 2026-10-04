@@ -1653,7 +1653,9 @@ impl Server {
     }
 
     /// **The deployment's catalogue** (ADR-0125): `store:data/stores#get` and
-    /// `store:data/menus#for-store`, what the `Store` and `Menu` queries read.
+    /// `store:data/menus#sections`, what the `Store` and `Menu` queries read,
+    /// and `menus#for-store`, the benchmark's own store's menu (ADR-0156,
+    /// ADR-0181).
     /// This server holds two stores (ADR-0162): 47, whose menu is the keyed
     /// list E7-P mutates, and 48. Any other is answered `not-found`.
     ///
@@ -1706,43 +1708,89 @@ impl Server {
         });
         // What can be ordered now (ADR-0178), as the menu's rows say.
         let sold_out = self.sold_out.lock().expect("sold out").clone();
+        // A store's items, each as the data layer holds it: read through the
+        // program's `MenuItem` (ADR-0166), so the benchmark's, which declares
+        // fewer fields, is passed what it declares.
+        let rows_of = move |store: &str| -> Vec<(String, Val)> {
+            let items = match store {
+                STORE_ID => menu.clone(),
+                _ => second_menu(),
+            };
+            items
+                .iter()
+                .map(|(id, name)| {
+                    let (category, category_name) = item_category(store, id);
+                    let row = Val::Record(vec![
+                        ("id".into(), Val::String(id.clone())),
+                        // Its store, and its category (ADR-0181).
+                        ("store-id".into(), Val::String(store.to_string())),
+                        ("name".into(), Val::String(name.clone())),
+                        (
+                            "description".into(),
+                            Val::String(item_description(id).into()),
+                        ),
+                        // Its price, in cents (ADR-0169).
+                        (
+                            "price".into(),
+                            Val::Record(vec![("minor-units".into(), Val::S64(item_price(id)))]),
+                        ),
+                        // Whether it can be ordered now (ADR-0178): what
+                        // `menus#is-available` answers.
+                        ("available".into(), Val::Bool(!sold_out.contains(id))),
+                        (
+                            "category".into(),
+                            Val::Record(vec![
+                                ("id".into(), Val::String(category.into())),
+                                ("name".into(), Val::String(category_name.into())),
+                            ]),
+                        ),
+                    ]);
+                    (category.to_string(), row)
+                })
+                .collect()
+        };
+        let rows_of = Arc::new(rows_of);
+        let rows = rows_of.clone();
         let for_store: HostFn = Arc::new(move |args: &[Val]| match args {
             [Val::String(id)] if store_named(id).is_some() => {
-                let items = match id.as_str() {
-                    STORE_ID => menu.clone(),
-                    _ => second_menu(),
-                };
                 Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
-                    items
+                    rows(id).into_iter().map(|(_, row)| row).collect(),
+                )))))])
+            }
+            [Val::String(_)] => Ok(not_found()),
+            other => Err(format!("menus#for-store received {other:?}")),
+        });
+        // **The menu, grouped by category** (ADR-0181): each category in the
+        // order its first item is listed, with its items in theirs.
+        let sections: HostFn = Arc::new(move |args: &[Val]| match args {
+            [Val::String(id)] if store_named(id).is_some() => {
+                let mut grouped: Vec<(String, Val, Vec<Val>)> = Vec::new();
+                for (category, row) in rows_of(id) {
+                    let Val::Record(fields) = &row else { continue };
+                    let named = fields
                         .iter()
-                        .map(|(id, name)| {
+                        .find(|(n, _)| n == "category")
+                        .map(|(_, v)| v.clone())
+                        .unwrap_or(Val::Record(Vec::new()));
+                    match grouped.iter_mut().find(|(c, ..)| *c == category) {
+                        Some((_, _, items)) => items.push(row),
+                        None => grouped.push((category, named, vec![row])),
+                    }
+                }
+                Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
+                    grouped
+                        .into_iter()
+                        .map(|(_, category, items)| {
                             Val::Record(vec![
-                                ("id".into(), Val::String(id.clone())),
-                                ("name".into(), Val::String(name.clone())),
-                                // Read through the program's `MenuItem`
-                                // (ADR-0166): the benchmark's has none.
-                                (
-                                    "description".into(),
-                                    Val::String(item_description(id).into()),
-                                ),
-                                // Its price, in cents (ADR-0169).
-                                (
-                                    "price".into(),
-                                    Val::Record(vec![(
-                                        "minor-units".into(),
-                                        Val::S64(item_price(id)),
-                                    )]),
-                                ),
-                                // Whether it can be ordered now (ADR-0178):
-                                // what `menus#is-available` answers.
-                                ("available".into(), Val::Bool(!sold_out.contains(id))),
+                                ("category".into(), category),
+                                ("items".into(), Val::List(items)),
                             ])
                         })
                         .collect(),
                 )))))])
             }
             [Val::String(_)] => Ok(not_found()),
-            other => Err(format!("menus#for-store received {other:?}")),
+            other => Err(format!("menus#sections received {other:?}")),
         });
         // What the recommender answers (ADR-0148), after its delay: a slow
         // source, which a streamed region does not wait for.
@@ -1844,6 +1892,7 @@ impl Server {
         BTreeMap::from([
             ("store:data/stores#get".to_string(), get),
             ("store:data/menus#for-store".to_string(), for_store),
+            ("store:data/menus#sections".to_string(), sections),
             ("store:data/notices#current".to_string(), notice),
             ("store:data/kitchen#prep-minutes".to_string(), prep),
             ("store:data/menus#in-category".to_string(), in_category),
@@ -2362,29 +2411,58 @@ impl Server {
         }
         for (collection, reads) in lists {
             let fields: Vec<&str> = collection.split('.').skip(1).collect();
-            let (Some(Val::List(items)), Some(Value::List(rows))) =
-                (val_at(value, &fields), value_at_mut(&mut out, &fields))
-            else {
-                return Err(format!("`{collection}`'s rows are read, and it is no list"));
-            };
-            for (item, row) in items.iter().zip(rows.iter_mut()) {
-                let Value::Record(fields) = row else {
-                    return Err(format!("a row of `{collection}` is no record"));
-                };
-                for read in &reads {
-                    let read_value = self.follow(item.clone(), &read["steps"])?;
-                    // Set whole, by its path from the item's name:
-                    // `item.price.display` is `price.display` in the row,
-                    // which the renderer reads as one (ADR-0170). Until
-                    // 2026-10-03 it was set inside `price`, and a member of
-                    // a number, `quantity.count`, had nowhere to go.
-                    let path = read["path"].as_str().unwrap_or_default();
-                    let within = path.split_once('.').map_or("", |(_, rest)| rest);
-                    fields.insert(within.to_string(), val_to_value(&read_value));
-                }
-            }
+            self.rows_at(value, &mut out, &fields, &reads, collection)?;
         }
         Ok(out)
+    }
+
+    /// **Each row of the list at `fields`, with what its reads compute**
+    /// (ADR-0170): `*` is each item of a list on the way, so a loop inside
+    /// a loop, `menu.*.items`, has each of its rows' reads computed in each
+    /// outer item (ADR-0181).
+    fn rows_at(
+        &self,
+        value: &Val,
+        out: &mut Value,
+        fields: &[&str],
+        reads: &[&serde_json::Value],
+        collection: &str,
+    ) -> Result<(), String> {
+        let unlisted = || format!("`{collection}`'s rows are read, and it is no list");
+        if let Some(at) = fields.iter().position(|f| *f == "*") {
+            let (before, after) = (&fields[..at], &fields[at + 1..]);
+            let (Some(Val::List(items)), Some(Value::List(rows))) =
+                (val_at(value, before), value_at_mut(out, before))
+            else {
+                return Err(unlisted());
+            };
+            for (item, row) in items.iter().zip(rows.iter_mut()) {
+                self.rows_at(item, row, after, reads, collection)?;
+            }
+            return Ok(());
+        }
+        let (Some(Val::List(items)), Some(Value::List(rows))) =
+            (val_at(value, fields), value_at_mut(out, fields))
+        else {
+            return Err(unlisted());
+        };
+        for (item, row) in items.iter().zip(rows.iter_mut()) {
+            let Value::Record(fields) = row else {
+                return Err(format!("a row of `{collection}` is no record"));
+            };
+            for read in reads {
+                let read_value = self.follow(item.clone(), &read["steps"])?;
+                // Set whole, by its path from the item's name:
+                // `item.price.display` is `price.display` in the row, which
+                // the renderer reads as one (ADR-0170). Until 2026-10-03 it
+                // was set inside `price`, and a member of a number,
+                // `quantity.count`, had nowhere to go.
+                let path = read["path"].as_str().unwrap_or_default();
+                let within = path.split_once('.').map_or("", |(_, rest)| rest);
+                fields.insert(within.to_string(), val_to_value(&read_value));
+            }
+        }
+        Ok(())
     }
 
     /// The text a part shows, found by its template path.
@@ -2822,34 +2900,25 @@ impl Server {
         // The menu E7-P changes is store 47's (ADR-0162), read again with
         // the change.
         let items = self.menu_rows(STORE_ID)?;
-        let (template, part) = self.menu_part();
+        let (template, _) = self.menu_part();
         let env = self.menu_env(STORE_ID, &items);
-        // The change's own patch, where it moves the list: an insert at its
-        // anchor, a removal, a move. A rename's and a stock change's are its
-        // row's, below: reinserting a renamed item would also work visually,
-        // and destroy the node, which is the distinction E7-P exists to make.
-        let structural = match &op {
-            MenuOp::Rename { .. } | MenuOp::Stock { .. } => None,
-            _ => Some(Targeted {
-                target: self.menu_address(),
-                operation: op
-                    .patch(template, part, &items, &env, &self.templates)
-                    .map_err(|b| format!("{b:?}"))?,
-            }),
-        };
-        // What the pages show once it applies, and every other difference
-        // from the menu now.
-        let after = op.shown_after(rows(&before), rows(&items))?;
-        let rest = list_patches(
+        // The whole difference between what the open pages show and the menu
+        // now (ADR-0178), derived from the two values as a session's list's
+        // is (ADR-0145): an insert, a removal, a move, a rename, a stock
+        // change, and anything changed at the source unannounced, each in
+        // its category's list, every row whose key stayed keeping its nodes
+        // (ADR-0181). Until 2026-10-04 an insert, a removal and a move sent a
+        // patch E7-P made for its own operation, which a menu grouped by
+        // category has nowhere to address.
+        let patches = list_patches(
             template,
             &self.menu_address().template,
             "menu",
-            &after,
+            rows(&before),
             rows(&items),
             &env,
             &self.templates,
         )?;
-        let patches: Vec<Targeted> = structural.into_iter().chain(rest).collect();
         if std::env::var("PW_TRACE").is_ok() {
             eprintln!("broadcast {:?} to {} document(s)", op, queue.len());
         }
@@ -4159,99 +4228,6 @@ impl MenuOp {
         }
         Ok(())
     }
-
-    /// **What the open pages show once this change's own patch applies**
-    /// (ADR-0178): the rows they showed, with the item inserted, removed or
-    /// moved where `apply` puts it. An inserted item is its row in `now`.
-    /// Every other row is as the pages showed it, so what differs from `now`
-    /// is what the change did not say.
-    fn shown_after(&self, shown: &[Value], now: &[Value]) -> Result<Vec<Value>, String> {
-        let key = |r: &Value| match r {
-            Value::Record(f) => match f.get("id") {
-                Some(Value::Text(id)) => Some(id.clone()),
-                _ => None,
-            },
-            _ => None,
-        };
-        let position = |rows: &[Value], id: &str| {
-            rows.iter()
-                .position(|r| key(r).as_deref() == Some(id))
-                .ok_or_else(|| format!("no item `{id}` shown"))
-        };
-        let mut rows = shown.to_vec();
-        match self {
-            MenuOp::Insert { id, at, before, .. } => {
-                let row = now[position(now, id)?].clone();
-                let at = match at {
-                    Some(a) => {
-                        let p = position(&rows, a)?;
-                        if *before { p } else { p + 1 }
-                    }
-                    None if *before => 0,
-                    None => rows.len(),
-                };
-                rows.insert(at, row);
-            }
-            MenuOp::Remove { id } => {
-                rows.remove(position(&rows, id)?);
-            }
-            MenuOp::Move { id, after } => {
-                let item = rows.remove(position(&rows, id)?);
-                let to = match after {
-                    None => 0,
-                    Some(a) => position(&rows, a)? + 1,
-                };
-                rows.insert(to, item);
-            }
-            MenuOp::Rename { .. } | MenuOp::Stock { .. } => {}
-        }
-        Ok(rows)
-    }
-
-    /// The patch describing this change, with markup the renderer produced.
-    fn patch(
-        &self,
-        template: &Template,
-        part: LocalPartId,
-        rows: &Value,
-        env: &Env,
-        others: &[Template],
-    ) -> Result<PatchOp, pw_render::Blocked> {
-        let each = part;
-        let token = |id: &str| pw_render::instance_token_of(each, &key_row(id), "id", env);
-        Ok(match self {
-            MenuOp::Insert { id, at, before, .. } => {
-                // The row the page renders for it, as its `Menu` query read
-                // it (ADR-0169).
-                let row = row_of(rows, id).ok_or_else(|| pw_render::Blocked::MissingValue {
-                    path: format!("menu[{id}]"),
-                })?;
-                let html = pw_render::render_instance(template, each, &row, env, others)?;
-                let instance = at.as_deref().map(token);
-                if *before {
-                    PatchOp::InsertBefore { instance, html }
-                } else {
-                    PatchOp::InsertAfter { instance, html }
-                }
-            }
-            MenuOp::Remove { id } => PatchOp::RemoveInstance {
-                instance: token(id),
-            },
-            MenuOp::Move { id, after } => PatchOp::MoveInstance {
-                instance: token(id),
-                after: after.as_deref().map(token),
-            },
-            // A rename and a stock change set their item's row where it is,
-            // or render it again where it is, which `broadcast_menu` derives
-            // from what the pages show (ADR-0168, ADR-0178).
-            MenuOp::Rename { .. } | MenuOp::Stock { .. } => {
-                return Err(pw_render::Blocked::UnrepresentedConstruct {
-                    reason: "a row's change is its instance's, not the list's".into(),
-                    at: template.path.clone(),
-                });
-            }
-        })
-    }
 }
 
 /// A cart as the WIT's `domain-cart` record: its lines, each with an item,
@@ -4450,6 +4426,17 @@ fn second_menu() -> Vec<(String, String)> {
     .to_vec()
 }
 
+/// **An item's category in its store** (ADR-0181), by its id and its name:
+/// store 47 lists every item, E7-P's too, under Coffee, so its moves stay
+/// within one list; store 48's drinks and its bakery are two.
+fn item_category(store: &str, id: &str) -> (&'static str, &'static str) {
+    match (store, id) {
+        (STORE_ID, _) => ("coffee", "Coffee"),
+        (_, "scone") => ("bakery", "Bakery"),
+        _ => ("drinks", "Drinks"),
+    }
+}
+
 /// A store's name, by its id: the stores this server holds.
 fn store_named(id: &str) -> Option<&'static str> {
     match id {
@@ -4535,41 +4522,102 @@ fn text_of(v: &Value) -> Option<String> {
     }
 }
 
-/// **The patches that set an instance's changed parts where they are**
-/// (ADR-0168): a text part's text, and an attribute's value, each addressed
-/// inside the instance.
-fn instance_patches(
+/// **A part's address inside `frames`**, the loop instances around it,
+/// outermost first (ADR-0181).
+fn address_in(
     schema: &TemplateSchemaId,
-    each: PartId,
-    instance: &pw_document::InstanceToken,
-    changes: Vec<(PartId, pw_render::InstanceChange)>,
-) -> Vec<Targeted> {
-    changes
-        .into_iter()
-        .map(|(id, change)| Targeted {
-            target: PartAddress::new(schema, LocalPartId(id.0))
-                .within(LocalPartId(each.0), instance.clone()),
-            operation: match change {
-                pw_render::InstanceChange::Text(text) => PatchOp::ReplaceText { text },
-                pw_render::InstanceChange::Attribute {
-                    name,
-                    value: Some(value),
-                } => PatchOp::SetAttribute { name, value },
-                pw_render::InstanceChange::Attribute { name, value: None } => {
-                    PatchOp::RemoveAttribute { name }
-                }
-            },
-        })
-        .collect()
+    frames: &[(PartId, pw_document::InstanceToken)],
+    part: PartId,
+) -> PartAddress {
+    frames.iter().fold(
+        PartAddress::new(schema, LocalPartId(part.0)),
+        |at, (each, instance)| at.within(LocalPartId(each.0), instance.clone()),
+    )
 }
 
-/// **A list's change, as keyed operations** (ADR-0145). The list the
-/// template iterates over `list` becomes `new`:
-/// - an item whose key left is removed;
-/// - a new one is inserted where it now is;
-/// - one out of place is moved;
-/// - one whose value changed is set in place, text part by text part, or
-///   replaced when its markup holds more than text.
+/// **The patches that set an instance's changed parts where they are**
+/// (ADR-0168): a text part's text, an attribute's value, and a list inside
+/// the instance, each addressed inside `frames` (ADR-0181).
+fn instance_patches(
+    schema: &TemplateSchemaId,
+    frames: &[(PartId, pw_document::InstanceToken)],
+    changes: Vec<(PartId, pw_render::InstanceChange)>,
+) -> Vec<Targeted> {
+    let mut out = Vec::new();
+    for (id, change) in changes {
+        let target = address_in(schema, frames, id);
+        match change {
+            pw_render::InstanceChange::Text(text) => out.push(Targeted {
+                target,
+                operation: PatchOp::ReplaceText { text },
+            }),
+            pw_render::InstanceChange::Attribute {
+                name,
+                value: Some(value),
+            } => out.push(Targeted {
+                target,
+                operation: PatchOp::SetAttribute { name, value },
+            }),
+            pw_render::InstanceChange::Attribute { name, value: None } => out.push(Targeted {
+                target,
+                operation: PatchOp::RemoveAttribute { name },
+            }),
+            pw_render::InstanceChange::List(changes) => {
+                out.extend(list_change_patches(schema, frames, id, changes));
+            }
+        }
+    }
+    out
+}
+
+/// **The patches a keyed list's changes are** (ADR-0145, ADR-0181), the
+/// list's own operations at its address inside `frames`, and an instance's
+/// changes inside it.
+fn list_change_patches(
+    schema: &TemplateSchemaId,
+    frames: &[(PartId, pw_document::InstanceToken)],
+    each: PartId,
+    changes: Vec<pw_render::ListChange>,
+) -> Vec<Targeted> {
+    let target = address_in(schema, frames, each);
+    let at = |operation: PatchOp| Targeted {
+        target: target.clone(),
+        operation,
+    };
+    let mut out = Vec::new();
+    for change in changes {
+        match change {
+            pw_render::ListChange::Remove(instance) => {
+                out.push(at(PatchOp::RemoveInstance { instance }))
+            }
+            pw_render::ListChange::InsertAfter { after, html } => {
+                out.push(at(PatchOp::InsertAfter {
+                    instance: Some(after),
+                    html,
+                }))
+            }
+            pw_render::ListChange::InsertBefore { before, html } => {
+                out.push(at(PatchOp::InsertBefore {
+                    instance: before,
+                    html,
+                }))
+            }
+            pw_render::ListChange::Move { instance, after } => {
+                out.push(at(PatchOp::MoveInstance { instance, after }))
+            }
+            pw_render::ListChange::Set { instance, changes } => {
+                let mut inside = frames.to_vec();
+                inside.push((each, instance));
+                out.extend(instance_patches(schema, &inside, changes));
+            }
+        }
+    }
+    out
+}
+
+/// **A list's change, as keyed operations** (ADR-0145): the list the
+/// template iterates over `list` becomes `new`, as the renderer derives it
+/// (`pw_render::list_changes`), a list inside a row included (ADR-0181).
 ///
 /// An item whose key stayed keeps its nodes, as E7-P keeps the menu's: a
 /// focus, a scroll, and anything a test marked on it stay.
@@ -4582,83 +4630,12 @@ fn list_patches(
     env: &Env,
     others: &[Template],
 ) -> Result<Vec<Targeted>, String> {
-    let Some((each, key)) = each_over(&template.chunks, list) else {
+    let Some((each, _)) = each_over(&template.chunks, list) else {
         return Err(format!("`{}` iterates no list `{list}`", template.path));
     };
-    let target = PartAddress::new(schema, LocalPartId(each.0));
-    let token = |v: &Value| pw_render::instance_token_of(each, v, &key, env);
-    let render = |v: &Value| {
-        pw_render::render_instance(template, each, v, env, others).map_err(|b| format!("{b:?}"))
-    };
-    // Where the instance after `prev` goes: after it, or at the head.
-    let insert = |prev: &Option<pw_document::InstanceToken>, html: String| match prev {
-        None => PatchOp::InsertBefore {
-            instance: None,
-            html,
-        },
-        Some(p) => PatchOp::InsertAfter {
-            instance: Some(p.clone()),
-            html,
-        },
-    };
-    let at = |operation: PatchOp| Targeted {
-        target: target.clone(),
-        operation,
-    };
-    let wanted: Vec<pw_document::InstanceToken> = new.iter().map(token).collect();
-    let mut out = Vec::new();
-    // What the document holds, as each operation leaves it.
-    let mut current: Vec<(pw_document::InstanceToken, Value)> = Vec::new();
-    for v in old {
-        let t = token(v);
-        if wanted.contains(&t) {
-            current.push((t, v.clone()));
-        } else {
-            out.push(at(PatchOp::RemoveInstance { instance: t }));
-        }
-    }
-    let mut prev: Option<pw_document::InstanceToken> = None;
-    for (i, item) in new.iter().enumerate() {
-        let t = wanted[i].clone();
-        match current.iter().position(|(c, _)| *c == t) {
-            None => {
-                out.push(at(insert(&prev, render(item)?)));
-                current.insert(i, (t.clone(), item.clone()));
-            }
-            Some(found) => {
-                if found != i {
-                    out.push(at(PatchOp::MoveInstance {
-                        instance: t.clone(),
-                        after: prev.clone(),
-                    }));
-                    let moved = current.remove(found);
-                    current.insert(i, moved);
-                }
-                if current[i].1 != *item {
-                    let was = current[i].1.clone();
-                    // Each text and attribute the change reaches, set where
-                    // it is (ADR-0168).
-                    let in_place =
-                        pw_render::instance_changes(template, each, &was, item, env, others)
-                            .map_err(|b| format!("{b:?}"))?;
-                    match in_place {
-                        Some(changes) => out.extend(instance_patches(schema, each, &t, changes)),
-                        // More than text: the instance is rendered again, where
-                        // it is.
-                        None => {
-                            out.push(at(PatchOp::RemoveInstance {
-                                instance: t.clone(),
-                            }));
-                            out.push(at(insert(&prev, render(item)?)));
-                        }
-                    }
-                    current[i].1 = item.clone();
-                }
-            }
-        }
-        prev = Some(t);
-    }
-    Ok(out)
+    let changes = pw_render::list_changes(template, each, old, new, env, others)
+        .map_err(|b| format!("{b:?}"))?;
+    Ok(list_change_patches(schema, &[], each, changes))
 }
 
 /// The `{#each}` over `list`: its part, and its key's path. Searched through
@@ -4753,16 +4730,6 @@ fn default_menu() -> Vec<(String, String)> {
     .collect()
 }
 
-/// **The row of `rows` whose item is `id`** (ADR-0169).
-fn row_of(rows: &Value, id: &str) -> Option<Value> {
-    let Value::List(rows) = rows else {
-        return None;
-    };
-    rows.iter()
-        .find(|r| matches!(r, Value::Record(f) if f.get("id") == Some(&Value::Text(id.into()))))
-        .cloned()
-}
-
 /// A list's rows, or none where the value is no list.
 fn rows(v: &Value) -> &[Value] {
     match v {
@@ -4772,6 +4739,7 @@ fn rows(v: &Value) -> &[Value] {
 }
 
 /// A row with its key alone: what an instance's token is derived from.
+#[cfg(test)]
 fn key_row(id: &str) -> Value {
     Value::Record([("id".to_string(), Value::Text(id.into()))].into())
 }
@@ -7663,12 +7631,20 @@ public query Store(",
             .find(|(i, _)| i == id)
             .map(|(_, name)| name)
             .unwrap_or_else(|| panic!("no item `{id}`"));
+        // Its store and its category (ADR-0181), as the data layer says.
+        let store = match default_menu().iter().any(|(i, _)| i == id) {
+            true => STORE_ID,
+            false => SECOND_STORE.0,
+        };
+        let (category, category_name) = item_category(store, id);
         serde_json::json!({
             "description": item_description(id),
             "id": id,
+            "store_id": store,
             "name": name,
             "price": { "minor_units": item_price(id) },
             "available": true,
+            "category": { "id": category, "name": category_name },
         })
     }
 
@@ -8136,23 +8112,30 @@ public query Store(",
     /// item as its menu row shows it (ADR-0172).
     fn add_shown(item: &str, quantity: i64) -> [Val; 2] {
         let shown = shown(item);
+        let text = |v: &serde_json::Value| Val::String(v.as_str().unwrap_or_default().into());
         [
+            // In the order `MenuItem` declares its fields, as a component's
+            // record takes them.
             Val::Record(vec![
                 ("id".into(), Val::String(item.into())),
-                (
-                    "name".into(),
-                    Val::String(shown["name"].as_str().unwrap_or_default().into()),
-                ),
-                (
-                    "description".into(),
-                    Val::String(shown["description"].as_str().unwrap_or_default().into()),
-                ),
+                // Its store (ADR-0181).
+                ("store-id".into(), text(&shown["store_id"])),
+                ("name".into(), text(&shown["name"])),
+                ("description".into(), text(&shown["description"])),
                 (
                     "price".into(),
                     Val::Record(vec![("minor-units".into(), Val::S64(item_price(item)))]),
                 ),
                 // As the page showed it: one it could order (ADR-0178).
                 ("available".into(), Val::Bool(true)),
+                // Its category (ADR-0181).
+                (
+                    "category".into(),
+                    Val::Record(vec![
+                        ("id".into(), text(&shown["category"]["id"])),
+                        ("name".into(), text(&shown["category"]["name"])),
+                    ]),
+                ),
             ]),
             Val::S64(quantity),
         ]
@@ -8715,6 +8698,7 @@ public query Store(",
         let sent = |id: &str| {
             Val::Record(vec![
                 ("id".into(), Val::String(id.into())),
+                ("store-id".into(), Val::String(STORE_ID.into())),
                 ("name".into(), Val::String("Free coffee".into())),
                 ("description".into(), Val::String(String::new())),
                 (
@@ -8722,6 +8706,13 @@ public query Store(",
                     Val::Record(vec![("minor-units".into(), Val::S64(1))]),
                 ),
                 ("available".into(), Val::Bool(true)),
+                (
+                    "category".into(),
+                    Val::Record(vec![
+                        ("id".into(), Val::String("free".into())),
+                        ("name".into(), Val::String("Free".into())),
+                    ]),
+                ),
             ])
         };
         s.command(
@@ -9055,7 +9046,7 @@ public query Store(",
             "one Store for both readers"
         );
         assert_eq!(
-            calls(&s, "store:data/menus#for-store"),
+            calls(&s, "store:data/menus#sections"),
             1,
             "one Menu for both"
         );
@@ -9069,7 +9060,7 @@ public query Store(",
         s.query_clock.0.advance(30_001);
         s.render_store("reader-a");
         assert_eq!(calls(&s, "store:data/stores#get"), 2, "Store expired");
-        assert_eq!(calls(&s, "store:data/menus#for-store"), 1, "Menu did not");
+        assert_eq!(calls(&s, "store:data/menus#sections"), 1, "Menu did not");
     }
 
     /// **A command drops exactly the entry it invalidates** (ADR-0127): the
@@ -9144,7 +9135,7 @@ public query Store(",
             html.contains("Ristretto"),
             "the page shows the changed menu: {html}"
         );
-        assert_eq!(calls(&s, "store:data/menus#for-store"), 2);
+        assert_eq!(calls(&s, "store:data/menus#sections"), 2);
     }
 
     /// **A private entry is keyed by its session; a shared one by its
@@ -9819,7 +9810,7 @@ public query Store(",
     #[test]
     fn a_menu_change_drops_that_stores_kept_menu_only() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
-        let reads = || calls(&s, "store:data/menus#for-store");
+        let reads = || calls(&s, "store:data/menus#sections");
         s.serve_store_document("a", STORE_ID).expect("served");
         s.serve_store_document("a", "48").expect("served");
         let read = reads();
@@ -9894,8 +9885,16 @@ public query Store(",
                 },
             ]
         );
-        // Each inside the espresso's own instance, which keeps its nodes.
-        assert!(set.patches.iter().all(|p| p.target.instances.len() == 1));
+        // Each inside the espresso's own instance, which keeps its nodes,
+        // inside its category's (ADR-0181).
+        let espresso = menu_instance(&s, "espresso");
+        assert!(
+            set.patches.iter().all(
+                |p| p.target.instances.len() == 2 && p.target.instances[1].instance == espresso
+            ),
+            "{:?}",
+            set.patches
+        );
     }
 
     /// Every patch operation queued for one document, in order: each patch
@@ -9918,10 +9917,45 @@ public query Store(",
 
     /// An item's instance in store 47's menu fragment, as the open pages
     /// address it.
+    /// An item's instance in store 47's menu, inside its category's, as the
+    /// open pages address it (ADR-0181): every item of store 47's is a
+    /// coffee.
     fn menu_instance(s: &Server, id: &str) -> pw_document::InstanceToken {
-        let (_, part) = s.menu_part();
+        let (template, _) = s.menu_part();
+        let (items, _) = each_over(&template.chunks, "section.items").expect("the items' loop");
+        pw_render::instance_token_of(items, &key_row(id), "id", &coffee_env(s))
+    }
+
+    /// Inside store 47's coffee category: what its items' tokens are derived
+    /// in.
+    fn coffee_env(s: &Server) -> Env {
+        let (template, part) = s.menu_part();
         let env = s.menu_env(STORE_ID, &Value::List(Vec::new()));
-        pw_render::instance_token_of(part, &key_row(id), "id", &env)
+        let coffee = Value::Record(
+            [(
+                "category".to_string(),
+                Value::Record([("id".to_string(), Value::Text("coffee".into()))].into()),
+            )]
+            .into(),
+        );
+        pw_render::instance_env(template, part, &coffee, &env).expect("a category's instance")
+    }
+
+    /// Where store 47's coffees are: the items' loop, inside the coffee
+    /// category's instance (ADR-0181).
+    fn coffees_at(s: &Server) -> PartAddress {
+        let (template, part) = s.menu_part();
+        let (items, _) = each_over(&template.chunks, "section.items").expect("the items' loop");
+        let env = s.menu_env(STORE_ID, &Value::List(Vec::new()));
+        let coffee = Value::Record(
+            [(
+                "category".to_string(),
+                Value::Record([("id".to_string(), Value::Text("coffee".into()))].into()),
+            )]
+            .into(),
+        );
+        let token = pw_render::instance_token_of(part, &coffee, "category.id", &env);
+        PartAddress::new(&s.menu_address().template, LocalPartId(items.0)).within(part, token)
     }
 
     /// The row an operation renders again, where it is one.
@@ -9992,6 +10026,8 @@ public query Store(",
             html.contains("Sold out") && !html.contains("<button"),
             "{html}"
         );
+        // Both in the coffees' list, inside the coffee category (ADR-0181).
+        assert!(ops.iter().all(|o| o.target == coffees_at(&s)), "{ops:?}");
         // Another store's page is not told of store 47's stock.
         assert!(operations_for(&s, "b", other).is_empty());
         // A document served now shows it, with no frame of its own.
@@ -10077,7 +10113,7 @@ public query Store(",
         let espresso = menu_instance(&s, "espresso");
         let renamed: Vec<&Targeted> = ops
             .iter()
-            .filter(|t| t.target.instances.first().map(|f| &f.instance) == Some(&espresso))
+            .filter(|t| t.target.instances.last().map(|f| &f.instance) == Some(&espresso))
             .collect();
         assert!(
             renamed.iter().any(|t| t.operation
@@ -10101,11 +10137,14 @@ public query Store(",
         );
     }
 
-    /// **A structural change, and what changed unannounced with it**
-    /// (ADR-0178): E7-P's insert keeps its own patch, at its anchor, and the
-    /// rows that differ from what the pages show follow it.
+    /// **A structural change, and what changed unannounced with it, derived
+    /// from the menu's values** (ADR-0178, ADR-0181): E7-P's insert is the
+    /// difference between what the pages show and the menu now, as the
+    /// sold-out espresso's row is, each in the coffees' list. Until
+    /// 2026-10-04 an insert sent a patch E7-P made at its anchor, which a menu
+    /// grouped by category has nowhere to address.
     #[test]
-    fn an_insert_keeps_its_anchor_and_sends_the_rest() {
+    fn an_insert_and_what_changed_with_it_are_derived_from_the_menu() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
         s.sold_out
@@ -10120,19 +10159,29 @@ public query Store(",
         })
         .expect("inserted");
         let ops = operations_for(&s, "a", document);
-        let PatchOp::InsertBefore { instance, html } = &ops[0].operation else {
-            panic!("the insert first, at its anchor: {ops:?}");
-        };
-        assert_eq!(instance.as_ref(), Some(&menu_instance(&s, "cortado")));
-        assert!(html.contains("Flat White"), "{html}");
+        assert_eq!(ops.len(), 3, "{ops:?}");
+        // The espresso, sold out, rendered again where it is: first.
         assert_eq!(
-            ops[1].operation,
+            ops[0].operation,
             PatchOp::RemoveInstance {
                 instance: menu_instance(&s, "espresso")
             }
         );
-        assert!(rendered_row(&ops[2].operation).is_some_and(|r| r.contains("Sold out")));
-        assert_eq!(ops.len(), 3, "{ops:?}");
+        let PatchOp::InsertBefore {
+            instance: None,
+            html,
+        } = &ops[1].operation
+        else {
+            panic!("the espresso again, at the head: {ops:?}");
+        };
+        assert!(html.contains("Sold out"), "{html}");
+        // Then the flat white, after it, which puts it before the cortado.
+        let PatchOp::InsertAfter { instance, html } = &ops[2].operation else {
+            panic!("the insert after the espresso: {ops:?}");
+        };
+        assert_eq!(instance.as_ref(), Some(&menu_instance(&s, "espresso")));
+        assert!(html.contains("Flat White"), "{html}");
+        assert!(ops.iter().all(|o| o.target == coffees_at(&s)), "{ops:?}");
     }
 
     /// **A stock change is `InventoryChanged`, not `MenuChanged`** (ADR-0178):
@@ -10153,7 +10202,7 @@ public query Store(",
                 .collect()
         };
         let asks = || calls(&s, "store:data/recommendations#for-store");
-        let menus = || calls(&s, "store:data/menus#for-store");
+        let menus = || calls(&s, "store:data/menus#sections");
         page("a");
         let (asked, read) = (asks(), menus());
         s.sold_out
@@ -10195,6 +10244,42 @@ public query Store(",
         assert!(!served.contains("aria-label=\"Add Cortado\""), "{served}");
         assert!(s.menu_version(STORE_ID) > version);
         assert_eq!(operations_for(&s, "a", document).len(), 2);
+    }
+
+    /// **A store's menu is grouped by its category** (ADR-0181, charter
+    /// §15.1): each category a heading and its items, in the order the store
+    /// lists them. Store 47's coffees are one; store 48's drinks and its
+    /// bakery are two, each item under its own.
+    #[test]
+    fn a_menu_is_grouped_by_its_category() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let page = |id: &str| {
+            let (html, _) = s.serve_store_document("a", id).expect("served");
+            (
+                visible(&html)
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                html,
+            )
+        };
+        let (blue, html) = page(STORE_ID);
+        assert!(blue.contains("Coffee Espresso A double shot"), "{blue}");
+        // One category's heading; the cart's has attributes of its own.
+        assert_eq!(html.matches("<h2>").count(), 1, "one category");
+        let (harbor, html) = page("48");
+        assert_eq!(
+            html.matches("<h2>").count(),
+            2,
+            "Drinks and Bakery: {harbor}"
+        );
+        let at = |text: &str| {
+            harbor
+                .find(text)
+                .unwrap_or_else(|| panic!("no {text}: {harbor}"))
+        };
+        assert!(at("Drinks Drip Coffee") < at("Matcha Latte"));
+        assert!(at("Matcha Latte") < at("Bakery Blueberry Scone"));
     }
 
     /// **Each menu row shows its price** (ADR-0169, charter §15.1): what the

@@ -128,9 +128,9 @@ fn a_handler_written_as_a_lambda_has_code() {
 fn a_handler_captures_what_it_reads_of_the_page() {
     // A loop's item, read by a field: what the listed form would carry.
     let inferred = page(
-        "            {#each menu as item (item.id)}\n                \
+        "            {#each menu as section (section.category.id)}{#each section.items as item (item.id)}\n                \
          <button type=\"button\" on:press={() => { let _added = increase_in_cart(item.id) }}>More</button>\n\
-         \x20           {/each}",
+         \x20           {/each}{/each}",
     );
     let listed = inferred.replace(
         "on:press={() =>",
@@ -146,9 +146,9 @@ fn a_handler_captures_what_it_reads_of_the_page() {
 
     // A loop's item, whole, given to a command that takes it (ADR-0172).
     let whole = page(
-        "            {#each menu as item (item.id)}\n                \
+        "            {#each menu as section (section.category.id)}{#each section.items as item (item.id)}\n                \
          <button type=\"button\" on:press={() => { let _added = add_to_cart(item, PositiveInt(1)) }}>Add</button>\n\
-         \x20           {/each}",
+         \x20           {/each}{/each}",
     );
     assert_eq!(reported(&whole), Vec::<String>::new(), "{whole}");
     let found = events(&pw_core::build::build(&units(&whole)).expect("builds"));
@@ -182,9 +182,9 @@ fn a_listed_capture_is_still_held_to_what_the_handler_reads() {
     // PW5025: the listed form captures what it lists, and reading another
     // binding of the page is the defect it was.
     let src = page(
-        "            {#each menu as item (item.id)}\n                \
+        "            {#each menu as section (section.category.id)}{#each section.items as item (item.id)}\n                \
          <button type=\"button\" on:press={resumable() => { let _added = add_to_cart(item, PositiveInt(1)) }}>Add</button>\n\
-         \x20           {/each}",
+         \x20           {/each}{/each}",
     );
     let found = reported(&src);
     assert!(

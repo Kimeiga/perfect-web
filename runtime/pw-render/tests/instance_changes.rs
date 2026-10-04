@@ -367,11 +367,12 @@ fn tagged() -> Template {
     }
 }
 
-/// **Any other block that changed renders the row again** (ADR-0168): only
-/// a block that decides is looked into (ADR-0178), and a list inside the row
-/// is not one.
+/// **Any other block that changed renders the row again** (ADR-0168): a
+/// block that decides is looked into (ADR-0178), and so is a keyed list
+/// inside the row (ADR-0181, `tests/nested_lists.rs`); an unkeyed one has no
+/// instance to address.
 #[test]
-fn a_list_inside_the_row_that_changed_renders_the_row_again() {
+fn an_unkeyed_list_inside_the_row_that_changed_renders_the_row_again() {
     let row = |tags: &[&str]| {
         Value::Record(
             [

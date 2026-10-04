@@ -65,9 +65,10 @@ test.describe("the document the server produced", () => {
     // instances = 8. And each item's price (ADR-0169): 2 in each of three
     // instances = 6. And the cart's own (ADR-0172): its lines' loop 2, its
     // subtotal 2, its fees note's block 2 = 6. And whether each item can be
-    // ordered (ADR-0178): its block, 2 in each of three instances = 6. 64 in
-    // all.
-    expect(shape.anchors).toBe(64);
+    // ordered (ADR-0178): its block, 2 in each of three instances = 6. And
+    // the menu grouped by category (ADR-0181): the coffee category's
+    // instance 2, its heading 2, and its items' own loop 2 = 6. 70 in all.
+    expect(shape.anchors).toBe(70);
     // Three Add buttons and one Clear button. The Clear button exists so that
     // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`. And
     // the cart's empty message, whose `hidden` reads the cart (ADR-0172).
@@ -342,11 +343,13 @@ test.describe("instance identity — the three Add buttons", () => {
     // The menu's instances: a stream's region is its document's (ADR-0165),
     // and a part's number moves when the page above it changes (ADR-0166).
     const tokens = (html) => {
-      const menu = html.slice(html.indexOf('<ul id="menu">'), html.indexOf("</ul>"));
+      const at = html.indexOf('<div id="menu">');
+      const menu = html.slice(at, html.indexOf("</div>", at));
       return [...menu.matchAll(/pw:s\d+@([A-Za-z0-9_-]{16})/g)].map((m) => m[1]);
     };
     expect(tokens(a)).toEqual(tokens(b));
-    expect(tokens(a)).toHaveLength(3);
+    // The coffee category's, and its three items' (ADR-0181).
+    expect(tokens(a)).toHaveLength(4);
     void page;
   });
 });

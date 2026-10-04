@@ -217,10 +217,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
           e14-estimate-range`): `min_minutes` and `max_minutes`, each a
           `PositiveInt`, and `generated_at`, an `Instant`; the slot says
           the range in words, in three engines.
-        - **Next: `MenuItem.category` and `store_id`, and
-          `Store.menu_version`.** Acceptance: the menu is grouped by its
-          category, each item kept where it is when the menu changes, in
-          three engines.
+        - ~~`MenuItem.category` and `store_id`, and `Store.menu_version`~~
+          (ADR-0181, `just e14-menu-categories`): the menu is grouped by
+          category, a list inside a row changed where it is, and every menu
+          change derived from the menu's values, in three engines. A menu's
+          version and a cart's identity stay the runtime's.
+     9. **Next: accessibility** (test 14): an automated audit of the store's
+        page in three engines, of its states (a cart with lines, a sold-out
+        item, a refused press). Acceptance: no violation the audit reports,
+        and each a test where one was found.
 
      The benchmark's store is its own copy since ADR-0156, so the canonical
      store grows without re-basing the tasks. Then E14-E's design, ready for

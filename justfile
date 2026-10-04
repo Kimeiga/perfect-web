@@ -2362,6 +2362,33 @@ e14-estimate-range:
      } > docs/evidence/E14/estimate-range.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/estimate-range.txt
 
+# ADR-0181: a menu grouped by its category, and a list inside a row changed
+# where it is. The plan's, the renderer's and the server's tests, the pages in
+# three engines, and the mutation controls.
+e14-menu-categories:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0181 - a menu is grouped by its category, and a list inside a row is changed where it is"; echo; \
+       echo "produced by: just e14-menu-categories"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the plan (compiler/pw-core/tests/row_reads.rs)"; echo; \
+       cargo test --locked -p pw-core --test row_reads 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the renderer (runtime/pw-render/tests/nested_lists.rs, instance_changes.rs)"; echo; \
+       cargo test --locked -p pw-render --test nested_lists --test instance_changes 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_menu_is_grouped|a_rename_sets|a_stock_change_told|an_insert_and_what|a_change_sends_what)|^test result'; \
+       echo; echo "== the pages, in three engines (e2e/stores.spec.mjs, e2e/keyed-list.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs e2e/keyed-list.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/menu_categories_mutations.py)"; echo; \
+       python3 scripts/menu_categories_mutations.py; \
+     } > docs/evidence/E14/menu-categories.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/menu-categories.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.
@@ -3255,8 +3282,8 @@ e10-handlers:
        echo; \
        echo "NOT CLAIMED: captures are a patched part. An element carries what its"; \
        echo "handler reads as rendered; the store reads only item.id, the loop key."; \
-       echo "NOT CLAIMED: an opaque type's invariant is checked at the boundary."; \
-       echo "PositiveInt arrives as an s64; the language states no invariant for it."; \
+       echo "An opaque type's invariant is checked at the boundary since ADR-0179:"; \
+       echo "the host holds PositiveInt's value >= 1 as it decodes the arguments."; \
        echo "NOT CLAIMED: the event as a handler parameter. No syntax binds one, the"; \
        echo "runtime listens for a click only, and a handler with parameters is refused."; \
        echo "Computation, branches, loops and several commands compile since"; \

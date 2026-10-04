@@ -8,7 +8,7 @@
 
 module Menus
 
-import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, MenuItemId,
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, MenuItemId, MenuSection,
     OrderId, OrderProgress, PositiveInt, Recommendation,
     RecommendationError, PaymentError, TrackingError }
 import capability.{ SessionId, Organization, OrganizationId, User, UserId }
@@ -48,6 +48,11 @@ import browser.{ Element, MapHandle, MapError }
 // callable identity.
 fn for_store(store: StoreId) -> Result<List<MenuItem>, StoreError> !{ database.read<Menus> }
     host "store:data/menus#for-store"
+
+// The store's menu, grouped by category, in the order the store lists them
+// (ADR-0181).
+fn sections(store: StoreId) -> Result<List<MenuSection>, StoreError> !{ database.read<Menus> }
+    host "store:data/menus#sections"
 
 // **Whether an item can be ordered now** (charter §15.4): asked inside the
 // command that adds it, so an item sold out since the page was rendered is

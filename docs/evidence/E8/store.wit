@@ -68,8 +68,8 @@ interface store-page-estimate-api {
 }
 
 interface store-page-menu-api {
-    use pw:types/types.{domain-menu-item, domain-store-error, domain-store-id};
-    menu: func(arg0: domain-store-id) -> result<list<domain-menu-item>, domain-store-error>;
+    use pw:types/types.{domain-menu-section, domain-store-error, domain-store-id};
+    menu: func(arg0: domain-store-id) -> result<list<domain-menu-section>, domain-store-error>;
 }
 
 interface store-page-recommendations-api {
@@ -229,10 +229,21 @@ package pw:types {
         type domain-order-id = string;
         record domain-menu-item {
             id: domain-menu-item-id,
+            store-id: domain-store-id,
             name: string,
             description: string,
             price: domain-money,
             available: bool,
+            category: domain-menu-category,
+        }
+        type domain-category-id = string;
+        record domain-menu-category {
+            id: domain-category-id,
+            name: string,
+        }
+        record domain-menu-section {
+            category: domain-menu-category,
+            items: list<domain-menu-item>,
         }
         type domain-positive-int = s64;
         record domain-money {
@@ -314,9 +325,9 @@ package store:data {
         current: func(arg0: capability-session-id) -> result<domain-delivery-estimate, domain-estimate-error>;
     }
     interface menus {
-        use pw:types/types.{domain-menu-item, domain-menu-item-id, domain-store-error, domain-store-id};
-        for-store: func(arg0: domain-store-id) -> result<list<domain-menu-item>, domain-store-error>;
+        use pw:types/types.{domain-menu-item-id, domain-menu-section, domain-store-error, domain-store-id};
         is-available: func(arg0: domain-menu-item-id) -> bool;
+        sections: func(arg0: domain-store-id) -> result<list<domain-menu-section>, domain-store-error>;
     }
     interface recommendations {
         use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};

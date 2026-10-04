@@ -1518,3 +1518,13 @@ a delivery estimate is a range, and says when it was made.
   `Instant`. An estimate of 0 minutes is a failed read (ADR-0179).
 - The slot says "Delivery in 25 to 35 min", in words: an en dash in a range
   is read unreliably by screen readers.
+
+[ADR-0181](DECISIONS/ADR-0181-a-menu-is-grouped-by-its-category.md):
+a menu is grouped by its category, and a list inside a row is changed where it
+is.
+- Charter §15.1: `MenuItem.store_id` and `category`; the store's `Menu` answers
+  `MenuSection`s, and the page gives each category a heading and its items.
+- The plan reads a loop inside a loop (`menu.*.items`); the renderer derives a
+  keyed list's change, a list inside a row diffed where it is; every menu
+  change is derived from the menu's values, E7-P's operations included.
+- A menu's version and a cart's identity stay the runtime's, not fields.

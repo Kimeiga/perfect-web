@@ -178,6 +178,15 @@ pub fn changes(request: &[u8]) -> (u32, String) {
     let now = pw_render::Value::from_wire(&request["now"]);
     match pw_render::instance_changes(&template_of(part), each, &was, &now, &env, &[]) {
         Ok(None) => (0, "null".to_string()),
+        // A list inside a speculated row is refused at build (ADR-0170), and
+        // the browser sets no list's operations of its own: rendered again.
+        Ok(Some(changes))
+            if changes
+                .iter()
+                .any(|(_, c)| matches!(c, pw_render::InstanceChange::List(_))) =>
+        {
+            (0, "null".to_string())
+        }
         Ok(Some(changes)) => {
             let out: Vec<serde_json::Value> = changes
                 .into_iter()
@@ -188,6 +197,7 @@ pub fn changes(request: &[u8]) -> (u32, String) {
                     pw_render::InstanceChange::Attribute { name, value } => {
                         serde_json::json!([id.0, { "attribute": name, "value": value }])
                     }
+                    pw_render::InstanceChange::List(_) => serde_json::Value::Null,
                 })
                 .collect();
             (0, serde_json::Value::Array(out).to_string())

@@ -74,17 +74,16 @@ MUTANTS = [
         "server",
         SERVER,
         # Re-anchored by ADR-0178: a rename's patches are its row's, as the
-        # whole menu's difference is derived, which a session's list's are.
-        "                        Some(changes) => out.extend(instance_patches(schema, each, &t, changes)),\n",
-        "                        Some(changes) => out.extend(instance_patches(\n"
-        "                            schema,\n"
-        "                            each,\n"
-        "                            &t,\n"
-        "                            changes\n"
-        "                                .into_iter()\n"
-        "                                .filter(|(_, c)| matches!(c, pw_render::InstanceChange::Text(_)))\n"
-        "                                .collect(),\n"
-        "                        )),\n",
+        # whole menu's difference is derived, which a session's list's are;
+        # and by ADR-0181, where an attribute's change becomes its patch.
+        "            pw_render::InstanceChange::Attribute {\n"
+        "                name,\n"
+        "                value: Some(value),\n"
+        "            } => out.push(Targeted {\n"
+        "                target,\n"
+        "                operation: PatchOp::SetAttribute { name, value },\n"
+        "            }),\n",
+        "            pw_render::InstanceChange::Attribute { value: Some(_), .. } => {}\n",
     ),
     (
         "the menu control decodes only spaces",

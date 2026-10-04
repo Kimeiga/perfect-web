@@ -54,13 +54,24 @@ test("each Add button carries exactly what its handler reads", async ({ page }) 
 
   // What the body reads: the item, which `add_to_cart` makes its line from
   // (ADR-0172), by the fields its type declares, whether it is available
-  // among them (ADR-0178). What the page computed for the row, the price as
-  // text, is not the item's, and is not there.
+  // (ADR-0178), its store and its category among them (ADR-0181). What the
+  // page computed for the row, the price as text, is not the item's, and is
+  // not there.
   const parsed = captures.map((c) => JSON.parse(c));
   for (const c of parsed) {
     expect(Object.keys(c)).toEqual(["item"]);
-    expect(Object.keys(c.item).sort()).toEqual(["available", "description", "id", "name", "price"]);
+    expect(Object.keys(c.item).sort()).toEqual([
+      "available",
+      "category",
+      "description",
+      "id",
+      "name",
+      "price",
+      "store_id",
+    ]);
     expect(c.item.available).toBe(true);
+    expect(c.item.category).toEqual({ id: "coffee", name: "Coffee" });
+    expect(c.item.store_id).toBe("47");
     expect(Object.keys(c.item.price)).toEqual(["minor_units"]);
   }
   expect(new Set(parsed.map((c) => c.item.id)).size, "one item per button").toBe(parsed.length);

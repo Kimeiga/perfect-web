@@ -12,9 +12,9 @@ Each mutant undoes one piece:
 - the renderer: a block that decides as it did rendered again; one that
   decides otherwise set where it is; a block's handlers not found;
 - the server: a stock change announced as the menu's; the pages taken to
-  show the menu as it is now; an inserted row not where the pages show it;
-  the pages open not told when the menu is read again; a document's menu
-  rendered again from its own read, untold (ADR-0150's rule);
+  show the menu as it is now; the pages open not told when the menu is read
+  again; a document's menu rendered again from its own read, untold
+  (ADR-0150's rule);
 - the control: `/bench/stock?tell=true` telling nothing.
 
 A value-analysis mutant must fail `pw-core`'s tests, all of them run; a
@@ -45,16 +45,18 @@ MUTANTS = [
         "every item is said to be available",
         "server",
         SERVER,
-        '                                ("available".into(), Val::Bool(!sold_out.contains(id))),\n',
-        '                                ("available".into(), Val::Bool(true)),\n',
+        # Re-anchored by ADR-0181, whose data layer groups the menu.
+        '                        ("available".into(), Val::Bool(!sold_out.contains(id))),\n',
+        '                        ("available".into(), Val::Bool(true)),\n',
     ),
     (
         "a sold-out item's row says nothing",
         "server",
         APP,
-        "                            {:else}\n"
-        "                                <p>Sold out</p>\n",
-        "                            {:else}\n",
+        # Re-anchored by ADR-0181: the row is inside its category's.
+        "                                    {:else}\n"
+        "                                        <p>Sold out</p>\n",
+        "                                    {:else}\n",
     ),
     (
         "the `Menu` query does not listen for a stock change",
@@ -123,15 +125,15 @@ MUTANTS = [
         "the pages are taken to show the menu as it is now",
         "server",
         SERVER,
-        "        let mut rows = shown.to_vec();\n",
-        "        let mut rows = now.to_vec();\n",
-    ),
-    (
-        "an inserted row is not where the pages show it",
-        "server",
-        SERVER,
-        "                rows.insert(at, row);\n",
-        "                let _ = (at, row);\n",
+        # Re-anchored by ADR-0181: the whole change is derived from what the
+        # pages show and the menu now, with no step between. Its sibling,
+        # "an inserted row is not where the pages show it", went with that
+        # step: an insert's place is the derivation's (patch_set's "a new
+        # item goes to the head").
+        "            rows(&before),\n"
+        "            rows(&items),\n",
+        "            rows(&items),\n"
+        "            rows(&items),\n",
     ),
     (
         "the pages open are not told when the menu is read again",

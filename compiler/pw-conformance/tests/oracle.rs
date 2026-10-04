@@ -461,7 +461,9 @@ fn the_stores_queries_agree_with_their_reference() {
     let u = store();
     for (id, op) in [
         ("store.page.Cart", "store:data/carts#current"),
-        ("store.page.Menu", "store:data/menus#for-store"),
+        // The menu, grouped by category, as the data layer answers it
+        // (ADR-0181).
+        ("store.page.Menu", "store:data/menus#sections"),
         ("store.page.Store", "store:data/stores#get"),
     ] {
         let op: &'static str = op;
@@ -472,8 +474,8 @@ fn the_stores_queries_agree_with_their_reference() {
                 "store:data/carts#current" => {
                     |args, host| host("store:data/carts#current", vec![args[0].clone()])
                 }
-                "store:data/menus#for-store" => {
-                    |args, host| host("store:data/menus#for-store", vec![args[0].clone()])
+                "store:data/menus#sections" => {
+                    |args, host| host("store:data/menus#sections", vec![args[0].clone()])
                 }
                 _ => |args, host| host("store:data/stores#get", vec![args[0].clone()]),
             },

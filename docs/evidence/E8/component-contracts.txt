@@ -65,7 +65,7 @@ store.page.Estimate  abi 415fdfe738cf5f70
 store.page.Menu  abi 60058db28f2ab607
   runs at   origin
   needs     database.read<Menus>
-  host      store:data/menus#for-store  (database.read<Menus>)
+  host      store:data/menus#sections  (database.read<Menus>)
   exports   query Menu
 
 store.page.Recommendations  abi 362c2dcd203e1e3f

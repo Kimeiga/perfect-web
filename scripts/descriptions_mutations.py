@@ -31,7 +31,8 @@ ENGINE = ROOT / "runtime/pw-host/src/lib.rs"
 STORE = ROOT / "examples/store/app.pw"
 
 # The view from the store's description to its items'.
-# Re-anchored by ADR-0180, whose estimate is a range.
+# Re-anchored by ADR-0180, whose estimate is a range, and ADR-0181, whose
+# menu is grouped by category.
 BOTH_DESCRIPTIONS = (
     "            <p id=\"store-description\">{store.description}</p>\n"
     "\n"
@@ -44,11 +45,15 @@ BOTH_DESCRIPTIONS = (
     "            </section>\n"
     "\n"
     "            <section aria-label=\"Menu\">\n"
-    "                <ul id=\"menu\">\n"
-    "                    {#each menu as item (item.id)}\n"
-    "                        <li>\n"
-    "                            <span>{item.name}</span>\n"
-    "                            <p>{item.description}</p>\n"
+    "                <!-- Grouped by category, each a heading and its items (ADR-0181). -->\n"
+    "                <div id=\"menu\">\n"
+    "                    {#each menu as section (section.category.id)}\n"
+    "                        <h2>{section.category.name}</h2>\n"
+    "                        <ul>\n"
+    "                            {#each section.items as item (item.id)}\n"
+    "                                <li>\n"
+    "                                    <span>{item.name}</span>\n"
+    "                                    <p>{item.description}</p>\n"
 )
 
 # (what, suite, file, anchor, replacement)
@@ -126,7 +131,7 @@ MUTANTS = [
         BOTH_DESCRIPTIONS,
         BOTH_DESCRIPTIONS.replace(
             "            <p id=\"store-description\">{store.description}</p>\n", ""
-        ).replace("                            <p>{item.description}</p>\n", ""),
+        ).replace("                                    <p>{item.description}</p>\n", ""),
     ),
 ]
 

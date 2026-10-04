@@ -673,6 +673,14 @@ fn row_read(
 /// alone: `None` where one is not a field.
 fn field_type(sigs: &Signatures, mut ty: ResolvedType, fields: &[&str]) -> Option<ResolvedType> {
     for field in fields {
+        // Each item of a list (ADR-0181): `menu.*.items`.
+        if *field == "*" {
+            ty = ty
+                .as_builtin()
+                .filter(|b| *b == crate::resolved::Builtin::List)
+                .and_then(|_| ty.args().first().cloned())?;
+            continue;
+        }
         ty = sigs
             .type_decl(ty.def_id()?)?
             .record
@@ -692,7 +700,8 @@ fn unplanned(part: u32, path: &str, what: &str) -> String {
     format!(
         "part {part} reads `{path}` through a member function in {what}, which no host \
          computes there: one computes it from a query's value in text at the top of the page \
-         (ADR-0125), or from the item of a loop over a query's list (ADR-0169)"
+         (ADR-0125), or from the item of a loop over a query's list, or over a list in such an \
+         item (ADR-0169, ADR-0181)"
     )
 }
 
@@ -710,7 +719,14 @@ fn enclosing_loop(
     for c in chunks {
         let Chunk::Dynamic(p) = c else { continue };
         if p.id().is_some_and(|id| id.0 == part) {
-            return Some(around.iter().rev().find(|(b, _)| b == root).cloned());
+            let Some(at) = around.iter().rposition(|(b, _)| b == root) else {
+                return Some(None);
+            };
+            let (binding, collection) = &around[at];
+            return Some(Some((
+                binding.clone(),
+                through_loops(collection, &around[..at]),
+            )));
         }
         let bound = match p {
             Part::Each {
@@ -732,6 +748,26 @@ fn enclosing_loop(
         }
     }
     None
+}
+
+/// **A loop's list, as a path from a query's value** (ADR-0181): a loop
+/// inside another iterates a list in the outer one's item, so its
+/// `section.items` is `menu.*.items`, the list read through each item of
+/// `menu`. A list no loop around binds is its path as written.
+fn through_loops(collection: &str, outer: &[(String, String)]) -> String {
+    let (head, rest) = collection
+        .split_once('.')
+        .map_or((collection, ""), |(h, r)| (h, r));
+    match outer.iter().rposition(|(b, _)| b == head) {
+        Some(at) => {
+            let base = through_loops(&outer[at].1, &outer[..at]);
+            match rest.is_empty() {
+                true => format!("{base}.*"),
+                false => format!("{base}.*.{rest}"),
+            }
+        }
+        None => collection.to_string(),
+    }
 }
 
 /// Every `<stream>` in `chunks`, in document order.

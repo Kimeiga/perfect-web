@@ -159,6 +159,18 @@ test("insert before an instance puts it before, and disturbs nothing else", asyn
   ).toEqual(["mark-0", null, "mark-1", "mark-2"]);
 });
 
+test("insert before the first instance puts it at the head, and disturbs nothing else", async ({
+  page,
+}) => {
+  // ADR-0181: the server derives the change from the menu's values, and an
+  // item new at the head goes before the first instance, by its address.
+  await ready(page);
+  const { status } = await command(page, "op=insert_before&id=mocha&name=Mocha&at=espresso");
+  expect(status).toBe(202);
+  const rows = await settled(page, ["Mocha", "Espresso", "Cortado", "Cold Brew"]);
+  expect(rows.map((r) => r.identity)).toEqual([null, "mark-0", "mark-1", "mark-2"]);
+});
+
 test("insert after an instance puts it after", async ({ page }) => {
   // The control for the test above: if the runtime ignored `before`/`after`
   // and always did one of them, exactly one of these two would pass.

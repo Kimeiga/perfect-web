@@ -40,7 +40,7 @@ import Estimates
 // page renders without authority moved with it. That was the architect's
 // ruling and the reason the repair waited for a frozen matrix.
 import context.{ current_session }
-import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, InteractionId,
+import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, MenuSection, InteractionId,
     MenuItemId, PositiveInt, Recommendation, RecommendationError, DeliveryEstimate,
     EstimateError }
 import capability.{ Session, SessionId }
@@ -51,7 +51,7 @@ import Events.{ CartChanged, MenuChanged, InventoryChanged }
 // menu and no other (§15.6 test 11, ADR-0164). When the menus' origin fails,
 // the last menu kept is shown (§15.6 test 18, ADR-0177): it is every
 // reader's, and still true of no one in particular.
-public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
+public query Menu(id: StoreId) -> Result<List<MenuSection>, StoreError>
     freshness      5.minutes
     consistency    snapshot
     cache          shared
@@ -62,7 +62,7 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
     timeout        2.seconds
     fallback       last_known_good
 {
-    Menus.for_store(id)
+    Menus.sections(id)
 }
 
 // **What the recommender suggests for the store** (charter §15.2, §15.3,
@@ -268,31 +268,37 @@ session page StorePage(id: StoreId) {
             </section>
 
             <section aria-label="Menu">
-                <ul id="menu">
-                    {#each menu as item (item.id)}
-                        <li>
-                            <span>{item.name}</span>
-                            <p>{item.description}</p>
-                            <p>{item.price.display}</p>
-                            <!-- Whether it can be ordered, before the press (ADR-0178). -->
-                            {#if item.available}
-                                <button
-                                    type="button"
-                                    aria-label="Add {item.name}"
-                                    on:press={resumable(captures = { item }) => match add_to_cart(item, PositiveInt(1)) {
-                                        Ok(_) => notice = "",
-                                        Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
-                                        Err(_) => notice = "That item could not be added.",
-                                    }}
-                                >
-                                    Add
-                                </button>
-                            {:else}
-                                <p>Sold out</p>
-                            {/if}
-                        </li>
+                <!-- Grouped by category, each a heading and its items (ADR-0181). -->
+                <div id="menu">
+                    {#each menu as section (section.category.id)}
+                        <h2>{section.category.name}</h2>
+                        <ul>
+                            {#each section.items as item (item.id)}
+                                <li>
+                                    <span>{item.name}</span>
+                                    <p>{item.description}</p>
+                                    <p>{item.price.display}</p>
+                                    <!-- Whether it can be ordered, before the press (ADR-0178). -->
+                                    {#if item.available}
+                                        <button
+                                            type="button"
+                                            aria-label="Add {item.name}"
+                                            on:press={resumable(captures = { item }) => match add_to_cart(item, PositiveInt(1)) {
+                                                Ok(_) => notice = "",
+                                                Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
+                                                Err(_) => notice = "That item could not be added.",
+                                            }}
+                                        >
+                                            Add
+                                        </button>
+                                    {:else}
+                                        <p>Sold out</p>
+                                    {/if}
+                                </li>
+                            {/each}
+                        </ul>
                     {/each}
-                </ul>
+                </div>
             </section>
 
             <section aria-labelledby="cart-heading">

@@ -48,14 +48,27 @@ opaque type InteractionId = String
 // Its description since ADR-0166, charter §15.1's: what the item is, which a
 // menu's row shows under its name. Its price since ADR-0169, which the row
 // shows as `price.display`. Whether it can be ordered since ADR-0178, which
-// the row decides its Add by, before the press.
+// the row decides its Add by, before the press. Its store and its category
+// since ADR-0181, the rest of charter §15.1's.
 type MenuItem = MenuItem {
     id: MenuItemId,
+    store_id: StoreId,
     name: String,
     description: String,
     price: Money<USD>,
     available: Bool,
+    category: MenuCategory,
 }
+
+// **A category of a store's menu** (ADR-0181, charter §15.1's
+// `MenuCategory`): what the menu groups its items by.
+opaque type CategoryId = String
+
+type MenuCategory = MenuCategory { id: CategoryId, name: String }
+
+// **A category's items, in the order the store lists them** (ADR-0181):
+// what a store's menu is, grouped.
+type MenuSection = MenuSection { category: MenuCategory, items: List<MenuItem> }
 
 // --- quantities -----------------------------------------------------------
 

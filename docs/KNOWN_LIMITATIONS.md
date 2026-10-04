@@ -460,7 +460,11 @@ awaited in order. What remains:
   narrower record is the program's to declare.
 - **A list inside a shared query's value is rendered once** (ADR-0170). It
   is rendered with its document and not patched again. Only the menu's
-  public fragment is patched for every reader (E7-P).
+  public fragment is patched for every reader (E7-P), its categories' lists
+  inside it included (ADR-0181).
+- **An unkeyed list inside a row renders the row again** when it changes
+  (ADR-0181): its instances have no address. A keyed one is changed where
+  it is.
 - **A comment in markup is `<!-- -->`** (ADR-0167), and no page renders it.
   HTML's other bogus comments, `<!x>` and `<?x>`, are read as elements. A
   line of markup text that begins with `//` or `/*` is refused (PW5028),

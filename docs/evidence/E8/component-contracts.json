@@ -575,7 +575,7 @@
     "imports": [
       {
         "interface": "store:data/menus",
-        "name": "for-store",
+        "name": "sections",
         "capability": "database.read<Menus>",
         "capabilities": [
           {
@@ -602,7 +602,7 @@
                     "args": [
                       {
                         "declared": {
-                          "path": "domain.MenuItem"
+                          "path": "domain.MenuSection"
                         }
                       }
                     ]

@@ -161,6 +161,27 @@ fn what_a_row_decides_by_and_a_list_it_iterates_are_computed_for_it() {
 }
 
 #[test]
+fn a_row_of_a_loop_inside_a_loop_reads_members_of_its_item() {
+    // ADR-0181: the inner loop's `section.items` is `sections.*.items`, the
+    // list in each item of the query's `sections`, and its rows read members
+    // as a query's list's do, in text and attributes alike. Until 2026-10-04
+    // it was refused as a list that is not a query's.
+    let plan = plan(
+        "{#each sections as section (section.title)}<ul>{#each section.items as item \
+         (item.id)}<li title={item.price.display}>{item.price.display}</li>{/each}</ul>{/each}",
+    )
+    .expect("planned");
+    assert_eq!(
+        plan.rows,
+        [row(
+            "sections.*.items",
+            "item.price.display",
+            &[field("price"), member("t.display")]
+        )]
+    );
+}
+
+#[test]
 fn a_member_read_no_host_computes_is_refused_where_it_is() {
     for (markup, refused) in [
         // At the top of the page: an attribute, and what a block decides by.
@@ -184,26 +205,14 @@ fn a_member_read_no_host_computes_is_refused_where_it_is() {
             "{#match total.discount}{:Some(d)}<p>{d.minor_units}</p>{:None}<p>none</p>{/match}",
             "part 0 reads `total.discount` through a member function in what a block decides by",
         ),
-        // A row of a list that is not a query's: its loop's items are a
-        // field of another row's.
-        (
-            "{#each sections as section (section.title)}<ul>{#each section.items as item \
-             (item.id)}<li>{item.price.display}</li>{/each}</ul>{/each}",
-            "part 2 reads `item.price.display` through a member function in a text part",
-        ),
-        (
-            "{#each sections as section (section.title)}<ul>{#each section.items as item \
-             (item.id)}<li title={item.price.display}>x</li>{/each}</ul>{/each}",
-            "part 2 reads `item.price.display` through a member function in an attribute",
-        ),
     ] {
         let why = plan(markup).expect_err(markup);
         assert!(why.starts_with(refused), "{markup}: {why}");
         assert!(
             why.ends_with(
                 "which no host computes there: one computes it from a query's value in text at \
-                 the top of the page (ADR-0125), or from the item of a loop over a query's list \
-                 (ADR-0169)"
+                 the top of the page (ADR-0125), or from the item of a loop over a query's list, \
+                 or over a list in such an item (ADR-0169, ADR-0181)"
             ),
             "{why}"
         );

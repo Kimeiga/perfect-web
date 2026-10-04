@@ -155,9 +155,17 @@ fn a_field_the_type_declares_and_the_answer_lacks_is_refused() {
 
 #[test]
 fn a_list_s_rows_and_a_declared_error_are_read_through_their_types() {
+    let coffee = || {
+        Val::Record(vec![
+            ("id".into(), Val::String("coffee".into())),
+            ("name".into(), Val::String("Coffee".into())),
+        ])
+    };
     let item = |id: &str, extra: bool| {
         let mut fields = vec![
             ("id".to_string(), Val::String(id.into())),
+            // Its store and its category (ADR-0181).
+            ("store-id".to_string(), Val::String("47".into())),
             ("name".to_string(), Val::String(id.to_uppercase())),
             (
                 "description".to_string(),
@@ -170,23 +178,33 @@ fn a_list_s_rows_and_a_declared_error_are_read_through_their_types() {
             ),
             // Whether it can be ordered (ADR-0178).
             ("available".to_string(), Val::Bool(true)),
+            ("category".to_string(), coffee()),
         ];
         if extra {
             fields.push(("calories".into(), Val::S64(5)));
         }
         Val::Record(fields)
     };
+    // The menu, grouped by category (ADR-0181): a list of sections, each a
+    // record holding a list, each row read through its type in turn.
     let menu = |extra: bool| {
-        ok(Val::List(vec![
-            item("espresso", extra),
-            item("cortado", extra),
-        ]))
+        let mut section = vec![
+            ("category".to_string(), coffee()),
+            (
+                "items".to_string(),
+                Val::List(vec![item("espresso", extra), item("cortado", extra)]),
+            ),
+        ];
+        if extra {
+            section.push(("position".into(), Val::S64(1)));
+        }
+        ok(Val::List(vec![Val::Record(section)]))
     };
     let read = |answer: Val| {
         run(
             "store.page.Menu",
             "database.read<Menus>",
-            "store:data/menus#for-store",
+            "store:data/menus#sections",
             answer,
         )
     };

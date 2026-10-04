@@ -71,25 +71,35 @@ fn refused(src: &str) -> Vec<String> {
         .collect()
 }
 
+/// A store's items as one list, for a page over them: the store's own `Menu`
+/// is grouped by category since ADR-0181.
+const ITEMS: &str = "import Menus\nimport Events.{ MenuChanged }\n\
+    import domain.{ StoreError, MenuItem }\n\n\
+    public query Items(id: StoreId) -> Result<List<MenuItem>, StoreError>\n    \
+    freshness      5.minutes\n    consistency    snapshot\n    cache          shared\n    \
+    key            id\n    invalidates_on MenuChanged(id)\n    timeout        2.seconds\n\
+    {\n    Menus.for_store(id)\n}\n\n";
+
 /// A page over the store's menu with three signals, whose view holds
 /// `markup` after a button that changes each.
 fn page(markup: &str) -> String {
     format!(
-        "module t\n\nimport store.page.{{ Menu }}\n\
-         import domain.{{ StoreId, MenuItemId, CartError, InteractionId }}\n\n\
+        "module t\n\n\
+         import domain.{{ StoreId, MenuItemId, CartError, InteractionId }}\n{items}\
          command pick(item: MenuItemId) -> Result<MenuItemId, CartError>\n    \
          requires SignedIn\n    idempotent_by InteractionId\n{{\n    Ok(item)\n}}\n\n\
          type Panel = Shut | Item(Int)\n\n\
          page P(id: StoreId, chosen: MenuItemId) {{\n    cache private\n\n    \
          signal count: Int = 0\n    signal open: Bool = false\n    signal panel: Panel = Panel.Shut\n    \
          signal tags: List<String> = [\"a\", \"b\"]\n    signal title: String = \"t\"\n\n    \
-         let menu = query Menu(id)\n\n    \
+         let menu = query Items(id)\n\n    \
          view {{\n        <main>\n            \
          <button type=\"button\" on:press={{() => count = count + 1}}>Up</button>\n            \
          <button type=\"button\" on:press={{() => open = true}}>Open</button>\n            \
          <button type=\"button\" on:press={{() => panel = Panel.Item(count)}}>Item</button>\n            \
          <button type=\"button\" on:press={{() => tags = [\"c\"]}}>Tags</button>\n            \
-         {markup}\n        </main>\n    }}\n}}\n"
+         {markup}\n        </main>\n    }}\n}}\n",
+        items = ITEMS
     )
 }
 

@@ -107,6 +107,15 @@ fn ui(views: &str) -> String {
     )
 }
 
+/// A store's items as one list, for a page over them: the store's own `Menu`
+/// is grouped by category since ADR-0181.
+const ITEMS: &str = "import Menus\nimport Events.{ MenuChanged }\n\
+    import domain.{ StoreError, MenuItem }\n\n\
+    public query Items(id: StoreId) -> Result<List<MenuItem>, StoreError>\n    \
+    freshness      5.minutes\n    consistency    snapshot\n    cache          shared\n    \
+    key            id\n    invalidates_on MenuChanged(id)\n    timeout        2.seconds\n\
+    {\n    Menus.for_store(id)\n}\n\n";
+
 /// A page over the store's menu, in module `t`, whose view holds `markup`,
 /// using the views `used` imports from `ui`.
 fn page(used: &[&str], markup: &str) -> String {
@@ -115,12 +124,13 @@ fn page(used: &[&str], markup: &str) -> String {
         _ => format!("import ui.{{ {} }}\n", used.join(", ")),
     };
     format!(
-        "module t\n\nimport store.page.{{ Menu, Store, Cart }}\nimport domain.{{ StoreId }}\n\
-         import context.{{ current_session }}\n{import}\n\
+        "module t\n\nimport store.page.{{ Store, Cart }}\nimport domain.{{ StoreId }}\n\
+         import context.{{ current_session }}\n{import}{items}\n\
          page P(id: StoreId) {{\n    cache private\n\n    \
-         let store = query Store(id)\n    let menu = query Menu(id)\n    \
+         let store = query Store(id)\n    let menu = query Items(id)\n    \
          let cart = query Cart(current_session())\n\n    \
-         view {{\n        <main>\n{markup}\n        </main>\n    }}\n}}\n"
+         view {{\n        <main>\n{markup}\n        </main>\n    }}\n}}\n",
+        items = ITEMS
     )
 }
 
@@ -367,12 +377,13 @@ fn cart_count_page(inline: bool) -> (String, String) {
         false => "import ui.{ CartCount, AddButton }\n",
     };
     let page = format!(
-        "module t\n\nimport store.page.{{ Menu, Cart }}\nimport domain.{{ StoreId }}\n\
-         import context.{{ current_session }}\n{imports}\n\
+        "module t\n\nimport store.page.{{ Cart }}\nimport domain.{{ StoreId }}\n\
+         import context.{{ current_session }}\n{imports}{items}\n\
          page P(id: StoreId) {{\n    cache private\n\n    \
-         let menu = query Menu(id)\n    let cart = query Cart(current_session())\n\n    \
+         let menu = query Items(id)\n    let cart = query Cart(current_session())\n\n    \
          view {{\n        <main>\n            {count}\n            \
-         <ul>{{#each menu as item (item.id)}}<li>{add}</li>{{/each}}</ul>\n        </main>\n    }}\n}}\n"
+         <ul>{{#each menu as item (item.id)}}<li>{add}</li>{{/each}}</ul>\n        </main>\n    }}\n}}\n",
+        items = ITEMS
     );
     (views, page)
 }

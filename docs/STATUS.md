@@ -13,6 +13,20 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0181, 2026-10-04: a menu is grouped by its category, and a list inside
+a row is changed where it is** (charter §15.1, the end of the audit's eighth
+gap). `MenuItem` declares its `store_id` and its `category`, and the store's
+`Menu` answers `MenuSection`s, each a heading and its items on the page. To
+get there:
+- the plan reads a loop inside a loop (`menu.*.items`);
+- the renderer derives a keyed list's change, a list inside a row diffed
+  where it is, which the server did for a list at the top of a page alone;
+- every menu change is derived from the menu's values, E7-P's operations
+  included, whose items keep their nodes inside their category.
+
+A menu's version and a cart's identity stay the runtime's, ruled rather than
+added as second fields. 7 mutants (`just e14-menu-categories`).
+
 **ADR-0180, 2026-10-04: a delivery estimate is a range, and says when it
 was made** (charter §15.1). `DeliveryEstimate { min_minutes: PositiveInt,
 max_minutes: PositiveInt, generated_at: Instant }`, and the platform's
@@ -2880,14 +2894,11 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **§15.1's remaining fields** (the audit's eighth gap): `MenuItem.category`
-   and `store_id`, and `Store.menu_version`. `available` is met by ADR-0178,
-   `PositiveInt` checked at every construction and boundary by ADR-0179, and
-   `DeliveryEstimate`'s range by ADR-0180.
-2. **Accessibility** (test 14, the audit's ninth gap): an automated audit of
+1. **Accessibility** (test 14, the audit's ninth gap): an automated audit of
    the store's page in three engines.
-3. **Tests 2 and 13** (the audit's tenth gap): the running store's shared
+2. **Tests 2 and 13** (the audit's tenth gap): the running store's shared
    output holds no session or secret field.
+3. **E14-E's design**, ready for the owner's choice of models and budget.
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

@@ -36,6 +36,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+RENDER = ROOT / "runtime/pw-render/src/lib.rs"
 PROTOCOL = ROOT / "runtime/pw-protocol/src/lib.rs"
 BIN = ROOT / "runtime/pw-render/src/bin/pw-render.rs"
 SPIKE = ROOT / "spikes/own-renderer"
@@ -54,31 +55,33 @@ MUTANTS = [
     (
         "an item that left is kept",
         "server",
-        SERVER,
-        "        } else {\n            out.push(at(PatchOp::RemoveInstance { instance: t }));\n        }\n",
+        # Re-anchored by ADR-0181: the renderer derives a list's change.
+        RENDER,
+        "        } else {\n            out.push(ListChange::Remove(t));\n        }\n",
         "        } else {\n            let _ = t;\n        }\n",
     ),
     (
         "nothing moves",
         "server",
-        SERVER,
+        # Re-anchored by ADR-0181.
+        RENDER,
         "                if found != i {\n",
         "                if found != i && false {\n",
     ),
     (
         "a changed item is always rendered again",
         "server",
-        SERVER,
-        # Re-anchored by ADR-0168: what changed, part by part.
-        "                    match in_place {\n"
-        "                        Some(changes) => out.extend(instance_patches(schema, each, &t, changes)),\n",
-        "                    match in_place.filter(|_| false) {\n"
-        "                        Some(changes) => out.extend(instance_patches(schema, each, &t, changes)),\n",
+        # Re-anchored by ADR-0168: what changed, part by part; and by
+        # ADR-0181, where the renderer derives it.
+        RENDER,
+        "                    match row_changes(part, &was, item, env, others, at)? {\n",
+        "                    match row_changes(part, &was, item, env, others, at)?.filter(|_| false) {\n",
     ),
     (
         "a new item goes to the head",
         "server",
-        SERVER,
+        # Re-anchored by ADR-0181.
+        RENDER,
         "        prev = Some(t);\n    }\n    Ok(out)\n",
         "        let _ = t;\n    }\n    Ok(out)\n",
     ),

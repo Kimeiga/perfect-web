@@ -108,8 +108,11 @@ const rows = (v) =>
   v.lines
     .map((l) => `${l.name}x${list.rows["quantity.count"](l)}=${list.rows["total.display"](l)}`)
     .join(" ");
-const espresso = { id: "espresso", name: "Espresso", description: "", price: { minor_units: 450 } };
-const cortado = { id: "cortado", name: "Cortado", description: "Short.", price: { minor_units: 375 } };
+// As the page shows an item: its store, whether it can be ordered, and its
+// category too (ADR-0178, ADR-0181).
+const coffee = { id: "coffee", name: "Coffee" };
+const espresso = { id: "espresso", store_id: "47", name: "Espresso", description: "", price: { minor_units: 450 }, available: true, category: coffee };
+const cortado = { id: "cortado", store_id: "47", name: "Cortado", description: "Short.", price: { minor_units: 375 }, available: true, category: coffee };
 const steps = [held];
 const step = (command, args) => steps.push(run(command, steps.at(-1), args));
 step("store.page.add_to_cart", [espresso, 1]);
