@@ -7,7 +7,8 @@ Each mutant undoes one piece:
   row's; one id in two arms of a block taken as two elements;
 - PW5032: a reference to nothing let through; one to an element shown only
   some of the time let through; an id in every arm of a block taken as not
-  always shown; an id the page computes taken as no id;
+  always shown; an id the page computes taken as no id, and one written
+  with holes taken as any;
 - PW5033: an unknown ARIA attribute, a value its attribute does not take,
   and an unknown role, each let through;
 - one mistake, one report: a field named by a reference to nothing, and one
@@ -81,6 +82,14 @@ MUTANTS = [
         "            || self.computed.iter().any(|(before, after)| {\n",
         "        false\n"
         "            && self.computed.iter().any(|(before, after)| {\n",
+    ),
+    (
+        # A correction to ADR-0185, the same day: a string with holes was
+        # taken as an id that may be anything.
+        "an id written with holes may be anything",
+        CHECK,
+        "                    Expr::Interpolated { text, .. } => {\n",
+        "                    Expr::Interpolated { text, .. } if false => {\n",
     ),
     (
         "an unknown ARIA attribute is let through",

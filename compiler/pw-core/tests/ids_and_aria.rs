@@ -98,6 +98,19 @@ fn a_reference_names_an_element_shown_whenever_the_referrer_is() {
         "<ul aria-describedby=\"line-espresso\">{#each lines as line (line.id)}\
          <li id=\"line-{line.id}\">{line.name}</li>{/each}</ul>",
     );
+    // An id the page computes from a pattern is that pattern: a reference
+    // outside it still names nothing. Until 2026-10-04 any such id let every
+    // reference through (a correction to ADR-0185).
+    refused(
+        "<ul aria-describedby=\"help\">{#each lines as line (line.id)}\
+         <li id=\"line-{line.id}\">{line.name}</li>{/each}</ul>",
+        "PW5032 `aria-describedby` names `help`, which no element of `V` has",
+    );
+    // And one wholly computed may be any.
+    clean(
+        "<ul aria-describedby=\"help\">{#each lines as line (line.id)}\
+         <li id={line.id}>{line.name}</li>{/each}</ul>",
+    );
 }
 
 #[test]

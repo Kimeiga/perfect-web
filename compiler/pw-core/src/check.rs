@@ -2392,14 +2392,25 @@ impl<'b> Ids<'b> {
             match &a.value {
                 AttrValue::Static(_) => {
                     let v = static_attr(attrs, "id").unwrap_or_default();
-                    match (v.find('{'), v.rfind('}')) {
-                        (Some(open), Some(close)) => {
-                            ids.computed.push((&v[..open], &v[close + 1..]))
-                        }
-                        _ => ids.written.entry(v).or_default().push(n),
-                    }
+                    ids.written.entry(v).or_default().push(n);
                 }
-                AttrValue::Expr(_) => ids.anything = true,
+                // `id="line-{line.item_id}"`: a string with holes, whose text
+                // before the first and after the last is fixed. Until
+                // 2026-10-04 it was taken as an id that may be anything, and
+                // a declaration with one let every reference to nothing
+                // through (a correction to ADR-0185).
+                AttrValue::Expr(e) => match body.expr(*e) {
+                    Expr::Interpolated { text, .. } => {
+                        let v = text.trim_matches(|c| c == '"' || c == '\'');
+                        match (v.find('{'), v.rfind('}')) {
+                            (Some(open), Some(close)) => {
+                                ids.computed.push((&v[..open], &v[close + 1..]))
+                            }
+                            _ => ids.anything = true,
+                        }
+                    }
+                    _ => ids.anything = true,
+                },
                 AttrValue::None => {}
             }
         }

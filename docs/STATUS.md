@@ -24,8 +24,13 @@ page someone read (ADR-0182's audit).
   is refused, and `aria-labelledby` offered.
 
 A field left unnamed by such a mistake is not reported again by PW5014.
-Corpus C10: R-049 to R-051 and A-026; **generality is 36 / 36**. 12 mutants
+Corpus C10: R-049 to R-051 and A-026; **generality is 36 / 36**. 13 mutants
 (`just e14-ids`).
+
+**Correction, the same day.** An id written with holes, `id="line-{x}"`,
+was taken as one that may be anything. So a declaration with one let every
+reference to nothing through, and A-026 is one. It is read as its pattern
+now.
 
 **ADR-0184, 2026-10-04: what a cache may keep holds nothing of a
 session's** (charter §15.6 tests 2 and 13, the audit's tenth and last gap).

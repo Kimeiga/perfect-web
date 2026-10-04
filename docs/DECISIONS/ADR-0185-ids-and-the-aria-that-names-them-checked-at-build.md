@@ -108,7 +108,8 @@ Recorded by `just e14-ids` in `docs/evidence/E14/ids.txt`:
   its own defect; generality 36 / 36; the C10 history test.
 - **Every program the repository checks is clean**: the store, the demos,
   the kiokun slice, the accepted corpus and the benchmark's store.
-- **`scripts/ids_mutations.py`**: 12 mutants.
+- **`scripts/ids_mutations.py`**: 13 mutants, one of them the correction's
+  (below).
 
 ## Not claimed
 
@@ -118,3 +119,16 @@ Recorded by `just e14-ids` in `docs/evidence/E14/ids.txt`:
   `aria-allowed-attr`, and the attributes a role requires. These are left
   to ADR-0182's audit.
 - **A `<label for>` that names an element that is not a control.**
+
+## Correction, 2026-10-04
+
+**An id written with holes was taken as one that may be anything.**
+`id="line-{line.item_id}"` is a string with holes, which the HIR holds as an
+interpolated expression, not as text. The first version read only text for
+an id's pattern, and took every expression as an id that could be anything.
+So a declaration with one such id let every reference to nothing through.
+A-026 is such a declaration.
+
+The id is now read as its pattern: the text before its first hole and after
+its last is fixed. A reference outside the pattern names nothing, and is
+refused. A test holds both cases, and a 13th mutant holds the test.
