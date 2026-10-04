@@ -1,0 +1,59 @@
+ADR-0181 - a menu is grouped by its category, and a list inside a row is changed where it is
+
+produced by: just e14-menu-categories
+commit: bb63cb5efaf1c5b4da8c31b7d28d88620b334ec3
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the plan (compiler/pw-core/tests/row_reads.rs)
+
+test fields_are_the_renderer_s_and_a_query_s_member_in_text_at_the_top_is_a_part ... ok
+test a_row_of_a_loop_inside_a_loop_reads_members_of_its_item ... ok
+test what_a_row_decides_by_and_a_list_it_iterates_are_computed_for_it ... ok
+test a_row_reads_a_member_of_its_item_once_in_text_and_attributes_alike ... ok
+test a_signal_s_member_is_refused_since_the_browser_reads_a_signal_by_field ... ok
+test a_member_read_no_host_computes_is_refused_where_it_is ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.55s
+
+== the renderer (runtime/pw-render/tests/nested_lists.rs, instance_changes.rs)
+
+test a_renamed_item_sets_its_text_and_every_attribute_that_reads_the_name ... ok
+test a_block_that_changed_renders_the_instance_again ... ok
+test nothing_changed_is_no_change ... ok
+test an_unkeyed_list_inside_the_row_that_changed_renders_the_row_again ... ok
+test an_attribute_is_set_as_the_document_writes_it_and_a_boolean_one_comes_and_goes ... ok
+test a_block_that_decides_as_it_did_is_set_where_it_is ... ok
+test what_a_handler_captures_is_set_where_it_is ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test an_item_renamed_inside_a_section_is_set_where_it_is ... ok
+test a_section_and_an_item_across_sections_are_the_outer_and_inner_lists_operations ... ok
+test an_item_inserted_moved_or_removed_inside_a_section_is_its_lists_own_operation ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+== the development server (pw-dev-server)
+
+test tests::a_change_sends_what_changed_unannounced_with_it ... ok
+test tests::a_menu_is_grouped_by_its_category ... ok
+test tests::a_rename_sets_every_part_that_reads_the_name ... ok
+test tests::a_stock_change_told_renders_its_row_again_where_it_is ... ok
+test tests::an_insert_and_what_changed_with_it_are_derived_from_the_menu ... ok
+test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.28s
+
+== the pages, in three engines (e2e/stores.spec.mjs, e2e/keyed-list.spec.mjs)
+
+  69 passed (1.0m)
+
+== mutation controls (scripts/menu_categories_mutations.py)
+
+baseline (core): 1155 passed, 0 failed
+baseline (render): 84 passed, 0 failed
+baseline (server): 104 passed, 0 failed
+a loop inside a loop is read as if its list were a query's [core]: KILLED (1 of 241 tests fail)
+`*` is not read as each item of a list [core]: KILLED (1 of 241 tests fail)
+a keyed list inside a row renders the row again [render]: KILLED (3 of 26 tests fail)
+an item new at the head is inserted with no instance before it [render]: KILLED (2 of 26 tests fail)
+a list's rows inside each item of another are not computed [server]: KILLED (39 of 104 tests fail)
+each item is a category of its own [server]: KILLED (39 of 104 tests fail)
+store 48's bakery is among its drinks [server]: KILLED (1 of 104 tests fail)
+7 of 7 mutants killed
