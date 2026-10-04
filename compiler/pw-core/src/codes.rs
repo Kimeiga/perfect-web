@@ -189,6 +189,10 @@ codes! {
     // reason, and an address naming nothing is 404's.
     NOT_FOUND_NAMES_A_CASE = "PW0342" / not_found_names_a_case / 1, DeclarationRules,
         "a page's `not_found_on` names a case of an error a query it reads can answer";
+    // ADR-0177: charter §15.6 test 18, origin failure follows last-known-good
+    // only for declared public data.
+    LAST_KNOWN_GOOD_IS_PUBLIC = "PW0343" / last_known_good_is_public / 1, DeclarationRules,
+        "a last-known-good fallback serves only public data";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
 

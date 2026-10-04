@@ -114,11 +114,12 @@ MUTANTS = [
         "`/bench/store` leaves the kept store in place",
         "browser",
         SERVER,
+        # Re-anchored by ADR-0177: the store page's plan, and every page's.
         "                .store(delay, std::sync::atomic::Ordering::SeqCst);\n"
-        "            let resources: std::collections::BTreeSet<String> = server\n",
+        "            let resources: std::collections::BTreeSet<String> = std::iter::once(&server.plan)\n",
         "                .store(delay, std::sync::atomic::Ordering::SeqCst);\n"
         "            let resources = std::collections::BTreeSet::<String>::new();\n"
-        "            let _kept: std::collections::BTreeSet<String> = server\n",
+        "            let _kept: std::collections::BTreeSet<String> = std::iter::once(&server.plan)\n",
     ),
 ]
 

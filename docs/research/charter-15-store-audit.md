@@ -122,7 +122,7 @@ are fixed (ADR-0155):
 | 15 | focus preserved | met, and since ADR-0172 through a speculation and the server's answer: a kept row's nodes stay, and focus in a row that goes passes on |
 | 16 | handler version mismatch recovers | partial: refused safely, the recovery not acted on (fixed) |
 | 17 | slow recommendations do not block Add | met since ADR-0165 in Chromium and Firefox, and in WebKit since ADR-0166, which gave the store enough text to be painted before its slots (`e2e/slots.spec.mjs`) |
-| 18 | last-known-good only for declared public data | partial: the materializer's tests; nothing limits the fallback to public data, and the server never serves one |
+| 18 | last-known-good only for declared public data | met since ADR-0177: PW0343 keeps `fallback last_known_good` to public data, the query runtime serves it for public data alone, and the store's page is shown with its last store while its origin fails, in three engines |
 
 ## Gaps, most important first
 
@@ -139,8 +139,7 @@ are fixed (ADR-0155):
 5. ~~**A command retried on a transport failure**~~ (§15.4): met by
    ADR-0173.
 6. ~~**§15.5's missing controls.**~~ Met by ADR-0174 to ADR-0176.
-7. **Last-known-good** (test 18): a rule limiting it to public data, and
-   the server serving it.
+7. ~~**Last-known-good** (test 18)~~: met by ADR-0177.
 8. **§15.1's fields**, and `PositiveInt` checked at the boundary. The
    descriptions are met by ADR-0166, and the price by ADR-0169. Still
    missing: `available`, `category` and `menu_version`; and

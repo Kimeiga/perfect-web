@@ -91,3 +91,21 @@ test("the store's delay slows every page that reads the store, until it is clear
   }
   expect(await served(page)).toBeLessThan(1500);
 });
+
+test("the store's origin failing: the page is shown with the last store kept, as public data may be", async ({
+  page,
+}) => {
+  // Charter §15.6 test 18 (ADR-0177). The store's read, kept; its origin
+  // failing once, and what was kept expired. The cart's own read failing is
+  // the test above: a private value is never answered from what was kept.
+  await ready(page);
+  const asked = async () => (await (await page.request.get("/bench/calls")).json()).store;
+  const before = await asked();
+  expect((await page.request.post("/bench/store?fail=next")).ok()).toBe(true);
+  const shown = await page.goto("/stores/47");
+  expect(shown.status()).toBe(200);
+  await expect(page.locator("#store-name")).toHaveText("Blue Bottle");
+  await expect(page.locator("#menu li")).toHaveCount(3);
+  // Its origin was asked, and failed: what the page shows was kept.
+  expect(await asked()).toBe(before + 1);
+});

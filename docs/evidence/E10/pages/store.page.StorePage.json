@@ -21,7 +21,8 @@
         "key": [
           0
         ],
-        "on_key_change": "cancel"
+        "on_key_change": "cancel",
+        "fallback": "last_known_good"
       },
       "not_found": [
         "not-found"
@@ -43,7 +44,8 @@
         "key": [
           0
         ],
-        "on_key_change": "cancel"
+        "on_key_change": "cancel",
+        "fallback": "last_known_good"
       },
       "not_found": [
         "not-found"

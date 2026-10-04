@@ -431,6 +431,10 @@ awaited in order. What remains:
 - **A browser sends a record field by field** (ADR-0172), each field named
   as the host finds it: a record with a field whose name would come back as
   another, `opensMinute`, is refused. A variant is not sent.
+- **A page does not say what it shows was the last kept** (ADR-0177).
+  While a public query's origin fails, its last value is shown, and nothing
+  tells the reader it is from before. `fallback empty` is checked and read
+  by nothing.
 - **A command's request that hangs waits** (ADR-0173). A command declares
   no `timeout`, so a request with its connection open and no answer is not
   a failure, and is not sent again.

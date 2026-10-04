@@ -198,13 +198,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - ~~A materializer failure, end to end~~ (ADR-0176,
           `just e14-materializer-failure`). Correction: a failed
           regeneration left a page a line short, silently.
-     7. **Next: last-known-good for declared public data** (test 18). A
-        public query that declares a last-known-good fallback serves its
-        last good value when its read fails (`/bench/fail?next=read`'s kind,
-        for the store or the menu), and a private one never does. Acceptance:
-        the menu shown from its last good value while its read fails, the
-        cart refused rather than served stale, and PW rules that keep the
-        fallback to public data, in three engines.
+     7. ~~Last-known-good for declared public data~~ (ADR-0177,
+        `just e14-last-known-good`): PW0343, the query runtime's fallback for
+        public data alone, and the store's page shown with its last store
+        kept while its origin fails, in three engines.
+     8. **Next: §15.1's remaining fields.** `MenuItem.available`,
+        `category` and `menu_version`; `DeliveryEstimate`'s range; and
+        `PositiveInt` checked where a request gives one. Acceptance: the
+        page shows an item that cannot be ordered as such before the press,
+        a quantity of 0 or less is refused at the host, in three engines.
      7. Availability on the page before the press: `MenuItem.available`, and
         an `InventoryChanged` the menu hears.
 

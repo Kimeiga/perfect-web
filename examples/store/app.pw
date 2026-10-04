@@ -48,7 +48,9 @@ import Events.{ CartChanged, MenuChanged }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
-// menu and no other (§15.6 test 11, ADR-0164).
+// menu and no other (§15.6 test 11, ADR-0164). When the menus' origin fails,
+// the last menu kept is shown (§15.6 test 18, ADR-0177): it is every
+// reader's, and still true of no one in particular.
 public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
     freshness      5.minutes
     consistency    snapshot
@@ -58,6 +60,7 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
+    fallback       last_known_good
 {
     Menus.for_store(id)
 }
@@ -82,6 +85,8 @@ public query Recommendations(id: StoreId) -> Result<List<Recommendation>, Recomm
     Recommender.for_store(id)
 }
 
+// The store, as the menu: public, and its last value kept shown when its
+// origin fails (ADR-0177).
 public query Store(id: StoreId) -> Result<Store, StoreError>
     freshness     30.seconds
     consistency   snapshot
@@ -90,6 +95,7 @@ public query Store(id: StoreId) -> Result<Store, StoreError>
     concurrency   one_per_key
     on_key_change cancel
     timeout       2.seconds
+    fallback      last_known_good
 {
     Stores.get(id)
 }

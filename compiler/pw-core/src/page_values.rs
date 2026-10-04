@@ -80,6 +80,11 @@ pub struct Policy {
     /// `keep`, as declared. Absent where the query declares none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_key_change: Option<String>,
+    /// **What a read whose origin fails is answered with** (ADR-0177):
+    /// `last_known_good` or `empty`, as declared. Absent where the query
+    /// declares none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<String>,
 }
 
 fn policy_of(decl: &crate::hir::Decl) -> Policy {
@@ -117,6 +122,7 @@ fn policy_of(decl: &crate::hir::Decl) -> Policy {
         on_key_change: decl
             .policy("on_key_change")
             .map(|p| p.value.trim().to_string()),
+        fallback: decl.policy("fallback").map(|p| p.value.trim().to_string()),
     }
 }
 

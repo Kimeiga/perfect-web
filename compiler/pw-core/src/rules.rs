@@ -265,6 +265,41 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
         );
     }
 
+    // --- PW0343: a last-known-good fallback for data that is not public -----
+    // Charter §15.6 test 18 (ADR-0177): "Origin failure follows last-known-good
+    // policy only for declared public data."
+    // What PW0100 reads as not public: labelled `session` or `private`, or
+    // kept privately. A shared materialization is public by ADR-0128's rule,
+    // and an unlabelled declaration is public to the manifest.
+    if let Some(f) = policy(policies, "fallback")
+        && f.value.trim() == "last_known_good"
+        && (matches!(visibility, "session" | "private")
+            || policy(policies, "cache").is_some_and(|c| c.value.trim() == "private"))
+    {
+        out.push(
+            err(
+                "PW0343",
+                "a last-known-good fallback serves only public data",
+                format!(
+                    "`{name}` answers a read whose origin failed with its last value, and its \
+                     result is `{label}`"
+                ),
+                f.span.clone(),
+            )
+            .related(
+                name_span.clone(),
+                format!("`{name}` is declared here, so its result is labeled `{label}`"),
+            )
+            .explain(
+                "a public value is the same for every reader, and the last one is still true \
+                 of no one in particular; a session's own value kept to answer for a failed \
+                 origin would be a copy of private data nothing was asked to keep, and would \
+                 hide the session's own writes",
+            )
+            .repair("remove `fallback last_known_good`, or declare the query `public`"),
+        );
+    }
+
     // --- PW0102: a stale session read ---------------------------------------
     if let Some(f) = policy(policies, "freshness")
         && visibility == "session"
@@ -581,6 +616,36 @@ mod tests {
     fn read_your_writes_on_a_public_query_is_rejected() {
         let src = "module s\npublic query Store(id: StoreId) -> Store\n    consistency read_your_writes\n{\n    0\n}\n";
         assert!(codes(src).contains(&"PW0101"));
+    }
+
+    #[test]
+    fn a_last_known_good_fallback_is_public_data_alone() {
+        // ADR-0177, charter §15.6 test 18.
+        let public = "module c\npublic query Store(id: Int) -> Int\n    freshness 30.seconds\n    cache shared\n    fallback last_known_good\n{\n    0\n}\n";
+        assert!(!codes(public).contains(&"PW0343"));
+        for (what, src) in [
+            (
+                "a session's",
+                "module c\nsession query Cart(s: Int) -> Int\n    freshness 0.seconds\n    fallback last_known_good\n{\n    0\n}\n",
+            ),
+            (
+                "one kept privately",
+                "module c\npublic query Mine(id: Int) -> Int\n    cache private\n    fallback last_known_good\n{\n    0\n}\n",
+            ),
+        ] {
+            assert!(codes(src).contains(&"PW0343"), "{what}: {:?}", codes(src));
+        }
+        // A shared materialization of public data, as the store's menu
+        // fragment is.
+        let materialized = "module c\nmaterialize Fragment(id: Int) {\n    partition public\n    fallback last_known_good\n}\n";
+        assert!(
+            !codes(materialized).contains(&"PW0343"),
+            "{:?}",
+            codes(materialized)
+        );
+        // `fallback empty` keeps nothing.
+        let empty = "module c\nsession query Cart(s: Int) -> Int\n    freshness 0.seconds\n    fallback empty\n{\n    0\n}\n";
+        assert!(!codes(empty).contains(&"PW0343"));
     }
 
     #[test]

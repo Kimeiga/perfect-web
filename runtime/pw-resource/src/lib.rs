@@ -106,6 +106,11 @@ pub enum Trace {
     ServedFromCache {
         key: Key,
     },
+    /// **The last value kept, served because the origin failed** (ADR-0177):
+    /// only for public data whose manifest declares `last_known_good`.
+    ServedLastKnownGood {
+        key: Key,
+    },
     Cancelled {
         key: Key,
         reason: &'static str,
@@ -161,6 +166,21 @@ pub struct Manifest {
     /// `cache` clause is not cached: concurrent requests still share one
     /// flight, and nothing outlives it.
     pub cacheable: bool,
+    /// **What a read that fails at its origin is answered with**
+    /// (ADR-0177): nothing, or for public data the last value kept.
+    pub fallback: Fallback,
+}
+
+/// **A read's fallback when its origin fails** (ADR-0177, charter §15.6
+/// test 18).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Fallback {
+    /// The failure is the reader's.
+    #[default]
+    None,
+    /// The last value kept, past its freshness, for public data alone: a
+    /// session's own value is never served from a copy kept for it.
+    LastKnownGood,
 }
 
 impl Manifest {
@@ -173,6 +193,7 @@ impl Manifest {
             retry_base: 100,
             timeout: 2_000,
             cacheable: true,
+            fallback: Fallback::None,
         }
     }
     pub fn uncached(mut self) -> Self {
@@ -181,6 +202,12 @@ impl Manifest {
     }
     pub fn private(mut self) -> Self {
         self.privacy = Privacy::Private;
+        self
+    }
+    /// The last value kept, when the origin fails (ADR-0177). Public data
+    /// alone: for private data it is never served.
+    pub fn last_known_good(mut self) -> Self {
+        self.fallback = Fallback::LastKnownGood;
         self
     }
     pub fn freshness(mut self, ms: Millis) -> Self {
@@ -217,6 +244,8 @@ struct Entry<V> {
     value: V,
     stored_at: Millis,
     privacy: Privacy,
+    /// Past its freshness whatever the clock says, and kept (ADR-0177).
+    expired: bool,
 }
 
 /// Why a request lost permission to publish a result.
@@ -374,6 +403,8 @@ impl<V> Clone for Resources<V> {
 pub enum Fetched<V = String> {
     FromCache(V),
     Fresh(V),
+    /// The origin failed, and the last value kept was served (ADR-0177).
+    LastKnownGood(V),
     /// Another caller's request was already running; this one joined it.
     Deduplicated(V),
     Failed(String),
@@ -467,6 +498,37 @@ impl<V: Clone> Resources<V> {
         &self,
         manifest: &Manifest,
         key: &Key,
+        load: impl FnMut(u32, &Cancellation<V>) -> Result<V, String>,
+    ) -> Fetched<V> {
+        let fetched = self.fetch_from_origin(manifest, key, load);
+        // **The last value kept, where the origin failed** (ADR-0177): for
+        // public data whose manifest declares it, and never for private
+        // data, whatever a manifest says. A stopped read is not a failure.
+        if matches!(fetched, Fetched::Failed(_) | Fetched::TimedOut)
+            && manifest.fallback == Fallback::LastKnownGood
+            && manifest.privacy == Privacy::Public
+        {
+            let mut st = self.state.lock().expect("state");
+            if let Some(value) = st
+                .cache
+                .get(key)
+                .filter(|e| e.privacy == Privacy::Public)
+                .map(|e| e.value.clone())
+            {
+                st.trace
+                    .push(Trace::ServedLastKnownGood { key: key.clone() });
+                return Fetched::LastKnownGood(value);
+            }
+        }
+        fetched
+    }
+
+    /// [`Resources::fetch_cancellable`], without a fallback: the cache, a
+    /// flight, or the origin.
+    fn fetch_from_origin(
+        &self,
+        manifest: &Manifest,
+        key: &Key,
         mut load: impl FnMut(u32, &Cancellation<V>) -> Result<V, String>,
     ) -> Fetched<V> {
         if manifest.resource != key.resource {
@@ -480,7 +542,7 @@ impl<V: Clone> Resources<V> {
                 if entry.privacy != manifest.privacy {
                     return Fetched::Failed("cache privacy does not match the manifest".into());
                 }
-                if now.saturating_sub(entry.stored_at) < manifest.freshness {
+                if !entry.expired && now.saturating_sub(entry.stored_at) < manifest.freshness {
                     let value = entry.value.clone();
                     st.trace.push(Trace::ServedFromCache { key: key.clone() });
                     return Fetched::FromCache(value);
@@ -546,6 +608,7 @@ impl<V: Clone> Resources<V> {
                                 value: value.clone(),
                                 stored_at: self.clock.now(),
                                 privacy: manifest.privacy,
+                                expired: false,
                             },
                         );
                     }
@@ -801,6 +864,18 @@ impl<V: Clone> Resources<V> {
     }
 
     /// Invalidate both stored values and publication rights of outstanding work.
+    /// **Each value kept of `resource`, expired and kept** (ADR-0177): the
+    /// next reader asks its origin, and a public value declared
+    /// `last_known_good` is still there to answer with if the origin fails.
+    pub fn expire(&self, resource: &str) {
+        let mut st = self.state.lock().expect("state");
+        for (key, entry) in st.cache.iter_mut() {
+            if key.resource == resource {
+                entry.expired = true;
+            }
+        }
+    }
+
     pub fn invalidate(&self, resource: &str) {
         let mut st = self.state.lock().expect("state");
         st.cache.retain(|key, _| key.resource != resource);

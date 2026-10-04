@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `c710aac`, with ADR-0176.
+**Reviewed:** 2026-10-04, against master `bce1234`, with ADR-0177.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -12,6 +12,15 @@ owner's ruling of 2026-10-02
 [plan](milestones/E14.md)). It starts with the Next.js and SvelteKit stores
 and an offline harness; no model is called until the owner chooses the models
 and budget.
+
+**ADR-0177, 2026-10-04: a public read whose origin fails is answered with
+the last value kept** (charter §15.6 test 18, the audit's seventh gap).
+`fallback last_known_good` was checked for its value and read by nothing,
+so the store's page answered 503 when its store's origin failed, though the
+last store was kept. Now PW0343 keeps the fallback to public data, the query
+runtime answers a public read whose origin failed with its last value, and
+the store's `Store` and `Menu` declare it. `/bench/store?fail=next` fails
+the store's origin once. 11 mutants (`just e14-last-known-good`).
 
 **Correction, ADR-0176, 2026-10-04: a materializer failure left a page a
 line short, silently**
@@ -2815,14 +2824,13 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **Last-known-good for declared public data** (test 18, the audit's
-   seventh gap), now that a read can be made to fail (ADR-0174): a rule
-   limiting it to public data, and the server serving it.
-2. **§15.1's remaining fields** (the audit's eighth gap): `available`,
+1. **§15.1's remaining fields** (the audit's eighth gap): `available`,
    `category` and `menu_version` on `MenuItem`, `DeliveryEstimate`'s range,
    and `PositiveInt` checked at the boundary.
-3. **Accessibility** (test 14, the audit's ninth gap): an automated audit of
+2. **Accessibility** (test 14, the audit's ninth gap): an automated audit of
    the store's page in three engines.
+3. **Tests 2 and 13** (the audit's tenth gap): the running store's shared
+   output holds no session or secret field.
 
 Owner decisions before E14-E (agent runs): which models, the budget, and how
 Pleris is taught to an agent (`docs/milestones/E14.md`).

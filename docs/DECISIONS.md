@@ -1476,3 +1476,12 @@ a regeneration that fails sends nothing, and is tried again.
   makes, and the commit's answer names a version a later one passes.
 - Correction: a failed regeneration's frames went out at a version that had
   not moved, and the page ended a line short, with no error.
+
+[ADR-0177](DECISIONS/ADR-0177-a-public-read-whose-origin-fails-is-answered-with-the-last-value-kept.md):
+a public read whose origin fails is answered with the last value kept.
+- Charter §15.6 test 18. PW0343 keeps `fallback last_known_good` to public
+  data; the query runtime answers a public read whose origin failed with
+  the last value kept, checking the manifest's privacy and the kept
+  value's; the store's `Store` and `Menu` declare it.
+- `/bench/store?fail=next` fails the store's origin once; the page is shown
+  with the last store kept, and a session's cart never is.

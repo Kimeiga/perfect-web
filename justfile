@@ -2252,6 +2252,33 @@ e14-materializer-failure:
      } > docs/evidence/E14/materializer-failure.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/materializer-failure.txt
 
+# ADR-0177: a public read whose origin fails is answered with the last value
+# kept (charter §15.6 test 18). The runtime's tests, the checker's, the
+# server's, the page in three engines, and the mutation controls.
+e14-last-known-good:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0177 - a public read whose origin fails is answered with the last value kept"; echo; \
+       echo "produced by: just e14-last-known-good"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the query runtime (runtime/pw-resource/tests/last_known_good.rs)"; echo; \
+       cargo test --locked -p pw-resource --test last_known_good 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== PW0343 (compiler/pw-core/src/rules.rs)"; echo; \
+       cargo test --locked -p pw-core --lib -- rules::tests::a_last_known_good 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::a_failed_origin|^test result'; \
+       echo; echo "== the page, in three engines (e2e/controls.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/controls.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/last_known_good_mutations.py)"; echo; \
+       python3 scripts/last_known_good_mutations.py; \
+     } > docs/evidence/E14/last-known-good.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/last-known-good.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

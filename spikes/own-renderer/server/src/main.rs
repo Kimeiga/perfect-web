@@ -585,6 +585,9 @@ struct Server {
     /// for every reader, as the store is one value for all of them. A test
     /// sets it through `/bench/store`.
     store_delay_ms: Arc<std::sync::atomic::AtomicU64>,
+    /// **Whether the store's next read fails at its origin** (ADR-0177),
+    /// once, for every reader. A test sets it through `/bench/store?fail=next`.
+    store_fails_next: Arc<std::sync::atomic::AtomicBool>,
     /// **What each session's cart meets at the database** (charter §15.5,
     /// ADR-0174): how long a read of it takes, and whether its next write
     /// and its next read fail. A test sets them through `/bench/cart` and
@@ -962,6 +965,7 @@ impl Server {
             prep_minutes: Mutex::new(12),
             sold_out: Mutex::new(std::collections::BTreeSet::new()),
             store_delay_ms: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            store_fails_next: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             cart_faults: Arc::new(Mutex::new(BTreeMap::new())),
             connection_faults: Mutex::new(BTreeMap::new()),
             materializer_faults: Mutex::new(std::collections::BTreeSet::new()),
@@ -1650,10 +1654,15 @@ impl Server {
                 None,
             )))))]
         };
-        // Charter §15.5's store delay (ADR-0174), as a test set it.
+        // Charter §15.5's store delay (ADR-0174), and its origin failing
+        // once (ADR-0177), as a test set them.
         let store_delay = self.store_delay_ms.clone();
+        let store_fails = self.store_fails_next.clone();
         let get: HostFn = Arc::new(move |args: &[Val]| match args {
             [Val::String(id)] if store_named(id).is_some() => {
+                if store_fails.swap(false, std::sync::atomic::Ordering::SeqCst) {
+                    return Err("stores#get: the store's origin is unavailable".to_string());
+                }
                 let delay = store_delay.load(std::sync::atomic::Ordering::SeqCst);
                 if delay > 0 {
                     std::thread::sleep(std::time::Duration::from_millis(delay));
@@ -1934,6 +1943,14 @@ impl Server {
                 | pw_resource::Fetched::Deduplicated(v) => {
                     if matches!(*v, Val::Result(Err(_))) {
                         self.queries.invalidate_key(&key);
+                    }
+                    return Ok(Val::clone(&v));
+                }
+                // The origin failed, and the query is public and declares
+                // `fallback last_known_good` (ADR-0177): the last value kept.
+                pw_resource::Fetched::LastKnownGood(v) => {
+                    if std::env::var("PW_TRACE").is_ok() {
+                        eprintln!("{resource}: its origin failed; its last known good value");
                     }
                     return Ok(Val::clone(&v));
                 }
@@ -4134,6 +4151,11 @@ fn runtime_manifest(resource: &str, policy: &serde_json::Value) -> pw_resource::
     if policy["cache"] == "none" {
         m = m.uncached();
     }
+    // Public data alone (ADR-0177): the runtime serves no private value from
+    // its fallback, whatever this says, and PW0343 refuses one declared.
+    if policy["fallback"] == "last_known_good" {
+        m = m.last_known_good();
+    }
     m
 }
 
@@ -5059,6 +5081,8 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 "category_stopped": server
                     .category_stopped
                     .load(std::sync::atomic::Ordering::SeqCst),
+                // The store's origin, asked (ADR-0177).
+                "store": count("store:data/stores#get"),
             });
             respond_json(&mut stream, 200, &session, fresh, &body.to_string());
         }
@@ -5070,6 +5094,32 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // one value for all of them. What any page kept of a store is read
         // again, so the next reader waits.
         ("POST", "/bench/store") => {
+            // **The store's origin, failing once** (ADR-0177): its next read
+            // fails, for every reader, and what was kept of it is expired
+            // and kept, so the next reader asks the origin, and a fallback
+            // has the last value to answer with.
+            if query.split('&').any(|p| p == "fail=next") {
+                server
+                    .store_fails_next
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                // The store page's plan and every page's: a server built
+                // from templates alone has the first.
+                for resource in std::iter::once(&server.plan)
+                    .chain(server.plans.values())
+                    .flat_map(|plan| {
+                        plan["bindings"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|b| b["resource"].as_str().map(str::to_string))
+                    })
+                    .collect::<std::collections::BTreeSet<_>>()
+                {
+                    server.queries.expire(&resource);
+                }
+                respond_json(&mut stream, 200, &session, fresh, "{}");
+                return;
+            }
             let delay = query
                 .split('&')
                 .find_map(|p| p.strip_prefix("delay="))
@@ -5078,9 +5128,8 @@ fn handle(server: &Server, mut stream: TcpStream) {
             server
                 .store_delay_ms
                 .store(delay, std::sync::atomic::Ordering::SeqCst);
-            let resources: std::collections::BTreeSet<String> = server
-                .plans
-                .values()
+            let resources: std::collections::BTreeSet<String> = std::iter::once(&server.plan)
+                .chain(server.plans.values())
                 .flat_map(|plan| {
                     plan["bindings"]
                         .as_array()
@@ -8316,6 +8365,54 @@ public query Store(",
         // And once: a drain with nothing changed sends nothing more.
         s.drain(session);
         assert_eq!(values(&s).len(), 1);
+    }
+
+    /// **Last-known-good, for public data alone** (charter §15.6 test 18,
+    /// ADR-0177): while the store's origin fails, a page is served the last
+    /// store kept; while a session's cart's read fails, its page is not.
+    #[test]
+    fn a_failed_origin_is_answered_with_the_last_public_value_kept() {
+        let s = rendering_server();
+        // The store read, and kept.
+        assert!(visible(&s.render_store("first")).contains("Blue Bottle"));
+        let reads = calls(&s, "store:data/stores#get");
+        // Its origin fails once, and what was kept is expired.
+        let armed = posted(&s, "/bench/store?fail=next", "first", "arm-1", "");
+        assert!(armed.starts_with("HTTP/1.1 200"), "{armed}");
+        let page = s.render_store("second");
+        assert!(
+            visible(&page).contains("Blue Bottle"),
+            "the last store kept"
+        );
+        assert_eq!(
+            calls(&s, "store:data/stores#get"),
+            reads + 1,
+            "its origin was asked"
+        );
+        assert!(
+            s.queries
+                .trace()
+                .iter()
+                .any(|t| matches!(t, pw_resource::Trace::ServedLastKnownGood { .. })),
+            "and failed, and what was kept answered"
+        );
+        // The origin back, the store is read again.
+        s.queries.expire("store.page.Store");
+        assert!(visible(&s.render_store("third")).contains("Blue Bottle"));
+        assert_eq!(calls(&s, "store:data/stores#get"), reads + 2);
+
+        // A session's cart, whose read fails: not served from anything kept.
+        s.serve_document_with_entries("fourth").expect("served");
+        s.cart_faults
+            .lock()
+            .unwrap()
+            .entry("fourth".into())
+            .or_default()
+            .fail_read = true;
+        let refused = s
+            .serve_document_with_entries("fourth")
+            .expect_err("a private read that failed");
+        assert!(refused.contains("the database is unavailable"), "{refused}");
     }
 
     /// **What a line records is the store's, not the request's** (ADR-0172).
