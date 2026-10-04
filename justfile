@@ -2557,6 +2557,28 @@ e14-stable-layout:
      } > docs/evidence/E14/stable-layout.txt
     @grep -E "passed|failed|mutants killed" docs/evidence/E14/stable-layout.txt
 
+# ADR-0188: a page's runtime is bounded as it is sent, in every run. The
+# sizes in Chromium, and the controls that grow the runtime and the renderer
+# past their bounds. E7's own record is `just e7-performance`.
+e14-runtime-size:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0188 - a page's runtime is bounded as it is sent, in every run"; echo; \
+       echo "produced by: just e14-runtime-size"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the sizes, as served and as sent (e2e/runtime-size.spec.mjs, Chromium)"; echo; \
+       (cd spikes/own-renderer && PW_PERFORMANCE=1 pnpm exec playwright test e2e/runtime-size.spec.mjs \
+          --project=chromium --workers=1 --reporter=list 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g' \
+         | grep -E "EVIDENCE|^ +(✓|✘|-) |^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== controls (scripts/runtime_size_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/runtime_size_mutations.py; \
+     } > docs/evidence/E14/runtime-size.txt
+    @grep -E "EVIDENCE interactive|EVIDENCE renderer|passed|failed|mutants killed" docs/evidence/E14/runtime-size.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

@@ -28,8 +28,10 @@ if [ ! -d "$SPIKE/dist" ]; then
 fi
 
 cd "$SPIKE"
-out="$(PW_PERFORMANCE=1 PORT="$PORT" pnpm exec playwright test e2e/performance.spec.mjs \
-  --project=chromium --workers=1 --reporter=list 2>&1 | sed 's/\x1b\[[0-9;]*m//g')"
+# The sizes, as sent (ADR-0188), and the costs that need the machine alone.
+out="$(PW_PERFORMANCE=1 PORT="$PORT" pnpm exec playwright test e2e/runtime-size.spec.mjs \
+  e2e/performance.spec.mjs --project=chromium --workers=1 --reporter=list 2>&1 \
+  | sed 's/\x1b\[[0-9;]*m//g')"
 echo "$out"
 
 mkdir -p "$(dirname "$OUT_FILE")"
@@ -37,6 +39,7 @@ mkdir -p "$(dirname "$OUT_FILE")"
   echo "E7 gate items 7-10 — the own renderer's cost, measured"
   echo
   echo "produced by: $PRODUCED_BY"
+  echo "commit:      $(git -C "$REPO_ROOT" rev-parse HEAD)$(git -C "$REPO_ROOT" diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"
   echo "engine:      chromium (Long Animation Frame API is Chromium-only)"
   echo "workers:     1 (a loaded machine measures the load)"
   echo
@@ -44,6 +47,8 @@ mkdir -p "$(dirname "$OUT_FILE")"
   echo "  the forced-layout detector is shown going red on a deliberate thrash;"
   echo "  the layout-read counter is shown counting a deliberate read;"
   echo "  the uncontained large menu is shown costing measurable time."
+  echo "The size bounds are shown failing on a grown runtime and renderer by"
+  echo "scripts/runtime_size_mutations.py, in a run of their own (ADR-0188)."
   echo
   echo "$out" | grep -E "^ *EVIDENCE" | sed 's/^ *EVIDENCE */  /'
   echo

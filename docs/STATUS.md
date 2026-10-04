@@ -13,6 +13,23 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Correction, ADR-0188, 2026-10-04: E7's gate item 7b had failed, unseen,
+since ADR-0172 at the latest.** Its test bounds what the store's page
+downloads to run, the runtime's script and the resume's WebAssembly, at
+128 KiB. It ran only in `just e7-performance`, which had not run since
+2026-08-07. E7 recorded 102,693 bytes; on 2026-10-04 there were 141,339, as
+the script grew from 28,471 bytes to 84,822.
+- Each file is now bounded as a static host sends it, compressed with Brotli
+  at quality 11: 64 KiB for activation, which is 44,129 bytes today, and
+  128 KiB for the renderer's WebAssembly, fetched to render a block again,
+  which is 82,888. Uncompressed and gzip figures are reported beside them.
+- The byte counts run in every browser suite, from
+  `e2e/runtime-size.spec.mjs`. Controls grow the script and the renderer by
+  bytes that do not compress, and each bound fails.
+- E7's record is recorded again, the first time since 2026-08-07.
+- For the owner: minifying the runtime would about halve the script as sent,
+  and needs a minifier this session did not download.
+
 **ADR-0187, 2026-10-04: nothing the store contains is on screen when its
 page is first laid out.** Lighthouse on a phone measured a cumulative layout
 shift of 0.136. Every menu item was contained (`content-visibility: auto`)
@@ -32,8 +49,8 @@ first layout takes 2.3 ms as served, against 15.2 ms uncontained. 6 mutants
 (`just e14-stable-layout`).
 
 **Found on the way: E7's gate item 7b had failed, unseen.** The bytes the
-store's page downloads to run passed its 128 KiB bound between ADR-0152 and
-ADR-0172. Its test runs only in `just e7-performance`, which had not run
+store's page downloads to run passed its 128 KiB bound after ADR-0152, and by
+ADR-0172 at the latest. Its test runs only in `just e7-performance`, which had not run
 since 2026-08-07. ADR-0188 is the ruling.
 
 **ADR-0186, 2026-10-04: a page states its description.** Lighthouse

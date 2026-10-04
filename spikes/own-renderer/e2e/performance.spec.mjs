@@ -1,4 +1,5 @@
-// E7 gate items 7–10 — what the own renderer costs, measured on the real page.
+// E7 gate items 7c–10 — what the own renderer costs, measured on the real page.
+// Its sizes, 7a, 7b and 7d, are `runtime-size.spec.mjs`'s (ADR-0188).
 //
 // Charter §14 E7 gate:
 //
@@ -104,68 +105,10 @@ async function reopen(page) {
   });
 }
 
-/** Every byte this route made the browser download, by kind. */
-async function transferred(page, run) {
-  const seen = new Map();
-  const on = (response) => {
-    const type = response.headers()["content-type"] ?? "";
-    seen.set(response.url(), { type, response });
-  };
-  page.on("response", on);
-  await run();
-  page.off("response", on);
-
-  const out = { script: 0, wasm: 0, document: 0, other: 0, urls: [] };
-  for (const [url, { type, response }] of seen) {
-    let size = 0;
-    try {
-      size = (await response.body()).length;
-    } catch {
-      continue;
-    }
-    const kind = /javascript/.test(type)
-      ? "script"
-      : /wasm/.test(type)
-        ? "wasm"
-        : /html/.test(type)
-          ? "document"
-          : "other";
-    out[kind] += size;
-    if (kind === "script" || kind === "wasm") out.urls.push(`${kind} ${size} ${url}`);
-  }
-  return out;
-}
-
-test("gate 7a: the static route ships no browser runtime", async ({ page }) => {
-  // The strongest form of "size measured": zero. A static page has nothing to
-  // activate, so it downloads no runtime at all — and this is what makes the
-  // interactive route's figure a cost of INTERACTIVITY rather than of using
-  // the framework.
-  const bytes = await transferred(page, async () => {
-    await page.goto("/HelloStatic.html");
-    await page.waitForLoadState("networkidle");
-  });
-  expect(bytes.script, "no script").toBe(0);
-  expect(bytes.wasm, "no wasm").toBe(0);
-  expect(bytes.document, "and the document is real").toBeGreaterThan(100);
-  console.log(`EVIDENCE static-route-script-bytes=${bytes.script} wasm-bytes=${bytes.wasm}`);
-});
-
-test("gate 7b: the interactive route's runtime is measured", async ({ page }) => {
-  const bytes = await transferred(page, () => ready(page));
-  console.log(`EVIDENCE interactive-script-bytes=${bytes.script}`);
-  console.log(`EVIDENCE interactive-wasm-bytes=${bytes.wasm}`);
-  for (const u of bytes.urls) console.log(`EVIDENCE  ${u}`);
-
-  // A bound, not a target. It exists so the number cannot quietly become a
-  // megabyte; the figure itself is the evidence.
-  expect(bytes.script + bytes.wasm).toBeLessThan(128 * 1024);
-  expect(bytes.script, "the runtime really was downloaded").toBeGreaterThan(0);
-
-  // Handler code is NOT in that figure, and that is E7-L's claim restated as a
-  // size: behaviour is not part of activation.
-  expect(bytes.urls.filter((u) => u.includes("/handler/")), "no handler bytes").toEqual([]);
-});
+// Gate items 7a and 7b, the bytes a page downloads to run, are
+// `runtime-size.spec.mjs`'s since 2026-10-04 (ADR-0188): a byte count does
+// not need the machine to itself, so it runs in every suite, and this file
+// runs only here.
 
 test("gate 7c: activation CPU is measured", async ({ page }) => {
   await ready(page);

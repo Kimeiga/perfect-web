@@ -549,6 +549,11 @@ changes when the page's values are next read. A title, or metadata, that
 reads a member function is refused where the page is planned: a host
 computes one in a text part of the page's body, or a loop's row.
 
+**The runtime is sent as it is written** (ADR-0188): comments and all, about
+45% of its script's bytes. Its bounds are on Brotli's compression of it, as a
+static host sends it. Minifying it waits on the owner (a minifier is a
+download). The development server compresses nothing.
+
 **The store contains a menu item only far down its page** (ADR-0187): when
 28 items precede it in its list, or 16 lists precede its list. That is at
 least 2,400 CSS pixels at 16 px text, in a single column. Not covered:

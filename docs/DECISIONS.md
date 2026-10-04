@@ -1601,3 +1601,16 @@ nothing the store contains is on screen when its page is first laid out.
   4K display's. At most 448 items are laid out uncontained, whatever the
   menu. The placeholder is 7.75em, within 5% of an item in three engines,
   and the style is in the head.
+
+[ADR-0188](DECISIONS/ADR-0188-a-page-s-runtime-is-bounded-as-it-is-sent-in-every-run.md):
+a page's runtime is bounded as it is sent, in every run.
+- A correction to E7's record: gate item 7b's bound, 128 KiB of what the
+  store's page downloads to run, had been passed by ADR-0172 at the latest
+  (141,339 bytes on 2026-10-04), unseen, as its test ran only in `just e7-performance`, last run on
+  2026-08-07.
+- Each file is bounded compressed with Brotli at quality 11, as a static
+  file is sent: 64 KiB for activation (44,129 bytes), 128 KiB for the
+  renderer's WebAssembly (82,888). The byte counts run in every browser
+  suite; controls grow each file past its bound.
+- For the owner: minifying the runtime, which needs a minifier this session
+  did not download.

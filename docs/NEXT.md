@@ -254,13 +254,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
         contained only 28 items or 16 categories down its page, the
         placeholder is an item's height, and the style is in the head. No
         shift at a phone's or a desktop's size; E7's gate item 10 kept.
-    14. **E7's gate item 7b has failed since ADR-0172, unseen.** The store's
-        page downloads 141,339 bytes to run, against a 128 KiB bound that only
-        `just e7-performance` checks, last run on 2026-08-07. ADR-0188 rules
-        on what the bound measures and where it runs.
+    14. ~~E7's gate item 7b had failed, unseen, since ADR-0172 at the latest~~ (ADR-0188,
+        `just e14-runtime-size`, `just e7-performance`): bounded as sent,
+        compressed with Brotli, in every suite; the renderer's WebAssembly
+        bounded too; E7's record recorded again.
 
      Next: E14-E's design, ready for the owner's choice of models and
-     budget, and the owner's decisions logged in ADR-0182 (axe-core).
+     budget, and the owner's decisions logged in ADR-0182 (axe-core) and
+     ADR-0188 (a minifier for the runtime).
 
      The benchmark's store is its own copy since ADR-0156, so the canonical
      store grows without re-basing the tasks. Then E14-E's design, ready for
