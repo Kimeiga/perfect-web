@@ -553,6 +553,78 @@ fn check_effect_names_no_operation(decl: &Decl, out: &mut Vec<Finding>) {
     );
 }
 
+/// **PW0623: an invariant the language reads** (ADR-0179): bounds on an
+/// `Int` representation's `value`, each a comparison with an integer, joined
+/// by `&`, that some value holds. Anything else is refused by name, so a
+/// predicate is never kept as a claim nothing checks.
+fn check_invariant(decl: &Decl, out: &mut Vec<Finding>) {
+    let Some(inv) = &decl.invariant else {
+        return;
+    };
+    let name = &decl.name;
+    let refuse = |out: &mut Vec<Finding>, span: Span, message: String, repair: &str| {
+        out.push(
+            err(
+                "PW0623",
+                "an opaque type's invariant is bounds the build and a host can check",
+                message,
+                span,
+            )
+            .related(decl.name_span.clone(), format!("`{name}` is declared here"))
+            .explain(
+                "an invariant is checked where a value of the type is built, by the build, and \
+                 where one arrives from outside, by the host, which runs none of the program's \
+                 code; bounds on an `Int` are what both can decide",
+            )
+            .repair(repair),
+        );
+    };
+    for (span, why) in &inv.unread {
+        refuse(
+            out,
+            span.clone(),
+            format!("`{name}`'s invariant is not read: {why}"),
+            "write bounds on `value`: `value >= 1`, or `value >= 0 & value <= 100`",
+        );
+    }
+    let representation = decl.opaque_of.as_ref().map(|t| t.written());
+    if representation.as_deref() != Some("Int") {
+        refuse(
+            out,
+            inv.span.clone(),
+            format!(
+                "`{name}` states an invariant over `{}`, and only an `Int`'s is read",
+                representation.unwrap_or_default()
+            ),
+            "state no invariant, or represent the type by an `Int`",
+        );
+    }
+    // A bound past what an `Int` holds is no bound a host could compare a
+    // value with, and the contract has nowhere to carry it.
+    let beyond = |b: Option<i128>| b.is_some_and(|b| i64::try_from(b).is_err());
+    if beyond(inv.at_least) || beyond(inv.at_most) {
+        refuse(
+            out,
+            inv.span.clone(),
+            format!(
+                "`{name}`'s invariant, `{}`, bounds `value` beyond what an `Int` holds",
+                inv.written
+            ),
+            "bound `value` within an `Int`'s range, -9223372036854775808 to 9223372036854775807",
+        );
+    }
+    if let (Some(lo), Some(hi)) = (inv.at_least, inv.at_most)
+        && lo > hi
+    {
+        refuse(
+            out,
+            inv.span.clone(),
+            format!("`{name}`'s invariant, `{}`, holds of no value", inv.written),
+            "bound `value` so that some value holds it",
+        );
+    }
+}
+
 /// Run every declaration-level rule over one program's HIR.
 ///
 /// Nested declarations included (`all_decls`), which the AST walk did not do:
@@ -566,6 +638,7 @@ pub fn check(hir: &Hir) -> Vec<Finding> {
         }
         check_effects_against_placement(decl, &mut out);
         check_effect_names_no_operation(decl, &mut out);
+        check_invariant(decl, &mut out);
     }
     out
 }

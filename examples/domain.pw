@@ -57,7 +57,9 @@ type MenuItem = MenuItem {
 
 // --- quantities -----------------------------------------------------------
 
-opaque type PositiveInt = Int
+// A count of at least one (ADR-0179): every construction is shown to hold
+// it at build, and a value that arrives from outside is checked by the host.
+opaque type PositiveInt = Int where value >= 1
 
 // The count a `PositiveInt` holds, for other modules. The type is opaque
 // outside this one, where `.value` reads its representation (ADR-0048).
@@ -66,9 +68,15 @@ fn count(n: PositiveInt) -> Int !{} { n.value }
 // The sum of two counts, for a transition that adds to a line (ADR-0122).
 fn added(a: PositiveInt, b: PositiveInt) -> PositiveInt !{} { PositiveInt(a.value + b.value) }
 
-// One fewer, for a line that holds more than one (ADR-0172). A line that
-// holds one goes instead: a `PositiveInt` holds no zero.
-fn fewer(n: PositiveInt) -> PositiveInt !{} { PositiveInt(n.value - 1) }
+// One fewer, for a line that holds more than one (ADR-0172). A
+// `PositiveInt` holds no zero, so one fewer than one is none (ADR-0179).
+fn fewer(n: PositiveInt) -> Option<PositiveInt> !{} {
+    if n.value > 1 {
+        Some(PositiveInt(n.value - 1))
+    } else {
+        None
+    }
+}
 
 type USD = USD { code: String }
 

@@ -1497,3 +1497,16 @@ reaches every page open.
   that a document read had left the pages open a version behind.
 - The renderer looks into a block that decides as it did; the value
   analysis types a listener's `_` as any value.
+
+[ADR-0179](DECISIONS/ADR-0179-an-opaque-type-states-its-invariant.md):
+an opaque type states its invariant, and every construction and every
+boundary holds it.
+- `opaque type PositiveInt = Int where value >= 1`: bounds on an `Int`'s
+  `value`, joined by `&`; PW0623 refuses any other predicate.
+- PW0622: a construction the build cannot show holds it is refused; the
+  value analysis bounds the `Int` it is given, and a test narrows it.
+- The contract states each boundary's checks, as paths into the value; the
+  host holds a command's arguments to them as it decodes them, and a data
+  layer's answer before the component reads it.
+- Measured before: a forged quantity of 0 committed a line of nothing, and
+  −3 a line of minus three.

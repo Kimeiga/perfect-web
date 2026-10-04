@@ -112,6 +112,10 @@ pub enum SyntaxKind {
     /// replaces this with real expression nodes.
     Body,
     Name,
+    /// `where value >= 1` after an opaque type's representation: what every
+    /// value of the type holds (ADR-0179). Its child is the predicate, an
+    /// expression.
+    Invariant,
 
     // ---- expressions (reserved; the core body grammar fills these) -------- 200..
     BlockExpr = 200,
@@ -371,6 +375,7 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         UnknownPolicy,
         Body,
         Name,
+        Invariant,
         BlockExpr,
         LiteralExpr,
         NameExpr,

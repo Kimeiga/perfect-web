@@ -318,6 +318,7 @@ impl Lowerer<'_> {
                 imports: imported_names(node),
                 visibility: visibility_of(node),
                 opaque_of: self.opaque_of(node),
+                invariant: invariant(self.src, node),
                 type_params: self.type_params(node),
                 declared_effects,
                 body: None,
@@ -1775,6 +1776,113 @@ fn declared_type(t: &SyntaxNode) -> crate::hir::DeclaredType {
         })
         .unwrap_or_default();
     crate::hir::DeclaredType::new(type_path(t), args)
+}
+
+/// **An opaque type's invariant, as bounds on its `value`** (ADR-0179):
+/// each comparison of `value` with an integer literal, joined by `&`. Any
+/// other part is kept, with why, for PW0623 to refuse.
+fn invariant(src: &str, node: &SyntaxNode) -> Option<crate::hir::Invariant> {
+    if node.kind() != K::OpaqueDecl {
+        return None;
+    }
+    let clause = node.children().find(|c| c.kind() == K::Invariant)?;
+    let predicate = clause.children().find(|c| is_expr(c.kind()));
+    let mut out = crate::hir::Invariant {
+        at_least: None,
+        at_most: None,
+        written: predicate
+            .as_ref()
+            .map(|p| text(src, p).trim().to_string())
+            .unwrap_or_default(),
+        span: span_of(&clause),
+        unread: Vec::new(),
+    };
+    match predicate {
+        Some(p) => bounds(src, &p, &mut out),
+        None => out
+            .unread
+            .push((span_of(&clause), "`where` states no predicate".to_string())),
+    }
+    Some(out)
+}
+
+/// The bounds `e` states on `value`, into `out`.
+fn bounds(src: &str, e: &SyntaxNode, out: &mut crate::hir::Invariant) {
+    let kids: Vec<SyntaxNode> = e.children().filter(|c| is_expr(c.kind())).collect();
+    let unread = |out: &mut crate::hir::Invariant, why: &str| {
+        out.unread.push((span_of(e), why.to_string()));
+    };
+    match e.kind() {
+        K::ParenExpr if kids.len() == 1 => bounds(src, &kids[0], out),
+        K::BinaryExpr if kids.len() == 2 => {
+            let Some(op) = own_tokens(e).into_iter().next() else {
+                return unread(out, "a bound needs its comparison");
+            };
+            if op.kind() == K::Amp {
+                bounds(src, &kids[0], out);
+                bounds(src, &kids[1], out);
+                return;
+            }
+            let compared = matches!(op.kind(), K::Cmp | K::LAngle | K::RAngle)
+                && matches!(op.text(), "<" | "<=" | ">" | ">=");
+            if !compared {
+                return unread(
+                    out,
+                    "a bound compares `value` with `<`, `<=`, `>` or `>=`, and bounds are \
+                     joined by `&`",
+                );
+            }
+            let is_value =
+                |n: &SyntaxNode| n.kind() == K::NameExpr && text(src, n).trim() == "value";
+            // `value >= 1`, or `1 <= value` read the other way round.
+            let (op, k) = match (is_value(&kids[0]), integer(&kids[1])) {
+                (true, Some(k)) => (op.text().to_string(), k),
+                _ => match (integer(&kids[0]), is_value(&kids[1])) {
+                    (Some(k), true) => {
+                        let flipped = match op.text() {
+                            "<" => ">",
+                            "<=" => ">=",
+                            ">" => "<",
+                            _ => "<=",
+                        };
+                        (flipped.to_string(), k)
+                    }
+                    _ => return unread(out, "a bound compares `value` with an integer"),
+                },
+            };
+            match op.as_str() {
+                ">=" => out.at_least = Some(out.at_least.map_or(k, |lo| lo.max(k))),
+                ">" => out.at_least = Some(out.at_least.map_or(k + 1, |lo| lo.max(k + 1))),
+                "<=" => out.at_most = Some(out.at_most.map_or(k, |hi| hi.min(k))),
+                _ => out.at_most = Some(out.at_most.map_or(k - 1, |hi| hi.min(k - 1))),
+            }
+        }
+        _ => unread(
+            out,
+            "an invariant is bounds on `value`: `value >= 1`, joined by `&`",
+        ),
+    }
+}
+
+/// An integer literal, or one negated: `1`, `-5`.
+fn integer(n: &SyntaxNode) -> Option<i128> {
+    match n.kind() {
+        K::LiteralExpr => {
+            let t = own_tokens(n).into_iter().next()?;
+            (t.kind() == K::Int)
+                .then(|| t.text().replace('_', "").parse::<i128>().ok())
+                .flatten()
+        }
+        K::UnaryExpr => {
+            let op = own_tokens(n).into_iter().next()?;
+            let inner = n.children().find(|c| is_expr(c.kind()))?;
+            (op.kind() == K::Minus)
+                .then(|| integer(&inner).map(|k| -k))
+                .flatten()
+        }
+        K::ParenExpr => integer(&n.children().find(|c| is_expr(c.kind()))?),
+        _ => None,
+    }
 }
 
 fn type_path(t: &SyntaxNode) -> String {

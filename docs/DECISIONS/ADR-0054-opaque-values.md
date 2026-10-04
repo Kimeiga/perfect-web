@@ -52,6 +52,10 @@ states no invariant for an opaque type (KNOWN_LIMITATIONS, "Opaque
 invariants are not checked at the boundary"), and a construction inside the
 declaring module is no different.
 
+Settled by ADR-0179: an opaque type may state its invariant, `where value
+>= 1`, and every construction is shown to hold it at build, and every
+boundary checks it.
+
 ### 2. A representation is a type tree
 
 `Decl::opaque_of` is a `DeclaredType`, as ADR-0028 made parameters, fields

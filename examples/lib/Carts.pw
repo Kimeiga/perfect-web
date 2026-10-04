@@ -113,10 +113,14 @@ fn with_fewer(cart: Cart, item: MenuItemId) -> Cart !{} {
     Cart { lines: List.map(kept, fn(line) shrunk(line, item)) }
 }
 
-// One line, one fewer when it holds `item` (ADR-0172).
+// One line, one fewer when it holds `item` (ADR-0172). One that holds one
+// has none fewer (ADR-0179): `with_fewer` has taken it away.
 fn shrunk(line: CartLine, item: MenuItemId) -> CartLine !{} {
     if same_item(line.item_id, item) {
-        CartLine { item_id: line.item_id, name: line.name, quantity: fewer(line.quantity), unit_price: line.unit_price }
+        match fewer(line.quantity) {
+            Some(quantity) => CartLine { item_id: line.item_id, name: line.name, quantity: quantity, unit_price: line.unit_price },
+            None => line,
+        }
     } else {
         line
     }

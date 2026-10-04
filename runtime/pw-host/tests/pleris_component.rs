@@ -608,6 +608,79 @@ fn json_arguments_are_typed_by_the_export_they_are_for() {
     assert_eq!(edge[1], Val::S64(i64::MIN));
 }
 
+/// **A quantity that is no `PositiveInt` is refused as the arguments are
+/// decoded** (ADR-0179): the contract states that argument 2 holds `value
+/// >= 1`, and the host holds a browser's request to it before the component
+/// runs. `arguments` alone types by the ABI, and takes any `s64`.
+#[test]
+fn a_quantity_that_is_no_positive_int_is_refused_as_the_arguments_are_decoded() {
+    let c = contract();
+    let prepared = engine::Prepared::compile(&component()).expect("compiles");
+    let located = c.exports[0].component.clone().expect("located");
+    let cortado = serde_json::json!({
+        "id": "cortado",
+        "name": "Cortado",
+        "description": "Short.",
+        "price": { "minor_units": 375 },
+        "available": true,
+    });
+    for forged in [0, -3, i64::MIN] {
+        let json = [cortado.clone(), serde_json::json!(forged)];
+        let why = prepared
+            .arguments_for(&located, &json)
+            .expect_err("refused before the component runs");
+        assert_eq!(
+            why,
+            format!(
+                "argument refused: value 2 is {forged}, and `domain.PositiveInt` holds `value >= 1`"
+            )
+        );
+        // The ABI alone takes it: the invariant is the contract's.
+        let [interface, function] = export(&c);
+        assert!(prepared.arguments(&[&interface, &function], &json).is_ok());
+    }
+    for held in [1, 2, i64::MAX] {
+        let args = prepared
+            .arguments_for(&located, &[cortado.clone(), serde_json::json!(held)])
+            .expect("a count");
+        assert_eq!(args[1], Val::S64(held));
+    }
+}
+
+/// **A data layer's answer that breaks an invariant is the command's
+/// failure** (ADR-0179): a cart line of 0, answered by `carts#add`, is never
+/// a value the component reads. The contract states where: `ok.lines.*.
+/// quantity`.
+#[test]
+fn a_data_layer_answer_that_breaks_an_invariant_is_the_commands_failure() {
+    let c = contract();
+    let bytes = component();
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
+    let [interface, function] = export(&c);
+    let run = |quantity: i64| {
+        let calls: Calls = Arc::default();
+        let answered = Val::Result(Ok(Some(Box::new(cart("cortado", quantity)))));
+        authorized_call(
+            &bytes,
+            &c,
+            &granted,
+            &limits(),
+            &host(&calls, answered),
+            &[&interface, &function],
+            &[item("cortado"), Val::S64(1)],
+        )
+    };
+    let why = run(0).expect_err("a line of 0 is no cart");
+    assert!(
+        why.contains(
+            "`store:data/carts#add` answered what breaks an invariant: value 1's \
+                      `ok.lines[0].quantity` is 0, and `domain.PositiveInt` holds `value >= 1`"
+        ),
+        "{why}"
+    );
+    assert!(run(1).is_ok());
+}
+
 #[test]
 fn arguments_for_an_export_the_component_does_not_have_are_refused() {
     let c = contract();

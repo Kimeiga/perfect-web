@@ -1161,6 +1161,7 @@ mod tests {
             variants: None,
             fields: None,
             opaque_of: None,
+            invariant: None,
             type_params: vec![],
             policies: vec![],
             imports: vec![],

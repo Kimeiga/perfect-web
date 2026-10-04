@@ -13,6 +13,25 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0179, 2026-10-04: an opaque type states its invariant, and every
+construction and every boundary holds it** (charter §15.1's `PositiveInt`,
+§7.1's "explicit decoding at every external boundary").
+`opaque type PositiveInt = Int where value >= 1`.
+- PW0622 refuses a construction the build cannot show holds it. The value
+  analysis bounds the `Int` it is given, and a test narrows it.
+- The contract states where each boundary must hold it: the host checks a
+  command's arguments as it decodes them, and a data layer's answer before
+  the component reads it.
+- `fewer` answers an `Option`: one fewer than one is none.
+
+25 mutants (`just e14-invariants`).
+
+**Correction, ADR-0179, 2026-10-04: a forged quantity reached the cart**
+([ADR-0179](DECISIONS/ADR-0179-an-opaque-type-states-its-invariant.md)).
+Measured through the development server's command path: a request with a
+quantity of 0 committed a line of `espresso × 0`, and one with −3 left
+`espresso × −3`. Now each is refused before the command runs, by name.
+
 **ADR-0178, 2026-10-04: whether an item can be ordered is shown before the
 press, and a change to it reaches every page open** (charter §15.1 and
 §15.2, the first part of the audit's eighth gap). `MenuItem` declares
@@ -2851,9 +2870,10 @@ cannot establish browser non-support; ADR-0027 corrects that interpretation.
 
 ## next three concrete tasks
 
-1. **§15.1's remaining fields** (the audit's eighth gap): `available`,
-   `category` and `menu_version` on `MenuItem`, `DeliveryEstimate`'s range,
-   and `PositiveInt` checked at the boundary.
+1. **§15.1's remaining fields** (the audit's eighth gap): `category` and
+   `menu_version`, and `DeliveryEstimate`'s range. `available` is met by
+   ADR-0178, and `PositiveInt` checked at every construction and boundary
+   by ADR-0179.
 2. **Accessibility** (test 14, the audit's ninth gap): an automated audit of
    the store's page in three engines.
 3. **Tests 2 and 13** (the audit's tenth gap): the running store's shared

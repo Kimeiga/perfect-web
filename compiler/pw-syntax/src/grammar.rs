@@ -2210,6 +2210,14 @@ impl<'a> P<'a> {
             if self.eat(Kind::Eq) {
                 self.type_ref();
             }
+            // `where value >= 1`: what every value of the type holds
+            // (ADR-0179), an expression the checker reads as bounds.
+            if self.at_kw("where") {
+                self.start(K::Invariant);
+                self.bump();
+                self.expr(0);
+                self.finish();
+            }
             self.finish();
             return true;
         }
@@ -2955,6 +2963,30 @@ mod tests {
             tree_text(&stray.green),
             "private\n\ntype T = T { x: Int }\n"
         );
+    }
+
+    #[test]
+    fn an_opaque_type_states_its_invariant_after_its_representation() {
+        // ADR-0179: `where` and a predicate, inside the declaration, after
+        // the representation. The predicate is an expression the checker
+        // reads as bounds.
+        let src = "opaque type Percent = Int where value >= 0 & value <= 100\n\
+                   opaque type Plain = Int\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let clause = first_text(&p, K::Invariant).expect("an invariant");
+        assert_eq!(clause.trim(), "where value >= 0 & value <= 100");
+        assert_eq!(texts(&p, K::Invariant).len(), 1, "the second declares none");
+        let decl = p
+            .green
+            .descendants()
+            .find(|n| n.kind() == K::OpaqueDecl)
+            .expect("an opaque type");
+        assert!(
+            kinds(&decl).contains(&K::Invariant),
+            "inside its declaration"
+        );
+        assert!(kinds(&decl).contains(&K::BinaryExpr));
     }
 
     #[test]

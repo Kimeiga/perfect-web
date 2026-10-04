@@ -121,6 +121,40 @@ test("arguments the command does not declare are refused before it runs", async 
   await expect(page.locator("#cart-count")).toHaveText("1");
 });
 
+test("a quantity that is no PositiveInt is refused before the command runs", async ({ page }) => {
+  // ADR-0179: `opaque type PositiveInt = Int where value >= 1`, and the
+  // command's contract says its second argument holds it. A request that
+  // claims 0 or less is refused as it is decoded, by name, as a number with
+  // a fraction is. Until 2026-10-04 a quantity of 0 committed a line of
+  // nothing, and -3 a line of minus three.
+  await ready(page);
+  const item = JSON.parse(
+    await page.locator("#menu button").first().getAttribute("data-pw-captures"),
+  ).item;
+  for (const quantity of [0, -3]) {
+    const response = await page.request.post("/command/store.page.add_to_cart", {
+      data: [item, quantity],
+      headers: { "pw-interaction": `forged-${quantity}` },
+    });
+    expect(response.status(), String(quantity)).toBe(400);
+    const body = await response.json();
+    expect(body).toMatchObject({ committed: false });
+    expect(body.error).toBe(
+      `argument refused: value 2 is ${quantity}, and \`domain.PositiveInt\` holds \`value >= 1\``,
+    );
+  }
+  await page.waitForTimeout(300);
+  await expect(page.locator("#cart-count"), "neither moved the cart").toHaveText("0");
+
+  // The control: two, which the type holds, adds two.
+  const ok = await page.request.post("/command/store.page.add_to_cart", {
+    data: [item, 2],
+    headers: { "pw-interaction": "counted-2" },
+  });
+  expect(await ok.json()).toMatchObject({ committed: true });
+  await expect(page.locator("#cart-count")).toHaveText("2");
+});
+
 test("the address-resolving command route is gone", async ({ page }) => {
   await ready(page);
   const response = await page.request.post("/command/add_to_cart?item=espresso&quantity=1");

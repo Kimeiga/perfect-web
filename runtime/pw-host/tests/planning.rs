@@ -226,6 +226,7 @@ fn an_edge_whose_ends_share_no_node_is_necessarily_remote() {
             name: "Store".into(),
             capability: String::new(),
             kind: pw_host::ImportKind::Component,
+            bounded: Vec::new(),
         }],
         exports: vec![pw_host::Export {
             name: "Widget".into(),
@@ -302,6 +303,7 @@ fn placement_and_transferability_are_independent_and_only_one_pair_fails() {
             name: "Store".into(),
             capability: String::new(),
             kind: pw_host::ImportKind::Component,
+            bounded: Vec::new(),
         }],
         exports: vec![pw_host::Export {
             name: "Widget".into(),
@@ -428,6 +430,7 @@ fn an_undetermined_signature_does_not_refuse_a_deployment() {
             name: "Store".into(),
             capability: String::new(),
             kind: pw_host::ImportKind::Component,
+            bounded: Vec::new(),
         }],
         exports: vec![pw_host::Export {
             name: "Widget".into(),
@@ -533,6 +536,7 @@ fn a_necessarily_remote_edge_that_owes_a_principal_is_not_a_finished_plan() {
             name: "Basket".into(),
             capability: String::new(),
             kind: pw_host::ImportKind::Component,
+            bounded: Vec::new(),
         }],
         exports: vec![pw_host::Export {
             name: "Widget".into(),
@@ -605,6 +609,7 @@ fn widget_for() -> ComponentContract {
             name: "Basket".into(),
             capability: String::new(),
             kind: pw_host::ImportKind::Component,
+            bounded: Vec::new(),
         }],
         exports: vec![pw_host::Export {
             name: "Widget".into(),

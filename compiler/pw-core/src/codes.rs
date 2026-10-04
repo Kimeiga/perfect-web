@@ -353,6 +353,13 @@ codes! {
         "a route's parameter is text: a `String`, or an opaque type over one";
     ANSWER_READ_FOR_A_VALUE = "PW0620" / answer_read_for_a_value / 1, Types,
         "what a command answers carries no value: a handler matches `Ok(_)`, and reads the value from a query";
+    // ADR-0179: `opaque type PositiveInt = Int` stated no invariant, so
+    // `PositiveInt(0)` built one, and a browser's quantity of 0 reached the
+    // cart as a line of nothing.
+    INVARIANT_NOT_SHOWN = "PW0622" / invariant_not_shown / 1, Types,
+        "a value is built of an opaque type only where the build shows it holds the type's invariant";
+    INVARIANT_UNREAD = "PW0623" / invariant_unread / 1, Types,
+        "an opaque type's invariant is bounds on its `Int` value, `value >= 1`, joined by `&`, that some value holds";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

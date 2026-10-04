@@ -358,6 +358,31 @@ pub struct ClauseKey {
     pub args: Vec<Arg>,
 }
 
+/// **What every value of an opaque type holds** (ADR-0179): `where value >=
+/// 1`, read as bounds on its `value`, each end included. Bounds alone: the
+/// build decides a construction against them, and a host checks a value it
+/// is given against them without running the program's code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Invariant {
+    /// The least value, where the predicate states one.
+    pub at_least: Option<i128>,
+    /// The greatest value, where the predicate states one.
+    pub at_most: Option<i128>,
+    /// The predicate as written: `value >= 1`.
+    pub written: String,
+    pub span: Span,
+    /// Each part of the predicate that is no bound on `value`, and why
+    /// (PW0623).
+    pub unread: Vec<(Span, String)>,
+}
+
+impl Invariant {
+    /// Does `n` hold it?
+    pub fn holds(&self, n: i128) -> bool {
+        self.at_least.is_none_or(|lo| n >= lo) && self.at_most.is_none_or(|hi| n <= hi)
+    }
+}
+
 /// **Where an expression tree runs.**
 ///
 /// Architect ruling, 2026-08-11:
@@ -513,6 +538,9 @@ pub struct Decl {
     /// tree, so `opaque type Names = List<String>` keeps its argument
     /// (ADR-0054). It was a spelling, and a generic one never resolved.
     pub opaque_of: Option<DeclaredType>,
+    /// `opaque type PositiveInt = Int where value >= 1`: what every value of
+    /// the type holds (ADR-0179), read as bounds on its `value`.
+    pub invariant: Option<Invariant>,
     /// The type parameters this declaration binds: `["C"]` for
     /// `opaque type Secret<C>`, `["T"]` for `effect database.read<T>`.
     ///

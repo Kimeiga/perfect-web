@@ -208,11 +208,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
           and a stock change reaches every page open, in three engines.
           Correction: a new version of the shared menu could leave the
           pages open a version behind.
-        - **Next: `PositiveInt` checked where a request gives one.**
-          Acceptance: a quantity of 0 or less is refused at the host, and
-          by the compiled handler, in three engines.
-        - Then `category` and `menu_version`, and `DeliveryEstimate`'s
-          range.
+        - ~~`PositiveInt` checked where a request gives one~~ (ADR-0179,
+          `just e14-invariants`): an opaque type states its invariant,
+          every construction is shown to hold it at build (PW0622), and the
+          host checks a command's arguments and a data layer's answers. A
+          forged quantity of 0 is refused, in three engines.
+        - **Next: `category` and `menu_version`, and `DeliveryEstimate`'s
+          range** (`min_minutes` and `max_minutes`, each a `PositiveInt`,
+          and `generated_at`). Acceptance: the menu is grouped by category,
+          and the estimate shows its range, in three engines.
 
      The benchmark's store is its own copy since ADR-0156, so the canonical
      store grows without re-basing the tasks. Then E14-E's design, ready for

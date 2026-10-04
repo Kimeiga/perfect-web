@@ -180,6 +180,7 @@ fn a_hand_written_rust_guest_through_the_host() {
                     name: name.into(),
                     capability: "store.read".into(),
                     kind: ImportKind::HostCapability,
+                    bounded: Vec::new(),
                 }
             })
             .collect(),
@@ -193,6 +194,7 @@ fn a_hand_written_rust_guest_through_the_host() {
                 function: "lookup".into(),
                 authorization: Vec::new(),
                 idempotent_by: None,
+                bounded: Vec::new(),
             }),
         }],
     };

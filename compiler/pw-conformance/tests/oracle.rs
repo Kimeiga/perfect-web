@@ -121,6 +121,54 @@ fn val(rng: &mut Rng, ty: &Type, depth: u32) -> Val {
     }
 }
 
+/// **A generated value, made to hold what the contract states of it**
+/// (ADR-0179): each `Int` at a checked place brought within its bounds,
+/// keeping what it was where it already was. A value that breaks one is
+/// refused at the boundary, which the reference does not model: what is
+/// compared is the component's work on what a host passes it.
+fn fit(v: &mut Val, path: &[String], b: &pw_core::contract::Bounded) {
+    match (path.split_first(), v) {
+        (None, Val::S64(n)) => {
+            let spread = (n.unsigned_abs() % 1_000_000) as i64;
+            if let Some(lo) = b.at_least
+                && *n < lo
+            {
+                *n = lo.saturating_add(spread);
+            }
+            if let Some(hi) = b.at_most
+                && *n > hi
+            {
+                *n = hi.saturating_sub(spread);
+            }
+            if let Some(lo) = b.at_least
+                && *n < lo
+            {
+                *n = lo;
+            }
+        }
+        (Some((step, rest)), Val::List(items)) if step == "*" => {
+            for item in items {
+                fit(item, rest, b);
+            }
+        }
+        (Some((step, rest)), Val::Option(Some(v))) if step == "some" => fit(v, rest, b),
+        (Some((step, rest)), Val::Result(Ok(Some(v)))) if step == "ok" => fit(v, rest, b),
+        (Some((step, rest)), Val::Result(Err(Some(v)))) if step == "err" => fit(v, rest, b),
+        (Some((step, rest)), Val::Variant(name, Some(v))) if name == step => fit(v, rest, b),
+        (Some((step, rest)), Val::Record(fields)) => {
+            if let Some((_, v)) = fields.iter_mut().find(|(n, _)| n == step) {
+                fit(v, rest, b);
+            }
+        }
+        (Some((step, rest)), Val::Tuple(items)) => {
+            if let Some(v) = step.parse::<usize>().ok().and_then(|i| items.get_mut(i)) {
+                fit(v, rest, b);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// The artifact's own types: each imported function's result, and the export's
 /// parameters.
 struct Types {
@@ -204,10 +252,29 @@ fn differential(
     let t = types(&runnable.compiled().component.bytes, &export);
     let ops: Vec<String> = t.results.keys().cloned().collect();
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15 ^ what.len() as u64);
+    // What the contract states each argument and each answer holds
+    // (ADR-0179).
+    let arguments_hold = located.bounded.clone();
+    let answers_hold: BTreeMap<String, Vec<pw_core::contract::Bounded>> = contract
+        .imports
+        .iter()
+        .map(|i| (format!("{}#{}", i.interface, i.name), i.bounded.clone()))
+        .collect();
     for case in 0..CASES {
         let seed = rng.0;
-        let args: Vec<Val> = t.params.iter().map(|p| val(&mut rng, p, 0)).collect();
-        let answer: Arc<Answer> = layer(&mut rng, &t).into();
+        let mut args: Vec<Val> = t.params.iter().map(|p| val(&mut rng, p, 0)).collect();
+        for b in &arguments_hold {
+            fit(&mut args[b.argument], &b.path, b);
+        }
+        let generated: Arc<Answer> = layer(&mut rng, &t).into();
+        let holds = answers_hold.clone();
+        let answer: Arc<Answer> = Arc::new(move |op: &str, a: &[Val]| {
+            let mut v = generated(op, a);
+            for b in holds.get(op).into_iter().flatten() {
+                fit(&mut v, &b.path, b);
+            }
+            v
+        });
 
         // The compiled component, through the host.
         let seen: Arc<Mutex<Vec<Call>>> = Arc::default();

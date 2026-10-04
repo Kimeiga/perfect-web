@@ -332,10 +332,14 @@ awaited in order. What remains:
   re-rendering the element leaves the old value there: for example, E7-P's
   keyed rename, which replaces only the item's text. The store's handler reads
   only `item.id`, the loop's key, which a keyed patch never changes.
-- **Opaque invariants are not checked at the boundary.** The host types a
-  browser's arguments by the component's parameters: `PositiveInt` arrives as
-  an `s64`, and any `s64` is accepted. `opaque type PositiveInt = Int` states
-  no invariant that could be checked.
+- **An opaque type's invariant is bounds on an `Int`** (ADR-0179). `where
+  value >= 1` is checked at every construction, by the build, and at every
+  boundary, by the host. A `String`'s length, or any other predicate, is
+  refused (PW0623) until a program needs it. A test narrows what it tests in
+  an `if`'s branches and across `&` and `|`; a test followed by an early
+  `return` narrows nothing after it. A keyed read's key and a route's
+  parameter are not held to an invariant: none of the store's is a type
+  that states one.
 - **A privacy label follows the control flow since ADR-0129.** A branch a
   secret chooses carries its label, and so does a sink inside it. A name
   bound over a labelled collection's elements carries its label (ADR-0063).

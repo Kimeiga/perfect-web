@@ -114,6 +114,29 @@ pub struct Import {
     pub capability: String,
     #[serde(default)]
     pub kind: ImportKind,
+    /// Where its answer must hold an invariant (ADR-0179). Mirrored by field
+    /// name, ADR-0018.
+    #[serde(default)]
+    pub bounded: Vec<Bounded>,
+}
+
+/// **One place a value from outside must hold an invariant** (ADR-0179), as
+/// the compiler states it: the value at `argument`, each step into it, and
+/// the bounds. Mirrored by field name, ADR-0018. A step is a record's field,
+/// `*` for each item of a list, `some`, `ok` or `err`, a case by its name, or
+/// a field of a case's payload by its position.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Bounded {
+    pub argument: usize,
+    #[serde(default)]
+    pub path: Vec<String>,
+    #[serde(rename = "type")]
+    pub ty: String,
+    pub holds: String,
+    #[serde(default)]
+    pub at_least: Option<i64>,
+    #[serde(default)]
+    pub at_most: Option<i64>,
 }
 
 /// What class an ACTUAL Wasm import falls into.
@@ -317,6 +340,10 @@ pub struct ComponentExport {
     /// that runs it.
     #[serde(default)]
     pub idempotent_by: Option<String>,
+    /// Where an argument must hold an invariant (ADR-0179). Mirrored by field
+    /// name, ADR-0018.
+    #[serde(default)]
+    pub bounded: Vec<Bounded>,
 }
 
 /// **What binding modes an interface edge supports**, as the compiler derived
@@ -1161,9 +1188,9 @@ pub mod engine {
         /// strings are accepted; every other parameter type is refused by name
         /// until a command needs it.
         ///
-        /// This checks the ABI's types, not what an opaque type's name
-        /// promises. `PositiveInt` arrives as an `s64`, and the language does
-        /// not yet state an invariant that could be checked here.
+        /// This checks the ABI's types, not what an opaque type promises:
+        /// [`Prepared::arguments_for`] holds them to the invariants the
+        /// contract states as well (ADR-0179).
         pub fn arguments(
             &self,
             export: &[&str],
@@ -1187,6 +1214,21 @@ pub mod engine {
                     from_json(ty, v, &format!("argument {} (`{name}`)", i + 1))
                 })
                 .collect()
+        }
+
+        /// **An export's arguments, as its contract states them** (ADR-0179):
+        /// typed by its parameters, as [`Prepared::arguments`] types them,
+        /// and each held to the invariants the contract names. A browser's
+        /// quantity of 0, for a `PositiveInt`, is refused here, before the
+        /// component runs, as a number with a fraction is.
+        pub fn arguments_for(
+            &self,
+            export: &crate::ComponentExport,
+            json: &[serde_json::Value],
+        ) -> Result<Vec<wasmtime::component::Val>, String> {
+            let args = self.arguments(&[&export.interface, &export.function], json)?;
+            holds(&export.bounded, &args).map_err(|why| format!("argument refused: {why}"))?;
+            Ok(args)
         }
     }
 
@@ -1288,6 +1330,116 @@ pub mod engine {
             }
             (v, _) => v,
         })
+    }
+
+    /// **Does each value hold every invariant `checks` states of it?**
+    /// (ADR-0179). Refused by name otherwise: where the value is, what it is,
+    /// and what its type holds. A value of another shape than the path says is
+    /// refused too: the contract and the value disagree.
+    pub fn holds(
+        checks: &[crate::Bounded],
+        values: &[wasmtime::component::Val],
+    ) -> Result<(), String> {
+        for check in checks {
+            let Some(v) = values.get(check.argument) else {
+                return Err(format!(
+                    "no value {} to hold `{}`'s invariant",
+                    check.argument + 1,
+                    check.ty
+                ));
+            };
+            held(check, v, &mut Vec::new())?;
+        }
+        Ok(())
+    }
+
+    fn held(
+        check: &crate::Bounded,
+        v: &wasmtime::component::Val,
+        at: &mut Vec<String>,
+    ) -> Result<(), String> {
+        use wasmtime::component::Val;
+        let Some(step) = check.path.get(at.len()) else {
+            let Val::S64(n) = v else {
+                return Err(format!(
+                    "{} is no `Int`, which `{}` is",
+                    place(check, at),
+                    check.ty
+                ));
+            };
+            let above = check.at_least.is_none_or(|b| *n >= b);
+            let below = check.at_most.is_none_or(|b| *n <= b);
+            return match above && below {
+                true => Ok(()),
+                false => Err(format!(
+                    "{} is {n}, and `{}` holds `{}`",
+                    place(check, at),
+                    check.ty,
+                    check.holds
+                )),
+            };
+        };
+        let inside = |v: &Val, at: &mut Vec<String>, name: String| {
+            at.push(name);
+            let r = held(check, v, at);
+            at.pop();
+            r
+        };
+        match (step.as_str(), v) {
+            ("*", Val::List(items)) => {
+                for (i, item) in items.iter().enumerate() {
+                    inside(item, at, format!("[{i}]"))?;
+                }
+                Ok(())
+            }
+            ("some", Val::Option(o)) => match o {
+                Some(v) => inside(v, at, step.clone()),
+                None => Ok(()),
+            },
+            ("ok", Val::Result(Ok(v))) | ("err", Val::Result(Err(v))) => match v {
+                Some(v) => inside(v, at, step.clone()),
+                None => Ok(()),
+            },
+            ("ok", Val::Result(Err(_))) | ("err", Val::Result(Ok(_))) => Ok(()),
+            (case, Val::Variant(name, payload)) => match (name == case, payload) {
+                (true, Some(v)) => inside(v, at, step.clone()),
+                _ => Ok(()),
+            },
+            (field, Val::Record(fields)) => match fields.iter().find(|(n, _)| n == field) {
+                Some((_, v)) => inside(v, at, step.clone()),
+                None => Err(format!("{} has no field `{field}`", place(check, at))),
+            },
+            (index, Val::Tuple(items)) => {
+                match index.parse::<usize>().ok().and_then(|i| items.get(i)) {
+                    Some(v) => inside(v, at, step.clone()),
+                    None => Err(format!("{} has no field {index}", place(check, at))),
+                }
+            }
+            _ => Err(format!(
+                "{} is not what `{}`'s invariant is checked at",
+                place(check, at),
+                check.ty
+            )),
+        }
+    }
+
+    /// "argument 2", "argument 1's `lines[0].quantity`", as a refusal names it.
+    fn place(check: &crate::Bounded, at: &[String]) -> String {
+        let mut path = String::new();
+        for step in at {
+            if step.starts_with('[') {
+                path.push_str(step);
+            } else {
+                if !path.is_empty() {
+                    path.push('.');
+                }
+                path.push_str(step);
+            }
+        }
+        match path.is_empty() {
+            true => format!("value {}", check.argument + 1),
+            false => format!("value {}'s `{path}`", check.argument + 1),
+        }
     }
 
     /// One JSON value, as a value of this component type, or why not.
@@ -1479,6 +1631,13 @@ pub mod engine {
                     ));
                 };
                 let named = key.clone();
+                // What its answer must hold (ADR-0179), as the contract states.
+                let bounded: Vec<crate::Bounded> = contract
+                    .imports
+                    .iter()
+                    .find(|i| i.key() == key)
+                    .map(|i| i.bounded.clone())
+                    .unwrap_or_default();
                 instance
                     .func_new(func, move |_, ty, args, results| {
                         let out = implementation(args).map_err(wasmtime::Error::msg)?;
@@ -1496,6 +1655,14 @@ pub mod engine {
                             *slot = project(v, &ty)
                                 .map_err(|e| wasmtime::Error::msg(format!("`{named}`: {e}")))?;
                         }
+                        // A data layer's answer comes from outside the
+                        // program: an invariant it breaks is a failed call,
+                        // never a value the component reads (ADR-0179).
+                        holds(&bounded, results).map_err(|why| {
+                            wasmtime::Error::msg(format!(
+                                "`{named}` answered what breaks an invariant: {why}"
+                            ))
+                        })?;
                         Ok(())
                     })
                     .map_err(|e| format!("{key}: {e}"))?;

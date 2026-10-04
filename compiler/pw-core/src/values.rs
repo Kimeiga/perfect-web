@@ -402,6 +402,10 @@ pub enum RelationKind {
     /// parameters, each once and nothing else (PW0619, ADR-0136). Each prop's
     /// type is an `Argument` relation.
     Props,
+    /// `PositiveInt(n)`: the value an opaque type is built from, against the
+    /// invariant the type states, as far as the build can bound it (PW0622,
+    /// ADR-0179).
+    Invariant,
 }
 
 /// A fields relation's expectation for a field its type does not declare.
@@ -508,7 +512,179 @@ struct Typer<'a> {
     /// Each template attribute written as a string with holes: its holes are
     /// `template_relations`', which names the attribute (ADR-0084).
     attribute_strings: BTreeSet<ExprId>,
+    /// Each expression's parent, for the `if`s a construction is inside
+    /// (ADR-0179).
+    parents: BTreeMap<ExprId, ExprId>,
+    /// Each `let`'s initializer, by the pattern it binds (ADR-0179).
+    lets: BTreeMap<crate::hir::PatternId, ExprId>,
 }
+
+/// **The integers a value can be, as far as the build can bound it**
+/// (ADR-0179): each end included, or open where nothing bounds it. Exact over
+/// `Int`, since both backends trap where an `Int` operation overflows: a value
+/// that is computed at all is the integer the expression means.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Interval {
+    lo: Option<i128>,
+    hi: Option<i128>,
+}
+
+impl Interval {
+    const ANY: Interval = Interval { lo: None, hi: None };
+
+    fn exactly(k: i128) -> Interval {
+        Interval {
+            lo: Some(k),
+            hi: Some(k),
+        }
+    }
+
+    fn add(self, o: Interval) -> Interval {
+        Interval {
+            lo: self.lo.zip(o.lo).and_then(|(a, b)| a.checked_add(b)),
+            hi: self.hi.zip(o.hi).and_then(|(a, b)| a.checked_add(b)),
+        }
+    }
+
+    fn neg(self) -> Interval {
+        Interval {
+            lo: self.hi.and_then(i128::checked_neg),
+            hi: self.lo.and_then(i128::checked_neg),
+        }
+    }
+
+    /// The least and the greatest of the four products of the ends, an open
+    /// end an infinity: `[1, ∞) × 2` is `[2, ∞)`. The values are integers, so
+    /// an end of 0 times an infinity is 0.
+    fn mul(self, o: Interval) -> Interval {
+        #[derive(Clone, Copy, PartialEq, PartialOrd)]
+        enum End {
+            Below,
+            At(i128),
+            Above,
+        }
+        let low = |b: Option<i128>| b.map_or(End::Below, End::At);
+        let high = |b: Option<i128>| b.map_or(End::Above, End::At);
+        let times = |a: End, b: End| -> Option<End> {
+            Some(match (a, b) {
+                (End::At(x), End::At(y)) => End::At(x.checked_mul(y)?),
+                (End::At(0), _) | (_, End::At(0)) => End::At(0),
+                (End::At(x), far) | (far, End::At(x)) => match (x > 0) == (far == End::Above) {
+                    true => End::Above,
+                    false => End::Below,
+                },
+                (a, b) => match a == b {
+                    true => End::Above,
+                    false => End::Below,
+                },
+            })
+        };
+        let corners = [
+            times(low(self.lo), low(o.lo)),
+            times(low(self.lo), high(o.hi)),
+            times(high(self.hi), low(o.lo)),
+            times(high(self.hi), high(o.hi)),
+        ];
+        let Some(corners) = corners.into_iter().collect::<Option<Vec<End>>>() else {
+            return Interval::ANY;
+        };
+        let least = corners
+            .iter()
+            .copied()
+            .fold(End::Above, |a, b| if b < a { b } else { a });
+        let most = corners
+            .iter()
+            .copied()
+            .fold(End::Below, |a, b| if b > a { b } else { a });
+        Interval {
+            lo: match least {
+                End::At(x) => Some(x),
+                _ => None,
+            },
+            hi: match most {
+                End::At(x) => Some(x),
+                _ => None,
+            },
+        }
+    }
+
+    /// Either: the value of a branch, one of two.
+    fn hull(self, o: Interval) -> Interval {
+        Interval {
+            lo: self.lo.zip(o.lo).map(|(a, b)| a.min(b)),
+            hi: self.hi.zip(o.hi).map(|(a, b)| a.max(b)),
+        }
+    }
+
+    /// Both: what a test established of a value, and what it was.
+    fn meet(self, o: Interval) -> Interval {
+        let pick = |a: Option<i128>, b: Option<i128>, f: fn(i128, i128) -> i128| match (a, b) {
+            (Some(x), Some(y)) => Some(f(x, y)),
+            (x, None) => x,
+            (None, y) => y,
+        };
+        Interval {
+            lo: pick(self.lo, o.lo, i128::max),
+            hi: pick(self.hi, o.hi, i128::min),
+        }
+    }
+
+    fn within(self, inv: &crate::hir::Invariant) -> bool {
+        let above = inv.at_least.is_none_or(|b| self.lo.is_some_and(|l| l >= b));
+        let below = inv.at_most.is_none_or(|b| self.hi.is_some_and(|h| h <= b));
+        above && below
+    }
+
+    /// As a diagnostic says it: "at least 0", "from -3 to 5", "any `Int`".
+    fn described(self) -> String {
+        match (self.lo, self.hi) {
+            (Some(a), Some(b)) if a == b => format!("{a}"),
+            (Some(a), Some(b)) => format!("from {a} to {b}"),
+            (Some(a), None) => format!("at least {a}"),
+            (None, Some(b)) => format!("at most {b}"),
+            (None, None) => "any `Int`".to_string(),
+        }
+    }
+
+    /// What `x OP k` makes of `x`, holding or not: `>=` and `1` give
+    /// "at least 1", and not holding, "at most 0".
+    fn compared(op: &str, k: i128, holds: bool) -> Option<Interval> {
+        let op = match (op, holds) {
+            (op, true) => op,
+            ("<", false) => ">=",
+            ("<=", false) => ">",
+            (">", false) => "<=",
+            (">=", false) => "<",
+            ("==", false) => "!=",
+            ("!=", false) => "==",
+            _ => return None,
+        };
+        Some(match op {
+            "<" => Interval {
+                lo: None,
+                hi: k.checked_sub(1),
+            },
+            "<=" => Interval {
+                lo: None,
+                hi: Some(k),
+            },
+            ">" => Interval {
+                lo: k.checked_add(1),
+                hi: None,
+            },
+            ">=" => Interval {
+                lo: Some(k),
+                hi: None,
+            },
+            "==" => Interval::exactly(k),
+            _ => return None,
+        })
+    }
+}
+
+/// A place a value is read from that a test can narrow: a local, and the
+/// fields read through it, `n.value`.
+type Path = (Binder, Vec<String>);
 
 /// What a resolved call is checked against: its parameters, where each is
 /// declared, and its result, all under the binder whose type parameters the
@@ -943,6 +1119,21 @@ impl<'a> Typer<'a> {
             solved: RefCell::new(BTreeMap::new()),
             used,
             attribute_strings,
+            parents: body
+                .exprs()
+                .flat_map(|(id, _, _)| body.children(id).into_iter().map(move |c| (c, id)))
+                .collect(),
+            lets: body
+                .exprs()
+                .filter_map(|(_, e, _)| match e {
+                    Expr::Let {
+                        pat: Some(pat),
+                        init: Some(init),
+                        ..
+                    } => Some((*pat, *init)),
+                    _ => None,
+                })
+                .collect(),
         };
 
         // What the program implies: an unannotated `let` or `use` takes its
@@ -1867,9 +2058,236 @@ impl<'a> Typer<'a> {
                 boundary: (span.clone(), format!("in this call to `{name}`")),
             });
         }
+        // The value an opaque type is built from, against what the type
+        // states every value of it holds (ADR-0179).
+        if let Target::Opaque(def) = &target
+            && let Some(inv) = self.sigs.type_decl(*def).and_then(|t| t.invariant.as_ref())
+            && inv.unread.is_empty()
+            && arity_ok
+            && let Some((_, value)) = supplied.first()
+        {
+            let found = self.interval_at(*value);
+            relations.push(ValueRelation {
+                declaration: self.decl.name.clone(),
+                kind: RelationKind::Invariant,
+                span: self.body.expr_span(*value),
+                target: name.clone(),
+                index: Some(0),
+                outcome: match found.within(inv) {
+                    true => Outcome::Agree,
+                    false => Outcome::Disagree {
+                        expected: inv.written.clone(),
+                        actual: found.described(),
+                    },
+                },
+                declared_at: Some((def.unit, inv.span.clone())),
+                boundary: (span.clone(), format!("`{name}` holds `{}`", inv.written)),
+            });
+        }
         Solved {
             result: result.map(|r| s.close(&r)).unwrap_or(Ty::Unknown),
             relations,
+        }
+    }
+
+    /// **What `e` can be, where it is read** (ADR-0179): its interval,
+    /// narrowed by every test made around it.
+    fn interval_at(&self, e: ExprId) -> Interval {
+        let facts = self.facts_at(e);
+        self.interval(e, &facts, 0)
+    }
+
+    /// What the tests around `e` establish of the values it reads: an `if`'s
+    /// condition in its branch, its negation in its `else`, and the left of
+    /// `&` on its right, as the left of `|` fails there.
+    fn facts_at(&self, e: ExprId) -> Vec<(Path, Interval)> {
+        let mut out = Vec::new();
+        let mut child = e;
+        while let Some(&parent) = self.parents.get(&child) {
+            match self.body.expr(parent) {
+                Expr::If { cond, then, els } => {
+                    if *then == child {
+                        out.extend(self.facts(*cond, true));
+                    } else if *els == Some(child) {
+                        out.extend(self.facts(*cond, false));
+                    }
+                }
+                Expr::Binary {
+                    op: BinOp::And,
+                    lhs,
+                    rhs,
+                } if *rhs == child => out.extend(self.facts(*lhs, true)),
+                Expr::Binary {
+                    op: BinOp::Or,
+                    lhs,
+                    rhs,
+                } if *rhs == child => out.extend(self.facts(*lhs, false)),
+                _ => {}
+            }
+            child = parent;
+        }
+        out
+    }
+
+    /// What `cond` establishes where it holds, or where it does not: a local,
+    /// or a field read through one, compared with an integer.
+    fn facts(&self, cond: ExprId, holds: bool) -> Vec<(Path, Interval)> {
+        match self.body.expr(cond) {
+            Expr::Binary {
+                op: BinOp::And,
+                lhs,
+                rhs,
+            } if holds => {
+                let mut both = self.facts(*lhs, true);
+                both.extend(self.facts(*rhs, true));
+                both
+            }
+            Expr::Binary {
+                op: BinOp::Or,
+                lhs,
+                rhs,
+            } if !holds => {
+                let mut neither = self.facts(*lhs, false);
+                neither.extend(self.facts(*rhs, false));
+                neither
+            }
+            Expr::Unary {
+                op: UnOp::Not,
+                operand,
+            } => self.facts(*operand, !holds),
+            Expr::Binary {
+                op: BinOp::Cmp(c),
+                lhs,
+                rhs,
+            } => {
+                // `n.value > 1`, or `1 < n.value` read the other way round.
+                let flipped = match c.as_str() {
+                    "<" => ">",
+                    "<=" => ">=",
+                    ">" => "<",
+                    ">=" => "<=",
+                    other => other,
+                };
+                let (path, op, k) = match (self.path_of(*lhs), self.integer(*rhs)) {
+                    (Some(path), Some(k)) => (path, c.as_str(), k),
+                    _ => match (self.integer(*lhs), self.path_of(*rhs)) {
+                        (Some(k), Some(path)) => (path, flipped, k),
+                        _ => return Vec::new(),
+                    },
+                };
+                Interval::compared(op, k, holds)
+                    .map(|i| vec![(path, i)])
+                    .unwrap_or_default()
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// A local, and the fields read through it: `n`, `n.value`.
+    fn path_of(&self, e: ExprId) -> Option<Path> {
+        match self.body.expr(e) {
+            Expr::Name(_) => self.lexical.binder(e).map(|b| (b, Vec::new())),
+            Expr::Field { base, name } => self.path_of(*base).map(|(b, mut fields)| {
+                fields.push(name.clone());
+                (b, fields)
+            }),
+            _ => None,
+        }
+    }
+
+    /// An integer literal, or one negated.
+    fn integer(&self, e: ExprId) -> Option<i128> {
+        match self.body.expr(e) {
+            Expr::Literal(Literal::Int(s)) => s.replace('_', "").parse().ok(),
+            Expr::Unary {
+                op: UnOp::Neg,
+                operand,
+            } => self.integer(*operand).and_then(i128::checked_neg),
+            _ => None,
+        }
+    }
+
+    /// **The interval of an `Int` expression** under `facts` (ADR-0179):
+    /// exact for a literal and for arithmetic on bounded values; an opaque
+    /// value's representation as its type bounds it; a `let`'s local as its
+    /// initializer, where the `let` is; either branch of an `if` or a
+    /// `match`. Anything else is any `Int`, and a test of it narrows it.
+    fn interval(&self, e: ExprId, facts: &[(Path, Interval)], depth: u32) -> Interval {
+        // A chain of `let`s, each read through the last, ends; this bounds
+        // the walk where one would not.
+        if depth > 64 {
+            return Interval::ANY;
+        }
+        let next = depth + 1;
+        let natural = match self.body.expr(e) {
+            _ if self.integer(e).is_some() => {
+                self.integer(e).map_or(Interval::ANY, Interval::exactly)
+            }
+            Expr::Unary {
+                op: UnOp::Neg,
+                operand,
+            } => self.interval(*operand, facts, next).neg(),
+            Expr::Binary { op, lhs, rhs } if matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul) => {
+                let (a, b) = (
+                    self.interval(*lhs, facts, next),
+                    self.interval(*rhs, facts, next),
+                );
+                match op {
+                    BinOp::Add => a.add(b),
+                    BinOp::Sub => a.add(b.neg()),
+                    _ => a.mul(b),
+                }
+            }
+            Expr::Field { base, name } if name == "value" => match self.of(*base) {
+                Ty::Nominal(def, _) => self
+                    .sigs
+                    .type_decl(def)
+                    .and_then(|t| t.invariant.as_ref())
+                    .filter(|i| i.unread.is_empty())
+                    .map_or(Interval::ANY, |i| Interval {
+                        lo: i.at_least,
+                        hi: i.at_most,
+                    }),
+                _ => Interval::ANY,
+            },
+            Expr::Name(_) => match self.lexical.binder(e) {
+                Some(Binder::Pattern(p)) => match self.lets.get(&p) {
+                    Some(init) => {
+                        let there = self.facts_at(*init);
+                        self.interval(*init, &there, next)
+                    }
+                    None => Interval::ANY,
+                },
+                _ => Interval::ANY,
+            },
+            Expr::Block { stmts } => stmts
+                .last()
+                .map_or(Interval::ANY, |last| self.interval(*last, facts, next)),
+            Expr::If {
+                cond,
+                then,
+                els: Some(els),
+            } => {
+                let mut yes = facts.to_vec();
+                yes.extend(self.facts(*cond, true));
+                let mut no = facts.to_vec();
+                no.extend(self.facts(*cond, false));
+                self.interval(*then, &yes, next)
+                    .hull(self.interval(*els, &no, next))
+            }
+            Expr::Match { arms, .. } => arms
+                .iter()
+                .map(|a| self.interval(a.body, facts, next))
+                .reduce(Interval::hull)
+                .unwrap_or(Interval::ANY),
+            _ => Interval::ANY,
+        };
+        match self.path_of(e) {
+            Some(path) => facts
+                .iter()
+                .filter(|(p, _)| *p == path)
+                .fold(natural, |acc, (_, i)| acc.meet(*i)),
+            None => natural,
         }
     }
 
@@ -4136,6 +4554,41 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  a `Result` or a sum type has no truth, and the renderer refuses it",
             )
             .repair("take it apart with `{#match}`"),
+            RelationKind::Invariant => {
+                let mut d = Diagnostic::error(
+                    crate::codes::INVARIANT_NOT_SHOWN.id,
+                    crate::codes::INVARIANT_NOT_SHOWN.invariant,
+                    Detector::Signature,
+                    format!(
+                        "a `{}` holds `{expected}`, and the build cannot show this value \
+                         does: it is {actual}",
+                        r.target
+                    ),
+                    r.span.clone(),
+                )
+                .reason("invariant_not_shown")
+                .explain(
+                    "a value of an opaque type that states an invariant is built only where \
+                     the build shows the invariant holds: from a literal, from values whose \
+                     bounds give it, or inside an `if` that tests it. A value the build \
+                     cannot bound is tested first, and what builds from it answers an \
+                     `Option` (ADR-0179)",
+                )
+                .repair(format!(
+                    "test the value first, `if .. {{ Some({}(..)) }} else {{ None }}`, or \
+                     build from a value its bounds give",
+                    r.target
+                ));
+                if let Some((unit, span)) = &r.declared_at
+                    && *unit == at
+                {
+                    d = d.related(
+                        span.clone(),
+                        format!("`{}` states `{expected}` here", r.target),
+                    );
+                }
+                d
+            }
             RelationKind::Props => Diagnostic::error(
                 crate::codes::VIEW_PROPS.id,
                 crate::codes::VIEW_PROPS.invariant,

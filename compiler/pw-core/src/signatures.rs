@@ -132,6 +132,9 @@ pub struct TypeDecl {
     pub record: Option<Vec<(String, TypeResolution)>>,
     /// `opaque type PositiveInt = Int`: what `PositiveInt(1)` is built from.
     pub representation: Option<TypeResolution>,
+    /// `where value >= 1`: what every value of the opaque type holds
+    /// (ADR-0179).
+    pub invariant: Option<crate::hir::Invariant>,
     /// `type Shape = | Circle(Int) | Empty`: each case, in declaration order,
     /// with its payload's fields, each resolved from where the declaration is
     /// written (ADR-0059). A case is found by its position here, which is its
@@ -219,7 +222,9 @@ impl Signatures {
                         rep,
                         decl.name_span.clone(),
                     );
-                    out.types.entry(def).or_default().representation = Some(representation);
+                    let facts = out.types.entry(def).or_default();
+                    facts.representation = Some(representation);
+                    facts.invariant = decl.invariant.clone();
                 }
                 if decl.kind == DeclKind::Type
                     && let Some(cases) = &decl.variants

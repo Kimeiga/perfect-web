@@ -117,6 +117,7 @@ fn the_declared_component_imports_exactly_what_its_world_says() {
                 name: name.to_string(),
                 capability: "store.read".into(),
                 kind: ImportKind::HostCapability,
+                bounded: Vec::new(),
             }
         })
         .collect();
@@ -158,6 +159,7 @@ fn the_std_component_is_refused_for_authority_nobody_asked_for() {
                     name: name.to_string(),
                     capability: "store.read".into(),
                     kind: ImportKind::HostCapability,
+                    bounded: Vec::new(),
                 }
             })
             .collect(),
@@ -222,6 +224,7 @@ fn a_granted_component_instantiates_and_an_ungranted_one_does_not() {
                 name: name.to_string(),
                 capability: "store.read".into(),
                 kind: ImportKind::HostCapability,
+                bounded: Vec::new(),
             }
         })
         .collect();
@@ -272,6 +275,7 @@ fn a_refused_admission_yields_no_granted_to_link_from() {
                 name: name.to_string(),
                 capability: "store.read".into(),
                 kind: ImportKind::HostCapability,
+                bounded: Vec::new(),
             }
         })
         .collect();
@@ -318,6 +322,7 @@ fn an_instance_runs_within_the_budget_its_deployment_declares() {
                 name: name.to_string(),
                 capability: "store.read".into(),
                 kind: ImportKind::HostCapability,
+                bounded: Vec::new(),
             }
         })
         .collect();
@@ -388,6 +393,7 @@ fn a_memory_ceiling_denies_growth_rather_than_aborting() {
                 name: name.to_string(),
                 capability: "store.read".into(),
                 kind: ImportKind::HostCapability,
+                bounded: Vec::new(),
             }
         })
         .collect();
@@ -453,6 +459,7 @@ fn a_granted_guest_calls_the_host_and_receives_its_answer() {
                 name: name.to_string(),
                 capability: "store.read".into(),
                 kind: ImportKind::HostCapability,
+                bounded: Vec::new(),
             }
         })
         .collect();

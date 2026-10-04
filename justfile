@@ -2308,6 +2308,38 @@ e14-availability:
      } > docs/evidence/E14/availability.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/availability.txt
 
+# ADR-0179: an opaque type states its invariant, and every construction and
+# every boundary holds it. The parser, the checker, the conformance oracle,
+# the host, the server, the page in three engines, and the mutation controls.
+e14-invariants:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0179 - an opaque type states its invariant, and every construction and every boundary holds it"; echo; \
+       echo "produced by: just e14-invariants"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the parser (compiler/pw-syntax/src/grammar.rs)"; echo; \
+       cargo test --locked -p pw-syntax --lib -- an_opaque_type_states_its_invariant 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the checker, PW0622 and PW0623 (compiler/pw-core/tests/invariants.rs)"; echo; \
+       cargo test --locked -p pw-core --test invariants 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the conformance oracle, its values fitted to the contract"; echo; \
+       cargo test --locked -p pw-conformance --test oracle 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the host (runtime/pw-host/tests/bounded.rs, pleris_component.rs)"; echo; \
+       cargo test --locked -p pw-host --features engine --test bounded 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-host --features engine --test pleris_component -- a_quantity_that_is_no a_data_layer_answer 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_quantity_that_is_no_positive_int|a_stored_line_of_nothing)|^test result'; \
+       echo; echo "== the page, in three engines (e2e/compiled-handler.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/compiled-handler.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/invariants_mutations.py)"; echo; \
+       python3 scripts/invariants_mutations.py; \
+     } > docs/evidence/E14/invariants.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/invariants.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

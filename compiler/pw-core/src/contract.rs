@@ -295,6 +295,171 @@ pub struct Import {
     /// look privileged.
     #[serde(default)]
     pub kind: ImportKind,
+    /// **Where its answer must hold an invariant** (ADR-0179): a data
+    /// layer's answer comes from outside the program, and a host checks it
+    /// before the component reads it. `argument` is 0, the answer.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bounded: Vec<Bounded>,
+}
+
+/// **One place a value from outside must hold an invariant** (ADR-0179):
+/// the value at `argument`, then each step into it, and the bounds the
+/// opaque type there states. A step is a record's field, `*` for each item
+/// of a list, `some`, `ok` or `err`, a case by its name, or a field of a
+/// case's payload by its position. All as the component names them, so a
+/// host checks a value without knowing the program's types.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Bounded {
+    pub argument: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub path: Vec<String>,
+    /// The opaque type whose invariant it is: `domain.PositiveInt`.
+    #[serde(rename = "type")]
+    pub ty: String,
+    /// The invariant as written: `value >= 1`.
+    pub holds: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at_least: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at_most: Option<i64>,
+}
+
+/// **Every invariant a value of `t` holds, wherever it is in the value**
+/// (ADR-0179), for the value at `argument`. A type that contains itself is
+/// followed once.
+pub(crate) fn bounded_in(
+    sigs: &Signatures,
+    t: &crate::resolved::ResolvedType,
+    argument: usize,
+) -> Vec<Bounded> {
+    let mut out = Vec::new();
+    bounds_within(
+        sigs,
+        &t.semantic_key(),
+        argument,
+        &mut Vec::new(),
+        &mut Vec::new(),
+        &mut out,
+    );
+    out
+}
+
+fn bounds_within(
+    sigs: &Signatures,
+    key: &crate::resolved::TypeKey,
+    argument: usize,
+    path: &mut Vec<String>,
+    seen: &mut Vec<crate::resolve::DefId>,
+    out: &mut Vec<Bounded>,
+) {
+    use crate::resolved::{Builtin, TypeKey};
+    let step = |name: String,
+                key: &TypeKey,
+                path: &mut Vec<String>,
+                seen: &mut Vec<_>,
+                out: &mut Vec<_>| {
+        path.push(name);
+        bounds_within(sigs, key, argument, path, seen, out);
+        path.pop();
+    };
+    match key {
+        TypeKey::Builtin(Builtin::List, args) => {
+            if let Some(item) = args.first() {
+                step("*".into(), item, path, seen, out);
+            }
+        }
+        TypeKey::Builtin(Builtin::Option, args) => {
+            if let Some(some) = args.first() {
+                step("some".into(), some, path, seen, out);
+            }
+        }
+        TypeKey::Builtin(Builtin::Result, args) => {
+            for (case, arg) in ["ok", "err"].iter().zip(args) {
+                step((*case).into(), arg, path, seen, out);
+            }
+        }
+        TypeKey::Nominal(def, args) => {
+            if seen.contains(def) {
+                return;
+            }
+            let Some(facts) = sigs.type_decl(*def) else {
+                return;
+            };
+            if let Some(inv) = facts.invariant.as_ref().filter(|i| i.unread.is_empty()) {
+                out.push(Bounded {
+                    argument,
+                    path: path.clone(),
+                    ty: sigs.path_of(*def).unwrap_or_default().to_string(),
+                    holds: inv.written.clone(),
+                    at_least: inv.at_least.and_then(|b| i64::try_from(b).ok()),
+                    at_most: inv.at_most.and_then(|b| i64::try_from(b).ok()),
+                });
+            }
+            // A field's or a case's type, under the arguments `def` is applied
+            // to: `Money<USD>`'s fields as `USD`'s.
+            let applied = |t: &crate::resolved::TypeResolution| {
+                t.resolved()
+                    .map(|r| substituted_key(&r.semantic_key(), *def, args))
+            };
+            seen.push(*def);
+            for (name, t) in facts.record.iter().flatten() {
+                if let Some(k) = applied(t) {
+                    step(crate::wit::ident(name), &k, path, seen, out);
+                }
+            }
+            for (case, fields) in facts.variants.iter().flatten() {
+                path.push(crate::wit::ident(case));
+                match fields.as_slice() {
+                    [only] => {
+                        if let Some(k) = applied(only) {
+                            bounds_within(sigs, &k, argument, path, seen, out);
+                        }
+                    }
+                    several => {
+                        for (i, t) in several.iter().enumerate() {
+                            if let Some(k) = applied(t) {
+                                step(i.to_string(), &k, path, seen, out);
+                            }
+                        }
+                    }
+                }
+                path.pop();
+            }
+            if let Some(k) = facts.representation.as_ref().and_then(applied) {
+                bounds_within(sigs, &k, argument, path, seen, out);
+            }
+            seen.pop();
+        }
+        _ => {}
+    }
+}
+
+/// `key` with `binder`'s type parameters replaced by `args`.
+fn substituted_key(
+    key: &crate::resolved::TypeKey,
+    binder: crate::resolve::DefId,
+    args: &[crate::resolved::TypeKey],
+) -> crate::resolved::TypeKey {
+    use crate::resolved::TypeKey;
+    match key {
+        TypeKey::Parameter { binder: b, index } if *b == binder => args
+            .get(*index as usize)
+            .cloned()
+            .unwrap_or_else(|| key.clone()),
+        TypeKey::Builtin(c, xs) => TypeKey::Builtin(
+            *c,
+            xs.iter()
+                .map(|x| substituted_key(x, binder, args))
+                .collect(),
+        ),
+        TypeKey::Nominal(d, xs) => TypeKey::Nominal(
+            *d,
+            xs.iter()
+                .map(|x| substituted_key(x, binder, args))
+                .collect(),
+        ),
+        other => other.clone(),
+    }
 }
 
 /// Who defines an operation.
@@ -429,6 +594,10 @@ pub struct ComponentExport {
     /// defect: `idempotent_by InteractionId` was checked and never held.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub idempotent_by: Option<String>,
+    /// **Where an argument must hold an invariant** (ADR-0179): a browser's
+    /// request is a claim, and a host checks it before the component runs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bounded: Vec<Bounded>,
 }
 
 /// **What the compiler tells the host about one component.**
@@ -736,6 +905,12 @@ fn host_calls(
                 _ => Ownership::External,
             },
             kind: ImportKind::HostCapability,
+            bounded: signature
+                .returns
+                .as_ref()
+                .and_then(|r| r.resolved())
+                .map(|t| bounded_in(sigs, t, 0))
+                .unwrap_or_default(),
         });
     }
     out
@@ -820,6 +995,8 @@ fn component_calls(
                 // which is the question `owner` is not answering.
                 owner: Ownership::External,
                 kind: ImportKind::Component,
+                // Another component's answer is built by checked code.
+                bounded: Vec::new(),
             });
         }
     }
@@ -1125,6 +1302,17 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             component.idempotent_by = decl
                 .policy("idempotent_by")
                 .map(|p| p.value.trim().to_string());
+            component.bounded = sigs
+                .by_def(crate::resolve::DefId { unit, decl: id.0 })
+                .map(|s| {
+                    s.params
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, p)| Some(bounded_in(sigs, p.as_ref()?.resolved()?, i)))
+                        .flatten()
+                        .collect()
+                })
+                .unwrap_or_default();
             let exports = vec![Export {
                 name: decl.name.clone(),
                 kind: kind.to_string(),
@@ -1215,6 +1403,17 @@ fn schema_of(
             if let Some(key) = &component.idempotent_by {
                 text.push_str("|idempotent_by:");
                 text.push_str(key);
+            }
+            // What the host checks of an argument before the component runs
+            // (ADR-0179), as authorization is.
+            for b in &component.bounded {
+                text.push_str(&format!(
+                    "|bounded:{}:{}:{}:{}",
+                    b.argument,
+                    b.path.join("."),
+                    b.ty,
+                    b.holds
+                ));
             }
         }
     }

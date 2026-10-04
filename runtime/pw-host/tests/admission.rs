@@ -54,6 +54,7 @@ fn contract(id: &str, placements: &[&str], capabilities: &[&str]) -> ComponentCo
                 },
                 capability: c.name(),
                 kind: ImportKind::HostCapability,
+                bounded: Vec::new(),
             })
             .collect(),
         required_capabilities: required,
@@ -472,6 +473,7 @@ fn with_component_dep(mut c: ComponentContract) -> ComponentContract {
         name: "Store".into(),
         capability: String::new(),
         kind: ImportKind::Component,
+        bounded: Vec::new(),
     });
     c
 }
@@ -509,6 +511,7 @@ fn an_import_is_classified_before_it_is_compared() {
         name: "read".into(),
         capability: "store.read".into(),
         kind: ImportKind::HostCapability,
+        bounded: Vec::new(),
     });
     assert_eq!(
         classify(&spike, "perfect-web:store/stores@0.1.0#read"),
@@ -603,6 +606,7 @@ fn a_runtime_import_can_never_be_authorised() {
         name: "exit".into(),
         capability: "database.read<Stores>".into(),
         kind: ImportKind::HostCapability,
+        bounded: Vec::new(),
     });
 
     let a = admit(

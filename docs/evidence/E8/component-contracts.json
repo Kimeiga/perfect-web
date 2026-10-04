@@ -131,7 +131,7 @@
   {
     "component_id": "domain.count",
     "capability_mapping": 1,
-    "abi_schema": "8aaf4448b4ac79d0",
+    "abi_schema": "19d276ac5a377d7a",
     "required_capabilities": [],
     "allowed_placements": [
       "build",
@@ -152,7 +152,15 @@
         },
         "component": {
           "interface": "pw:app/domain-count-api@0.1.0",
-          "function": "count"
+          "function": "count",
+          "bounded": [
+            {
+              "argument": 0,
+              "type": "domain.PositiveInt",
+              "holds": "value >= 1",
+              "at_least": 1
+            }
+          ]
         }
       }
     ]
@@ -189,7 +197,7 @@
   {
     "component_id": "domain.line_count",
     "capability_mapping": 1,
-    "abi_schema": "79995784a8451fc2",
+    "abi_schema": "71f80d3135f3ec16",
     "required_capabilities": [],
     "allowed_placements": [
       "build",
@@ -218,7 +226,20 @@
         },
         "component": {
           "interface": "pw:app/domain-line-count-api@0.1.0",
-          "function": "line-count"
+          "function": "line-count",
+          "bounded": [
+            {
+              "argument": 0,
+              "path": [
+                "lines",
+                "*",
+                "quantity"
+              ],
+              "type": "domain.PositiveInt",
+              "holds": "value >= 1",
+              "at_least": 1
+            }
+          ]
         }
       }
     ]
@@ -226,7 +247,7 @@
   {
     "component_id": "domain.subtotal",
     "capability_mapping": 1,
-    "abi_schema": "f91e2f7273509b3a",
+    "abi_schema": "efd6a5f943acadae",
     "required_capabilities": [],
     "allowed_placements": [
       "build",
@@ -255,7 +276,20 @@
         },
         "component": {
           "interface": "pw:app/domain-subtotal-api@0.1.0",
-          "function": "subtotal"
+          "function": "subtotal",
+          "bounded": [
+            {
+              "argument": 0,
+              "path": [
+                "lines",
+                "*",
+                "quantity"
+              ],
+              "type": "domain.PositiveInt",
+              "holds": "value >= 1",
+              "at_least": 1
+            }
+          ]
         }
       }
     ]
@@ -263,7 +297,7 @@
   {
     "component_id": "domain.total",
     "capability_mapping": 1,
-    "abi_schema": "b34c0c8510993136",
+    "abi_schema": "646f52dd5992d40d",
     "required_capabilities": [],
     "allowed_placements": [
       "build",
@@ -284,7 +318,18 @@
         },
         "component": {
           "interface": "pw:app/domain-total-api@0.1.0",
-          "function": "total"
+          "function": "total",
+          "bounded": [
+            {
+              "argument": 0,
+              "path": [
+                "quantity"
+              ],
+              "type": "domain.PositiveInt",
+              "holds": "value >= 1",
+              "at_least": 1
+            }
+          ]
         }
       }
     ]
@@ -349,7 +394,21 @@
           }
         },
         "owner": "external",
-        "kind": "host_capability"
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "lines",
+              "*",
+              "quantity"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
       }
     ],
     "exports": [
@@ -833,7 +892,7 @@
   {
     "component_id": "store.page.add_to_cart",
     "capability_mapping": 1,
-    "abi_schema": "e10d07d4e3509ab3",
+    "abi_schema": "b0847bb334f1be0e",
     "required_capabilities": [
       {
         "family": "database",
@@ -937,7 +996,21 @@
           }
         },
         "owner": "external",
-        "kind": "host_capability"
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "lines",
+              "*",
+              "quantity"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
       },
       {
         "interface": "store:data/menus",
@@ -992,7 +1065,15 @@
               "predicate": "SignedIn"
             }
           ],
-          "idempotent_by": "InteractionId"
+          "idempotent_by": "InteractionId",
+          "bounded": [
+            {
+              "argument": 1,
+              "type": "domain.PositiveInt",
+              "holds": "value >= 1",
+              "at_least": 1
+            }
+          ]
         }
       }
     ]
@@ -1089,7 +1170,21 @@
           }
         },
         "owner": "external",
-        "kind": "host_capability"
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "lines",
+              "*",
+              "quantity"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
       }
     ],
     "exports": [
@@ -1220,7 +1315,21 @@
           }
         },
         "owner": "external",
-        "kind": "host_capability"
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "lines",
+              "*",
+              "quantity"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
       }
     ],
     "exports": [
@@ -1361,7 +1470,21 @@
           }
         },
         "owner": "external",
-        "kind": "host_capability"
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "lines",
+              "*",
+              "quantity"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
       },
       {
         "interface": "store:data/menus",
@@ -1518,7 +1641,21 @@
           }
         },
         "owner": "external",
-        "kind": "host_capability"
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "lines",
+              "*",
+              "quantity"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
       }
     ],
     "exports": [

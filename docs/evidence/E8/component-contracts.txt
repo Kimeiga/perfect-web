@@ -30,7 +30,7 @@ Resources.Store  abi 67b9938482d95947
   runs at   build, browser, edge, origin
   exports   query Store
 
-domain.count  abi 8aaf4448b4ac79d0
+domain.count  abi 19d276ac5a377d7a
   runs at   build, browser, edge, origin
   exports   function count
 
@@ -38,15 +38,15 @@ domain.display  abi 8d1fd3f0102ea01e
   runs at   build, browser, edge, origin
   exports   function display
 
-domain.line_count  abi 79995784a8451fc2
+domain.line_count  abi 71f80d3135f3ec16
   runs at   build, browser, edge, origin
   exports   function line_count
 
-domain.subtotal  abi f91e2f7273509b3a
+domain.subtotal  abi efd6a5f943acadae
   runs at   build, browser, edge, origin
   exports   function subtotal
 
-domain.total  abi b34c0c8510993136
+domain.total  abi 646f52dd5992d40d
   runs at   build, browser, edge, origin
   exports   function total
 
@@ -96,7 +96,7 @@ store.page.StorePage  abi d803b26130c7cf49
   host      pw:host/session#read  (session.read)
   exports   page StorePage
 
-store.page.add_to_cart  abi e10d07d4e3509ab3
+store.page.add_to_cart  abi b0847bb334f1be0e
   runs at   origin
   needs     database.read<Menus>
   needs     database.write<Carts>

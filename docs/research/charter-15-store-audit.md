@@ -52,7 +52,7 @@ are fixed (ADR-0155):
 | Cart.id, consumer_id, version | missing as fields: a cart is keyed by its session, and its version is the runtime's entry version |
 | Cart.items | partial: `lines: List<CartLine>` |
 | CartLine.item_id, unit_price | met (`Money<USD>`) |
-| CartLine.quantity: PositiveInt | partial: `PositiveInt` is `Int` underneath, unchecked at the boundary (KNOWN_LIMITATIONS) |
+| CartLine.quantity: PositiveInt | met since ADR-0179: `PositiveInt` states `value >= 1`; every construction is shown to hold it at build, and the host checks a command's quantity and every cart a data layer answers |
 | DeliveryEstimate.min_minutes, max_minutes, generated_at | missing: `{ minutes: Int }`, and no `Instant` |
 
 ## §15.2 Privacy and placement
@@ -141,10 +141,10 @@ are fixed (ADR-0155):
    ADR-0173.
 6. ~~**§15.5's missing controls.**~~ Met by ADR-0174 to ADR-0176.
 7. ~~**Last-known-good** (test 18)~~: met by ADR-0177.
-8. **§15.1's fields**, and `PositiveInt` checked at the boundary. The
-   descriptions are met by ADR-0166, the price by ADR-0169, and
-   `available` by ADR-0178. Still missing: `category` and `menu_version`;
-   and `DeliveryEstimate`'s range.
+8. **§15.1's fields.** The descriptions are met by ADR-0166, the price by
+   ADR-0169, `available` by ADR-0178, and `PositiveInt` checked at every
+   construction and boundary by ADR-0179. Still missing: `category` and
+   `menu_version`; and `DeliveryEstimate`'s range.
 9. **Accessibility** (test 14): an automated audit. Each Add named by its
    item, and a live region for the count, are met by ADR-0168.
 10. **Tests 2 and 13** against the running store's shared output.

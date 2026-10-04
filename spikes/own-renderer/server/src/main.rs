@@ -1332,9 +1332,9 @@ impl Server {
             .and_then(|c| c.exports.first())
             .and_then(|e| e.component.clone())
             .ok_or_else(|| format!("`{component_id}`'s contract does not locate its export"))?;
-        let args = loaded
-            .prepared
-            .arguments(&[&export.interface, &export.function], json)?;
+        // Typed by the export's parameters, and held to the invariants its
+        // contract states (ADR-0179): a forged quantity of 0 is refused here.
+        let args = loaded.prepared.arguments_for(&export, json)?;
         let answered = |run: Result<Answered, String>| match run {
             Ok(answered) => answered,
             Err(why) => Answered {
@@ -7114,6 +7114,80 @@ public query Store(",
         let (fresh, _) = s.serve_document("c");
         assert!(visible(&fresh).contains("Closing early"), "{fresh}");
         assert_eq!(notice_calls(&s), 2);
+    }
+
+    /// **A quantity that is no `PositiveInt` is refused at the boundary**
+    /// (ADR-0179, charter §7.1's "explicit decoding at every external
+    /// boundary"). A browser's request is a claim, and one forged with a
+    /// quantity of 0 or less is refused before the command runs: nothing is
+    /// written, and the cart is as it was. Until 2026-10-04 it was accepted
+    /// as an `s64`, and the data layer added it to the line.
+    #[test]
+    fn a_quantity_that_is_no_positive_int_is_refused_at_the_boundary() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        s.serve_document("a");
+        for forged in [0, -3] {
+            let refused = s.command_answer(
+                ADD,
+                "a",
+                &[shown("espresso"), serde_json::json!(forged)],
+                Some(&format!("forged-{forged}")),
+            );
+            let why = refused.expect_err("refused before the command runs");
+            assert!(
+                why.contains("`domain.PositiveInt`") && why.contains("value >= 1"),
+                "{why}"
+            );
+            assert!(why.contains(&format!("{forged}")), "{why}");
+        }
+        let lines = s
+            .carts
+            .lock()
+            .expect("carts")
+            .get("a")
+            .cloned()
+            .unwrap_or_default();
+        assert!(lines.is_empty(), "the cart holds {:?}", lines.len());
+        // A quantity the type holds is added, as before.
+        let added = s
+            .command_answer(
+                ADD,
+                "a",
+                &[shown("espresso"), serde_json::json!(2)],
+                Some("press-1"),
+            )
+            .expect("a well-formed request");
+        assert!(added.committed);
+        assert_eq!(s.cart_value("a"), 2);
+    }
+
+    /// **A count the data layer holds that is no `PositiveInt` is never
+    /// shown** (ADR-0179): a line of 0 written around the program, as a
+    /// database's row can be, makes the cart's read fail, by name, and the
+    /// page is not served from it.
+    #[test]
+    fn a_stored_line_of_nothing_is_a_failed_read() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        s.serve_document("a");
+        let added = s
+            .command_answer(
+                ADD,
+                "a",
+                &[shown("espresso"), serde_json::json!(1)],
+                Some("press-1"),
+            )
+            .expect("a well-formed request");
+        assert!(added.committed);
+        s.carts.lock().expect("carts").get_mut("a").expect("a cart")[0].quantity = 0;
+        let why = match s.serve_store_document("a", STORE_ID) {
+            Err(Unread::Failed(why)) => why,
+            other => panic!("served from a line of 0: {other:?}"),
+        };
+        assert!(
+            why.contains("answered what breaks an invariant")
+                && why.contains("`ok.lines[0].quantity` is 0"),
+            "{why}"
+        );
     }
 
     #[test]

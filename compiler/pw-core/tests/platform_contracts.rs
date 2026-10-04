@@ -428,7 +428,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-04: `examples/domain.pw`'s `MenuItem` declares `available`,
     // charter §15.1's, which the menu's row decides its Add by, before the
     // press (ADR-0178).
-    const EXPECTED: u64 = 0xf3877da4004b7cff;
+    // 2026-10-04: `examples/domain.pw`'s `PositiveInt` states its invariant,
+    // `value >= 1`, which every construction is shown to hold and every
+    // boundary checks, and `fewer` answers an `Option` (ADR-0179).
+    const EXPECTED: u64 = 0x4b70269234f06755;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()
