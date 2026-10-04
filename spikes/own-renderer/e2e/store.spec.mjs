@@ -58,15 +58,16 @@ test.describe("the document the server produced", () => {
     // store name 2, the loop's own range 2, three loop INSTANCE boundaries 6,
     // the item name inside each instance 6, the cart count 2, the cart's
     // notice 2 (ADR-0157) = 20. And the store's slots, filled (ADR-0165): the
-    // estimate's range 2 and its minutes 2; the recommendations' range 2,
-    // their loop's 2, two instances 4 and two names 4 = 16. And what the store
+    // estimate's range 2, and its least and most minutes 2 each (ADR-0180);
+    // the recommendations' range 2, their loop's 2, two instances 4 and two
+    // names 4 = 18. And what the store
     // and each item say of themselves (ADR-0166): 2, and 2 in each of three
     // instances = 8. And each item's price (ADR-0169): 2 in each of three
     // instances = 6. And the cart's own (ADR-0172): its lines' loop 2, its
     // subtotal 2, its fees note's block 2 = 6. And whether each item can be
-    // ordered (ADR-0178): its block, 2 in each of three instances = 6. 62 in
+    // ordered (ADR-0178): its block, 2 in each of three instances = 6. 64 in
     // all.
-    expect(shape.anchors).toBe(62);
+    expect(shape.anchors).toBe(64);
     // Three Add buttons and one Clear button. The Clear button exists so that
     // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`. And
     // the cart's empty message, whose `hidden` reads the cart (ADR-0172).
