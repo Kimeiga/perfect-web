@@ -232,12 +232,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
           `<title>` at the top of a page's view, written into the head and
           set again as `document.title`; PW5029 and PW5030; corpus C9. The
           store's title is its name, in three engines.
-    10. **Next: tests 2 and 13** against the running store's shared output:
-        the static public shell holds no private cart data, and the shared
-        cache holds no session or secret field. Acceptance: each read from
-        what the running store serves and keeps, in three engines where a
-        page is involved, with a control that fails when a session's value
-        is put there.
+    10. ~~Tests 2 and 13 against the running store's shared output~~
+        (ADR-0184, `just e14-shared-output`). Found: the store's page went
+        out with no `Cache-Control`, and a fresh session's cookie went on a
+        build's files. A session's response says `private, no-store`, a
+        build's file names no session, and the shared caches are the same
+        whether or not anyone pressed.
+
+     **Every gap of the charter §15 audit is closed.** Next: E14-E's design,
+     ready for the owner's choice of models and budget, and the owner's
+     decisions logged in ADR-0182 (axe-core) and here.
 
      The benchmark's store is its own copy since ADR-0156, so the canonical
      store grows without re-basing the tasks. Then E14-E's design, ready for

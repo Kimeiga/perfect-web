@@ -13,6 +13,20 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0184, 2026-10-04: what a cache may keep holds nothing of a
+session's** (charter §15.6 tests 2 and 13, the audit's tenth and last gap).
+Reading the running store's output found two ways one person's data could
+reach the next through a cache:
+- the store's page went out with no `Cache-Control`;
+- a fresh session's cookie went on whatever it asked for first, a build's
+  file included (RFC 9111 §7.3: a cookie does not stop a cache).
+
+A session's response now says `private, no-store`, and a build's file names
+no session. What the query runtime keeps for every reader, and the
+materializer's public fragments, are tested the same whether or not two
+sessions filled their carts, and name no session and no key. 6 mutants
+(`just e14-shared-output`). Every gap of the audit of charter §15 is closed.
+
 **ADR-0183, 2026-10-04: a page states its title** (WCAG 2.4.2, which
 ADR-0182 left open).
 - **The language.** `<title>{store.name}</title>` at the top of a page's view.

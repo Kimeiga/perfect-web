@@ -2441,6 +2441,29 @@ e14-titles:
      } > docs/evidence/E14/titles.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/titles.txt
 
+# ADR-0184: what a cache may keep holds nothing of a session's (charter
+# §15.6 tests 2 and 13). The server's tests against the running store, the
+# browser in three engines, and the mutation controls.
+e14-shared-output:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0184 - what a cache may keep holds nothing of a session's"; echo; \
+       echo "produced by: just e14-shared-output"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the development server, running the store (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_session_s_response_is_kept|what_a_shared_cache_keeps)|^test result'; \
+       echo; echo "== the page, in three engines (e2e/shared-output.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/shared-output.spec.mjs --reporter=list 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/shared_output_mutations.py)"; echo; \
+       python3 scripts/shared_output_mutations.py; \
+     } > docs/evidence/E14/shared-output.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/shared-output.txt
+
 # ADR-0153 and ADR-0154: the two forms gate item 5 found open. A template
 # tests a case with `{#match}` (PW0337), and a command a page's handler calls
 # declares `idempotent_by` (PW0338). The tests and the mutation controls.

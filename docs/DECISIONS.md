@@ -1551,3 +1551,14 @@ a page states its title.
   that reads a signal or a speculated value is refused at build.
 - Corpus C9: A-025, R-047 and R-048; four routed fixtures given a title;
   generality 33 / 33.
+
+[ADR-0184](DECISIONS/ADR-0184-what-a-cache-may-keep-holds-nothing-of-a-session-s.md):
+what a cache may keep holds nothing of a session's.
+- Charter §15.6 tests 2 and 13 against the running store. Found: the
+  store's page went out with no `Cache-Control`, and a fresh session's
+  cookie went on a build's files. A cache could have handed one person's
+  cart, or session, to the next.
+- A session's response says `private, no-store`; a build's file names no
+  session. What the query runtime keeps for every reader, and the
+  materializer's public fragments, are the same whether or not anyone
+  pressed.

@@ -3724,7 +3724,7 @@ impl Server {
             String::new()
         };
         let head = format!(
-            "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\n{cookie}\
+            "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\n{PRIVATE}{cookie}\
              connection: close\r\n\r\n"
         );
         let shell = page.strip_suffix(DOCUMENT_END).unwrap_or(page);
@@ -5603,20 +5603,13 @@ fn handle(server: &Server, mut stream: TcpStream) {
             let module = route.trim_start_matches("/speculation/");
             let module = module.split('?').next().unwrap_or(module);
             match std::fs::read(server.artifacts.join("speculations").join(module)) {
-                Ok(bytes) => respond(
-                    &mut stream,
-                    200,
-                    "text/javascript; charset=utf-8",
-                    &session,
-                    fresh,
-                    &bytes,
-                ),
-                Err(_) => respond(
+                Ok(bytes) => {
+                    respond_build(&mut stream, 200, "text/javascript; charset=utf-8", &bytes)
+                }
+                Err(_) => respond_build(
                     &mut stream,
                     404,
                     "text/plain; charset=utf-8",
-                    &session,
-                    fresh,
                     b"this speculation was not compiled",
                 ),
             }
@@ -5633,31 +5626,22 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 // An identity this build does not know. Refused rather than
                 // guessed: serving *some* handler for an unknown identity is
                 // how a stale document ends up running new code.
-                respond(
+                respond_build(
                     &mut stream,
                     404,
                     "text/plain; charset=utf-8",
-                    &session,
-                    fresh,
                     b"no such handler",
                 );
                 return;
             }
             match std::fs::read(server.handler_module(id)) {
-                Ok(module) => respond(
-                    &mut stream,
-                    200,
-                    "text/javascript; charset=utf-8",
-                    &session,
-                    fresh,
-                    &module,
-                ),
-                Err(_) => respond(
+                Ok(module) => {
+                    respond_build(&mut stream, 200, "text/javascript; charset=utf-8", &module)
+                }
+                Err(_) => respond_build(
                     &mut stream,
                     404,
                     "text/plain; charset=utf-8",
-                    &session,
-                    fresh,
                     b"this handler was not compiled",
                 ),
             }
@@ -5688,12 +5672,10 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 .into_iter()
                 .map(|(identity, capture)| format!("{identity}|{capture}\n"))
                 .collect();
-            respond(
+            respond_build(
                 &mut stream,
                 200,
                 "text/plain; charset=utf-8",
-                &session,
-                fresh,
                 table.as_bytes(),
             );
         }
@@ -5771,7 +5753,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
             let (page, params) = routed.expect("matched");
             serve_page(server, &mut stream, &session, fresh, &page, params)
         }
-        ("GET", _) => serve_file(server, &mut stream, route, &session, fresh),
+        ("GET", _) => serve_file(server, &mut stream, route),
         _ => respond(&mut stream, 405, "text/plain", &session, fresh, b"method"),
     }
 }
@@ -5815,7 +5797,7 @@ fn stream_open(
     };
     let head = format!(
         "HTTP/1.1 200 OK\r\ncontent-type: application/x-ndjson\r\n\
-         cache-control: no-store\r\n{cookie}connection: close\r\n\r\n"
+         {PRIVATE}{cookie}connection: close\r\n\r\n"
     );
     if stream.write_all(head.as_bytes()).is_err() {
         return;
@@ -6159,11 +6141,11 @@ fn path_decoded(v: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
-fn serve_file(server: &Server, stream: &mut TcpStream, route: &str, session: &str, fresh: bool) {
+fn serve_file(server: &Server, stream: &mut TcpStream, route: &str) {
     let name = route.trim_start_matches('/');
     // No traversal: a request names a file in `dist` and nothing above it.
     if name.contains("..") || name.contains('/') {
-        respond(stream, 404, "text/plain", session, fresh, b"not found");
+        respond_build(stream, 404, "text/plain", b"not found");
         return;
     }
     let path = server.dist.join(name);
@@ -6175,8 +6157,8 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str, session: &st
         _ => "application/octet-stream",
     };
     match std::fs::read(&path) {
-        Ok(bytes) => respond(stream, 200, mime, session, fresh, &bytes),
-        Err(_) => respond(stream, 404, "text/plain", session, fresh, b"not found"),
+        Ok(bytes) => respond_build(stream, 200, mime, &bytes),
+        Err(_) => respond_build(stream, 404, "text/plain", b"not found"),
     }
 }
 
@@ -6519,14 +6501,37 @@ fn reason(code: u16) -> &'static str {
     }
 }
 
+/// **How a response to a session's request may be kept** (ADR-0184): by
+/// no cache. What it holds is the session's, a page, its cart, an answer to
+/// its command, or the cookie that names it; and a cache that kept it would
+/// give it to whoever asked next. Charter §15.6 tests 2, 12 and 13: until
+/// 2026-10-04 the store's page said nothing of how it may be kept.
+const PRIVATE: &str = "cache-control: private, no-store\r\n";
+
+/// **A response to a session's request**: kept by no cache, and with the
+/// cookie that names a fresh session (ADR-0184).
 fn respond(stream: &mut TcpStream, code: u16, mime: &str, session: &str, fresh: bool, body: &[u8]) {
     let cookie = if fresh {
         format!("set-cookie: pw-session={session}; Path=/; SameSite=Lax\r\n")
     } else {
         String::new()
     };
+    write_response(stream, code, mime, &format!("{PRIVATE}{cookie}"), body);
+}
+
+/// **A file of the build** (ADR-0184): the runtime, the renderer, a
+/// handler's module. The same for every reader, and holding nothing of
+/// one, so any cache may keep it. It names no session: until 2026-10-04 a
+/// fresh session's cookie went on whatever it asked for first, and a cache
+/// that kept that file would have given the session to everyone it served
+/// the file to, who would then all share one cart.
+fn respond_build(stream: &mut TcpStream, code: u16, mime: &str, body: &[u8]) {
+    write_response(stream, code, mime, "", body);
+}
+
+fn write_response(stream: &mut TcpStream, code: u16, mime: &str, headers: &str, body: &[u8]) {
     let head = format!(
-        "HTTP/1.1 {code} {}\r\ncontent-type: {mime}\r\ncontent-length: {}\r\n{cookie}connection: close\r\n\r\n",
+        "HTTP/1.1 {code} {}\r\ncontent-type: {mime}\r\ncontent-length: {}\r\n{headers}connection: close\r\n\r\n",
         reason(code),
         body.len()
     );
@@ -10490,6 +10495,125 @@ public query Store(",
         let refused = page("c");
         assert!(refused.starts_with("HTTP/1.1 200"), "{refused}");
         assert_eq!(slot(&refused, "Delivery"), "Delivery estimate unavailable");
+    }
+
+    /// **A session's response is kept by no cache, and a build's names no
+    /// session** (ADR-0184, charter §15.6 tests 2 and 12). Until 2026-10-04
+    /// the store's page said nothing of how it may be kept, and a fresh
+    /// session's cookie went on whatever it asked for first: a file of the
+    /// build a cache kept would have given that session to everyone it was
+    /// served to.
+    #[test]
+    fn a_session_s_response_is_kept_by_no_cache_and_a_build_s_names_no_session() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        // The head of a response to a fresh session: one with no cookie.
+        let head = |path: &str| -> String {
+            let whole: String = fetched_as(&s, path, None)
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect();
+            whole
+                .split("\r\n\r\n")
+                .next()
+                .unwrap_or_default()
+                .to_ascii_lowercase()
+        };
+        // The store's page, whole and streamed; the page that is not found.
+        recommend(&s, 0, None);
+        let whole = head("/stores/47");
+        recommend(&s, 300, None);
+        let streamed = head("/stores/47");
+        let absent = head("/stores/999");
+        for (what, head) in [
+            ("whole", &whole),
+            ("streamed", &streamed),
+            ("absent", &absent),
+        ] {
+            assert!(
+                head.contains("cache-control: private, no-store"),
+                "{what}: {head}"
+            );
+            assert!(head.contains("set-cookie: pw-session="), "{what}: {head}");
+        }
+        // Files of the build, each asked for first by a fresh session.
+        let handler = s
+            .handler_identities()
+            .into_iter()
+            .next()
+            .expect("a handler");
+        for path in [
+            "/templates.json".to_string(),
+            format!("/handler/{handler}.mjs"),
+        ] {
+            let head = head(&path);
+            assert!(head.starts_with("http/1.1 200"), "{path}: {head}");
+            assert!(
+                !head.contains("set-cookie"),
+                "{path} names a session: {head}"
+            );
+            assert!(!head.contains("private"), "{path}: {head}");
+        }
+    }
+
+    /// **What a shared cache keeps holds nothing a session put in it**
+    /// (ADR-0184, charter §15.6 tests 2 and 13). Two sessions fill their
+    /// carts and read their pages. What the query runtime keeps for every
+    /// reader, and each fragment the materializer keeps in its public
+    /// partition, is then what it is when nobody pressed anything: it names
+    /// no session, holds no line of a cart, and holds no deployment key.
+    #[test]
+    fn what_a_shared_cache_keeps_holds_nothing_a_session_put_in_it() {
+        let (alice, bob) = ("session-alice-shared-output", "session-bob-shared-output");
+        let kept = |pressed: bool| -> (Vec<String>, Vec<String>) {
+            let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+            recommend(&s, 0, None);
+            for session in [alice, bob] {
+                for store in [STORE_ID, "48"] {
+                    s.serve_store_document(session, store).expect("served");
+                }
+            }
+            if pressed {
+                s.command(ADD, alice, &add_shown("espresso", 2), false)
+                    .expect("added");
+                s.command(ADD, bob, &add_shown("cold-brew", 1), false)
+                    .expect("added");
+                for session in [alice, bob] {
+                    s.serve_store_document(session, STORE_ID).expect("served");
+                }
+            }
+            let mut values: Vec<String> = s
+                .queries
+                .public_cache_contents()
+                .into_iter()
+                .map(|(key, value)| format!("{key:?} = {value:?}"))
+                .collect();
+            values.sort();
+            let mut fragments: Vec<String> = s
+                .materializer
+                .all_entries()
+                .into_iter()
+                .filter(|(key, _)| key.contains("partition=public"))
+                .map(|(key, entry)| format!("{key} = {}", entry.body))
+                .collect();
+            fragments.sort();
+            (values, fragments)
+        };
+        let (values, fragments) = kept(true);
+        assert!(
+            !values.is_empty(),
+            "the query runtime keeps the store's values"
+        );
+        assert!(!fragments.is_empty(), "the materializer keeps the menu");
+        assert_eq!(kept(false), (values.clone(), fragments.clone()));
+        let deployment_key = pw_resource::entry::DEVELOPMENT_KEY;
+        for kept in values.iter().chain(&fragments) {
+            for secret in [alice, bob, deployment_key] {
+                assert!(
+                    !kept.contains(secret),
+                    "{secret} is kept for every reader: {kept}"
+                );
+            }
+        }
     }
 
     /// **A store's page is titled by its name** (ADR-0183): the page states

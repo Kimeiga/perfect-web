@@ -110,7 +110,7 @@ are fixed (ADR-0155):
 | # | test | status |
 |---|---|---|
 | 1 | readable without JavaScript | met |
-| 2 | static public shell holds no private cart data | partial: the store page is `cache private`, so it has no public shell |
+| 2 | static public shell holds no private cart data | met since ADR-0184: the page's public shell is the store's values and its menu's fragment, every reader's, and they are the same whether or not any session filled a cart; the rest of the page says `private, no-store` |
 | 3 | recommendations stream after core content | met since ADR-0165 in the store's response, and in three engines since ADR-0166 (`e2e/slots.spec.mjs`) |
 | 4, 5 | one interaction one mutation; two interactions two | met |
 | 6, 7, 8 | one key one request; a changed key cancels stale work; leaving cancels | met on T07's store, three engines (ADR-0152) |
@@ -118,7 +118,7 @@ are fixed (ADR-0155):
 | 10 | an unavailable item gives a typed error and a consistent cart | met since ADR-0157: refused by name, the handler shows it, the count goes back, in three engines (`e2e/availability.spec.mjs`) |
 | 11 | `MenuChanged(store_47)` invalidates store 47 only | met since ADR-0162 for pages, end to end in three engines (`e2e/stores.spec.mjs`), and in `pw-materialize`'s tests; since ADR-0164 for the query cache too, which had dropped every store's kept menu |
 | 12 | A's cart never observed by B | met |
-| 13 | shared caches hold no session or secret fields | partial: synthetic values only |
+| 13 | shared caches hold no session or secret fields | met since ADR-0184, against the running store: what the query runtime keeps for every reader and the materializer's public fragments name no session, hold no cart line and no deployment key; and a build's file names no session |
 | 14 | keyboard and screen-reader semantics | met since ADR-0182: the store read by axe's and WCAG 2.2 AA's rules in three engines, as served and after each kind of change, with the keyboard, the accessibility tree, live regions said once, reflow, a phone's width and reduced motion (`e2e/accessibility.spec.mjs`); its title, the store's name, since ADR-0183. Each Add is named by its item since ADR-0168 |
 | 15 | focus preserved | met, and since ADR-0172 through a speculation and the server's answer: a kept row's nodes stay, and focus in a row that goes passes on |
 | 16 | handler version mismatch recovers | partial: refused safely, the recovery not acted on (fixed) |
@@ -159,7 +159,11 @@ are fixed (ADR-0155):
    - Seen on the way, not an accessibility finding: store 48's page shows a
      line added at store 47. §15.1's `Cart` names no store, so a cart is the
      session's, across stores, as the charter has it.
-10. **Tests 2 and 13** against the running store's shared output.
+10. ~~**Tests 2 and 13** against the running store's shared output~~: met by
+    ADR-0184. Reading it found two defects. The store's page said nothing of
+    how it may be kept, and a fresh session's cookie went on a build's
+    files. Each could have handed one person's cart to the next through a
+    cache.
 
 The benchmark's Pleris store is its own copy since ADR-0156, so changing
 the canonical store's markup moves no task's patch. Until then, items 1-4

@@ -528,6 +528,14 @@ shown by the view's own signal or one provided to it (ADR-0144). A page
 that reads queries holds signals on the store's route only (ADR-0140); any
 other page with queries is not served yet (E14-Q).
 
+**A response's caching is said for a session's responses alone**
+(ADR-0184). A session's response says `private, no-store`, and a build's
+file names no session but says nothing of how long it may be kept, which is
+the deployment's. A page declared `cache shared` is not served yet, so no
+response says `public`. The engines in the browser suite ask for a page
+again on going back whatever it says, so `no-store`'s effect on a browser
+that restores pages is held by its header alone.
+
 **A page states its title only when it is served at a route** (ADR-0183).
 PW5029 refuses a routed page that states none. A page without a route is
 titled by the host that serves it, as before: the demos' pages by their
