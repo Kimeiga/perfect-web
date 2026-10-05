@@ -63,9 +63,11 @@ MUTANTS = [
     ),
     (
         "a case named alone under another is a binding",
+        # Re-anchored by ADR-0197: a case named alone is a constructor
+        # pattern, and a match holding one under another is not one level.
         LOWER,
-        "                    Pattern::Bind { name, .. } => !me.names_a_case(name),",
-        "                    Pattern::Bind { .. } => true,",
+        "                    .all(|a| matches!(body.pat(*a), Pattern::Wild | Pattern::Bind { .. })),",
+        "                    .all(|a| !matches!(body.pat(*a), Pattern::Literal(_))),",
     ),
     (
         "a literal is tested for inequality",

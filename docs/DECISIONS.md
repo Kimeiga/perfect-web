@@ -1692,3 +1692,12 @@ ruling 3).
 - Every other keyword is contextual. The platform's `query`, `measure` and
   `mutate` stand, since a call by a statement word reads as a call.
 - The repair suggests a name: `match_`, PEP 8's trailing underscore.
+
+[ADR-0197](DECISIONS/ADR-0197-a-pattern-tells-a-case-from-a-binding-by-its-capital.md):
+a pattern tells a case from a binding by its capital (ADR-0195, ruling 2).
+- The parser decides once, `pw_syntax::pattern_kind`; six analyses had each
+  guessed, and a misspelt case, `Circel`, bound a name that matched every
+  value (rustc's E0170).
+- A capitalized name its type lacks is PW0608 (revision 3); a case named in
+  lowercase is PW0625; `{:Some(Draft)}` is no arm. `check::Env` is gone.
+- Corpus C14, generality 41 / 41.

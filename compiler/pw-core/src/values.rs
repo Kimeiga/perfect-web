@@ -718,7 +718,7 @@ pub(crate) fn type_of(
     body: &Body,
     e: ExprId,
 ) -> (Ty, String) {
-    let lexical = Lexical::build(sigs, Some(at), decl, body);
+    let lexical = Lexical::build(decl, body);
     let typer = Typer::new(sigs, ws, at, module, decl, body, lexical, Vec::new());
     let t = typer.of(e);
     let name = typer.display(&t);
@@ -1390,11 +1390,7 @@ impl<'a> Typer<'a> {
 
     fn bind_pattern(&self, ty: &Ty, pat: crate::hir::PatternId, out: &mut Vec<(Binder, Ty)>) {
         match self.body.pat(pat) {
-            Pattern::Bind { name, .. } => {
-                if !self.names_a_case(name) {
-                    out.push((Binder::Pattern(pat), ty.clone()));
-                }
-            }
+            Pattern::Bind { .. } => out.push((Binder::Pattern(pat), ty.clone())),
             Pattern::Ctor { path, args } => {
                 if let Some(fields) = self.pattern_fields(ty, path, args.len()) {
                     for (arg, field) in args.iter().zip(&fields) {
@@ -1404,13 +1400,6 @@ impl<'a> Typer<'a> {
             }
             _ => {}
         }
-    }
-
-    /// Is a name written alone in a pattern a case rather than a binding: the
-    /// language's `true`, `false` or `None`, or a case of a type this unit
-    /// sees (ADR-0038)?
-    fn names_a_case(&self, name: &str) -> bool {
-        crate::lexical::names_a_case(self.sigs, Some(self.at), name)
     }
 
     /// The types of the fields a constructor pattern takes apart, read
@@ -4029,8 +4018,7 @@ pub fn relations(hir: &Hir, sigs: &Signatures, ws: &Workspace, at: UnitId) -> Ve
         annotations(hir, sigs, ws, at, id, decl, &mut out);
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
-        let lexical = Lexical::build_in(sigs, Some(at), hir, id)
-            .unwrap_or_else(|| Lexical::build(sigs, Some(at), decl, body));
+        let lexical = Lexical::build_in(hir, id).unwrap_or_else(|| Lexical::build(decl, body));
         let outer: Vec<Ty> = lexical
             .outer_bindings()
             .map(|(d, b)| {
@@ -4076,8 +4064,7 @@ pub fn member_reads(
     id: DeclId,
 ) -> MemberReads {
     let lexical_of = |d: DeclId, decl: &Decl, body: &Body| {
-        Lexical::build_in(sigs, Some(at), hir, d)
-            .unwrap_or_else(|| Lexical::build(sigs, Some(at), decl, body))
+        Lexical::build_in(hir, d).unwrap_or_else(|| Lexical::build(decl, body))
     };
     // `id`, and each declaration whose bindings it reads.
     let mut needed = BTreeSet::from([id]);

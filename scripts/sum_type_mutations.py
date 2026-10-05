@@ -58,11 +58,13 @@ MUTANTS = [
         "        1 => found.into_iter().next(),",
         "        1 => None,",
     ),
+    # Re-anchored by ADR-0197: an uppercase name is a case by its capital,
+    # so a qualifier makes a case of what a module's lowercase name begins.
     (
         "a pattern through its type is a binding",
         GRAMMAR,
-        "                let is_ctor = takes_args || after > 1;",
-        "                let is_ctor = takes_args;",
+        "                    || after > 1\n",
+        "",
     ),
     (
         "a pattern's qualifier is not checked",

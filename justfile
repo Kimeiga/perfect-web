@@ -2613,6 +2613,28 @@ e14-orders:
      } > docs/evidence/E14/orders.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/orders.txt
 
+# ADR-0197 (ADR-0195's ruling 2): a pattern tells a case from a binding by
+# its capital. Its tests, the conformance suite's patterns, the corpus at C14,
+# and the mutation controls.
+e14-case-names:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0197 - a pattern tells a case from a binding by its capital"; echo; \
+       echo "produced by: just e14-case-names"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/case_names.rs, sum_types.rs)"; echo; \
+       cargo test --locked -p pw-core --test case_names --test sum_types 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== compiled patterns (compiler/pw-conformance/tests/patterns.rs, sum_types.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test patterns --test sum_types 2>&1 | grep -E '^test result'; \
+       echo; echo "== the corpus at C14 (corpus-check, generality.rs, checking_source.rs)"; echo; \
+       cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
+       cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
+         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result'; \
+       echo; echo "== mutation controls (scripts/case_names_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/case_names_mutations.py; \
+     } > docs/evidence/E14/case-names.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/case-names.txt
+
 # ADR-0196 (ADR-0195's ruling 3): only a word that begins a statement or an
 # expression is reserved. The parser's test, every program checked as before,
 # and the mutation controls.

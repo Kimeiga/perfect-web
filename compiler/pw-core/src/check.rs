@@ -32,52 +32,8 @@ pub struct Unit {
     pub hir: Hir,
 }
 
-/// **Every name some type in the program has as a constructor**: each
-/// declared sum type's cases, and the language's own `Some`, `None`, `Ok`
-/// and `Err`. A bare name in a pattern that is one of these is a constructor,
-/// never a fresh binding (ADR-0038).
-///
-/// It held an ADT per declaration, read from spellings, until 2026-09-26.
-/// Each match now types its own subject's constructors from the resolved
-/// declarations (`Instances`, ADR-0060), and this is what is left: the names.
-///
-/// **The set of files passed to one invocation is treated as one program.**
-/// Recorded as assumption A-009.
-pub struct Env {
-    constructors: BTreeSet<String>,
-}
-
-impl Env {
-    pub fn build(units: &[Unit]) -> Env {
-        let mut constructors: BTreeSet<String> = ["Some", "None", "Ok", "Err"]
-            .into_iter()
-            .map(str::to_string)
-            .collect();
-        for u in units {
-            for (_, d) in u.hir.all_decls() {
-                for v in d.variants.iter().flatten() {
-                    constructors.insert(v.name.clone());
-                }
-            }
-        }
-        Env { constructors }
-    }
-
-    /// The names the program knows as constructors, sorted.
-    pub fn constructors(&self) -> impl Iterator<Item = &str> {
-        self.constructors.iter().map(String::as_str)
-    }
-
-    /// Whether any type this program knows has a constructor of this name.
-    fn names_a_constructor(&self, name: &str) -> bool {
-        self.constructors.contains(name)
-    }
-}
-
 /// Check every unit against the shared environment.
 pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
-    let env = Env::build(units);
-
     // E2B: one workspace module graph, built before any semantic analysis.
     // Resolution failures are reported per unit, so a file importing a module
     // that does not exist says so instead of failing later in a checker that
@@ -125,7 +81,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     }
     for (i, u) in units.iter().enumerate() {
         let per_unit = resolution.entry(i).or_default();
-        per_unit.extend(unresolved_uses(&workspace, &sigs, &hirs, i, &u.hir));
+        per_unit.extend(unresolved_uses(&workspace, &hirs, i, &u.hir));
         // ADR-0072: an element named with a capital letter is a view.
         per_unit.extend(view_elements(&workspace, &hirs, i, &u.hir));
         // ADR-0148: a streamed query is read by a `<stream>`, which shows
@@ -147,11 +103,11 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // ADR-0089: a policy's value is one its domain has.
         per_unit.extend(policy_values(&workspace, i, &u.hir));
         // ADR-0107: a cache key names each parameter its entry depends on.
-        per_unit.extend(keys_name_what_is_read(&sigs, i, &u.hir));
+        per_unit.extend(keys_name_what_is_read(&u.hir));
         // ADR-0114: what is built before any request reads none of its values.
-        per_unit.extend(built_pages_read_no_parameter(&sigs, i, &u.hir));
+        per_unit.extend(built_pages_read_no_parameter(&u.hir));
         // ADR-0110: a resumable handler reads what it captures.
-        per_unit.extend(handlers_read_their_captures(&sigs, i, &u.hir));
+        per_unit.extend(handlers_read_their_captures(&u.hir));
         // ADR-0113: and performs only what the browser may.
         per_unit.extend(handlers_run_in_the_browser(
             &inference, &ontology, &workspace, &hirs, i, &u.hir,
@@ -241,7 +197,6 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
             out.extend(check_unit_with(
-                &env,
                 &labels,
                 &reads,
                 &summaries,
@@ -545,7 +500,7 @@ fn answer_read_for_a_value(hir: &Hir, unit: usize, sigs: &Signatures) -> Vec<Dia
                 bound.insert(*p, command);
             }
         }
-        let lexical = Lexical::build(sigs, Some(unit), decl, body);
+        let lexical = Lexical::build(decl, body);
         for e in &within {
             let Expr::Match { scrutinee, arms } = body.expr(*e) else {
                 continue;
@@ -605,7 +560,6 @@ fn ok_payloads(body: &Body, p: hir::PatternId) -> Vec<hir::PatternId> {
 /// is left alone until types exist.
 fn unresolved_uses(
     workspace: &crate::resolve::Workspace,
-    sigs: &Signatures,
     hirs: &[&Hir],
     unit: usize,
     hir: &Hir,
@@ -623,7 +577,7 @@ fn unresolved_uses(
         // call to a function value out of its binding's scope names nothing
         // (ADR-0066). The set below held every name the body bound anywhere,
         // so such a call passed.
-        let lexical = crate::lexical::Lexical::build_in(sigs, Some(unit), hir, decl_id);
+        let lexical = crate::lexical::Lexical::build_in(hir, decl_id);
 
         let mut in_scope = crate::resolve::local_bindings(body);
         in_scope.extend(decl.params.iter().map(|p| p.name.clone()));
@@ -1610,7 +1564,7 @@ fn speculation_reconciled(
 /// holds a key to the privacy partitions a value depends on; this holds it
 /// to the parameters. A read is any use of the parameter in the body, which
 /// errs toward keying: a parameter read only for a trace is keyed too.
-fn keys_name_what_is_read(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
+fn keys_name_what_is_read(hir: &Hir) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {
         if !matches!(
@@ -1622,7 +1576,7 @@ fn keys_name_what_is_read(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diag
         let Some(body) = decl.body.map(|b| hir.body(b)) else {
             continue;
         };
-        let Some(lexical) = crate::lexical::Lexical::build_in(sigs, Some(unit), hir, id) else {
+        let Some(lexical) = crate::lexical::Lexical::build_in(hir, id) else {
             continue;
         };
         // Each parameter the body reads, with its first read.
@@ -1698,13 +1652,13 @@ fn keys_name_what_is_read(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diag
 /// unless it is captured. A declaration's name is not a binding, and neither
 /// is what the handler binds itself. Until 2026-09-26 such a handler checked
 /// and `pw emit-handlers` refused it: "`item` is not bound here".
-fn handlers_read_their_captures(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
+fn handlers_read_their_captures(hir: &Hir) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {
         let Some(body) = decl.body.map(|b| hir.body(b)) else {
             continue;
         };
-        let Some(lexical) = crate::lexical::Lexical::build_in(sigs, Some(unit), hir, id) else {
+        let Some(lexical) = crate::lexical::Lexical::build_in(hir, id) else {
             continue;
         };
         for lambda in body.walk() {
@@ -1893,7 +1847,7 @@ fn handlers_run_in_the_browser(
 /// request exists (charter §9.3: "public, deterministic, build-known"), so a
 /// parameter, which a request supplies, has no value when it is built. Until
 /// 2026-09-26 a build-placed page rendering its `id` checked.
-fn built_pages_read_no_parameter(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
+fn built_pages_read_no_parameter(hir: &Hir) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {
         if declared_world(hir, decl) != Some(World::Build) || decl.params.is_empty() {
@@ -1902,7 +1856,7 @@ fn built_pages_read_no_parameter(sigs: &Signatures, unit: usize, hir: &Hir) -> V
         let Some(body) = decl.body.map(|b| hir.body(b)) else {
             continue;
         };
-        let Some(lexical) = crate::lexical::Lexical::build_in(sigs, Some(unit), hir, id) else {
+        let Some(lexical) = crate::lexical::Lexical::build_in(hir, id) else {
             continue;
         };
         let mut reported = BTreeSet::new();
@@ -4510,7 +4464,7 @@ fn resolve_diagnostic(e: &crate::resolve::ResolveError) -> Diagnostic {
     }
 }
 
-pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
+pub fn check_unit(unit: &Unit) -> Vec<Diagnostic> {
     let sigs = Signatures::default();
     // One unit's own workspace, so a call to a sibling in the same file still
     // resolves. Narrower than `check_units` by construction — see below.
@@ -4525,7 +4479,6 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
     let ws = crate::resolve::Workspace::build(&[&unit.hir]);
     let graph = crate::graph::Graph::build(&[&unit.hir], &ws);
     check_unit_with(
-        env,
         &BTreeMap::new(),
         &Reads::default(),
         // No program-wide pass over one unit: each callee is read by its
@@ -4552,7 +4505,6 @@ pub fn check_unit(env: &Env, unit: &Unit) -> Vec<Diagnostic> {
 
 #[allow(clippy::too_many_arguments)]
 fn check_unit_with(
-    env: &Env,
     labels: &BTreeMap<crate::resolve::DefId, Label>,
     // What each declaration reads through what it calls (ADR-0118).
     reads: &Reads,
@@ -4693,7 +4645,6 @@ fn check_unit_with(
         }
 
         let site = MatchSite {
-            env,
             ws,
             sigs,
             at,
@@ -4767,7 +4718,6 @@ pub struct MatchAnalysis {
 /// about which matches exist, and the disagreement would be invisible: an
 /// audit would report a proof for a match no rule examined.
 pub fn match_analysis(units: &[Unit]) -> Vec<MatchAnalysis> {
-    let env = Env::build(units);
     // One workspace, because a scrutinee's type must be RESOLVED before the
     // environment is consulted — `Status` alone does not say whose.
     let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
@@ -4786,7 +4736,6 @@ pub fn match_analysis(units: &[Unit]) -> Vec<MatchAnalysis> {
                 }
             }
             let site = MatchSite {
-                env: &env,
                 ws: &ws,
                 sigs: &sigs,
                 at,
@@ -4826,7 +4775,6 @@ struct Subject {
 
 /// Where a match is, and what it can read: the context both callers share.
 struct MatchSite<'a> {
-    env: &'a Env,
     ws: &'a crate::resolve::Workspace,
     sigs: &'a crate::signatures::Signatures,
     at: usize,
@@ -4853,7 +4801,6 @@ struct MatchSite<'a> {
 /// arm's value was proven against the parameter's constructors.
 fn subject(site: &MatchSite<'_>, scrutinee: ExprId) -> Result<Subject, (String, Option<String>)> {
     let MatchSite {
-        env,
         ws,
         sigs,
         at,
@@ -4878,13 +4825,13 @@ fn subject(site: &MatchSite<'_>, scrutinee: ExprId) -> Result<Subject, (String, 
                 Some(written),
             ));
         };
-        return typed_subject(env, sigs, &crate::values::Ty::of(t), written);
+        return typed_subject(sigs, &crate::values::Ty::of(t), written);
     }
     match crate::values::type_of(sigs, ws, *at, *module, decl, body, scrutinee) {
         (crate::values::Ty::Unknown | crate::values::Ty::Var(_) | crate::values::Ty::Any, _) => {
             Err(("the scrutinee's type is unknown here".into(), None))
         }
-        (ty, name) => typed_subject(env, sigs, &ty, name),
+        (ty, name) => typed_subject(sigs, &ty, name),
     }
 }
 
@@ -4892,7 +4839,6 @@ fn subject(site: &MatchSite<'_>, scrutinee: ExprId) -> Result<Subject, (String, 
 /// `Option` or `Result`, a `Bool`, or an `Int` or a `String` by its
 /// literals (ADR-0060).
 fn typed_subject(
-    _env: &Env,
     sigs: &Signatures,
     ty: &crate::values::Ty,
     name: String,
@@ -5116,7 +5062,7 @@ fn analyse_match(
     scrutinee: ExprId,
     arms: &[hir::MatchArm],
 ) -> (MatchAnalysis, Found) {
-    let (env, body) = (site.env, site.body);
+    let body = site.body;
     let span = body.expr_span(match_id);
     let blocked = |reason: &str, ty: Option<String>| MatchAnalysis {
         declaration: declaration.to_string(),
@@ -5152,7 +5098,6 @@ fn analyse_match(
         .iter()
         .map(|a| {
             to_exhaust_pattern(
-                env,
                 &subject,
                 body,
                 &qualifier,
@@ -5476,7 +5421,6 @@ enum PatternFault {
 /// payload.
 #[allow(clippy::too_many_arguments)]
 fn to_exhaust_pattern(
-    env: &Env,
     subject: &Subject,
     body: &Body,
     qualifier: &dyn Fn(&str) -> Option<crate::resolve::DefId>,
@@ -5562,32 +5506,12 @@ fn to_exhaust_pattern(
                 }
             }
         }
-        HPat::Bind { name, .. } => {
-            if let Some(cs) = &ctors
-                && let Some(i) = cs.iter().position(|c| &c.name == name)
-            {
-                // `Some` alone, for a constructor that carries a field.
-                return match cs[i].fields.len() {
-                    0 => Ok(EPat::unit(i)),
-                    declared => Err(PatternFault::Arity(Arity {
-                        ctor: name.clone(),
-                        written: 0,
-                        declared,
-                        span: body.pat_span(id),
-                    })),
-                };
-            }
-            // Another type's constructor is not a fresh binding: `None`
-            // against a `Status` names `Option`'s case, and `true` against
-            // an `Int` names a `Bool`.
-            if env.names_a_constructor(name) || matches!(name.as_str(), "true" | "false") {
-                return Err(match &ctors {
-                    Some(cs) => foreign(name, cs),
-                    None => untakeable(name),
-                });
-            }
-            Ok(EPat::Wildcard)
-        }
+        // A binding, always: a pattern's name is a case by its capital, and
+        // the parser made each such name a constructor pattern (ADR-0195,
+        // ruling 2). Until ADR-0197 a bare name was a case when some type
+        // anywhere had a case of that name, and a binding otherwise, so a
+        // misspelt `Circel` matched everything.
+        HPat::Bind { .. } => Ok(EPat::Wildcard),
         HPat::Ctor { path, args } => {
             // `DecodeError.Invalid` and `Invalid` name the same constructor,
             // where the qualifier names the type matched (ADR-0059). Read by
@@ -5619,7 +5543,6 @@ fn to_exhaust_pattern(
                 .zip(fields)
                 .map(|(a, t)| {
                     to_exhaust_pattern(
-                        env,
                         subject,
                         body,
                         qualifier,
@@ -5634,7 +5557,7 @@ fn to_exhaust_pattern(
         }
         HPat::Or(ps) => ps
             .iter()
-            .map(|p| to_exhaust_pattern(env, subject, body, qualifier, literals, *p, ty, ty_name))
+            .map(|p| to_exhaust_pattern(subject, body, qualifier, literals, *p, ty, ty_name))
             .collect::<Result<Vec<_>, _>>()
             .map(EPat::Or),
     }

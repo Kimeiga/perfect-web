@@ -13,6 +13,19 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0197, 2026-10-05: a pattern tells a case from a binding by its
+capital** (ADR-0195, ruling 2). Six analyses each decided whether a bare
+pattern name was a case, and no two agreed: a misspelt case, `Circel`, bound
+a name and matched every value, as rustc's E0170 does.
+- The parser decides once, by the first letter: an uppercase name is a case,
+  and any other binds. Every later reader reads its decision.
+- A capitalized name its type lacks is PW0608, and a case named in lowercase
+  is PW0625.
+- No program changes; the store's 66 artifacts are byte-identical.
+
+Corpus C14: R-055, R-056 and A-030; **generality is 41 / 41**. 5 mutants
+(`just e14-case-names`).
+
 **ADR-0196, 2026-10-05: only a word that begins a statement or an
 expression is reserved** (ADR-0195, ruling 3). `let return = n` checked, and
 the binding's next use read as a `return`; `let match = n` was a parse error

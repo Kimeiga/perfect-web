@@ -60,9 +60,11 @@ MUTANTS = [
     ),
     (
         "another type's bare constructor reads as a binding",
-        CHECK,
-        '            if env.names_a_constructor(name) || matches!(name.as_str(), "true" | "false") {',
-        '            if (env.names_a_constructor(name) || matches!(name.as_str(), "true" | "false")) && false {',
+        # Re-anchored by ADR-0197: the parser decides a bare name by its
+        # capital, and the checker reads what it decided.
+        GRAMMAR,
+        "                    || pattern_kind(self.cur_text()) == PatternKind::Case\n",
+        "",
     ),
     (
         "a literal reads as a wildcard",

@@ -87,7 +87,7 @@ fn captured_by(
         return BTreeSet::new();
     };
     within.push(def);
-    let lexical = Lexical::build(sigs, Some(def.unit), decl, body);
+    let lexical = Lexical::build(decl, body);
     let param = |e: ExprId| {
         param_of(&lexical, body, e).and_then(|i| decl.params.get(i).map(|p| p.name.clone()))
     };

@@ -4,7 +4,7 @@
 //! produces an error is a checker bug, and that is asserted first — a checker
 //! that reports more by reporting wrongly is worse than one that reports less.
 
-use pw_core::check::{Env, Unit, check_sources};
+use pw_core::check::check_sources;
 
 /// Declaration-level rules over one file, through the one parser.
 ///
@@ -131,15 +131,6 @@ fn rejected_program(path: &std::path::Path) -> Vec<(String, String)> {
     }
     out.push((path.file_name().unwrap().to_string_lossy().to_string(), src));
     out
-}
-
-fn unit(name: &str, src: &str) -> Unit {
-    let p = parse_tree(src);
-    Unit {
-        path: name.to_string(),
-        src: src.to_string(),
-        hir: lower_file(src, &p.green),
-    }
 }
 
 #[test]
@@ -373,20 +364,6 @@ fn every_diagnostic_carries_what_charter_16_3_requires() {
         }
     }
     assert!(n > 0, "the corpus must produce at least one diagnostic");
-}
-
-#[test]
-fn the_environment_knows_every_constructor_name() {
-    // A bare pattern name that some type has as a constructor is that
-    // constructor (ADR-0038): the program's own cases, and the language's
-    // four. Each match types its own subject's constructors (ADR-0060).
-    let u = unit(
-        "t.pw",
-        "module m\nopaque type StoreId = String\ntype S = | A | B(Int)\n",
-    );
-    let env = Env::build(std::slice::from_ref(&u));
-    let names: Vec<&str> = env.constructors().collect();
-    assert_eq!(names, ["A", "B", "Err", "None", "Ok", "Some"]);
 }
 
 /// Everything a developer would be shown for one diagnostic, as one string.

@@ -1948,16 +1948,23 @@ fn constructor_arm(inner: &str) -> Option<crate::hir::TemplateArm> {
         Some((n, rest)) => (n.trim(), Some(rest.strip_suffix(')')?.trim())),
         None => (inner, None),
     };
-    // `Circle`, or `Shape.Circle` through its type (ADR-0061).
+    // `Circle`, or `Shape.Circle` through its type (ADR-0061): a case by
+    // its capital, and each field a binding by its own (ADR-0195, ruling 2).
+    // `{:Some(None)}` bound a name `None` until ADR-0197; an arm takes one
+    // case apart, and a field that is a case is a nested pattern no arm has.
     let case = name.rsplit('.').next().unwrap_or(name);
-    if !case.starts_with(|c: char| c.is_uppercase()) || !name.split('.').all(ident) {
+    if pw_syntax::pattern_kind(case) != pw_syntax::PatternKind::Case || !name.split('.').all(ident)
+    {
         return None;
     }
     let bindings = match fields {
         None => Vec::new(),
         Some(f) => {
             let names: Vec<&str> = f.split(',').map(str::trim).collect();
-            if !names.iter().all(|n| ident(n)) {
+            if !names
+                .iter()
+                .all(|n| ident(n) && pw_syntax::pattern_kind(n) == pw_syntax::PatternKind::Binding)
+            {
                 return None;
             }
             names.into_iter().map(str::to_string).collect()

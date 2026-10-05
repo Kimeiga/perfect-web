@@ -73,7 +73,7 @@ fn check_body(
     provision: &Provision,
     out: &mut Vec<Diagnostic>,
 ) {
-    let lexical = Lexical::build(sigs, Some(at), decl, body);
+    let lexical = Lexical::build(decl, body);
     // The module signals it names, provided to it (ADR-0144).
     let named = module_signals_named(sigs, at, &lexical, body);
     let handlers = handlers(body);
@@ -865,7 +865,7 @@ fn needs_of(
         return BTreeMap::new();
     };
     within.push(def);
-    let lexical = Lexical::build(sigs, Some(def.unit), decl, body);
+    let lexical = Lexical::build(decl, body);
     let gives: BTreeSet<DefId> = provided_in(sigs, def.unit, body)
         .into_iter()
         .map(|(signal, _)| signal)
@@ -1079,7 +1079,7 @@ fn provided(
             sigs.path_of(d).unwrap_or_default().to_string(),
         )
     };
-    let lexical = Lexical::build(sigs, Some(at), decl, body);
+    let lexical = Lexical::build(decl, body);
     let mut reported: BTreeSet<DefId> = BTreeSet::new();
     for (signal, e) in module_signals_named(sigs, at, &lexical, body) {
         if given.contains_key(&signal) || !reported.insert(signal) {

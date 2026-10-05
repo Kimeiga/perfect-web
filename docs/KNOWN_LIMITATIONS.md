@@ -155,12 +155,10 @@ refused by name:
   Until 2026-09-25 matches over `Option`, `Result` and calls were not checked
   at all, and four other shapes were proven exhaustive when they were not
   (ADR-0038).
-- **A binding cannot share a constructor's name** (ADR-0038). A bare
-  pattern name that some type has as a constructor is read as that
-  constructor, and against another type it is PW0608; any other bare name,
-  a misspelt case among them, binds. ADR-0195 (ruling 2) rules that
-  capitalization decides: a case name is uppercase, a lowercase pattern name
-  always binds, and an uppercase one is always a case; not built yet.
+- **A `let` name or a parameter may begin with a capital** (ADR-0197). A
+  pattern's name is a case by its capital and a binding otherwise, and a
+  case is declared with one (PW0625); a `let` and a parameter bind a name
+  whatever its first letter, since their grammar binds nothing else.
 - **`return` is a statement, not an expression.** Its value is the statement
   after it, in a block or on its line in a match arm (ADR-0038).
 - **A template arm takes one case apart** (ADR-0042, ADR-0061). A template's

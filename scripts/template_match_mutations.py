@@ -54,9 +54,10 @@ MUTANTS = [
     ),
     (
         "a qualified arm does not parse",
+        # Re-anchored by ADR-0197: an arm's case by its capital.
         HIR_LOWER,
-        "    if !case.starts_with(|c: char| c.is_uppercase()) || !name.split('.').all(ident) {",
-        "    if !case.starts_with(|c: char| c.is_uppercase()) || !ident(name) {",
+        "    if pw_syntax::pattern_kind(case) != pw_syntax::PatternKind::Case || !name.split('.').all(ident)\n",
+        "    if pw_syntax::pattern_kind(case) != pw_syntax::PatternKind::Case || !ident(name)\n",
     ),
     (
         "an arm of several names does not parse",

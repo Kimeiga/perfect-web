@@ -1,0 +1,12 @@
+// @status: GENERAL
+// @invariant: case_name_capitalized
+//
+// Structurally different from R-055: the lowercase case carries a payload,
+// in a generic sum type, after an uppercase one. A pattern `ok(x)` would
+// still read as a case by its arguments, but `ok` alone would bind.
+
+module generality.case_lowercase
+
+type Outcome<T> =
+    | Failed
+    | ok(T)

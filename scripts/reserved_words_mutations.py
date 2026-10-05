@@ -32,17 +32,19 @@ MUTANTS = [
         "    STMT_KEYWORDS.contains(&word) || EXPR_KEYWORDS.contains(&word) || word == \"derived\"\n",
         "    STMT_KEYWORDS.contains(&word) || word == \"derived\"\n",
     ),
+    # Re-anchored by ADR-0197: the parser decides a pattern's name by its
+    # capital, and `true` and `false` are `Bool`'s cases there.
     (
         "a pattern's binding is not checked",
         GRAMMAR,
-        "                if !is_ctor && !matches!(self.cur_text(), \"true\" | \"false\") {\n",
-        "                if false {\n",
+        "                if !is_ctor {\n                    self.not_a_statement_keyword(\"a binding\");\n",
+        "                if false {\n                    self.not_a_statement_keyword(\"a binding\");\n",
     ),
     (
         "`true` in a pattern is refused as a name",
         GRAMMAR,
-        "                if !is_ctor && !matches!(self.cur_text(), \"true\" | \"false\") {\n",
-        "                if !is_ctor {\n",
+        "                    || matches!(self.cur_text(), \"true\" | \"false\");\n",
+        "                    ;\n",
     ),
     (
         "a declaration is refused a statement word",

@@ -625,6 +625,46 @@ fn check_invariant(decl: &Decl, out: &mut Vec<Finding>) {
     }
 }
 
+/// **PW0625: a case is named with a capital letter** (ADR-0197, ADR-0195's
+/// ruling 2). A pattern's name is a case by its capital and a binding
+/// otherwise, so a case named in lowercase could never be matched by name:
+/// `active` in a pattern would bind, and match everything.
+fn check_case_names(decl: &Decl, out: &mut Vec<Finding>) {
+    for v in decl.variants.iter().flatten() {
+        if pw_syntax::pattern_kind(&v.name) == pw_syntax::PatternKind::Case {
+            continue;
+        }
+        let name = &v.name;
+        let mut capital = name.clone();
+        if let Some(first) = capital.get_mut(0..1) {
+            first.make_ascii_uppercase();
+        }
+        out.push(
+            err(
+                "PW0625",
+                "a sum type's case is named with a capital letter, so a pattern tells it \
+                 from a binding",
+                format!(
+                    "`{}`'s case `{name}` is not named with a capital letter",
+                    decl.name
+                ),
+                v.span.clone(),
+            )
+            .related(
+                decl.name_span.clone(),
+                format!("`{}` is declared here", decl.name),
+            )
+            .explain(
+                "a pattern's name is a case when it begins with a capital letter, and a new \
+                 binding otherwise (as in Haskell, OCaml and Elm), so a case named in \
+                 lowercase would be read as a binding wherever a pattern names it, and match \
+                 every value",
+            )
+            .repair(format!("name it `{capital}`")),
+        );
+    }
+}
+
 /// Run every declaration-level rule over one program's HIR.
 ///
 /// Nested declarations included (`all_decls`), which the AST walk did not do:
@@ -639,6 +679,7 @@ pub fn check(hir: &Hir) -> Vec<Finding> {
         check_effects_against_placement(decl, &mut out);
         check_effect_names_no_operation(decl, &mut out);
         check_invariant(decl, &mut out);
+        check_case_names(decl, &mut out);
     }
     out
 }

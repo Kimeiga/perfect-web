@@ -183,6 +183,28 @@ pub fn reserved(word: &str) -> bool {
     STMT_KEYWORDS.contains(&word) || EXPR_KEYWORDS.contains(&word) || word == "derived"
 }
 
+/// **What a name in a pattern is** (ADR-0195, ruling 2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatternKind {
+    /// A case, resolved in the type of what is matched.
+    Case,
+    /// A new binding.
+    Binding,
+}
+
+/// **Is a pattern's name a case or a binding?** (ADR-0195, ruling 2). Its
+/// first letter decides, as in Haskell, OCaml and Elm: an uppercase name is a
+/// case, and any other, `_x` among them, binds. So a misspelt case, `Circel`,
+/// is a case its type lacks, refused, and never a binding that matches
+/// everything. A case is declared with an uppercase name for the same reason
+/// (PW0625).
+pub fn pattern_kind(name: &str) -> PatternKind {
+    match name.as_bytes().first() {
+        Some(b'A'..=b'Z') => PatternKind::Case,
+        _ => PatternKind::Binding,
+    }
+}
+
 pub const STMT_CLAUSE_KEYWORDS: &[&str] =
     &["because", "attributes_forced_layout_to", "when", "respects"];
 
@@ -1921,18 +1943,24 @@ impl<'a> P<'a> {
                 self.finish();
             }
             Kind::Ident => {
-                // A constructor pattern if it takes arguments, or if it is
-                // qualified by its type (`Shape.Empty`); a binding otherwise,
-                // which is one name. Until 2026-09-26 `Shape.Empty` was a
-                // binding of that dotted name, so it matched everything, and
-                // `Shape.Circle(r)` did not parse (ADR-0059).
+                // A constructor pattern if it takes arguments, if it is
+                // qualified by its type (`Shape.Empty`), or if its name is a
+                // case's, uppercase (ADR-0195, ruling 2); `true` and `false`
+                // are `Bool`'s cases. A binding otherwise, which is one name.
+                // Until 2026-09-26 `Shape.Empty` was a binding of that dotted
+                // name, so it matched everything, and `Shape.Circle(r)` did
+                // not parse (ADR-0059). Until ADR-0197 a bare `Empty` was a
+                // binding here, and each later reader guessed again.
                 let mut after = 1;
                 while self.nth_is(after, Kind::Dot) && self.nth_is(after + 1, Kind::Ident) {
                     after += 2;
                 }
                 let takes_args = self.nth_is(after, Kind::LParen);
-                let is_ctor = takes_args || after > 1;
-                if !is_ctor && !matches!(self.cur_text(), "true" | "false") {
+                let is_ctor = takes_args
+                    || after > 1
+                    || pattern_kind(self.cur_text()) == PatternKind::Case
+                    || matches!(self.cur_text(), "true" | "false");
+                if !is_ctor {
                     self.not_a_statement_keyword("a binding");
                 }
                 self.start(if is_ctor { K::CtorPat } else { K::BindingPat });

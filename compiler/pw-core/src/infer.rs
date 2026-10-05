@@ -87,7 +87,7 @@ impl<'a> Types<'a> {
         body: &Body,
         module: Option<&str>,
     ) -> Types<'a> {
-        let lexical = Lexical::build(sigs, sigs.unit_of(module), decl, body);
+        let lexical = Lexical::build(decl, body);
         Types::with(sigs, decl, body, module, lexical, Vec::new())
     }
 
@@ -97,8 +97,7 @@ impl<'a> Types<'a> {
     pub fn of_decl(sigs: &'a Signatures, hir: &Hir, id: DeclId, body: &Body) -> Types<'a> {
         let decl = hir.decl(id);
         let module = hir.module_of(id);
-        let at = sigs.unit_of(module);
-        let Some(lexical) = Lexical::build_in(sigs, at, hir, id) else {
+        let Some(lexical) = Lexical::build_in(hir, id) else {
             return Types::of_body(sigs, decl, body, module);
         };
         let parent = crate::lexical::enclosing(hir, id).and_then(|p| {

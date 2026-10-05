@@ -22,8 +22,10 @@ CHECK = ROOT / "compiler/pw-core/src/check.rs"
 MUTANTS = [
     (
         "the rule does not run",
+        # Re-anchored by ADR-0197: the rule reads no signatures, since
+        # scoping no longer asks a type whether a name is a case.
         CHECK,
-        "        per_unit.extend(built_pages_read_no_parameter(&sigs, i, &u.hir));\n",
+        "        per_unit.extend(built_pages_read_no_parameter(&u.hir));\n",
         "",
     ),
     (

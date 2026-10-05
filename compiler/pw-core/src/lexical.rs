@@ -30,34 +30,6 @@ use std::collections::BTreeMap;
 use crate::hir::{
     AttrValue, Body, Decl, DeclId, Expr, ExprId, Hir, Node, NodeId, Pattern, PatternId,
 };
-use crate::resolve::{Namespace, Resolution, UnitId};
-use crate::signatures::Signatures;
-
-/// **Is a name written alone in a pattern a case rather than a binding?**
-/// The language's `true`, `false` or `None`, or a case of a type `at` sees
-/// (ADR-0038). Such a pattern tests; it binds nothing. `at` is `None` for a
-/// file that declares no module, which sees no declared type.
-///
-/// The one rule, with every reader of [`Lexical`]: a pattern the value
-/// relations read as a test and another analysis read as a binding would give
-/// one name two meanings.
-pub fn names_a_case(sigs: &Signatures, at: Option<UnitId>, name: &str) -> bool {
-    let ws = sigs.workspace();
-    let own = at.is_none_or(|at| {
-        matches!(
-            ws.resolve_in(at, Namespace::Term, name),
-            Resolution::Unresolved
-        )
-    });
-    (own && matches!(name, "true" | "false" | "None"))
-        || at.is_some_and(|at| {
-            ws.visible_types(at).into_iter().any(|def| {
-                sigs.type_decl(def)
-                    .and_then(|t| t.variants.as_ref())
-                    .is_some_and(|cs| cs.iter().any(|(n, _)| n == name))
-            })
-        })
-}
 
 /// **Where a local name is bound.**
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -121,10 +93,11 @@ pub struct Lexical {
 type Scope = Vec<(String, Binder)>;
 
 impl Lexical {
-    /// Resolve every local name in `decl`'s body, a body of unit `at`, by
-    /// [`names_a_case`].
-    pub fn build(sigs: &Signatures, at: Option<UnitId>, decl: &Decl, body: &Body) -> Lexical {
-        Lexical::of(decl, body, &|name| names_a_case(sigs, at, name))
+    /// Resolve every local name in `decl`'s body. A pattern's name binds
+    /// where the parser made it a binding, by its capital (ADR-0197): no
+    /// type is read to tell a case from a binding.
+    pub fn build(decl: &Decl, body: &Body) -> Lexical {
+        Lexical::of(decl, body)
     }
 
     /// **The same, for the declaration `id` of `hir`, where it may be nested
@@ -132,16 +105,11 @@ impl Lexical {
     /// declaration's parameters and the bindings in scope where it is
     /// written, each resolved in the enclosing declaration, as the enclosing
     /// one's own were. `None` for a declaration with no body.
-    pub fn build_in(
-        sigs: &Signatures,
-        at: Option<UnitId>,
-        hir: &Hir,
-        id: DeclId,
-    ) -> Option<Lexical> {
+    pub fn build_in(hir: &Hir, id: DeclId) -> Option<Lexical> {
         let decl = hir.decl(id);
         let body = hir.body(decl.body?);
         let outer: Vec<(String, DeclId, Binder)> = match enclosing(hir, id) {
-            Some(parent) => Lexical::build_in(sigs, at, hir, parent)?
+            Some(parent) => Lexical::build_in(hir, parent)?
                 .nested
                 .remove(&id)
                 .unwrap_or_default()
@@ -155,22 +123,12 @@ impl Lexical {
             .iter()
             .map(|c| (*c, hir.decl_span(*c).start))
             .collect();
-        Some(Lexical::with(
-            decl,
-            body,
-            &|name| names_a_case(sigs, at, name),
-            &children,
-            outer,
-        ))
+        Some(Lexical::with(decl, body, &children, outer))
     }
 
     /// Resolve every local name in `decl`'s body and policy terms.
-    ///
-    /// `is_case` says whether a name written alone in a pattern is a case
-    /// rather than a binding: `None`, `true`, or a case of a type the unit
-    /// sees (ADR-0038). Such a pattern binds nothing.
-    pub fn of(decl: &Decl, body: &Body, is_case: &dyn Fn(&str) -> bool) -> Lexical {
-        Lexical::with(decl, body, is_case, &[], Vec::new())
+    pub fn of(decl: &Decl, body: &Body) -> Lexical {
+        Lexical::with(decl, body, &[], Vec::new())
     }
 
     /// The resolution, where `outer` are the bindings around the declaration,
@@ -179,7 +137,6 @@ impl Lexical {
     fn with(
         decl: &Decl,
         body: &Body,
-        is_case: &dyn Fn(&str) -> bool,
         children: &[(DeclId, usize)],
         outer: Vec<(String, DeclId, Binder)>,
     ) -> Lexical {
@@ -197,7 +154,6 @@ impl Lexical {
         );
         let mut walk = Walk {
             body,
-            is_case,
             children,
             out: &mut out,
         };
@@ -279,7 +235,6 @@ pub fn enclosing(hir: &Hir, id: DeclId) -> Option<DeclId> {
 
 struct Walk<'a> {
     body: &'a Body,
-    is_case: &'a dyn Fn(&str) -> bool,
     /// The declarations nested in this one, by where each is written.
     children: &'a [(DeclId, usize)],
     out: &'a mut Lexical,
@@ -479,15 +434,14 @@ impl Walk<'_> {
         }
     }
 
-    /// The names a pattern binds, pushed in order. A name that is a case is
-    /// a test, not a binding. An or-pattern binds its first alternative's
-    /// names, which every alternative must bind alike.
+    /// The names a pattern binds, pushed in order. A case is a test, and a
+    /// constructor pattern since ADR-0197, so it binds nothing. An
+    /// or-pattern binds its first alternative's names, which every
+    /// alternative must bind alike.
     fn pattern(&mut self, p: PatternId, scope: &mut Scope) {
         match self.body.pat(p) {
             Pattern::Bind { name, .. } => {
-                if !(self.is_case)(name) {
-                    scope.push((name.clone(), Binder::Pattern(p)));
-                }
+                scope.push((name.clone(), Binder::Pattern(p)));
             }
             Pattern::Ctor { args, .. } => {
                 for a in args.clone() {

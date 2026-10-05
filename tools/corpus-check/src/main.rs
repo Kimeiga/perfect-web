@@ -58,6 +58,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "links the body allows",
     // ADR-0194, corpus C13: a type that contains itself.
     "a type that contains itself through a list",
+    // ADR-0197, corpus C14: a pattern's name by its capital.
+    "cases and bindings told apart by their capital",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -135,6 +137,9 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a link the head holds, written in markup",
     // ADR-0194, corpus C13: PW0624.
     "a type no finite value has",
+    // ADR-0197, corpus C14: PW0625 and PW0608.
+    "a case named in lowercase",
+    "a misspelt case in a pattern",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

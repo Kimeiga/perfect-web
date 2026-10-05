@@ -1,0 +1,26 @@
+// @corpus: rejected
+// @id: R-056
+// @category: a misspelt case in a pattern
+// @rule: PW0608
+// @invariant: pattern_constructor
+// @charter: §7.1
+// @milestone: 14
+// @expect-error: `Delivred` is a case `OrderState` does not have
+//
+// `Delivred` is spelt wrong. By its capital it is a case, and `OrderState`
+// has none of that name, so it is refused. Read as a binding, as it was until
+// ADR-0197 and as rustc reads one (E0170), it would take every order the
+// arm before it left, and say each was delivered.
+
+module store.order_message
+
+type OrderState =
+    | Placed
+    | Delivered
+
+fn message(s: OrderState) -> String !{} {
+    match s {
+        Placed => "Your order is placed.",
+        Delivred => "Delivered.",
+    }
+}

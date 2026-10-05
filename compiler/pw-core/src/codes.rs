@@ -297,8 +297,10 @@ codes! {
     // Until 2026-09-25 such a pattern read as a wildcard, so `Ok(x)` and
     // `Err(e)` arms proved a match over an `Option` exhaustive. Revision 2
     // (ADR-0059): a case built through its type, `Shape.Bogus(1)`, is held to
-    // the same invariant; until 2026-09-26 it was undecided.
-    PATTERN_CONSTRUCTOR = "PW0608" / pattern_constructor / 2, Types,
+    // the same invariant; until 2026-09-26 it was undecided. Revision 3
+    // (ADR-0197): a pattern's name is a case by its capital, so a bare
+    // `Circel` its type lacks is held to it too; it had been a binding.
+    PATTERN_CONSTRUCTOR = "PW0608" / pattern_constructor / 3, Types,
         "a constructor must name a case of the type it builds or matches";
     // Until 2026-09-25 a member the type does not have was unknown, and A-015
     // read `box.x` from a snapshot of a `Rect`, which has no `x` (ADR-0048).
@@ -368,6 +370,10 @@ codes! {
     // value at all.
     NO_FINITE_VALUE = "PW0624" / no_finite_value / 1, Types,
         "a declared type has a finite value: one that contains itself has a way to be built without itself";
+    // ADR-0197 (ADR-0195, ruling 2): a pattern tells a case from a binding by
+    // its capital, as Haskell, OCaml and Elm do.
+    CASE_NAME_CAPITALIZED = "PW0625" / case_name_capitalized / 1, Types,
+        "a sum type's case is named with a capital letter, so a pattern tells it from a binding";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

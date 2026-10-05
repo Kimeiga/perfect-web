@@ -4313,15 +4313,10 @@ impl<'a> Lower<'a> {
         };
         match body.pat(pat) {
             Pattern::Wild => Lowering::Lowered(Takes::Rest(None)),
-            Pattern::Bind { name, .. } => match self.case_index(name, cases, declared) {
-                // `None`, or `Empty`: a case without a payload, written alone.
-                Some(i) if cases[i].1.is_empty() => Lowering::Lowered(Takes::Case(i, Vec::new())),
-                Some(_) => Lowering::Blocked {
-                    why: format!("`{name}` carries a payload; the checker refuses it (PW0603)"),
-                    span: span.clone(),
-                },
-                None => Lowering::Lowered(Takes::Rest(Some(name.clone()))),
-            },
+            // A binding, always: `None` and `Empty`, a case without a payload
+            // written alone, are constructor patterns by their capital
+            // (ADR-0195, ruling 2).
+            Pattern::Bind { name, .. } => Lowering::Lowered(Takes::Rest(Some(name.clone()))),
             Pattern::Ctor { path, args } => {
                 let Some(i) = self.case_index(path, cases, declared) else {
                     return unsupported(
@@ -4408,30 +4403,17 @@ impl<'a> Lower<'a> {
                 .is_some_and(|t| t.variants.is_some()),
             _ => false,
         };
-        fn one_level(me: &Lower<'_>, body: &Body, p: crate::hir::PatternId) -> bool {
+        fn one_level(body: &Body, p: crate::hir::PatternId) -> bool {
             match body.pat(p) {
                 Pattern::Wild | Pattern::Bind { .. } => true,
-                Pattern::Ctor { args, .. } => args.iter().all(|a| match body.pat(*a) {
-                    Pattern::Wild => true,
-                    Pattern::Bind { name, .. } => !me.names_a_case(name),
-                    _ => false,
-                }),
-                Pattern::Or(alternatives) => alternatives.iter().all(|a| one_level(me, body, *a)),
+                Pattern::Ctor { args, .. } => args
+                    .iter()
+                    .all(|a| matches!(body.pat(*a), Pattern::Wild | Pattern::Bind { .. })),
+                Pattern::Or(alternatives) => alternatives.iter().all(|a| one_level(body, *a)),
                 Pattern::Literal(_) | Pattern::Error => false,
             }
         }
-        variant && arms.iter().all(|a| one_level(self, body, a.pat))
-    }
-
-    /// Whether a name written alone in a pattern is a case: `true`, `false`,
-    /// the language's four, or a case some declared type in the program has,
-    /// as the checker reads it (ADR-0038).
-    fn names_a_case(&self, name: &str) -> bool {
-        matches!(name, "true" | "false" | "Some" | "None" | "Ok" | "Err")
-            || self.cx.hirs.iter().any(|h| {
-                h.all_decls()
-                    .any(|(_, d)| d.variants.iter().flatten().any(|v| v.name == name))
-            })
+        variant && arms.iter().all(|a| one_level(body, a.pat))
     }
 
     /// **A match compiled to a decision tree** (ADR-0060): nested patterns,
@@ -4499,22 +4481,15 @@ impl<'a> Lower<'a> {
         };
         match body.pat(id) {
             Pattern::Wild => Lowering::Lowered(TreePat::Any(None)),
-            Pattern::Bind { name, .. } => {
-                if *ty == Type::Bool && matches!(name.as_str(), "true" | "false") {
-                    return Lowering::Lowered(TreePat::Bool(name == "true"));
-                }
-                if let Some((cases, declared)) = self.variant_cases(ty, span)
-                    && let Some(i) = self.case_index(name, &cases, declared)
-                {
-                    return match cases[i].1.is_empty() {
-                        true => Lowering::Lowered(TreePat::Case(cases[i].0, Vec::new())),
-                        false => Lowering::Blocked {
-                            why: format!("`{name}` carries a payload; the checker refuses it"),
-                            span: span.clone(),
-                        },
-                    };
-                }
-                Lowering::Lowered(TreePat::Any(Some(name.clone())))
+            // A binding, always, by its capital (ADR-0195, ruling 2).
+            Pattern::Bind { name, .. } => Lowering::Lowered(TreePat::Any(Some(name.clone()))),
+            // `true` and `false`, `Bool`'s two cases.
+            Pattern::Ctor { path, args }
+                if *ty == Type::Bool
+                    && args.is_empty()
+                    && matches!(path.as_str(), "true" | "false") =>
+            {
+                Lowering::Lowered(TreePat::Bool(path == "true"))
             }
             Pattern::Ctor { path, args } => {
                 let Some((cases, declared)) = self.variant_cases(ty, span) else {

@@ -1,0 +1,27 @@
+// @corpus: accepted
+// @id: A-030
+// @category: cases and bindings told apart by their capital
+// @charter: §7.1
+// @milestone: 14
+//
+// A pattern's name is a case when it begins with a capital letter, and a
+// binding otherwise (ADR-0197). `Placed` and `None` are cases; `other`,
+// `minutes` and `_late` are bindings, whatever cases exist elsewhere.
+
+module store.order_progress
+
+type OrderState =
+    | Placed
+    | Preparing(Int)
+    | Delivered
+
+fn progress(s: OrderState, eta: Option<Int>) -> String !{} {
+    match s {
+        Placed => "placed",
+        Preparing(minutes) => match eta {
+            Some(_late) => "running late",
+            None => "{minutes} minutes",
+        },
+        other => "done",
+    }
+}

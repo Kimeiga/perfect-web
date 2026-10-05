@@ -1,0 +1,20 @@
+// @status: GENERAL
+// @invariant: pattern_constructor
+//
+// Structurally different from R-056: the misspelt case is nested in an
+// `Option`'s case, and it misspells a case of a generic type. Read as a
+// binding, it would take every `Some`.
+
+module generality.nested_misspelt
+
+type Shape =
+    | Circle(Int)
+    | Empty
+
+fn area(s: Option<Shape>) -> Int !{} {
+    match s {
+        Some(Circle(r)) => r,
+        Some(Emtpy) => 0,
+        None => -1,
+    }
+}

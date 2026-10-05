@@ -1,0 +1,19 @@
+// @status: NEIGHBOUR
+// @invariant: pattern_constructor
+// @dimension: valid neighbour — a binding named like a case in lowercase, and every case spelt as declared
+//
+// `empty` is a binding, though `Empty` is a case: its first letter decides.
+
+module generality.binding_named_like_a_case
+
+type Shape =
+    | Circle(Int)
+    | Empty
+
+fn area(s: Option<Shape>) -> Int !{} {
+    match s {
+        Some(Circle(r)) => r,
+        Some(empty) => 0,
+        None => -1,
+    }
+}

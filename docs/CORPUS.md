@@ -723,3 +723,28 @@ Generality at open:        39/39 invariants generality-tested
 | A-029 | added: a reply thread, a comment and a list of comments, built and walked | new category, `a type that contains itself through a list` |
 | R-054 | added: a thread whose every value holds its first reply (`PW0624`) | new category |
 | `no_finite_value` | a GENERAL witness, two sum types holding each other in every case through a generic record, and a NEIGHBOUR one, six types each with a way to be built without itself | new invariant |
+
+## C14: a pattern's name by its capital, 2026-10-05
+
+Opened because the specification changed: a pattern's name is a case by its
+capital and a binding otherwise, and a case is declared with one (`PW0625`);
+a misspelt case is a case its type lacks (`PW0608`).
+[ADR-0197](DECISIONS/ADR-0197-a-pattern-tells-a-case-from-a-binding-by-its-capital.md)
+is the decision. No invariant is retired, no `@expect-error` line of an
+earlier fixture changed, and no fixture moved.
+
+```text
+Corpus version:            C14
+Accepted programs:         30
+Rejected programs:         56
+Charter categories:        30/30 accepted, 56/56 rejected
+Generality at open:        41/41 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-030 | added: cases and bindings in one match, nested, each told by its capital | new category, `cases and bindings told apart by their capital` |
+| R-055 | added: a case named in lowercase (`PW0625`) | new category |
+| R-056 | added: a misspelt case in a pattern (`PW0608`) | new category |
+| `case_name_capitalized` | a GENERAL witness, a lowercase case with a payload in a generic type, and a NEIGHBOUR one, cases with capitals, digits and underscores | new invariant |
+| `pattern_constructor` | a GENERAL witness, a misspelt case nested in an `Option`'s, and a NEIGHBOUR one, a binding named like a case in lowercase | new witnesses |

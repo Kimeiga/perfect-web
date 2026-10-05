@@ -1,0 +1,18 @@
+// @corpus: rejected
+// @id: R-055
+// @category: a case named in lowercase
+// @rule: PW0625
+// @invariant: case_name_capitalized
+// @charter: §7.1
+// @milestone: 14
+// @expect-error: `OrderState`'s case `placed` is not named with a capital letter
+//
+// A pattern's name is a case when it begins with a capital letter, and a
+// binding otherwise. A case named `placed` could never be matched by name:
+// `placed => ..` in a match would bind it, and take every order.
+
+module store.order_state
+
+type OrderState =
+    | placed
+    | Delivered

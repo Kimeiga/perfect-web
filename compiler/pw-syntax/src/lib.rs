@@ -36,8 +36,8 @@ pub mod tree;
 
 pub use fmt::{format_source, format_tree};
 pub use grammar::{
-    DECL_STARTERS, POLICY_KEYWORDS, Parse, RESOURCE_NOUNS, SyntaxError, UI_NOUNS, parse_expr,
-    parse_expr_list, parse_transition_clause, parse_tree, parse_type,
+    DECL_STARTERS, POLICY_KEYWORDS, Parse, PatternKind, RESOURCE_NOUNS, SyntaxError, UI_NOUNS,
+    parse_expr, parse_expr_list, parse_transition_clause, parse_tree, parse_type, pattern_kind,
 };
 pub use kind::{Pw, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use lexer::{Kind, Span, Token, lex};

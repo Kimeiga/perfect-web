@@ -1,0 +1,13 @@
+// @status: NEIGHBOUR
+// @invariant: case_name_capitalized
+// @dimension: valid neighbour — cases with capitals, digits and underscores after the first letter
+//
+// Each case begins with a capital letter, whatever follows it.
+
+module generality.case_capitals
+
+type Version =
+    | V1
+    | V2_beta
+    | Latest
+    | HTTP2

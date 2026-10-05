@@ -247,8 +247,8 @@ fn a_constructor_its_type_lacks_is_refused_not_read_as_a_wildcard() {
         ["PW0608 `Bogus` is not a constructor of `m.Status`"]
     );
 
-    // A bare name is a constructor where some type has one of that name, and
-    // a fresh binding otherwise.
+    // A bare name is a case by its capital (ADR-0197): `Red` is one the
+    // type lacks, refused, and never a fresh binding.
     let other = "public query Q(w: String) -> Int {\n    match status(w) {\n        Draft => 1,\n        Red => 2,\n    }\n}\n";
     assert_eq!(
         reported(other),

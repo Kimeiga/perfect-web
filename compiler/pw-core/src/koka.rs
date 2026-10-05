@@ -335,16 +335,9 @@ fn lower_expr(b: &Body, id: ExprId) -> Result<String, &'static str> {
 fn lower_pattern(b: &Body, id: crate::hir::PatternId) -> Result<String, &'static str> {
     Ok(match b.pat(id) {
         Pattern::Wild => "_".to_string(),
-        Pattern::Bind { name, .. } => {
-            // A binding that names a constructor IS the constructor — the same
-            // ambiguity the exhaustiveness bridge resolves, and getting it wrong
-            // here would silently turn an arm into a catch-all.
-            if starts_upper(name) {
-                name.clone()
-            } else {
-                value_name(name)
-            }
-        }
+        // A binding, always: the parser made a case's name a constructor
+        // pattern, by its capital (ADR-0195, ruling 2).
+        Pattern::Bind { name, .. } => value_name(name),
         Pattern::Ctor { path, args } => {
             let head = path.rsplit('.').next().unwrap_or(path);
             if args.is_empty() {

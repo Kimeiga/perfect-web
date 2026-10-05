@@ -184,6 +184,38 @@ fn a_pattern_through_its_type_is_a_case_not_a_binding() {
 }
 
 #[test]
+fn a_case_alone_through_a_module_is_a_case_not_a_binding() {
+    // `geometry.Shape.Empty` begins with a module's lowercase name: its
+    // qualifier makes it a case, as its capital makes `Empty` one
+    // (ADR-0197). Read as a binding, it would take every shape, and this
+    // match would be proven exhaustive.
+    let geometry = "module geometry\n\ntype Shape =\n    | Circle(Int)\n    | Empty\n";
+    let partial = "module t\n\nimport geometry\n\nfn f(s: geometry.Shape) -> Int {\n    match s {\n        geometry.Shape.Empty => 0,\n    }\n}\n";
+    let check = |src: &str| -> Vec<String> {
+        let mut files = std_lib();
+        files.push(("geometry.pw".to_string(), geometry.to_string()));
+        files.push(("t.pw".to_string(), src.to_string()));
+        check_sources(&files)
+            .into_iter()
+            .filter(|(n, _)| n == "t.pw")
+            .flat_map(|(_, ds)| ds.into_iter().map(|d| format!("{} {}", d.code, d.message)))
+            .collect()
+    };
+    let got = check(partial);
+    assert!(
+        got.iter()
+            .any(|d| d.starts_with("PW0305") && d.contains("not exhaustive")),
+        "{got:?}"
+    );
+    // Control: with its other case, it is.
+    let whole = partial.replace(
+        "        geometry.Shape.Empty => 0,\n",
+        "        geometry.Shape.Empty => 0,\n        geometry.Shape.Circle(r) => r,\n",
+    );
+    assert_eq!(check(&whole), Vec::<String>::new());
+}
+
+#[test]
 fn a_patterns_qualifier_must_name_the_type_matched() {
     let src = program(
         "type Box =\n    | Empty\n    | Full(Int)\n\nfn f(s: Shape) -> Int {\n    match s {\n        \

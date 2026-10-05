@@ -297,8 +297,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - first, the quick, correctness-critical ones: 14, a speculation
           never invents a value (the new line takes the price the page
           shows, done by ADR-0172); 12 and 13, KNOWN_LIMITATIONS' stale
-          entries (done); 2, a case name is uppercase and a lowercase pattern
-          name always a binding; ~~3, only statement-starting words
+          entries (done); ~~2, a case name is uppercase and a lowercase
+          pattern name always a binding~~ (ADR-0197, `just e14-case-names`);
+          ~~3, only statement-starting words
           reserved~~ (ADR-0196, `just e14-reserved-words`); 5, a bare case
           with a payload resolved like a nullary one; 12's remainder, a
           named function as a handler, `e => save(e)`;
