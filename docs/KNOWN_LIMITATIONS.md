@@ -73,8 +73,18 @@ rather than approximated:
   is laid out per instance, its arguments fixed by its fields or its use. In
   a query's parameter or result it has no WIT form, unless its parameter is
   phantom. An instance only a lambda's branches name is refused by name.
-- **A type that contains itself is refused** (ADR-0059): the Canonical ABI
-  has no recursive types, and the backend lays every value out by its type.
+- **A type that contains itself compiles only through a list** (ADR-0194):
+  `replies: List<Comment>` is laid out by its type, and crosses a boundary
+  as its nodes. Not yet:
+  - **held in place**, `Option<Node>` or `Add(Expr, Expr)`, which needs a
+    box: refused by name;
+  - **crossing a boundary** through another declaration, as a list of lists
+    of itself, holding another such type, or as an opaque type: refused by
+    name where its WIT is written;
+  - **on the browser's wire**: a handler, a signal or a browser's argument
+    holding one is refused by name;
+  - **nested deeper than 128 in a host** (`NESTED_DEPTH`): a host reads such
+    a value's nodes instead.
 - **`==` compares primitives only.** Two records, two sum-type values or two
   lists are not compared by either backend, and the refusal is by name
   (`Eq` on a nominal type).

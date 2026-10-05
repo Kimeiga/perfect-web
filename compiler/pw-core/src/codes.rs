@@ -360,6 +360,11 @@ codes! {
         "a value is built of an opaque type only where the build shows it holds the type's invariant";
     INVARIANT_UNREAD = "PW0623" / invariant_unread / 1, Types,
         "an opaque type's invariant is bounds on its `Int` value, `value >= 1`, joined by `&`, that some value holds";
+    // ADR-0194: a type may contain itself, and one each of whose values
+    // holds another of itself, `type Loop = Loop { again: Loop }`, has no
+    // value at all.
+    NO_FINITE_VALUE = "PW0624" / no_finite_value / 1, Types,
+        "a declared type has a finite value: one that contains itself has a way to be built without itself";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

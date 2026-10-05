@@ -35,7 +35,8 @@ MUTANTS = [
     (
         "a field's name is written unescaped",
         WIT,
-        "                        escaped(&ident(f)),",
+        # Re-anchored by ADR-0194: a type and its node share one renderer.
+        "                    escaped(&ident(f)),",
         "                        ident(f),",
     ),
     (

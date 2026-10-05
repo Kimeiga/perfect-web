@@ -1653,3 +1653,14 @@ an order is placed, and its page follows it.
   `/order` shows its status, kept current as the store moves it along.
 - A change the store makes, not a command, reaches the session's open pages
   (`session_changed`), against the order's own entry at an advancing version.
+
+[ADR-0194](DECISIONS/ADR-0194-a-type-that-contains-itself-crosses-as-its-nodes.md):
+a type that contains itself compiles, and crosses a boundary as its nodes.
+- PW0624 refuses a type no finite value has, `type Loop = Loop { again: Loop }`.
+- Through a list, such a type is laid out by its type inside a component. At
+  a boundary it is `list<node>` in level order, each list of itself a
+  `list<u32>` of node indices: canonical, checked in one pass, encoded and
+  decoded with no recursion, and decoded in place. Malformed nodes trap.
+- A host holds the value nested, no deeper than 128, and an invariant inside
+  a tree holds at every node. Held in place, through another declaration,
+  or on the browser's wire, it is refused by name.

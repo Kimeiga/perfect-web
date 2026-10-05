@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: no_finite_value
+//
+// Structurally different from R-054: no field holds the type itself. Two sum
+// types each hold the other in every case, one through a generic record, so
+// the cycle runs through a declaration and an argument, and still no value
+// of either could be built first.
+
+module generality.no_value
+
+type Box<T> = Box { value: T }
+
+type Ping =
+    | Ping(Box<Pong>)
+    | Again(Ping, Int)
+
+type Pong =
+    | Pong(Ping)

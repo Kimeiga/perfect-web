@@ -1176,6 +1176,24 @@ pub mod engine {
             )
         }
 
+        /// **An export's results, as the program holds them** (ADR-0194):
+        /// each value of a type that contains itself made from its nodes, by
+        /// the export's declared result types. A call returns the nodes, as
+        /// the component passed them; a host that renders or compares the
+        /// values reads them so.
+        pub fn untangled(
+            &self,
+            export: &[&str],
+            results: Vec<wasmtime::component::Val>,
+        ) -> Result<Vec<wasmtime::component::Val>, String> {
+            let func = export_type(&self.engine, &self.component, export)?;
+            results
+                .into_iter()
+                .zip(func.results())
+                .map(|(v, t)| graph::untangle(v, &t))
+                .collect()
+        }
+
         /// **Arguments that arrived as JSON, typed by the export's own
         /// parameters.**
         ///
@@ -1260,6 +1278,316 @@ pub mod engine {
                 _ => None,
             })
             .ok_or_else(|| format!("`{interface}` exports no function `{function}`"))
+    }
+
+    /// **A type that contains itself, as a host holds it** (ADR-0194).
+    ///
+    /// A component passes a value of such a type as its nodes: a
+    /// `list<node>` in level order, node 0 the value, each `list<u32>` field
+    /// of a node its children's indices. A host holds the value itself,
+    /// nested, as the program's declaration shapes it: each of those fields a
+    /// list of the node's children. These convert between the two by the
+    /// type the component declares, through every type that holds one, and
+    /// neither recurses on the value, so its depth is no stack's business.
+    pub mod graph {
+        use wasmtime::component::Val;
+        use wasmtime::component::types::Type;
+
+        /// **The deepest nested value [`untangle`] makes.** A nested value
+        /// is cloned, compared, printed and dropped by recursion, which a
+        /// deep enough one overflows; its nodes are not. 128 is serde_json's
+        /// own default nesting limit, so a nested value a host holds is one it
+        /// could have parsed from JSON. Measured in a debug build, where each
+        /// level costs most: a clone or a comparison overflows half a 2 MiB
+        /// thread stack near 330 levels, so 128 leaves more than twice the
+        /// room (`pw-conformance`'s `recursive_types.rs`). A host that needs a
+        /// deeper value reads its nodes, which have no depth to overflow.
+        pub const NESTED_DEPTH: usize = 128;
+
+        /// Where a node holds its children: each field (or case payload, or a
+        /// payload tuple's element) that is a `list<u32>`.
+        #[derive(Debug, Clone, PartialEq)]
+        enum Slot {
+            /// A record's field, by name.
+            Field(String),
+            /// A case's payload, by the case's name.
+            Payload(String),
+            /// An element of a case's payload tuple.
+            Element(String, usize),
+        }
+
+        fn is_indices(ty: &Type) -> bool {
+            matches!(ty, Type::List(l) if l.ty() == Type::U32)
+        }
+
+        /// **The node type, when `ty` is a type that contains itself, as
+        /// its nodes**: `list<node>`, a record or a variant with a `list<u32>`
+        /// of children. Its slots.
+        fn node_of(ty: &Type) -> Option<(Type, Vec<Slot>)> {
+            let Type::List(list) = ty else {
+                return None;
+            };
+            let node = list.ty();
+            let mut slots = Vec::new();
+            match &node {
+                Type::Record(r) => {
+                    for f in r.fields() {
+                        if is_indices(&f.ty) {
+                            slots.push(Slot::Field(f.name.to_string()));
+                        }
+                    }
+                }
+                Type::Variant(v) => {
+                    for c in v.cases() {
+                        match &c.ty {
+                            Some(t) if is_indices(t) => {
+                                slots.push(Slot::Payload(c.name.to_string()))
+                            }
+                            Some(Type::Tuple(t)) => {
+                                for (i, e) in t.types().enumerate() {
+                                    if is_indices(&e) {
+                                        slots.push(Slot::Element(c.name.to_string(), i));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                _ => return None,
+            }
+            (!slots.is_empty()).then_some((node, slots))
+        }
+
+        /// A node's lists of children, in the order the encoding reads them,
+        /// each taken out of the node.
+        fn take_lists(node: &mut Val, slots: &[Slot]) -> Result<Vec<Vec<Val>>, String> {
+            let mut out = Vec::new();
+            for slot in slots {
+                let held = match (slot, &mut *node) {
+                    (Slot::Field(name), Val::Record(fields)) => {
+                        fields.iter_mut().find(|(n, _)| n == name).map(|(_, v)| v)
+                    }
+                    (Slot::Payload(case), Val::Variant(name, Some(p))) if name == case => {
+                        Some(&mut **p)
+                    }
+                    (Slot::Element(case, i), Val::Variant(name, Some(p))) if name == case => {
+                        match &mut **p {
+                            Val::Tuple(items) => items.get_mut(*i),
+                            _ => None,
+                        }
+                    }
+                    // Another case: it holds no children here.
+                    (Slot::Payload(_) | Slot::Element(..), Val::Variant(..)) => continue,
+                    _ => None,
+                };
+                let Some(Val::List(items)) = held else {
+                    return Err(format!("a node has no list of children at {slot:?}"));
+                };
+                out.push(std::mem::take(items));
+            }
+            Ok(out)
+        }
+
+        /// Put each list back, in the order [`take_lists`] took them.
+        fn put_lists(node: &mut Val, slots: &[Slot], mut lists: Vec<Vec<Val>>) {
+            lists.reverse();
+            for slot in slots {
+                let held = match (slot, &mut *node) {
+                    (Slot::Field(name), Val::Record(fields)) => {
+                        fields.iter_mut().find(|(n, _)| n == name).map(|(_, v)| v)
+                    }
+                    (Slot::Payload(case), Val::Variant(name, Some(p))) if name == case => {
+                        Some(&mut **p)
+                    }
+                    (Slot::Element(case, i), Val::Variant(name, Some(p))) if name == case => {
+                        match &mut **p {
+                            Val::Tuple(items) => items.get_mut(*i),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+                if let Some(v) = held {
+                    *v = Val::List(lists.pop().unwrap_or_default());
+                }
+            }
+        }
+
+        /// Is `ty` a type that contains itself, as its nodes?
+        pub fn is_nodes(ty: &Type) -> bool {
+            node_of(ty).is_some()
+        }
+
+        /// **A value as the component passes it**: each value of a type
+        /// that contains itself, nested, made its nodes. A value already
+        /// given as its nodes is passed as it is: the component checks it.
+        pub fn tangle(v: Val, ty: &Type) -> Result<Val, String> {
+            if let Some((node, slots)) = node_of(ty) {
+                return match v {
+                    // Nodes already.
+                    Val::List(items) => Ok(Val::List(items)),
+                    root => encode(root, &node, &slots),
+                };
+            }
+            walk(v, ty, &tangle)
+        }
+
+        /// **A value as the program holds it**: each value of a type that
+        /// contains itself made from its nodes, which must be a tree in level
+        /// order, as the component's own decoder requires, and no deeper
+        /// than [`NESTED_DEPTH`].
+        pub fn untangle(v: Val, ty: &Type) -> Result<Val, String> {
+            if let Some((node, slots)) = node_of(ty) {
+                let Val::List(nodes) = v else {
+                    return Err("a value of a type that contains itself is not its nodes".into());
+                };
+                return decode(nodes, &node, &slots);
+            }
+            walk(v, ty, &untangle)
+        }
+
+        /// `f` on every part of `v` its type says may hold such a value.
+        fn walk(
+            v: Val,
+            ty: &Type,
+            f: &dyn Fn(Val, &Type) -> Result<Val, String>,
+        ) -> Result<Val, String> {
+            let inner =
+                |v: Option<Box<Val>>, ty: Option<Type>| -> Result<Option<Box<Val>>, String> {
+                    match (v, ty) {
+                        (Some(v), Some(ty)) => Ok(Some(Box::new(f(*v, &ty)?))),
+                        (v, _) => Ok(v),
+                    }
+                };
+            Ok(match (v, ty) {
+                (Val::Record(fields), Type::Record(r)) => {
+                    let types: Vec<(String, Type)> =
+                        r.fields().map(|f| (f.name.to_string(), f.ty)).collect();
+                    let mut out = Vec::with_capacity(fields.len());
+                    for (name, v) in fields {
+                        let v = match types.iter().find(|(n, _)| *n == name) {
+                            Some((_, t)) => f(v, t)?,
+                            None => v,
+                        };
+                        out.push((name, v));
+                    }
+                    Val::Record(out)
+                }
+                (Val::List(items), Type::List(l)) => {
+                    let t = l.ty();
+                    Val::List(
+                        items
+                            .into_iter()
+                            .map(|v| f(v, &t))
+                            .collect::<Result<_, _>>()?,
+                    )
+                }
+                (Val::Tuple(items), Type::Tuple(t)) => Val::Tuple(
+                    items
+                        .into_iter()
+                        .zip(t.types())
+                        .map(|(v, t)| f(v, &t))
+                        .collect::<Result<_, _>>()?,
+                ),
+                (Val::Option(v), Type::Option(o)) => Val::Option(inner(v, Some(o.ty()))?),
+                (Val::Result(Ok(v)), Type::Result(r)) => Val::Result(Ok(inner(v, r.ok())?)),
+                (Val::Result(Err(v)), Type::Result(r)) => Val::Result(Err(inner(v, r.err())?)),
+                (Val::Variant(case, v), Type::Variant(t)) => {
+                    let ty = t.cases().find(|c| c.name == case).and_then(|c| c.ty);
+                    Val::Variant(case, inner(v, ty)?)
+                }
+                (v, _) => v,
+            })
+        }
+
+        /// A nested value, as its nodes in level order: the node list is a
+        /// queue, each node's children appended as it is reached.
+        fn encode(root: Val, node: &Type, slots: &[Slot]) -> Result<Val, String> {
+            let mut queue = std::collections::VecDeque::from([root]);
+            let mut nodes = Vec::new();
+            let mut next: u32 = 1;
+            while let Some(mut v) = queue.pop_front() {
+                let lists = take_lists(&mut v, slots)?;
+                let mut indices = Vec::with_capacity(lists.len());
+                for children in lists {
+                    let k = u32::try_from(children.len()).map_err(|_| "too many nodes")?;
+                    indices.push((next..next + k).map(Val::U32).collect());
+                    next = next.checked_add(k).ok_or("too many nodes")?;
+                    queue.extend(children);
+                }
+                put_lists(&mut v, slots, indices);
+                // A node's other fields, by the node's type.
+                nodes.push(walk(v, node, &tangle)?);
+            }
+            Ok(Val::List(nodes))
+        }
+
+        /// Nodes, checked as the component's decoder checks them, as the
+        /// nested value they encode, built from the last node back: in level
+        /// order each node's children lie after it, one run of indices per
+        /// list, continuing the runs before it.
+        fn decode(mut nodes: Vec<Val>, node: &Type, slots: &[Slot]) -> Result<Val, String> {
+            let len = nodes.len();
+            if len == 0 {
+                return Err("a value of a type that contains itself has no nodes".into());
+            }
+            // Each node's runs, checked, and each node's depth.
+            let mut runs: Vec<Vec<(usize, usize)>> = Vec::with_capacity(len);
+            let mut depth = vec![0usize; len];
+            depth[0] = 1;
+            let mut next = 1usize;
+            for (i, v) in nodes.iter_mut().enumerate() {
+                let lists = take_lists(v, slots)?;
+                let mut mine = Vec::with_capacity(lists.len());
+                for list in lists {
+                    let k = list.len();
+                    if k > 0 && next <= i {
+                        return Err(format!("node {i} holds a node before its own"));
+                    }
+                    if k > len - next {
+                        return Err(format!("node {i} holds a node past the last"));
+                    }
+                    for (j, x) in list.iter().enumerate() {
+                        if *x != Val::U32((next + j) as u32) {
+                            return Err(format!(
+                                "node {i}'s children are not the {k} indices from {next}"
+                            ));
+                        }
+                    }
+                    for c in next..next + k {
+                        depth[c] = depth[i] + 1;
+                        if depth[c] > NESTED_DEPTH {
+                            return Err(format!(
+                                "the value is deeper than {NESTED_DEPTH}, the deepest a host nests"
+                            ));
+                        }
+                    }
+                    mine.push((next, k));
+                    next += k;
+                }
+                runs.push(mine);
+            }
+            if next != len {
+                return Err(format!("{} node(s) no list holds", len - next));
+            }
+            let mut built: Vec<Option<Val>> = Vec::with_capacity(len);
+            built.resize_with(len, || None);
+            for i in (0..len).rev() {
+                let mut v = std::mem::replace(&mut nodes[i], Val::Bool(false));
+                let lists = runs[i]
+                    .iter()
+                    .map(|(at, k)| {
+                        (*at..at + k)
+                            .map(|c| built[c].take().expect("built"))
+                            .collect()
+                    })
+                    .collect();
+                put_lists(&mut v, slots, lists);
+                built[i] = Some(walk(v, node, &untangle)?);
+            }
+            Ok(built[0].take().expect("the first node"))
+        }
     }
 
     /// **A host's answer, read through the type the component declares**
@@ -1509,6 +1837,13 @@ pub mod engine {
                 }
                 Val::Record(fields)
             }
+            // The browser's wire does not carry one yet (ADR-0194).
+            Type::List(_) if graph::is_nodes(ty) => {
+                return Err(format!(
+                    "{at}: a value of a type that contains itself is not accepted from a \
+                     browser yet"
+                ));
+            }
             Type::List(list) => {
                 let items = v.as_array().ok_or_else(|| expected("an array"))?;
                 let element = list.ty();
@@ -1640,7 +1975,16 @@ pub mod engine {
                     .unwrap_or_default();
                 instance
                     .func_new(func, move |_, ty, args, results| {
-                        let out = implementation(args).map_err(wasmtime::Error::msg)?;
+                        // A type that contains itself reaches the host
+                        // nested, as the program shapes it (ADR-0194).
+                        let args: Vec<Val> = args
+                            .iter()
+                            .cloned()
+                            .zip(ty.params())
+                            .map(|(v, (_, t))| graph::untangle(v, &t))
+                            .collect::<Result<_, _>>()
+                            .map_err(|e| wasmtime::Error::msg(format!("`{named}`: {e}")))?;
+                        let out = implementation(&args).map_err(wasmtime::Error::msg)?;
                         if out.len() != results.len() {
                             return Err(wasmtime::Error::msg(format!(
                                 "the host returned {} values where the operation has {}",
@@ -1651,8 +1995,11 @@ pub mod engine {
                         // Read through the type the component declares
                         // (ADR-0166): a data layer's row may hold more than
                         // the program asks for.
+                        // A nested value of a type that contains itself
+                        // is made its nodes first, each then read so.
                         for ((slot, v), ty) in results.iter_mut().zip(out).zip(ty.results()) {
-                            *slot = project(v, &ty)
+                            *slot = graph::tangle(v, &ty)
+                                .and_then(|v| project(v, &ty))
                                 .map_err(|e| wasmtime::Error::msg(format!("`{named}`: {e}")))?;
                         }
                         // A data layer's answer comes from outside the
@@ -1697,7 +2044,15 @@ pub mod engine {
             .ok_or_else(|| format!("`{}` is not a function", export.join("#")))?;
         // The result arity is the function's type's, read from the artifact.
         let mut results = vec![Val::Bool(false); func.ty(&store).results().len()];
-        func.call(&mut store, args, &mut results)
+        // An argument of a type that contains itself may be given nested; it
+        // is passed as its nodes (ADR-0194).
+        let args: Vec<Val> = args
+            .iter()
+            .cloned()
+            .zip(func.ty(&store).params())
+            .map(|(v, (_, t))| graph::tangle(v, &t))
+            .collect::<Result<_, _>>()?;
+        func.call(&mut store, &args, &mut results)
             .map_err(|e| format!("{e:#}"))?;
         let usage = Usage {
             fuel: fuel_before.saturating_sub(store.get_fuel().map_err(|e| e.to_string())?),

@@ -1,0 +1,16 @@
+// @corpus: rejected
+// @id: R-054
+// @category: a type no finite value has
+// @rule: PW0624
+// @invariant: no_finite_value
+// @charter: §7.1
+// @milestone: 14
+// @expect-error: `Thread` has no finite value, since `first` has none
+//
+// A thread whose every value holds its first reply: none could ever be
+// built, since each would need another built before it. A list of replies
+// may be empty; one reply written as a field may not be absent.
+
+module store.thread
+
+type Thread = Thread { text: String, first: Thread }

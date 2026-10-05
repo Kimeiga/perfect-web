@@ -13,6 +13,22 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0194, 2026-10-05: a type that contains itself compiles, and crosses
+a boundary as its nodes.** This is the first item of the app layer the owner
+put before the AI benchmark. A reply thread could be declared and checked,
+and ADR-0059 refused it in the backend.
+- Through a list, such a type is laid out by its type inside a component.
+- At a boundary it crosses as its nodes, in level order: `list<node>`, each
+  list of itself a `list<u32>` of indices. Neither side recurses on the
+  value, so a chain 50,000 deep crosses both ways, and malformed nodes trap.
+- A host holds the value nested, no deeper than 128.
+- PW0624 refuses a type no finite value has.
+- A type held in place, the browser's wire and views that contain themselves
+  come next.
+
+Corpus C13: R-054 and A-029; **generality is 39 / 39**. 21 mutants
+(`just e14-recursive-types`).
+
 **ADR-0193, 2026-10-04: an order is placed, and its page follows it.**
 The store's flow ended at a cart.
 - The cart's page places the cart as an order, in one commit with the emptied

@@ -1410,15 +1410,18 @@ fn ty_resolved_with(
         return arg(0);
     }
     if let Some(def) = ty.def_id() {
-        // Refused by name here, where a type first meets the backend: until
-        // 2026-09-26 it reached the world as WIT that does not parse.
-        if contains_itself(sigs, def) {
+        // A type that contains itself through a list is laid out by its type
+        // (ADR-0194): a list's elements are where it points. One that holds
+        // itself in place is refused by name here, where a type first meets
+        // the backend, until the backend boxes the value.
+        if crate::recursion::contains_itself_in_place(sigs, def) {
             return Lowering::Unsupported {
-                construct: "a type that contains itself",
+                construct: "a type that contains itself in place",
                 span: span.clone(),
                 reason: format!(
-                    "`{ty}` holds a value of its own type; the Canonical ABI has no recursive \
-                     types, and this backend lays every value out by its type"
+                    "`{ty}` holds a value of its own type with no list between: a list's \
+                     elements are where it points, so a `List<{ty}>` field has a layout, and a \
+                     value held within its own type has none until the backend boxes it"
                 ),
             };
         }
@@ -5403,46 +5406,6 @@ fn holds_collection(cx: &Context<'_>, t: &Type, seen: &mut Vec<DefId>) -> bool {
         }
         Type::Int | Type::Float | Type::Bool | Type::Str | Type::Unit | Type::Function(..) => false,
     }
-}
-
-/// **Does a declared type hold a value of its own type**, through its
-/// fields, its cases or its representation, at any depth (ADR-0059)?
-fn contains_itself(sigs: &Signatures, def: DefId) -> bool {
-    fn parts(t: &crate::signatures::TypeDecl) -> impl Iterator<Item = &TypeResolution> {
-        t.record
-            .iter()
-            .flatten()
-            .map(|(_, r)| r)
-            .chain(t.representation.iter())
-            .chain(t.variants.iter().flatten().flat_map(|(_, fs)| fs.iter()))
-    }
-    fn reaches(
-        sigs: &Signatures,
-        ty: &ResolvedType,
-        target: DefId,
-        seen: &mut BTreeSet<DefId>,
-    ) -> bool {
-        if let Some(d) = ty.def_id() {
-            if d == target {
-                return true;
-            }
-            if seen.insert(d)
-                && let Some(t) = sigs.type_decl(d)
-                && parts(t).any(|r| r.resolved().is_some_and(|x| reaches(sigs, x, target, seen)))
-            {
-                return true;
-            }
-        }
-        ty.args().iter().any(|a| reaches(sigs, a, target, seen))
-    }
-    let Some(t) = sigs.type_decl(def) else {
-        return false;
-    };
-    let mut seen = BTreeSet::new();
-    parts(t).any(|r| {
-        r.resolved()
-            .is_some_and(|x| reaches(sigs, x, def, &mut seen))
-    })
 }
 
 /// A variant type's cases, each with its payload's fields' types.

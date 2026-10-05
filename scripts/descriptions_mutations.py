@@ -58,12 +58,14 @@ BOTH_DESCRIPTIONS = (
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
+    # Re-anchored by ADR-0194: a nested answer is made its nodes first.
     (
         "a host's answer is passed as it is",
         "engine",
         ENGINE,
         "                        for ((slot, v), ty) in results.iter_mut().zip(out).zip(ty.results()) {\n"
-        "                            *slot = project(v, &ty)\n"
+        "                            *slot = graph::tangle(v, &ty)\n"
+        "                                .and_then(|v| project(v, &ty))\n"
         "                                .map_err(|e| wasmtime::Error::msg(format!(\"`{named}`: {e}\")))?;\n"
         "                        }\n",
         "                        for ((slot, v), _) in results.iter_mut().zip(out).zip(ty.results()) {\n"

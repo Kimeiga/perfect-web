@@ -700,3 +700,26 @@ Generality at open:        38/38 invariants generality-tested
 | A-028 | added: links the body allows, a stylesheet, a preconnect and an item's property | new category, `links the body allows` |
 | R-053 | added: a canonical link in a page's markup (`PW5035`) | new category |
 | `link_not_in_body` | a GENERAL witness, an icon among body-ok relations in a view, and a NEIGHBOUR one, body-ok relations in another case and an item's property | new invariant |
+
+## C13: a type that contains itself, and one no finite value has, 2026-10-05
+
+Opened because the specification changed: a type may contain itself
+through a list, and one each of whose values holds another value no finite
+one fills is refused where it is declared (`PW0624`).
+[ADR-0194](DECISIONS/ADR-0194-a-type-that-contains-itself-crosses-as-its-nodes.md)
+is the decision. No invariant is retired, no `@expect-error` line of an
+earlier fixture changed, and no fixture moved.
+
+```text
+Corpus version:            C13
+Accepted programs:         29
+Rejected programs:         54
+Charter categories:        29/29 accepted, 54/54 rejected
+Generality at open:        39/39 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-029 | added: a reply thread, a comment and a list of comments, built and walked | new category, `a type that contains itself through a list` |
+| R-054 | added: a thread whose every value holds its first reply (`PW0624`) | new category |
+| `no_finite_value` | a GENERAL witness, two sum types holding each other in every case through a generic record, and a NEIGHBOUR one, six types each with a way to be built without itself | new invariant |

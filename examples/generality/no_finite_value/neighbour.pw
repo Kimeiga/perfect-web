@@ -1,0 +1,24 @@
+// @status: NEIGHBOUR
+// @invariant: no_finite_value
+// @dimension: valid neighbour — each type holds itself, and each has a way to be built without itself
+//
+// A list or an option of itself may be empty, a case may hold none of it, a
+// result has another side, and a generic case may not need its argument.
+
+module generality.some_value
+
+type Tree = Tree { kids: List<Tree> }
+
+type Chain = Chain { next: Option<Chain> }
+
+type Expr =
+    | Number(Int)
+    | Add(Expr, Expr)
+
+type Either = Either { left: Result<Either, String> }
+
+type Maybe<T> =
+    | Nothing
+    | Just(T)
+
+type Pending = Pending { later: Maybe<Pending> }

@@ -55,6 +55,7 @@ pub mod placement;
 pub mod policy;
 pub mod privacy;
 pub mod provenance;
+pub mod recursion;
 pub mod resolve;
 pub mod resolved;
 pub mod resume;

@@ -1124,33 +1124,37 @@ impl Server {
             .component
             .clone()
             .ok_or_else(|| format!("`{component_id}`'s contract does not locate its export"))?;
-        self.components
+        let prepared = &self
+            .components
             .get(component_id)
             .ok_or_else(|| format!("no compiled component `{component_id}`"))?
-            .prepared
-            .call_authorized_within(
-                contract,
-                &granted,
-                &Limits {
-                    fuel: Some(50_000_000),
-                    memory_bytes: Some(16 * 1024 * 1024),
-                    table_elements: Some(1_000),
-                },
-                host,
-                &[&export.interface, &export.function],
-                args,
-                |predicate, _bound| match predicate {
-                    // This is a DEVELOPMENT identity model, not authentication:
-                    // every session the local server issued is the signed-in demo
-                    // principal. The important property here is that `requires`
-                    // is evaluated explicitly and an unknown predicate cannot run.
-                    "SignedIn" if !session.is_empty() => Ok(true),
-                    "SignedIn" => Ok(false),
-                    other => Err(format!(
-                        "the development deployment has no authorization predicate `{other}`"
-                    )),
-                },
-            )
+            .prepared;
+        let results = prepared.call_authorized_within(
+            contract,
+            &granted,
+            &Limits {
+                fuel: Some(50_000_000),
+                memory_bytes: Some(16 * 1024 * 1024),
+                table_elements: Some(1_000),
+            },
+            host,
+            &[&export.interface, &export.function],
+            args,
+            |predicate, _bound| match predicate {
+                // This is a DEVELOPMENT identity model, not authentication:
+                // every session the local server issued is the signed-in demo
+                // principal. The important property here is that `requires`
+                // is evaluated explicitly and an unknown predicate cannot run.
+                "SignedIn" if !session.is_empty() => Ok(true),
+                "SignedIn" => Ok(false),
+                other => Err(format!(
+                    "the development deployment has no authorization predicate `{other}`"
+                )),
+            },
+        )?;
+        // A type that contains itself arrives as its nodes, and a page reads
+        // it nested (ADR-0194).
+        prepared.untangled(&[&export.interface, &export.function], results)
     }
 
     /// The platform's session operation: the request's session, and nothing

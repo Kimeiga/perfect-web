@@ -326,6 +326,62 @@ fn instr_name(i: &Instr) -> &'static str {
     }
 }
 
+/// **Does a value of `ty` hold a type that contains itself** (ADR-0194)?
+/// A decoder or an encoder here is written out by the type's shape, so one
+/// for such a type would never end.
+fn holds_itself(program: &Program, ty: &Type) -> bool {
+    fn walk(
+        program: &Program,
+        ty: &Type,
+        path: &mut Vec<(crate::resolve::DefId, Vec<Type>)>,
+        clear: &mut BTreeSet<(crate::resolve::DefId, Vec<Type>)>,
+    ) -> bool {
+        match ty {
+            Type::Nominal(d, args) => {
+                let key = (*d, args.clone());
+                if path.contains(&key) {
+                    return true;
+                }
+                if clear.contains(&key) {
+                    return false;
+                }
+                let Some(shape) = program
+                    .types
+                    .iter()
+                    .find(|t| t.def == *d && t.args == *args)
+                    .map(|t| &t.shape)
+                else {
+                    return false;
+                };
+                path.push(key.clone());
+                let found = match shape {
+                    Shape::Alias(of) => walk(program, of, path, clear),
+                    Shape::Record { fields } => {
+                        fields.iter().any(|(_, t)| walk(program, t, path, clear))
+                    }
+                    Shape::Variant { cases } => cases
+                        .iter()
+                        .any(|(_, fs)| fs.iter().any(|t| walk(program, t, path, clear))),
+                };
+                path.pop();
+                if !found {
+                    clear.insert(key);
+                }
+                found
+            }
+            Type::List(t) | Type::Option(t) | Type::Set(t) => walk(program, t, path, clear),
+            Type::Result(a, b) | Type::Map(a, b) => {
+                walk(program, a, path, clear) || walk(program, b, path, clear)
+            }
+            Type::Function(ps, r) => {
+                ps.iter().any(|t| walk(program, t, path, clear)) || walk(program, r, path, clear)
+            }
+            Type::Int | Type::Float | Type::Bool | Type::Str | Type::Unit => false,
+        }
+    }
+    walk(program, ty, &mut Vec::new(), &mut BTreeSet::new())
+}
+
 pub(crate) fn decoder(program: &Program, ty: &Type, expr: &str) -> Result<String, String> {
     let none = BTreeMap::new();
     Emitter::new(program, &none, &[]).decode(expr, ty)
@@ -669,6 +725,14 @@ impl<'p> Emitter<'p> {
     /// it names a value, and never does anything.
     fn decode(&self, expr: &str, ty: &Type) -> Result<String, String> {
         let refused = || format!("a captured {ty:?}, which the document does not carry");
+        // Written out by its shape, a decoder of a type that contains itself
+        // would never end (ADR-0194).
+        if holds_itself(self.program, ty) {
+            return Err(format!(
+                "a captured {ty:?}, which holds a type that contains itself: the browser's \
+                 wire does not carry one yet"
+            ));
+        }
         Ok(match ty {
             Type::Int => format!("BigInt({expr})"),
             Type::Float | Type::Str | Type::Bool => expr.to_string(),
@@ -751,6 +815,12 @@ impl<'p> Emitter<'p> {
     /// trap; a record as an object by field name; a case as its name and
     /// payload, as `decode` reads it.
     fn wire_value(&mut self, v: &str, ty: &Type) -> Result<String, String> {
+        if holds_itself(self.program, ty) {
+            return Err(format!(
+                "a value of type {ty:?}, which holds a type that contains itself: the \
+                 browser's wire does not carry one yet (ADR-0194)"
+            ));
+        }
         Ok(match ty {
             Type::Int => format!("{}({v})", self.uses("exact")),
             Type::Float | Type::Str | Type::Bool => v.to_string(),

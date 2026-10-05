@@ -274,10 +274,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
      **The owner's priority (2026-10-04): the app layer before the AI
      benchmark.** Pleris is to be the perfect web application maker whatever
      the database. Next, each as its own ruling:
-    20. **Types that contain themselves**, lifting ADR-0059: a recursive type
-        laid out indirectly in a component, flattened to nodes and indices at
-        the WIT and browser boundaries, then recursive views (ADR-0130's
-        ruling, unbuilt since ADR-0136).
+    20. **Types that contain themselves**, lifting ADR-0059:
+        - ~~through a list, inside a component and across its boundary as
+          nodes and indices~~ (ADR-0194, `just e14-recursive-types`), with
+          PW0624 for a type no finite value has;
+        - next, held in place, boxed: `Option<Node>`, `Add(Expr, Expr)`, and
+          through another declaration across a boundary;
+        - then the browser's wire, as nodes, and views that contain
+          themselves (ADR-0130's ruling, unbuilt since ADR-0136), bounded
+          below the 512 elements a browser's parser nests.
     21. **A data source states what it guarantees**: transactions,
         consistency and its change feed. The compiler refuses a query or a
         command that asks more of its source than it gives.
@@ -285,6 +290,26 @@ E14 comes before E11-E13. Its plan, controls and task list are
         (pagination, live public data, threads, optimistic posting), a
         multi-tenant SaaS (organizations, roles, forms, uploads), and one app
         on three kinds of database.
+    23. **The owner's rulings of 2026-10-05**, relayed by the session "Web
+        Pleris capabilities and limitations": fifteen open "(ruling
+        needed)" items. Record them as ADR-0195, each confirmed or overruled
+        against primary sources, then implement:
+        - first, the quick, correctness-critical ones: 14, a speculation
+          never invents a value (the new line takes the price the page
+          shows); 12 and 13, KNOWN_LIMITATIONS' stale entries; 2, a case
+          name is uppercase and a lowercase pattern name always a binding;
+          3, only statement-starting words reserved; 5, a bare case with a
+          payload resolved like a nullary one;
+        - with the app layer: 10, a materialization may read another (no
+          cycles, transitive invalidation) for the feed; 11, `emits` keys
+          evaluated by the command and written with its writes (an outbox),
+          with data-source guarantees; 8 and 9, cache keys by information
+          flow and labels on clause keys;
+        - then 1 (Rust's record-literal rule), 4 (bidirectional typing, else
+          "annotation needed"), 6 (Float `%` Euclidean; text as ECMAScript's
+          Number::toString), 7 (`return` stays a statement) and 15 (E7 gate
+          8 counts attributed long frames only, with a thrashing control);
+        - and a sweep of the 109 "(ruling needed)" marks in 56 ADRs.
 
      Next: E14-E's design, ready for the owner's choice of models and
      budget, and the owner's decisions logged in ADR-0182 (axe-core) and

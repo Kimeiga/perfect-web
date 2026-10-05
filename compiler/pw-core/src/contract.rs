@@ -325,8 +325,10 @@ pub struct Bounded {
 }
 
 /// **Every invariant a value of `t` holds, wherever it is in the value**
-/// (ADR-0179), for the value at `argument`. A type that contains itself is
-/// followed once.
+/// (ADR-0179), for the value at `argument`. A type that contains itself
+/// crosses as its nodes (ADR-0194), so its parts are each node's: the path
+/// goes through every node, `*`, once, and a list of itself in a node is
+/// indices, which hold nothing.
 pub(crate) fn bounded_in(
     sigs: &Signatures,
     t: &crate::resolved::ResolvedType,
@@ -401,6 +403,11 @@ fn bounds_within(
                 t.resolved()
                     .map(|r| substituted_key(&r.semantic_key(), *def, args))
             };
+            // As its nodes: each one's parts, every node at once.
+            let nodes = crate::recursion::contains_itself(sigs, *def);
+            if nodes {
+                path.push("*".into());
+            }
             seen.push(*def);
             for (name, t) in facts.record.iter().flatten() {
                 if let Some(k) = applied(t) {
@@ -429,6 +436,9 @@ fn bounds_within(
                 bounds_within(sigs, &k, argument, path, seen, out);
             }
             seen.pop();
+            if nodes {
+                path.pop();
+            }
         }
         _ => {}
     }

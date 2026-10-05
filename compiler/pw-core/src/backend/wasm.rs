@@ -486,6 +486,7 @@ pub fn core_module_with(
     let mut helpers = Helpers {
         first: first_closure + function.closures.len() as u32,
         used: Vec::new(),
+        graphs: Vec::new(),
     };
     let shared = Shared {
         resolve,
@@ -599,8 +600,9 @@ pub fn core_module_with(
     for b in &closure_bodies {
         code.function(b);
     }
+    let layouts: Vec<GraphLayout> = helpers.graphs.iter().map(|(_, l)| l.clone()).collect();
     for h in &helpers.used {
-        code.function(&h.body(realloc_index));
+        code.function(&h.body(realloc_index, &layouts));
     }
 
     module.section(&types);
@@ -769,11 +771,104 @@ fn internal_types(
         idents,
         out: &mut out,
         visiting: Vec::new(),
+        holders: holders_of_cycles(declared),
+        deferred: Vec::new(),
+        broken: BTreeSet::new(),
     };
     for t in wanted {
         cx.wit(resolve, &t);
     }
+    // A list whose element never resolved has no layout, and neither has
+    // anything holding one: left out, so the encoder refuses what needs it.
+    let broken: BTreeSet<wit_parser::TypeId> = cx
+        .broken
+        .iter()
+        .copied()
+        .chain(cx.deferred.iter().map(|(id, _)| *id))
+        .collect();
+    if !broken.is_empty() {
+        out.retain(|_, w| !reaches_any(resolve, *w, &broken, &mut BTreeSet::new()));
+    }
     out
+}
+
+/// Does `t` reach one of `ids`, through every type it is built of?
+fn reaches_any(
+    resolve: &Resolve,
+    t: WitType,
+    ids: &BTreeSet<wit_parser::TypeId>,
+    seen: &mut BTreeSet<wit_parser::TypeId>,
+) -> bool {
+    let WitType::Id(id) = t else {
+        return false;
+    };
+    if ids.contains(&id) {
+        return true;
+    }
+    if !seen.insert(id) {
+        return false;
+    }
+    let mut each = |t: &WitType| reaches_any(resolve, *t, ids, seen);
+    match &resolve.types[id].kind {
+        TypeDefKind::Record(r) => r.fields.iter().any(|f| each(&f.ty)),
+        TypeDefKind::Tuple(t) => t.types.iter().any(&mut each),
+        TypeDefKind::Variant(v) => v.cases.iter().filter_map(|c| c.ty.as_ref()).any(&mut each),
+        TypeDefKind::Option(t) | TypeDefKind::List(t) | TypeDefKind::Type(t) => each(t),
+        TypeDefKind::Result(r) => r.ok.iter().chain(r.err.iter()).any(&mut each),
+        _ => false,
+    }
+}
+
+/// A declaration's instance: its identity and the types it is applied to.
+type Instance = (DefId, Vec<Type>);
+
+/// **The instances whose values hold a type that contains itself**
+/// (ADR-0194): each instance in a cycle of the declarations' shapes, and
+/// each that reaches one. A value of one is never the world's type, which
+/// holds the cycle as its nodes.
+fn holders_of_cycles(declared: &[TypeDef]) -> BTreeSet<Instance> {
+    let edges: BTreeMap<Instance, Vec<Instance>> = declared
+        .iter()
+        .map(|d| {
+            let mut next = Vec::new();
+            match &d.shape {
+                Shape::Alias(of) => next.extend(of.nominals()),
+                Shape::Record { fields } => {
+                    for (_, t) in fields {
+                        next.extend(t.nominals());
+                    }
+                }
+                Shape::Variant { cases } => {
+                    for (_, fs) in cases {
+                        for t in fs {
+                            next.extend(t.nominals());
+                        }
+                    }
+                }
+            }
+            ((d.def, d.args.clone()), next)
+        })
+        .collect();
+    let reach = |from: &(DefId, Vec<Type>)| {
+        let mut seen: BTreeSet<(DefId, Vec<Type>)> = BTreeSet::new();
+        let mut stack: Vec<(DefId, Vec<Type>)> = edges.get(from).cloned().unwrap_or_default();
+        while let Some(n) = stack.pop() {
+            if seen.insert(n.clone()) {
+                stack.extend(edges.get(&n).cloned().unwrap_or_default());
+            }
+        }
+        seen
+    };
+    let cyclic: BTreeSet<(DefId, Vec<Type>)> = edges
+        .keys()
+        .filter(|k| reach(k).contains(*k))
+        .cloned()
+        .collect();
+    edges
+        .keys()
+        .filter(|k| cyclic.contains(*k) || reach(k).iter().any(|r| cyclic.contains(r)))
+        .cloned()
+        .collect()
 }
 
 struct TypeCx<'a> {
@@ -781,9 +876,26 @@ struct TypeCx<'a> {
     declared: &'a [TypeDef],
     idents: &'a BTreeMap<DefId, String>,
     out: &'a mut BTreeMap<Type, WitType>,
-    /// Declarations being defined: a record that contains itself has no
-    /// canonical layout.
+    /// Declarations being defined: one met again, with no list between, has
+    /// no canonical layout.
     visiting: Vec<(DefId, Vec<Type>)>,
+    /// [`holders_of_cycles`].
+    holders: BTreeSet<(DefId, Vec<Type>)>,
+    /// **Lists whose elements hold a declaration being defined** (ADR-0194),
+    /// each allocated before it with a placeholder element, and its element
+    /// set once nothing it holds is being defined. A list's layout does not
+    /// read its element's, so the declaration that holds it is laid out
+    /// after it, as `SizeAlign` lays out each type after the types it reads.
+    deferred: Vec<(wit_parser::TypeId, Element)>,
+    /// Deferred lists whose element had no WIT form.
+    broken: BTreeSet<wit_parser::TypeId>,
+}
+
+/// A deferred list's element: a value, or a map's entry.
+#[derive(Debug, Clone)]
+enum Element {
+    Value(Type),
+    Entry(Type, Type),
 }
 
 impl TypeCx<'_> {
@@ -815,6 +927,15 @@ impl TypeCx<'_> {
                 let inner = self.wit(resolve, inner)?;
                 anonymous(resolve, TypeDefKind::Option(inner))
             }
+            // A list of a declaration being defined, or of anything holding
+            // one, is deferred (ADR-0194): its layout is a pointer and a
+            // length, whatever its element is.
+            Type::List(inner) | Type::Set(inner) if self.holds_visiting(inner) => {
+                return Some(self.defer(resolve, Element::Value((**inner).clone())));
+            }
+            Type::Map(k, v) if self.holds_visiting(k) || self.holds_visiting(v) => {
+                return Some(self.defer(resolve, Element::Entry((**k).clone(), (**v).clone())));
+            }
             Type::List(inner) => {
                 let inner = self.wit(resolve, inner)?;
                 anonymous(resolve, TypeDefKind::List(inner))
@@ -843,8 +964,11 @@ impl TypeCx<'_> {
             }
             Type::Nominal(def, args) => {
                 // The world's own, when the declaration crosses the boundary:
-                // one type, whatever a phantom argument is.
-                if let (Some(iface), Some(ident)) = (self.world_types, self.idents.get(def))
+                // one type, whatever a phantom argument is. Never for a type
+                // that contains itself, or holds one: the world holds that
+                // as its nodes (ADR-0194), and the body as its values.
+                if !self.holders.contains(&(*def, args.clone()))
+                    && let (Some(iface), Some(ident)) = (self.world_types, self.idents.get(def))
                     && let Some(id) = resolve.interfaces[iface].types.get(ident)
                 {
                     WitType::Id(*id)
@@ -944,12 +1068,114 @@ impl TypeCx<'_> {
                         }
                     };
                     self.visiting.pop();
-                    defined?
+                    let defined = defined?;
+                    // Known before the lists that wait for it are given
+                    // their elements, which may be this very type.
+                    self.out.insert(t.clone(), defined);
+                    self.settle_deferred(resolve);
+                    defined
                 }
             }
         };
         self.out.insert(t.clone(), w);
         Some(w)
+    }
+
+    /// Does `t` hold a declaration being defined, at any depth?
+    fn holds_visiting(&self, t: &Type) -> bool {
+        fn walk(cx: &TypeCx<'_>, t: &Type, seen: &mut BTreeSet<(DefId, Vec<Type>)>) -> bool {
+            match t {
+                Type::Nominal(def, args) => {
+                    let key = (*def, args.clone());
+                    if cx.visiting.contains(&key) {
+                        return true;
+                    }
+                    if !seen.insert(key) {
+                        return false;
+                    }
+                    let Some(d) = cx
+                        .declared
+                        .iter()
+                        .find(|d| d.def == *def && d.args == *args)
+                    else {
+                        return false;
+                    };
+                    match &d.shape {
+                        Shape::Alias(of) => walk(cx, of, seen),
+                        Shape::Record { fields } => fields.iter().any(|(_, t)| walk(cx, t, seen)),
+                        Shape::Variant { cases } => cases
+                            .iter()
+                            .any(|(_, fs)| fs.iter().any(|t| walk(cx, t, seen))),
+                    }
+                }
+                Type::List(t) | Type::Option(t) | Type::Set(t) => walk(cx, t, seen),
+                Type::Result(a, b) | Type::Map(a, b) => walk(cx, a, seen) || walk(cx, b, seen),
+                Type::Function(..)
+                | Type::Int
+                | Type::Float
+                | Type::Bool
+                | Type::Str
+                | Type::Unit => false,
+            }
+        }
+        walk(self, t, &mut BTreeSet::new())
+    }
+
+    /// A list allocated now, its element set by [`TypeCx::settle_deferred`].
+    fn defer(&mut self, resolve: &mut Resolve, element: Element) -> WitType {
+        let id = resolve.types.alloc(WitTypeDef {
+            name: None,
+            // A placeholder, replaced before any layout is read: a list's
+            // own layout does not read it.
+            kind: TypeDefKind::List(WitType::U8),
+            owner: TypeOwner::None,
+            docs: Default::default(),
+            stability: Default::default(),
+            span: Default::default(),
+            external_id: None,
+        });
+        self.deferred.push((id, element));
+        WitType::Id(id)
+    }
+
+    /// Give each deferred list whose element no longer holds a declaration
+    /// being defined that element.
+    fn settle_deferred(&mut self, resolve: &mut Resolve) {
+        let mut i = 0;
+        while i < self.deferred.len() {
+            let ready = match &self.deferred[i].1 {
+                Element::Value(t) => !self.holds_visiting(t),
+                Element::Entry(k, v) => !self.holds_visiting(k) && !self.holds_visiting(v),
+            };
+            if !ready {
+                i += 1;
+                continue;
+            }
+            let (id, element) = self.deferred.remove(i);
+            let wit = match element {
+                Element::Value(t) => self.wit(resolve, &t),
+                Element::Entry(k, v) => match (self.wit(resolve, &k), self.wit(resolve, &v)) {
+                    (Some(k), Some(v)) => Some(WitType::Id(resolve.types.alloc(WitTypeDef {
+                        name: None,
+                        kind: TypeDefKind::Tuple(Tuple { types: vec![k, v] }),
+                        owner: TypeOwner::None,
+                        docs: Default::default(),
+                        stability: Default::default(),
+                        span: Default::default(),
+                        external_id: None,
+                    }))),
+                    _ => None,
+                },
+            };
+            match wit {
+                Some(w) => resolve.types[id].kind = TypeDefKind::List(w),
+                None => {
+                    self.broken.insert(id);
+                }
+            }
+            // Resolving an element may have settled others: start over.
+            i = 0;
+        }
     }
 }
 
@@ -1081,6 +1307,190 @@ fn dealias(resolve: &Resolve, t: WitType) -> WitType {
         }
     }
     t
+}
+
+/// **Does a world's type hold a node index** (ADR-0194)? No Pleris type is
+/// a `u32`, and a function value never crosses, so a `u32` in a world is
+/// always a node's index: the type holds a type that contains itself, as its
+/// nodes, and the body's value of it is laid out otherwise.
+fn holds_index(resolve: &Resolve, t: &WitType) -> bool {
+    // A body's own types may contain themselves through a list; a world's
+    // never do, but the walk is safe on either.
+    fn walk(resolve: &Resolve, t: &WitType, seen: &mut BTreeSet<wit_parser::TypeId>) -> bool {
+        match dealias(resolve, *t) {
+            WitType::U32 => true,
+            WitType::Id(id) if seen.insert(id) => match &resolve.types[id].kind {
+                TypeDefKind::Record(r) => r.fields.iter().any(|f| walk(resolve, &f.ty, seen)),
+                TypeDefKind::Tuple(t) => t.types.iter().any(|t| walk(resolve, t, seen)),
+                TypeDefKind::Variant(v) => v
+                    .cases
+                    .iter()
+                    .filter_map(|c| c.ty.as_ref())
+                    .any(|t| walk(resolve, t, seen)),
+                TypeDefKind::Option(t) | TypeDefKind::List(t) => walk(resolve, t, seen),
+                TypeDefKind::Result(r) => {
+                    r.ok.iter()
+                        .chain(r.err.iter())
+                        .any(|t| walk(resolve, t, seen))
+                }
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    walk(resolve, t, &mut BTreeSet::new())
+}
+
+/// **A world's type that is a type that contains itself, as its nodes**
+/// (ADR-0194): `list<node>`, where the node is a record or a variant one of
+/// whose fields is a `list<u32>` of its children's indices. The node's type.
+fn node_of(resolve: &Resolve, t: &WitType) -> Option<wit_parser::TypeId> {
+    let WitType::Id(list) = dealias(resolve, *t) else {
+        return None;
+    };
+    let TypeDefKind::List(element) = &resolve.types[list].kind else {
+        return None;
+    };
+    let WitType::Id(node) = dealias(resolve, *element) else {
+        return None;
+    };
+    let indices = |t: &WitType| match dealias(resolve, *t) {
+        WitType::Id(l) => matches!(
+            resolve.types[l].kind,
+            TypeDefKind::List(e) if dealias(resolve, e) == WitType::U32
+        ),
+        _ => false,
+    };
+    let holds = match &resolve.types[node].kind {
+        TypeDefKind::Record(r) => r.fields.iter().any(|f| indices(&f.ty)),
+        TypeDefKind::Variant(v) => v.cases.iter().filter_map(|c| c.ty).any(|p| {
+            indices(&p)
+                || matches!(dealias(resolve, p), WitType::Id(t)
+                    if matches!(&resolve.types[t].kind, TypeDefKind::Tuple(tu)
+                        if tu.types.iter().any(indices)))
+        }),
+        _ => false,
+    };
+    holds.then_some(node)
+}
+
+/// **Where a type that contains itself holds itself, and how it is laid
+/// out** (ADR-0194): the body's value and its node have one layout, but for
+/// each list of the type, which in the node is a list of indices.
+#[derive(Debug, Clone)]
+struct GraphLayout {
+    size: u32,
+    align: u32,
+    /// A variant's discriminant, where the type is one.
+    tag: Option<Int>,
+    /// Each list of the type: the case that holds it, for a variant, and
+    /// where it sits.
+    slots: Vec<(Option<u32>, u64)>,
+}
+
+/// The layout of `tree`, the body's value, against `node`, the world's, or
+/// why the two do not match.
+fn graph_layout(
+    resolve: &Resolve,
+    sizes: &SizeAlign,
+    tree: wit_parser::TypeId,
+    node: wit_parser::TypeId,
+) -> Result<GraphLayout, String> {
+    let is_self = |t: &WitType| match dealias(resolve, *t) {
+        WitType::Id(l) => matches!(
+            resolve.types[l].kind,
+            TypeDefKind::List(e) if dealias(resolve, e) == WitType::Id(tree)
+        ),
+        _ => false,
+    };
+    let is_index = |t: &WitType| match dealias(resolve, *t) {
+        WitType::Id(l) => matches!(
+            resolve.types[l].kind,
+            TypeDefKind::List(e) if dealias(resolve, e) == WitType::U32
+        ),
+        _ => false,
+    };
+    // One part of the value against the node's: a list of the type against
+    // a list of indices, anything else against one type.
+    let part = |a: &WitType, b: &WitType| -> Result<bool, String> {
+        match (is_self(a), is_index(b)) {
+            (true, true) => Ok(true),
+            (false, false) if same_type(resolve, a, b) => Ok(false),
+            _ => Err("a field of the value and of its node differ".to_string()),
+        }
+    };
+    let size = sizes.size(&WitType::Id(tree)).size_wasm32() as u32;
+    let align = sizes.align(&WitType::Id(tree)).align_wasm32() as u32;
+    if size != sizes.size(&WitType::Id(node)).size_wasm32() as u32 {
+        return Err("the value and its node have different sizes".to_string());
+    }
+    let mut slots = Vec::new();
+    let tag = match (&resolve.types[tree].kind, &resolve.types[node].kind) {
+        (TypeDefKind::Record(a), TypeDefKind::Record(b)) if a.fields.len() == b.fields.len() => {
+            let offsets = sizes.field_offsets(a.fields.iter().map(|f| &f.ty));
+            for ((o, _), (fa, fb)) in offsets.iter().zip(a.fields.iter().zip(&b.fields)) {
+                if part(&fa.ty, &fb.ty)? {
+                    slots.push((None, o.size_wasm32() as u64));
+                }
+            }
+            None
+        }
+        (TypeDefKind::Variant(a), TypeDefKind::Variant(b)) if a.cases.len() == b.cases.len() => {
+            let payload = sizes
+                .payload_offset(a.tag(), a.cases.iter().map(|c| c.ty.as_ref()))
+                .size_wasm32() as u64;
+            for (c, (ca, cb)) in a.cases.iter().zip(&b.cases).enumerate() {
+                match (ca.ty, cb.ty) {
+                    (None, None) => {}
+                    (Some(pa), Some(pb)) => {
+                        let tuples = match (dealias(resolve, pa), dealias(resolve, pb)) {
+                            (WitType::Id(x), WitType::Id(y)) => {
+                                match (&resolve.types[x].kind, &resolve.types[y].kind) {
+                                    (TypeDefKind::Tuple(x), TypeDefKind::Tuple(y))
+                                        if x.types.len() == y.types.len() =>
+                                    {
+                                        Some((x.types.clone(), y.types.clone()))
+                                    }
+                                    _ => None,
+                                }
+                            }
+                            _ => None,
+                        };
+                        match tuples {
+                            Some((xs, ys)) => {
+                                let offsets = sizes.field_offsets(xs.iter());
+                                for ((o, _), (x, y)) in offsets.iter().zip(xs.iter().zip(&ys)) {
+                                    if part(x, y)? {
+                                        slots.push((
+                                            Some(c as u32),
+                                            payload + o.size_wasm32() as u64,
+                                        ));
+                                    }
+                                }
+                            }
+                            None => {
+                                if part(&pa, &pb)? {
+                                    slots.push((Some(c as u32), payload));
+                                }
+                            }
+                        }
+                    }
+                    _ => return Err("a case of the value and of its node differ".to_string()),
+                }
+            }
+            Some(a.tag())
+        }
+        _ => return Err("the value and its node are not one kind of type".to_string()),
+    };
+    if slots.is_empty() {
+        return Err("the value holds no list of itself".to_string());
+    }
+    Ok(GraphLayout {
+        size,
+        align,
+        tag,
+        slots,
+    })
 }
 
 /// How one IR value is held while the export runs.
@@ -1252,11 +1662,13 @@ fn export_body(
             types: Vec::new(),
         },
         held: BTreeMap::new(),
+        // A result that holds a type that contains itself is built in the
+        // body's own types, and converted where it leaves (ADR-0194).
         expected: expected_types(
             resolve,
             shared.wit,
             function,
-            export_fn.result,
+            export_fn.result.filter(|rt| !holds_index(resolve, rt)),
             imports,
             shared.callees,
         ),
@@ -1264,7 +1676,7 @@ fn export_body(
 
     // Parameters arrive flat, in the order the world lists them.
     let mut next_param = 0u32;
-    for ((value, _), param) in function.params.iter().zip(&export_fn.params) {
+    for ((value, own), param) in function.params.iter().zip(&export_fn.params) {
         let Some(flats) = flat(resolve, &param.ty) else {
             refuse!(
                 "a parameter that does not flatten",
@@ -1274,13 +1686,20 @@ fn export_body(
         };
         let ls: Vec<u32> = (next_param..next_param + flats.len() as u32).collect();
         next_param += flats.len() as u32;
-        enc.held.insert(
-            *value,
-            Held::Flat {
-                ty: param.ty,
-                locals: ls,
+        let arrived = Held::Flat {
+            ty: param.ty,
+            locals: ls,
+        };
+        // A type that contains itself arrives as its nodes, and is the
+        // body's value from here (ADR-0194).
+        let held = match shared.wit.get(own).copied() {
+            Some(own) if holds_index(resolve, &param.ty) => match enc.convert(arrived, own) {
+                Encoding::Encoded(h) => h,
+                other => return other.map(|_| unreachable!()),
             },
-        );
+            _ => arrived,
+        };
+        enc.held.insert(*value, held);
     }
 
     let Some(entry) = function.entry() else {
@@ -1563,7 +1982,10 @@ fn expect_region(cx: &Expecting<'_>, instrs: &[Instr], out: &mut BTreeMap<ValueI
             Instr::ImportCall { import, args, .. } => {
                 if let Some((_, _, func)) = imports.get(&import.qualified()) {
                     for (a, p) in args.iter().zip(&func.params) {
-                        out.entry(*a).or_insert(p.ty);
+                        // Converted where it is passed (ADR-0194).
+                        if !holds_index(resolve, &p.ty) {
+                            out.entry(*a).or_insert(p.ty);
+                        }
                     }
                 }
             }
@@ -1884,12 +2306,20 @@ impl Enc<'_> {
         let Some(t) = h.ty() else {
             blocked!("`{}` returns a call with no result", self.export);
         };
-        if !same_type(resolve, t, &rt) {
+        let h = if same_type(resolve, t, &rt) {
+            h
+        } else if holds_index(resolve, &rt) {
+            // A type that contains itself leaves as its nodes (ADR-0194).
+            match self.convert(h, rt) {
+                Encoding::Encoded(h) => h,
+                other => return other.map(|_| ()),
+            }
+        } else {
             blocked!(
                 "`{}` returns a value of another component type than it declares",
                 self.export
             );
-        }
+        };
         match exit {
             Exit::Callee {
                 result: Some((ty, passing)),
@@ -1933,6 +2363,313 @@ impl Enc<'_> {
                 Encoding::Encoded(())
             }
         }
+    }
+
+    /// **A value, in another component type's layout** (ADR-0194): the
+    /// world's, where a type that contains itself crosses as its nodes, or
+    /// the body's own, where such a value arrives. Every part that is one
+    /// type in both is copied as it is.
+    fn convert(&mut self, h: Held, to: WitType) -> Encoding<Held> {
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        let Some(from) = h.ty().copied() else {
+            blocked!("`{}` converts a call with no result", self.export);
+        };
+        if same_type(resolve, &from, &to) {
+            return Encoding::Encoded(h);
+        }
+        let src = match h {
+            Held::Memory { ptr, .. } => ptr,
+            Held::Flat { ty, locals } => {
+                let area = self.locals.fresh(ValType::I32);
+                allocate(sizes, &ty, self.realloc_index, area, &mut self.ops);
+                match store(
+                    resolve,
+                    sizes,
+                    &mut self.locals,
+                    &ty,
+                    area,
+                    0,
+                    &locals,
+                    &mut self.ops,
+                ) {
+                    Encoding::Encoded(_) => {}
+                    other => return other.map(|_| unreachable!()),
+                }
+                area
+            }
+            Held::Nothing => blocked!("`{}` converts a call with no result", self.export),
+        };
+        let dst = self.locals.fresh(ValType::I32);
+        allocate(sizes, &to, self.realloc_index, dst, &mut self.ops);
+        match self.convert_at(src, 0, from, dst, 0, to) {
+            Encoding::Encoded(()) => {}
+            other => return other.map(|_| unreachable!()),
+        }
+        Encoding::Encoded(Held::Memory { ty: to, ptr: dst })
+    }
+
+    /// Write the value of type `from` at `src + so` as a value of type `to`
+    /// at `dst + d`. Each `to` is the same type as `from`, or the two differ
+    /// only where one holds a type that contains itself and the other its
+    /// nodes.
+    fn convert_at(
+        &mut self,
+        src: u32,
+        so: u64,
+        from: WitType,
+        dst: u32,
+        d: u64,
+        to: WitType,
+    ) -> Encoding<()> {
+        use wasm_encoder::BlockType::Empty;
+        use wasm_encoder::Instruction as I;
+        let (resolve, sizes) = (self.resolve, self.sizes);
+        let word = |offset: u64| MemArg {
+            offset,
+            align: 2,
+            memory_index: 0,
+        };
+        if same_type(resolve, &from, &to) {
+            let size = sizes.size(&from).size_wasm32() as i32;
+            let (s, t) = (self.address(src, so), self.address(dst, d));
+            self.ops.extend([
+                I::LocalGet(t),
+                I::LocalGet(s),
+                I::I32Const(size),
+                I::MemoryCopy {
+                    src_mem: 0,
+                    dst_mem: 0,
+                },
+            ]);
+            return Encoding::Encoded(());
+        }
+        let (f, t) = (dealias(resolve, from), dealias(resolve, to));
+        let (WitType::Id(fid), WitType::Id(tid)) = (f, t) else {
+            blocked!(
+                "`{}` converts between two component types that are not one",
+                self.export
+            );
+        };
+        let kinds = (&resolve.types[fid].kind, &resolve.types[tid].kind);
+        // The body's value of a type that contains itself, as its nodes.
+        if matches!(kinds.0, TypeDefKind::Record(_) | TypeDefKind::Variant(_))
+            && let Some(node) = node_of(resolve, &to)
+        {
+            let layout = match graph_layout(resolve, sizes, fid, node) {
+                Ok(l) => l,
+                Err(why) => refuse!(
+                    "a type that contains itself whose nodes this backend does not lay out",
+                    "`{}`: {why}",
+                    self.export
+                ),
+            };
+            let n = self.helpers.graph((fid, node), layout);
+            let call = self.helpers.index(Helper::Encode(n));
+            let at = self.address(src, so);
+            let (ptr, len) = (
+                self.locals.fresh(ValType::I32),
+                self.locals.fresh(ValType::I32),
+            );
+            self.ops.extend([
+                I::LocalGet(at),
+                I::Call(call),
+                I::LocalSet(len),
+                I::LocalSet(ptr),
+                I::LocalGet(dst),
+                I::LocalGet(ptr),
+                I::I32Store(word(d)),
+                I::LocalGet(dst),
+                I::LocalGet(len),
+                I::I32Store(word(d + 4)),
+            ]);
+            return Encoding::Encoded(());
+        }
+        // Nodes, as the body's value: checked, and rebuilt where they lie.
+        if matches!(kinds.1, TypeDefKind::Record(_) | TypeDefKind::Variant(_))
+            && let Some(node) = node_of(resolve, &from)
+        {
+            let layout = match graph_layout(resolve, sizes, tid, node) {
+                Ok(l) => l,
+                Err(why) => refuse!(
+                    "a type that contains itself whose nodes this backend does not lay out",
+                    "`{}`: {why}",
+                    self.export
+                ),
+            };
+            let size = layout.size as i32;
+            let n = self.helpers.graph((tid, node), layout);
+            let call = self.helpers.index(Helper::Decode(n));
+            let root = self.locals.fresh(ValType::I32);
+            let at = self.address(dst, d);
+            self.ops.extend([
+                I::LocalGet(src),
+                I::I32Load(word(so)),
+                I::LocalGet(src),
+                I::I32Load(word(so + 4)),
+                I::Call(call),
+                I::LocalSet(root),
+                I::LocalGet(at),
+                I::LocalGet(root),
+                I::I32Const(size),
+                I::MemoryCopy {
+                    src_mem: 0,
+                    dst_mem: 0,
+                },
+            ]);
+            return Encoding::Encoded(());
+        }
+        match kinds {
+            (TypeDefKind::List(fe), TypeDefKind::List(te)) => {
+                let (fe, te) = (*fe, *te);
+                let (fs, ts) = (
+                    sizes.size(&fe).size_wasm32() as u32,
+                    sizes.size(&te).size_wasm32() as u32,
+                );
+                let ta = sizes.align(&te).align_wasm32() as u32;
+                let (ptr, len, i) = (
+                    self.locals.fresh(ValType::I32),
+                    self.locals.fresh(ValType::I32),
+                    self.locals.fresh(ValType::I32),
+                );
+                self.ops.extend([
+                    I::LocalGet(src),
+                    I::I32Load(word(so)),
+                    I::LocalSet(ptr),
+                    I::LocalGet(src),
+                    I::I32Load(word(so + 4)),
+                    I::LocalSet(len),
+                ]);
+                let out = self.alloc_array(len, ts, ta);
+                self.ops.extend([
+                    I::I32Const(0),
+                    I::LocalSet(i),
+                    I::Block(Empty),
+                    I::Loop(Empty),
+                    I::LocalGet(i),
+                    I::LocalGet(len),
+                    I::I32GeU,
+                    I::BrIf(1),
+                ]);
+                let from_at = self.element_address(ptr, i, fs);
+                let to_at = self.element_address(out, i, ts);
+                match self.convert_at(from_at, 0, fe, to_at, 0, te) {
+                    Encoding::Encoded(()) => {}
+                    other => return other,
+                }
+                self.ops.extend(increment(i));
+                self.ops.extend([
+                    I::Br(0),
+                    I::End,
+                    I::End,
+                    I::LocalGet(dst),
+                    I::LocalGet(out),
+                    I::I32Store(word(d)),
+                    I::LocalGet(dst),
+                    I::LocalGet(len),
+                    I::I32Store(word(d + 4)),
+                ]);
+                Encoding::Encoded(())
+            }
+            (TypeDefKind::Record(a), TypeDefKind::Record(b))
+                if a.fields.len() == b.fields.len() =>
+            {
+                let fa: Vec<WitType> = a.fields.iter().map(|f| f.ty).collect();
+                let fb: Vec<WitType> = b.fields.iter().map(|f| f.ty).collect();
+                self.convert_fields(src, so, &fa, dst, d, &fb)
+            }
+            (TypeDefKind::Tuple(a), TypeDefKind::Tuple(b)) if a.types.len() == b.types.len() => {
+                let (fa, fb) = (a.types.clone(), b.types.clone());
+                self.convert_fields(src, so, &fa, dst, d, &fb)
+            }
+            (
+                TypeDefKind::Option(_) | TypeDefKind::Result(_) | TypeDefKind::Variant(_),
+                TypeDefKind::Option(_) | TypeDefKind::Result(_) | TypeDefKind::Variant(_),
+            ) => {
+                let (Some((ca, ta)), Some((cb, tb))) =
+                    (variant_cases(resolve, from), variant_cases(resolve, to))
+                else {
+                    blocked!("`{}` converts a variant with no cases", self.export);
+                };
+                if ca.len() != cb.len() || ta != tb {
+                    blocked!(
+                        "`{}` converts between two variants with different cases",
+                        self.export
+                    );
+                }
+                let pa = sizes
+                    .payload_offset(ta, ca.iter().map(Option::as_ref))
+                    .size_wasm32() as u64;
+                let pb = sizes
+                    .payload_offset(tb, cb.iter().map(Option::as_ref))
+                    .size_wasm32() as u64;
+                let tag = self.locals.fresh(ValType::I32);
+                self.ops.extend([
+                    I::LocalGet(src),
+                    load_tag(ta, so),
+                    I::LocalSet(tag),
+                    I::LocalGet(dst),
+                    I::LocalGet(tag),
+                    store_tag(tb, d),
+                ]);
+                for (c, (x, y)) in ca.iter().zip(&cb).enumerate() {
+                    match (x, y) {
+                        (None, None) => {}
+                        (Some(x), Some(y)) => {
+                            self.ops.extend([
+                                I::LocalGet(tag),
+                                I::I32Const(c as i32),
+                                I::I32Eq,
+                                I::If(Empty),
+                            ]);
+                            match self.convert_at(src, so + pa, *x, dst, d + pb, *y) {
+                                Encoding::Encoded(()) => {}
+                                other => return other,
+                            }
+                            self.ops.push(I::End);
+                        }
+                        _ => blocked!(
+                            "`{}` converts between two variants with different payloads",
+                            self.export
+                        ),
+                    }
+                }
+                Encoding::Encoded(())
+            }
+            _ => blocked!(
+                "`{}` converts between two component types that are not one",
+                self.export
+            ),
+        }
+    }
+
+    /// A record's or a tuple's fields, each converted where it sits.
+    fn convert_fields(
+        &mut self,
+        src: u32,
+        so: u64,
+        from: &[WitType],
+        dst: u32,
+        d: u64,
+        to: &[WitType],
+    ) -> Encoding<()> {
+        let sizes = self.sizes;
+        let oa: Vec<u64> = sizes
+            .field_offsets(from.iter())
+            .into_iter()
+            .map(|(o, _)| o.size_wasm32() as u64)
+            .collect();
+        let ob: Vec<u64> = sizes
+            .field_offsets(to.iter())
+            .into_iter()
+            .map(|(o, _)| o.size_wasm32() as u64)
+            .collect();
+        for (i, (x, y)) in from.iter().zip(to).enumerate() {
+            match self.convert_at(src, so + oa[i], *x, dst, d + ob[i], *y) {
+                Encoding::Encoded(()) => {}
+                other => return other,
+            }
+        }
+        Encoding::Encoded(())
     }
 
     /// Push a value the way a function compiled beside the export takes it
@@ -2040,7 +2777,7 @@ impl Enc<'_> {
                 result,
                 import,
                 args,
-                ..
+                ty,
             } => {
                 let Some((index, sig, func)) = self.imports.get(&import.qualified()) else {
                     blocked!("`{}` has no core import", import.qualified());
@@ -2067,14 +2804,23 @@ impl Enc<'_> {
                     };
                     // **The component-level check.** Two positions that
                     // flatten alike are not therefore one type.
-                    if !same_type(resolve, t, &param.ty) {
+                    let h = if same_type(resolve, t, &param.ty) {
+                        h
+                    } else if holds_index(resolve, &param.ty) {
+                        // A type that contains itself is passed as its
+                        // nodes (ADR-0194).
+                        match self.convert(h, param.ty) {
+                            Encoding::Encoded(h) => h,
+                            other => return other.map(|_| ()),
+                        }
+                    } else {
                         blocked!(
                             "`{}` passes a value of another component type as `{}` of `{}`",
                             self.export,
                             param.name,
                             import.qualified()
                         );
-                    }
+                    };
                     match push_flat_values(resolve, sizes, &mut self.locals, &h, &mut self.ops) {
                         Encoding::Encoded(()) => {}
                         other => return other,
@@ -2107,6 +2853,17 @@ impl Enc<'_> {
                         self.ops.push(I::Call(*index));
                         Held::Nothing
                     }
+                };
+                // An answer that holds a type that contains itself arrives
+                // as its nodes, and is the body's value from here (ADR-0194).
+                let out = match (&func.result, self.wit.get(ty).copied()) {
+                    (Some(rt), Some(own)) if holds_index(resolve, rt) => {
+                        match self.convert(out, own) {
+                            Encoding::Encoded(h) => h,
+                            other => return other.map(|_| ()),
+                        }
+                    }
+                    _ => out,
                 };
                 self.held.insert(*result, out);
             }
@@ -5627,6 +6384,352 @@ fn increment(i: u32) -> [wasm_encoder::Instruction<'static>; 4] {
     [I::LocalGet(i), I::I32Const(1), I::I32Add, I::LocalSet(i)]
 }
 
+/// **A value of a type that contains itself, as its nodes** (ADR-0194).
+///
+/// `(root) -> (ptr, len)`. The nodes are in level order, and the node list is
+/// its own queue: node `i` is a copy of a value, so its lists of the type
+/// still point at its children, which are copied after the nodes so far, in
+/// one copy per list, since a list holds its elements one after another.
+/// Each list is then made a run of one array of indices, `1, 2, ..`: in
+/// level order every node but the first is claimed once, in node order, so
+/// node `i`'s children are the run that continues the runs before it. Both
+/// arrays grow by doubling. Nothing here recurses, so a value of any depth
+/// is encoded.
+///
+/// params: 0 root; locals: 1 cap, 2 nodes, 3 idx, 4 n, 5 i, 6 node, 7 src,
+/// 8 k, 9 j, 10 tmp, 11 grown, 12 tag
+fn encode_graph(
+    layout: &GraphLayout,
+    realloc: u32,
+) -> (Vec<(u32, ValType)>, Vec<wasm_encoder::Instruction<'static>>) {
+    use wasm_encoder::BlockType::Empty;
+    use wasm_encoder::Instruction as I;
+    let (root, cap, nodes, idx, n, i, node, src, k, j, tmp, grown, tag) =
+        (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+    let size = layout.size as i32;
+    let word = |offset: u64| MemArg {
+        offset,
+        align: 2,
+        memory_index: 0,
+    };
+    let copy = I::MemoryCopy {
+        src_mem: 0,
+        dst_mem: 0,
+    };
+    // `base + at * scale`
+    let address = |base: u32, at: u32, scale: i32| {
+        vec![
+            I::LocalGet(base),
+            I::LocalGet(at),
+            I::I32Const(scale),
+            I::I32Mul,
+            I::I32Add,
+        ]
+    };
+    let alloc = |count: u32, scale: i32, align: i32, into: u32| {
+        vec![
+            I::I32Const(0),
+            I::I32Const(0),
+            I::I32Const(align),
+            I::LocalGet(count),
+            I::I32Const(scale),
+            I::I32Mul,
+            I::Call(realloc),
+            I::LocalSet(into),
+        ]
+    };
+    let mut ops = vec![I::I32Const(8), I::LocalSet(cap)];
+    ops.extend(alloc(cap, size, layout.align as i32, nodes));
+    ops.extend(alloc(cap, 4, 4, idx));
+    ops.extend([
+        I::LocalGet(nodes),
+        I::LocalGet(root),
+        I::I32Const(size),
+        copy.clone(),
+        I::I32Const(1),
+        I::LocalSet(n),
+        I::I32Const(0),
+        I::LocalSet(i),
+        I::Block(Empty),
+        I::Loop(Empty),
+        I::LocalGet(i),
+        I::LocalGet(n),
+        I::I32GeU,
+        I::BrIf(1),
+    ]);
+    ops.extend(address(nodes, i, size));
+    ops.push(I::LocalSet(node));
+    if let Some(t) = layout.tag {
+        ops.extend([I::LocalGet(node), load_tag(t, 0), I::LocalSet(tag)]);
+    }
+    for (case, offset) in &layout.slots {
+        let mut body = vec![
+            I::LocalGet(node),
+            I::I32Load(word(*offset)),
+            I::LocalSet(src),
+            I::LocalGet(node),
+            I::I32Load(word(offset + 4)),
+            I::LocalSet(k),
+            // Room for `k` more nodes, and their indices.
+            I::LocalGet(n),
+            I::LocalGet(k),
+            I::I32Add,
+            I::LocalGet(cap),
+            I::I32GtU,
+            I::If(Empty),
+            // grown = max(cap * 2, n + k), within what one region holds.
+            I::LocalGet(cap),
+            I::I32Const(1),
+            I::I32Shl,
+            I::LocalTee(grown),
+            I::LocalGet(n),
+            I::LocalGet(k),
+            I::I32Add,
+            I::LocalTee(tmp),
+            I::LocalGet(grown),
+            I::LocalGet(tmp),
+            I::I32GtU,
+            I::Select,
+            I::LocalTee(grown),
+            I::I32Const(i32::MAX / size),
+            I::I32GtU,
+            I::If(Empty),
+            I::Unreachable,
+            I::End,
+        ];
+        body.extend(alloc(grown, size, layout.align as i32, tmp));
+        body.extend([I::LocalGet(tmp), I::LocalGet(nodes), I::LocalGet(n)]);
+        body.extend([I::I32Const(size), I::I32Mul, copy.clone()]);
+        body.extend([I::LocalGet(tmp), I::LocalSet(nodes)]);
+        body.extend(alloc(grown, 4, 4, tmp));
+        body.extend([
+            I::LocalGet(tmp),
+            I::LocalGet(idx),
+            I::LocalGet(n),
+            I::I32Const(1),
+            I::I32Sub,
+            I::I32Const(4),
+            I::I32Mul,
+            copy.clone(),
+            I::LocalGet(tmp),
+            I::LocalSet(idx),
+            I::LocalGet(grown),
+            I::LocalSet(cap),
+        ]);
+        body.extend(address(nodes, i, size));
+        body.extend([I::LocalSet(node), I::End]);
+        // The children, after the nodes so far.
+        body.extend(address(nodes, n, size));
+        body.extend([
+            I::LocalGet(src),
+            I::LocalGet(k),
+            I::I32Const(size),
+            I::I32Mul,
+            copy.clone(),
+            // Their indices: n, n + 1, .., at idx[n - 1 ..].
+            I::I32Const(0),
+            I::LocalSet(j),
+            I::Block(Empty),
+            I::Loop(Empty),
+            I::LocalGet(j),
+            I::LocalGet(k),
+            I::I32GeU,
+            I::BrIf(1),
+            I::LocalGet(idx),
+            I::LocalGet(n),
+            I::I32Const(1),
+            I::I32Sub,
+            I::LocalGet(j),
+            I::I32Add,
+            I::I32Const(4),
+            I::I32Mul,
+            I::I32Add,
+            I::LocalGet(n),
+            I::LocalGet(j),
+            I::I32Add,
+            I::I32Store(word(0)),
+        ]);
+        body.extend(increment(j));
+        body.extend([
+            I::Br(0),
+            I::End,
+            I::End,
+            // The list, as its run of indices.
+            I::LocalGet(node),
+            I::LocalGet(idx),
+            I::LocalGet(n),
+            I::I32Const(1),
+            I::I32Sub,
+            I::I32Const(4),
+            I::I32Mul,
+            I::I32Add,
+            I::I32Store(word(*offset)),
+            I::LocalGet(n),
+            I::LocalGet(k),
+            I::I32Add,
+            I::LocalSet(n),
+        ]);
+        match case {
+            Some(c) => {
+                ops.extend([
+                    I::LocalGet(tag),
+                    I::I32Const(*c as i32),
+                    I::I32Eq,
+                    I::If(Empty),
+                ]);
+                ops.extend(body);
+                ops.push(I::End);
+            }
+            None => ops.extend(body),
+        }
+    }
+    ops.extend(increment(i));
+    ops.extend([
+        I::Br(0),
+        I::End,
+        I::End,
+        I::LocalGet(nodes),
+        I::LocalGet(n),
+        I::End,
+    ]);
+    (vec![(12, ValType::I32)], ops)
+}
+
+/// **Nodes, checked, made in place into the value they encode** (ADR-0194).
+///
+/// `(ptr, len) -> root`. A node's lists of indices must each continue the
+/// run of indices the lists before it hold, from 1, with each index after
+/// its own node's, and the runs must end at the last node: each node but
+/// the first then has one list holding it, from a node before it, so the
+/// nodes are one tree, with no cycle and none shared or left over. Anything
+/// else traps. Each list is then rewritten in place to point at its
+/// children, which in level order lie one after another in the nodes
+/// themselves: a value's list of the type is exactly that. Nothing is
+/// copied, and nothing here recurses.
+///
+/// params: 0 nodes, 1 len; locals: 2 i, 3 next, 4 node, 5 ptr, 6 k, 7 j,
+/// 8 tag
+fn decode_graph(
+    layout: &GraphLayout,
+) -> (Vec<(u32, ValType)>, Vec<wasm_encoder::Instruction<'static>>) {
+    use wasm_encoder::BlockType::Empty;
+    use wasm_encoder::Instruction as I;
+    let (nodes, len, i, next, node, ptr, k, j, tag) = (0, 1, 2, 3, 4, 5, 6, 7, 8);
+    let size = layout.size as i32;
+    let word = |offset: u64| MemArg {
+        offset,
+        align: 2,
+        memory_index: 0,
+    };
+    let trap_if = |mut cond: Vec<I<'static>>| {
+        cond.extend([I::If(Empty), I::Unreachable, I::End]);
+        cond
+    };
+    let mut ops = trap_if(vec![I::LocalGet(len), I::I32Eqz]);
+    ops.extend([
+        I::I32Const(1),
+        I::LocalSet(next),
+        I::I32Const(0),
+        I::LocalSet(i),
+        I::Block(Empty),
+        I::Loop(Empty),
+        I::LocalGet(i),
+        I::LocalGet(len),
+        I::I32GeU,
+        I::BrIf(1),
+        I::LocalGet(nodes),
+        I::LocalGet(i),
+        I::I32Const(size),
+        I::I32Mul,
+        I::I32Add,
+        I::LocalSet(node),
+    ]);
+    if let Some(t) = layout.tag {
+        ops.extend([I::LocalGet(node), load_tag(t, 0), I::LocalSet(tag)]);
+    }
+    for (case, offset) in &layout.slots {
+        let mut body = vec![
+            I::LocalGet(node),
+            I::I32Load(word(*offset)),
+            I::LocalSet(ptr),
+            I::LocalGet(node),
+            I::I32Load(word(offset + 4)),
+            I::LocalSet(k),
+        ];
+        // A node's children come after it.
+        body.extend(trap_if(vec![
+            I::LocalGet(k),
+            I::I32Const(0),
+            I::I32Ne,
+            I::LocalGet(next),
+            I::LocalGet(i),
+            I::I32LeU,
+            I::I32And,
+        ]));
+        // Each index continues the run. One past the last node is caught
+        // at the end, as a run that does not end there.
+        body.extend([
+            I::I32Const(0),
+            I::LocalSet(j),
+            I::Block(Empty),
+            I::Loop(Empty),
+            I::LocalGet(j),
+            I::LocalGet(k),
+            I::I32GeU,
+            I::BrIf(1),
+        ]);
+        body.extend(trap_if(vec![
+            I::LocalGet(ptr),
+            I::LocalGet(j),
+            I::I32Const(4),
+            I::I32Mul,
+            I::I32Add,
+            I::I32Load(word(0)),
+            I::LocalGet(next),
+            I::LocalGet(j),
+            I::I32Add,
+            I::I32Ne,
+        ]));
+        body.extend(increment(j));
+        body.extend([
+            I::Br(0),
+            I::End,
+            I::End,
+            // The list, as its children: in level order, where they lie.
+            I::LocalGet(node),
+            I::LocalGet(nodes),
+            I::LocalGet(next),
+            I::I32Const(size),
+            I::I32Mul,
+            I::I32Add,
+            I::I32Store(word(*offset)),
+            I::LocalGet(next),
+            I::LocalGet(k),
+            I::I32Add,
+            I::LocalSet(next),
+        ]);
+        match case {
+            Some(c) => {
+                ops.extend([
+                    I::LocalGet(tag),
+                    I::I32Const(*c as i32),
+                    I::I32Eq,
+                    I::If(Empty),
+                ]);
+                ops.extend(body);
+                ops.push(I::End);
+            }
+            None => ops.extend(body),
+        }
+    }
+    ops.extend(increment(i));
+    ops.extend([I::Br(0), I::End, I::End]);
+    // Every node but the first is some list's.
+    ops.extend(trap_if(vec![I::LocalGet(next), I::LocalGet(len), I::I32Ne]));
+    ops.extend([I::LocalGet(nodes), I::End]);
+    (vec![(7, ValType::I32)], ops)
+}
+
 /// The body of each string helper after the first three. Returns the extra
 /// locals and the instructions; the caller wraps them in a `Function`.
 fn string_helper(
@@ -6415,7 +7518,11 @@ fn string_helper(
             ]);
             (vec![(12, ValType::I32)], ops)
         }
-        Helper::StrEq | Helper::StrCmp | Helper::IntToString => {
+        Helper::StrEq
+        | Helper::StrCmp
+        | Helper::IntToString
+        | Helper::Encode(_)
+        | Helper::Decode(_) => {
             unreachable!("written in Helper::body")
         }
     }
@@ -7109,12 +8216,21 @@ enum Helper {
     /// `(p, l, ranges, ranges', multi, multi') -> (p, l)`: each code point
     /// mapped by a case table in the data segment (ADR-0056).
     CaseMap,
+    /// `(root) -> (ptr, len)`: a value of a type that contains itself, as its
+    /// nodes (ADR-0194), by [`Helpers::graphs`]' layout at this index.
+    Encode(u32),
+    /// `(ptr, len) -> root`: nodes checked, and made in place into the value
+    /// they encode (ADR-0194).
+    Decode(u32),
 }
 
 struct Helpers {
     /// The index the first helper gets.
     first: u32,
     used: Vec<Helper>,
+    /// Each type that contains itself a body converts (ADR-0194): the body's
+    /// type and its node's, and their layout.
+    graphs: Vec<((wit_parser::TypeId, wit_parser::TypeId), GraphLayout)>,
 }
 
 impl Helpers {
@@ -7127,6 +8243,17 @@ impl Helpers {
             }
         };
         self.first + at as u32
+    }
+
+    /// The layout of a type that contains itself, by its index.
+    fn graph(&mut self, key: (wit_parser::TypeId, wit_parser::TypeId), layout: GraphLayout) -> u32 {
+        match self.graphs.iter().position(|(k, _)| *k == key) {
+            Some(i) => i as u32,
+            None => {
+                self.graphs.push((key, layout));
+                (self.graphs.len() - 1) as u32
+            }
+        }
     }
 }
 
@@ -7149,10 +8276,12 @@ impl Helper {
                 vec![ValType::I32; 2],
             ),
             Helper::CaseMap => (vec![ValType::I32; 6], vec![ValType::I32; 2]),
+            Helper::Encode(_) => (vec![ValType::I32], vec![ValType::I32; 2]),
+            Helper::Decode(_) => (vec![ValType::I32; 2], vec![ValType::I32]),
         }
     }
 
-    fn body(self, realloc_index: u32) -> Function {
+    fn body(self, realloc_index: u32, graphs: &[GraphLayout]) -> Function {
         use wasm_encoder::BlockType::Empty;
         use wasm_encoder::Instruction as I;
         let byte = |offset: u64| {
@@ -7174,6 +8303,8 @@ impl Helper {
             | Helper::LowerAscii
             | Helper::Slice
             | Helper::CaseMap => string_helper(self, realloc_index),
+            Helper::Encode(i) => encode_graph(&graphs[i as usize], realloc_index),
+            Helper::Decode(i) => decode_graph(&graphs[i as usize]),
             // params: 0 p1, 1 l1, 2 p2, 3 l2; local 4 i
             Helper::StrEq => (
                 vec![(1, ValType::I32)],

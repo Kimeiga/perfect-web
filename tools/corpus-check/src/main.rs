@@ -56,6 +56,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "page states its description",
     // ADR-0189, corpus C12: a `<link>` where HTML allows it.
     "links the body allows",
+    // ADR-0194, corpus C13: a type that contains itself.
+    "a type that contains itself through a list",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -131,6 +133,8 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "metadata outside the top of a page's view",
     // ADR-0189, corpus C12: PW5035.
     "a link the head holds, written in markup",
+    // ADR-0194, corpus C13: PW0624.
+    "a type no finite value has",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

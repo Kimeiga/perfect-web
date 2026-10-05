@@ -94,12 +94,12 @@ MUTANTS = [
         "                            taken.push(i)",
         "                            let _ = i;",
     ),
-    (
-        "a type that contains itself reaches the world",
-        LOWER,
-        "        if contains_itself(sigs, def) {",
-        "        if false && contains_itself(sigs, def) {",
-    ),
+    # "a type that contains itself reaches the world" was retired by
+    # ADR-0194: one refusal became two, where the WIT is written and where
+    # the body is lowered, so this script's tests, which hold one such type
+    # in a signature, pass with either one undone. Each is a mutant of
+    # `recursive_types_mutations.py` now, against a test that tells them
+    # apart.
     (
         "a 16-bit discriminant is stored in 8 bits",
         WASM,

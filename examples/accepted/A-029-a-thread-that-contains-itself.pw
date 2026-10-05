@@ -1,0 +1,27 @@
+// @corpus: accepted
+// @id: A-029
+// @category: a type that contains itself through a list
+// @charter: §7.1
+// @milestone: 14
+//
+// A reply thread is a comment and its replies, each a comment (ADR-0194).
+// A list of them may be empty, so a thread is built from its leaves up, and
+// one is walked by a function that calls itself.
+
+module store.reply_thread
+
+import List
+
+type Comment = Comment { text: String, replies: List<Comment> }
+
+fn count(c: Comment) -> Int !{} {
+    List.fold(c.replies, 1, (n, r) => n + count(r))
+}
+
+public query Thread() -> Comment !{} {
+    Comment { text: "First!", replies: [Comment { text: "Second.", replies: [] }] }
+}
+
+public query Size() -> Int !{} {
+    count(Comment { text: "First!", replies: [] })
+}

@@ -2613,6 +2613,31 @@ e14-orders:
      } > docs/evidence/E14/orders.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/orders.txt
 
+# ADR-0194: a type that contains itself compiles, and crosses a boundary as
+# its nodes. The checker's, the WIT generator's and the lowering's tests; the
+# components through the E8 host against a Rust model; the JavaScript modules
+# against the components under Node; and the mutation controls.
+e14-recursive-types:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0194 - a type that contains itself compiles, and crosses as its nodes"; echo; \
+       echo "produced by: just e14-recursive-types"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the checker, the WIT and the lowering (compiler/pw-core/tests/recursive_types.rs)"; echo; \
+       cargo test --locked -p pw-core --test recursive_types 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== components through the E8 host (compiler/pw-conformance/tests/recursive_types.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test recursive_types -- --test-threads=1 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the JavaScript modules, against their components under Node (compiler/pw-conformance/tests/javascript.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test javascript a_type_that_contains_itself -- --nocapture 2>&1 | grep -E '^javascript:|^test result'; \
+       echo; echo "== the corpus at C13 (corpus-check, generality.rs, checking_source.rs)"; echo; \
+       cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
+       cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
+         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result'; \
+       echo; echo "== mutation controls (scripts/recursive_types_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/recursive_types_mutations.py; \
+     } > docs/evidence/E14/recursive-types.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E14/recursive-types.txt
+
 # ADR-0186: a page states its description. The compiler's, the renderer's
 # and the server's tests, each store's page in three engines, the corpus at
 # C11, every program clean, and the mutation controls.

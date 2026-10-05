@@ -161,6 +161,22 @@ impl Runnable {
         )
     }
 
+    /// [`Runnable::call`], its results as the program holds them: each value
+    /// of a type that contains itself made from its nodes (ADR-0194).
+    pub fn call_untangled(
+        &self,
+        ops: &BTreeMap<String, HostFn>,
+        args: &[Val],
+    ) -> Result<Vec<Val>, String> {
+        let results = self.call(ops, args)?;
+        let export = self.contract.exports[0]
+            .component
+            .clone()
+            .expect("the contract locates its export");
+        self.prepared
+            .untangled(&[&export.interface, &export.function], results)
+    }
+
     pub fn compiled(&self) -> &Compiled {
         &self.compiled
     }

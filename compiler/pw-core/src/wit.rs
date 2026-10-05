@@ -74,6 +74,10 @@ pub enum WitError {
     /// artifact. Reported rather than resolved by order, because "whichever was
     /// met last" is an answer that looks like every other answer.
     Claimed { operation: String, count: usize },
+    /// **A type that contains itself, in a form no node holds yet**
+    /// (ADR-0194): one that crosses a boundary crosses as its nodes, and a
+    /// node holds the type only as a `List` of it.
+    Recursive { ty: String, why: String },
 }
 
 impl std::fmt::Display for WitError {
@@ -87,6 +91,12 @@ impl std::fmt::Display for WitError {
             }
             WitError::Claimed { operation, count } => {
                 write!(f, "{count} declarations claim `{operation}`")
+            }
+            WitError::Recursive { ty, why } => {
+                write!(
+                    f,
+                    "`{ty}` is a type that contains itself, and crosses no boundary yet: {why}"
+                )
             }
         }
     }
@@ -428,6 +438,13 @@ impl Types {
     fn is_phantom(&self, def: DefId) -> bool {
         self.phantom.contains(&def)
     }
+
+    /// The declaration a qualified path names.
+    fn def_of(&self, path: &str) -> Option<DefId> {
+        self.by_def
+            .iter()
+            .find_map(|(def, p)| (p == path).then_some(*def))
+    }
 }
 
 impl TypeDef {
@@ -645,7 +662,14 @@ pub fn package(
 ) -> Result<(String, Vec<World>), WitError> {
     let sigs = Signatures::build(ws, hirs);
     let types = Types::build(hirs, ws, &sigs);
-    no_collisions(types.known.keys().cloned())?;
+    // A type that contains itself names its node type too (ADR-0194).
+    let nodes: Vec<String> = types
+        .by_def
+        .iter()
+        .filter(|(def, _)| crate::recursion::contains_itself(&sigs, **def))
+        .map(|(_, path)| node_name(path))
+        .collect();
+    no_collisions(types.known.keys().cloned().chain(nodes))?;
     no_collisions(contracts.iter().map(|c| c.component_id.clone()))?;
 
     // The declaration behind each contract, by the path the contract names.
@@ -800,7 +824,7 @@ pub fn package(
         .flat_map(|a| a.uses.iter().cloned())
         .chain(host_uses)
         .collect();
-    let type_text = render_types(&types, &reachable(&types, seeds))?;
+    let type_text = render_types(&types, &reachable(&types, seeds), &sigs)?;
     Ok((render(&type_text, &apis, &worlds, &hosts), worlds))
 }
 
@@ -938,59 +962,133 @@ fn reachable(types: &Types, seeds: impl IntoIterator<Item = String>) -> BTreeSet
 /// **Refusing, not emitting a placeholder.** A record whose field has no WIT
 /// form is one a host would decode into something it never was, and this is
 /// reached only for types an export actually names.
-fn render_types(types: &Types, wanted: &BTreeSet<String>) -> Result<String, WitError> {
+fn render_types(
+    types: &Types,
+    wanted: &BTreeSet<String>,
+    sigs: &Signatures,
+) -> Result<String, WitError> {
     let mut out = String::new();
     for def in &types.defs {
         if !wanted.contains(def.name()) {
             continue;
         }
         let name = def.name();
-        match def {
-            TypeDef::Record { fields, .. } => {
-                if fields.is_empty() {
-                    // A WIT record must have at least one field. A Pleris type
-                    // with none carries no information, and a nameable type
-                    // carrying none is the nearest honest thing.
-                    out.push_str(&format!("    type {} = tuple<>;\n", escaped(&ident(name))));
-                    continue;
-                }
-                out.push_str(&format!("    record {} {{\n", escaped(&ident(name))));
-                for (f, ty) in fields {
-                    out.push_str(&format!(
-                        "        {}: {},\n",
-                        escaped(&ident(f)),
-                        wit_type(ty, types, name)?
-                    ));
-                }
-                out.push_str("    }\n");
+        if let Some(id) = types.def_of(name)
+            && crate::recursion::contains_itself(sigs, id)
+        {
+            out.push_str(&render_graph(def, id, types, sigs)?);
+            continue;
+        }
+        out.push_str(&render_shape(def, &escaped(&ident(name)), &|ty| {
+            wit_type(ty, types, name)
+        })?);
+    }
+    Ok(out)
+}
+
+/// **A record, a variant or an alias**, named `id`, each field's type
+/// written by `field`: the type's own, or its node's (ADR-0194).
+fn render_shape(
+    def: &TypeDef,
+    id: &str,
+    field: &dyn Fn(&TypeResolution) -> Result<String, WitError>,
+) -> Result<String, WitError> {
+    let mut out = String::new();
+    match def {
+        TypeDef::Record { fields, .. } => {
+            if fields.is_empty() {
+                // A WIT record must have at least one field. A Pleris type
+                // with none carries no information, and a nameable type
+                // carrying none is the nearest honest thing.
+                out.push_str(&format!("    type {id} = tuple<>;\n"));
+                return Ok(out);
             }
-            TypeDef::Variant { cases, .. } => {
-                out.push_str(&format!("    variant {} {{\n", escaped(&ident(name))));
-                for (case, fields) in cases {
-                    let payload = match fields.as_slice() {
-                        [] => String::new(),
-                        [ty] => format!("({})", wit_type(ty, types, name)?),
-                        many => format!(
-                            "(tuple<{}>)",
-                            many.iter()
-                                .map(|ty| wit_type(ty, types, name))
-                                .collect::<Result<Vec<_>, _>>()?
-                                .join(", ")
-                        ),
-                    };
-                    out.push_str(&format!("        {}{},\n", escaped(&ident(case)), payload));
-                }
-                out.push_str("    }\n");
-            }
-            TypeDef::Alias { of, .. } => {
+            out.push_str(&format!("    record {id} {{\n"));
+            for (f, ty) in fields {
                 out.push_str(&format!(
-                    "    type {} = {};\n",
-                    escaped(&ident(name)),
-                    wit_type(of, types, name)?
+                    "        {}: {},\n",
+                    escaped(&ident(f)),
+                    field(ty)?
                 ));
             }
+            out.push_str("    }\n");
+        }
+        TypeDef::Variant { cases, .. } => {
+            out.push_str(&format!("    variant {id} {{\n"));
+            for (case, fields) in cases {
+                let payload = match fields.as_slice() {
+                    [] => String::new(),
+                    [ty] => format!("({})", field(ty)?),
+                    many => format!(
+                        "(tuple<{}>)",
+                        many.iter()
+                            .map(field)
+                            .collect::<Result<Vec<_>, _>>()?
+                            .join(", ")
+                    ),
+                };
+                out.push_str(&format!("        {}{},\n", escaped(&ident(case)), payload));
+            }
+            out.push_str("    }\n");
+        }
+        TypeDef::Alias { of, .. } => {
+            out.push_str(&format!("    type {id} = {};\n", field(of)?));
         }
     }
+    Ok(out)
+}
+
+/// The WIT identifier of a type's node type (ADR-0194), as a name
+/// [`no_collisions`] checks: `rec.thread.Comment` → `rec-thread-comment-node`.
+fn node_name(path: &str) -> String {
+    format!("{path} node")
+}
+
+/// **A type that contains itself, as its nodes** (ADR-0194).
+///
+/// WIT has no type that contains itself, and the Canonical ABI no layout for
+/// one, so the type is a list of its nodes: its fields as written, except
+/// that each field holding a `List` of the type holds a `list<u32>` of node
+/// indices. Node 0 is the value; the nodes are in level order, so each
+/// node's children are the next indices no node before it has claimed.
+fn render_graph(
+    def: &TypeDef,
+    id: DefId,
+    types: &Types,
+    sigs: &Signatures,
+) -> Result<String, WitError> {
+    let name = def.name();
+    crate::recursion::self_slots(sigs, id).map_err(|why| WitError::Recursive {
+        ty: name.to_string(),
+        why,
+    })?;
+    let slot = |ty: &TypeResolution| {
+        ty.resolved().is_some_and(|t| {
+            t.as_builtin() == Some(Builtin::List)
+                && t.args().first().is_some_and(|e| e.def_id() == Some(id))
+        })
+    };
+    let field = |ty: &TypeResolution| -> Result<String, WitError> {
+        match slot(ty) {
+            true => Ok("list<u32>".to_string()),
+            false => wit_type(ty, types, name),
+        }
+    };
+    let me = escaped(&ident(name));
+    let node = escaped(&ident(&node_name(name)));
+    let mut out = format!(
+        "    /// `{name}` contains itself, so it crosses as its nodes: node 0 is the\n    \
+         /// value, and each `list<u32>` holds a node's children's indices, which\n    \
+         /// continue the indices the nodes before it hold, in level order.\n    \
+         type {me} = list<{node}>;\n"
+    );
+    if let TypeDef::Alias { .. } = def {
+        return Err(WitError::Recursive {
+            ty: name.to_string(),
+            why: "an opaque type that contains itself has no nodes of its own".to_string(),
+        });
+    }
+    out.push_str(&render_shape(def, &node, &field)?);
     Ok(out)
 }
 

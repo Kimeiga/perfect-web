@@ -719,7 +719,9 @@ fn agree_on(
         let r = Runnable::new(compile(us, id));
         let mut list = Vec::new();
         for args in calls {
-            let want = match r.call(&ops, args) {
+            // As the program holds the result: a type that contains itself
+            // nested, as the module's values are (ADR-0194).
+            let want = match r.call_untangled(&ops, args) {
                 Ok(v) => canonical(&v[0]),
                 Err(_) => serde_json::json!({ "trap": true }),
             };
@@ -777,6 +779,115 @@ fn every_query_agrees_with_its_component_under_node() {
     let (queries, calls, traps) = agree(&us, &ids, 0x15);
     println!(
         "javascript: {queries} queries, {calls} calls, component and module agree \
+         ({traps} trapped in both)"
+    );
+}
+
+/// **A type that contains itself** (ADR-0194): a module's value is nested,
+/// a component's crosses as its nodes, and the two agree on what each
+/// query makes of the same trees.
+const RECURSIVE: &str = r#"module r
+
+import List
+
+type Comment = Comment { text: String, likes: Int, replies: List<Comment> }
+
+type Json =
+    | Null
+    | Num(Float)
+    | Array(List<Json>)
+    | Keyed(String, List<Json>)
+
+fn count(c: Comment) -> Int {
+    List.fold(c.replies, 1, (n, r) => n + count(r))
+}
+
+fn bump(c: Comment) -> Comment {
+    Comment { text: "{c.text}!", likes: c.likes * 2, replies: List.map(c.replies, bump) }
+}
+
+fn total(j: Json) -> Float {
+    match j {
+        Null => 0.0,
+        Num(x) => x,
+        Array(items) => List.fold(items, 0.0, (t, x) => t + total(x)),
+        Keyed(_, items) => List.fold(items, 1.0, (t, x) => t + total(x)),
+    }
+}
+
+public query Size(c: Comment) -> Int { count(c) }
+
+public query Bumped(c: Comment) -> Comment { bump(c) }
+
+public query Replies(c: Comment) -> List<Comment> { c.replies }
+
+public query Total(j: Json) -> Float { total(j) }
+
+public query Echo(j: Json) -> Json { j }
+"#;
+
+/// A random comment thread, nested, as the program holds one.
+fn comment_val(rng: &mut Rng, depth: u32) -> Val {
+    let replies = if depth == 0 { 0 } else { rng.below(4) };
+    Val::Record(vec![
+        ("text".into(), Val::String(rng.string())),
+        ("likes".into(), Val::S64(rng.int())),
+        (
+            "replies".into(),
+            Val::List((0..replies).map(|_| comment_val(rng, depth - 1)).collect()),
+        ),
+    ])
+}
+
+/// A random JSON-like value, nested.
+fn json_val(rng: &mut Rng, depth: u32) -> Val {
+    let case = |name: &str, p: Option<Val>| Val::Variant(name.into(), p.map(Box::new));
+    let pick = if depth == 0 {
+        rng.below(2)
+    } else {
+        rng.below(4)
+    };
+    match pick {
+        0 => case("null", None),
+        1 => case("num", Some(Val::Float64((rng.int() as f64) / 4.0))),
+        2 => case(
+            "array",
+            Some(Val::List(
+                (0..rng.below(4))
+                    .map(|_| json_val(rng, depth - 1))
+                    .collect(),
+            )),
+        ),
+        _ => case(
+            "keyed",
+            Some(Val::Tuple(vec![
+                Val::String(rng.string()),
+                Val::List(
+                    (0..rng.below(4))
+                        .map(|_| json_val(rng, depth - 1))
+                        .collect(),
+                ),
+            ])),
+        ),
+    }
+}
+
+#[test]
+fn a_type_that_contains_itself_agrees_with_its_component() {
+    let us = units(&[("r.pw", RECURSIVE)]);
+    let mut rng = Rng(0x0194);
+    let mut cases: Vec<(String, Vec<Vec<Val>>)> = Vec::new();
+    for id in ["r.Size", "r.Bumped", "r.Replies"] {
+        let calls = (0..CASES).map(|_| vec![comment_val(&mut rng, 4)]).collect();
+        cases.push((id.to_string(), calls));
+    }
+    for id in ["r.Total", "r.Echo"] {
+        let calls = (0..CASES).map(|_| vec![json_val(&mut rng, 4)]).collect();
+        cases.push((id.to_string(), calls));
+    }
+    let (queries, calls, traps) = agree_on(&us, &cases, 0x0194);
+    println!(
+        "javascript: {queries} queries over trees, {calls} calls, component and module agree \
          ({traps} trapped in both)"
     );
 }

@@ -545,10 +545,11 @@ fn generality_is_reported_separately_from_conformance() {
     // 36 the same day: ADR-0185's three, `duplicate_id`,
     // `reference_names_nothing` and `aria_unknown`. 37 / 37 the same day:
     // ADR-0186's `metadata_misplaced`. 38 / 38 the same day: ADR-0189's
-    // `link_not_in_body`.
+    // `link_not_in_body`. 39 / 39 on 2026-10-05: ADR-0194's
+    // `no_finite_value`.
     assert_eq!(
         (general.len(), narrow.len(), untested.len()),
-        (38, 0, 0),
+        (39, 0, 0),
         "the published figure moved. If that is intended, update
          docs/STATUS.md and docs/NEXT.md in the same commit — a number in a
          status report that no test holds is a number that drifts."
