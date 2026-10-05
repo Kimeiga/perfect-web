@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `63ce91d`, with ADR-0207 and ADR-0208.
+**Reviewed:** 2026-10-05, against master `feea53b`, with ADR-0209.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2823,6 +2823,15 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`feea53b` (2026-10-05, ADR-0209): `just ci` passes locally, the workspace's
+2015 tests pass, and the browser suite passes 728 in three engines, with 13
+skipped. ADR-0209's evidence is `docs/evidence/E14/command-invalidations.txt`,
+recorded at that commit: the command's component, the store's commands
+against their references, the server's drop, the store's artifacts as the
+compiler emits them, and 4 of 4 mutants killed. Recorded again at that
+commit, the server's command path having changed: `command-events.txt` 4 of
+4, `E10/committed-events.txt` 4 of 4, and `menu-changed.txt` 5 of 5, its
+anchor moved where the menu's events reach the queries.
 `63ce91d` (2026-10-05, ADR-0207 and ADR-0208): `just ci` passes locally, the
 workspace's 2012 tests pass, and the browser suite passes 728 in three
 engines, with 13 skipped. ADR-0207's evidence is
