@@ -438,7 +438,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-04: `examples/domain.pw`'s `MenuItem` declares its `store_id`
     // and its `category`, a `MenuCategory`, and `MenuSection` groups a
     // store's menu by category, charter §15.1's (ADR-0181).
-    const EXPECTED: u64 = 0xc6c5b3b9256e6a08;
+    // 2026-10-04: `examples/domain.pw` declares `OrderStatus`, where a
+    // session's order is, and `OrderError`, why one was not placed: the store
+    // places its cart as an order and follows it (ADR-0193).
+    const EXPECTED: u64 = 0xe9a6163a6218a24a;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

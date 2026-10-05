@@ -28,6 +28,7 @@ import Carts
 import Menus
 import Recommender
 import Estimates
+import Orders
 // The invocation context. `current_session()` was called and never imported
 // from E4 until 2026-08-10, and nothing said so: `unresolved_uses` examines
 // dotted paths whose head looks like a module, and a bare call to nothing
@@ -42,9 +43,9 @@ import Estimates
 import context.{ current_session }
 import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, MenuSection, InteractionId,
     MenuItemId, PositiveInt, Recommendation, RecommendationError, DeliveryEstimate,
-    EstimateError }
+    EstimateError, OrderStatus, OrderError, TrackingError }
 import capability.{ Session, SessionId }
-import Events.{ CartChanged, MenuChanged, InventoryChanged }
+import Events.{ CartChanged, MenuChanged, InventoryChanged, OrderChanged }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -155,6 +156,21 @@ session query Estimate(session: Session<SessionId>) -> Result<DeliveryEstimate, 
     Estimates.current(session)
 }
 
+// **The session's order**, as the store last said of it (ADR-0193): the
+// session's alone, and read again whenever the store moves it along.
+session query Order(session: Session<SessionId>) -> Result<Option<OrderStatus>, TrackingError>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            session
+    invalidates_on OrderChanged(session)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    Orders.current(session)
+}
+
 // The mutation, as charter §15.4 asks. Idempotent by interaction id, so a
 // double-tap is one add. Transactional. Optimistic, so the count moves before
 // the round trip, and moves back if the add is refused. And the item's
@@ -241,6 +257,21 @@ command clear_cart()
     emits         CartChanged(current_session())
 {
     Carts.clear(current_session())
+}
+
+// **The session's cart, placed as its order** (ADR-0193): the order is the
+// cart's lines, and the cart is empty after, in one commit. An empty cart
+// places nothing, and says so.
+command place_order()
+    -> Result<OrderStatus, OrderError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    transaction   serializable
+    invalidates   Cart(current_session()), Order(current_session())
+    emits         CartChanged(current_session()), OrderChanged(current_session())
+{
+    Orders.place(current_session())
 }
 
 // Private to the session that reads it (ADR-0172): its cart's lines are the
@@ -411,6 +442,8 @@ session page CartPage() {
     cache        private
 
     let cart = query Cart(current_session())
+    // Its order, once it is placed (ADR-0193).
+    let order = query Order(current_session())
     // What the cart last had to say: a line that could not be changed.
     signal notice: String = ""
 
@@ -473,6 +506,21 @@ session page CartPage() {
             >
                 Clear
             </button>
+            <!-- The cart, placed as an order (ADR-0193). -->
+            <button
+                id="place-order"
+                type="button"
+                on:press={resumable() => match place_order() {
+                    Ok(_) => notice = "Your order is placed.",
+                    Err(OrderError.NothingToOrder) => notice = "Your cart is empty: there is nothing to order.",
+                }}
+            >
+                Place order
+            </button>
+            {#match order}
+            {:Some(_)}<p id="order-link"><a href="/order">Follow your order</a></p>
+            {:None}
+            {/match}
         </main>
     }
 }
@@ -504,6 +552,36 @@ session page HomePage() {
             <p aria-live="polite" aria-atomic="true">
                 <a id="cart-page" href="/cart">Your cart</a>: <span id="cart-count">{cart.line_count}</span> items
             </p>
+        </main>
+    }
+}
+// **The session's order, as the store moves it along** (ADR-0193): placed,
+// being prepared, on its way, delivered. What the store says next reaches the
+// page while it is open, and a screen reader says it.
+session page OrderPage() {
+    route        "/order"
+    placement    origin
+    cache        private
+
+    let order = query Order(current_session())
+
+    view {
+        <title>Your order</title>
+        <main>
+            <h1>Your order</h1>
+            <section aria-label="Status" aria-live="polite" aria-atomic="true">
+                {#match order}
+                {:Some(status)}
+                    {#match status}
+                    {:Placed}<p id="order-status">Placed: the store has your order.</p>
+                    {:Preparing}<p id="order-status">Preparing: the store is making it.</p>
+                    {:OnTheWay}<p id="order-status">On its way to you.</p>
+                    {:Delivered}<p id="order-status">Delivered.</p>
+                    {/match}
+                {:None}<p id="order-status">You have no order yet.</p>
+                {/match}
+            </section>
+            <p><a href="/">Order from a store</a></p>
         </main>
     }
 }

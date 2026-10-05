@@ -80,6 +80,15 @@ interface store-page-menu-api {
     menu: func(arg0: domain-store-id) -> result<list<domain-menu-section>, domain-store-error>;
 }
 
+interface store-page-order-api {
+    use pw:types/types.{capability-session-id, domain-order-status, domain-tracking-error};
+    order: func(arg0: capability-session-id) -> result<option<domain-order-status>, domain-tracking-error>;
+}
+
+interface store-page-order-page-api {
+    order-page: func();
+}
+
 interface store-page-recommendations-api {
     use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};
     recommendations: func(arg0: domain-store-id) -> result<list<domain-recommendation>, domain-recommendation-error>;
@@ -118,6 +127,11 @@ interface store-page-decrease-in-cart-api {
 interface store-page-increase-in-cart-api {
     use pw:types/types.{domain-cart, domain-cart-error, domain-menu-item-id};
     increase-in-cart: func(arg0: domain-menu-item-id) -> result<domain-cart, domain-cart-error>;
+}
+
+interface store-page-place-order-api {
+    use pw:types/types.{domain-order-error, domain-order-status};
+    place-order: func() -> result<domain-order-status, domain-order-error>;
 }
 
 interface store-page-remove-from-cart-api {
@@ -172,6 +186,8 @@ world store-page-cart-page {
     import store-page-clear-cart-api;
     import store-page-decrease-in-cart-api;
     import store-page-increase-in-cart-api;
+    import store-page-order-api;
+    import store-page-place-order-api;
     import store-page-remove-from-cart-api;
     export store-page-cart-page-api;
 }
@@ -191,6 +207,17 @@ world store-page-home-page {
 world store-page-menu {
     import store:data/menus;
     export store-page-menu-api;
+}
+
+world store-page-order {
+    import store:data/orders;
+    export store-page-order-api;
+}
+
+world store-page-order-page {
+    import pw:host/session;
+    import store-page-order-api;
+    export store-page-order-page-api;
 }
 
 world store-page-recommendations {
@@ -247,6 +274,12 @@ world store-page-increase-in-cart {
     import store:data/carts;
     import store:data/menus;
     export store-page-increase-in-cart-api;
+}
+
+world store-page-place-order {
+    import pw:host/session;
+    import store:data/orders;
+    export store-page-place-order-api;
 }
 
 world store-page-remove-from-cart {
@@ -313,8 +346,21 @@ package pw:types {
             quantity-too-large,
             cart-expired,
         }
+        variant domain-order-status {
+            placed,
+            preparing,
+            on-the-way,
+            delivered,
+        }
+        variant domain-order-error {
+            nothing-to-order,
+        }
         record domain-order-progress {
             stage-label: string,
+        }
+        variant domain-tracking-error {
+            order-not-found,
+            tracking-unavailable,
         }
         record domain-order-failure {
             label: string,
@@ -363,6 +409,11 @@ package store:data {
         use pw:types/types.{domain-menu-item-id, domain-menu-section, domain-store-error, domain-store-id};
         is-available: func(arg0: domain-menu-item-id) -> bool;
         sections: func(arg0: domain-store-id) -> result<list<domain-menu-section>, domain-store-error>;
+    }
+    interface orders {
+        use pw:types/types.{capability-session-id, domain-order-error, domain-order-status, domain-tracking-error};
+        current: func(arg0: capability-session-id) -> result<option<domain-order-status>, domain-tracking-error>;
+        place: func(arg0: capability-session-id) -> result<domain-order-status, domain-order-error>;
     }
     interface recommendations {
         use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};

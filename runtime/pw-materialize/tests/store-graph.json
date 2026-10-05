@@ -27,6 +27,14 @@
       ]
     },
     {
+      "path": "Events.OrderChanged",
+      "name": "OrderChanged",
+      "node": "event",
+      "params": [
+        "session"
+      ]
+    },
+    {
       "path": "Events.PromotionChanged",
       "name": "PromotionChanged",
       "node": "event",
@@ -165,6 +173,25 @@
       ]
     },
     {
+      "path": "store.page.Order",
+      "name": "Order",
+      "node": "resource",
+      "partition": "private",
+      "privacy": "session",
+      "key": [
+        "session"
+      ],
+      "params": [
+        "session"
+      ]
+    },
+    {
+      "path": "store.page.OrderPage",
+      "name": "OrderPage",
+      "node": "page",
+      "params": []
+    },
+    {
       "path": "store.page.Recommendations",
       "name": "Recommendations",
       "node": "resource",
@@ -237,6 +264,12 @@
       "params": [
         "item"
       ]
+    },
+    {
+      "path": "store.page.place_order",
+      "name": "place_order",
+      "node": "command",
+      "params": []
     },
     {
       "path": "store.page.remove_from_cart",
@@ -322,6 +355,14 @@
       ]
     },
     {
+      "from": "store.page.CartPage",
+      "to": "store.page.Order",
+      "kind": "reads",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
       "from": "store.page.HomePage",
       "to": "store.page.Cart",
       "kind": "reads",
@@ -350,6 +391,22 @@
       "kind": "invalidated_by",
       "key": [
         "id"
+      ]
+    },
+    {
+      "from": "store.page.Order",
+      "to": "Events.OrderChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "session"
+      ]
+    },
+    {
+      "from": "store.page.OrderPage",
+      "to": "store.page.Order",
+      "kind": "reads",
+      "key": [
+        "current_session()"
       ]
     },
     {
@@ -443,6 +500,38 @@
     {
       "from": "store.page.increase_in_cart",
       "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.place_order",
+      "to": "Events.CartChanged",
+      "kind": "emits",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.place_order",
+      "to": "Events.OrderChanged",
+      "kind": "emits",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.place_order",
+      "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.place_order",
+      "to": "store.page.Order",
       "kind": "invalidates",
       "key": [
         "current_session()"

@@ -216,12 +216,12 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
     // and `clear_cart`, which captures nothing and is resumable all the same.
     // E7-L needed a second handler: with one, "the exact handler was fetched"
     // is satisfied by any fetch at all.
-    // And the cart's own page's four (ADR-0190): a line's three and its
-    // clear.
+    // And the cart's own page's five: a line's three, its clear (ADR-0190)
+    // and its place_order (ADR-0193).
     assert_eq!(
         pairs.len(),
-        9,
-        "the store's page declares five resumable handlers, its cart's page four"
+        10,
+        "the store's page declares five resumable handlers, its cart's page five"
     );
     for (m, a) in &pairs {
         assert_eq!(
@@ -255,5 +255,7 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
 
     let handlers: std::collections::BTreeSet<&str> =
         pairs.iter().map(|(m, _)| m.handler.as_str()).collect();
-    assert_eq!(handlers.len(), 5, "and five handlers are five identities");
+    // The cart's own page's line handlers are the store's, as their code
+    // is (ADR-0190); its place_order is a sixth (ADR-0193).
+    assert_eq!(handlers.len(), 6, "and six handlers are six identities");
 }

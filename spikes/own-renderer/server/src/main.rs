@@ -699,6 +699,22 @@ fn cart_entry(session: &str) -> ResourceEntryId {
     ResourceEntryId::derive(&cart_identity(session), &IDENTITY)
 }
 
+/// **A session's order's entry** (ADR-0193): what a change the store makes
+/// to it is sent against, as the cart's is.
+fn order_entry(session: &str) -> ResourceEntryId {
+    ResourceEntryId::derive(
+        &EntryIdentity::new(
+            "store.page.Order",
+            &[session],
+            Partition::Session {
+                id: session.to_string(),
+            },
+        )
+        .generation(BUILD),
+        &IDENTITY,
+    )
+}
+
 /// **The compiler's contracts, as data.**
 ///
 /// Read from `docs/evidence/E8/component-contracts.json`, which `just
@@ -844,6 +860,8 @@ fn dev_topology() -> Topology {
                 "database.read<Menus>",
                 // A session's order (E14, T04).
                 "database.read<Orders>",
+                // And the order a session places (ADR-0193).
+                "database.write<Orders>",
                 "database.read<Stores>",
                 "database.write<Carts>",
                 // The recommender (ADR-0148), a source reached over the network.
@@ -1222,10 +1240,15 @@ impl Server {
             let mut carts = self.carts.lock().expect("carts");
             let current = carts.get(session).cloned().unwrap_or_default();
             let staged: Arc<Mutex<Option<Lines>>> = Arc::default();
+            // The order a command places (ADR-0193), staged with the cart it
+            // empties, and committed with it.
+            let placed: Arc<Mutex<Option<String>>> = Arc::default();
+            let order = Self::order_layer(session, current.clone(), staged.clone(), placed.clone());
             let mut host = self.faulted(
                 session,
                 Self::data_layer(session, current, staged.clone(), fail, self.catalog()),
             );
+            host.extend(order);
             host.insert(
                 "pw:host/session#read".to_string(),
                 Self::session_operation(session),
@@ -1276,6 +1299,14 @@ impl Server {
                 Ok::<_, String>(events)
             })?;
             carts.insert(session.to_string(), lines);
+            // And the order it placed (ADR-0193), before what reads it is
+            // dropped and read again below.
+            if let Some(status) = placed.lock().expect("placed").take() {
+                self.orders
+                    .lock()
+                    .expect("orders")
+                    .insert(session.to_string(), status);
+            }
             // What the cart's values include from now on, by the interaction
             // that committed it (ADR-0172), recorded with the commit.
             if let Some(interaction) = interaction {
@@ -1604,6 +1635,70 @@ impl Server {
                 Ok(())
             }),
         ])
+    }
+
+    /// **The store's data layer for orders, as a command sees it**
+    /// (ADR-0193): `orders#place` places the session's cart as its order.
+    /// The order is the cart's lines, staged as `placed`, and the cart is
+    /// staged empty, so the two commit together, in the command's commit.
+    /// An empty cart places nothing, and says so.
+    fn order_layer(
+        session: &str,
+        current: Lines,
+        staged: Arc<Mutex<Option<Lines>>>,
+        placed: Arc<Mutex<Option<String>>>,
+    ) -> BTreeMap<String, HostFn> {
+        let this_session = session.to_string();
+        let place: HostFn = Arc::new(move |args: &[Val]| {
+            let [Val::String(s)] = args else {
+                return Err(format!("orders#place received {args:?}"));
+            };
+            if *s != this_session {
+                return Err("orders#place was passed another session".to_string());
+            }
+            let mut staged = staged.lock().expect("staged");
+            let lines = staged.clone().unwrap_or_else(|| current.clone());
+            if lines.is_empty() {
+                return Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                    "nothing-to-order".into(),
+                    None,
+                )))))]);
+            }
+            *staged = Some(Lines::new());
+            *placed.lock().expect("placed") = Some("placed".to_string());
+            Ok(vec![Val::Result(Ok(Some(Box::new(Val::Variant(
+                "placed".into(),
+                None,
+            )))))])
+        });
+        BTreeMap::from([("store:data/orders#place".to_string(), place)])
+    }
+
+    /// **A session's resource changed outside a command** (ADR-0193): the
+    /// store moved an order along. The change arrives as the event the
+    /// program declares for it, `event` with the session as its key, and
+    /// each of the session's documents is read again and sent what changed,
+    /// against `entry` at its next version. Until 2026-10-04 only a command
+    /// on the cart reached an open page: the store's order was read again
+    /// when the page was.
+    ///
+    /// A session's query keeps no answer (PW0102), but a read of it may be in
+    /// flight from before the change, and one `one_per_key` lets the read
+    /// below join. The event drops it, as a command's commit drops the reads
+    /// it makes stale (ADR-0127), so the read below starts after the change.
+    fn session_changed(&self, session: &str, event: &str, entry: &ResourceEntryId) {
+        let session_lock = self.one_at_a_time(session);
+        let _one = session_lock
+            .lock()
+            .expect("one change of a session at a time");
+        self.invalidate_queries(
+            "",
+            session,
+            &[pw_materialize::Event::new(event, &[session])],
+        );
+        self.clock.advance(1);
+        let version = Version(self.clock.now());
+        self.send_documents(session, entry, version, false);
     }
 
     /// **Forget the subscribers that stopped asking, and what was kept for
@@ -2601,6 +2696,21 @@ impl Server {
             return;
         }
 
+        self.send_documents(session, &cart_entry(session), self.version(session), true);
+    }
+
+    /// **Each of a session's documents, read again and sent what changed**
+    /// (ADR-0145, ADR-0161), against `entry` at `version`: the cart's, after
+    /// a command (`drain_held`), or another resource's, after the store
+    /// changed it (ADR-0193). The cart's value goes with it to a page that
+    /// speculates on it, when the change is the cart's (`speculated`).
+    fn send_documents(
+        &self,
+        session: &str,
+        entry: &ResourceEntryId,
+        version: Version,
+        speculated: bool,
+    ) {
         // What each of the session's pages shows now, from its queries
         // (ADR-0145), each read for its own document (ADR-0161), outside the
         // table.
@@ -2634,8 +2744,6 @@ impl Server {
         // document the server DERIVED from it, as one set (ADR-0145). A
         // subscription and a patch are logically separate — a server may
         // derive a patch from a change rather than must.
-        let entry = cart_entry(session);
-        let version = self.version(session);
         let mut failed = Vec::new();
         let mut queue = self.pending.lock().expect("pending");
         for (doc, page, store, bindings, now) in read {
@@ -2649,6 +2757,7 @@ impl Server {
             // a value later than its version.
             let value = self
                 .speculates_on_cart(&page)
+                .filter(|_| speculated)
                 .and_then(|binding| bindings.get(&binding))
                 .map(val_to_json);
             // Against what the document shows. With none served, none shows.
@@ -5248,6 +5357,8 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 None => orders.remove(&session),
             };
             drop(orders);
+            // And the session's open pages told (ADR-0193).
+            server.session_changed(&session, "Events.OrderChanged", &order_entry(&session));
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
         // The recommender a test sets (ADR-0148): how long it takes, how it
@@ -9605,10 +9716,12 @@ public query Store(",
     fn a_document_whose_handlers_were_not_compiled_is_refused() {
         let s = rendering_server();
         let named = s.handler_identities();
+        // The cart's own page's handlers are the store's, as their code is
+        // (ADR-0190); placing an order is one more (ADR-0193).
         assert_eq!(
             named.len(),
-            5,
-            "add_to_cart, clear_cart, and a line's three (ADR-0172): {named:?}"
+            6,
+            "add_to_cart, clear_cart, a line's three (ADR-0172) and place_order: {named:?}"
         );
         assert_eq!(
             s.uncompiled_handlers(),
@@ -10139,6 +10252,143 @@ public query Store(",
         );
         let b = visible(&page("/cart", "b"));
         assert!(b.contains("Your cart is empty."), "{b}");
+    }
+
+    /// The order's page, and the command that places an order (ADR-0193).
+    const ORDER_PAGE: &str = "store.page.OrderPage";
+    const PLACE: &str = "store.page.place_order";
+
+    /// Every patch set queued for one document, in order.
+    fn sets_of(s: &Server, doc: &Doc) -> Vec<PatchSet> {
+        s.pending.lock().expect("pending")[doc]
+            .frames
+            .iter()
+            .filter_map(|(_, f)| match f {
+                StreamFrame::PatchSet(set) => Some(set.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The HTML a patch set writes, its blocks rendered again.
+    fn written(set: &PatchSet) -> String {
+        set.patches
+            .iter()
+            .map(|p| match &p.operation {
+                PatchOp::ReplaceRange { html } => html.clone(),
+                PatchOp::ReplaceText { text } => text.clone(),
+                _ => String::new(),
+            })
+            .collect()
+    }
+
+    /// **An order is placed from the cart, and its page shows it**
+    /// (ADR-0193): the cart's lines become the session's order, the cart is
+    /// empty after, and a page open on the order is sent the change.
+    #[test]
+    fn an_order_is_placed_from_the_cart_and_reaches_its_open_page() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let (html, _, _, _) = s
+            .serve_document_settled("a", ORDER_PAGE, &Params::new(), &[])
+            .expect("served");
+        assert!(visible(&html).contains("You have no order yet."), "{html}");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        s.command(ADD, "a", &add_shown("espresso", 2), false)
+            .expect("added");
+        s.command(PLACE, "a", &[], false).expect("placed");
+        assert_eq!(
+            s.orders
+                .lock()
+                .expect("orders")
+                .get("a")
+                .map(String::as_str),
+            Some("placed")
+        );
+        assert!(
+            s.carts.lock().expect("carts")["a"].is_empty(),
+            "the cart is empty after"
+        );
+        let last = sets_of(&s, &doc).pop().expect("a patch set");
+        assert!(
+            written(&last).contains("Placed: the store has your order."),
+            "{last:?}"
+        );
+        // Another session has none.
+        let (other, _, _, _) = s
+            .serve_document_settled("b", ORDER_PAGE, &Params::new(), &[])
+            .expect("served");
+        assert!(
+            visible(&other).contains("You have no order yet."),
+            "{other}"
+        );
+    }
+
+    /// **An empty cart places no order** (ADR-0193), and says so: the
+    /// command is answered with its declared error, and nothing commits.
+    #[test]
+    fn an_empty_cart_places_no_order() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let answered = s
+            .command_answered(PLACE, "a", &[], false, None)
+            .expect("answered");
+        assert!(!answered.committed, "{:?}", answered.result);
+        assert!(
+            answered
+                .result
+                .as_ref()
+                .is_some_and(|r| r.to_string().contains("nothing-to-order")),
+            "{:?}",
+            answered.result
+        );
+        assert!(s.orders.lock().expect("orders").get("a").is_none());
+    }
+
+    /// **The store moving an order along reaches the page open on it**
+    /// (ADR-0193), through the kitchen's own address: not a command, so not
+    /// the cart's change. Sent against the order's own entry, at a version
+    /// that advances, and with no speculated value to a cart page open
+    /// beside it.
+    fn moved_along(s: &Served) {
+        s.command(ADD, "a", &add_shown("espresso", 1), false)
+            .expect("added");
+        s.command(PLACE, "a", &[], false).expect("placed");
+        s.serve_document_settled("a", ORDER_PAGE, &Params::new(), &[])
+            .expect("served");
+        let order = latest(&s.pending.lock().expect("pending"), "a");
+        s.serve_document_settled("a", CART_PAGE, &Params::new(), &[])
+            .expect("served");
+        let cart = latest(&s.pending.lock().expect("pending"), "a");
+        let mut versions = Vec::new();
+        for (status, said) in [
+            ("preparing", "Preparing: the store is making it."),
+            ("on-the-way", "On its way to you."),
+            ("delivered", "Delivered."),
+        ] {
+            let answer = posted(s, &format!("/bench/order?status={status}"), "a", "", "");
+            assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
+            let last = sets_of(s, &order).pop().expect("a patch set");
+            assert!(written(&last).contains(said), "{status}: {last:?}");
+            let basis = &last.basis.resources;
+            assert_eq!(basis.len(), 1);
+            assert_eq!(basis[0].entry, order_entry("a"));
+            versions.push(basis[0].version);
+        }
+        assert!(versions.windows(2).all(|w| w[0] < w[1]), "{versions:?}");
+        let values = s.pending.lock().expect("pending")[&cart]
+            .frames
+            .iter()
+            .filter(|(_, f)| matches!(f, StreamFrame::EntryValue { .. }))
+            .count();
+        assert_eq!(values, 0, "the cart's value went with the order's change");
+    }
+
+    #[test]
+    fn the_store_moving_an_order_along_reaches_its_open_page() {
+        moved_along(&served_from_patches_in(
+            "examples",
+            |app| app.to_string(),
+            &[],
+        ));
     }
 
     /// **The stores, as the home page** (ADR-0192): at `/`, each store this

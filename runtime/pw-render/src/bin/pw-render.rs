@@ -374,6 +374,18 @@ fn convert(v: &serde_json::Value) -> Result<Value, String> {
                     capability: capability.to_string(),
                 });
             }
+            // A case, in the wire form a page's values travel in
+            // (`Value::from_wire`): `{"$case": "None"}`, or `{"$case": "Some",
+            // "value": ...}`. Until 2026-10-04 a values file could state no
+            // case, and a page that matches on an option could not be
+            // rendered from one (ADR-0193).
+            if let Some(case) = o.get("$case") {
+                let case = case.as_str().ok_or("$case must be a string")?;
+                return Ok(Value::Variant {
+                    case: case.to_string(),
+                    payload: o.get("value").map(convert).transpose()?.map(Box::new),
+                });
+            }
             let mut m = BTreeMap::new();
             for (k, v) in o {
                 m.insert(k.clone(), convert(v)?);

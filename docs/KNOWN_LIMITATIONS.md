@@ -188,7 +188,8 @@ refused by name:
     plan** (ADR-0190), and speculates from its own module (ADR-0191). The
     store's page alone has its shared list, the menu, kept as one fragment
     for every reader, and a change to public data other than the menu
-    reaches no open page.
+    reaches no open page. A change the store makes to a session's own
+    resource reaches its pages (ADR-0193), for the order alone so far.
   - **A query's budget bounds the region, not the query.** The query runs on
     after its region is given the host's failure, and what it answers is
     kept as its policy says.

@@ -190,6 +190,8 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
             "clear_cart",
             "decrease_in_cart",
             "increase_in_cart",
+            // The cart's own page places it as an order (ADR-0193).
+            "place_order",
             "remove_from_cart"
         ]
     );
@@ -365,8 +367,9 @@ fn a_module_and_its_event_part_name_one_handler() {
     let units = store_units();
     let modules = modules(&units);
     let parts = event_parts(&units);
-    // The store's page's five, and its cart's page's four (ADR-0190).
-    assert_eq!(parts.len(), 9, "{parts:?}");
+    // The store's page's five, and its cart's page's five (ADR-0190,
+    // ADR-0193).
+    assert_eq!(parts.len(), 10, "{parts:?}");
     for (name, identity, captures) in &parts {
         let m = &modules[name];
         assert_eq!(&m.identity, identity, "{name}: one identity");

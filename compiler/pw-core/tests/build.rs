@@ -77,6 +77,8 @@ fn the_store_builds_every_artifact_from_source() {
             // The store's slots, since ADR-0165: each stream's query.
             "store.page.Estimate",
             "store.page.Menu",
+            // A session's order (ADR-0193).
+            "store.page.Order",
             "store.page.Recommendations",
             "store.page.Store",
             // The stores the home page lists (ADR-0192).
@@ -86,6 +88,8 @@ fn the_store_builds_every_artifact_from_source() {
             // A line's controls (ADR-0172).
             "store.page.decrease_in_cart",
             "store.page.increase_in_cart",
+            // The cart, placed as an order (ADR-0193).
+            "store.page.place_order",
             "store.page.remove_from_cart",
         ],
         "every command and query the page reaches, compiled and audited"
@@ -122,14 +126,15 @@ fn the_store_builds_every_artifact_from_source() {
 
     assert_eq!(
         b.templates.len(),
-        3,
-        "StorePage, CartPage (ADR-0190) and HomePage (ADR-0192)"
+        4,
+        "StorePage, CartPage (ADR-0190), HomePage (ADR-0192) and OrderPage (ADR-0193)"
     );
     assert_eq!(
         b.handlers.len(),
-        9,
-        "add_to_cart, clear_cart, and a line's three (ADR-0172); and the cart \
-         page's clear and a line's three (ADR-0190)"
+        10,
+        "add_to_cart, clear_cart, and a line's three (ADR-0172); the cart \
+         page's clear and a line's three (ADR-0190), and its place_order \
+         (ADR-0193)"
     );
     assert_eq!(
         b.contracts.len(),

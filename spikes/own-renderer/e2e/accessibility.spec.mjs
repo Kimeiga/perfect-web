@@ -181,6 +181,25 @@ test("another store, and a store that is not there, keep every rule", async ({ p
   expect(await audit(page), "not found").toEqual([]);
 });
 
+test("the order's page keeps every rule, as the store moves it along", async ({ page }) => {
+  // ADR-0193: a status said to a screen reader as it changes.
+  await ready(page, "/order");
+  expect(await audit(page), "no order").toEqual([]);
+  await ready(page, "/stores/47");
+  await page.getByRole("button", { name: "Add Espresso" }).click();
+  await expect(page.locator("#cart-count")).toHaveText("1");
+  await ready(page, "/cart");
+  await page.getByRole("button", { name: "Place order" }).click();
+  await expect(page.locator("#order-link")).toBeVisible();
+  expect(await audit(page), "the cart, its order placed").toEqual([]);
+  await ready(page, "/order");
+  await expect(page.locator("#order-status")).toHaveText("Placed: the store has your order.");
+  expect(await audit(page), "placed").toEqual([]);
+  await page.request.post("/bench/order?status=preparing");
+  await expect(page.locator("#order-status")).toHaveText("Preparing: the store is making it.");
+  expect(await audit(page), "preparing").toEqual([]);
+});
+
 test("the home page keeps every rule", async ({ context }) => {
   // ADR-0192: the stores, and the session's cart beside them.
   const home = await context.newPage();

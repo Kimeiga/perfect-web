@@ -1645,3 +1645,11 @@ as the home page.
   of the store's data layer, a public `StoreList()` query over it, and a
   `HomePage` at `/`: each store linked to its page, and the session's cart
   counted beside them. `/` was store 47's page, an alias from E7.
+
+[ADR-0193](DECISIONS/ADR-0193-an-order-is-placed-and-its-page-follows-it.md):
+an order is placed, and its page follows it.
+- The cart's page places its cart as an order: one commit writes the order
+  and the emptied cart, and an empty cart places nothing. The order's page at
+  `/order` shows its status, kept current as the store moves it along.
+- A change the store makes, not a command, reaches the session's open pages
+  (`session_changed`), against the order's own entry at an advancing version.

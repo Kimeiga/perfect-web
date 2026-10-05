@@ -5,6 +5,7 @@
     { "id": "47", "name": "Blue Bottle", "description": "Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning." },
     { "id": "48", "name": "Harbor Coffee", "description": "A neighborhood cafe by the water, pouring drip coffee brewed to order and matcha whisked by hand." }
   ],
+  "order": { "$case": "None" },
   "menu": [
     { "category": { "id": "coffee", "name": "Coffee" }, "items": [
       { "id": "espresso", "store_id": "47", "name": "Espresso", "description": "A double shot, pulled short.", "price": { "minor_units": 350 }, "price.display": "$3.50", "available": true, "category": { "id": "coffee", "name": "Coffee" } },

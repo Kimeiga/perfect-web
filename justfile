@@ -2589,6 +2589,30 @@ e14-home:
      } > docs/evidence/E14/home.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/home.txt
 
+# ADR-0193: an order is placed from the cart, and its page follows it as the
+# store moves it along. The server's tests, the order's flow in three
+# engines with its audit, and the mutation controls.
+e14-orders:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0193 - an order is placed, and its page follows it"; echo; \
+       echo "produced by: just e14-orders"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(an_order_is_placed|an_empty_cart_places|the_store_moving_an_order)|^test result'; \
+       echo; echo "== the order's flow, in three engines (e2e/pages.spec.mjs, e2e/accessibility.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs \
+          -g "order" --reporter=list 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/orders_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/orders_mutations.py; \
+     } > docs/evidence/E14/orders.txt
+    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/orders.txt
+
 # ADR-0186: a page states its description. The compiler's, the renderer's
 # and the server's tests, each store's page in three engines, the corpus at
 # C11, every program clean, and the mutation controls.

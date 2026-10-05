@@ -202,6 +202,18 @@ type CartError =
 
 // --- orders ---------------------------------------------------------------
 
+// **Where a customer's order is** (ADR-0193): what the store last said of
+// it.
+type OrderStatus =
+    | Placed
+    | Preparing
+    | OnTheWay
+    | Delivered
+
+// **Why an order was not placed** (ADR-0193).
+type OrderError =
+    | NothingToOrder
+
 type OrderDraft = OrderDraft {
     id: OrderId,
     cart: Cart,

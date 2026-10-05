@@ -1,0 +1,23 @@
+// @corpus: fixture
+// @id: LIB-Orders
+// @category: application service — a session's order
+// @charter: §15
+// @milestone: E14
+//
+// A customer's order, from the store's data layer, as a cart is (ADR-0193):
+// placed from the session's cart, and moved along by the store.
+
+module Orders
+
+import Carts
+import domain.{ OrderStatus, OrderError, TrackingError }
+import capability.{ Session, SessionId }
+
+// The session's order, as the store last said; none before one is placed.
+fn current(s: Session<SessionId>) -> Result<Option<OrderStatus>, TrackingError> !{ database.read<Orders> }
+    host "store:data/orders#current"
+
+// The session's cart, placed as its order: the order is the cart's lines,
+// and the cart is empty after. An empty cart places nothing.
+fn place(s: Session<SessionId>) -> Result<OrderStatus, OrderError> !{ database.write<Orders>, database.write<Carts> }
+    host "store:data/orders#place"

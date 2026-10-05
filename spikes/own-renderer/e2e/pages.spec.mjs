@@ -124,3 +124,42 @@ test("the home page counts the session's cart as it changes", async ({ context }
   await store.getByRole("button", { name: "Add Espresso" }).click();
   await expect(home.locator("#cart-count")).toHaveText("1");
 });
+
+test("an order is placed from the cart, and its page follows it as the store moves it along", async ({
+  context,
+}) => {
+  // ADR-0193: the cart, placed as an order; the order's page, kept current
+  // as the store says where it is.
+  const page = await context.newPage();
+  await oneEspresso(page);
+  await page.getByRole("button", { name: "Place order" }).click();
+  await expect(page.locator("#cart-notice")).toHaveText("Your order is placed.");
+  await expect(page.locator("#cart-count")).toHaveText("0");
+  await page.getByRole("link", { name: "Follow your order" }).click();
+  await expect(page).toHaveURL(/\/order$/);
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1", null, {
+    polling: 50,
+  });
+  await expect(page).toHaveTitle("Your order");
+  const status = page.locator("#order-status");
+  await expect(status).toHaveText("Placed: the store has your order.");
+  // The store moves it along, and the page open on it says so, unreloaded.
+  for (const [step, said] of [
+    ["preparing", "Preparing: the store is making it."],
+    ["on-the-way", "On its way to you."],
+    ["delivered", "Delivered."],
+  ]) {
+    const answer = await page.request.post(`/bench/order?status=${step}`);
+    expect(answer.ok()).toBe(true);
+    await expect(status).toHaveText(said);
+  }
+});
+
+test("an empty cart places no order, and says so", async ({ page }) => {
+  await ready(page, "/cart");
+  await page.getByRole("button", { name: "Place order" }).click();
+  await expect(page.locator("#cart-notice")).toHaveText(
+    "Your cart is empty: there is nothing to order.",
+  );
+  await expect(page.locator("#order-link")).toHaveCount(0);
+});

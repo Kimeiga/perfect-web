@@ -13,6 +13,19 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0193, 2026-10-04: an order is placed, and its page follows it.**
+The store's flow ended at a cart.
+- The cart's page places the cart as an order, in one commit with the emptied
+  cart. An empty cart places nothing.
+- The order's page, at `/order`, shows where the order is, in a live region.
+- A change the store makes, which is no command, now reaches the session's
+  open pages, against the order's own entry. Until now only a command on the
+  cart reached one.
+
+The store's program is a delivery's flow: the stores, a store, its cart,
+the order, each kept current while it is open. 7 mutants
+(`just e14-orders`).
+
 **ADR-0192, 2026-10-04: the stores, as the home page.** A delivery site
 starts with its stores, and the store's program had no list.
 - `Stores.list()` is a host operation of the store's data layer, and

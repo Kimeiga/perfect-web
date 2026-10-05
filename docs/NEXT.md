@@ -268,10 +268,23 @@ E14 comes before E11-E13. Its plan, controls and task list are
         server answers.
     18. ~~A list of stores as the home page~~ (ADR-0192, `just e14-home`):
         `StoreList()` and `HomePage` at `/`.
-    19. **Placing an order**: a checkout on the cart's page that places the
-        cart as an order, and an order's page at its own route that shows
-        its status as it changes (the store's program declares `Order` and
-        the host answers `orders#current`).
+    19. ~~Placing an order~~ (ADR-0193, `just e14-orders`): the cart placed
+        as an order, and its page kept current as the store moves it along.
+
+     **The owner's priority (2026-10-04): the app layer before the AI
+     benchmark.** Pleris is to be the perfect web application maker whatever
+     the database. Next, each as its own ruling:
+    20. **Types that contain themselves**, lifting ADR-0059: a recursive type
+        laid out indirectly in a component, flattened to nodes and indices at
+        the WIT and browser boundaries, then recursive views (ADR-0130's
+        ruling, unbuilt since ADR-0136).
+    21. **A data source states what it guarantees**: transactions,
+        consistency and its change feed. The compiler refuses a query or a
+        command that asks more of its source than it gives.
+    22. **Reference apps unlike the store**, to find the gaps: a feed
+        (pagination, live public data, threads, optimistic posting), a
+        multi-tenant SaaS (organizations, roles, forms, uploads), and one app
+        on three kinds of database.
 
      Next: E14-E's design, ready for the owner's choice of models and
      budget, and the owner's decisions logged in ADR-0182 (axe-core) and

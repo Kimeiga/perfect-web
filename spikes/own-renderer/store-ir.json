@@ -3,7 +3,7 @@
     "path": "store.page.CartPage",
     "name": "CartPage",
     "params": [],
-    "schema": "af851b35f6f6cfe0",
+    "schema": "237c6cc51cf6cc06",
     "chunks": [
       {
         "chunk": "static",
@@ -267,13 +267,61 @@
       },
       {
         "chunk": "static",
-        "value": ">\n                Clear\n            </button>\n        </main>"
+        "value": ">\n                Clear\n            </button>\n            \n            <button data-pw=\"5\" id=\"place-order\" type=\"button\""
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "event",
+          "id": 16,
+          "owner": 5,
+          "event": "press",
+          "handler": "1dba658cf8c3c6a1",
+          "name": "place_order"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": ">\n                Place order\n            </button>\n            "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "match",
+          "id": 17,
+          "value": "order",
+          "arms": [
+            {
+              "case": "Some",
+              "binding": "_",
+              "body": [
+                {
+                  "chunk": "static",
+                  "value": "<p id=\"order-link\"><a href=\"/order\">Follow your order</a></p>\n            "
+                }
+              ]
+            },
+            {
+              "case": "None",
+              "body": [
+                {
+                  "chunk": "static",
+                  "value": "\n            "
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n        </main>"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 16,
+          "id": 18,
           "pieces": [
             {
               "piece": "text",
@@ -401,6 +449,114 @@
             {
               "piece": "text",
               "value": "Order from the stores near you, for delivery or pickup."
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "path": "store.page.OrderPage",
+    "name": "OrderPage",
+    "params": [],
+    "schema": "21a3a0df884cd80a",
+    "chunks": [
+      {
+        "chunk": "static",
+        "value": "<main>\n            <h1>Your order</h1>\n            <section aria-label=\"Status\" aria-live=\"polite\" aria-atomic=\"true\">\n                "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "match",
+          "id": 0,
+          "value": "order",
+          "arms": [
+            {
+              "case": "Some",
+              "binding": "status",
+              "body": [
+                {
+                  "chunk": "static",
+                  "value": "\n                    "
+                },
+                {
+                  "chunk": "dynamic",
+                  "value": {
+                    "part": "match",
+                    "id": 1,
+                    "value": "status",
+                    "arms": [
+                      {
+                        "case": "placed",
+                        "body": [
+                          {
+                            "chunk": "static",
+                            "value": "<p id=\"order-status\">Placed: the store has your order.</p>\n                    "
+                          }
+                        ]
+                      },
+                      {
+                        "case": "preparing",
+                        "body": [
+                          {
+                            "chunk": "static",
+                            "value": "<p id=\"order-status\">Preparing: the store is making it.</p>\n                    "
+                          }
+                        ]
+                      },
+                      {
+                        "case": "on-the-way",
+                        "body": [
+                          {
+                            "chunk": "static",
+                            "value": "<p id=\"order-status\">On its way to you.</p>\n                    "
+                          }
+                        ]
+                      },
+                      {
+                        "case": "delivered",
+                        "body": [
+                          {
+                            "chunk": "static",
+                            "value": "<p id=\"order-status\">Delivered.</p>\n                    "
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "chunk": "static",
+                  "value": "\n                "
+                }
+              ]
+            },
+            {
+              "case": "None",
+              "body": [
+                {
+                  "chunk": "static",
+                  "value": "<p id=\"order-status\">You have no order yet.</p>\n                "
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n            </section>\n            <p><a href=\"/\">Order from a store</a></p>\n        </main>"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "title",
+          "id": 2,
+          "pieces": [
+            {
+              "piece": "text",
+              "value": "Your order"
             }
           ]
         }
