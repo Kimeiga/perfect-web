@@ -263,11 +263,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
     16. ~~Every page that binds a query, served at its route~~ (ADR-0190,
         `just e14-pages`): E14-Q's next slice; the store's cart as a page of
         its own, kept current beside the store's.
-    17. **Every page speculates**, from the module `pw build` writes it
-        (ADR-0172), as the store's does: the cart page shows a press when the
-        server answers. Then a list of stores as the store's home page, which
-        needs a stores query and its shared list kept current (ADR-0190's
-        alternatives).
+    17. ~~Every page speculates~~ (ADR-0191, `just e14-page-speculation`):
+        from its own module; the cart's page shows a press before the
+        server answers.
+    18. **A list of stores as the home page**, at `/`: a stores query and a
+        host operation for it, each store linked to its page, and the
+        session's cart beside them.
 
      Next: E14-E's design, ready for the owner's choice of models and
      budget, and the owner's decisions logged in ADR-0182 (axe-core) and

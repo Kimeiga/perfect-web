@@ -1631,3 +1631,10 @@ every page that binds a query is served at its route.
 - The menu's fragment and the speculation stay the store's page's. The store
   gains a second page, its cart at `/cart`: a change made on either page
   reaches the other while both are open.
+
+[ADR-0191](DECISIONS/ADR-0191-every-page-speculates-from-its-own-module.md):
+every page speculates from its own module.
+- `pw build` wrote every page a speculation module; the server read the
+  store's alone, so the cart's page showed a press only when the server
+  answered. Now each page carries its own, and each document whose page
+  speculates on a value is sent it.

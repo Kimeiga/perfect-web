@@ -524,11 +524,12 @@ struct Server {
     /// for a running server; the document directory for the unit tests,
     /// which `run.sh` fills the same way.
     artifacts: std::path::PathBuf,
-    /// **The store page's speculation manifest** (ADR-0122), as `pw
-    /// emit-speculations` wrote it to `dist/speculations/`: which bindings
+    /// **Each page's speculation manifest** (ADR-0122, ADR-0191), by its
+    /// page's path, as `pw build` wrote it to `speculations/`: which bindings
     /// the page speculates on, and so which entries' values it is sent.
-    /// `None` when the build wrote none.
-    speculation: Option<serde_json::Value>,
+    /// Until 2026-10-04 the store's alone was read, and no other page
+    /// speculated, though the build wrote each its module.
+    speculations: BTreeMap<String, serde_json::Value>,
     /// **What the store page shows, as reads of what its queries return**
     /// (ADR-0125): `pw build`'s `pages/store.page.StorePage.json`. Each
     /// binding names the query component it runs; each part, the steps from
@@ -956,7 +957,7 @@ impl Server {
             plans,
         }: Built,
     ) -> Server {
-        let speculation = speculation_manifest(&artifacts);
+        let speculations = speculation_manifests(&artifacts);
         let query_clock = pw_resource::Clock::new();
         let clock = Clock::new();
         let materializer = Materializer::new(clock.clone(), BUILD);
@@ -996,7 +997,7 @@ impl Server {
             menu_rendered_from: Mutex::new(BTreeMap::new()),
             contracts,
             topology,
-            speculation,
+            speculations,
             plan,
             plans,
             queries: pw_resource::Resources::caching(query_clock.clone()),
@@ -2647,14 +2648,14 @@ impl Server {
         for (doc, page, store, bindings, now) in read {
             // And the value itself, to a page that speculates on it
             // (ADR-0122), from the snapshot the patches are derived from.
-            // Only the store's page carries a speculation (ADR-0190).
+            // To each page that speculates on it, by its own manifest
+            // (ADR-0191).
             // Until 2026-10-03 it was read again after the table was let go,
             // and pushed in a second hold: a page could be sent one change in
             // two batches, and a command committed in between gave the frame
             // a value later than its version.
             let value = self
-                .speculates_on_cart()
-                .filter(|_| page == self.store_page())
+                .speculates_on_cart(&page)
                 .and_then(|binding| bindings.get(&binding))
                 .map(val_to_json);
             // Against what the document shows. With none served, none shows.
@@ -3256,7 +3257,12 @@ impl Server {
             .expect("keyed")
             .insert(doc.clone(), Keyed::default());
         // Its cursor is its number, never zero.
-        Some((html, doc.1, self.speculated_entries(&doc.0), env))
+        Some((
+            html,
+            doc.1,
+            self.speculated_entries(&doc.0, &self.page_of(doc)),
+            env,
+        ))
     }
 
     /// **The cart, as the page's speculation module decodes it** (ADR-0122):
@@ -3275,11 +3281,11 @@ impl Server {
         val_to_json(&cart)
     }
 
-    /// Does the page speculate on the session's cart? Read from the manifest:
+    /// Does `page` speculate on the session's cart? Read from its manifest:
     /// a binding of `store.page.Cart` keyed by `current_session()`, the one
     /// key this server computes, as it computes an event's (ADR-0104).
-    fn speculates_on_cart(&self) -> Option<String> {
-        self.speculation.as_ref()?["bindings"]
+    fn speculates_on_cart(&self, page: &str) -> Option<String> {
+        self.speculations.get(page)?["bindings"]
             .as_array()?
             .iter()
             .find(|b| {
@@ -3289,10 +3295,11 @@ impl Server {
             .and_then(|b| b["binding"].as_str().map(str::to_string))
     }
 
-    /// Each speculated binding's entry, version and value, for the document.
-    fn speculated_entries(&self, session: &str) -> serde_json::Value {
+    /// Each speculated binding's entry, version and value, for a document of
+    /// `page`.
+    fn speculated_entries(&self, session: &str, page: &str) -> serde_json::Value {
         let mut out = serde_json::Map::new();
-        if let Some(binding) = self.speculates_on_cart() {
+        if let Some(binding) = self.speculates_on_cart(page) {
             out.insert(
                 binding,
                 serde_json::json!({
@@ -5730,15 +5737,15 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // module here itself. An identity this build's templates do not name
         // is refused before the file system is asked, so a request can only
         // ever reach a file the compiler named.
-        // The page's speculation module (ADR-0122), as `pw emit-speculations`
-        // wrote it. Only the one the manifest names.
+        // A page's speculation module (ADR-0122), as `pw build` wrote it.
+        // Only one a page's manifest names (ADR-0191).
         ("GET", route)
             if route.strip_prefix("/speculation/").is_some_and(|m| {
+                let m = m.split('?').next().unwrap_or(m);
                 server
-                    .speculation
-                    .as_ref()
-                    .and_then(|s| s["module"].as_str())
-                    == Some(m.split('?').next().unwrap_or(m))
+                    .speculations
+                    .values()
+                    .any(|s| s["module"].as_str() == Some(m))
             }) =>
         {
             let module = route.trim_start_matches("/speculation/");
@@ -6165,31 +6172,26 @@ fn serve_bound(
                 Ok(served) => served,
                 Err(why) => return unavailable(stream, why),
             };
-        // The store's page alone speculates (ADR-0190).
-        let speculating = page == server.store_page();
-        let speculation = server
-            .speculation
-            .as_ref()
-            .filter(|_| speculating)
-            .and_then(|m| {
-                let module = m["module"].as_str()?;
-                // Each part the browser renders again with a speculation
-                // (ADR-0172), whose template the document carries.
-                let regions: Vec<u32> = m["regions"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|r| r.as_u64().map(|r| r as u32))
-                    .collect();
-                Some((format!("/speculation/{module}"), entries, regions))
-            });
+        // Its page's speculation, by its own manifest (ADR-0191).
+        let speculation = server.speculations.get(page).and_then(|m| {
+            let module = m["module"].as_str()?;
+            // Each part the browser renders again with a speculation
+            // (ADR-0172), whose template the document carries.
+            let regions: Vec<u32> = m["regions"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|r| r.as_u64().map(|r| r as u32))
+                .collect();
+            Some((format!("/speculation/{module}"), entries, regions))
+        });
         // The page's title, from the values it was rendered with
         // (ADR-0183). A store's program that states none, the benchmark's
         // copy, is titled as every store's page was, and another page that
         // states none by its name, as a page of signals is.
         let title = match pw_render::title_text(template, &env) {
             Ok(title) => title.unwrap_or_else(|| {
-                if speculating {
+                if page == server.store_page() {
                     "Store".to_string()
                 } else {
                     template.name.clone()
@@ -6635,10 +6637,20 @@ fn document(
 const RUNTIME: &str = "<script>import(\"/pw-runtime.mjs\")</script>";
 
 /// The store page's speculation manifest, if the build wrote one (ADR-0122).
-fn speculation_manifest(dist: &std::path::Path) -> Option<serde_json::Value> {
-    let text = std::fs::read_to_string(dist.join("speculations").join("store.page.StorePage.json"))
-        .ok()?;
-    serde_json::from_str(&text).ok()
+/// **Every page's speculation manifest** (ADR-0191), by the page it names.
+fn speculation_manifests(dist: &std::path::Path) -> BTreeMap<String, serde_json::Value> {
+    let Ok(entries) = std::fs::read_dir(dist.join("speculations")) else {
+        return BTreeMap::new();
+    };
+    entries
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        .filter_map(|p| {
+            let m: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(&p).ok()?).ok()?;
+            Some((m["page"].as_str()?.to_string(), m))
+        })
+        .collect()
 }
 
 fn session_of(headers: &str) -> String {
@@ -9134,12 +9146,15 @@ public query Store(",
     /// The manifest `pw emit-speculations` writes for the store page.
     fn speculating_server() -> Server {
         let mut s = rendering_server();
-        s.speculation = Some(serde_json::json!({
-            "page": "store.page.StorePage",
-            "module": "store.page.StorePage.mjs",
-            "bindings": [{ "binding": "cart", "resource": "store.page.Cart", "key": ["current_session()"] }],
-            "commands": ["store.page.add_to_cart"],
-        }));
+        s.speculations.insert(
+            "store.page.StorePage".to_string(),
+            serde_json::json!({
+                "page": "store.page.StorePage",
+                "module": "store.page.StorePage.mjs",
+                "bindings": [{ "binding": "cart", "resource": "store.page.Cart", "key": ["current_session()"] }],
+                "commands": ["store.page.add_to_cart"],
+            }),
+        );
         s
     }
 
@@ -10079,9 +10094,20 @@ public query Store(",
                 "{cart}"
             );
             assert!(visible(&cart).contains("Your cart is empty."), "{cart}");
-            // The store's page alone speculates.
-            assert!(!cart.contains("\"speculation\""), "{cart}");
+            // It speculates from its own module (ADR-0191).
+            assert!(
+                cart.contains("\"speculation\":\"/speculation/store.page.CartPage.mjs\""),
+                "{cart}"
+            );
         }
+        // Which is served, and a module no page's manifest names is not.
+        let module = page("/speculation/store.page.CartPage.mjs", "a");
+        assert!(
+            module.starts_with("HTTP/1.1 200") && module.contains("text/javascript"),
+            "{module}"
+        );
+        let none = page("/speculation/store.page.Nothing.mjs", "a");
+        assert!(!none.starts_with("HTTP/1.1 200"), "{none}");
         // The session's cart, and not another's.
         s.command(ADD, "a", &add_shown("espresso", 2), false)
             .expect("the command commits");
@@ -10148,7 +10174,7 @@ public query Store(",
                 && matches!(&p.operation, PatchOp::ReplaceText { text } if text == "2")),
             "{to_cart:?}"
         );
-        // And the speculated value to the page that speculates alone.
+        // And the speculated value to each, as each speculates (ADR-0191).
         let values = |doc: &Doc| {
             s.pending.lock().expect("pending")[doc]
                 .frames
@@ -10156,7 +10182,7 @@ public query Store(",
                 .filter(|(_, f)| matches!(f, StreamFrame::EntryValue { .. }))
                 .count()
         };
-        assert_eq!((values(&store) > 0, values(&cart)), (true, 0));
+        assert_eq!((values(&store) > 0, values(&cart) > 0), (true, true));
     }
 
     /// **A page other than the store's is told nothing of its menu**

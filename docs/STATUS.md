@@ -13,6 +13,17 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0191, 2026-10-04: every page speculates from its own module.** The
+compiler wrote every page a speculation module, and the server read the
+store's alone, so the cart's page showed a press only when the server
+answered.
+- Each page now carries its own module, and a change's speculated value is
+  sent to each document whose page speculates on it.
+- The cart's page moves a line's quantity before the server answers, and
+  restores a refused press, in three engines.
+
+4 mutants (`just e14-page-speculation`).
+
 **ADR-0190, 2026-10-04: every page that binds a query is served at its
 route** (E14-Q's next slice). A store like DoorDash's is several pages that
 read queries. Only the store's page could: the server read its plan and
@@ -26,8 +37,8 @@ bound a query.
   press on either page reaches the other while both are open, in three
   engines.
 
-9 mutants (`just e14-pages`). Not yet: a page other than the store's
-speculating, and public data other than the menu kept current.
+9 mutants (`just e14-pages`). Not yet: public data other than the menu
+kept current. A page other than the store's speculates since ADR-0191.
 
 **ADR-0189, 2026-10-04: a `<link>` is written where HTML allows it.**
 `<link rel="canonical">` and `rel="icon"` written in markup checked and

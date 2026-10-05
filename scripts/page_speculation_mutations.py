@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-0190: every page that binds a query is served at
-its route, and kept current by its own plan.
+"""Mutation controls for ADR-0191: every page speculates from its own module.
 
 Each mutant undoes one piece of the development server's:
-- a page that binds a query served as a page of signals, which refuses it;
-- every document recorded as the store's;
-- a document's bindings read by the store's plan;
-- a document patched against the store's template;
-- a change sent to the store's documents alone;
-- the store's menu fragment rendered for every page;
-- the store's menu told to every document of its store.
+- the store's manifest alone read;
+- a page given the store's speculation;
+- a module no page but the store's names refused;
+- a speculated value sent to the store's documents alone.
 
 Every mutant must fail the development server's tests of a second page.
 
-Run from the repository root; `just e14-pages` records the output. The
-source is restored after every mutant, whatever happens.
+Run from the repository root; `just e14-page-speculation` records the
+output. The source is restored after every mutant, whatever happens.
 """
 
 import os
@@ -30,68 +26,39 @@ SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 # (what, file, anchor, replacement)
 MUTANTS = [
     (
-        "a page that binds a query is served as a page of signals",
+        "the store's manifest alone is read",
         SERVER,
-        "            .and_then(|plan| plan[\"bindings\"].as_array())\n"
-        "            .is_some_and(|b| !b.is_empty())\n",
-        "            .and_then(|plan| plan[\"bindings\"].as_array())\n"
-        "            .is_some_and(|_| false)\n",
+        "        .filter(|p| p.extension().is_some_and(|x| x == \"json\"))\n",
+        "        .filter(|p| p.ends_with(\"store.page.StorePage.json\"))\n",
     ),
     (
-        "every document is recorded as the store's",
+        "a page is given the store's speculation",
         SERVER,
-        "            .insert(doc.clone(), page.to_string());\n",
-        "            .insert(doc.clone(), self.store_page().to_string());\n",
+        "        let speculation = server.speculations.get(page).and_then(|m| {\n",
+        "        let speculation = server\n"
+        "            .speculations\n"
+        "            .get(server.store_page())\n"
+        "            .and_then(|m| {\n",
     ),
     (
-        "a document's bindings are read by the store's plan",
+        "a module the store's manifest does not name is refused",
         SERVER,
-        "        let plan = self.plan_of(&page);\n"
-        "        let mut out = BTreeMap::new();\n",
-        "        let plan = &self.plan;\n"
-        "        let mut out = BTreeMap::new();\n",
+        "                    .any(|s| s[\"module\"].as_str() == Some(m))\n",
+        "                    .any(|s| s[\"page\"] == \"store.page.StorePage\" && s[\"module\"].as_str() == Some(m))\n",
     ),
     (
-        "a document is patched against the store's template",
+        "a speculated value is sent to the store's documents alone",
         SERVER,
-        "    ) -> Result<Vec<Targeted>, String> {\n"
-        "        let template = self.template_of(page);\n",
-        "    ) -> Result<Vec<Targeted>, String> {\n"
-        "        let template = self.store_template();\n",
+        "                .speculates_on_cart(&page)\n",
+        "                .speculates_on_cart(&page)\n"
+        "                .filter(|_| page == self.store_page())\n",
     ),
-    (
-        "a change is sent to the store's documents alone",
-        SERVER,
-        "        for doc in documents {\n"
-        "            let store = self.store_of(&doc);\n",
-        "        for doc in documents\n"
-        "            .into_iter()\n"
-        "            .filter(|d| self.page_of(d) == self.store_page())\n"
-        "        {\n"
-        "            let store = self.store_of(&doc);\n",
-    ),
-    (
-        "every page renders the store's menu",
-        SERVER,
-        "        let menu = (page == self.store_page()).then(|| {\n",
-        "        let menu = true.then(|| {\n",
-    ),
-    (
-        "the store's menu is told to every document of its store",
-        SERVER,
-        "                .is_none_or(|page| page.as_str() == self.store_page())\n",
-        "                .is_none_or(|_| true)\n",
-    ),
-    # ADR-0191 lets every page speculate from its own module: the two
-    # mutants that sent the store's speculation to every page are
-    # `page_speculation_mutations.py`'s now, turned around.
 ]
 
 TESTS = [
     "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
     "a_page_that_binds_a_query_is_served_at_its_route",
     "a_change_reaches_each_page_that_reads_it_by_its_own_plan",
-    "a_page_without_the_menu_is_told_nothing_of_it",
 ]
 
 # How long one command may run. Past the bound it is killed with everything

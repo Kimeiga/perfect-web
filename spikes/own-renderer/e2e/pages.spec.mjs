@@ -59,3 +59,44 @@ test("the store's page links to the cart's", async ({ page }) => {
   });
   await expect(page).toHaveTitle("Your cart");
 });
+
+/** The cart page with one Espresso in its session's cart. */
+async function oneEspresso(page) {
+  await ready(page, "/stores/47");
+  await page.getByRole("button", { name: "Add Espresso" }).click();
+  await expect(page.locator("#cart-count")).toHaveText("1");
+  await ready(page, "/cart");
+}
+
+test("a press on the cart's page is shown before the server answers", async ({ page }) => {
+  // ADR-0191: the cart's page speculates from its own module, as the
+  // store's does. The command's request is held at the network, so "before"
+  // is observed rather than inferred from timing.
+  await oneEspresso(page);
+  const held = [];
+  await page.route("**/command/store.page.increase_in_cart", async (route) => {
+    await new Promise((resolve) => held.push(resolve));
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Increase quantity of Espresso" }).click();
+  await expect.poll(() => held.length).toBe(1);
+  await expect(page.locator("#cart-count")).toHaveText("2");
+  held.splice(0).forEach((resolve) => resolve());
+  await expect(page.locator("#cart-count")).toHaveText("2");
+  await page.unroute("**/command/store.page.increase_in_cart");
+  // And the server agrees, read from a fresh document.
+  await ready(page, "/cart");
+  await expect(page.locator("#cart-count")).toHaveText("2");
+});
+
+test("a press the server refuses is restored on the cart's page", async ({ page }) => {
+  await oneEspresso(page);
+  await page.route("**/command/store.page.increase_in_cart", (route) =>
+    route.fulfill({ status: 202, contentType: "application/json", body: '{"committed":false}' }),
+  );
+  await page.getByRole("button", { name: "Increase quantity of Espresso" }).click();
+  await expect(page.locator("#cart-count")).toHaveText("1");
+  await expect
+    .poll(() => page.evaluate(() => window.__pw.log.join("\n")))
+    .toMatch(/restored cart/);
+});

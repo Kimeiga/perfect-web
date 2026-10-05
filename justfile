@@ -2543,6 +2543,29 @@ e14-pages:
      } > docs/evidence/E14/pages.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/pages.txt
 
+# ADR-0191: every page speculates from its own module. The server's tests,
+# the cart's page showing a press before the server answers in three
+# engines, and the mutation controls.
+e14-page-speculation:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0191 - every page speculates from its own module"; echo; \
+       echo "produced by: just e14-page-speculation"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_page_that_binds_a_query|a_change_reaches_each_page)|^test result'; \
+       echo; echo "== the cart's page, in three engines (e2e/pages.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs --reporter=list 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/page_speculation_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/page_speculation_mutations.py; \
+     } > docs/evidence/E14/page-speculation.txt
+    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/page-speculation.txt
+
 # ADR-0186: a page states its description. The compiler's, the renderer's
 # and the server's tests, each store's page in three engines, the corpus at
 # C11, every program clean, and the mutation controls.
