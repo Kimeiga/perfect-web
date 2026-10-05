@@ -441,7 +441,8 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-04: `examples/domain.pw` declares `OrderStatus`, where a
     // session's order is, and `OrderError`, why one was not placed: the store
     // places its cart as an order and follows it (ADR-0193).
-    const EXPECTED: u64 = 0xe9a6163a6218a24a;
+    // ADR-0208 declared `outbox.write`, the effect of emitting an event.
+    const EXPECTED: u64 = 0xf8b632a0deb149b7;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

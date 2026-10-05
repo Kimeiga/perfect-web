@@ -421,6 +421,12 @@ pub enum ExecutionContext {
     /// it may read invocation context, and its effects are not the
     /// declaration's work.
     Key,
+    /// **An event's key** (ADR-0208): an argument of
+    /// `CartChanged(current_session())` in `emits CartChanged(..)`. The
+    /// command evaluates it, before its body, and hands the event to the
+    /// outbox: so what it performs is the command's work (ADR-0195, ruling
+    /// 9).
+    Emitted,
     /// **A listener's argument** (ADR-0091): `id` in `invalidates_on
     /// MenuChanged(id)`. The declaration's parameter an event's value must
     /// equal, or `_`. Nothing in it is evaluated; it says which part of an
@@ -467,7 +473,10 @@ impl ExecutionContext {
     pub fn contributes_to_declaration(self) -> bool {
         matches!(
             self,
-            ExecutionContext::Draw | ExecutionContext::Acquire | ExecutionContext::Release
+            ExecutionContext::Draw
+                | ExecutionContext::Acquire
+                | ExecutionContext::Release
+                | ExecutionContext::Emitted
         )
     }
 
@@ -480,6 +489,7 @@ impl ExecutionContext {
             ExecutionContext::Acquire => "a resource's acquire block",
             ExecutionContext::Release => "a resource's release block",
             ExecutionContext::Key => "a clause's key",
+            ExecutionContext::Emitted => "an event's key",
             ExecutionContext::Listener => "a listener's argument",
         }
     }

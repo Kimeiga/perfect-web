@@ -251,6 +251,7 @@ world store-page-store-page {
 }
 
 world store-page-add-to-cart {
+    import pw:host/outbox;
     import pw:host/session;
     import store:data/carts;
     import store:data/menus;
@@ -258,18 +259,21 @@ world store-page-add-to-cart {
 }
 
 world store-page-clear-cart {
+    import pw:host/outbox;
     import pw:host/session;
     import store:data/carts;
     export store-page-clear-cart-api;
 }
 
 world store-page-decrease-in-cart {
+    import pw:host/outbox;
     import pw:host/session;
     import store:data/carts;
     export store-page-decrease-in-cart-api;
 }
 
 world store-page-increase-in-cart {
+    import pw:host/outbox;
     import pw:host/session;
     import store:data/carts;
     import store:data/menus;
@@ -277,12 +281,14 @@ world store-page-increase-in-cart {
 }
 
 world store-page-place-order {
+    import pw:host/outbox;
     import pw:host/session;
     import store:data/orders;
     export store-page-place-order-api;
 }
 
 world store-page-remove-from-cart {
+    import pw:host/outbox;
     import pw:host/session;
     import store:data/carts;
     export store-page-remove-from-cart-api;
@@ -386,6 +392,11 @@ package pw:types {
 }
 
 package pw:host {
+    interface outbox {
+        use pw:types/types.{capability-session-id};
+        cart-changed: func(arg0: capability-session-id);
+        order-changed: func(arg0: capability-session-id);
+    }
     interface session {
         use pw:types/types.{capability-session-id};
         read: func() -> capability-session-id;

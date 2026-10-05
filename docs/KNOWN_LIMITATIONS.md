@@ -443,12 +443,12 @@ awaited in order. What remains:
   `onClick={handle}`, is refused when checked (PW0614): a lambda written
   where it is used shows what it captures and the signals it writes, and a
   declaration is how a behaviour is shared.
-- **The dev server computes one event key: `current_session()`**
-  (ADR-0104). It commits the events a command declares, and refuses a
-  command whose event carries anything else, such as its own argument.
-  ADR-0195 (ruling 11) rules that the compiled command returns its typed
-  events with its result, and the host writes them in the writes'
-  transaction; not built yet.
+- **A command computes its events; the server still reads `invalidates`
+  keys' text** (ADR-0208). Each event goes to the platform's outbox from the
+  command's component, and commits with its writes. An `invalidates` key is
+  `current_session()` or the whole query is dropped: sound, and the same
+  work, next. An event carrying a value that is not a key (a record, a list)
+  checks, and is refused when the command runs.
 - **A source's guarantees are its program's statement** (ADR-0207). What a
   program asks of its data is held to what its `source` declarations give;
   nothing yet compares a source's clauses with the database a deployment

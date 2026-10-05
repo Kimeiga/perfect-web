@@ -118,6 +118,10 @@ pub struct Import {
     /// name, ADR-0018.
     #[serde(default)]
     pub bounded: Vec<Bounded>,
+    /// **The event this import writes to the outbox** (ADR-0208), by its
+    /// declaration's path. Mirrored by field name, ADR-0018.
+    #[serde(default)]
+    pub event: Option<String>,
 }
 
 /// **One place a value from outside must hold an invariant** (ADR-0179), as

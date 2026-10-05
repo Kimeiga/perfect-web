@@ -337,6 +337,16 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
     f.ret = ret.clone();
 
     let body = cx.hirs[unit].body(body_id);
+    // **A command's events, computed by the command** (ADR-0208). Each
+    // `emits` key's values are evaluated before its body, on what it was
+    // given, and handed to the platform's outbox, which commits them with the
+    // command's writes or not at all. The server never reads a key's text.
+    for key in decl.policy("emits").iter().flat_map(|p| &p.keys) {
+        match f.emit(body, key) {
+            Lowering::Lowered(()) => {}
+            other => return other.map(|_| unreachable!()),
+        }
+    }
     let result = match f.expr(body, body.root, Some(&ret)) {
         Lowering::Lowered(v) => v,
         other => return other.map(|_| unreachable!()),
@@ -1452,6 +1462,71 @@ fn ty_resolved_with(
 }
 
 impl<'a> Lower<'a> {
+    /// **An event a command emits** (ADR-0208): its values, at the
+    /// parameters the event declares, then the outbox's call.
+    fn emit(&mut self, body: &Body, key: &crate::hir::ClauseKey) -> Lowering<()> {
+        let blocked = |why: String| Lowering::Blocked {
+            why,
+            span: key.span.clone(),
+        };
+        let Some(event) = crate::backend::emitted_event(self.cx.ws, self.unit, key) else {
+            return blocked(format!("`emits {}` names no event", key.name));
+        };
+        let (Some(decl), Some(sig)) = (
+            crate::resolve::declaration(self.cx.hirs, event),
+            self.cx.sigs.by_def(event),
+        ) else {
+            return blocked(format!("`{}` has no resolved signature", key.name));
+        };
+        let Some(import) = crate::backend::host_binding(decl) else {
+            return blocked(format!("`{}` is not the outbox's", key.name));
+        };
+        // Each value at its parameter: by its name where it is named, and
+        // otherwise in order, as the checker related them (ADR-0088).
+        let mut given: Vec<Option<ExprId>> = vec![None; sig.params.len()];
+        let mut next = 0;
+        for a in &key.args {
+            let at = match &a.name {
+                Some(name) => sig.names.iter().position(|n| n == name),
+                None => {
+                    next += 1;
+                    Some(next - 1)
+                }
+            };
+            match at.and_then(|i| given.get_mut(i)) {
+                Some(slot) => *slot = Some(a.value),
+                None => {
+                    return blocked(format!("`{}` is given a value it does not carry", key.name));
+                }
+            }
+        }
+        let mut args = Vec::new();
+        for (slot, declared) in given.into_iter().zip(&sig.params) {
+            let (Some(expr), Some(declared)) = (slot, declared.as_ref()) else {
+                return blocked(format!(
+                    "`{}` is not given every value it carries",
+                    key.name
+                ));
+            };
+            let ty = match ty_resolution(self.cx.sigs, declared, &key.span) {
+                Lowering::Lowered(t) => t,
+                other => return other.map(|_| unreachable!()),
+            };
+            match self.expr(body, expr, Some(&ty)) {
+                Lowering::Lowered(v) => args.push(v),
+                other => return other.map(|_| unreachable!()),
+            }
+        }
+        let result = self.fresh();
+        self.push(Instr::ImportCall {
+            result,
+            import,
+            args,
+            ty: Type::Unit,
+        });
+        Lowering::Lowered(())
+    }
+
     /// Lower one expression. `expected` is the type its context fixes, if any:
     /// the declaration's result, a parameter's type, the arms' common type.
     /// It is how `None` knows what it is `None` of.

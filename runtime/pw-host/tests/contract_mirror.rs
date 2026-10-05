@@ -203,11 +203,16 @@ fn the_real_contracts_drive_a_real_admission() {
                 // missing since E4. A node that does not publish it cannot run
                 // the page — which is the admission decision working, not a
                 // test detail.
+                //
+                // `outbox.write` joined it on 2026-10-05 (ADR-0208): a
+                // command's events are committed with its writes, so a node
+                // runs it only where it keeps an outbox.
                 grants: BTreeSet::from([
                     "database.read<Carts>".to_string(),
                     "database.read<Menus>".to_string(),
                     "database.read<Stores>".to_string(),
                     "database.write<Carts>".to_string(),
+                    "outbox.write".to_string(),
                     "session.read".to_string(),
                 ]),
             },

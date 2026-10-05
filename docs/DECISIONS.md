@@ -1787,3 +1787,13 @@ owner's priority 21; ADR-0195's ruling 11).
 - A query's consistency, a command's isolation, events and idempotency, and
   its writes in one source are held to it (PW0344-PW0349). A resource no
   source holds is the host's database's.
+[ADR-0208](DECISIONS/ADR-0208-a-command-computes-its-events.md): a command
+computes its events, and the outbox commits them with its writes
+(ADR-0195's ruling 11's other half).
+- Each event is a function of the platform's outbox,
+  `pw:host/outbox#cart-changed`, which the command calls before its body
+  with the values it computed. Emitting is `outbox.write`, which a node
+  grants where it keeps an outbox.
+- The server stages them and commits them with the writes; it evaluates no
+  key's text for an event. Found: an `Int` key missed its entry, and an
+  empty value reached every entry.

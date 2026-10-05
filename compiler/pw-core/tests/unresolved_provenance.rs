@@ -148,6 +148,8 @@ fn a005_idempotent_command_after_repair() {
         caps(c),
         BTreeSet::from([
             "database.write<Carts>".to_string(),
+            // Its events, written with its writes (ADR-0208).
+            "outbox.write".to_string(),
             "session.read".to_string()
         ]),
         "the write it always had, plus the session read it was doing without \
@@ -214,6 +216,8 @@ fn a014_content_addressed_handler_after_repair() {
         caps(of(&cs, "cart.commands.add_to_cart")),
         BTreeSet::from([
             "database.write<Carts>".to_string(),
+            // Its events, written with its writes (ADR-0208).
+            "outbox.write".to_string(),
             "session.read".to_string()
         ]),
         "the command carries what the view does not"
@@ -376,6 +380,7 @@ fn store_page_after_repair() {
         BTreeSet::from([
             "database.read<Menus>".to_string(),
             "database.write<Carts>".to_string(),
+            "outbox.write".to_string(),
             "session.read".to_string()
         ]),
         "the write AND the session read — which is what the backend saw as two \

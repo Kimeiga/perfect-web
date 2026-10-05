@@ -102,6 +102,34 @@ fn the_committed_wit_is_what_the_compiler_emits_now() {
     );
 }
 
+/// **The committed contracts are what the compiler derives now**
+/// (ADR-0208). Nothing compared them, and they were last emitted at ADR-0181:
+/// the pages and the order ADR-0190 to ADR-0193 added were in no committed
+/// contract, and the host's planning tests read them.
+#[test]
+fn the_committed_contracts_are_what_the_compiler_derives_now() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let sources = store_sources(&root);
+    let hirs: Vec<Hir> = sources
+        .iter()
+        .map(|s| lower_file(s, &parse_tree(s).green))
+        .collect();
+    let refs: Vec<&Hir> = hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+    let fresh = serde_json::to_value(contracts(&refs, &sigs, &ws)).expect("contracts encode");
+    let committed: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join("docs/evidence/E8/component-contracts.json"))
+            .expect("component-contracts.json"),
+    )
+    .expect("the committed contracts parse");
+    assert!(
+        fresh == committed,
+        "docs/evidence/E8/component-contracts.json is stale. Run `just e8-contracts` \
+         and commit the result."
+    );
+}
+
 #[test]
 fn the_check_would_notice_a_change() {
     // **A comparison against a file that is always equal proves nothing.** So

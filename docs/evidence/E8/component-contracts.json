@@ -443,6 +443,108 @@
     ]
   },
   {
+    "component_id": "store.page.CartPage",
+    "capability_mapping": 1,
+    "abi_schema": "f00a4fe14eeded6f",
+    "required_capabilities": [
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.page.Cart",
+        "name": "Cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.Order",
+        "name": "Order",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.clear_cart",
+        "name": "clear_cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.decrease_in_cart",
+        "name": "decrease_in_cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.increase_in_cart",
+        "name": "increase_in_cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.place_order",
+        "name": "place_order",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.remove_from_cart",
+        "name": "remove_from_cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "CartPage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-cart-page-api@0.1.0",
+          "function": "cart-page"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.Estimate",
     "capability_mapping": 1,
     "abi_schema": "415fdfe738cf5f70",
@@ -559,6 +661,78 @@
     ]
   },
   {
+    "component_id": "store.page.HomePage",
+    "capability_mapping": 1,
+    "abi_schema": "2c950586f6696763",
+    "required_capabilities": [
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.page.Cart",
+        "name": "Cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.StoreList",
+        "name": "StoreList",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "HomePage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-home-page-api@0.1.0",
+          "function": "home-page"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.Menu",
     "capability_mapping": 1,
     "abi_schema": "60058db28f2ab607",
@@ -634,6 +808,173 @@
         "component": {
           "interface": "pw:app/store-page-menu-api@0.1.0",
           "function": "menu"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.Order",
+    "capability_mapping": 1,
+    "abi_schema": "6def0e0e60df40e2",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Orders"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/orders",
+        "name": "current",
+        "capability": "database.read<Orders>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Orders"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "Option",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "domain.OrderStatus"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.TrackingError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "Order",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
+                "position": "argument 0",
+                "ty": "Session<SessionId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "Session<SessionId>",
+                "position": "result",
+                "ty": "Option<OrderStatus>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-order-api@0.1.0",
+          "function": "order"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.OrderPage",
+    "capability_mapping": 1,
+    "abi_schema": "ba1334c5a2f7dee7",
+    "required_capabilities": [
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.page.Order",
+        "name": "Order",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "OrderPage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-order-page-api@0.1.0",
+          "function": "order-page"
         }
       }
     ]
@@ -792,6 +1133,68 @@
     ]
   },
   {
+    "component_id": "store.page.StoreList",
+    "capability_mapping": 1,
+    "abi_schema": "7fad5df1af8cdb8f",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/stores",
+        "name": "list",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.Store"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "StoreList",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-store-list-api@0.1.0",
+          "function": "store-list"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.StorePage",
     "capability_mapping": 1,
     "abi_schema": "d803b26130c7cf49",
@@ -914,7 +1317,7 @@
   {
     "component_id": "store.page.add_to_cart",
     "capability_mapping": 1,
-    "abi_schema": "b0847bb334f1be0e",
+    "abi_schema": "e39ed9ad14de8346",
     "required_capabilities": [
       {
         "family": "database",
@@ -927,6 +1330,10 @@
         "argument": "Carts"
       },
       {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
         "family": "session",
         "operation": "read"
       }
@@ -935,6 +1342,39 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:host/outbox",
+        "name": "cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.CartChanged"
+      },
       {
         "interface": "pw:host/session",
         "name": "read",
@@ -1103,12 +1543,16 @@
   {
     "component_id": "store.page.clear_cart",
     "capability_mapping": 1,
-    "abi_schema": "bade60abc3477904",
+    "abi_schema": "01a95bd54db3e938",
     "required_capabilities": [
       {
         "family": "database",
         "operation": "write",
         "argument": "Carts"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
       },
       {
         "family": "session",
@@ -1119,6 +1563,39 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:host/outbox",
+        "name": "cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.CartChanged"
+      },
       {
         "interface": "pw:host/session",
         "name": "read",
@@ -1243,12 +1720,16 @@
   {
     "component_id": "store.page.decrease_in_cart",
     "capability_mapping": 1,
-    "abi_schema": "8ad56a870ecb332a",
+    "abi_schema": "a36b2242c3929e82",
     "required_capabilities": [
       {
         "family": "database",
         "operation": "write",
         "argument": "Carts"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
       },
       {
         "family": "session",
@@ -1259,6 +1740,39 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:host/outbox",
+        "name": "cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.CartChanged"
+      },
       {
         "interface": "pw:host/session",
         "name": "read",
@@ -1388,7 +1902,7 @@
   {
     "component_id": "store.page.increase_in_cart",
     "capability_mapping": 1,
-    "abi_schema": "69261a5c0182c363",
+    "abi_schema": "0408ccf9c5cd1849",
     "required_capabilities": [
       {
         "family": "database",
@@ -1401,6 +1915,10 @@
         "argument": "Carts"
       },
       {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
         "family": "session",
         "operation": "read"
       }
@@ -1409,6 +1927,39 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:host/outbox",
+        "name": "cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.CartChanged"
+      },
       {
         "interface": "pw:host/session",
         "name": "read",
@@ -1567,14 +2118,23 @@
     ]
   },
   {
-    "component_id": "store.page.remove_from_cart",
+    "component_id": "store.page.place_order",
     "capability_mapping": 1,
-    "abi_schema": "800206716105eda8",
+    "abi_schema": "fb6bec6c5ebf1383",
     "required_capabilities": [
       {
         "family": "database",
         "operation": "write",
         "argument": "Carts"
+      },
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Orders"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
       },
       {
         "family": "session",
@@ -1585,6 +2145,232 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:host/outbox",
+        "name": "cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.CartChanged"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "order-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.OrderChanged"
+      },
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/orders",
+        "name": "place",
+        "capability": "database.write<Orders>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Orders"
+          },
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.OrderStatus"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.OrderError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "place_order",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-place-order-api@0.1.0",
+          "function": "place-order",
+          "authorization": [
+            {
+              "predicate": "SignedIn"
+            }
+          ],
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.remove_from_cart",
+    "capability_mapping": 1,
+    "abi_schema": "e413a06821dd64ec",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Carts"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/outbox",
+        "name": "cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.CartChanged"
+      },
       {
         "interface": "pw:host/session",
         "name": "read",

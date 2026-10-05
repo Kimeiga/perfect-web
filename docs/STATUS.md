@@ -13,6 +13,23 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0208, 2026-10-05: a command computes its events, and the outbox
+commits them with its writes** (ADR-0195's ruling 11's other half). The
+server computed an event's values from its key's text, `current_session()`
+alone, and refused `emits ItemChanged(item)`. Each event is now a function
+of the platform's outbox, `pw:host/outbox#cart-changed`; the command's
+component calls it before its body with the values it computed, and the
+host stages them and commits them with the writes, or not at all. Emitting
+is the effect `outbox.write`, which a node grants where it keeps an outbox:
+without it a command is refused, rather than its events lost. Found on the
+way: an `Int` key reached a query's key as a `String` and missed its entry,
+and an event carrying `""` reached every entry. **Correction:** the
+committed component contracts were last emitted at ADR-0181, and nothing
+compared them; the order's contracts were in none. They are compared now.
+`invalidates` keys are
+still read by the server, which is sound and next (`just
+e14-command-events`).
+
 **ADR-0207, 2026-10-05: a data source states what it guarantees, and
 nothing asks it for more** (the owner's priority 21; ADR-0195's ruling 11).
 `source X  holds A, B  transactions …  reads …  changes …`: the isolation a

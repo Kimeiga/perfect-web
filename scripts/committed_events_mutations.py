@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-0104: the dev server commits the events a
-command declares.
+"""Mutation controls for ADR-0104 and ADR-0208: the dev server commits the
+events a command computes, and no others.
 
-Each mutant undoes one piece: committing the declared events rather than
-`CartChanged` whatever was declared, reading the command's own edges,
-reading its `emits` edges, carrying the session as `current_session()`'s
-value, and refusing a value the server cannot compute. The dev server's
-tests must then fail.
+Each mutant undoes one piece: committing the events the command handed the
+outbox rather than `CartChanged` whatever it computed, keeping what it
+handed, and each value's text as a key. The dev server's tests must then
+fail.
 
 Run from the repository root; `just e10-committed-events` records the
 output. The source is restored after every mutant, whatever happens.
@@ -23,7 +22,7 @@ SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
     (
-        "`CartChanged` is committed whatever is declared",
+        "`CartChanged` is committed whatever is computed",
         SERVER,
         "                Ok::<_, String>(events)\n",
         "                let _ = events;\n"
@@ -32,32 +31,26 @@ MUTANTS = [
         "                    &[session],\n"
         "                )])\n",
     ),
+    # ADR-0208: the command computes its events and hands them to the
+    # outbox. ADR-0104's four controls of the server's key evaluation are
+    # retired with it.
     (
-        "any command's events are this one's",
+        "the outbox keeps nothing a command hands it",
         SERVER,
-        "        .filter(|e| e.kind == pw_materialize::EdgeKind::Emits && e.from == command)",
-        "        .filter(|e| e.kind == pw_materialize::EdgeKind::Emits)",
+        "                        .push((event.clone(), values.to_vec()));\n",
+        "                        .clear();\n",
     ),
     (
-        "any edge is an event",
+        "an `Int` is not its text",
         SERVER,
-        "        .filter(|e| e.kind == pw_materialize::EdgeKind::Emits && e.from == command)",
-        "        .filter(|e| e.from == command)",
+        "            Val::S64(n) => Ok(n.to_string()),\n",
+        "            Val::S64(n) => Ok(format!(\"{n}.0\")),\n",
     ),
     (
-        "the session is not the value",
+        "a `Bool` is not its text",
         SERVER,
-        "                    \"current_session()\" => Ok(session),",
-        "                    \"current_session()\" => Ok(\"\"),",
-    ),
-    (
-        "a value is guessed",
-        SERVER,
-        "                    other => Err(format!(\n"
-        "                        \"`{command}` emits",
-        "                    _ if true => Ok(session),\n"
-        "                    other => Err(format!(\n"
-        "                        \"`{command}` emits",
+        "            Val::Bool(b) => Ok(b.to_string()),\n",
+        "            Val::Bool(b) => Ok(u8::from(*b).to_string()),\n",
     ),
 ]
 

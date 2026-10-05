@@ -881,6 +881,8 @@ fn dev_topology() -> Topology {
                 // working, and is what this list not being derived from the
                 // contracts is for.
                 "session.read",
+                // A command's events, committed with its writes (ADR-0208).
+                "outbox.write",
             ]
             .iter()
             .map(|s| s.to_string())
@@ -1107,6 +1109,39 @@ impl Server {
     /// Authority first — `admit` against the artifact's real imports — then
     /// the component, with the deployment's implementation of each granted
     /// operation. The command's result is whatever the COMPONENT returns.
+    /// **The platform's outbox, for one command** (ADR-0208): each event its
+    /// contract imports, linked to a function that stages what the command
+    /// gives it, to be committed with its writes or not at all. The server
+    /// never computes an event's values.
+    fn outbox(
+        &self,
+        component_id: &str,
+        host: &mut BTreeMap<String, HostFn>,
+    ) -> Result<StagedEvents, String> {
+        let contract = self
+            .contracts
+            .iter()
+            .find(|c| c.component_id == component_id)
+            .ok_or_else(|| format!("no contract for `{component_id}`"))?;
+        let staged: StagedEvents = Arc::default();
+        for import in &contract.imports {
+            let Some(event) = import.event.clone() else {
+                continue;
+            };
+            let into = staged.clone();
+            host.insert(
+                import.key(),
+                Arc::new(move |values: &[Val]| {
+                    into.lock()
+                        .expect("staged events")
+                        .push((event.clone(), values.to_vec()));
+                    Ok(Vec::new())
+                }),
+            );
+        }
+        Ok(staged)
+    }
+
     fn run(
         &self,
         component_id: &str,
@@ -1273,10 +1308,10 @@ impl Server {
                 }),
             );
 
-            // What the command declares it emits (ADR-0104), computed before
-            // it runs: a value this server cannot compute is refused, and a
-            // refused command has written nothing.
-            let events = declared_events(&self.graph, component_id, session)?;
+            // What the command emits (ADR-0208): it computes each event's
+            // values itself and hands them to the platform's outbox, which
+            // stages them here with its writes.
+            let staged_events = self.outbox(component_id, &mut host)?;
             let out = self.run(component_id, session, &host, args)?;
             let result = out.first().map(answer_json);
             if let [Val::Result(Err(_))] = out.as_slice() {
@@ -1297,7 +1332,11 @@ impl Server {
                 });
             };
             let total: i64 = lines.iter().map(|l| l.quantity).sum();
-            let emitted = events.clone();
+            let emitted = staged_events.lock().expect("staged events").clone();
+            let events = emitted
+                .iter()
+                .map(|(event, values)| outboxed(event, values))
+                .collect::<Result<Vec<_>, String>>()?;
             self.materializer.command(|tx| {
                 Materializer::set_state(tx, &format!("cart:{session}"), &total.to_string());
                 Ok::<_, String>(events)
@@ -1698,7 +1737,7 @@ impl Server {
         self.invalidate_queries(
             "",
             session,
-            &[pw_materialize::Event::new(event, &[session])],
+            &[(event.to_string(), vec![Val::String(session.into())])],
         );
         self.clock.advance(1);
         let version = Version(self.clock.now());
@@ -2163,7 +2202,7 @@ impl Server {
     /// names in `invalidates`, and each entry an emitted event reaches through
     /// a query's `invalidates_on`. An event that leaves a key unbound (`_`,
     /// ADR-0091) drops every entry of that query.
-    fn invalidate_queries(&self, command: &str, session: &str, events: &[pw_materialize::Event]) {
+    fn invalidate_queries(&self, command: &str, session: &str, events: &[(String, Vec<Val>)]) {
         // A query's policy, which keys its entries: read by a `let`, or by a
         // stream, whose answer is kept too (ADR-0148). Until 2026-10-03 only
         // a `let`'s was found, so an event never reached a stream's kept
@@ -2204,13 +2243,15 @@ impl Server {
                 drop_key(&e.to, args);
             }
         }
-        for event in events {
+        for (event, values) in events {
             for e in &self.graph.edges {
-                if e.kind != pw_materialize::EdgeKind::InvalidatedBy || e.to != event.name {
+                if e.kind != pw_materialize::EdgeKind::InvalidatedBy || e.to != *event {
                     continue;
                 }
-                // The query's parameters, bound from the event's arguments by
-                // the names its `invalidates_on` gives them.
+                // The query's parameters, bound from the event's values by
+                // the names its `invalidates_on` gives them: each as the
+                // command computed it, so an `Int` keys as an `Int` does
+                // (ADR-0208). Until then each was a `String`.
                 let params = self
                     .graph
                     .nodes
@@ -2221,9 +2262,9 @@ impl Server {
                 let mut args = vec![None; params.len()];
                 for (i, name) in e.key.iter().enumerate() {
                     if let (Some(p), Some(v)) =
-                        (params.iter().position(|q| q == name), event.args.get(i))
+                        (params.iter().position(|q| q == name), values.get(i))
                     {
-                        args[p] = Some(Val::String(v.clone()));
+                        args[p] = Some(v.clone());
                     }
                 }
                 drop_key(&e.from, args.into_iter().collect());
@@ -3046,7 +3087,9 @@ impl Server {
             }
             _ => pw_materialize::Event::new("Events.MenuChanged", &[STORE_ID]),
         };
-        self.invalidate_queries("", "", &[event]);
+        // The store's ids are `String`s (`domain.pw`), as they key here.
+        let values = event.args.iter().map(|a| Val::String(a.clone())).collect();
+        self.invalidate_queries("", "", &[(event.name.clone(), values)]);
 
         // The menu E7-P changes is store 47's (ADR-0162), read again with
         // the change.
@@ -4237,6 +4280,11 @@ impl Server {
     }
 }
 
+/// **The events a command handed the outbox** (ADR-0208), each by its
+/// declaration's path with the values it computed, staged until its writes
+/// commit.
+type StagedEvents = Arc<Mutex<Vec<(String, Vec<Val>)>>>;
+
 /// **A region a document leaves for its query to fill** (ADR-0148): which
 /// part, the plan's entry for it (its query's component and policies), and
 /// what this request gives the query.
@@ -5109,39 +5157,22 @@ fn store_description(id: &str) -> &'static str {
 const STYLE: &str = "#menu > ul > li:nth-child(n+29), #menu > ul:nth-of-type(n+17) > li \
                      { content-visibility: auto; contain-intrinsic-size: auto 7.75em; }";
 
-/// **The events a command declares it emits**, with their values
-/// (ADR-0104).
-///
-/// Read from the command's `emits` edges in the compiler's graph: `emits
-/// CartChanged(current_session())` is `Events.CartChanged` carrying the
-/// session. Until 2026-09-26 this server committed `CartChanged` after any
-/// cart write, whatever the command declared, so a command that emitted
-/// nothing worked here and nowhere else. A value the server cannot compute
-/// is refused, never guessed.
-fn declared_events(
-    graph: &pw_materialize::Graph,
-    command: &str,
-    session: &str,
-) -> Result<Vec<pw_materialize::Event>, String> {
-    graph
-        .edges
+/// **An event as the outbox keeps it** (ADR-0208): its declaration's path,
+/// and each value the command computed, as a key's text. A key is a
+/// `String`, an `Int` or a `Bool` (PW5308); a value of another type keys no
+/// entry, and is refused rather than written.
+fn outboxed(event: &str, values: &[Val]) -> Result<pw_materialize::Event, String> {
+    let texts = values
         .iter()
-        .filter(|e| e.kind == pw_materialize::EdgeKind::Emits && e.from == command)
-        .map(|e| {
-            let values = e
-                .key
-                .iter()
-                .map(|arg| match arg.as_str() {
-                    "current_session()" => Ok(session),
-                    other => Err(format!(
-                        "`{command}` emits `{}` with `{other}`, which this server cannot compute",
-                        e.to
-                    )),
-                })
-                .collect::<Result<Vec<&str>, String>>()?;
-            Ok(pw_materialize::Event::new(&e.to, &values))
+        .map(|v| match v {
+            Val::String(s) => Ok(s.clone()),
+            Val::S64(n) => Ok(n.to_string()),
+            Val::Bool(b) => Ok(b.to_string()),
+            other => Err(format!("`{event}` carries {other:?}, which keys no entry")),
         })
-        .collect()
+        .collect::<Result<Vec<String>, String>>()?;
+    let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
+    Ok(pw_materialize::Event::new(event, &texts))
 }
 
 /// The graph, as `pw emit-graph` produced it. Read at build time so the server
@@ -9685,64 +9716,52 @@ public query Store(",
         );
     }
 
-    /// **A command commits the events it declares, and no others**
-    /// (ADR-0104). `add_to_cart` declares `emits
-    /// CartChanged(current_session())`, so its cart's entry moves. Declaring
-    /// none, the write commits and nothing is told: until 2026-09-26 this
-    /// server committed `CartChanged` whatever the command declared.
+    /// **A command commits the events it computes, and no others**
+    /// (ADR-0104, ADR-0208). `add_to_cart` declares `emits
+    /// CartChanged(current_session())`: its component evaluates the key and
+    /// hands the event to the platform's outbox, the one function of it its
+    /// contract imports, and its cart's entry moves. The server reads no key.
     #[test]
-    fn a_command_commits_the_events_it_declares() {
+    fn a_command_commits_the_events_it_computes() {
         let s = rendering_server();
+        let imported: Vec<&str> = s
+            .contracts
+            .iter()
+            .find(|c| c.component_id == ADD)
+            .expect("its contract")
+            .imports
+            .iter()
+            .filter_map(|i| i.event.as_deref())
+            .collect();
         assert_eq!(
-            declared_events(&s.graph, ADD, "session-7").expect("computable"),
-            [pw_materialize::Event::new(
-                &["Events", ".CartChanged"].concat(),
-                &["session-7"]
-            )],
+            imported,
+            ["Events.CartChanged"],
             "exactly the one it declares"
         );
         s.drain("session-7");
         let before = s.version("session-7");
         s.command(ADD, "session-7", &add_shown("espresso", 1), false)
             .expect("runs");
-        assert_ne!(s.version("session-7"), before, "the declared event");
-
-        let mut s = rendering_server();
-        s.graph
-            .edges
-            .retain(|e| !(e.from == ADD && e.kind == pw_materialize::EdgeKind::Emits));
-        s.drain("session-7");
-        let before = s.version("session-7");
-        s.command(ADD, "session-7", &add_shown("espresso", 1), false)
-            .expect("runs");
-        assert_eq!(s.cart_value("session-7"), 1, "the write committed");
+        assert_ne!(s.version("session-7"), before, "the event it computed");
         assert_eq!(
-            s.version("session-7"),
-            before,
-            "and no event reached the cart"
+            outboxed("Events.Moved", &[Val::S64(-3), Val::Bool(true)]),
+            Ok(pw_materialize::Event::new("Events.Moved", &["-3", "true"])),
+            "an `Int` and a `Bool` key as their text"
         );
     }
 
-    /// **A value the server cannot compute is refused before the command
-    /// runs** (ADR-0104), and nothing is written.
+    /// **A command whose events a node cannot keep does not run there**
+    /// (ADR-0208). Without `outbox.write`, its component's outbox is not
+    /// linked: it is refused, and nothing is written, rather than its writes
+    /// committed and its events lost.
     #[test]
-    fn an_event_value_the_server_cannot_compute_is_refused() {
+    fn a_command_whose_events_cannot_be_kept_is_not_run() {
         let mut s = rendering_server();
-        for e in s
-            .graph
-            .edges
-            .iter_mut()
-            .filter(|e| e.from == ADD && e.kind == pw_materialize::EdgeKind::Emits)
-        {
-            e.key = vec!["item".to_string()];
-        }
+        s.topology.nodes[0].grants.retain(|g| g != "outbox.write");
         let err = s
             .command(ADD, "session-8", &add("espresso", 1), false)
-            .expect_err("`item` is not computed here");
-        assert!(
-            err.contains("add_to_cart") && err.contains("`item`"),
-            "{err}"
-        );
+            .expect_err("no outbox here");
+        assert!(err.contains("outbox.write"), "{err}");
         assert_eq!(s.cart_value("session-8"), 0, "nothing was written");
     }
 

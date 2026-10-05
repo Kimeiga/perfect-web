@@ -2708,6 +2708,28 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0208: a command computes its events, and the outbox commits them with
+# its writes. The component's calls, the outbox's values, the server's
+# commits, and the mutation controls.
+e14-command-events:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0208 - a command computes its events, and the outbox commits them with its writes"; echo; \
+       echo "produced by: just e14-command-events"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the command's component (compiler/pw-conformance/tests/events.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test events 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the outbox's values (runtime/pw-materialize/tests/outbox_values.rs)"; echo; \
+       cargo test --locked -p pw-materialize --test outbox_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server's commits"; echo; \
+       cargo test --locked -p pw-dev-server -- a_command_commits_the_events_it_computes a_command_whose_events_cannot_be_kept_is_not_run 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the store's artifacts, as the compiler emits them"; echo; \
+       cargo test --locked -p pw-core --test evidence_is_current 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/committed_events_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/committed_events_mutations.py; \
+     } > docs/evidence/E14/command-events.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/command-events.txt
+
 # ADR-0207: a data source states what it guarantees, and nothing asks it for
 # more. The rules' tests, the store checked with its source, and the
 # mutation controls.

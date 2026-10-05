@@ -20,6 +20,10 @@ pub enum PrivacyQualifier {
     Organization,
 }
 
+/// **The effect of emitting an event** (ADR-0208): it is written to the
+/// outbox with the command's writes, and sent if and only if they commit.
+pub const OUTBOX_WRITE: &str = "outbox.write";
+
 #[derive(Debug, Clone)]
 pub struct Signature {
     pub path: String,
@@ -338,7 +342,12 @@ impl Signatures {
                 ) {
                     continue;
                 }
-                let sig = out.signature_of(def, decl);
+                let mut sig = out.signature_of(def, decl);
+                // Emitting an event writes it to the outbox, with the
+                // command's writes (ADR-0208).
+                if decl.kind == DeclKind::Event {
+                    sig.effects = vec![OUTBOX_WRITE.to_string()];
+                }
                 if Namespace::of(decl.kind) == Some(Namespace::Term) {
                     if let Some(key) = sig
                         .params

@@ -788,12 +788,7 @@ impl<'a> Inference<'a> {
                 // client at a different time, and a command whose row absorbed
                 // it would be indistinguishable from one performing the
                 // transition itself.
-                for (_, root) in decl.term_roots() {
-                    if !root.context.contributes_to_declaration() {
-                        continue;
-                    }
-                    out.extend(self.infer_rooted(unit, b, root.root).effects);
-                }
+                self.roots_and_events(unit, b, decl, &mut out);
                 out.sort();
                 out.dedup();
                 out
@@ -813,6 +808,29 @@ impl<'a> Inference<'a> {
     /// E8-0 needs this for a page whose handler lambdas are separately loaded
     /// units — see `infer_excluding`. The declared-versus-inferred rule is the
     /// same one; only the scope narrows.
+    /// **The roots that are a declaration's work, and its events**: what
+    /// `effective_effects` adds to its body's row, and a contract's
+    /// capabilities with it (ADR-0208).
+    fn roots_and_events(
+        &self,
+        unit: usize,
+        b: &crate::hir::Body,
+        decl: &crate::hir::Decl,
+        out: &mut Vec<String>,
+    ) {
+        for (_, root) in decl.term_roots() {
+            if !root.context.contributes_to_declaration() {
+                continue;
+            }
+            out.extend(self.infer_rooted(unit, b, root.root).effects);
+        }
+        // **And the events it emits** (ADR-0208), each written to the outbox
+        // with its writes.
+        if decl.policy("emits").is_some_and(|p| !p.keys.is_empty()) {
+            out.push(crate::signatures::OUTBOX_WRITE.to_string());
+        }
+    }
+
     pub fn effective_effects_excluding(
         &self,
         unit: usize,
@@ -828,6 +846,7 @@ impl<'a> Inference<'a> {
                     .effects
                     .into_iter()
                     .collect();
+                self.roots_and_events(unit, hir.body(body), decl, &mut out);
                 out.sort();
                 out.dedup();
                 out

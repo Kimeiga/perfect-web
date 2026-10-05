@@ -168,7 +168,7 @@ fn lowered(
 /// `Carts.add` and `Carts.clear` share `database.write<Carts>` and have
 /// different ABIs.
 #[test]
-fn the_real_add_to_cart_lowers_to_three_import_calls() {
+fn the_real_add_to_cart_lowers_to_its_import_calls() {
     let built = Built::new(&store());
     let (p, refusals) = lowered(&built);
 
@@ -195,15 +195,19 @@ fn the_real_add_to_cart_lowers_to_three_import_calls() {
     assert_eq!(
         host,
         [
+            "pw:host/outbox#cart-changed",
+            "pw:host/session#read",
             "pw:host/session#read",
             "store:data/carts#add",
             "store:data/menus#is-available"
         ],
-        "the three callables it invokes, by the identity the ARTIFACT will carry: \
-         since ADR-0157 it asks whether the item can be ordered"
+        "the callables it invokes, by the identity the ARTIFACT will carry: \
+         since ADR-0157 it asks whether the item can be ordered, and since \
+         ADR-0208 it reads the session for its event's key and hands the \
+         event to the outbox"
     );
 
-    // And the authority, which is a separate fact: three callables, two of
+    // And the authority, which is a separate fact: four callables, two of
     // which share their capabilities with `Carts.clear` and `Menus.for_store`.
     // Architect ruling, 2026-08-20: a capability authorizes an operation and
     // does not identify one.
@@ -214,6 +218,7 @@ fn the_real_add_to_cart_lowers_to_three_import_calls() {
         [
             "database.read<Menus>",
             "database.write<Carts>",
+            "outbox.write",
             "session.read"
         ]
     );

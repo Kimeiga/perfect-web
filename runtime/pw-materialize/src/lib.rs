@@ -423,9 +423,13 @@ impl Materializer {
         };
         let mut ids = Vec::new();
         for ev in &events {
+            // As a JSON array (ADR-0208): joined by a separator, one empty
+            // value was read back as none, and an event carrying `""`
+            // reached every entry.
+            let args = serde_json::to_string(&ev.args).expect("strings encode");
             tx.execute(
                 "INSERT INTO outbox (event, args) VALUES (?1, ?2)",
-                params![ev.name, ev.args.join("\u{1}")],
+                params![ev.name, args],
             )
             .expect("insert outbox");
             ids.push(tx.last_insert_rowid());
@@ -504,11 +508,14 @@ impl Materializer {
                     id: r.get(0)?,
                     event: Event {
                         name: r.get(1)?,
-                        args: if args.is_empty() {
-                            Vec::new()
-                        } else {
-                            args.split('\u{1}').map(str::to_string).collect()
-                        },
+                        // Written by `command` above, as a JSON array.
+                        args: serde_json::from_str(&args).map_err(|e| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                2,
+                                rusqlite::types::Type::Text,
+                                Box::new(e),
+                            )
+                        })?,
                     },
                 })
             })

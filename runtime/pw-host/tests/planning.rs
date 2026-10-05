@@ -52,6 +52,11 @@ fn full() -> Topology {
                     "database.write<Carts>".to_string(),
                     "network.fetch".to_string(),
                     "session.read".to_string(),
+                    // A command's events, kept with its writes (ADR-0208).
+                    "outbox.write".to_string(),
+                    // A session's order, read and placed (ADR-0193).
+                    "database.read<Orders>".to_string(),
+                    "database.write<Orders>".to_string(),
                 ]),
             },
         ],
@@ -222,6 +227,7 @@ fn an_edge_whose_ends_share_no_node_is_necessarily_remote() {
         required_capabilities: vec![],
         allowed_placements: vec!["browser".into()],
         imports: vec![pw_host::Import {
+            event: None,
             interface: "pw:app/app.Store".into(),
             name: "Store".into(),
             capability: String::new(),
@@ -299,6 +305,7 @@ fn placement_and_transferability_are_independent_and_only_one_pair_fails() {
         required_capabilities: vec![],
         allowed_placements: vec!["browser".into()],
         imports: vec![pw_host::Import {
+            event: None,
             interface: format!("pw:app/{target}"),
             name: "Store".into(),
             capability: String::new(),
@@ -426,6 +433,7 @@ fn an_undetermined_signature_does_not_refuse_a_deployment() {
         required_capabilities: vec![],
         allowed_placements: vec!["browser".into()],
         imports: vec![pw_host::Import {
+            event: None,
             interface: "pw:app/app.Store".into(),
             name: "Store".into(),
             capability: String::new(),
@@ -532,6 +540,7 @@ fn a_necessarily_remote_edge_that_owes_a_principal_is_not_a_finished_plan() {
         required_capabilities: vec![],
         allowed_placements: vec!["browser".into()],
         imports: vec![pw_host::Import {
+            event: None,
             interface: "pw:app/app.Basket".into(),
             name: "Basket".into(),
             capability: String::new(),
@@ -605,6 +614,7 @@ fn widget_for() -> ComponentContract {
         required_capabilities: vec![],
         allowed_placements: vec!["browser".into()],
         imports: vec![pw_host::Import {
+            event: None,
             interface: "pw:app/app.Basket".into(),
             name: "Basket".into(),
             capability: String::new(),

@@ -300,6 +300,11 @@ pub struct Import {
     /// before the component reads it. `argument` is 0, the answer.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bounded: Vec<Bounded>,
+    /// **The event this import writes to the outbox** (ADR-0208), by its
+    /// declaration's path, `Events.CartChanged`: the host commits what it is
+    /// given as that event, with the command's writes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
 }
 
 /// **One place a value from outside must hold an invariant** (ADR-0179):
@@ -841,7 +846,15 @@ fn host_calls(
     let body = hir.body(body_id);
     let mut out = Vec::new();
     let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
-    for expr in body.walk() {
+    // What the body calls, and what its events' keys call: the command
+    // computes those (ADR-0208).
+    let mut exprs = body.walk();
+    let emitted = hir.decl(id).policy("emits");
+    for root in emitted.iter().flat_map(|p| &p.roots) {
+        exprs.extend(body.walk_from(root.root));
+    }
+    let mut callees: Vec<crate::resolve::DefId> = Vec::new();
+    for expr in exprs {
         let Expr::Call { callee, .. } = body.expr(expr) else {
             continue;
         };
@@ -849,9 +862,18 @@ fn host_calls(
         if path.is_empty() {
             continue;
         }
-        let Some(def) = inference.resolved_from(unit, &path) else {
-            continue;
-        };
+        if let Some(def) = inference.resolved_from(unit, &path) {
+            callees.push(def);
+        }
+    }
+    // And the outbox's function for each event it emits.
+    callees.extend(
+        emitted
+            .iter()
+            .flat_map(|p| &p.keys)
+            .filter_map(|k| crate::backend::emitted_event(sigs.workspace(), unit, k)),
+    );
+    for def in callees {
         let Some(decl) = crate::resolve::declaration(hirs, def) else {
             continue;
         };
@@ -921,6 +943,7 @@ fn host_calls(
                 .and_then(|r| r.resolved())
                 .map(|t| bounded_in(sigs, t, 0))
                 .unwrap_or_default(),
+            event: (decl.kind == crate::hir::DeclKind::Event).then(|| signature.path.clone()),
         });
     }
     out
@@ -1007,6 +1030,7 @@ fn component_calls(
                 kind: ImportKind::Component,
                 // Another component's answer is built by checked code.
                 bounded: Vec::new(),
+                event: None,
             });
         }
     }

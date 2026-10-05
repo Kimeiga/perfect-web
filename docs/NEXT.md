@@ -298,9 +298,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
           `source`; a query or a command that asks more of its source than
           it gives is refused~~ (ADR-0207, `just e14-data-sources`), and the
           store states its own;
-        - then ruling 11's other half, a command's events computed by the
-          command and written by the host in its writes' transaction; and a
-          host comparing a source's clauses with the database it opens.
+        - ~~ruling 11's other half, a command's events computed by the
+          command and committed by the host with its writes~~ (ADR-0208,
+          `just e14-command-events`);
+        - then `invalidates` keys computed the same way, and a host
+          comparing a source's clauses with the database it opens.
     22. **Reference apps unlike the store**, to find the gaps: a feed
         (pagination, live public data, threads, optimistic posting), a
         multi-tenant SaaS (organizations, roles, forms, uploads), and one app

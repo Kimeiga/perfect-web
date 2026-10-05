@@ -157,6 +157,16 @@ effect session.read {
     capability session.read
 }
 
+// --- the outbox -------------------------------------------------------------
+
+// **A command's events, written with its writes** (ADR-0208): the
+// transactional outbox, by which an event is sent if and only if the
+// command's writes commit. A command that `emits` performs it. Which nodes
+// keep an outbox is the deployment's, as which provide a session is.
+effect outbox.write {
+    capability outbox.write
+}
+
 // --- network ----------------------------------------------------------------
 
 effect network.fetch {

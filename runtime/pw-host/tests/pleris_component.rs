@@ -155,9 +155,19 @@ fn stocked(calls: &Calls, add_result: Val, available: bool) -> BTreeMap<String, 
             .push(("store:data/carts#add".into(), args.to_vec()));
         Ok(vec![add_result.clone()])
     });
+    // The outbox, which the command hands its event to (ADR-0208).
+    let outbox_calls = calls.clone();
+    let outbox: HostFn = Arc::new(move |args: &[Val]| {
+        outbox_calls
+            .lock()
+            .unwrap()
+            .push(("pw:host/outbox#cart-changed".into(), args.to_vec()));
+        Ok(Vec::new())
+    });
     BTreeMap::from([
         ("store:data/menus#is-available".to_string(), stock),
         ("pw:host/session#read".to_string(), read),
+        ("pw:host/outbox#cart-changed".to_string(), outbox),
         ("store:data/carts#add".to_string(), add),
     ])
 }
@@ -170,9 +180,10 @@ fn admitted(c: &ComponentContract, bytes: &[u8], grants: &[&str]) -> Result<Gran
 
 /// What the command needs granted: the menu read, the cart write and the
 /// session.
-const ALL: [&str; 3] = [
+const ALL: [&str; 4] = [
     "database.read<Menus>",
     "database.write<Carts>",
+    "outbox.write",
     "session.read",
 ];
 
@@ -219,9 +230,10 @@ fn the_artifact_imports_exactly_what_its_contract_allows() {
     assert_eq!(
         actual,
         [
+            "pw:host/outbox#cart-changed",
             "pw:host/session#read",
             "store:data/carts#add",
-            "store:data/menus#is-available"
+            "store:data/menus#is-available",
         ]
     );
     let c = contract();
@@ -337,20 +349,29 @@ fn the_compiled_command_runs_through_the_host() {
     println!("the host saw: {seen:?}");
     println!("the command returned: {out:?}");
 
-    // The COMPONENT asked whether the item can be ordered, read the session,
-    // then called the data layer with it and with its own arguments, in that
-    // order.
-    assert_eq!(seen.len(), 3, "{seen:?}");
+    // The COMPONENT read the session for its event's key and handed the event
+    // to the outbox (ADR-0208), asked whether the item can be ordered, read
+    // the session, then called the data layer with it and with its own
+    // arguments, in that order.
+    assert_eq!(seen.len(), 5, "{seen:?}");
+    assert_eq!(seen[0], ("pw:host/session#read".to_string(), vec![]));
     assert_eq!(
-        seen[0],
+        seen[1],
+        (
+            "pw:host/outbox#cart-changed".to_string(),
+            vec![Val::String("session-7".into())]
+        )
+    );
+    assert_eq!(
+        seen[2],
         (
             "store:data/menus#is-available".to_string(),
             vec![Val::String("cortado".into())]
         )
     );
-    assert_eq!(seen[1], ("pw:host/session#read".to_string(), vec![]));
+    assert_eq!(seen[3], ("pw:host/session#read".to_string(), vec![]));
     assert_eq!(
-        seen[2],
+        seen[4],
         (
             "store:data/carts#add".to_string(),
             vec![
@@ -398,13 +419,22 @@ fn an_item_that_cannot_be_ordered_is_refused_before_anything_is_written() {
             Some(Box::new(Val::String("cortado".into()))),
         )))))]
     );
+    // Its event was handed to the outbox first (ADR-0208), and a refusal
+    // commits it no more than it commits a write.
     assert_eq!(
         *calls.lock().unwrap(),
-        [(
-            "store:data/menus#is-available".to_string(),
-            vec![Val::String("cortado".into())]
-        )],
-        "only the availability was read"
+        [
+            ("pw:host/session#read".to_string(), vec![]),
+            (
+                "pw:host/outbox#cart-changed".to_string(),
+                vec![Val::String("session-7".into())]
+            ),
+            (
+                "store:data/menus#is-available".to_string(),
+                vec![Val::String("cortado".into())]
+            )
+        ],
+        "only the availability was read, and nothing written"
     );
 }
 

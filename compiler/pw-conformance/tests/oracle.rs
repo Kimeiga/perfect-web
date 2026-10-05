@@ -16,7 +16,7 @@
 //! field offset or a discriminant that the encoder got wrong changes a call or
 //! a result, or traps.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 use pw_conformance::{Runnable, compile, files, units};
@@ -250,7 +250,14 @@ fn differential(
     let located = contract.exports[0].component.clone().expect("located");
     let export = [located.interface, located.function];
     let t = types(&runnable.compiled().component.bytes, &export);
-    let ops: Vec<String> = t.results.keys().cloned().collect();
+    // Every operation the contract imports. One with no result, the
+    // outbox's (ADR-0208), answers nothing.
+    let ops: Vec<String> = contract
+        .imports
+        .iter()
+        .map(|i| format!("{}#{}", i.interface, i.name))
+        .collect();
+    let answered: BTreeSet<String> = t.results.keys().cloned().collect();
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15 ^ what.len() as u64);
     // What the contract states each argument and each answer holds
     // (ADR-0179).
@@ -282,9 +289,13 @@ fn differential(
             .iter()
             .map(|op| {
                 let (seen, answer, name) = (seen.clone(), answer.clone(), op.clone());
+                let answers = answered.contains(op);
                 let f: HostFn = Arc::new(move |a: &[Val]| {
                     seen.lock().unwrap().push((name.clone(), a.to_vec()));
-                    Ok(vec![answer(&name, a)])
+                    Ok(match answers {
+                        true => vec![answer(&name, a)],
+                        false => Vec::new(),
+                    })
                 });
                 (op.clone(), f)
             })
@@ -297,6 +308,9 @@ fn differential(
         let mut expected_calls: Vec<Call> = Vec::new();
         let expected = reference(&args, &mut |name, a| {
             expected_calls.push((name.to_string(), a.clone()));
+            if !answered.contains(name) {
+                return Val::Tuple(Vec::new());
+            }
             answer(name, &a)
         });
 
@@ -380,6 +394,9 @@ fn the_stores_commands_agree_with_their_reference() {
     // (ADR-0157). Run with each answer, so each branch is compared. The item
     // is the one the page showed (ADR-0172); the command writes by its id.
     let add: Reference = |args, host| {
+        // Its event first, its key computed before its body (ADR-0208).
+        let key = host("pw:host/session#read", vec![]);
+        host("pw:host/outbox#cart-changed", vec![key]);
         let id = field(&args[0], "id");
         if host("store:data/menus#is-available", vec![id.clone()]) != Val::Bool(true) {
             return Val::Result(Err(Some(Box::new(Val::Variant(
@@ -401,6 +418,9 @@ fn the_stores_commands_agree_with_their_reference() {
     // One more of a line's item (ADR-0172): its availability read again, as
     // `add_to_cart`'s is, and one added.
     let increase: Reference = |args, host| {
+        // Its event first, its key computed before its body (ADR-0208).
+        let key = host("pw:host/session#read", vec![]);
+        host("pw:host/outbox#cart-changed", vec![key]);
         if host("store:data/menus#is-available", vec![args[0].clone()]) != Val::Bool(true) {
             return Val::Result(Err(Some(Box::new(Val::Variant(
                 "item-unavailable".to_string(),
@@ -431,6 +451,9 @@ fn the_stores_commands_agree_with_their_reference() {
         "store.page.decrease_in_cart",
         &Runnable::new(compile(&u, "store.page.decrease_in_cart")),
         |args, host| {
+            // Its event first, its key computed before its body (ADR-0208).
+            let key = host("pw:host/session#read", vec![]);
+            host("pw:host/outbox#cart-changed", vec![key]);
             let session = host("pw:host/session#read", vec![]);
             host("store:data/carts#decrease", vec![session, args[0].clone()])
         },
@@ -440,6 +463,9 @@ fn the_stores_commands_agree_with_their_reference() {
         "store.page.remove_from_cart",
         &Runnable::new(compile(&u, "store.page.remove_from_cart")),
         |args, host| {
+            // Its event first, its key computed before its body (ADR-0208).
+            let key = host("pw:host/session#read", vec![]);
+            host("pw:host/outbox#cart-changed", vec![key]);
             let session = host("pw:host/session#read", vec![]);
             host("store:data/carts#remove", vec![session, args[0].clone()])
         },
@@ -449,6 +475,9 @@ fn the_stores_commands_agree_with_their_reference() {
         "store.page.clear_cart",
         &Runnable::new(compile(&u, "store.page.clear_cart")),
         |_, host| {
+            // Its event first, its key computed before its body (ADR-0208).
+            let key = host("pw:host/session#read", vec![]);
+            host("pw:host/outbox#cart-changed", vec![key]);
             let session = host("pw:host/session#read", vec![]);
             host("store:data/carts#clear", vec![session])
         },

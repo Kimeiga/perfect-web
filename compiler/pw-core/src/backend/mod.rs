@@ -91,6 +91,15 @@ pub fn host_binding(decl: &crate::hir::Decl) -> Option<ir::ImportId> {
     if decl.kind == crate::hir::DeclKind::Effect {
         return None;
     }
+    // **An event is the platform's outbox's** (ADR-0208): a command emits
+    // `CartChanged` by calling `pw:host/outbox#cart-changed` with its values,
+    // and the host commits it with the command's writes or not at all.
+    if decl.kind == crate::hir::DeclKind::Event {
+        return Some(ir::ImportId {
+            interface: OUTBOX_INTERFACE.to_string(),
+            name: crate::wit::ident(&decl.name),
+        });
+    }
     let p = decl.policy("host")?;
     let raw = p.value.trim().trim_matches('"');
     let (interface, name) = raw.split_once('#')?;
@@ -101,6 +110,24 @@ pub fn host_binding(decl: &crate::hir::Decl) -> Option<ir::ImportId> {
         interface: interface.to_string(),
         name: name.to_string(),
     })
+}
+
+/// **The event an `emits` key names** (ADR-0208), resolved as the checker
+/// resolves it (ADR-0088): in the event namespace, from the declaring unit.
+pub fn emitted_event(
+    ws: &crate::resolve::Workspace,
+    unit: usize,
+    key: &crate::hir::ClauseKey,
+) -> Option<crate::resolve::DefId> {
+    use crate::resolve::{Namespace, Resolution};
+    let found = match key.name.contains('.') {
+        true => ws.resolve_path_in(unit, Namespace::Event, &key.name),
+        false => ws.resolve_in(unit, Namespace::Event, &key.name),
+    };
+    match found {
+        Resolution::Local(def) | Resolution::Imported { def, .. } => Some(def),
+        _ => None,
+    }
 }
 
 /// **Is this declaration an operation the compiler supplies, and which?**
@@ -134,6 +161,10 @@ pub fn intrinsic_binding(decl: &crate::hir::Decl) -> Option<Result<ir::Operation
 /// Not a spelling-based resolution: the package IS the identity, and this reads
 /// it rather than guessing from a function's name.
 pub const PLATFORM_PACKAGE: &str = "pw:host";
+
+/// **The platform's outbox** (ADR-0208): each event a program declares is a
+/// function of it, taking what the event carries.
+pub const OUTBOX_INTERFACE: &str = "pw:host/outbox";
 
 /// **One canonical callable definition, consumed by both the contract and the
 /// backend.**
