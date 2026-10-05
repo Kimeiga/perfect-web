@@ -3,9 +3,11 @@
 //! host's own state, and no other program could be served.
 
 use super::*;
-use std::collections::BTreeSet;
 
 pub(crate) struct StoreData {
+    /// **A test's: the next command's data layer answers `cart-expired`**,
+    /// the declared refusal, once (ADR-0174).
+    pub(crate) fail_next: std::sync::atomic::AtomicBool,
     /// The keyed collection E7-P's structural patches operate on.
     ///
     /// Mutable, because a list that never changes cannot demonstrate that a
@@ -61,6 +63,12 @@ pub(crate) struct StoreData {
 }
 
 impl StoreData {
+    /// **The page a document with none recorded is** (ADR-0218): the store's
+    /// own, which its first documents and tests were served as.
+    pub(crate) fn default_page() -> &'static str {
+        "store.page.StorePage"
+    }
+
     /// **What a node grants the store's data layer** (ADR-0218), beyond the
     /// platform's session and outbox.
     pub(crate) fn grants() -> &'static [&'static str] {
@@ -86,16 +94,9 @@ impl StoreData {
         ]
     }
 
-    /// **Every operation the store's data layer supplies** (ADR-0218), as the
-    /// functions it builds name them: what a build may import.
-    pub(crate) fn operations(&self) -> BTreeSet<String> {
-        let mut ops: BTreeSet<String> = self.reads("", None).into_keys().collect();
-        ops.extend(self.begin("", false).ops().into_keys());
-        ops
-    }
-
     pub(crate) fn new() -> StoreData {
         StoreData {
+            fail_next: std::sync::atomic::AtomicBool::new(false),
             menu: Mutex::new(default_menu()),
             carts: Mutex::new(BTreeMap::new()),
             orders: Mutex::new(BTreeMap::new()),
@@ -740,5 +741,44 @@ impl Staging<'_> {
                 .expect("orders")
                 .insert(self.session.clone(), status);
         }
+    }
+}
+
+impl crate::data::Staged for Staging<'_> {
+    fn ops(&self) -> crate::data::Ops {
+        Staging::ops(self)
+    }
+
+    fn rows(&self) -> Option<Vec<(String, String)>> {
+        Staging::rows(self)
+    }
+
+    fn publish(&mut self) {
+        Staging::publish(self)
+    }
+}
+
+impl crate::data::DataLayer for StoreData {
+    fn reads(&self, session: &str, stopped: Option<Stopped>) -> crate::data::Ops {
+        StoreData::reads(self, session, stopped)
+    }
+
+    fn begin<'a>(&'a self, session: &str) -> Box<dyn crate::data::Staged + 'a> {
+        let fail = self
+            .fail_next
+            .swap(false, std::sync::atomic::Ordering::SeqCst);
+        Box::new(StoreData::begin(self, session, fail))
+    }
+
+    fn grants(&self) -> Vec<&'static str> {
+        StoreData::grants().to_vec()
+    }
+
+    fn default_page(&self) -> Option<&'static str> {
+        Some(StoreData::default_page())
+    }
+
+    fn session_entry(&self) -> bool {
+        true
     }
 }

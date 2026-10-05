@@ -77,11 +77,41 @@ rulings on 2026-10-05 (NEXT 22, 24). Date: 2026-10-05. Milestone: E14.
 Twenty-five mutants anchored in the moved code now name `store.rs`
 (`STORE_DATA`); `slots_mutations.py`'s anchors read `self.store.menu`.
 
+## Done in its second commit: the feed is served
+
+5. **`DataLayer` and `Staged`** (`server/src/data.rs`):
+   - its operations for a query, for one session;
+   - a command's staging;
+   - the grants a node gives it;
+   - the page a document with none recorded is;
+   - whether a session's documents are versioned by an entry of its own (the
+     store's cart);
+   - its operations, read from the functions it builds.
+
+   The store implements them, and its test fault is a one-shot flag on its
+   data.
+6. **The host chooses the layer the build's contracts import**: the feed's
+   for `feed:…`, the store's otherwise. The node's grants are the platform's
+   and the layer's, and the default page is the layer's. A program with none
+   needs no store page. Without a session entry, a commit sends the
+   session's documents at the host's clock.
+7. **The feed's data layer** (`server/src/feed.rs`): users and posts in
+   memory, its timeline, a thread with its replies as deep as they go, the
+   session's user, and staged posts and likes.
+8. **The feed itself**, `examples/feed/app.pw`. The server's test
+   `the_feed_is_served_by_the_host_its_data_the_deployments` builds it,
+   serves its home page from the layer, commits a post (its event's key
+   computed by the command, ADR-0208), and finds the post in the patch sent
+   to the session's open timeline.
+
 ## Not claimed yet
 
-- **The steps after these**: the store's test routes, the session's entry,
-  the default page and its presentation, the shared fragment. Then the trait
-  the feed's data layer implements, and the feed.
+- **The store's test routes, the session's entry, the default page's
+  presentation and the shared fragment** are still the store's code beside
+  the host's. A program that is not the store has an empty `StoreData`
+  beside its own layer.
+- **Live data across sessions**: another session's open timeline is not
+  told of a post yet (next).
 - **Live public data across sessions.** A commit tells the committing
   session's documents. Another session's open timeline is not told of a post
   yet. The feed needs it.

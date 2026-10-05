@@ -479,14 +479,21 @@ impl Default for Estimator {
     }
 }
 
+mod data;
+mod feed;
 mod store;
 
 struct Server {
     /// The templates the compiler emitted, deserialized once.
     templates: Vec<Template>,
-    /// **The store's data** (ADR-0218): what its data layer holds, which the
-    /// deployment supplies. It was the host's own state until ADR-0218.
-    store: store::StoreData,
+    /// **The program's data layer** (ADR-0218): what its contracts import,
+    /// which the deployment supplies. A query reads through it and a command
+    /// stages its writes in it.
+    data: Arc<dyn data::DataLayer>,
+    /// **The store's data** (ADR-0218), which its own test controls and
+    /// shared fragment still reach directly: `data` when the program is the
+    /// store, and empty otherwise.
+    store: Arc<store::StoreData>,
     /// The materializer's clock, advanced once per regeneration.
     ///
     /// A version is `Entry.generated_at`, which is a clock reading — so a clock
@@ -656,6 +663,23 @@ fn cart_entry(session: &str) -> ResourceEntryId {
     ResourceEntryId::derive(&cart_identity(session), &IDENTITY)
 }
 
+/// **A session's documents' entry** (ADR-0218): what a commit's change is
+/// sent against for a program whose data layer keeps no entry of its own for
+/// the session.
+fn session_documents(session: &str) -> ResourceEntryId {
+    ResourceEntryId::derive(
+        &EntryIdentity::new(
+            "pw.session.documents",
+            &[session],
+            Partition::Session {
+                id: session.to_string(),
+            },
+        )
+        .generation(BUILD),
+        &IDENTITY,
+    )
+}
+
 /// **A session's order's entry** (ADR-0193): what a change the store makes
 /// to it is sent against, as the cart's is.
 fn order_entry(session: &str) -> ResourceEntryId {
@@ -807,7 +831,14 @@ fn contracts() -> Vec<ComponentContract> {
 ///
 /// `docs/evidence/E8/artifact-audit.txt` is the same shape against real
 /// components.
+#[cfg(test)]
 fn dev_topology() -> Topology {
+    topology_for(store::StoreData::grants())
+}
+
+/// **The development origin, granting the platform's operations and a data
+/// layer's** (ADR-0218).
+fn topology_for(layer: &[&'static str]) -> Topology {
     Topology {
         nodes: vec![Node {
             name: "dev-origin".to_string(),
@@ -825,7 +856,7 @@ fn dev_topology() -> Topology {
                 "outbox.write",
             ]
             .iter()
-            .chain(store::StoreData::grants())
+            .chain(layer)
             .map(|s| s.to_string())
             .collect(),
         }],
@@ -850,9 +881,6 @@ impl Server {
         let graph = pw_materialize::Graph::from_json(&read("graph.json")?)
             .map_err(|e| format!("graph.json: {e:?}"))?;
         let components = components_in(&build.join("components"))?;
-        let plan: serde_json::Value =
-            serde_json::from_str(&read("pages/store.page.StorePage.json")?)
-                .map_err(|e| format!("pages/store.page.StorePage.json: {e}"))?;
         let mut plans = BTreeMap::new();
         for entry in std::fs::read_dir(build.join("pages")).map_err(|e| format!("pages: {e}"))? {
             let path = entry.map_err(|e| format!("pages: {e}"))?.path();
@@ -865,9 +893,30 @@ impl Server {
                 serde_json::from_str(&text).map_err(|e| format!("{page}: {e}"))?,
             );
         }
-        let server = Server::with(
+        // The page a document with none recorded is (ADR-0218): the store's,
+        // where the program has it. A program without one has none.
+        // **The data layer the program's contracts import** (ADR-0218): the
+        // feed's where they import `feed:…`, the store's otherwise.
+        let store = Arc::new(store::StoreData::new());
+        let data: Arc<dyn data::DataLayer> = if contracts
+            .iter()
+            .flat_map(|c| &c.imports)
+            .any(|i| i.interface.starts_with("feed:"))
+        {
+            Arc::new(feed::FeedData::new())
+        } else {
+            store.clone()
+        };
+        // The page a document with none recorded is, where the layer has one.
+        let plan = data
+            .default_page()
+            .and_then(|page| plans.get(page))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        let topology = topology_for(&data.grants());
+        let server = Server::with_layer(
             dist,
-            dev_topology(),
+            topology,
             Built {
                 artifacts: build,
                 templates,
@@ -877,11 +926,13 @@ impl Server {
                 plan,
                 plans,
             },
+            store,
+            data,
         );
         // **What the program imports, its data layer supplies** (ADR-0218):
         // refused here, as uncompiled handlers are, rather than when a press
         // first reaches the operation.
-        let supplied = server.store.operations();
+        let supplied = server.data.operations();
         for c in &server.contracts {
             for i in &c.imports {
                 if i.kind != pw_host::ImportKind::HostCapability || i.interface.starts_with("pw:") {
@@ -924,7 +975,16 @@ impl Server {
         )
     }
 
-    fn with(
+    #[cfg(test)]
+    fn with(dist: std::path::PathBuf, topology: Topology, built: Built) -> Server {
+        let store = Arc::new(store::StoreData::new());
+        let data: Arc<dyn data::DataLayer> = store.clone();
+        Server::with_layer(dist, topology, built, store, data)
+    }
+
+    /// [`Server::with`], its data layer given (ADR-0218): the store's own,
+    /// or another program's, beside which the store's is empty.
+    fn with_layer(
         dist: std::path::PathBuf,
         topology: Topology,
         Built {
@@ -936,6 +996,8 @@ impl Server {
             plan,
             plans,
         }: Built,
+        store: Arc<store::StoreData>,
+        data: Arc<dyn data::DataLayer>,
     ) -> Server {
         let speculations = speculation_manifests(&artifacts);
         let query_clock = pw_resource::Clock::new();
@@ -945,7 +1007,8 @@ impl Server {
         materializer.declare("store.page.Menu", FragmentPolicy::default());
         Server {
             templates,
-            store: store::StoreData::new(),
+            data,
+            store,
             clock,
             materializer,
             graph,
@@ -1183,7 +1246,11 @@ impl Server {
         args: &[Val],
         fail: bool,
     ) -> Result<(), String> {
-        let answered = self.command_answered(component_id, session, args, fail, None)?;
+        // The store's test fault, for this command alone (ADR-0174).
+        self.store
+            .fail_next
+            .store(fail, std::sync::atomic::Ordering::SeqCst);
+        let answered = self.command_answered(component_id, session, args, None)?;
         if answered.committed {
             return Ok(());
         }
@@ -1202,7 +1269,6 @@ impl Server {
         component_id: &str,
         session: &str,
         args: &[Val],
-        fail: bool,
         interaction: Option<&str>,
     ) -> Result<Answered, String> {
         // The session's one change at a time, through its frames (ADR-0172).
@@ -1216,7 +1282,7 @@ impl Server {
         // both read the lines, and one of them would be lost
         // (`lazy-handler.spec.mjs` clicks twice concurrently to find that).
         {
-            let mut staging = self.store.begin(session, fail);
+            let mut staging = self.data.begin(session);
             let mut host = staging.ops();
             host.insert(
                 "pw:host/session#read".to_string(),
@@ -1279,7 +1345,16 @@ impl Server {
             // entry it invalidates. The version moves because the RESOURCE
             // moved.
             drop(staging);
-            self.drain_held(session);
+            // The session's documents, at the version the commit made: by the
+            // layer's own entry for the session (the store's cart), or on the
+            // host's clock (ADR-0218).
+            if self.data.session_entry() {
+                self.drain_held(session);
+            } else {
+                self.clock.advance(1);
+                let version = Version(self.clock.now());
+                self.send_documents(session, &session_documents(session), version, false);
+            }
             Ok(Answered {
                 committed: true,
                 result,
@@ -1358,7 +1433,6 @@ impl Server {
                 component_id,
                 session,
                 &args,
-                false,
                 interaction,
             )));
         };
@@ -1400,8 +1474,7 @@ impl Server {
         let outcome = self
             .commands
             .try_command(&key, || {
-                answered(self.command_answered(component_id, session, &args, false, Some(id)))
-                    .kept()
+                answered(self.command_answered(component_id, session, &args, Some(id))).kept()
             })
             .map_err(|e| format!("interaction `{id}`'s outcome is unknown: {e:?}"))?;
         Ok(Answered::from_kept(&outcome))
@@ -1760,7 +1833,7 @@ impl Server {
         stopped: Option<Stopped>,
     ) -> Result<Val, String> {
         // The store's reads (ADR-0218), and the platform's session.
-        let mut host = self.store.reads(session, stopped);
+        let mut host = self.data.reads(session, stopped);
         host.insert(
             "pw:host/session#read".to_string(),
             Self::session_operation(session),
@@ -9230,6 +9303,70 @@ public query Store(",
         assert_eq!((varied.max_attempts, varied.jitter), (3, true));
     }
 
+    /// **The feed reference app, built and served** (ADR-0218): its data the
+    /// feed's layer, chosen because its contracts import `feed:data/…`.
+    fn served_feed() -> Served {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let dir = tempfile::TempDir::with_prefix("pw-feed-").expect("a temporary directory");
+        let mut units = Vec::new();
+        for d in [
+            "packages/pw-std",
+            "packages/pw-platform-web",
+            "examples/feed",
+        ] {
+            let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(d))
+                .unwrap_or_else(|e| panic!("{d}: {e}"))
+                .map(|e| e.expect("entry").path())
+                .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+                .collect();
+            paths.sort();
+            for p in paths {
+                let src = std::fs::read_to_string(&p).expect("read");
+                units.push(pw_core::check::Unit {
+                    hir: pw_core::lower::lower_file(&src, &pw_syntax::parse_tree(&src).green),
+                    path: p.display().to_string(),
+                    src,
+                });
+            }
+        }
+        let build = pw_core::build::build(&units).expect("the feed builds");
+        assert!(build.refusals().is_empty(), "{:?}", build.refusals());
+        let out = dir.path().join("build");
+        build.write(&out).expect("the build is written");
+        Served {
+            server: Server::from_build(out.clone(), out).expect("served"),
+            _dir: dir,
+        }
+    }
+
+    /// **A second program is served by the same host** (ADR-0218): the
+    /// feed's timeline from its data layer, and a post committed and sent
+    /// to the session's document. Until ADR-0218 the host served the store
+    /// alone, and the feed's build failed at start.
+    #[test]
+    fn the_feed_is_served_by_the_host_its_data_the_deployments() {
+        let s = served_feed();
+        let (html, _, _, _) = s
+            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        assert!(html.contains("Hello, feed."), "{html}");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        let answered = s
+            .command_answered(
+                "feed.app.post",
+                "a",
+                &[Val::String("A first post".into())],
+                Some("i-1"),
+            )
+            .expect("runs");
+        assert!(answered.committed, "{:?}", answered.result);
+        let set = sets_of(&s, &doc).pop().expect("a patch set");
+        assert!(
+            format!("{set:?}").contains("A first post"),
+            "the timeline shows the post: {set:?}"
+        );
+    }
+
     /// **A build that imports what its data layer does not supply is refused
     /// at start** (ADR-0218), as one whose handlers were not compiled is,
     /// rather than when a request first reaches the operation.
@@ -9996,9 +10133,7 @@ public query Store(",
     #[test]
     fn an_empty_cart_places_no_order() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
-        let answered = s
-            .command_answered(PLACE, "a", &[], false, None)
-            .expect("answered");
+        let answered = s.command_answered(PLACE, "a", &[], None).expect("answered");
         assert!(!answered.committed, "{:?}", answered.result);
         assert!(
             answered

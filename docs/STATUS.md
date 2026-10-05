@@ -19,7 +19,9 @@ served the store alone, and a second program failed at `from_build`. The
 split is made in place, in steps, every test green after each: the store's
 state, its reads, a command's staging and its grants are `StoreData` now,
 and a build that imports what the layer does not supply is refused at start.
-The rest, then the feed, follow.
+Then the feed: a `DataLayer` the host chooses by the build's imports, the
+feed's own in memory, and `examples/feed/app.pw` served and committing a
+post to the session's open timeline.
 
 **ADR-0217, 2026-10-05: what a handler at the top of the page captures is
 set again when it changes** (urgent defect 2). A row's captures were patched

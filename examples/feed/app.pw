@@ -1,0 +1,161 @@
+// @corpus: reference
+// @id: FEED
+// @category: a reference app unlike the store: a feed
+// @milestone: E14
+//
+// The owner's reference app (NEXT 22): a Twitter-shaped feed, to find what
+// the store does not. Users, posts with their replies as deep as they go, a
+// timeline read a page at a time, posting and liking. Its data is the
+// deployment's (ADR-0218): `feed:data/…` is what the host's feed layer
+// supplies.
+
+module feed.app
+
+import List
+import context.{ current_session }
+import capability.{ Session, SessionId }
+
+opaque type UserId = String
+opaque type PostId = String
+opaque type InteractionId = String
+
+type User = User { id: UserId, handle: String, name: String }
+
+type Post = Post {
+    id: PostId,
+    author: User,
+    text: String,
+    likes: Int,
+    replies: List<Post>,
+}
+
+type FeedError =
+    | Unavailable
+    | NotFound
+
+event Posted(author: UserId)
+event Liked(post: PostId)
+
+fn timeline(s: Session<SessionId>, limit: Int) -> List<Post> !{ database.read<Post> }
+    host "feed:data/posts#timeline"
+
+fn thread(id: PostId) -> Result<Post, FeedError> !{ database.read<Post> }
+    host "feed:data/posts#thread"
+
+fn author(s: Session<SessionId>) -> UserId !{ database.read<User> }
+    host "feed:data/users#of-session"
+
+fn publish(s: Session<SessionId>, text: String) -> Result<Post, FeedError> !{ database.write<Post> }
+    host "feed:data/posts#publish"
+
+fn add_like(s: Session<SessionId>, post: PostId) -> Result<Post, FeedError> !{ database.write<Post> }
+    host "feed:data/posts#like"
+
+session query Timeline(session: Session<SessionId>, limit: Int) -> List<Post>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            session, limit
+    invalidates_on Posted(_), Liked(_)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    timeline(session, limit)
+}
+
+public query Thread(id: PostId) -> Result<Post, FeedError>
+    freshness      5.seconds
+    consistency    snapshot
+    cache          shared
+    key            id
+    invalidates_on Liked(id), Posted(_)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    thread(id)
+}
+
+command post(text: String) -> Result<Post, FeedError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    emits         Posted(author(current_session()))
+{
+    publish(current_session(), text)
+}
+
+command like(post: PostId) -> Result<Post, FeedError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    emits         Liked(post)
+{
+    add_like(current_session(), post)
+}
+
+session page Home() {
+    route     "/"
+    placement origin
+    cache     private
+
+    signal shown: Int = 20
+    signal draft: String = ""
+    let feed = query Timeline(current_session(), shown)
+
+    view {
+        <title>Home</title>
+        <main>
+            <h1>Home</h1>
+            <form on:submit|prevent={() => match post(draft) {
+                Ok(_) => draft = "",
+                Err(_) => draft = draft,
+            }}>
+                <label>What's happening? <textarea bind:value={draft}></textarea></label>
+                <button type="submit">Post</button>
+            </form>
+            <ul>
+                {#each feed as p (p.id)}
+                    <li>
+                        <a href="/post/{p.id}">{p.author.name}</a>
+                        <p>{p.text}</p>
+                        <button type="button" on:press={resumable(captures = { p }) => match like(p.id) {
+                            Ok(_) => draft = draft,
+                            Err(_) => draft = draft,
+                        }}>Like ({p.likes})</button>
+                    </li>
+                {/each}
+            </ul>
+            <button type="button" on:press={() => shown = shown + 20}>Load more</button>
+        </main>
+    }
+}
+
+// A post and its replies, each a post with its own, as deep as they go
+// (ADR-0203: a view that contains itself).
+view Replies(post: Post) {
+    <article>
+        <p><a href="/post/{post.id}">{post.author.name}</a></p>
+        <p>{post.text}</p>
+        <ul>
+            {#each post.replies as reply (reply.id)}
+                <li><Replies post={reply} /></li>
+            {/each}
+        </ul>
+    </article>
+}
+
+page PostPage(id: PostId) {
+    route        "/post/{id}"
+    not_found_on FeedError.NotFound
+    placement    origin
+    cache        private
+
+    let thread = query Thread(id)
+
+    view {
+        <title>Post</title>
+        <main>
+            <Replies post={thread} />
+        </main>
+    }
+}
