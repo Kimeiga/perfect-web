@@ -1664,3 +1664,20 @@ a type that contains itself compiles, and crosses a boundary as its nodes.
 - A host holds the value nested, no deeper than 128, and an invariant inside
   a tree holds at every node. Held in place, through another declaration,
   or on the browser's wire, it is refused by name.
+
+[ADR-0195](DECISIONS/ADR-0195-the-owners-rulings-on-fifteen-open-questions.md):
+the owner's rulings on fifteen open questions.
+- Relayed 2026-10-05: record shorthand by Rust's rule; a case uppercase and
+  a lowercase pattern name always a binding; only statement-starting words
+  reserved; "type annotation needed" where nothing fixes a result; a bare
+  case with a payload resolved like a payload-free one; Float `%` as Rust's
+  `rem_euclid` and a Float's text as ECMAScript's `Number::toString`;
+  `return` stays a statement.
+- Cache keys by information flow; labels on clause keys; `Cart(_)` written
+  out, materializations that read others; events returned by the command
+  and written in its transaction; a named function as a handler; `<link>`
+  origins declared and the CSP generated from them; a speculation never
+  invents a value; E7's gate 8 counting attributed long frames.
+- Each checked against a primary source and confirmed, `%` refined by
+  `rem_euclid`'s own contract, and ordered behind the app layer except
+  where it fixes a wrong value.

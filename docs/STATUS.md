@@ -13,6 +13,14 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0195, 2026-10-05: the owner's rulings on fifteen open questions.**
+The owner ruled on fifteen "(ruling needed)" items, relayed by another
+session. Each is recorded, checked against a primary source and confirmed;
+`%` on a Float is refined by `rem_euclid`'s own contract. Each is built in
+a later ADR of its own, in the order the record sets: the ones that fix a
+wrong value first (an invented zero price), the rest with the app layer or
+after it.
+
 **ADR-0194, 2026-10-05: a type that contains itself compiles, and crosses
 a boundary as its nodes.** This is the first item of the app layer the owner
 put before the AI benchmark. A reply thread could be declared and checked,
