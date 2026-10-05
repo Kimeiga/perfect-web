@@ -479,14 +479,6 @@ fn a_type_of_three_hundred_cases_has_a_wider_discriminant() {
     );
 }
 
-fn refused(program: &str, id: &str) -> String {
-    let err = pw_core::backend::component::compile(&units(&[("m.pw", program)]), id)
-        .map(|_| ())
-        .expect_err("refused");
-    println!("{id}: {err}");
-    err
-}
-
 #[test]
 fn a_bare_case_with_a_payload_is_built() {
     // ADR-0198 (ADR-0195's ruling 5): `Circle(n)` alone builds the case, as
