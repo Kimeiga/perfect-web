@@ -37,6 +37,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 VALUES = ROOT / "compiler/pw-core/src/values.rs"
 RENDER = ROOT / "runtime/pw-render/src/lib.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 APP = ROOT / "examples/store/app.pw"
 
 # (what, suite, file, anchor, replacement)
@@ -44,7 +45,7 @@ MUTANTS = [
     (
         "every item is said to be available",
         "server",
-        SERVER,
+        STORE_DATA,
         # Re-anchored by ADR-0181, whose data layer groups the menu.
         '                        ("available".into(), Val::Bool(!sold_out.contains(id))),\n',
         '                        ("available".into(), Val::Bool(true)),\n',

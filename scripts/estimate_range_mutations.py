@@ -24,6 +24,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 APP = ROOT / "examples/store/app.pw"
 DOMAIN = ROOT / "examples/domain.pw"
 
@@ -32,21 +33,21 @@ MUTANTS = [
     (
         "no range unless one is asked for",
         "server",
-        SERVER,
+        STORE_DATA,
         "                            Val::S64(estimator.max_minutes.unwrap_or(estimator.minutes + 10)),\n",
         "                            Val::S64(estimator.max_minutes.unwrap_or(estimator.minutes)),\n",
     ),
     (
         "no `generated_at` is answered",
         "server",
-        SERVER,
+        STORE_DATA,
         '                        ("generated-at".into(), Val::S64(wall_millis())),\n',
         "",
     ),
     (
         "the benchmark's own `minutes` is no longer answered",
         "server",
-        SERVER,
+        STORE_DATA,
         '                        ("minutes".into(), Val::S64(estimator.minutes)),\n',
         "",
     ),

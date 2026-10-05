@@ -1851,3 +1851,11 @@ a handler at the top of the page captures is set again when it changes
 - A row's captures were patched with the row. A top-level handler's were in
   no plan, so a button capturing the cart sent the cart the page was first
   rendered with. The plan, the server and a speculation set them again now.
+[ADR-0218](DECISIONS/ADR-0218-a-host-serves-any-program-its-data-is-the-deployments.md):
+a host serves any program, and its data is the deployment's (the feed
+reference app's first step).
+- The development server served the store alone: its machinery and the
+  store's data were one. The split is made in place, in steps, each keeping
+  every test green. First the store's state, reads, command staging and
+  grants move into `StoreData`, and a build importing what no layer supplies
+  is refused at start.

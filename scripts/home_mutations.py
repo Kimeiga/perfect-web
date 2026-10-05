@@ -20,6 +20,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 
 # (what, file, anchor, replacement)
 MUTANTS = [
@@ -31,7 +32,7 @@ MUTANTS = [
     ),
     (
         "the host lists one store",
-        SERVER,
+        STORE_DATA,
         "                [STORE_ID, SECOND_STORE.0]\n",
         "                [STORE_ID]\n",
     ),

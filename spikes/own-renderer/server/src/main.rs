@@ -479,15 +479,14 @@ impl Default for Estimator {
     }
 }
 
+mod store;
+
 struct Server {
     /// The templates the compiler emitted, deserialized once.
     templates: Vec<Template>,
-    /// The keyed collection E7-P's structural patches operate on.
-    ///
-    /// Mutable, because a list that never changes cannot demonstrate that a
-    /// change preserves identity. Each item is `(key, name)` and the key is
-    /// what `{#each menu as item key item.id}` declares.
-    menu: Mutex<Vec<(String, String)>>,
+    /// **The store's data** (ADR-0218): what its data layer holds, which the
+    /// deployment supplies. It was the host's own state until ADR-0218.
+    store: store::StoreData,
     /// The materializer's clock, advanced once per regeneration.
     ///
     /// A version is `Entry.generated_at`, which is a clock reading — so a clock
@@ -497,11 +496,6 @@ struct Server {
     clock: Clock,
     /// The one materializer. Versions come from here and from nowhere else.
     materializer: Materializer,
-    /// Per-session cart lines — `(item, quantity)` — behind the
-    /// materializer's command boundary. This is the deployment's DATA LAYER:
-    /// `store:data/carts#add` is its operation, and the compiled command calls
-    /// it through the host.
-    carts: Mutex<BTreeMap<String, Lines>>,
     /// **Each session's committed interactions**, most recent last
     /// (ADR-0172): what a value of its cart includes, which a page drops its
     /// speculations by. As many as are kept for idempotency.
@@ -582,42 +576,6 @@ struct Server {
     /// Registered and forgotten with its parameters; a document not in it
     /// is the store's.
     pages: Mutex<BTreeMap<Doc, String>>,
-    /// **Each session's order, by its status's case** (E14, T04): what
-    /// `store:data/orders#current` answers. The kitchen sets it through
-    /// `/bench/order`; no order is `None`.
-    orders: Mutex<BTreeMap<String, String>>,
-    /// **The recommender** (ADR-0148): what a streamed region's query reads,
-    /// with the delay and failure a test sets.
-    recommender: Mutex<Recommender>,
-    /// **Each session's estimator** (E14, T10), as a test set it; the default
-    /// for a session no test has.
-    estimators: Mutex<BTreeMap<String, Estimator>>,
-    /// **What the store has posted on its notice board** (E14, T09): what
-    /// `store:data/notices#current` answers. A test posts a notice through
-    /// `/bench/notice`, and nothing is told it changed.
-    notice: Mutex<String>,
-    /// **How long the kitchen takes now, in minutes** (E14, T02): what
-    /// `store:data/kitchen#prep-minutes` answers, after [`KITCHEN_MS`]. A
-    /// test changes it through `/bench/prep`, and nothing is told.
-    prep_minutes: Mutex<i64>,
-    /// **The items sold out** (charter §15.4, §15.5's forced stale item): what
-    /// `store:data/menus#is-available` answers no for, inside the command
-    /// that adds one. A test sells one out through `/bench/stock`, and the
-    /// page that shows it is not told.
-    sold_out: Mutex<std::collections::BTreeSet<String>>,
-    /// **How long the store's data layer takes to answer for a store**
-    /// (charter §15.5's store delay, ADR-0174), in milliseconds: one delay
-    /// for every reader, as the store is one value for all of them. A test
-    /// sets it through `/bench/store`.
-    store_delay_ms: Arc<std::sync::atomic::AtomicU64>,
-    /// **Whether the store's next read fails at its origin** (ADR-0177),
-    /// once, for every reader. A test sets it through `/bench/store?fail=next`.
-    store_fails_next: Arc<std::sync::atomic::AtomicBool>,
-    /// **What each session's cart meets at the database** (charter §15.5,
-    /// ADR-0174): how long a read of it takes, and whether its next write
-    /// and its next read fail. A test sets them through `/bench/cart` and
-    /// `/bench/fail`.
-    cart_faults: Arc<Mutex<BTreeMap<String, CartFaults>>>,
     /// **What each session's connections meet** (charter §15.5's one-shot
     /// network error and forced reconnect, ADR-0175): whether its next
     /// command's connection is dropped, and when its subscriptions are cut
@@ -629,11 +587,6 @@ struct Server {
     materializer_faults: Mutex<std::collections::BTreeSet<String>>,
     /// **Each document's keyed reads** (ADR-0152, ADR-0161).
     keyed: Mutex<BTreeMap<Doc, Keyed>>,
-    /// **The menu's categories** (E14, T07): which is slow, and how slow.
-    categories: Mutex<Categories>,
-    /// How many reads of a category saw they were stopped, and ended early
-    /// (E14, T07).
-    category_stopped: Arc<std::sync::atomic::AtomicU64>,
     /// **The items each store's menu fragment was last rendered from**: a
     /// fragment is rendered again when the `Menu` query's value is not what
     /// it shows.
@@ -859,25 +812,8 @@ fn dev_topology() -> Topology {
         nodes: vec![Node {
             name: "dev-origin".to_string(),
             world: "origin".to_string(),
+            // The platform's grants, and its data layer's (ADR-0218).
             grants: [
-                "database.read<Carts>",
-                "database.read<Menus>",
-                // A session's order (E14, T04).
-                "database.read<Orders>",
-                // And the order a session places (ADR-0193).
-                "database.write<Orders>",
-                "database.read<Stores>",
-                "database.write<Carts>",
-                // The recommender (ADR-0148), a source reached over the network.
-                "network.fetch",
-                // A session's delivery estimate (E14, T10).
-                "database.read<Estimates>",
-                // The store's notice board (E14, T09).
-                "database.read<Notices>",
-                // The kitchen's prep time (E14, T02).
-                "database.read<Kitchen>",
-                // The menu by category (E14, T07).
-                "database.read<Categories>",
                 // 2026-08-10. The store gained the `import context.{
                 // current_session }` it had been missing since E4, so the page
                 // and both commands read the session. A dev origin that does
@@ -889,6 +825,7 @@ fn dev_topology() -> Topology {
                 "outbox.write",
             ]
             .iter()
+            .chain(store::StoreData::grants())
             .map(|s| s.to_string())
             .collect(),
         }],
@@ -928,7 +865,7 @@ impl Server {
                 serde_json::from_str(&text).map_err(|e| format!("{page}: {e}"))?,
             );
         }
-        Ok(Server::with(
+        let server = Server::with(
             dist,
             dev_topology(),
             Built {
@@ -940,7 +877,26 @@ impl Server {
                 plan,
                 plans,
             },
-        ))
+        );
+        // **What the program imports, its data layer supplies** (ADR-0218):
+        // refused here, as uncompiled handlers are, rather than when a press
+        // first reaches the operation.
+        let supplied = server.store.operations();
+        for c in &server.contracts {
+            for i in &c.imports {
+                if i.kind != pw_host::ImportKind::HostCapability || i.interface.starts_with("pw:") {
+                    continue;
+                }
+                if !supplied.contains(&i.key()) {
+                    return Err(format!(
+                        "`{}` imports `{}`, which the data layer does not supply",
+                        c.component_id,
+                        i.key()
+                    ));
+                }
+            }
+        }
+        Ok(server)
     }
 
     /// The server on the committed artifacts, on a topology the caller chooses.
@@ -989,14 +945,13 @@ impl Server {
         materializer.declare("store.page.Menu", FragmentPolicy::default());
         Server {
             templates,
+            store: store::StoreData::new(),
             clock,
             materializer,
             graph,
-            carts: Mutex::new(BTreeMap::new()),
             applied: Mutex::new(BTreeMap::new()),
             sessions: Mutex::new(BTreeMap::new()),
             components,
-            menu: Mutex::new(default_menu()),
             dist,
             artifacts,
             pending: Mutex::new(BTreeMap::new()),
@@ -1004,20 +959,9 @@ impl Server {
             documents: std::sync::atomic::AtomicU64::new(1),
             params: Mutex::new(BTreeMap::new()),
             pages: Mutex::new(BTreeMap::new()),
-            orders: Mutex::new(BTreeMap::new()),
-            recommender: Mutex::new(Recommender::default()),
-            estimators: Mutex::new(BTreeMap::new()),
-            notice: Mutex::new("Open until 7 pm".to_string()),
-            prep_minutes: Mutex::new(12),
-            sold_out: Mutex::new(std::collections::BTreeSet::new()),
-            store_delay_ms: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            store_fails_next: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            cart_faults: Arc::new(Mutex::new(BTreeMap::new())),
             connection_faults: Mutex::new(BTreeMap::new()),
             materializer_faults: Mutex::new(std::collections::BTreeSet::new()),
             keyed: Mutex::new(BTreeMap::new()),
-            categories: Mutex::new(Categories::default()),
-            category_stopped: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             menu_rendered_from: Mutex::new(BTreeMap::new()),
             contracts,
             topology,
@@ -1083,29 +1027,13 @@ impl Server {
     /// of the state. The page's count is `domain.line_count`'s (ADR-0125).
     #[cfg(test)]
     fn cart_value(&self, session: &str) -> i64 {
-        self.carts
+        self.store
+            .carts
             .lock()
             .expect("carts")
             .get(session)
             .map(|lines| lines.iter().map(|l| l.quantity).sum())
             .unwrap_or(0)
-    }
-
-    /// **Each item a store holds now, with its name and price** (ADR-0172):
-    /// what a new line records. Store 47's menu as E7-P has changed it, and
-    /// store 48's.
-    fn catalog(&self) -> Arc<Catalog> {
-        let first = self.menu.lock().expect("menu").clone();
-        Arc::new(
-            first
-                .into_iter()
-                .chain(second_menu())
-                .map(|(id, name)| {
-                    let price = item_price(&id);
-                    (id, (name, price))
-                })
-                .collect(),
-        )
     }
 
     /// **The platform's outbox, for one command** (ADR-0208, ADR-0209): each
@@ -1282,40 +1210,17 @@ impl Server {
         let _one = session_lock
             .lock()
             .expect("one change of a session at a time");
-        // One lock across the call and the commit: two presses in the same
-        // instant both read the lines, and one of them would be lost —
-        // `lazy-handler.spec.mjs` clicks twice concurrently to find exactly that.
+        // The data layer's writes, staged until the transaction commits
+        // (ADR-0218): for the store, the session's cart, under one lock held
+        // across the call and the commit — two presses in the same instant
+        // both read the lines, and one of them would be lost
+        // (`lazy-handler.spec.mjs` clicks twice concurrently to find that).
         {
-            let mut carts = self.carts.lock().expect("carts");
-            let current = carts.get(session).cloned().unwrap_or_default();
-            let staged: Arc<Mutex<Option<Lines>>> = Arc::default();
-            // The order a command places (ADR-0193), staged with the cart it
-            // empties, and committed with it.
-            let placed: Arc<Mutex<Option<String>>> = Arc::default();
-            let order = Self::order_layer(session, current.clone(), staged.clone(), placed.clone());
-            let mut host = self.faulted(
-                session,
-                Self::data_layer(session, current, staged.clone(), fail, self.catalog()),
-            );
-            host.extend(order);
+            let mut staging = self.store.begin(session, fail);
+            let mut host = staging.ops();
             host.insert(
                 "pw:host/session#read".to_string(),
                 Self::session_operation(session),
-            );
-            // Whether an item can be ordered now (charter §15.4), read inside
-            // the command that adds it. One no store's menu has is not
-            // (ADR-0172): a page sends the item it showed, and a request can
-            // name any.
-            let sold_out = self.sold_out.lock().expect("sold out").clone();
-            let catalog = self.catalog();
-            host.insert(
-                "store:data/menus#is-available".to_string(),
-                Arc::new(move |args: &[Val]| match args {
-                    [Val::String(item)] => Ok(vec![Val::Bool(
-                        catalog.contains_key(item) && !sold_out.contains(item),
-                    )]),
-                    other => Err(format!("menus#is-available received {other:?}")),
-                }),
             );
 
             // What the command emits (ADR-0208): it computes each event's
@@ -1333,7 +1238,7 @@ impl Server {
                     why: None,
                 });
             }
-            let Some(lines) = staged.lock().expect("staged").take() else {
+            let Some(rows) = staging.rows() else {
                 // Nothing was written, so there is nothing to commit.
                 return Ok(Answered {
                     committed: true,
@@ -1341,7 +1246,6 @@ impl Server {
                     why: None,
                 });
             };
-            let total: i64 = lines.iter().map(|l| l.quantity).sum();
             let (emitted, invalidated) = {
                 let staged = staged_events.lock().expect("staged");
                 (staged.events.clone(), staged.invalidated.clone())
@@ -1350,19 +1254,16 @@ impl Server {
                 .iter()
                 .map(|(event, values)| outboxed(event, values))
                 .collect::<Result<Vec<_>, String>>()?;
+            // The state the data layer staged and the outbox's events, in one
+            // transaction (ADR-0019, ADR-0208).
             self.materializer.command(|tx| {
-                Materializer::set_state(tx, &format!("cart:{session}"), &total.to_string());
+                for (key, value) in &rows {
+                    Materializer::set_state(tx, key, value);
+                }
                 Ok::<_, String>(events)
             })?;
-            carts.insert(session.to_string(), lines);
-            // And the order it placed (ADR-0193), before what reads it is
-            // dropped and read again below.
-            if let Some(status) = placed.lock().expect("placed").take() {
-                self.orders
-                    .lock()
-                    .expect("orders")
-                    .insert(session.to_string(), status);
-            }
+            // What was staged is the data layer's from now on.
+            staging.publish();
             // What the cart's values include from now on, by the interaction
             // that committed it (ADR-0172), recorded with the commit.
             if let Some(interaction) = interaction {
@@ -1377,7 +1278,7 @@ impl Server {
             // The materializer drains the committed event and regenerates the
             // entry it invalidates. The version moves because the RESOURCE
             // moved.
-            drop(carts);
+            drop(staging);
             self.drain_held(session);
             Ok(Answered {
                 committed: true,
@@ -1531,205 +1432,6 @@ impl Server {
             })
     }
 
-    /// **The session's cart operations, as its faults make them**
-    /// (ADR-0174). A read waits the session's delay. The next write, and the
-    /// next read, fail once each as a database that is down fails: the
-    /// operation answers no value, and the component that called it traps.
-    fn faulted(
-        &self,
-        session: &str,
-        mut host: BTreeMap<String, HostFn>,
-    ) -> BTreeMap<String, HostFn> {
-        for (name, writes) in [
-            ("current", false),
-            ("add", true),
-            ("decrease", true),
-            ("remove", true),
-            ("clear", true),
-        ] {
-            let key = format!("store:data/carts#{name}");
-            let Some(op) = host.remove(&key) else {
-                continue;
-            };
-            let faults = self.cart_faults.clone();
-            let session = session.to_string();
-            host.insert(
-                key,
-                Arc::new(move |args: &[Val]| {
-                    let delay = {
-                        let mut all = faults.lock().expect("cart faults");
-                        let mut mine = all.get_mut(&session);
-                        let failing = mine.as_deref_mut().is_some_and(|m| {
-                            std::mem::take(if writes {
-                                &mut m.fail_write
-                            } else {
-                                &mut m.fail_read
-                            })
-                        });
-                        if failing {
-                            return Err(format!("carts#{name}: the database is unavailable"));
-                        }
-                        mine.map(|m| if writes { 0 } else { m.delay_ms })
-                            .unwrap_or_default()
-                    };
-                    if delay > 0 {
-                        std::thread::sleep(std::time::Duration::from_millis(delay));
-                    }
-                    op(args)
-                }),
-            );
-        }
-        host
-    }
-
-    /// **The deployment's data layer: `store:data/carts`, whole.**
-    ///
-    /// Every operation the interface declares, whichever command is running;
-    /// the host links only those the component imports and was granted. Each
-    /// write stages the session's new lines in `staged`, and nothing here
-    /// commits. A command's `Ok` does that, in [`Server::command`]. The
-    /// session an operation is passed must be the one the host gave the
-    /// component, or the component is acting for someone else.
-    fn data_layer(
-        session: &str,
-        current: Lines,
-        staged: Arc<Mutex<Option<Lines>>>,
-        fail: bool,
-        catalog: Arc<Catalog>,
-    ) -> BTreeMap<String, HostFn> {
-        let expired = || {
-            vec![Val::Result(Err(Some(Box::new(Val::Variant(
-                "cart-expired".into(),
-                None,
-            )))))]
-        };
-        let op = |name: &'static str,
-                  f: fn(&mut Lines, &[Val], &Catalog) -> Result<(), String>|
-         -> (String, HostFn) {
-            let this_session = session.to_string();
-            let current = current.clone();
-            let staged = staged.clone();
-            let catalog = catalog.clone();
-            let run: HostFn = Arc::new(move |args: &[Val]| {
-                let Some(Val::String(s)) = args.first() else {
-                    return Err(format!("carts#{name} received {args:?}"));
-                };
-                if *s != this_session {
-                    return Err(format!("carts#{name} was passed another session"));
-                }
-                if fail {
-                    return Ok(expired());
-                }
-                let mut staged = staged.lock().expect("staged");
-                let mut lines = staged.clone().unwrap_or_else(|| current.clone());
-                f(&mut lines, &args[1..], &catalog)?;
-                let cart = cart_value(&lines);
-                if name != "current" {
-                    *staged = Some(lines);
-                }
-                Ok(vec![Val::Result(Ok(Some(Box::new(cart))))])
-            });
-            (format!("store:data/carts#{name}"), run)
-        };
-        BTreeMap::from([
-            op("add", |lines, args, catalog| {
-                let [Val::String(item), Val::S64(quantity)] = args else {
-                    return Err(format!("carts#add received {args:?}"));
-                };
-                match lines.iter_mut().find(|l| l.item == *item) {
-                    Some(line) => line.quantity += quantity,
-                    None => {
-                        // The line records its item as it is now (ADR-0172).
-                        let (name, price) = catalog
-                            .get(item)
-                            .cloned()
-                            .ok_or_else(|| format!("carts#add: no store has an item `{item}`"))?;
-                        lines.push(Line {
-                            item: item.clone(),
-                            quantity: *quantity,
-                            name,
-                            price,
-                        });
-                    }
-                }
-                Ok(())
-            }),
-            // One fewer; a line that holds one goes (ADR-0172). A line that
-            // is not there is not: another page took it away first.
-            op("decrease", |lines, args, _| {
-                let [Val::String(item)] = args else {
-                    return Err(format!("carts#decrease received {args:?}"));
-                };
-                if let Some(at) = lines.iter().position(|l| l.item == *item) {
-                    if lines[at].quantity > 1 {
-                        lines[at].quantity -= 1;
-                    } else {
-                        lines.remove(at);
-                    }
-                }
-                Ok(())
-            }),
-            // The line, gone (ADR-0172).
-            op("remove", |lines, args, _| {
-                let [Val::String(item)] = args else {
-                    return Err(format!("carts#remove received {args:?}"));
-                };
-                lines.retain(|l| l.item != *item);
-                Ok(())
-            }),
-            op("clear", |lines, args, _| {
-                if !args.is_empty() {
-                    return Err(format!("carts#clear received {args:?}"));
-                }
-                lines.clear();
-                Ok(())
-            }),
-            op("current", |_, args, _| {
-                if !args.is_empty() {
-                    return Err(format!("carts#current received {args:?}"));
-                }
-                Ok(())
-            }),
-        ])
-    }
-
-    /// **The store's data layer for orders, as a command sees it**
-    /// (ADR-0193): `orders#place` places the session's cart as its order.
-    /// The order is the cart's lines, staged as `placed`, and the cart is
-    /// staged empty, so the two commit together, in the command's commit.
-    /// An empty cart places nothing, and says so.
-    fn order_layer(
-        session: &str,
-        current: Lines,
-        staged: Arc<Mutex<Option<Lines>>>,
-        placed: Arc<Mutex<Option<String>>>,
-    ) -> BTreeMap<String, HostFn> {
-        let this_session = session.to_string();
-        let place: HostFn = Arc::new(move |args: &[Val]| {
-            let [Val::String(s)] = args else {
-                return Err(format!("orders#place received {args:?}"));
-            };
-            if *s != this_session {
-                return Err("orders#place was passed another session".to_string());
-            }
-            let mut staged = staged.lock().expect("staged");
-            let lines = staged.clone().unwrap_or_else(|| current.clone());
-            if lines.is_empty() {
-                return Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
-                    "nothing-to-order".into(),
-                    None,
-                )))))]);
-            }
-            *staged = Some(Lines::new());
-            *placed.lock().expect("placed") = Some("placed".to_string());
-            Ok(vec![Val::Result(Ok(Some(Box::new(Val::Variant(
-                "placed".into(),
-                None,
-            )))))])
-        });
-        BTreeMap::from([("store:data/orders#place".to_string(), place)])
-    }
-
     /// **A session's resource changed outside a command** (ADR-0193): the
     /// store moved an order along. The change arrives as the event the
     /// program declares for it, `event` with the session as its key, and
@@ -1816,250 +1518,6 @@ impl Server {
                 self.commands.forget_command(&key);
             }
         }
-    }
-
-    /// **The deployment's catalogue** (ADR-0125): `store:data/stores#get` and
-    /// `store:data/menus#sections`, what the `Store` and `Menu` queries read,
-    /// and `menus#for-store`, the benchmark's own store's menu (ADR-0156,
-    /// ADR-0181).
-    /// This server holds two stores (ADR-0162): 47, whose menu is the keyed
-    /// list E7-P mutates, and 48. Any other is answered `not-found`.
-    ///
-    /// Its slow sources poll `stopped`, to end early a read nobody is
-    /// waiting for (ADR-0152).
-    fn catalog_within(&self, stopped: Option<Stopped>) -> BTreeMap<String, HostFn> {
-        let menu = self.menu.lock().expect("menu").clone();
-        let not_found = || {
-            vec![Val::Result(Err(Some(Box::new(Val::Variant(
-                "not-found".into(),
-                None,
-            )))))]
-        };
-        // Charter §15.5's store delay (ADR-0174), and its origin failing
-        // once (ADR-0177), as a test set them.
-        let store_delay = self.store_delay_ms.clone();
-        let store_fails = self.store_fails_next.clone();
-        let get: HostFn = Arc::new(move |args: &[Val]| match args {
-            [Val::String(id)] if store_named(id).is_some() => {
-                if store_fails.swap(false, std::sync::atomic::Ordering::SeqCst) {
-                    return Err("stores#get: the store's origin is unavailable".to_string());
-                }
-                let delay = store_delay.load(std::sync::atomic::Ordering::SeqCst);
-                if delay > 0 {
-                    std::thread::sleep(std::time::Duration::from_millis(delay));
-                }
-                Ok(vec![Val::Result(Ok(Some(Box::new(store_record(id)))))])
-            }
-            [Val::String(_)] => Ok(not_found()),
-            other => Err(format!("stores#get received {other:?}")),
-        });
-        // Every store this server holds, in its order (ADR-0192): what the
-        // home page lists.
-        let list: HostFn = Arc::new(move |args: &[Val]| match args {
-            [] => Ok(vec![Val::List(
-                [STORE_ID, SECOND_STORE.0]
-                    .into_iter()
-                    .map(store_record)
-                    .collect(),
-            )]),
-            other => Err(format!("stores#list received {other:?}")),
-        });
-        // What can be ordered now (ADR-0178), as the menu's rows say.
-        let sold_out = self.sold_out.lock().expect("sold out").clone();
-        // A store's items, each as the data layer holds it: read through the
-        // program's `MenuItem` (ADR-0166), so the benchmark's, which declares
-        // fewer fields, is passed what it declares.
-        let rows_of = move |store: &str| -> Vec<(String, Val)> {
-            let items = match store {
-                STORE_ID => menu.clone(),
-                _ => second_menu(),
-            };
-            items
-                .iter()
-                .map(|(id, name)| {
-                    let (category, category_name) = item_category(store, id);
-                    let row = Val::Record(vec![
-                        ("id".into(), Val::String(id.clone())),
-                        // Its store, and its category (ADR-0181).
-                        ("store-id".into(), Val::String(store.to_string())),
-                        ("name".into(), Val::String(name.clone())),
-                        (
-                            "description".into(),
-                            Val::String(item_description(id).into()),
-                        ),
-                        // Its price, in cents (ADR-0169).
-                        (
-                            "price".into(),
-                            Val::Record(vec![("minor-units".into(), Val::S64(item_price(id)))]),
-                        ),
-                        // Whether it can be ordered now (ADR-0178): what
-                        // `menus#is-available` answers.
-                        ("available".into(), Val::Bool(!sold_out.contains(id))),
-                        (
-                            "category".into(),
-                            Val::Record(vec![
-                                ("id".into(), Val::String(category.into())),
-                                ("name".into(), Val::String(category_name.into())),
-                            ]),
-                        ),
-                    ]);
-                    (category.to_string(), row)
-                })
-                .collect()
-        };
-        let rows_of = Arc::new(rows_of);
-        let rows = rows_of.clone();
-        let for_store: HostFn = Arc::new(move |args: &[Val]| match args {
-            [Val::String(id)] if store_named(id).is_some() => {
-                Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
-                    rows(id).into_iter().map(|(_, row)| row).collect(),
-                )))))])
-            }
-            [Val::String(_)] => Ok(not_found()),
-            other => Err(format!("menus#for-store received {other:?}")),
-        });
-        // **The menu, grouped by category** (ADR-0181): each category in the
-        // order its first item is listed, with its items in theirs.
-        let sections: HostFn = Arc::new(move |args: &[Val]| match args {
-            [Val::String(id)] if store_named(id).is_some() => {
-                let mut grouped: Vec<(String, Val, Vec<Val>)> = Vec::new();
-                for (category, row) in rows_of(id) {
-                    let Val::Record(fields) = &row else { continue };
-                    let named = fields
-                        .iter()
-                        .find(|(n, _)| n == "category")
-                        .map(|(_, v)| v.clone())
-                        .unwrap_or(Val::Record(Vec::new()));
-                    match grouped.iter_mut().find(|(c, ..)| *c == category) {
-                        Some((_, _, items)) => items.push(row),
-                        None => grouped.push((category, named, vec![row])),
-                    }
-                }
-                Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
-                    grouped
-                        .into_iter()
-                        .map(|(_, category, items)| {
-                            Val::Record(vec![
-                                ("category".into(), category),
-                                ("items".into(), Val::List(items)),
-                            ])
-                        })
-                        .collect(),
-                )))))])
-            }
-            [Val::String(_)] => Ok(not_found()),
-            other => Err(format!("menus#sections received {other:?}")),
-        });
-        // What the recommender answers (ADR-0148), after its delay: a slow
-        // source, which a streamed region does not wait for.
-        let recommender = self.recommender.lock().expect("recommender").clone();
-        // Store 47's menu as it is now, which its recommendations are drawn
-        // from (ADR-0165).
-        let suggested_from = self.menu.lock().expect("menu").clone();
-        let recommend: HostFn = Arc::new(move |args: &[Val]| {
-            let [Val::String(store)] = args else {
-                return Err(format!("recommendations#for-store received {args:?}"));
-            };
-            std::thread::sleep(std::time::Duration::from_millis(recommender.delay_ms));
-            let items = match (&recommender.items, store.as_str()) {
-                (Some(items), _) => items.clone(),
-                (None, STORE_ID) => recommended_from(&suggested_from),
-                (None, id) if store_named(id).is_some() => recommended_from(&second_menu()),
-                (None, _) => Vec::new(),
-            };
-            match recommender.fail.as_deref() {
-                Some("host") => Err("the recommender is down".to_string()),
-                Some(_) => Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
-                    "none-available".into(),
-                    None,
-                )))))]),
-                None => Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
-                    items
-                        .iter()
-                        .map(|(id, name)| {
-                            Val::Record(vec![
-                                ("id".into(), Val::String(id.clone())),
-                                ("name".into(), Val::String(name.clone())),
-                            ])
-                        })
-                        .collect(),
-                )))))]),
-            }
-        });
-        // What the store has posted (E14, T09). Every call is counted, as
-        // every data-layer call is: what `/bench/calls` reports.
-        let posted = self.notice.lock().expect("notice").clone();
-        let notice: HostFn = Arc::new(move |args: &[Val]| match args {
-            [Val::String(id)] if id == STORE_ID => Ok(vec![Val::Result(Ok(Some(Box::new(
-                Val::String(posted.clone()),
-            ))))]),
-            [Val::String(_)] => Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
-                "not-found".into(),
-                None,
-            )))))]),
-            other => Err(format!("notices#current received {other:?}")),
-        });
-        // How long the kitchen takes now (E14, T02), after [`KITCHEN_MS`]:
-        // a slow source. The minutes are the ones it was asked with.
-        let minutes = *self.prep_minutes.lock().expect("prep minutes");
-        let prep: HostFn = Arc::new(move |args: &[Val]| match args {
-            [Val::String(id)] if id == STORE_ID => {
-                std::thread::sleep(std::time::Duration::from_millis(KITCHEN_MS));
-                Ok(vec![Val::Result(Ok(Some(Box::new(Val::S64(minutes)))))])
-            }
-            [Val::String(_)] => Ok(not_found()),
-            other => Err(format!("kitchen#prep-minutes received {other:?}")),
-        });
-        // The menu's items in a category (E14, T07), the slow category after
-        // its delay. A read that is stopped meanwhile ends early, and says so:
-        // what `/bench/calls` counts as stopped.
-        let categories = self.categories.lock().expect("categories").clone();
-        let in_menu = self.menu.lock().expect("menu").clone();
-        let ended_early = self.category_stopped.clone();
-        let in_category: HostFn = Arc::new(move |args: &[Val]| match args {
-            [Val::String(id), Val::String(category)] if id == STORE_ID => {
-                if categories.slow.as_deref() == Some(category.as_str()) {
-                    let until = std::time::Instant::now()
-                        + std::time::Duration::from_millis(categories.delay_ms);
-                    while std::time::Instant::now() < until {
-                        if stopped.as_ref().is_some_and(|s| s()) {
-                            ended_early.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                            return Err("stopped: nobody is waiting for it".to_string());
-                        }
-                        std::thread::sleep(std::time::Duration::from_millis(10));
-                    }
-                }
-                Ok(vec![Val::Result(Ok(Some(Box::new(Val::List(
-                    in_menu
-                        .iter()
-                        .filter(|(item, _)| {
-                            category.as_str() == "all" || category_of(item) == category.as_str()
-                        })
-                        .map(|(id, name)| {
-                            Val::Record(vec![
-                                ("id".into(), Val::String(id.clone())),
-                                ("name".into(), Val::String(name.clone())),
-                            ])
-                        })
-                        .collect(),
-                )))))])
-            }
-            [Val::String(_), Val::String(_)] => Ok(not_found()),
-            other => Err(format!("menus#in-category received {other:?}")),
-        });
-        BTreeMap::from([
-            ("store:data/stores#get".to_string(), get),
-            ("store:data/stores#list".to_string(), list),
-            ("store:data/menus#for-store".to_string(), for_store),
-            ("store:data/menus#sections".to_string(), sections),
-            ("store:data/notices#current".to_string(), notice),
-            ("store:data/kitchen#prep-minutes".to_string(), prep),
-            ("store:data/menus#in-category".to_string(), in_category),
-            (
-                "store:data/recommendations#for-store".to_string(),
-                recommend,
-            ),
-        ])
     }
 
     /// `pw-resource`'s clock, brought to wall time (ADR-0127).
@@ -2301,82 +1759,12 @@ impl Server {
         args: &[Val],
         stopped: Option<Stopped>,
     ) -> Result<Val, String> {
-        let current = self
-            .carts
-            .lock()
-            .expect("carts")
-            .get(session)
-            .cloned()
-            .unwrap_or_default();
-        let mut host = self.faulted(
-            session,
-            Self::data_layer(session, current, Arc::default(), false, self.catalog()),
-        );
+        // The store's reads (ADR-0218), and the platform's session.
+        let mut host = self.store.reads(session, stopped);
         host.insert(
             "pw:host/session#read".to_string(),
             Self::session_operation(session),
         );
-        // The session's order, as its status's case (E14, T04). A case the
-        // program's type does not have is refused by the component's types,
-        // as any value the host gives is.
-        let order = self.orders.lock().expect("orders").get(session).cloned();
-        let this_session = session.to_string();
-        host.insert(
-            "store:data/orders#current".to_string(),
-            Arc::new(move |args: &[Val]| {
-                let Some(Val::String(s)) = args.first() else {
-                    return Err(format!("orders#current received {args:?}"));
-                };
-                if *s != this_session {
-                    return Err("orders#current was passed another session".to_string());
-                }
-                let status = order.clone().map(|case| Box::new(Val::Variant(case, None)));
-                Ok(vec![Val::Result(Ok(Some(Box::new(Val::Option(status)))))])
-            }),
-        );
-        // The session's delivery estimate (E14, T10), after the estimator's
-        // delay: a slow source, which a streamed region does not wait for.
-        let estimator = self
-            .estimators
-            .lock()
-            .expect("estimators")
-            .get(session)
-            .cloned()
-            .unwrap_or_default();
-        let this_session = session.to_string();
-        host.insert(
-            "store:data/estimates#current".to_string(),
-            Arc::new(move |args: &[Val]| {
-                let Some(Val::String(s)) = args.first() else {
-                    return Err(format!("estimates#current received {args:?}"));
-                };
-                if *s != this_session {
-                    return Err("estimates#current was passed another session".to_string());
-                }
-                std::thread::sleep(std::time::Duration::from_millis(estimator.delay_ms));
-                match estimator.fail.as_deref() {
-                    Some("declared") => Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
-                        "location-unavailable".into(),
-                        None,
-                    )))))]),
-                    Some(_) => Err("the estimator is down".to_string()),
-                    // A range, and when it was made (ADR-0180). And `minutes`,
-                    // which the benchmark's own store still reads (ADR-0156):
-                    // a program is passed the fields its type declares
-                    // (ADR-0166).
-                    None => Ok(vec![Val::Result(Ok(Some(Box::new(Val::Record(vec![
-                        ("minutes".into(), Val::S64(estimator.minutes)),
-                        ("min-minutes".into(), Val::S64(estimator.minutes)),
-                        (
-                            "max-minutes".into(),
-                            Val::S64(estimator.max_minutes.unwrap_or(estimator.minutes + 10)),
-                        ),
-                        ("generated-at".into(), Val::S64(wall_millis())),
-                    ])))))]),
-                }
-            }),
-        );
-        host.extend(self.catalog_within(stopped));
         let host = host
             .into_iter()
             .map(|(name, f)| {
@@ -3084,7 +2472,7 @@ impl Server {
             // Refusals happen before anything is regenerated: a rejected
             // operation must leave no version behind, or the page would be
             // told to catch up to a change that did not happen.
-            let mut items = self.menu.lock().expect("menu");
+            let mut items = self.store.menu.lock().expect("menu");
             op.apply(&mut items)?;
         }
         // The deployment's menu changed, which is `MenuChanged(47)`: it drops
@@ -5435,7 +4823,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 .find_map(|p| p.strip_prefix("status="))
                 .filter(|s| !s.is_empty())
                 .map(str::to_string);
-            let mut orders = server.orders.lock().expect("orders");
+            let mut orders = server.store.orders.lock().expect("orders");
             match status {
                 Some(s) => orders.insert(session.clone(), s),
                 None => orders.remove(&session),
@@ -5470,7 +4858,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                         .collect(),
                 );
             }
-            *server.recommender.lock().expect("recommender") = set;
+            *server.store.recommender.lock().expect("recommender") = set;
             // Every query a page of this build reads: what it kept, and what
             // is still running with the recommender as it was.
             let resources: std::collections::BTreeSet<String> = server
@@ -5500,7 +4888,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 .find_map(|p| p.strip_prefix("text="))
                 .and_then(percent_decoded)
                 .unwrap_or_default();
-            *server.notice.lock().expect("notice") = text;
+            *server.store.notice.lock().expect("notice") = text;
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
         // **A binding read again, for the key the browser asks for**
@@ -5565,7 +4953,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
             let Some(item) = param("item") else {
                 return respond_json(&mut stream, 400, &session, fresh, "{}");
             };
-            let mut sold_out = server.sold_out.lock().expect("sold out");
+            let mut sold_out = server.store.sold_out.lock().expect("sold out");
             if param("available").as_deref() == Some("false") {
                 sold_out.insert(item.clone());
             } else {
@@ -5600,7 +4988,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                     .find_map(|p| p.strip_prefix(&format!("{name}=") as &str))
                     .and_then(percent_decoded)
             };
-            *server.categories.lock().expect("categories") = Categories {
+            *server.store.categories.lock().expect("categories") = Categories {
                 slow: param("slow"),
                 delay_ms: param("delay").and_then(|d| d.parse().ok()).unwrap_or(0),
             };
@@ -5615,7 +5003,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 .and_then(|m| m.parse::<i64>().ok())
             {
                 Some(minutes) => {
-                    *server.prep_minutes.lock().expect("prep minutes") = minutes;
+                    *server.store.prep_minutes.lock().expect("prep minutes") = minutes;
                     respond_json(&mut stream, 200, &session, fresh, "{}");
                 }
                 None => respond_json(&mut stream, 400, &session, fresh, "{}"),
@@ -5630,7 +5018,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 "notice": count("store:data/notices#current"),
                 "prep": count("store:data/kitchen#prep-minutes"),
                 "category": count("store:data/menus#in-category"),
-                "category_stopped": server
+                "category_stopped": server.store
                     .category_stopped
                     .load(std::sync::atomic::Ordering::SeqCst),
                 // The store's origin, asked (ADR-0177).
@@ -5652,6 +5040,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
             // has the last value to answer with.
             if query.split('&').any(|p| p == "fail=next") {
                 server
+                    .store
                     .store_fails_next
                     .store(true, std::sync::atomic::Ordering::SeqCst);
                 // The store page's plan and every page's: a server built
@@ -5678,6 +5067,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 .and_then(|v| v.parse::<u64>().ok())
                 .unwrap_or(0);
             server
+                .store
                 .store_delay_ms
                 .store(delay, std::sync::atomic::Ordering::SeqCst);
             let resources: std::collections::BTreeSet<String> = std::iter::once(&server.plan)
@@ -5705,6 +5095,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 .and_then(|v| v.parse::<u64>().ok())
                 .unwrap_or(0);
             server
+                .store
                 .cart_faults
                 .lock()
                 .expect("cart faults")
@@ -5724,7 +5115,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
         // page's press met.
         ("POST", "/bench/fail") => {
             let next = query.split('&').find_map(|p| p.strip_prefix("next="));
-            let mut faults = server.cart_faults.lock().expect("cart faults");
+            let mut faults = server.store.cart_faults.lock().expect("cart faults");
             let mine = faults.entry(session.clone()).or_default();
             match next {
                 Some("write") => mine.fail_write = true,
@@ -5837,6 +5228,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
             }
             set.max_minutes = q("max").and_then(|v| v.parse().ok());
             server
+                .store
                 .estimators
                 .lock()
                 .expect("estimators")
@@ -6055,7 +5447,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
             respond_json(&mut stream, 200, &session, fresh, &body.to_string());
         }
         ("GET", "/menu") => {
-            let items = server.menu.lock().expect("menu");
+            let items = server.store.menu.lock().expect("menu");
             let ids: Vec<String> = items.iter().map(|(k, _)| format!("\"{k}\"")).collect();
             respond_json(
                 &mut stream,
@@ -6079,7 +5471,7 @@ fn handle(server: &Server, mut stream: TcpStream) {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0);
             if items > 0 {
-                let mut menu = server.menu.lock().expect("menu");
+                let mut menu = server.store.menu.lock().expect("menu");
                 if menu.len() != items {
                     *menu = (0..items)
                         .map(|i| (format!("item-{i}"), format!("Item {i}")))
@@ -7102,6 +6494,20 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
     /// the repository's root: the benchmark's store, or the canonical one,
     /// `examples`.
     fn served_from_patches_in(base: &str, change: fn(&str) -> String, patches: &[&str]) -> Served {
+        let (dir, out) = built_from_patches_in(base, change, patches);
+        Served {
+            server: Server::from_build(out.clone(), out).expect("served"),
+            _dir: dir,
+        }
+    }
+
+    /// [`served_from_patches_in`]'s build, not yet served: its directory, and
+    /// the build in it.
+    fn built_from_patches_in(
+        base: &str,
+        change: fn(&str) -> String,
+        patches: &[&str],
+    ) -> (tempfile::TempDir, std::path::PathBuf) {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
         let base = root.join(base);
         let dir = tempfile::TempDir::with_prefix("pw-served-").expect("a temporary directory");
@@ -7172,10 +6578,7 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         assert!(build.refusals().is_empty(), "{:?}", build.refusals());
         let out = work.join("build");
         build.write(&out).expect("the build is written");
-        Served {
-            server: Server::from_build(out.clone(), out).expect("served"),
-            _dir: dir,
-        }
+        (dir, out)
     }
 
     /// **A build served from a directory of its own, removed when the test
@@ -7204,7 +6607,8 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         let s = orders_server();
         let (none, _) = s.serve_document("a");
         assert!(visible(&none).contains("No order yet."), "{none}");
-        s.orders
+        s.store
+            .orders
             .lock()
             .expect("orders")
             .insert("a".into(), "preparing".into());
@@ -7223,7 +6627,8 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         let s = orders_server();
         // A status the program's type does not have: the component's types
         // refuse what the host gives, and the query fails.
-        s.orders
+        s.store
+            .orders
             .lock()
             .expect("orders")
             .insert("a".into(), "ready".into());
@@ -7240,7 +6645,8 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
     fn a_served_page_whose_values_fail_is_told_to_read_itself_again() {
         let s = orders_server();
         s.serve_document("a");
-        s.orders
+        s.store
+            .orders
             .lock()
             .expect("orders")
             .insert("a".into(), "ready".into());
@@ -7369,7 +6775,7 @@ public query Store(",
     }
 
     fn recommend(s: &Server, delay_ms: u64, fail: Option<&str>) {
-        *s.recommender.lock().expect("recommender") = Recommender {
+        *s.store.recommender.lock().expect("recommender") = Recommender {
             delay_ms,
             fail: fail.map(str::to_string),
             ..Recommender::default()
@@ -7498,7 +6904,7 @@ public query Store(",
         include_str!("../../../../benchmarks/tasks/T10-estimate-states/reference/pleris.patch");
 
     fn estimate(s: &Server, session: &str, fail: Option<&str>, minutes: i64) {
-        s.estimators.lock().expect("estimators").insert(
+        s.store.estimators.lock().expect("estimators").insert(
             session.to_string(),
             Estimator {
                 delay_ms: 0,
@@ -7561,7 +6967,8 @@ public query Store(",
         let s = served_from(|app| app.to_string(), None);
         let (before, _) = s.serve_document("a");
         assert!(visible(&before).contains("Cortado"), "{before}");
-        s.menu
+        s.store
+            .menu
             .lock()
             .expect("menu")
             .retain(|(id, _)| id != "cortado");
@@ -7608,7 +7015,7 @@ public query Store(",
         assert_eq!(notice_calls(&s), 1);
         // Posted at the source, and nothing is told: the kept answer is
         // served, and the board is not asked again.
-        *s.notice.lock().expect("notice") = "Closing early".to_string();
+        *s.store.notice.lock().expect("notice") = "Closing early".to_string();
         let (kept, _) = s.serve_document("b");
         assert!(visible(&kept).contains("Open until 7 pm"), "{kept}");
         assert_eq!(notice_calls(&s), 1);
@@ -7644,6 +7051,7 @@ public query Store(",
             assert!(why.contains(&format!("{forged}")), "{why}");
         }
         let lines = s
+            .store
             .carts
             .lock()
             .expect("carts")
@@ -7681,7 +7089,13 @@ public query Store(",
             )
             .expect("a well-formed request");
         assert!(added.committed);
-        s.carts.lock().expect("carts").get_mut("a").expect("a cart")[0].quantity = 0;
+        s.store
+            .carts
+            .lock()
+            .expect("carts")
+            .get_mut("a")
+            .expect("a cart")[0]
+            .quantity = 0;
         let why = match s.serve_store_document("a", STORE_ID) {
             Err(Unread::Failed(why)) => why,
             other => panic!("served from a line of 0: {other:?}"),
@@ -7702,7 +7116,8 @@ public query Store(",
         // given the same answer.
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         s.serve_document("a");
-        s.sold_out
+        s.store
+            .sold_out
             .lock()
             .expect("sold out")
             .insert("cortado".to_string());
@@ -7728,7 +7143,7 @@ public query Store(",
             .expect("a well-formed request");
         assert_eq!(again, refused, "a retry is given the first answer");
         // Back in stock, the next press adds.
-        s.sold_out.lock().expect("sold out").clear();
+        s.store.sold_out.lock().expect("sold out").clear();
         let added = s
             .command_answer(ADD, "a", &cortado, Some("press-2"))
             .expect("a well-formed request");
@@ -7859,7 +7274,7 @@ public query Store(",
     /// read took, what came of each, and how many reads of a category were
     /// stopped.
     fn hot_then_cold(s: &Server) -> (Timed, Timed, u64) {
-        *s.categories.lock().expect("categories") = Categories {
+        *s.store.categories.lock().expect("categories") = Categories {
             slow: Some("hot".to_string()),
             delay_ms: 1_000,
         };
@@ -7875,7 +7290,10 @@ public query Store(",
             let cold = scope.spawn(|| timed(2, "cold"));
             (hot.join().expect("hot"), cold.join().expect("cold"))
         });
-        let stopped = s.category_stopped.load(std::sync::atomic::Ordering::SeqCst);
+        let stopped = s
+            .store
+            .category_stopped
+            .load(std::sync::atomic::Ordering::SeqCst);
         (hot, cold, stopped)
     }
 
@@ -7931,7 +7349,7 @@ public query Store(",
             s.read_keyed("b", "browsing", 1, b, &category("hot"), STAYED),
             Ok(KeyOutcome::Applied)
         );
-        *s.categories.lock().expect("categories") = Categories {
+        *s.store.categories.lock().expect("categories") = Categories {
             slow: Some("hot".to_string()),
             delay_ms: 1_000,
         };
@@ -7954,7 +7372,9 @@ public query Store(",
         // Read to its end, for `b`: nothing was stopped, and `b`'s page was
         // not told to read itself again.
         assert_eq!(
-            s.category_stopped.load(std::sync::atomic::Ordering::SeqCst),
+            s.store
+                .category_stopped
+                .load(std::sync::atomic::Ordering::SeqCst),
             0
         );
         let queue = s.pending.lock().expect("pending");
@@ -7973,7 +7393,7 @@ public query Store(",
     #[test]
     fn a_browser_that_leaves_lets_go_of_its_read() {
         let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_CANCEL]);
-        *s.categories.lock().expect("categories") = Categories {
+        *s.store.categories.lock().expect("categories") = Categories {
             slow: Some("hot".to_string()),
             delay_ms: 1_000,
         };
@@ -7984,7 +7404,9 @@ public query Store(",
         assert_eq!(read, Ok(KeyOutcome::Superseded));
         assert!(started.elapsed() < std::time::Duration::from_millis(700));
         assert_eq!(
-            s.category_stopped.load(std::sync::atomic::Ordering::SeqCst),
+            s.store
+                .category_stopped
+                .load(std::sync::atomic::Ordering::SeqCst),
             1
         );
         // Nothing it read is shown.
@@ -8725,7 +8147,14 @@ public query Store(",
             .expect("runs");
         s.command(ADD, "session-9", &add_shown("cortado", 1), false)
             .expect("runs");
-        let lines = s.carts.lock().unwrap().get("session-9").cloned().unwrap();
+        let lines = s
+            .store
+            .carts
+            .lock()
+            .unwrap()
+            .get("session-9")
+            .cloned()
+            .unwrap();
         assert_eq!(
             lines
                 .iter()
@@ -8753,7 +8182,8 @@ public query Store(",
     /// A session's lines as the data layer holds them: each item and how
     /// many.
     fn quantities(s: &Server, session: &str) -> Vec<(String, i64)> {
-        s.carts
+        s.store
+            .carts
             .lock()
             .unwrap()
             .get(session)
@@ -8798,7 +8228,7 @@ public query Store(",
         // by name, as an add is, and nothing is written.
         s.command(ADD, "session-9", &add_shown("cortado", 1), false)
             .expect("runs");
-        s.sold_out.lock().unwrap().insert("cortado".into());
+        s.store.sold_out.lock().unwrap().insert("cortado".into());
         let refused = s
             .command(INCREASE, "session-9", &item("cortado"), false)
             .expect_err("sold out");
@@ -8844,7 +8274,8 @@ public query Store(",
     #[test]
     fn a_one_shot_write_error_fails_the_next_write_once() {
         let s = rendering_server();
-        s.cart_faults
+        s.store
+            .cart_faults
             .lock()
             .unwrap()
             .entry("session-9".into())
@@ -8870,7 +8301,8 @@ public query Store(",
         let s = rendering_server();
         // A page of the session's, served: its entry is made.
         s.serve_document_with_entries("session-9").expect("served");
-        s.cart_faults
+        s.store
+            .cart_faults
             .lock()
             .unwrap()
             .entry("session-9".into())
@@ -8899,7 +8331,8 @@ public query Store(",
         };
         // The shared queries, read and kept.
         timed("warm");
-        s.cart_faults
+        s.store
+            .cart_faults
             .lock()
             .unwrap()
             .entry("slow".into())
@@ -8908,7 +8341,8 @@ public query Store(",
         assert!(timed("slow") >= second, "its own session's cart");
         assert!(timed("quick") < second, "not another's");
 
-        s.store_delay_ms
+        s.store
+            .store_delay_ms
             .store(1000, std::sync::atomic::Ordering::SeqCst);
         assert!(
             timed("quick") < second,
@@ -8916,7 +8350,8 @@ public query Store(",
         );
         s.query_clock.0.advance(30_001);
         assert!(timed("quick") >= second, "read again, and slow");
-        s.store_delay_ms
+        s.store
+            .store_delay_ms
             .store(0, std::sync::atomic::Ordering::SeqCst);
         s.query_clock.0.advance(30_001);
         assert!(timed("quick") < second, "cleared");
@@ -9208,7 +8643,8 @@ public query Store(",
 
         // A session's cart, whose read fails: not served from anything kept.
         s.serve_document_with_entries("fourth").expect("served");
-        s.cart_faults
+        s.store
+            .cart_faults
             .lock()
             .unwrap()
             .entry("fourth".into())
@@ -9255,7 +8691,7 @@ public query Store(",
         )
         .expect("runs");
         let recorded = |s: &Server| {
-            s.carts.lock().unwrap()["session-9"]
+            s.store.carts.lock().unwrap()["session-9"]
                 .iter()
                 .map(|l| (l.name.clone(), l.price))
                 .collect::<Vec<_>>()
@@ -9792,6 +9228,29 @@ public query Store(",
         assert_eq!((exact.max_attempts, exact.jitter), (3, false));
         let varied = runtime_manifest("r", &serde_json::json!({ "attempts": 3, "jitter": true }));
         assert_eq!((varied.max_attempts, varied.jitter), (3, true));
+    }
+
+    /// **A build that imports what its data layer does not supply is refused
+    /// at start** (ADR-0218), as one whose handlers were not compiled is,
+    /// rather than when a request first reaches the operation.
+    #[test]
+    fn a_build_importing_what_no_data_layer_supplies_is_refused() {
+        let (_dir, out) = built_from_patches_in(
+            "examples",
+            |app| {
+                format!(
+                    "{app}\nfn nowhere(id: StoreId) -> Int !{{ database.read<Stores> }}\n    \
+                     host \"store:data/stores#nowhere\"\n\npublic query Nowhere(id: StoreId) -> \
+                     Int\n    freshness 0.seconds\n    cache shared\n    concurrency one_per_key\n    \
+                     on_key_change cancel\n    timeout 2.seconds\n{{\n    nowhere(id)\n}}\n"
+                )
+            },
+            &[],
+        );
+        let Err(why) = Server::from_build(out.clone(), out) else {
+            panic!("served");
+        };
+        assert!(why.contains("store:data/stores#nowhere"), "{why}");
     }
 
     /// **A command commits the events it computes, and no others**
@@ -10505,7 +9964,8 @@ public query Store(",
             .expect("added");
         s.command(PLACE, "a", &[], false).expect("placed");
         assert_eq!(
-            s.orders
+            s.store
+                .orders
                 .lock()
                 .expect("orders")
                 .get("a")
@@ -10513,7 +9973,7 @@ public query Store(",
             Some("placed")
         );
         assert!(
-            s.carts.lock().expect("carts")["a"].is_empty(),
+            s.store.carts.lock().expect("carts")["a"].is_empty(),
             "the cart is empty after"
         );
         let last = sets_of(&s, &doc).pop().expect("a patch set");
@@ -10548,7 +10008,7 @@ public query Store(",
             "{:?}",
             answered.result
         );
-        assert!(s.orders.lock().expect("orders").get("a").is_none());
+        assert!(s.store.orders.lock().expect("orders").get("a").is_none());
     }
 
     /// **The store moving an order along reaches the page open on it**
@@ -10933,7 +10393,8 @@ public query Store(",
     #[test]
     fn a_sold_out_item_is_shown_so_and_has_no_add() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
-        s.sold_out
+        s.store
+            .sold_out
             .lock()
             .expect("sold out")
             .insert("cortado".to_string());
@@ -10962,7 +10423,8 @@ public query Store(",
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
         let (_, other) = s.serve_store_document("b", "48").expect("served");
-        s.sold_out
+        s.store
+            .sold_out
             .lock()
             .expect("sold out")
             .insert("cortado".to_string());
@@ -10996,7 +10458,7 @@ public query Store(",
         assert!(visible(&now).contains("Sold out"), "{now}");
         assert!(operations_for(&s, "c", later).is_empty());
 
-        s.sold_out.lock().expect("sold out").clear();
+        s.store.sold_out.lock().expect("sold out").clear();
         s.broadcast_menu(MenuOp::Stock {
             id: "cortado".to_string(),
         })
@@ -11029,7 +10491,8 @@ public query Store(",
     fn an_untold_stock_change_reaches_the_open_pages_when_the_menu_is_read_again() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
-        s.sold_out
+        s.store
+            .sold_out
             .lock()
             .expect("sold out")
             .insert("cortado".to_string());
@@ -11061,7 +10524,8 @@ public query Store(",
     fn a_change_sends_what_changed_unannounced_with_it() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
-        s.sold_out
+        s.store
+            .sold_out
             .lock()
             .expect("sold out")
             .insert("cold-brew".to_string());
@@ -11108,7 +10572,8 @@ public query Store(",
     fn an_insert_and_what_changed_with_it_are_derived_from_the_menu() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
-        s.sold_out
+        s.store
+            .sold_out
             .lock()
             .expect("sold out")
             .insert("espresso".to_string());
@@ -11166,7 +10631,8 @@ public query Store(",
         let menus = || calls(&s, "store:data/menus#sections");
         page("a");
         let (asked, read) = (asks(), menus());
-        s.sold_out
+        s.store
+            .sold_out
             .lock()
             .expect("sold out")
             .insert("cortado".to_string());
@@ -11190,7 +10656,8 @@ public query Store(",
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
         let version = s.menu_version(STORE_ID);
-        s.sold_out
+        s.store
+            .sold_out
             .lock()
             .expect("sold out")
             .insert("cortado".to_string());
@@ -11394,7 +10861,7 @@ public query Store(",
         };
         estimate(&s, "a", None, 20);
         assert_eq!(slot(&page("a"), "Delivery"), "Delivery in 20 to 30 min");
-        s.estimators.lock().expect("estimators").insert(
+        s.store.estimators.lock().expect("estimators").insert(
             "b".to_string(),
             Estimator {
                 delay_ms: 0,
@@ -11690,7 +11157,7 @@ public query Store(",
     fn the_store_sends_its_slots_after_its_own_content() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         recommend(&s, 600, None);
-        s.estimators.lock().expect("estimators").insert(
+        s.store.estimators.lock().expect("estimators").insert(
             "a".to_string(),
             Estimator {
                 delay_ms: 200,

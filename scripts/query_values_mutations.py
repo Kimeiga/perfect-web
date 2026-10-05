@@ -26,6 +26,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 INFER = ROOT / "compiler/pw-core/src/infer.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 BIN = ROOT / "runtime/pw-render/src/bin/pw-render.rs"
 
 # (what, which tests, file, anchor, replacement)
@@ -71,7 +72,7 @@ MUTANTS = [
     (
         "the order interface answers no order",
         "server",
-        SERVER,
+        STORE_DATA,
         "                let status = order.clone().map(|case| Box::new(Val::Variant(case, None)));\n",
         "                let status = order.clone().map(|case| Box::new(Val::Variant(case, None))).filter(|_| false);\n",
     ),

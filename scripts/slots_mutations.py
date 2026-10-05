@@ -27,6 +27,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 STORE = ROOT / "examples/store/app.pw"
 
 # (what, suite, file, anchor, replacement)
@@ -70,14 +71,14 @@ MUTANTS = [
     (
         "every store is recommended store 47's menu",
         "server",
-        SERVER,
+        STORE_DATA,
         "                (None, id) if store_named(id).is_some() => recommended_from(&second_menu()),\n",
         "                (None, id) if store_named(id).is_some() => recommended_from(&suggested_from),\n",
     ),
     (
         "the recommendations are drawn from the menu as it was",
         "server",
-        SERVER,
+        STORE_DATA,
         "        let suggested_from = self.menu.lock().expect(\"menu\").clone();\n",
         "        let suggested_from = default_menu();\n",
     ),

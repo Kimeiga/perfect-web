@@ -354,7 +354,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           helper(id)` over a `fn`~~ (ADR-0212); ~~`List.maximum`'s −0~~
           (ADR-0213); ~~an opaque type's member named `value`~~ (ADR-0214);
         - **then the feed reference app** (the owner, 2026-10-05; item 22's
-          first), pulling in what it needs: 0073-a computed holes, 0071-a,
+          first): first a host that serves any program, its data the
+          deployment's (ADR-0218, under way: the store's state, reads,
+          staging and grants moved); then the feed, pulling in what it
+          needs: 0073-a computed holes, 0071-a,
           0122-d, 0057-a, 0099-a, a `String`'s length as an invariant, and
           ADR-0195's ruling 10, materialization chains;
         - then 0101-a to 0101-d, 0105-a, 0100-a, and the rest below;

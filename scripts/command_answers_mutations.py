@@ -36,6 +36,7 @@ JS = ROOT / "compiler/pw-core/src/backend/js_pure.rs"
 TEMPLATE = ROOT / "compiler/pw-core/src/template_ir.rs"
 CHECK = ROOT / "compiler/pw-core/src/check.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 STORE = ROOT / "examples/store/app.pw"
 RUNTIME = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
 
@@ -143,11 +144,11 @@ MUTANTS = [
     (
         "every item can be ordered",
         "cargo",
-        SERVER,
+        STORE_DATA,
         # Re-anchored by ADR-0172: an item can be ordered when a store has it
         # and it is not sold out.
-        "                        catalog.contains_key(item) && !sold_out.contains(item),\n",
-        "                        true || (catalog.contains_key(item) && !sold_out.contains(item)),\n",
+        "                    catalog.contains_key(item) && !sold_out.contains(item),\n",
+        "                    true || (catalog.contains_key(item) && !sold_out.contains(item)),\n",
     ),
     (
         "a kept answer forgets null",

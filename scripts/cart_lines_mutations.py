@@ -54,6 +54,7 @@ RENDER = ROOT / "runtime/pw-render/src/lib.rs"
 RENDER_WASM = ROOT / "runtime/pw-render-wasm/src/lib.rs"
 HOST = ROOT / "runtime/pw-host/src/lib.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 RUNTIME = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
 
 # (what, suite, file, anchor, replacement)
@@ -247,35 +248,35 @@ MUTANTS = [
     (
         "one fewer takes two",
         "server",
-        SERVER,
+        STORE_DATA,
         "                        lines[at].quantity -= 1;\n",
         "                        lines[at].quantity -= 2;\n",
     ),
     (
         "a line at one is kept",
         "server",
-        SERVER,
+        STORE_DATA,
         "                        lines.remove(at);\n",
         "                        lines[at].quantity = 0;\n",
     ),
     (
         "a removal removes nothing",
         "server",
-        SERVER,
+        STORE_DATA,
         "                lines.retain(|l| l.item != *item);\n",
         "                lines.retain(|_| true);\n",
     ),
     (
         "an item no store has is available",
         "server",
-        SERVER,
-        "                        catalog.contains_key(item) && !sold_out.contains(item),\n",
-        "                        !sold_out.contains(item),\n",
+        STORE_DATA,
+        "                    catalog.contains_key(item) && !sold_out.contains(item),\n",
+        "                    !sold_out.contains(item),\n",
     ),
     (
         "a line's price is not recorded",
         "server",
-        SERVER,
+        STORE_DATA,
         "                            .get(item)\n"
         "                            .cloned()\n",
         "                            .get(item)\n"

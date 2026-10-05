@@ -34,6 +34,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 PLAN = ROOT / "compiler/pw-core/src/page_values.rs"
 RENDER = ROOT / "runtime/pw-render/src/lib.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
@@ -85,7 +86,7 @@ MUTANTS = [
     (
         "each item is a category of its own",
         "server",
-        SERVER,
+        STORE_DATA,
         "                    match grouped.iter_mut().find(|(c, ..)| *c == category) {\n",
         "                    match grouped.iter_mut().find(|(c, ..)| *c == category).filter(|_| false) {\n",
     ),

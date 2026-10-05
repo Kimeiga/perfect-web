@@ -13,6 +13,14 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0218, 2026-10-05: a host serves any program, and its data is the
+deployment's** (the feed reference app, first step). The development server
+served the store alone, and a second program failed at `from_build`. The
+split is made in place, in steps, every test green after each: the store's
+state, its reads, a command's staging and its grants are `StoreData` now,
+and a build that imports what the layer does not supply is refused at start.
+The rest, then the feed, follow.
+
 **ADR-0217, 2026-10-05: what a handler at the top of the page captures is
 set again when it changes** (urgent defect 2). A row's captures were patched
 with the row (ADR-0172); a top-level handler's were in no plan. A button on

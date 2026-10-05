@@ -32,6 +32,7 @@ RESOURCE = ROOT / "runtime/pw-resource/src/lib.rs"
 RULES = ROOT / "compiler/pw-core/src/rules.rs"
 PLAN = ROOT / "compiler/pw-core/src/page_values.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
@@ -111,7 +112,7 @@ MUTANTS = [
     (
         "the store's origin does not fail",
         "server",
-        SERVER,
+        STORE_DATA,
         "                if store_fails.swap(false, std::sync::atomic::Ordering::SeqCst) {\n",
         "                if false && store_fails.swap(false, std::sync::atomic::Ordering::SeqCst) {\n",
     ),

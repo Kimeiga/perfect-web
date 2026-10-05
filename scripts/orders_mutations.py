@@ -26,12 +26,13 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 
 # (what, file, anchor, replacement)
 MUTANTS = [
     (
         "an empty cart places an order",
-        SERVER,
+        STORE_DATA,
         "            if lines.is_empty() {\n"
         "                return Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(\n"
         "                    \"nothing-to-order\".into(),\n",
@@ -41,15 +42,15 @@ MUTANTS = [
     ),
     (
         "a placed order leaves the cart as it was",
-        SERVER,
+        STORE_DATA,
         "            *staged = Some(Lines::new());\n",
         "",
     ),
     (
         "a placed order is not recorded",
-        SERVER,
-        "            if let Some(status) = placed.lock().expect(\"placed\").take() {\n",
-        "            if let Some(status) = placed.lock().expect(\"placed\").take().filter(|_| false) {\n",
+        STORE_DATA,
+        "        if let Some(status) = self.placed.lock().expect(\"placed\").take() {\n",
+        "        if let Some(status) = self.placed.lock().expect(\"placed\").take().filter(|_| false) {\n",
     ),
     (
         "the store's change is not sent",

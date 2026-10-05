@@ -28,27 +28,28 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
     (
         "a fault is not consumed",
         "server",
-        SERVER,
+        STORE_DATA,
         "                            std::mem::take(if writes {\n",
         "                            *(if writes {\n",
     ),
     (
         "another session's fault is taken",
         "server",
-        SERVER,
+        STORE_DATA,
         "                        let mut mine = all.get_mut(&session);\n",
         "                        let mut mine = all.values_mut().next();\n",
     ),
     (
         "a write's fault is taken by a read",
         "server",
-        SERVER,
+        STORE_DATA,
         "                                &mut m.fail_write\n"
         "                            } else {\n"
         "                                &mut m.fail_read\n",
@@ -59,7 +60,7 @@ MUTANTS = [
     (
         "the cart's delay is not waited",
         "server",
-        SERVER,
+        STORE_DATA,
         "                    if delay > 0 {\n"
         "                        std::thread::sleep(std::time::Duration::from_millis(delay));\n"
         "                    }\n"
@@ -69,7 +70,7 @@ MUTANTS = [
     (
         "every session waits a cart's delay",
         "server",
-        SERVER,
+        STORE_DATA,
         "                        mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
         "                            .unwrap_or_default()\n",
         "                        mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
@@ -78,7 +79,7 @@ MUTANTS = [
     (
         "the store's delay is not waited",
         "server",
-        SERVER,
+        STORE_DATA,
         "                let delay = store_delay.load(std::sync::atomic::Ordering::SeqCst);\n",
         "                let delay = store_delay.load(std::sync::atomic::Ordering::SeqCst) * 0;\n",
     ),
