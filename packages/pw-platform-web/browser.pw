@@ -40,9 +40,11 @@ opaque type LayoutSnapshot<T> = String
 
 // Reading a snapshot is explicit. A snapshot is not its value — the distinction
 // is what lets the frame model say *when* a measurement was taken — so `T` is
-// reached through this accessor rather than by treating the two as one type.
-// Recorded in docs/ASSUMPTIONS.md; the alternative is a phase rule.
-fn value<T>(snapshot: LayoutSnapshot<T>) -> T !{} { todo }
+// reached through this accessor rather than by treating the two as one type
+// (assumption A-020, ruled 0031-c). It was `value` until ADR-0214: in this
+// module `.value` is a `LayoutSnapshot`'s representation, and a member of that
+// name would be read in its place (PW0626).
+fn measured<T>(snapshot: LayoutSnapshot<T>) -> T !{} { todo }
 
 type Rect = Rect {
     width: Float,

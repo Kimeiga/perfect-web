@@ -78,14 +78,14 @@ MUTANTS = [
     (
         "maximum keeps the first element",
         LIST,
-        "if x > b | x != x { Some(x) } else { Some(b) }",
-        "if x > b | x != x { Some(b) } else { Some(b) }",
+        "                Some(x)\n            } else {\n                Some(b)\n",
+        "                Some(b)\n            } else {\n                Some(b)\n",
     ),
     (
         "maximum passes a NaN over",
         LIST,
-        "if x > b | x != x { Some(x) }",
-        "if x > b { Some(x) }",
+        "if x > b | x != x | (x == b",
+        "if x > b | (x == b",
     ),
 ]
 

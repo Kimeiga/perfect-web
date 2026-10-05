@@ -622,12 +622,40 @@ fn sum_and_maximum_compute() {
             ),
             other => panic!("sum({xs:?}) = {other:?}"),
         }
-        let max = xs.iter().copied().reduce(|m, x| if x > m { x } else { m });
-        assert_eq!(
-            call(&largest, &[floats(&xs)]),
-            Ok(Val::Option(max.map(|m| Box::new(Val::Float64(m))))),
-            "maximum({xs:?})"
-        );
+        // IEEE 754's `maximum`: +0 is larger than −0 (ADR-0213).
+        let max = xs.iter().copied().reduce(|m, x| {
+            if x > m || (x == m && x.is_sign_positive() && m.is_sign_negative()) {
+                x
+            } else {
+                m
+            }
+        });
+        // By its bits: `-0.0 == 0.0`, and a comparison of values would not
+        // see which zero it is.
+        match (call(&largest, &[floats(&xs)]), max) {
+            (Ok(Val::Option(Some(got))), Some(m)) => assert!(
+                matches!(*got, Val::Float64(g) if g.to_bits() == m.to_bits()),
+                "maximum({xs:?}) = {got:?}, not {m:?}"
+            ),
+            (Ok(Val::Option(None)), None) => {}
+            (other, m) => panic!("maximum({xs:?}) = {other:?}, not {m:?}"),
+        }
+    }
+    // +0 is larger than −0, in either order; two −0s are −0 (ADR-0213).
+    for (xs, expected) in [
+        (vec![-0.0, 0.0], 0.0f64),
+        (vec![0.0, -0.0], 0.0),
+        (vec![-0.0, -1.0, 0.0], 0.0),
+        (vec![-0.0, -0.0], -0.0),
+        (vec![-0.0], -0.0),
+    ] {
+        match call(&largest, &[floats(&xs)]) {
+            Ok(Val::Option(Some(v))) => assert!(
+                matches!(*v, Val::Float64(m) if m.to_bits() == expected.to_bits()),
+                "{xs:?}: {v:?}"
+            ),
+            other => panic!("{xs:?}: {other:?}"),
+        }
     }
     // A NaN is the maximum of any list with one, wherever it is.
     for xs in [

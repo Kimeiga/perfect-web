@@ -89,15 +89,21 @@ fn sum(items: List<Float>) -> Float !{} {
     fold(items, 0.0, (total, x) => total + x)
 }
 
-// The largest element, or `None` for an empty list (ADR-0055, ruling
-// needed). A NaN is the maximum of any list that has one, as IEEE 754's
-// `maximum` and JavaScript's `Math.max` give.
+// The largest element, or `None` for an empty list (ADR-0055, ruled
+// 0055-a). A NaN is the maximum of any list that has one, and +0 is larger
+// than −0, as IEEE 754's `maximum` and JavaScript's `Math.max` give: `1.0 /
+// x` is +∞ for +0 and −∞ for −0 (ADR-0213). Until then the first of the two
+// was kept.
 fn maximum(items: List<Float>) -> Option<Float> !{} {
     let mut best: Option<Float> = None
     for x in items {
         best = match best {
             None => Some(x),
-            Some(b) => if x > b | x != x { Some(x) } else { Some(b) },
+            Some(b) => if x > b | x != x | (x == b & 1.0 / x > 1.0 / b) {
+                Some(x)
+            } else {
+                Some(b)
+            },
         }
     }
     best

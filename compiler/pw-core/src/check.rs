@@ -98,6 +98,12 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             i,
             &u.hir,
         ));
+        // ADR-0214: an opaque type's `.value` is its representation in its
+        // own module, and nothing else there.
+        per_unit.extend(representation_unshadowed(&sigs, i, &u.hir));
+        // ADR-0212: a `query` reads a query or a resource, and a
+        // `subscription` a subscription.
+        per_unit.extend(reads_name_their_kind(&workspace, &sigs, i, &u.hir));
         // ADR-0148: a streamed query is read by a `<stream>`, which shows
         // each state its query can be in.
         per_unit.extend(crate::streams::check(&workspace, &hirs, &sigs, i, &u.hir));
@@ -2001,6 +2007,154 @@ fn built_pages_read_no_parameter(hir: &Hir) -> Vec<Diagnostic> {
         }
     }
     out
+}
+
+/// **A `query` reads a query or a resource, and a `subscription` a
+/// subscription** (ADR-0212, ruling 0108-a). `let v = query helper(id)` over
+/// a `fn` checked, and the page kept the function's answer as an entry, with
+/// a freshness, a key and a cache the function never declared.
+fn reads_name_their_kind(
+    ws: &crate::resolve::Workspace,
+    sigs: &Signatures,
+    unit: usize,
+    hir: &Hir,
+) -> Vec<Diagnostic> {
+    use crate::resolve::{Namespace, Resolution};
+    let mut out = Vec::new();
+    for (_, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else {
+            continue;
+        };
+        let body = hir.body(body_id);
+        for id in body.walk() {
+            let Expr::Keyword {
+                keyword, modifiers, ..
+            } = body.expr(id)
+            else {
+                continue;
+            };
+            let (reads, expected): (&[DeclKind], &str) = match keyword.as_str() {
+                "query" => (
+                    &[DeclKind::Query, DeclKind::Resource],
+                    "a query or a resource",
+                ),
+                "subscription" => (&[DeclKind::Subscription], "a subscription"),
+                _ => continue,
+            };
+            let Some(name) = modifiers.first() else {
+                continue;
+            };
+            let found = match name.contains('.') {
+                true => ws.resolve_path_in(unit, Namespace::Term, name),
+                false => ws.resolve_in(unit, Namespace::Term, name),
+            };
+            let (Resolution::Local(def) | Resolution::Imported { def, .. }) = found else {
+                continue;
+            };
+            let Some(kind) = sigs.kind_of(def) else {
+                continue;
+            };
+            if reads.contains(&kind) {
+                continue;
+            }
+            out.push(Diagnostic {
+                code: crate::codes::READ_NAMES_ANOTHER_KIND.id,
+                invariant: crate::codes::READ_NAMES_ANOTHER_KIND.invariant,
+                reason: "read_names_another_kind",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!(
+                    "`{keyword} {name}` reads {}, and a `{keyword}` reads {expected}",
+                    described(kind)
+                ),
+                primary_span: body.expr_span(id),
+                related: Vec::new(),
+                explanation: Some(format!(
+                    "A `{keyword}` is kept as an entry: its key, its freshness and \
+                     its cache are what {expected} declares. {} declares none of \
+                     them. Until ADR-0212 it was read as one all the same.",
+                    capitalized(described(kind))
+                )),
+                repairs: vec![Repair {
+                    description: match kind {
+                        DeclKind::Fn => format!("call `{name}(..)` without `{keyword}`"),
+                        _ => format!("name {expected}"),
+                    },
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// **An opaque type's own module reads its representation as `.value`, so it
+/// declares no member of that name** (ADR-0214, ADR-0210's urgent defect 8).
+/// `browser` declared `fn value<T>(snapshot: LayoutSnapshot<T>) -> T`, and
+/// in `browser` `snapshot.value` named both; `fn value(p: PositiveInt) ->
+/// Int { p.value }` would call itself for ever.
+fn representation_unshadowed(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        if decl.kind != DeclKind::Fn || decl.name != "value" {
+            continue;
+        }
+        let Some(receiver) = sigs
+            .by_def(crate::resolve::DefId { unit, decl: id.0 })
+            .and_then(|s| s.params.first())
+            .and_then(Option::as_ref)
+            .and_then(crate::resolved::TypeResolution::resolved)
+            .and_then(crate::resolved::ResolvedType::def_id)
+        else {
+            continue;
+        };
+        if receiver.unit != unit
+            || hir
+                .all_decls()
+                .find(|(d, _)| d.0 == receiver.decl)
+                .is_none_or(|(_, d)| d.kind != DeclKind::Opaque)
+        {
+            continue;
+        }
+        let ty = hir
+            .all_decls()
+            .find(|(d, _)| d.0 == receiver.decl)
+            .map(|(_, d)| d.name.clone())
+            .unwrap_or_default();
+        out.push(Diagnostic {
+            code: crate::codes::REPRESENTATION_SHADOWED.id,
+            invariant: crate::codes::REPRESENTATION_SHADOWED.invariant,
+            reason: "representation_shadowed",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message: format!(
+                "`value` is `{ty}`'s representation in this module, and a member of that \
+                 name would be read in its place"
+            ),
+            primary_span: decl.name_span.clone(),
+            related: Vec::new(),
+            explanation: Some(format!(
+                "In the module that declares an opaque type, `x.value` reads its \
+                 representation (ADR-0048). A member `value` of `{ty}` would be read \
+                 there instead, so the representation could not be reached, and a \
+                 member that reads it would call itself."
+            )),
+            repairs: vec![Repair {
+                description: format!("name the member for what it gives of a `{ty}`"),
+                replacement: None,
+            }],
+        });
+    }
+    out
+}
+
+/// `a query` → `A query`.
+fn capitalized(text: &str) -> String {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
 }
 
 /// What a declaration of `kind` is, for a message.

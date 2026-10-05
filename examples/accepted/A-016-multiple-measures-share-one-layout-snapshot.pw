@@ -24,8 +24,8 @@ component MenuAligner(items: List<ElementRef>) {
             // member no declaration has (ADR-0048).
             items |> List.map(fn(it) it.offsetWidth())
         }
-        let total = derived widths |> List.map(fn(w) w.value) |> List.sum()
-        let max = derived widths |> List.map(fn(w) w.value) |> List.maximum()
+        let total = derived widths |> List.map(fn(w) w.measured) |> List.sum()
+        let max = derived widths |> List.map(fn(w) w.measured) |> List.maximum()
 
         // `maximum` is `None` for an empty list (ADR-0055). It answered 0.0.
         mutate {

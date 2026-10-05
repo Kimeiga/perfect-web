@@ -2708,6 +2708,53 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0212: a query reads a query or a resource, and a subscription a subscription
+e14-query-reads:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0212 - a query reads a query or a resource, and a subscription a subscription"; echo; \
+       echo "produced by: just e14-query-reads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/reads_name_their_kind.rs)"; echo; \
+       cargo test --locked -p pw-core --test reads_name_their_kind 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus"; echo; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/query_reads_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/query_reads_mutations.py; \
+     } > docs/evidence/E14/query-reads.txt
+    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/query-reads.txt
+
+# ADR-0213: List.maximum gives +0 over -0
+e14-float-maximum:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0213 - List.maximum gives +0 over -0"; echo; \
+       echo "produced by: just e14-float-maximum"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== both backends, by bits (compiler/pw-conformance/tests/stdlib.rs, javascript.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test stdlib -- sum_and_maximum 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-conformance --test javascript 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/float_maximum_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/float_maximum_mutations.py; \
+     } > docs/evidence/E14/float-maximum.txt
+    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/float-maximum.txt
+
+# ADR-0214: an opaque type's own module reads its representation as .value, and declares no member of that name
+e14-opaque-value:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0214 - an opaque type's own module reads its representation as .value, and declares no member of that name"; echo; \
+       echo "produced by: just e14-opaque-value"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/members.rs)"; echo; \
+       cargo test --locked -p pw-core --test members 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the accepted corpus, A-015 to A-017 included"; echo; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -3; \
+       echo; echo "== mutation controls (scripts/opaque_value_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/opaque_value_mutations.py; \
+     } > docs/evidence/E14/opaque-value.txt
+    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/opaque-value.txt
+
 # ADR-0211: a path that leaves a loop's body leaves the function, and owes
 # its releases. The tests, the corpus, and the mutation controls.
 e14-affine-loops:

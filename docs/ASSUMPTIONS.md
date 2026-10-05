@@ -374,10 +374,13 @@ passing the binding to a function expecting the value is a type error.
 
 ## A-020 — a layout snapshot is read explicitly
 
-**Status:** `open`, ruling needed (2026-09-24, ADR-0031).
+**Status:** `confirmed`, the owner's ruling 0031-c (ADR-0210), 2026-10-05.
 
-`LayoutSnapshot<T>` is a type of its own and is read through `browser.value`
-(`w.value`), not treated as `T`. A-016 reads its widths that way.
+`LayoutSnapshot<T>` is a type of its own and is read through
+`browser.measured` (`w.measured`), not treated as `T`. A-016 reads its widths
+that way. The accessor was `value` until ADR-0214: in `browser`, `.value` is
+the snapshot's representation, and a member of that name was read in its
+place (PW0626).
 
 **Validated by** an architect ruling. **Alternative:** a phase rule, owned by
 the layout checker, under which a snapshot reads as its value in the phases

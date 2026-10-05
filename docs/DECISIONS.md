@@ -1817,3 +1817,17 @@ a path that leaves a loop's body leaves the function, and owes its releases
 (ruling 0045-a; ADR-0210's urgent defect 1).
 - A `return` or failing `?` in a `for` body left a transaction open and
   checked; the correct roll-back-then-return was refused. Both are fixed.
+[ADR-0212](DECISIONS/ADR-0212-a-query-reads-a-query.md): a `query` reads a
+query or a resource, and a `subscription` a subscription (ruling 0108-a;
+urgent defect 6).
+- `let v = query helper(n)` over a `fn` checked. PW5108 refuses the name
+  where it is read, by its kind.
+[ADR-0213](DECISIONS/ADR-0213-the-maximum-of-zeros-is-plus-zero.md):
+`List.maximum` gives +0 over −0 (urgent defect 7).
+- It kept the first, and its test compared by value, under which the two
+  are equal. It compares bits now, as IEEE's `maximum` orders them.
+[ADR-0214](DECISIONS/ADR-0214-an-opaque-types-value-is-its-representation.md):
+an opaque type's own module reads its representation as `.value`, and
+declares no member of that name (urgent defect 8).
+- `LayoutSnapshot`'s accessor was `value`, which shadowed the representation
+  in `browser`. It is `measured`, and PW0626 refuses the shape.

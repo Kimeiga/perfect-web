@@ -393,6 +393,11 @@ codes! {
     // its capital, as Haskell, OCaml and Elm do.
     CASE_NAME_CAPITALIZED = "PW0625" / case_name_capitalized / 1, Types,
         "a sum type's case is named with a capital letter, so a pattern tells it from a binding";
+    // ADR-0214 (ADR-0210's urgent defect 8): `browser.value` read a
+    // `LayoutSnapshot`, and in `browser` `.value` named both it and the
+    // representation.
+    REPRESENTATION_SHADOWED = "PW0626" / representation_shadowed / 1, Types,
+        "an opaque type's own module reads its representation as `.value`, so it declares no member of that name";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,
@@ -567,6 +572,10 @@ codes! {
     // `Cart` hears checked until 2026-09-26, and the speculation stayed.
     OPTIMISTIC_NOT_RECONCILED = "PW5107" / optimistic_not_reconciled / 1, ResourceGraph,
         "a command invalidates the entry it speculates on, so what it committed replaces the speculation";
+    // ADR-0212 (ruling 0108-a): `let v = query helper(id)` over a `fn`
+    // checked, and the page kept the function's answer as an entry.
+    READ_NAMES_ANOTHER_KIND = "PW5108" / read_names_another_kind / 1, ResourceGraph,
+        "a `query` reads a query or a resource, and a `subscription` a subscription";
 
     // --- what a capability names (PW52xx, E8) -----------------------------
     //

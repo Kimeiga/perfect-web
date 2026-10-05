@@ -13,6 +13,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0212 to ADR-0214, 2026-10-05: three of ADR-0210's soundness
+defects.**
+- A `query` reads a query or a resource, and a `subscription` a subscription:
+  `query helper(n)` over a `fn` checked (PW5108; `just e14-query-reads`).
+- `List.maximum` gives +0 over −0, as IEEE's `maximum` does; it kept the
+  first, and its test compared by value (`just e14-float-maximum`).
+- An opaque type's module declares no member named `value`, which shadowed
+  the representation: `LayoutSnapshot`'s accessor is `measured` (PW0626;
+  `just e14-opaque-value`).
+
 **ADR-0211, 2026-10-05: a path that leaves a loop's body leaves the
 function, and owes its releases** (ruling 0045-a; ADR-0210's urgent defect
 1). A `for` loop had no exits, so `let tx = Database.begin(); for s in

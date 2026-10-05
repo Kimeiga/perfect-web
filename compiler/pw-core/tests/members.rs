@@ -212,11 +212,33 @@ fn a_generic_representation_is_read_as_value() {
 }
 
 #[test]
-fn a_declared_value_member_is_the_member() {
-    // `LayoutSnapshot<T>` is opaque, and its module declares `value`, which
-    // gives the `T`: that is what `snapshot.value` reads, anywhere.
-    let src = "module m\n\nimport browser.{ LayoutSnapshot, Rect }\n\nfn left(s: LayoutSnapshot<Rect>) -> Float !{} {\n    s.value.left\n}\n";
+fn a_snapshot_is_read_by_its_accessor() {
+    // `LayoutSnapshot<T>` is opaque, and its module declares `measured`,
+    // which gives the `T`. It was `value` until ADR-0214, which in `browser`
+    // named the representation too.
+    let src = "module m\n\nimport browser.{ LayoutSnapshot, Rect }\n\nfn left(s: LayoutSnapshot<Rect>) -> Float !{} {\n    s.measured.left\n}\n";
     assert_eq!(codes(src), Vec::<&str>::new());
+}
+
+#[test]
+fn an_opaque_types_module_declares_no_member_named_value() {
+    // In `counts`, `c.value` is the representation; a member of that name
+    // would be read in its place, and reading it there would call itself
+    // (ADR-0214, PW0626).
+    let member = format!("{COUNT}fn value(c: Count) -> Int !{{}} {{\n    c.value\n}}\n");
+    assert_eq!(codes(&member), ["PW0626"]);
+    // Another name is a member like any other.
+    let named = member.replace("fn value(", "fn count(");
+    assert_eq!(codes(&named), Vec::<&str>::new());
+    // And a record's module may: a record has no representation to read.
+    let record = format!("{POINT}fn value(p: Point) -> Int !{{}} {{\n    p.x\n}}\n");
+    assert_eq!(codes(&record), Vec::<&str>::new());
+    // And a `value` of another module's type is that module's business: the
+    // representation is not readable there.
+    let elsewhere =
+        "module user\n\nimport counts.{ Count }\n\nfn value(c: Count) -> Int !{} {\n    1\n}\n";
+    let found = diagnostics(&[("counts.pw", COUNT), ("user.pw", elsewhere)]);
+    assert!(found.iter().all(|(c, _)| *c != "PW0626"), "{found:?}");
 }
 
 #[test]
