@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `feea53b`, with ADR-0209.
+**Reviewed:** 2026-10-05, against master `a518902`, with ADR-0210 to ADR-0214.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2848,6 +2848,13 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`a518902` (2026-10-05, ADR-0210 to ADR-0214): `just ci` passes locally, the
+workspace's 2025 tests pass, and the browser suite passes 728 in three
+engines, with 13 skipped. Recorded at that commit, in `docs/evidence/E14/`:
+`affine-loops.txt` (ADR-0211) 3 of 3 mutants killed, `query-reads.txt`
+(ADR-0212) 3 of 3, `float-maximum.txt` (ADR-0213) 2 of 2, `opaque-value.txt`
+(ADR-0214) 2 of 2; and again, their scripts re-anchored, `E10/affine.txt` 7
+of 7 and `E10/slices.txt` 10 of 10.
 `feea53b` (2026-10-05, ADR-0209): `just ci` passes locally, the workspace's
 2015 tests pass, and the browser suite passes 728 in three engines, with 13
 skipped. ADR-0209's evidence is `docs/evidence/E14/command-invalidations.txt`,

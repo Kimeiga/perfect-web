@@ -1,0 +1,32 @@
+ADR-0211 - a path that leaves a loop's body leaves the function, and owes its releases
+
+produced by: just e14-affine-loops
+commit: a5189027767e2d02bbed87d060d65164471a139c
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the rule (compiler/pw-core/tests/affine_loops.rs)
+
+test a_lambdas_own_name_is_not_the_transaction ... ok
+test a_local_bound_to_a_release_is_that_release ... ok
+test an_inner_transaction_does_not_end_an_outer_one ... ok
+test a_transaction_given_to_a_function_value_is_refused ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+test an_exit_inside_a_nested_loop_owes_the_release_too ... ok
+test a_return_inside_a_loop_owes_the_release ... ok
+test a_failing_try_inside_a_loop_owes_the_release ... ok
+test a_loop_that_leaves_nothing_open_is_unchanged ... ok
+test a_release_on_a_path_that_goes_round_again_is_refused ... ok
+test a_release_then_a_return_inside_a_loop_runs_once ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+== the corpus
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.82s
+
+== mutation controls (scripts/affine_loops_mutations.py)
+
+baseline: 10 passed, 0 failed
+a loop's body has no exits: KILLED (3 of 10 tests fail)
+a release before an exit inside a loop is refused: KILLED (1 of 10 tests fail)
+a release that goes round again is accepted: KILLED (1 of 10 tests fail)
+3 of 3 mutants killed

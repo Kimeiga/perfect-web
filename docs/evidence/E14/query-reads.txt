@@ -1,0 +1,24 @@
+ADR-0212 - a query reads a query or a resource, and a subscription a subscription
+
+produced by: just e14-query-reads
+commit: a5189027767e2d02bbed87d060d65164471a139c
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the rule (compiler/pw-core/tests/reads_name_their_kind.rs)
+
+test a_query_of_a_function_is_refused ... ok
+test a_query_of_a_subscription_and_a_subscription_of_a_query_are_refused ... ok
+test each_reads_its_own_kind ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+== the corpus
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 34.62s
+
+== mutation controls (scripts/query_reads_mutations.py)
+
+baseline: 3 passed, 0 failed
+a `query` may read any declaration: KILLED (2 of 3 tests fail)
+a `subscription` reads a query too: KILLED (1 of 3 tests fail)
+a `query` reads a subscription too: KILLED (1 of 3 tests fail)
+3 of 3 mutants killed
