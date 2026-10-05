@@ -6,7 +6,7 @@ idempotent.
 Each mutant undoes one piece:
 - the checker: PW0312 lets `transport_only` retry a command that is not
   idempotent again; or refuses `retry none`, which retries nothing;
-- the compiler: the clause not read, `fixed` read as `exponential`, or the
+- the compiler: the clause not read, or the
   policy not passed where the handler sends the command;
 - the program: the store's `add_to_cart` declares no retry;
 - the browser runtime: nothing sent again; an answer sent again; no bound;
@@ -59,13 +59,7 @@ MUTANTS = [
         "                .and_then(|p| crate::manifest::parse_retry(&p.value))\n"
         "                .filter(|_| false)\n",
     ),
-    (
-        "`fixed` is read as `exponential`",
-        "core",
-        LOWER,
-        "                        exponential: strategy != \"fixed\",\n",
-        "                        exponential: true,\n",
-    ),
+    # "`fixed` is read as `exponential`" is retired with `fixed` (ADR-0215).
     (
         "the policy is not passed where the command is sent",
         "core",

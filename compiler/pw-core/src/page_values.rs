@@ -70,6 +70,10 @@ pub struct Policy {
     pub timeout_ms: Option<u64>,
     /// Attempts in all, 1 meaning no retry.
     pub attempts: u32,
+    /// **Whether the delays between attempts vary** (ADR-0215), as the
+    /// query's `retry` says. Absent where they do not.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub jitter: bool,
     /// `concurrency parallel`: requests for one key do not share a flight.
     pub parallel: bool,
     /// The arguments the entry is keyed by, by position. A query with no
@@ -116,6 +120,14 @@ fn policy_of(decl: &crate::hir::Decl) -> Policy {
         attempts: match m.retry {
             Retry::Bounded { max, .. } => max.max(1),
             Retry::None | Retry::Forever => 1,
+        },
+        // Whether its delays vary, as its `retry` says (ADR-0215). Its
+        // strategy needs nothing more: `bounded_exponential` and
+        // `transport_only` retry a query alike, since a declared error is an
+        // answer and only a failed read is tried again.
+        jitter: match m.retry {
+            Retry::Bounded { jitter, .. } => jitter,
+            Retry::None | Retry::Forever => false,
         },
         parallel: m.concurrency == Some(Concurrency::Parallel),
         key,

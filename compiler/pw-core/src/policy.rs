@@ -240,14 +240,9 @@ const RETRY_OPS: &[Op] = &[
         name: "transport_only",
         args: RETRY_ARGS,
     },
-    // A fixed delay between attempts. The corpus writes it as a retry a
-    // valid program declares (`retry_not_idempotent`'s neighbour), and the
-    // manifest carries a strategy by name (ADR-0089, ruling needed).
-    Op {
-        id: "policy.retry.fixed",
-        name: "fixed",
-        args: RETRY_ARGS,
-    },
+    // `fixed` was a third until ADR-0215 (ruling 0089-b): a query's runtime
+    // never honoured it, and delays that do not grow keep clients that failed
+    // together retrying together.
 ];
 
 const CONFLICT_OPS: &[Op] = &[Op {

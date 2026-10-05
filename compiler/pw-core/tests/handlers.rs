@@ -185,7 +185,7 @@ fn sent(v: &serde_json::Value) -> &serde_json::Value {
 
 /// How the store's commands are sent again (ADR-0173), as each declares:
 /// `retry transport_only(max = 2, jitter = true)`.
-const RESEND: &str = "], { retry: { max: 2, backoff: \"exponential\", jitter: true } });";
+const RESEND: &str = "], { retry: { max: 2, jitter: true } });";
 
 #[test]
 fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
@@ -462,7 +462,7 @@ command Order(item: Item) -> Int { 0 }
 command Tag(names: List<String>, packs: List<Pack>) -> Int { 0 }
 command Resent(id: Sku) -> Int
     idempotent_by Sku
-    retry         fixed(max = 3)
+    retry         bounded_exponential(max = 3)
 {
     0
 }
@@ -695,7 +695,7 @@ fn a_command_is_sent_again_as_its_retry_clause_says() {
     assert!(
         m.source.contains(
             "await context.command(\"shop.ui.Resent\", [v0], \
-             { retry: { max: 3, backoff: \"fixed\", jitter: false } });"
+             { retry: { max: 3, jitter: false } });"
         ),
         "{}",
         m.source

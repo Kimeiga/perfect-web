@@ -1498,16 +1498,7 @@ impl<'p> Emitter<'p> {
                 // as the command declares it: the runtime sends it, and only
                 // it knows that no answer came.
                 let how = match resend {
-                    Some(r) => format!(
-                        ", {{ retry: {{ max: {}, backoff: {}, jitter: {} }} }}",
-                        r.max,
-                        json(if r.exponential {
-                            "exponential"
-                        } else {
-                            "fixed"
-                        }),
-                        r.jitter
-                    ),
+                    Some(r) => format!(", {{ retry: {{ max: {}, jitter: {} }} }}", r.max, r.jitter),
                     None => String::new(),
                 };
                 let answered = format!("{r}_answer");

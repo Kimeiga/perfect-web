@@ -7,7 +7,7 @@ function trap(what) {
 export const name = "place_order";
 export const handler = "1dba658cf8c3c6a1";
 export async function run(context) {
-  const v0_answer = await context.command("store.page.place_order", [], { retry: { max: 2, backoff: "exponential", jitter: true } });
+  const v0_answer = await context.command("store.page.place_order", [], { retry: { max: 2, jitter: true } });
   const v0 = ((c) => { switch (c.$case) { case "ok": return { $case: "ok", value: undefined }; case "err": return { $case: "err", value: ((c) => { switch (c.$case) { case "nothing-to-order": return { $case: "nothing-to-order" }; default: throw new Error("trap: no such case " + c.$case); } })(c.value) }; default: throw new Error("trap: no such case " + c.$case); } })(v0_answer);
   let v8;
   switch (v0.$case) {

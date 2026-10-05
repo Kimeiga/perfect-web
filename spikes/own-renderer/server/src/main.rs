@@ -4618,7 +4618,9 @@ fn settled_of(answer: Result<Val, String>) -> Settled {
 fn runtime_manifest(resource: &str, policy: &serde_json::Value) -> pw_resource::Manifest {
     let mut m = pw_resource::Manifest::new(resource)
         .freshness(policy["freshness_ms"].as_u64().unwrap_or(0))
-        .attempts(policy["attempts"].as_u64().unwrap_or(1) as u32);
+        .attempts(policy["attempts"].as_u64().unwrap_or(1) as u32)
+        // Whether its delays vary, as its `retry` says (ADR-0215).
+        .jitter(policy["jitter"] == true);
     if let Some(t) = policy["timeout_ms"].as_u64() {
         m.timeout = t;
     }
@@ -9729,6 +9731,17 @@ public query Store(",
             Some("0"),
             "the cleared cart's state, not the old total"
         );
+    }
+
+    /// **A query's `retry` reaches its cache as declared** (ADR-0215): its
+    /// attempts, and whether its delays vary. Until then every query
+    /// jittered, whatever it declared.
+    #[test]
+    fn a_querys_retry_reaches_its_cache_as_declared() {
+        let exact = runtime_manifest("r", &serde_json::json!({ "attempts": 3 }));
+        assert_eq!((exact.max_attempts, exact.jitter), (3, false));
+        let varied = runtime_manifest("r", &serde_json::json!({ "attempts": 3, "jitter": true }));
+        assert_eq!((varied.max_attempts, varied.jitter), (3, true));
     }
 
     /// **A command commits the events it computes, and no others**

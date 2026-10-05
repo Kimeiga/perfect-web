@@ -1831,3 +1831,9 @@ an opaque type's own module reads its representation as `.value`, and
 declares no member of that name (urgent defect 8).
 - `LayoutSnapshot`'s accessor was `value`, which shadowed the representation
   in `browser`. It is `measured`, and PW0626 refuses the shape.
+[ADR-0215](DECISIONS/ADR-0215-a-querys-retry-reaches-its-runtime.md): a
+query's `retry` reaches its runtime as declared, and `fixed` is no strategy
+(ruling 0089-b; urgent defect 4).
+- The plan carried a query's attempts alone, so `jitter = false` ran with
+  jitter, and `fixed` ran as exponential. The plan carries its jitter, and
+  `fixed` left the language.

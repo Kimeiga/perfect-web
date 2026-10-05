@@ -10,7 +10,7 @@ import domain.{ Money, PaymentError }
 command refund(order: OrderId, amount: Money<USD>)
     -> Result<PaymentReceipt, PaymentError>
     requires SignedIn
-    retry    fixed(max = 3)
+    retry    bounded_exponential(max = 3)
 {
     Payments.charge(order, amount)
 }

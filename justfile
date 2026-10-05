@@ -2708,6 +2708,22 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0215: a query's retry reaches its runtime as declared, and fixed is no strategy
+e14-query-retry:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0215 - a query's retry reaches its runtime as declared, and fixed is no strategy"; echo; \
+       echo "produced by: just e14-query-retry"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the plan, the cache and the server"; echo; \
+       cargo test --locked -p pw-core --test query_retry --test policy_values --test handlers 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-resource --test gate 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-dev-server -- a_querys_retry_reaches_its_cache_as_declared 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/query_retry_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/query_retry_mutations.py; \
+     } > docs/evidence/E14/query-retry.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/query-retry.txt
+
 # ADR-0212: a query reads a query or a resource, and a subscription a subscription
 e14-query-reads:
     @mkdir -p docs/evidence/E14

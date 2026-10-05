@@ -41,7 +41,7 @@ test("the module the browser loads is the compiled handler body", async ({ page 
   // (ADR-0173).
   const clear = await (await page.request.get(`/handler/${ids.clear_cart}.mjs`)).text();
   expect(clear).toContain(
-    'await context.command("store.page.clear_cart", [], { retry: { max: 2, backoff: "exponential", jitter: true } })',
+    'await context.command("store.page.clear_cart", [], { retry: { max: 2, jitter: true } })',
   );
 });
 

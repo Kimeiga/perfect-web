@@ -5401,15 +5401,9 @@ impl<'a> Lower<'a> {
                 .policy("retry")
                 .and_then(|p| crate::manifest::parse_retry(&p.value))
                 .and_then(|r| match r {
-                    crate::manifest::Retry::Bounded {
-                        strategy,
-                        max,
-                        jitter,
-                    } => Some(super::ir::Resend {
-                        max,
-                        exponential: strategy != "fixed",
-                        jitter,
-                    }),
+                    crate::manifest::Retry::Bounded { max, jitter, .. } => {
+                        Some(super::ir::Resend { max, jitter })
+                    }
                     crate::manifest::Retry::None | crate::manifest::Retry::Forever => None,
                 });
             let result = self.fresh();

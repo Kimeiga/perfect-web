@@ -190,31 +190,36 @@ fn an_operator_is_given_its_arguments() {
         &retry("nope(max = 3)"),
         &["PW0335 `retry nope(max = 3)`: `nope` is none of `retry`'s operators"],
     );
+    // `fixed` left `retry`'s operators with ADR-0215 (ruling 0089-b).
     says(
-        &retry("fixed(maxx = 3)"),
-        &["PW0335 `retry fixed(maxx = 3)`: `fixed` takes no argument `maxx`"],
+        &retry("fixed(max = 3)"),
+        &["PW0335 `retry fixed(max = 3)`: `fixed` is none of `retry`'s operators"],
     );
     says(
-        &retry("fixed(max = \"two\")"),
-        &["`fixed`'s `max` is a count from 1, and this is `\"two\"`"],
+        &retry("transport_only(maxx = 3)"),
+        &["PW0335 `retry transport_only(maxx = 3)`: `transport_only` takes no argument `maxx`"],
     );
     says(
-        &retry("fixed(max = 0)"),
-        &["`fixed`'s `max` is a count from 1, and this is `0`"],
+        &retry("transport_only(max = \"two\")"),
+        &["`transport_only`'s `max` is a count from 1, and this is `\"two\"`"],
+    );
+    says(
+        &retry("transport_only(max = 0)"),
+        &["`transport_only`'s `max` is a count from 1, and this is `0`"],
     );
     says(
         &retry("bounded_exponential(jitter = true)"),
         &["`bounded_exponential` is not given `max`"],
     );
     says(
-        &retry("fixed(3)"),
-        &["`fixed` takes its arguments by name, and `3` names none"],
+        &retry("transport_only(3)"),
+        &["`transport_only` takes its arguments by name, and `3` names none"],
     );
     says(
-        &retry("fixed(max = 3, max = 4)"),
-        &["`fixed` is given `max` twice"],
+        &retry("transport_only(max = 3, max = 4)"),
+        &["`transport_only` is given `max` twice"],
     );
-    clean(&retry("fixed(max = 3)"));
+    clean(&retry("transport_only(max = 3)"));
     clean(&retry("bounded_exponential(max = 3, jitter = true)"));
     clean(&retry("none"));
 }
@@ -241,7 +246,7 @@ fn a_retried_command_is_idempotent_whatever_it_retries_on() {
     for retry in [
         "retry transport_only(max = 2, jitter = true)",
         "retry bounded_exponential(max = 3, jitter = true)",
-        "retry fixed(max = 3)",
+        "retry bounded_exponential(max = 3)",
     ] {
         says(&command(retry), &["PW0312"]);
         clean(&command(&format!("idempotent_by Tag\n{retry}")));

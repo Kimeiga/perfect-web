@@ -354,3 +354,22 @@ fn the_trace_records_what_actually_happened() {
         .count();
     assert_eq!((started, cached), (2, 1), "{t:#?}");
 }
+
+/// **A delay varies only where the declaration says `jitter`** (ADR-0215).
+/// Every query jittered, whatever it declared, until then.
+#[test]
+fn a_delay_varies_only_with_jitter() {
+    let exact = Manifest::new("r").attempts(3).jitter(false);
+    assert_eq!(
+        [
+            exact.backoff(1, "alpha"),
+            exact.backoff(2, "alpha"),
+            exact.backoff(3, "beta")
+        ],
+        [100, 200, 400],
+        "doubling, and no more"
+    );
+    let varied = Manifest::new("r").attempts(3).jitter(true);
+    assert_ne!(varied.backoff(3, "alpha"), varied.backoff(3, "beta"));
+    assert!(varied.backoff(3, "alpha") >= 400 && varied.backoff(3, "alpha") < 500);
+}

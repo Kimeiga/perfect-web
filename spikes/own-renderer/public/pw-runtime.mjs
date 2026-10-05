@@ -576,13 +576,14 @@ async function command(component, args, interaction, retry) {
 
 /**
  * How long to wait before sending a command again (ADR-0173): a second,
- * doubling with each attempt where the clause says `exponential`, as
- * TanStack Query waits between retries (`Math.min(1000 * 2 ** n, 30000)`),
- * and drawn at random below that where it says `jitter`, so that pages that
- * lost one connection do not all send again at once.
+ * doubling with each attempt, as TanStack Query waits between retries
+ * (`Math.min(1000 * 2 ** n, 30000)`), and drawn at random below that where
+ * the clause says `jitter`, so that pages that lost one connection do not all
+ * send again at once. A delay that did not double, `fixed`, left the language
+ * with ADR-0215.
  */
 function resendDelay(retry, attempt) {
-  const bound = Math.min(retry.backoff === "fixed" ? 1000 : 1000 * 2 ** attempt, 30000);
+  const bound = Math.min(1000 * 2 ** attempt, 30000);
   return retry.jitter ? Math.random() * bound : bound;
 }
 

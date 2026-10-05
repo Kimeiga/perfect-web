@@ -164,12 +164,12 @@ pub enum Const {
 
 /// **How a handler sends a command again when no answer came** (ADR-0173),
 /// from the command's `retry` clause: at most `max` more times, each after a
-/// delay that doubles (`exponential`) or does not, drawn at random below it
-/// where the clause says `jitter`.
+/// delay that doubles, drawn at random below it where the clause says
+/// `jitter`. A delay that did not double, `fixed`, left the language with
+/// ADR-0215.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Resend {
     pub max: u32,
-    pub exponential: bool,
     pub jitter: bool,
 }
 

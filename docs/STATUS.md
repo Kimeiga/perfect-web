@@ -13,6 +13,13 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0215, 2026-10-05: a query's `retry` reaches its runtime as declared**
+(ruling 0089-b; urgent defect 4). A page's plan carried a query's attempts
+alone, so `jitter = false` ran with jitter and `fixed` ran as exponential.
+The plan carries whether the delays vary, and the cache honours it; `fixed`
+left `retry`'s operators, since fixed delays keep clients that failed
+together retrying together (`just e14-query-retry`).
+
 **ADR-0212 to ADR-0214, 2026-10-05: three of ADR-0210's soundness
 defects.**
 - A `query` reads a query or a resource, and a `subscription` a subscription:

@@ -160,6 +160,10 @@ pub struct Manifest {
     /// jitter derived from the key rather than from a random source — a test
     /// that cannot predict the delay cannot assert on it.
     pub retry_base: Millis,
+    /// **Whether the delays vary**, as the declaration's `retry` says
+    /// (ADR-0215): `jitter = false` waits exactly `base * 2^(n-1)`. Until
+    /// ADR-0215 every query jittered, whatever it declared.
+    pub jitter: bool,
     /// Whole-flight budget, including retries, measured by the injected clock.
     pub timeout: Millis,
     /// Whether a result is kept at all (ADR-0127). A declaration with no
@@ -191,6 +195,7 @@ impl Manifest {
             freshness: 30_000,
             max_attempts: 1,
             retry_base: 100,
+            jitter: true,
             timeout: 2_000,
             cacheable: true,
             fallback: Fallback::None,
@@ -218,6 +223,11 @@ impl Manifest {
         self.max_attempts = n;
         self
     }
+    /// Whether the delays vary (ADR-0215).
+    pub fn jitter(mut self, jitter: bool) -> Self {
+        self.jitter = jitter;
+        self
+    }
 
     /// Backoff for `attempt`, doubling, with jitter that depends on the key.
     ///
@@ -229,7 +239,7 @@ impl Manifest {
             .retry_base
             .saturating_mul(2u64.pow(attempt.saturating_sub(1).min(16)));
         let spread = base / 4;
-        if spread == 0 {
+        if spread == 0 || !self.jitter {
             return base;
         }
         let h = key
