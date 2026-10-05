@@ -107,9 +107,14 @@ Recorded by `just e14-command-events` in
   read back as written, `""` among them.
 - **The dev server's tests**:
   - `add_to_cart` imports exactly `CartChanged` and moves its cart's entry;
+  - built without its `emits`, its write commits and no entry hears of it;
   - without `outbox.write` it is refused, and nothing is written.
 - **`scripts/committed_events_mutations.py`**: ADR-0104's four controls of
   the server's evaluation are retired with it, and three are added.
+  - **Correction:** at `558e35b` its first control, `CartChanged` committed
+    whatever the command computed, survived. ADR-0104 had killed it by
+    removing the graph's `emits` edge, and this ADR deleted that half of the
+    test with the graph's part. The emits-nothing test above restores it.
 - **The store's WIT, contracts and components** are emitted again, and
   `evidence_is_current.rs` now compares the contracts too. The planning
   tests' origin grants the order's `Orders` and `outbox.write`.

@@ -9750,6 +9750,35 @@ public query Store(",
         );
     }
 
+    /// **A command that emits nothing tells nothing** (ADR-0104,
+    /// ADR-0208). Its write commits, and no entry hears of it: the events
+    /// committed are the ones the command computed, and a command built
+    /// without `emits` computes none. Until 2026-09-26 this server committed
+    /// `CartChanged` whatever a command declared.
+    #[test]
+    fn a_command_that_emits_nothing_tells_nothing() {
+        let s = served_from_patches_in(
+            "examples",
+            |app| {
+                // `add_to_cart`'s, the first command's.
+                let emits = "    emits         CartChanged(current_session())\n";
+                assert!(app.contains(emits), "the store's add_to_cart emits");
+                app.replacen(emits, "", 1)
+            },
+            &[],
+        );
+        s.drain("session-7");
+        let before = s.version("session-7");
+        s.command(ADD, "session-7", &add_shown("espresso", 1), false)
+            .expect("runs");
+        assert_eq!(s.cart_value("session-7"), 1, "the write committed");
+        assert_eq!(
+            s.version("session-7"),
+            before,
+            "and no event reached the cart"
+        );
+    }
+
     /// **A command whose events a node cannot keep does not run there**
     /// (ADR-0208). Without `outbox.write`, its component's outbox is not
     /// linked: it is refused, and nothing is written, rather than its writes

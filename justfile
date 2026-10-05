@@ -2722,7 +2722,7 @@ e14-command-events:
        echo; echo "== the outbox's values (runtime/pw-materialize/tests/outbox_values.rs)"; echo; \
        cargo test --locked -p pw-materialize --test outbox_values 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the server's commits"; echo; \
-       cargo test --locked -p pw-dev-server -- a_command_commits_the_events_it_computes a_command_whose_events_cannot_be_kept_is_not_run 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-dev-server -- a_command_commits_the_events_it_computes a_command_that_emits_nothing_tells_nothing a_command_whose_events_cannot_be_kept_is_not_run 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the store's artifacts, as the compiler emits them"; echo; \
        cargo test --locked -p pw-core --test evidence_is_current 2>&1 | grep -E '^test result'; \
        echo; echo "== mutation controls (scripts/committed_events_mutations.py)"; echo; \
