@@ -13,6 +13,21 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0211, 2026-10-05: a path that leaves a loop's body leaves the
+function, and owes its releases** (ruling 0045-a; ADR-0210's urgent defect
+1). A `for` loop had no exits, so `let tx = Database.begin(); for s in
+sessions { if s == "" { return Ok(()) } }; tx.commit()` checked with the
+transaction left open on that `return`, as did a failing `?` in the body;
+and the correct program, rolling back then returning, was refused. A `return`
+or failing `?` in a pass now owes the release, and a release on a path that
+leaves before the pass ends runs once. 3 mutants (`just e14-affine-loops`).
+
+**ADR-0210, 2026-10-05: the owner's rulings on the pre-delegation marks,
+ADR-0031 to ADR-0122**, relayed by the session "Web Pleris capabilities and
+limitations" as ADR-0195's were: 85 marks, 26 overruled, 30 confirmed, 29
+settled, and ten soundness defects its probes found. Each is built in its
+own ADR, the defects first (NEXT 24).
+
 **ADR-0209, 2026-10-05: a command computes the entries it invalidates**
 (ADR-0195's ruling 11, completed). The server read each `invalidates` key's
 text, `current_session()`, and dropped every entry of the query for anything

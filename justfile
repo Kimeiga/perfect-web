@@ -2708,6 +2708,23 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0211: a path that leaves a loop's body leaves the function, and owes
+# its releases. The tests, the corpus, and the mutation controls.
+e14-affine-loops:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0211 - a path that leaves a loop's body leaves the function, and owes its releases"; echo; \
+       echo "produced by: just e14-affine-loops"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/affine_loops.rs)"; echo; \
+       cargo test --locked -p pw-core --test affine_loops --test affine_bindings 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus"; echo; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/affine_loops_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/affine_loops_mutations.py; \
+     } > docs/evidence/E14/affine-loops.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/affine-loops.txt
+
 # ADR-0209: a command computes the entries it invalidates. The command's
 # calls, the server's drops, the store against its references, and the
 # mutation controls.

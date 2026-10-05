@@ -394,16 +394,35 @@ impl Paths<'_> {
             Expr::Try { value } => self
                 .expr(*value)
                 .then(Flow::exit(span.clone()).or(Flow::identity())),
-            // A loop's body, or a function value's, runs any number of times.
-            Expr::For { .. } | Expr::Lambda { .. } => Flow {
+            // **A loop's body runs any number of times** (ADR-0211, ruling
+            // 0045-a). Its iterable is evaluated once. A path that leaves the
+            // body inside a pass, `return` or a failing `?`, leaves it as any
+            // other exit does, owing what it has not released: until
+            // ADR-0211 a `for` had no exits, and a transaction left open by
+            // a `return` in one checked. A release is accepted only on a
+            // path that leaves before the pass ends; one on a path that goes
+            // round again runs again.
+            Expr::For { iterable, body, .. } => {
+                let pass = self.expr(*body);
+                let repeated = pass.repeated.or_else(|| {
+                    pass.through
+                        .iter()
+                        .any(|c| *c > 0)
+                        .then(|| self.first_release(*body))
+                        .flatten()
+                });
+                self.expr(*iterable).then(Flow {
+                    through: BTreeSet::from([0]),
+                    exits: pass.exits,
+                    repeated,
+                })
+            }
+            // A function value's body runs any number of times, and its
+            // `return` leaves the function value, not this body.
+            Expr::Lambda { .. } => Flow {
                 through: BTreeSet::from([0]),
                 exits: Vec::new(),
-                repeated: self
-                    .body
-                    .walk_from(id)
-                    .into_iter()
-                    .map(|e| self.body.expr_span(e))
-                    .find(|s| self.releases.contains(s)),
+                repeated: self.first_release(id),
             },
             Expr::Name(_)
                 if self.tails.contains(&id) && means(self.body, self.types, id, self.acquired) =>
@@ -412,6 +431,15 @@ impl Paths<'_> {
             }
             _ => self.children(id),
         }
+    }
+
+    /// The first release inside `id`, where a reader meets it.
+    fn first_release(&self, id: ExprId) -> Option<Span> {
+        self.body
+            .walk_from(id)
+            .into_iter()
+            .map(|e| self.body.expr_span(e))
+            .find(|s| self.releases.contains(s))
     }
 
     fn children(&self, id: ExprId) -> Flow {

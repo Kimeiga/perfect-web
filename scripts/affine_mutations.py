@@ -43,8 +43,8 @@ MUTANTS = [
     (
         "a release in a loop counts once",
         AFFINE,
-        "                    .find(|s| self.releases.contains(s)),\n            },",
-        "                    .find(|s| self.releases.contains(s))\n                    .filter(|_| false),\n            },",
+        "            .find(|s| self.releases.contains(s))\n    }",
+        "            .find(|s| self.releases.contains(s))\n            .filter(|_| false)\n    }",
     ),
     (
         "a parameter the declaration promises to release is not followed",

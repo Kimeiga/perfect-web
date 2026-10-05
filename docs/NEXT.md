@@ -340,7 +340,29 @@ E14 comes before E11-E13. Its plan, controls and task list are
           "annotation needed"), 6 (Float `%` Euclidean; text as ECMAScript's
           Number::toString), 7 (`return` stays a statement) and 15 (E7 gate
           8 counts attributed long frames only, with a thrashing control);
-        - and a sweep of the 109 "(ruling needed)" marks in 56 ADRs.
+        - ~~and a sweep of the 109 "(ruling needed)" marks in 56 ADRs~~,
+          ruled and relayed 2026-10-05 (ADR-0210, item 24).
+    24. **The owner's rulings on the pre-delegation marks** (ADR-0210),
+        relayed 2026-10-05, each in its own ADR:
+        - first, the soundness defects its probes found: ~~a transaction
+          left open by an exit inside a loop~~ (ADR-0211, `just
+          e14-affine-loops`); stale captures; ~~a handler calling a `todo`
+          command~~ (not reproduced: the build refuses it); a retry's
+          strategy dropped; misplaced policy heads ignored; `query
+          helper(id)` over a `fn`; `List.maximum`'s −0; an opaque type's
+          member named `value`;
+        - **then the feed reference app** (the owner, 2026-10-05; item 22's
+          first), pulling in what it needs: 0073-a computed holes, 0071-a,
+          0122-d, 0057-a, 0099-a, a `String`'s length as an invariant, and
+          ADR-0195's ruling 10, materialization chains;
+        - then 0101-a to 0101-d, 0105-a, 0100-a, and the rest below;
+        - with the app layer: computed holes (0073-a), then 0071-a;
+          route-keyed speculation (0122-d); map keys (0057-a, 0057-c); `let
+          _`, `while`, 0052-a, 0055-b, 0061-a, 0049-b; cheaper instantiation
+          (0046-a);
+        - after it: 0060-a, 0078-a, 0056-a, 0047-a's parser split;
+        - housekeeping: 0032-a's field made required, 0049-a's wording,
+          kiokun's NOTICE, an inlining budget, KNOWN_LIMITATIONS cleaned.
 
      Next: E14-E's design, ready for the owner's choice of models and
      budget, and the owner's decisions logged in ADR-0182 (axe-core) and

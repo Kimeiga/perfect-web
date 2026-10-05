@@ -1806,3 +1806,14 @@ completed).
 - The server drops the entry by that key once the writes commit, and reads
   no key's text: until then anything but `current_session()` dropped every
   entry of the query.
+[ADR-0210](DECISIONS/ADR-0210-the-owners-rulings-on-the-pre-delegation-marks.md):
+the owner's rulings on the pre-delegation marks, ADR-0031 to ADR-0122,
+relayed as ADR-0195's were.
+- 85 marks: 26 overruled, 30 confirmed, 29 already settled. Ten soundness
+  defects the sweep found come first.
+- Each is built in its own ADR, which may overrule it with research.
+[ADR-0211](DECISIONS/ADR-0211-a-path-that-leaves-a-loop-owes-its-releases.md):
+a path that leaves a loop's body leaves the function, and owes its releases
+(ruling 0045-a; ADR-0210's urgent defect 1).
+- A `return` or failing `?` in a `for` body left a transaction open and
+  checked; the correct roll-back-then-return was refused. Both are fixed.
