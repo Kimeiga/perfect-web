@@ -1895,3 +1895,10 @@ intermittent `slots.spec.mjs`).
   recommendation of two. It waits for the comment the renderer writes after
   each template now. The slots' tests hold the recommender instead of
   outwaiting a delay half a second short of the query's timeout.
+[ADR-0224](DECISIONS/ADR-0224-a-longer-read-is-not-applied-over-a-commit-it-did-not-see.md):
+a longer read is not applied over a commit it did not see (found by
+ADR-0222).
+- A keyed read read outside the session's hold and applied its value after,
+  so a commit between the two was sent first and then undone by the older
+  value. It applies in the hold now, and reads again when a change reached
+  its document while it read.

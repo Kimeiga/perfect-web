@@ -14,6 +14,13 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0224, 2026-10-05: a longer read is not applied over a commit it did
+not see** (found by ADR-0222). "Load more" read the timeline outside the
+session's hold and applied it after: a post committed in between was sent,
+then undone by the longer list read before it. A keyed read applies in the
+session's hold now, and reads again when a change reached its document while
+it read, the last time inside the hold (`just e14-keyed-race`).
+
 **ADR-0223, 2026-10-05: a streamed region is filled when its whole arm has
 arrived** (found by an intermittent `slots.spec.mjs`). The runtime applied a
 `<template for>` as soon as it saw one, and a response that arrived in parts

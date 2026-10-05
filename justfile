@@ -2708,6 +2708,21 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0224: a longer read is not applied over a commit it did not see. The
+# server's tests and the mutation control.
+e14-keyed-race:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0224 - a longer read is not applied over a commit it did not see"; echo; \
+       echo "produced by: just e14-keyed-race"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_longer_read_is_not_applied_over_a_commit_it_did_not_see a_page_that_reads_more_holds_what_it_shows under_cancel_a_newer_key_stops_the_old_keys_read under_supersede_the_old_keys_read_runs_on_unshown 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/keyed_race_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/keyed_race_mutations.py; \
+     } > docs/evidence/E14/keyed-race.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/keyed-race.txt
+
 # ADR-0223: a streamed region is filled when its whole arm has arrived. The
 # renderer's tests, the slots in three engines, and the mutation controls.
 e14-whole-fills:

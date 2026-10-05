@@ -268,6 +268,10 @@ fn reload_batch(cursor: u64) -> String {
 /// session had one subscriber, and serving a document cleared it.
 type Doc = (String, u64);
 
+/// What a test does between a keyed read and its apply (ADR-0224).
+#[cfg(test)]
+type KeyedFetched = Box<dyn FnOnce(&Server) + Send>;
+
 /// **A page's parameters**, as its address gives them (ADR-0162): `id`,
 /// from `/stores/{id}`.
 type Params = BTreeMap<String, String>;
@@ -631,6 +635,10 @@ struct Server {
     /// `/bench/split-fills`, as a network that delivers a response in parts
     /// would.
     split_fills: std::sync::atomic::AtomicU64,
+    /// **What a test does between a keyed read and its apply** (ADR-0224),
+    /// once: a commit there is the race the apply is held against.
+    #[cfg(test)]
+    keyed_fetched: Mutex<Option<KeyedFetched>>,
     /// **What each session's connections meet** (charter §15.5's one-shot
     /// network error and forced reconnect, ADR-0175): whether its next
     /// command's connection is dropped, and when its subscriptions are cut
@@ -1090,6 +1098,8 @@ impl Server {
             telling: Mutex::new(Vec::new()),
             speculated_versions: Mutex::new(BTreeMap::new()),
             split_fills: std::sync::atomic::AtomicU64::new(0),
+            #[cfg(test)]
+            keyed_fetched: Mutex::new(None),
             connection_faults: Mutex::new(BTreeMap::new()),
             materializer_faults: Mutex::new(std::collections::BTreeSet::new()),
             keyed: Mutex::new(BTreeMap::new()),
@@ -3556,33 +3566,76 @@ impl Server {
             return Ok(KeyOutcome::Superseded);
         }
 
-        // While it reads, a browser that leaves lets go of it too.
-        let done = std::sync::atomic::AtomicBool::new(false);
-        let mine = &doc;
-        let value = std::thread::scope(|scope| {
-            if cancel {
-                let done = &done;
-                scope.spawn(move || {
-                    while !done.load(std::sync::atomic::Ordering::SeqCst) {
-                        if left() {
-                            self.let_go(mine, binding, seq);
-                            return;
+        // **Applied in the session's hold, and read again if a change reached
+        // the document while it read** (ADR-0224). A commit holds the session
+        // from its commit to what it sends, so none comes between the check
+        // and what is sent below. Read outside the hold, so a slow read keeps
+        // no command of the session waiting, but for the last attempt, read
+        // inside it, as a document's last is read in the table (ADR-0151).
+        // Until ADR-0224 a value read before a commit could be applied after
+        // the commit's change was sent, and the page showed the list without
+        // it until the next change.
+        let session_lock = self.one_at_a_time(session);
+        let sent = |s: &Self| {
+            s.pending
+                .lock()
+                .expect("pending")
+                .get(&doc)
+                .map(|w| w.pushed)
+        };
+        let mut attempt = 1;
+        let (value, _one) = loop {
+            let last = attempt >= DOCUMENT_ATTEMPTS;
+            let held = last.then(|| {
+                session_lock
+                    .lock()
+                    .expect("one change of a session at a time")
+            });
+            let before = sent(self);
+            // While it reads, a browser that leaves lets go of it too.
+            let done = std::sync::atomic::AtomicBool::new(false);
+            let mine = &doc;
+            let value = std::thread::scope(|scope| {
+                if cancel {
+                    let done = &done;
+                    scope.spawn(move || {
+                        while !done.load(std::sync::atomic::Ordering::SeqCst) {
+                            if left() {
+                                self.let_go(mine, binding, seq);
+                                return;
+                            }
+                            std::thread::sleep(std::time::Duration::from_millis(20));
                         }
-                        std::thread::sleep(std::time::Duration::from_millis(20));
-                    }
-                });
+                    });
+                }
+                let value = self.fetch_answer_at(session, b, &args, &flight);
+                done.store(true, std::sync::atomic::Ordering::SeqCst);
+                value
+            });
+            let value = match value {
+                Ok(value) => unwrapped(b["resource"].as_str().unwrap_or_default(), value)?,
+                // Stopped: let go of, by a newer read or a browser that left.
+                Err(_) if self.superseded(session, binding, seq, document, cancel) => {
+                    return Ok(KeyOutcome::Superseded);
+                }
+                Err(why) => return Err(why),
+            };
+            #[cfg(test)]
+            if let Some(between) = self.keyed_fetched.lock().expect("between").take() {
+                between(self);
             }
-            let value = self.fetch_answer_at(session, b, &args, &flight);
-            done.store(true, std::sync::atomic::Ordering::SeqCst);
-            value
-        });
-        let value = match value {
-            Ok(value) => unwrapped(b["resource"].as_str().unwrap_or_default(), value)?,
-            // Stopped: let go of, by a newer read or a browser that left.
-            Err(_) if self.superseded(session, binding, seq, document, cancel) => {
-                return Ok(KeyOutcome::Superseded);
+            let held = match held {
+                Some(held) => held,
+                None => session_lock
+                    .lock()
+                    .expect("one change of a session at a time"),
+            };
+            if !last && sent(self) != before {
+                drop(held);
+                attempt += 1;
+                continue;
             }
-            Err(why) => return Err(why),
+            break (value, held);
         };
         drop(hold);
 
@@ -10004,6 +10057,47 @@ public query Store(",
             panic!("one value sent: {sent:?}");
         };
         assert_eq!(value.as_array().map(Vec::len), Some(22), "{value}");
+    }
+
+    /// **A longer read is not applied over a commit it did not see**
+    /// (ADR-0224). "Load more" reads the timeline for a longer page; the
+    /// session posts between that read and its apply, and its change is sent
+    /// first. Applied as read, the longer page would be the one without the
+    /// post, and the page would show it so until the next change.
+    #[test]
+    fn a_longer_read_is_not_applied_over_a_commit_it_did_not_see() {
+        let s = served_feed();
+        for i in 0..21 {
+            s.command_answered(
+                "feed.app.post",
+                "b",
+                &[Val::String(format!("Post {i}"))],
+                Some(&format!("i-{i}")),
+            )
+            .expect("runs");
+        }
+        let (_, cursor, _, _) = s
+            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        *s.keyed_fetched.lock().expect("between") = Some(Box::new(|s: &Server| {
+            s.command_answered(
+                "feed.app.post",
+                "a",
+                &[Val::String("Between the read and its apply".into())],
+                Some("i-between"),
+            )
+            .expect("runs");
+        }));
+        let more = BTreeMap::from([("shown".to_string(), serde_json::json!(40))]);
+        let read = s.read_keyed("a", "feed", 1, cursor, &more, STAYED);
+        assert!(matches!(read, Ok(KeyOutcome::Applied)), "applied");
+        let shown = s.shown.lock().expect("shown")[&doc].speculated["feed"].clone();
+        assert_eq!(shown.as_array().map(Vec::len), Some(23), "{shown}");
+        assert_eq!(
+            shown[0]["text"], "Between the read and its apply",
+            "{shown}"
+        );
     }
 
     /// **A page that reads nothing a commit dropped is not read again**
