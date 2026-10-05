@@ -181,6 +181,18 @@ test("another store, and a store that is not there, keep every rule", async ({ p
   expect(await audit(page), "not found").toEqual([]);
 });
 
+test("the home page keeps every rule", async ({ context }) => {
+  // ADR-0192: the stores, and the session's cart beside them.
+  const home = await context.newPage();
+  await ready(home, "/");
+  expect(await audit(home), "as served").toEqual([]);
+  const store = await context.newPage();
+  await ready(store, "/stores/47");
+  await store.getByRole("button", { name: "Add Espresso" }).click();
+  await expect(home.locator("#cart-count")).toHaveText("1");
+  expect(await audit(home), "its cart counted").toEqual([]);
+});
+
 test("the cart's own page keeps every rule, empty and with lines", async ({ context }) => {
   // ADR-0190: a second page that binds a query, audited as the store's is.
   const store = await context.newPage();

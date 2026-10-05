@@ -13,6 +13,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0192, 2026-10-04: the stores, as the home page.** A delivery site
+starts with its stores, and the store's program had no list.
+- `Stores.list()` is a host operation of the store's data layer, and
+  `StoreList()` a public query over it.
+- `HomePage`, at `/`, links each store to its page and counts the session's
+  cart beside them, kept current. `/` was store 47's page, an alias from E7.
+
+The store's program is three pages now, the home page, a store's and the
+cart's, each linked to the next. 2 mutants (`just e14-home`).
+
 **ADR-0191, 2026-10-04: every page speculates from its own module.** The
 compiler wrote every page a speculation module, and the server read the
 store's alone, so the cart's page showed a press only when the server

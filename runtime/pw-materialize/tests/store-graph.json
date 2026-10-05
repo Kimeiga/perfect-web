@@ -146,6 +146,12 @@
       ]
     },
     {
+      "path": "store.page.HomePage",
+      "name": "HomePage",
+      "node": "page",
+      "params": []
+    },
+    {
       "path": "store.page.Menu",
       "name": "Menu",
       "node": "resource",
@@ -183,6 +189,15 @@
       "params": [
         "id"
       ]
+    },
+    {
+      "path": "store.page.StoreList",
+      "name": "StoreList",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "key": [],
+      "params": []
     },
     {
       "path": "store.page.StorePage",
@@ -305,6 +320,20 @@
       "key": [
         "current_session()"
       ]
+    },
+    {
+      "from": "store.page.HomePage",
+      "to": "store.page.Cart",
+      "kind": "reads",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.HomePage",
+      "to": "store.page.StoreList",
+      "kind": "reads",
+      "key": []
     },
     {
       "from": "store.page.Menu",

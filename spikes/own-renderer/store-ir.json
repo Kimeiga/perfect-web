@@ -285,6 +285,129 @@
     ]
   },
   {
+    "path": "store.page.HomePage",
+    "name": "HomePage",
+    "params": [],
+    "schema": "67d9fb5284999a50",
+    "chunks": [
+      {
+        "chunk": "static",
+        "value": "<main>\n            <h1>Stores</h1>\n            <ul id=\"stores\">\n                "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "each",
+          "id": 0,
+          "collection": "stores",
+          "binding": "store",
+          "key": "id",
+          "body": [
+            {
+              "chunk": "static",
+              "value": "\n                    <li>\n                        <h2><a data-pw=\"0\" "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "interpolated_attribute",
+                "id": 1,
+                "owner": 0,
+                "name": "href",
+                "segments": [
+                  {
+                    "segment": "static",
+                    "value": "/stores/"
+                  },
+                  {
+                    "segment": "value",
+                    "value": "store.id"
+                  }
+                ],
+                "context": "url"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 2,
+                "value": "store.name",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</a></h2>\n                        <p>"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 3,
+                "value": "store.description",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</p>\n                    </li>\n                "
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n            </ul>\n            <p aria-live=\"polite\" aria-atomic=\"true\">\n                <a id=\"cart-page\" href=\"/cart\">Your cart</a>: <span id=\"cart-count\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 4,
+          "value": "cart.line_count",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</span> items\n            </p>\n        </main>"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "title",
+          "id": 5,
+          "pieces": [
+            {
+              "piece": "text",
+              "value": "Stores"
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "meta",
+          "id": 6,
+          "attribute": "name",
+          "key": "description",
+          "content": [
+            {
+              "piece": "text",
+              "value": "Order from the stores near you, for delivery or pickup."
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
     "path": "store.page.StorePage",
     "name": "StorePage",
     "params": [

@@ -46,6 +46,11 @@ import browser.{ Element, MapHandle, MapError }
 fn get(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> }
     host "store:data/stores#get"
 
+// Every store this deployment holds, in the order it lists them: what a home
+// page shows (ADR-0192).
+fn list() -> List<Store> !{ database.read<Stores> }
+    host "store:data/stores#list"
+
 // `find` may not find one, and says so in its type. `get` is the form that
 // fails loudly; this is the form whose absence is a value.
 fn find(id: StoreId) -> Option<Store> !{ database.read<Stores> } {

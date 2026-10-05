@@ -2566,6 +2566,29 @@ e14-page-speculation:
      } > docs/evidence/E14/page-speculation.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/page-speculation.txt
 
+# ADR-0192: the stores, as the home page. The server's test, the home page
+# in three engines with its audit, and the mutation controls.
+e14-home:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0192 - the stores, as the home page"; echo; \
+       echo "produced by: just e14-home"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the development server (pw-dev-server)"; echo; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::the_stores_are_the_home_page|^test result'; \
+       echo; echo "== the home page, in three engines (e2e/pages.spec.mjs, e2e/accessibility.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs \
+          -g "home page|stores are the home" --reporter=list 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/home_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/home_mutations.py; \
+     } > docs/evidence/E14/home.txt
+    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/home.txt
+
 # ADR-0186: a page states its description. The compiler's, the renderer's
 # and the server's tests, each store's page in three engines, the corpus at
 # C11, every program clean, and the mutation controls.

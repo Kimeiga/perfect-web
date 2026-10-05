@@ -100,6 +100,18 @@ public query Store(id: StoreId) -> Result<Store, StoreError>
     Stores.get(id)
 }
 
+// Every store, the same for everybody: public, and cached `shared`
+// (ADR-0192).
+public query StoreList() -> List<Store>
+    freshness     30.seconds
+    consistency   snapshot
+    cache         shared
+    concurrency   one_per_key
+    timeout       2.seconds
+{
+    Stores.list()
+}
+
 // Private. Scoped to one session, so `cache private` — and the label the
 // `session` modifier gives it is what makes putting it in the shared cache a
 // compile error rather than a leak nobody notices.
@@ -461,6 +473,37 @@ session page CartPage() {
             >
                 Clear
             </button>
+        </main>
+    }
+}
+
+// **The stores, as the home page** (ADR-0192): each store by its name and
+// what it says of itself, linked to its page, and the session's cart beside
+// them. A store list is the first of a delivery site's pages.
+session page HomePage() {
+    route        "/"
+    placement    origin
+    cache        private
+
+    let stores = query StoreList()
+    let cart = query Cart(current_session())
+
+    view {
+        <title>Stores</title>
+        <meta name="description" content="Order from the stores near you, for delivery or pickup." />
+        <main>
+            <h1>Stores</h1>
+            <ul id="stores">
+                {#each stores as store (store.id)}
+                    <li>
+                        <h2><a href="/stores/{store.id}">{store.name}</a></h2>
+                        <p>{store.description}</p>
+                    </li>
+                {/each}
+            </ul>
+            <p aria-live="polite" aria-atomic="true">
+                <a id="cart-page" href="/cart">Your cart</a>: <span id="cart-count">{cart.line_count}</span> items
+            </p>
         </main>
     }
 }

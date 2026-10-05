@@ -266,9 +266,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
     17. ~~Every page speculates~~ (ADR-0191, `just e14-page-speculation`):
         from its own module; the cart's page shows a press before the
         server answers.
-    18. **A list of stores as the home page**, at `/`: a stores query and a
-        host operation for it, each store linked to its page, and the
-        session's cart beside them.
+    18. ~~A list of stores as the home page~~ (ADR-0192, `just e14-home`):
+        `StoreList()` and `HomePage` at `/`.
+    19. **Placing an order**: a checkout on the cart's page that places the
+        cart as an order, and an order's page at its own route that shows
+        its status as it changes (the store's program declares `Order` and
+        the host answers `orders#current`).
 
      Next: E14-E's design, ready for the owner's choice of models and
      budget, and the owner's decisions logged in ADR-0182 (axe-core) and

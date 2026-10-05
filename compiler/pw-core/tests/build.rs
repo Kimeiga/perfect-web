@@ -79,6 +79,8 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.Menu",
             "store.page.Recommendations",
             "store.page.Store",
+            // The stores the home page lists (ADR-0192).
+            "store.page.StoreList",
             "store.page.add_to_cart",
             "store.page.clear_cart",
             // A line's controls (ADR-0172).
@@ -118,7 +120,11 @@ fn the_store_builds_every_artifact_from_source() {
         ]
     );
 
-    assert_eq!(b.templates.len(), 2, "StorePage, and CartPage (ADR-0190)");
+    assert_eq!(
+        b.templates.len(),
+        3,
+        "StorePage, CartPage (ADR-0190) and HomePage (ADR-0192)"
+    );
     assert_eq!(
         b.handlers.len(),
         9,

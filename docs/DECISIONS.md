@@ -1638,3 +1638,10 @@ every page speculates from its own module.
   store's alone, so the cart's page showed a press only when the server
   answered. Now each page carries its own, and each document whose page
   speculates on a value is sent it.
+
+[ADR-0192](DECISIONS/ADR-0192-the-stores-as-the-home-page.md): the stores,
+as the home page.
+- A delivery site starts with its stores. `Stores.list()`, a host operation
+  of the store's data layer, a public `StoreList()` query over it, and a
+  `HomePage` at `/`: each store linked to its page, and the session's cart
+  counted beside them. `/` was store 47's page, an alias from E7.

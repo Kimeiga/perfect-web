@@ -71,6 +71,10 @@ interface store-page-estimate-api {
     estimate: func(arg0: capability-session-id) -> result<domain-delivery-estimate, domain-estimate-error>;
 }
 
+interface store-page-home-page-api {
+    home-page: func();
+}
+
 interface store-page-menu-api {
     use pw:types/types.{domain-menu-section, domain-store-error, domain-store-id};
     menu: func(arg0: domain-store-id) -> result<list<domain-menu-section>, domain-store-error>;
@@ -84,6 +88,11 @@ interface store-page-recommendations-api {
 interface store-page-store-api {
     use pw:types/types.{domain-store, domain-store-error, domain-store-id};
     store: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
+}
+
+interface store-page-store-list-api {
+    use pw:types/types.{domain-store};
+    store-list: func() -> list<domain-store>;
 }
 
 interface store-page-store-page-api {
@@ -172,6 +181,13 @@ world store-page-estimate {
     export store-page-estimate-api;
 }
 
+world store-page-home-page {
+    import pw:host/session;
+    import store-page-cart-api;
+    import store-page-store-list-api;
+    export store-page-home-page-api;
+}
+
 world store-page-menu {
     import store:data/menus;
     export store-page-menu-api;
@@ -185,6 +201,11 @@ world store-page-recommendations {
 world store-page-store {
     import store:data/stores;
     export store-page-store-api;
+}
+
+world store-page-store-list {
+    import store:data/stores;
+    export store-page-store-list-api;
 }
 
 world store-page-store-page {
@@ -349,6 +370,7 @@ package store:data {
     }
     interface stores {
         use pw:types/types.{domain-store, domain-store-error, domain-store-id};
+        %list: func() -> list<domain-store>;
         get: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
     }
 }

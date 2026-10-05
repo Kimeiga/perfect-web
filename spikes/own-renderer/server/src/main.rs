@@ -1697,29 +1697,21 @@ impl Server {
                 if delay > 0 {
                     std::thread::sleep(std::time::Duration::from_millis(delay));
                 }
-                Ok(vec![Val::Result(Ok(Some(Box::new(Val::Record(vec![
-                    ("id".into(), Val::String(id.clone())),
-                    (
-                        "name".into(),
-                        Val::String(store_named(id).unwrap_or_default().into()),
-                    ),
-                    // A program whose `Store` declares none is not given it
-                    // (ADR-0166): the benchmark's.
-                    (
-                        "description".into(),
-                        Val::String(store_description(id).into()),
-                    ),
-                    (
-                        "hours".into(),
-                        Val::Record(vec![
-                            ("opens-minute".into(), Val::S64(7 * 60)),
-                            ("closes-minute".into(), Val::S64(19 * 60)),
-                        ]),
-                    ),
-                ])))))])
+                Ok(vec![Val::Result(Ok(Some(Box::new(store_record(id)))))])
             }
             [Val::String(_)] => Ok(not_found()),
             other => Err(format!("stores#get received {other:?}")),
+        });
+        // Every store this server holds, in its order (ADR-0192): what the
+        // home page lists.
+        let list: HostFn = Arc::new(move |args: &[Val]| match args {
+            [] => Ok(vec![Val::List(
+                [STORE_ID, SECOND_STORE.0]
+                    .into_iter()
+                    .map(store_record)
+                    .collect(),
+            )]),
+            other => Err(format!("stores#list received {other:?}")),
         });
         // What can be ordered now (ADR-0178), as the menu's rows say.
         let sold_out = self.sold_out.lock().expect("sold out").clone();
@@ -1906,6 +1898,7 @@ impl Server {
         });
         BTreeMap::from([
             ("store:data/stores#get".to_string(), get),
+            ("store:data/stores#list".to_string(), list),
             ("store:data/menus#for-store".to_string(), for_store),
             ("store:data/menus#sections".to_string(), sections),
             ("store:data/notices#current".to_string(), notice),
@@ -4601,6 +4594,31 @@ fn item_category(store: &str, id: &str) -> (&'static str, &'static str) {
 }
 
 /// A store's name, by its id: the stores this server holds.
+/// **A store, as the data layer holds it** (ADR-0125, ADR-0192): what
+/// `stores#get` answers for one, and `stores#list` for each.
+fn store_record(id: &str) -> Val {
+    Val::Record(vec![
+        ("id".into(), Val::String(id.to_string())),
+        (
+            "name".into(),
+            Val::String(store_named(id).unwrap_or_default().into()),
+        ),
+        // A program whose `Store` declares none is not given it (ADR-0166):
+        // the benchmark's.
+        (
+            "description".into(),
+            Val::String(store_description(id).into()),
+        ),
+        (
+            "hours".into(),
+            Val::Record(vec![
+                ("opens-minute".into(), Val::S64(7 * 60)),
+                ("closes-minute".into(), Val::S64(19 * 60)),
+            ]),
+        ),
+    ])
+}
+
 fn store_named(id: &str) -> Option<&'static str> {
     match id {
         STORE_ID => Some(STORE_NAME),
@@ -5853,7 +5871,9 @@ fn handle(server: &Server, mut stream: TcpStream) {
             );
         }
         ("GET", "/stream") => stream_frames(server, &mut stream, &session, fresh, query),
-        ("GET", "/StorePage.html") | ("GET", "/") => {
+        // Store 47's page, for E7's measurements. The root is the page that
+        // declares it, the store list (ADR-0192).
+        ("GET", "/StorePage.html") => {
             // The large-menu case, for E7 gate item 10. A query parameter
             // rather than a second route: the same page, the same renderer,
             // the same runtime — only more items, which is what makes the
@@ -6116,8 +6136,9 @@ fn stream_frames(
 }
 
 /// **A page that binds a query, at the parameters `params` give it**
-/// (ADR-0162, ADR-0190): the store's, at `/StorePage.html` and `/` for store
-/// 47 and `/stores/{id}` for any, and any other at its route. Until
+/// (ADR-0162, ADR-0190): the store's, at `/StorePage.html` for store 47 and
+/// `/stores/{id}` for any, and any other at its route, the store list's at
+/// `/` (ADR-0192). Until
 /// 2026-10-04 only the store's page was served so: another page that bound
 /// a query was refused, and read queries through streams alone.
 fn serve_bound(
@@ -10120,6 +10141,54 @@ public query Store(",
         assert!(b.contains("Your cart is empty."), "{b}");
     }
 
+    /// **The stores, as the home page** (ADR-0192): at `/`, each store this
+    /// server holds by its name and description, linked to its page, and the
+    /// session's cart beside them, kept current as it changes. Until
+    /// 2026-10-04 `/` was store 47's page.
+    #[test]
+    fn the_stores_are_the_home_page() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let page = |path: &str, session: &str| -> String {
+            fetched_as(&s, path, Some(session))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        let home = page("/", "a");
+        assert!(home.starts_with("HTTP/1.1 200"), "{home}");
+        assert!(home.contains("<title>Stores</title>"), "{home}");
+        for (id, name) in [(STORE_ID, STORE_NAME), SECOND_STORE] {
+            assert!(
+                home.contains(&format!("href=\"/stores/{id}\"")) && visible(&home).contains(name),
+                "{id}: {home}"
+            );
+            assert!(
+                visible(&home).contains(store_description(id)),
+                "{id}: {home}"
+            );
+        }
+        assert!(visible(&home).contains("Your cart: 0 items"), "{home}");
+        // The cart beside them, as the session's: its count is patched there.
+        s.command(ADD, "a", &add_shown("espresso", 2), false)
+            .expect("the command commits");
+        let count = s
+            .template_of("store.page.HomePage")
+            .manifest()
+            .into_iter()
+            .find(|e| e.value == "cart.line_count")
+            .expect("the home page's count")
+            .id;
+        assert!(
+            patch_sets(&s, "a").iter().any(|set| set
+                .patches
+                .iter()
+                .any(|p| p.target.part == count
+                    && matches!(&p.operation, PatchOp::ReplaceText { text } if text == "2"))),
+            "the home page's count was not patched"
+        );
+        assert!(visible(&page("/", "a")).contains("Your cart: 2 items"));
+    }
+
     /// **A change reaches every page of the session that reads it**
     /// (ADR-0190): a press on the store's page sends the cart page the
     /// difference, derived from the cart page's own plan and addressed to its
@@ -11014,7 +11083,7 @@ public query Store(",
         // Control: a store's program that states none, the benchmark's copy,
         // is titled as every store's page was.
         let untitled = served_from(|app| app.to_string(), None);
-        assert_eq!(title_of(&untitled, "/"), "Store");
+        assert_eq!(title_of(&untitled, "/StorePage.html"), "Store");
     }
 
     /// **A store's page describes itself** (ADR-0186): its description, from

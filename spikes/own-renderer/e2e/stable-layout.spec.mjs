@@ -96,6 +96,9 @@ for (const [shape, lists, contained] of [
   test(`no item contained is on screen when the page is first laid out: ${shape}`, async ({
     page,
   }) => {
+    // Three pages, of up to a thousand items, each laid out at its size: in
+    // a suite running three engines at once, more than the default 30 s.
+    test.setTimeout(60_000);
     for (const viewport of [PHONE, DESKTOP, TALL]) {
       await page.setViewportSize(viewport);
       await menuOf(page, lists);

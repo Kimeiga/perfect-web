@@ -100,3 +100,27 @@ test("a press the server refuses is restored on the cart's page", async ({ page 
     .poll(() => page.evaluate(() => window.__pw.log.join("\n")))
     .toMatch(/restored cart/);
 });
+
+test("the stores are the home page, each a link to its own", async ({ page }) => {
+  // ADR-0192: a delivery site's first page.
+  await ready(page, "/");
+  await expect(page).toHaveTitle("Stores");
+  const stores = page.locator("#stores li");
+  await expect(stores.getByRole("heading", { level: 2 })).toHaveText(["Blue Bottle", "Harbor Coffee"]);
+  await page.getByRole("link", { name: "Harbor Coffee" }).click();
+  await expect(page).toHaveURL(/\/stores\/48$/);
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1", null, {
+    polling: 50,
+  });
+  await expect(page.locator("#store-name")).toHaveText("Harbor Coffee");
+});
+
+test("the home page counts the session's cart as it changes", async ({ context }) => {
+  const home = await context.newPage();
+  const store = await context.newPage();
+  await ready(home, "/");
+  await expect(home.locator("#cart-count")).toHaveText("0");
+  await ready(store, "/stores/47");
+  await store.getByRole("button", { name: "Add Espresso" }).click();
+  await expect(home.locator("#cart-count")).toHaveText("1");
+});

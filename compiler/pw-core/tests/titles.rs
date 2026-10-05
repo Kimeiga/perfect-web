@@ -81,6 +81,8 @@ fn build(change: impl Fn(&str) -> String) -> Result<pw_core::build::Build, Strin
 const TITLE: &str = "        <title>{store.name}</title>\n";
 /// Its route.
 const ROUTE: &str = "    route        \"/stores/{id}\"\n";
+/// The home page's link to it (ADR-0192).
+const STORE_LINK: &str = "href=\"/stores/{store.id}\"";
 
 fn store_template(b: &pw_core::build::Build) -> &Template {
     b.templates
@@ -142,11 +144,15 @@ fn a_page_s_title_is_a_part_of_the_document_numbered_after_the_rest() {
 fn writing_a_title_moves_no_part_of_the_body() {
     let with = build(|s| s.to_string()).expect("builds");
     // Without it the store states no title, which its route refuses: the
-    // control is the store served at no route.
+    // control is the store served at no route, and the home page's link to
+    // it, which named that route, pointed home (ADR-0192).
     let without = build(|s| {
         assert_eq!(s.matches(TITLE).count(), 1, "the title's anchor");
         assert_eq!(s.matches(ROUTE).count(), 1, "the route's anchor");
-        s.replace(TITLE, "").replace(ROUTE, "")
+        assert_eq!(s.matches(STORE_LINK).count(), 1, "the home page's link");
+        s.replace(TITLE, "")
+            .replace(ROUTE, "")
+            .replace(STORE_LINK, "href=\"/\"")
     })
     .expect("builds");
     // The head's parts aside: the metadata, numbered after the title
