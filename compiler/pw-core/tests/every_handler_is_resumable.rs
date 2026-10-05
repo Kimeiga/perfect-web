@@ -214,3 +214,37 @@ fn a_handler_named_by_a_local_is_refused_when_checked() {
         ]
     );
 }
+
+#[test]
+fn an_event_part_with_no_code_is_refused_at_build() {
+    // Every handler a checked program writes has code: a lambda, or a
+    // function or a command named (ADR-0199). The build's refusal is the
+    // backstop that no button which does nothing when pressed is shipped,
+    // so it is held here by hand: the page's one event part, its code taken
+    // away.
+    let src =
+        page("            <button type=\"button\" on:press={() => count = count + 1}>Add</button>");
+    let mut b = pw_core::build::build(&units(&src)).expect("builds");
+    assert!(b.refusals().is_empty(), "{:?}", b.refusals());
+    let mut blanked = 0;
+    for t in b.templates.iter_mut().filter(|t| t.path == "t.P") {
+        for c in &mut t.chunks {
+            if let pw_core::template_ir::Chunk::Dynamic(pw_core::template_ir::Part::Event {
+                handler,
+                ..
+            }) = c
+            {
+                handler.clear();
+                blanked += 1;
+            }
+        }
+    }
+    assert_eq!(blanked, 1);
+    assert!(
+        b.refusals()
+            .iter()
+            .any(|r| r.contains("`t.P`") && r.contains("no code to run")),
+        "{:?}",
+        b.refusals()
+    );
+}

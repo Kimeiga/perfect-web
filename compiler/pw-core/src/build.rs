@@ -225,10 +225,9 @@ impl Build {
             .iter()
             .map(|d| format!("a graph edge from `{}` names nothing: `{}`", d.from, d.name));
         // An event part with no code is a button that does nothing when
-        // pressed (ADR-0134). Every `on:` lambda is a handler with an
-        // identity now; what remains is a handler that is not a lambda,
-        // `on:submit={save}`, which waits for the event to be passed
-        // (ADR-0131).
+        // pressed (ADR-0134). Every handler a checked program writes has
+        // code since ADR-0199, a lambda, or a function or a command named,
+        // and anything else is refused when checked; this is the backstop.
         let inert = self.templates.iter().flat_map(|t| {
             t.manifest()
                 .into_iter()
