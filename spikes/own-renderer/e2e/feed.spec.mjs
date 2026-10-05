@@ -7,7 +7,9 @@
 //     deep as they go, and a post that is not there is not found;
 //   - a post reaches the author's timeline, and every other open reader's
 //     without a reload (ADR-0219), and the draft is cleared;
-//   - a like's count reaches every reader.
+//   - a like's count reaches every reader;
+//   - a post shows before the server answers, and is the server's after;
+//     one whose request fails is taken back (ADR-0222).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -89,4 +91,49 @@ test("a like's count reaches every reader", async ({ browser }) => {
   expect(await unreloaded(reader)).toBe(true);
   await a.close();
   await b.close();
+});
+
+test("a post shows before the server answers, and is the server's after", async ({
+  page,
+}, testInfo) => {
+  await home(page);
+  // The request held at the network: what shows meanwhile is the page's own.
+  let release;
+  const held = new Promise((r) => (release = r));
+  await page.route("**/command/feed.app.post", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const text = `Shown at once in ${testInfo.project.name}, ${Date.now()}`;
+  await page.getByLabel("What's happening?").fill(text);
+  await page.getByRole("button", { name: "Post" }).click();
+  await expect(post(page, text)).toHaveCount(1);
+  await expect(post(page, text).getByRole("link")).toHaveText("You");
+  await expect(page.locator("main > ul > li").first()).toContainText(text);
+  release();
+  // The server's: its author named as the server names it, and one row.
+  await expect(post(page, text).getByRole("link")).toHaveText(/^Guest /);
+  await expect(post(page, text)).toHaveCount(1);
+  await expect(page.getByLabel("What's happening?")).toHaveValue("");
+  expect(await unreloaded(page)).toBe(true);
+});
+
+test("a post whose request fails is taken back", async ({ page }, testInfo) => {
+  await home(page);
+  const before = await page.locator("main > ul > li").count();
+  let release;
+  const held = new Promise((r) => (release = r));
+  await page.route("**/command/feed.app.post", async (route) => {
+    await held;
+    await route.abort("failed");
+  });
+  const text = `Never sent from ${testInfo.project.name}, ${Date.now()}`;
+  await page.getByLabel("What's happening?").fill(text);
+  await page.getByRole("button", { name: "Post" }).click();
+  await expect(post(page, text)).toHaveCount(1);
+  release();
+  await expect(post(page, text)).toHaveCount(0);
+  await expect(page.locator("main > ul > li")).toHaveCount(before);
+  // The draft is kept, to send again.
+  await expect(page.getByLabel("What's happening?")).toHaveValue(text);
 });

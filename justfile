@@ -2708,6 +2708,31 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0222: a post is shown before the server answers. The compiler's and
+# the server's tests, the feed in three engines, and the mutation controls.
+e14-optimistic-posts:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0222 - a post is shown before the server answers"; echo; \
+       echo "produced by: just e14-optimistic-posts"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== a key left unnamed (compiler/pw-core/tests/optimistic_keys.rs)"; echo; \
+       cargo test --locked -p pw-core --test optimistic_keys 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_post_is_shown_before_the_server_answers a_speculated_value_that_did_not_change_is_not_sent_again a_page_that_reads_more_holds_what_it_shows a_speculating_page_is_sent_its_carts_value 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/optimistic_posts_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/optimistic_posts_mutations.py; \
+     } > docs/evidence/E14/optimistic-posts.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/optimistic-posts.txt
+
 # ADR-0221: a form control's value is written where HTML reads it. The
 # compiler's and the renderer's tests, the bound fields in three engines, the
 # corpus, and the mutation controls.

@@ -115,6 +115,17 @@ fn post_val(state: &State, row: &Row, replies: bool) -> Val {
     ])
 }
 
+/// **A post as a timeline shows it** (ADR-0222), the program's `Item`: who
+/// wrote it, what it says, and its likes.
+fn item_val(state: &State, row: &Row) -> Val {
+    Val::Record(vec![
+        ("id".into(), Val::String(row.id.clone())),
+        ("author".into(), user_val(state, &row.author)),
+        ("text".into(), Val::String(row.text.clone())),
+        ("likes".into(), Val::S64(row.likes)),
+    ])
+}
+
 fn not_found() -> Val {
     Val::Result(Err(Some(Box::new(Val::Variant("not-found".into(), None)))))
 }
@@ -131,13 +142,15 @@ fn reads_of(state: Arc<State>) -> crate::data::Ops {
         "feed:data/posts#timeline".to_string(),
         Arc::new(move |args: &[Val]| match args {
             [Val::String(_), Val::S64(limit)] => {
+                // Each an `Item`, a post as a timeline shows it (ADR-0222):
+                // its replies are its thread's.
                 let shown: Vec<Val> = s
                     .posts
                     .iter()
                     .rev()
                     .filter(|r| r.reply_to.is_none())
                     .take((*limit).max(0) as usize)
-                    .map(|r| post_val(&s, r, false))
+                    .map(|r| item_val(&s, r))
                     .collect();
                 Ok(vec![Val::List(shown)])
             }

@@ -376,6 +376,11 @@ struct Shown {
     captures: BTreeMap<u32, Option<String>>,
     /// The page's title, by its part, as its text (ADR-0183).
     title: Option<(u32, String)>,
+    /// **Each value the page speculates on, but the store's cart**
+    /// (ADR-0222), by its binding, as the page's module decodes it: what the
+    /// browser holds, sent when it changes, from the read the page's patches
+    /// are derived from.
+    speculated: BTreeMap<String, serde_json::Value>,
 }
 
 /// **The recommender the store's data layer reaches** (ADR-0148): what
@@ -587,6 +592,11 @@ struct Server {
     /// with the session that committed: told once the request that
     /// committed is answered (`tell_waiting`).
     telling: Mutex<Vec<(String, Vec<String>)>>,
+    /// **The version each speculated value was last sent at** (ADR-0222), by
+    /// session, page and binding: what a commit's answer names, so the page
+    /// keeps its speculation until the value that includes the commit
+    /// arrives.
+    speculated_versions: Mutex<BTreeMap<(String, String, String), Version>>,
     /// **What each session's connections meet** (charter §15.5's one-shot
     /// network error and forced reconnect, ADR-0175): whether its next
     /// command's connection is dropped, and when its subscriptions are cut
@@ -665,6 +675,23 @@ fn store_params(id: &str) -> Params {
 
 fn cart_entry(session: &str) -> ResourceEntryId {
     ResourceEntryId::derive(&cart_identity(session), &IDENTITY)
+}
+
+/// **A value a session's page speculates on, as the browser holds it**
+/// (ADR-0222): one entry for each page's binding, which its `entry_value`
+/// frames carry and a commit's answer names.
+fn speculated_entry(session: &str, page: &str, binding: &str) -> ResourceEntryId {
+    ResourceEntryId::derive(
+        &EntryIdentity::new(
+            &format!("pw.speculated.{page}#{binding}"),
+            &[session],
+            Partition::Session {
+                id: session.to_string(),
+            },
+        )
+        .generation(BUILD),
+        &IDENTITY,
+    )
 }
 
 /// **A session's documents' entry** (ADR-0218): what a commit's change is
@@ -1027,6 +1054,7 @@ impl Server {
             params: Mutex::new(BTreeMap::new()),
             pages: Mutex::new(BTreeMap::new()),
             telling: Mutex::new(Vec::new()),
+            speculated_versions: Mutex::new(BTreeMap::new()),
             connection_faults: Mutex::new(BTreeMap::new()),
             materializer_faults: Mutex::new(std::collections::BTreeSet::new()),
             keyed: Mutex::new(BTreeMap::new()),
@@ -1620,6 +1648,11 @@ impl Server {
             for (key, _) in keys {
                 self.commands.forget_command(&key);
             }
+            // And the versions its speculated values were sent at (ADR-0222).
+            self.speculated_versions
+                .lock()
+                .expect("speculated versions")
+                .retain(|(s, ..), _| *s != session);
         }
     }
 
@@ -2390,20 +2423,24 @@ impl Server {
                 .and_then(|binding| bindings.get(&binding))
                 .map(val_to_json);
             // Against what the document shows. With none served, none shows.
-            let patches = {
+            // And what changed of the values it speculates on (ADR-0222), in
+            // this hold.
+            let (patches, speculated) = {
                 let mut shown = self.shown.lock().expect("shown");
                 match shown.get(&doc) {
                     Some(was) => match self.derive(&page, session, &store, &bindings, was, &now) {
                         Ok(patches) => {
+                            let speculated =
+                                self.speculated_frames(&doc, &page, was, &now, &applied);
                             shown.insert(doc.clone(), now);
-                            patches
+                            (patches, speculated)
                         }
                         Err(why) => {
                             failed.push((doc, why));
                             continue;
                         }
                     },
-                    None => Vec::new(),
+                    None => (Vec::new(), Vec::new()),
                 }
             };
             // A document forgotten while it was read is told nothing.
@@ -2422,6 +2459,11 @@ impl Server {
                 basis: CausalBasis::of(entry.clone(), version),
                 patches,
             }));
+            // In the same hold, so the value a page holds is always the one
+            // the patches it was sent were derived from.
+            for frame in speculated {
+                waiting.push(frame);
+            }
             // In the same hold, so one change reaches a page whole.
             if let Some(value) = value {
                 waiting.push(StreamFrame::EntryValue {
@@ -2983,6 +3025,8 @@ impl Server {
         waiting.frames.clear();
         waiting.behind = false;
         waiting.seen = std::time::Instant::now();
+        // What it speculates on, as it was read (ADR-0222).
+        let entries = self.speculated_entries(&doc.0, &self.page_of(doc), &shown);
         self.shown.lock().expect("shown").insert(doc.clone(), shown);
         // Its keyed reads start with it (ADR-0152).
         self.keyed
@@ -2990,12 +3034,7 @@ impl Server {
             .expect("keyed")
             .insert(doc.clone(), Keyed::default());
         // Its cursor is its number, never zero.
-        Some((
-            html,
-            doc.1,
-            self.speculated_entries(&doc.0, &self.page_of(doc)),
-            env,
-        ))
+        Some((html, doc.1, entries, env))
     }
 
     /// **The cart, as the page's speculation module decodes it** (ADR-0122):
@@ -3028,10 +3067,72 @@ impl Server {
             .and_then(|b| b["binding"].as_str().map(str::to_string))
     }
 
+    /// **Each binding `page` speculates on, but the store's cart**
+    /// (ADR-0222), by its manifest: a value of any query the page shows by
+    /// the speculation's key. The cart's is the materializer's entry, kept
+    /// as before. Until ADR-0222 no other was sent, and a page that
+    /// speculated on one could not show it.
+    fn speculated_bindings(&self, page: &str) -> Vec<String> {
+        let cart = self.speculates_on_cart(page);
+        self.speculations
+            .get(page)
+            .and_then(|m| m["bindings"].as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|b| b["binding"].as_str().map(str::to_string))
+            .filter(|b| cart.as_deref() != Some(b.as_str()))
+            .collect()
+    }
+
+    /// **The frames that tell a document what changed of the values its page
+    /// speculates on** (ADR-0222), from `was` to `now`: each at a version
+    /// read from the clock in the caller's hold of the subscriber table, so
+    /// a document is sent its values in the order its versions say. Each
+    /// one sent is recorded, for a commit's answer to name.
+    fn speculated_frames(
+        &self,
+        doc: &Doc,
+        page: &str,
+        was: &Shown,
+        now: &Shown,
+        applied: &[String],
+    ) -> Vec<StreamFrame> {
+        let mut frames = Vec::new();
+        for (binding, value) in &now.speculated {
+            if was.speculated.get(binding) == Some(value) {
+                continue;
+            }
+            self.clock.advance(1);
+            let version = Version(self.clock.now());
+            self.speculated_versions
+                .lock()
+                .expect("speculated versions")
+                .insert((doc.0.clone(), page.to_string(), binding.clone()), version);
+            frames.push(StreamFrame::EntryValue {
+                protocol: CURRENT,
+                entry: speculated_entry(&doc.0, page, binding),
+                version,
+                value: value.clone(),
+                applied: applied.to_vec(),
+            });
+        }
+        frames
+    }
+
     /// Each speculated binding's entry, version and value, for a document of
-    /// `page`.
-    fn speculated_entries(&self, session: &str, page: &str) -> serde_json::Value {
+    /// `page` that shows `shown`. Read in the subscriber table's hold.
+    fn speculated_entries(&self, session: &str, page: &str, shown: &Shown) -> serde_json::Value {
         let mut out = serde_json::Map::new();
+        for (binding, value) in &shown.speculated {
+            out.insert(
+                binding.clone(),
+                serde_json::json!({
+                    "entry": speculated_entry(session, page, binding),
+                    "version": Version(self.clock.now()),
+                    "value": value,
+                }),
+            );
+        }
         if let Some(binding) = self.speculates_on_cart(page) {
             out.insert(
                 binding,
@@ -3048,6 +3149,26 @@ impl Server {
     /// The versions a committed command's writes produced (ADR-0122): what a
     /// page reconciles a speculation against.
     fn committed_basis(&self, session: &str) -> serde_json::Value {
+        // A layer with no session entry (ADR-0222): each value the session's
+        // pages speculate on, at the version it was last sent. A commit sends
+        // its value before it is answered, so the page waits for that one.
+        if !self.data.session_entry() {
+            let sent = self
+                .speculated_versions
+                .lock()
+                .expect("speculated versions");
+            let basis: Vec<serde_json::Value> = sent
+                .iter()
+                .filter(|((s, ..), _)| s == session)
+                .map(|((s, page, binding), version)| {
+                    serde_json::json!({
+                        "entry": speculated_entry(s, page, binding),
+                        "version": version,
+                    })
+                })
+                .collect();
+            return serde_json::Value::Array(basis);
+        }
         // Where the entry's regeneration failed (ADR-0176), the version it
         // was tried at, which any regeneration after it passes: the page
         // keeps its speculation until the value that includes the commit
@@ -3438,6 +3559,14 @@ impl Server {
         let store = self.store_of(&doc);
         let page = self.page_of(&doc);
         let now = self.showing(&page, session, &store, &bindings)?;
+        // The presses its values include, read before the table (ADR-0172).
+        let applied: Vec<String> = self
+            .applied
+            .lock()
+            .expect("applied")
+            .get(session)
+            .map(|q| q.iter().cloned().collect())
+            .unwrap_or_default();
         let mut queue = self.pending.lock().expect("pending");
         let mut keyed = self.keyed.lock().expect("keyed");
         let Some(read) = keyed
@@ -3447,14 +3576,17 @@ impl Server {
         else {
             return Ok(KeyOutcome::Superseded);
         };
-        let patches = {
+        // And what the page speculates on, at the new key (ADR-0222): a
+        // speculation after it is shown over the list the page shows.
+        let (patches, speculated) = {
             let mut shown = self.shown.lock().expect("shown");
             let Some(was) = shown.get(&doc) else {
                 return Ok(KeyOutcome::Superseded);
             };
             let patches = self.derive(&page, session, &store, &bindings, was, &now)?;
+            let speculated = self.speculated_frames(&doc, &page, was, &now, &applied);
             shown.insert(doc.clone(), now);
-            patches
+            (patches, speculated)
         };
         read.shown = key.clone();
         if read.hold.as_ref().is_some_and(|(n, _)| *n == seq) {
@@ -3474,6 +3606,9 @@ impl Server {
             basis: CausalBasis::of(entry, Version(seq)),
             patches,
         }));
+        for frame in speculated {
+            waiting.push(frame);
+        }
         Ok(KeyOutcome::Applied)
     }
 
@@ -3780,6 +3915,12 @@ impl Server {
                 .map_err(|b| format!("the title: {b:?}"))?
                 .ok_or_else(|| format!("the plan's title {id} is no part"))?;
             shown.title = Some((id as u32, title));
+        }
+        // Each value it speculates on (ADR-0222), from the same read.
+        for binding in self.speculated_bindings(page) {
+            if let Some(value) = bindings.get(&binding) {
+                shown.speculated.insert(binding, val_to_json(value));
+            }
         }
         Ok(shown)
     }
@@ -9638,6 +9779,133 @@ public query Store(",
             format!("{set:?}").contains("Over the wire"),
             "the other reader's timeline shows the post: {set:?}"
         );
+    }
+
+    /// The `entry_value` frames a document was sent: each entry, value,
+    /// version and the presses it names.
+    fn entry_values(
+        s: &Server,
+        doc: &Doc,
+    ) -> Vec<(ResourceEntryId, serde_json::Value, Version, Vec<String>)> {
+        s.pending.lock().expect("pending")[doc]
+            .frames
+            .iter()
+            .filter_map(|(_, f)| match f {
+                StreamFrame::EntryValue {
+                    entry,
+                    version,
+                    value,
+                    applied,
+                    ..
+                } => Some((entry.clone(), value.clone(), *version, applied.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// **A post is shown before the server answers, and the page is told
+    /// when the value it holds includes it** (ADR-0222). The feed's home page
+    /// speculates on its timeline: it holds the timeline's value, a post
+    /// sends the new one with the press it includes, and the post's answer
+    /// names that value's version. Until ADR-0222 a page held the store's
+    /// cart alone, and the feed's could not speculate.
+    #[test]
+    fn a_post_is_shown_before_the_server_answers_and_the_page_told_when_it_holds_it() {
+        let s = served_feed();
+        let (_, _, entries, _) = s
+            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        let feed = &entries["feed"];
+        assert_eq!(
+            feed["entry"],
+            serde_json::json!(speculated_entry("a", "feed.app.Home", "feed"))
+        );
+        assert_eq!(feed["value"].as_array().map(Vec::len), Some(1), "{feed}");
+        let before = feed["version"].as_u64().expect("a version");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("Before the answer".into())],
+            Some("i-7"),
+        )
+        .expect("runs");
+        let sent = entry_values(&s, &doc);
+        let [(entry, value, version, applied)] = sent.as_slice() else {
+            panic!("one value sent: {sent:?}");
+        };
+        assert_eq!(serde_json::json!(entry), feed["entry"]);
+        assert!(version.0 > before, "a newer version than the page holds");
+        assert_eq!(value[0]["text"], "Before the answer", "{value}");
+        assert!(
+            applied.contains(&"i-7".to_string()),
+            "it names the press it includes: {applied:?}"
+        );
+        assert_eq!(
+            s.committed_basis("a"),
+            serde_json::json!([{ "entry": entry, "version": version }]),
+            "the answer names the version that includes it"
+        );
+    }
+
+    /// **A value a page speculates on is sent when it changes, and only
+    /// then** (ADR-0222): a like of a reply, which no timeline shows, reads
+    /// the timeline again and finds it as it was.
+    #[test]
+    fn a_speculated_value_that_did_not_change_is_not_sent_again() {
+        let s = served_feed();
+        s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        s.command_answered(
+            "feed.app.like",
+            "a",
+            &[Val::String("p2".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        assert_eq!(entry_values(&s, &doc).len(), 0, "the timeline is as it was");
+        // Control: a like of a post the timeline shows.
+        s.command_answered(
+            "feed.app.like",
+            "a",
+            &[Val::String("p1".into())],
+            Some("i-2"),
+        )
+        .expect("runs");
+        assert_eq!(entry_values(&s, &doc).len(), 1, "the timeline changed");
+    }
+
+    /// **A page that reads more holds what it shows** (ADR-0222): "Load
+    /// more" reads the timeline again for a longer page, and the value the
+    /// page speculates on is the longer one, or a post pressed after it would
+    /// be shown over the shorter list.
+    #[test]
+    fn a_page_that_reads_more_holds_what_it_shows() {
+        let s = served_feed();
+        // One more than a page shows, by another session.
+        for i in 0..21 {
+            s.command_answered(
+                "feed.app.post",
+                "b",
+                &[Val::String(format!("Post {i}"))],
+                Some(&format!("i-{i}")),
+            )
+            .expect("runs");
+        }
+        let (_, cursor, entries, _) = s
+            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        assert_eq!(entries["feed"]["value"].as_array().map(Vec::len), Some(20));
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        let more = BTreeMap::from([("shown".to_string(), serde_json::json!(40))]);
+        let read = s.read_keyed("a", "feed", 1, cursor, &more, STAYED);
+        assert!(matches!(read, Ok(KeyOutcome::Applied)), "applied");
+        let sent = entry_values(&s, &doc);
+        let [(_, value, ..)] = sent.as_slice() else {
+            panic!("one value sent: {sent:?}");
+        };
+        assert_eq!(value.as_array().map(Vec::len), Some(22), "{value}");
     }
 
     /// **A page that reads nothing a commit dropped is not read again**

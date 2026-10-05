@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0222, 2026-10-05: a post is shown before the server answers** (the
+feed's optimistic posting). Speculation was the store's cart's: the server
+sent no other value, and the feed's timeline has a key, its length, a post
+cannot name. A target may leave a key unnamed (`_`, ruling 0105-a), and the
+server sends any value a page speculates on, read with what it shows and
+sent when it changes. A commit's answer names the version that includes it.
+In three engines a held post shows first, by "You", and becomes the
+server's; one that fails is taken back (`just e14-optimistic-posts`).
+
 **ADR-0221, 2026-10-05: a form control's value is written where HTML reads
 it** (found by the feed). `bind:value` on a `<textarea>` was written as a
 `value` attribute, which a textarea does not have: a first value showed

@@ -640,10 +640,17 @@ fn unresolved_uses(
             scope.extend(root.binders.iter().map(|(n, _)| n.clone()));
             scope.extend(crate::resolve::local_bindings_from(body, root.root));
 
+            // An optimistic clause's target may leave a key unnamed, `_`:
+            // the speculation reaches the entry the page shows, whatever its
+            // key there (ADR-0222, ruling 0105-a).
+            let wildcards = target_wildcards(body, root);
             for nid in body.walk_from(root.root) {
                 let Expr::Name(n) = body.expr(nid) else {
                     continue;
                 };
+                if wildcards.contains(&nid) {
+                    continue;
+                }
                 if scope.contains(n)
                     || crate::resolve::INTRINSIC_CALLS.contains(&n.as_str())
                     || !matches!(
@@ -4848,6 +4855,22 @@ fn target_is_not_a_resource_entry(
             replacement: None,
         }],
     }
+}
+
+/// **The keys an optimistic clause's target leaves unnamed** (ADR-0222): each
+/// argument of its call written `_`. Anywhere else `_` is a name, and
+/// resolves to nothing.
+pub(crate) fn target_wildcards(body: &Body, root: &crate::hir::TermRoot) -> Vec<ExprId> {
+    if root.context != crate::hir::ExecutionContext::TargetSelection {
+        return Vec::new();
+    }
+    let Expr::Call { args, .. } = body.expr(root.root) else {
+        return Vec::new();
+    };
+    args.iter()
+        .map(|a| a.value)
+        .filter(|e| matches!(body.expr(*e), Expr::Name(n) if n == "_"))
+        .collect()
 }
 
 /// A name inside an `optimistic` or `rollback` term that nothing binds.

@@ -55,8 +55,10 @@ pub struct Binding {
     pub binding: String,
     /// The resource it reads, as a component id: `store.page.Cart`.
     pub resource: String,
-    /// Its key, as written: `["current_session()"]`. The server computes
-    /// the entry from this, as it computes an event's key (ADR-0104).
+    /// Its key, as the page writes it: `["current_session()"]`, or
+    /// `["current_session()", "shown"]` where the speculation's target leaves
+    /// one unnamed (ADR-0222). The server finds the store's cart by it; any
+    /// other binding's value is the one the document shows (ADR-0222).
     pub key: Vec<String>,
 }
 
@@ -495,17 +497,25 @@ fn page_module(
                     why: format!("`{command}`'s optimistic target resolves to nothing"),
                 };
             };
-            let target_key: Vec<Option<DefId>> = args
+            // Each key: an invocation-context call, matched to the page's
+            // own; or `_`, which matches the page's key whatever it is
+            // (ADR-0222, ruling 0105-a): the timeline the page shows, at the
+            // length it shows it.
+            let target_key: Vec<Option<Option<DefId>>> = args
                 .iter()
-                .map(|a| context_call(cx.ws, cu, cbody, a.value))
+                .map(|a| match cbody.expr(a.value) {
+                    Expr::Name(n) if n == "_" => Some(None),
+                    _ => context_call(cx.ws, cu, cbody, a.value).map(Some),
+                })
                 .collect();
             let shown = bindings.iter().find(|b| {
                 b.resource == resource
                     && b.key.len() == target_key.len()
-                    && b.key
-                        .iter()
-                        .zip(&target_key)
-                        .all(|(k, t)| t.is_some() && context_call(cx.ws, unit, body, *k) == *t)
+                    && b.key.iter().zip(&target_key).all(|(k, t)| match t {
+                        Some(None) => true,
+                        Some(Some(call)) => context_call(cx.ws, unit, body, *k) == Some(*call),
+                        None => false,
+                    })
             });
             let Some(shown) = shown else {
                 return Encoding::Unsupported {

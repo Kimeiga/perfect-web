@@ -1880,3 +1880,10 @@ a form control's value is written where HTML reads it (found by the feed).
   have: a first value showed nothing until a script ran. It is written as
   the textarea's text now. PW5036 refuses a `<select>`'s value, which is the
   option it marks `selected`, and what no change would set again.
+[ADR-0222](DECISIONS/ADR-0222-a-post-is-shown-before-the-server-answers.md):
+a post is shown before the server answers (the feed's optimistic posting;
+ruling 0105-a's unnamed key).
+- Speculation was the store's cart's: the server sent no other value. A
+  target may leave a key unnamed, `_`, and the server sends any value a page
+  speculates on, read with what the page shows, when it changes. The feed's
+  post shows first, by "You", and is the server's when its value arrives.

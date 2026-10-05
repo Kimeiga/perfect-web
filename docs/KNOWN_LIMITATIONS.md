@@ -726,6 +726,14 @@ signal or text** (ADR-0221, PW5036). A select's chosen option is marked
 value a signal holds. A textarea a query fills waits for a patch the runtime
 applies to its default value.
 
+**A pending post is by "You"** (ADR-0222): a transition sees the value it
+changes and its command's arguments, not the page's own user. A value of a
+type that contains itself is not speculated on (ADR-0205 §5).
+
+**A longer read can be applied after a commit it did not see** (found by
+ADR-0222): a keyed read fetches outside the session's hold, and a value read
+before a commit can be shown after the commit's change, until the next one.
+
 **A commit reaches another session's open page by the query it reads, not
 by its key** (ADR-0219). A like drops one post's `Thread`, and every open
 thread page is read again; each other one is sent no change, from the cache.

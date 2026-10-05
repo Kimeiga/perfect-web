@@ -29,6 +29,15 @@ type Post = Post {
     replies: List<Post>,
 }
 
+// **A post as a timeline shows it** (ADR-0222): who wrote it, what it says,
+// and its likes. Its replies are its thread's.
+type Item = Item {
+    id: PostId,
+    author: User,
+    text: String,
+    likes: Int,
+}
+
 type FeedError =
     | Unavailable
     | NotFound
@@ -36,7 +45,7 @@ type FeedError =
 event Posted(author: UserId)
 event Liked(post: PostId)
 
-fn timeline(s: Session<SessionId>, limit: Int) -> List<Post> !{ database.read<Post> }
+fn timeline(s: Session<SessionId>, limit: Int) -> List<Item> !{ database.read<Post> }
     host "feed:data/posts#timeline"
 
 fn thread(id: PostId) -> Result<Post, FeedError> !{ database.read<Post> }
@@ -51,7 +60,7 @@ fn publish(s: Session<SessionId>, text: String) -> Result<Post, FeedError> !{ da
 fn add_like(s: Session<SessionId>, post: PostId) -> Result<Post, FeedError> !{ database.write<Post> }
     host "feed:data/posts#like"
 
-session query Timeline(session: Session<SessionId>, limit: Int) -> List<Post>
+session query Timeline(session: Session<SessionId>, limit: Int) -> List<Item>
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
@@ -81,8 +90,17 @@ command post(text: String) -> Result<Post, FeedError>
     requires      SignedIn
     idempotent_by InteractionId
     emits         Posted(author(current_session()))
+    optimistic    Timeline(current_session(), _) as feed => pending(feed, text)
 {
     publish(current_session(), text)
+}
+
+// **A post shown before the server answers** (ADR-0222): first in the
+// timeline, by "You", keyed apart from every other pending one.
+fn pending(feed: List<Item>, text: String) -> List<Item> !{} {
+    let you = User { id: UserId("you"), handle: "@you", name: "You" }
+    let id = PostId("pending-{List.length(feed)}")
+    List.concat([Item { id: id, author: you, text: text, likes: 0 }], feed)
 }
 
 command like(post: PostId) -> Result<Post, FeedError>

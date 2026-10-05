@@ -89,9 +89,10 @@ MUTANTS = [
         "what was sent is not remembered",
         "server",
         SERVER,
-        # Re-anchored by ADR-0161: what each document shows.
-        "                            shown.insert(doc.clone(), now);\n                            patches\n",
-        "                            let _ = now;\n                            patches\n",
+        # Re-anchored by ADR-0161: what each document shows. And by ADR-0222,
+        # whose speculated values are derived with its patches.
+        "                            shown.insert(doc.clone(), now);\n                            (patches, speculated)\n",
+        "                            let _ = now;\n                            (patches, speculated)\n",
     ),
     (
         "what a served document shows is not recorded",
