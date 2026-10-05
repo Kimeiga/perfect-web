@@ -585,6 +585,13 @@ fail for their declared invariant, now also with `PW0026` for the missing
 import that each repair added. That is the evidence the repairs removed an
 obstruction, not the defect.
 
+One exception, found by ADR-0200: R-019's C8 text writes a comment as `//` in
+markup. Since ADR-0167 that is text, so the `<ul>` it mentions opens an
+element that never closes, and the text no longer parses. The fixture itself
+moved to `<!-- -->` with ADR-0167. Until ADR-0200 the suite checked what
+recovery made of the old text; it now holds that the text does not parse,
+and is refused for that.
+
 ## C9: a page states its title, 2026-10-04
 
 Opened because the specification changed. A page served at a route states

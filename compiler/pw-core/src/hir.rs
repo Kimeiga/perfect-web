@@ -822,6 +822,9 @@ pub enum Literal {
     /// A string whose closing quote is missing. Kept as a literal so a body
     /// containing one still lowers.
     UnterminatedStr(String),
+    /// **`()`, the unit value** (ADR-0200), the one value of the type `()`.
+    /// Until ADR-0200 it lowered to an error node, which nothing reported.
+    Unit,
 }
 
 impl Literal {

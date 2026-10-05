@@ -1718,3 +1718,14 @@ a function or a command named as a handler is the lambda that calls it
 - A local's value, a page, a type or a case named as a handler is refused
   when checked (PW0614), and a handler named through a module is checked
   against its event (PW0602). Each checked before.
+[ADR-0200](DECISIONS/ADR-0200-unit-is-a-value-and-nothing-unread-checks.md):
+`()` is the unit value, and nothing the compiler cannot read checks (found
+building ADR-0199).
+- `()` was an expression that did not parse, typed as anything: `fn f() ->
+  Int !{} { () }` checked. It is typed `Unit` now, and built.
+- `check_sources` reports a file's syntax errors and keeps the file out, as
+  `pw check` does; four tests had passed on programs that do not parse.
+- An error node in a file that parses is refused (PW0015), and every `.pw`
+  file in the repository is held to that.
+- A `{#..}` block left open ends with its element, so PW5019 names it where
+  `pw check` had reported the end of the file, twice.

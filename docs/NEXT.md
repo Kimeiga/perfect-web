@@ -306,8 +306,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           type for both forms, still to build; ~~12's remainder, a
           named function as a handler, `e => save(e)`~~ (ADR-0199, `just
           e14-named-handlers`);
-        - found beside 12: ADR-0200, `()` as a value, which checks as an
-          expression that did not parse and is typed as anything;
+        - ~~found beside 12: ADR-0200, `()` as a value, which checks as an
+          expression that did not parse and is typed as anything~~
+          (ADR-0200, `just e14-unit-value`), with `check_sources` held to
+          `pw check` and an unclosed `{#if}` reported at the block;
         - with the app layer: 10, a materialization may read another (no
           cycles, transitive invalidation) for the feed; 11, `emits` keys
           evaluated by the command and written with its writes (an outbox),

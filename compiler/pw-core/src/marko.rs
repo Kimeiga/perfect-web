@@ -791,6 +791,7 @@ fn expr_text(body: &Body, id: ExprId, ctx: &Ctx<'_>) -> Result<String, String> {
         Expr::Literal(Literal::UnterminatedStr(_)) => {
             return Err("an unterminated string".to_string());
         }
+        Expr::Literal(Literal::Unit) => "undefined".to_string(),
         Expr::Field { base, name } => format!("{}.{}", expr_text(body, *base, ctx)?, name),
         Expr::Call { callee, args } => {
             let mut parts = Vec::new();

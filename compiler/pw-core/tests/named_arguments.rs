@@ -97,7 +97,7 @@ fn a_label_is_carried_from_the_argument_named() {
         format!(
             "module t\n\nimport log\nimport secrets\nimport capability.{{ Payments, Public }}\n\n\
              fn pick<T>(n: Int, x: T) -> T !{{}} {{ x }}\n\n\
-             fn leak() -> () !{{ log<Public>, secret<Payments> }} {{\n    log.public(\"{{{call}}}\")\n}}\n"
+             fn leak() -> () !{{ log<Public>, secret<Payments> }} {{\n    let v = {call}\n    log.public(v)\n}}\n"
         )
     };
     let found = reported(&src("pick(x = secrets.payments(), n = 0)"));

@@ -1168,6 +1168,7 @@ impl<'a> Typer<'a> {
                 Literal::Int(_) => Primitive::Int,
                 Literal::Float(_) => Primitive::Float,
                 Literal::Str(_) | Literal::UnterminatedStr(_) => Primitive::Str,
+                Literal::Unit => Primitive::Unit,
             }),
             Expr::Interpolated { .. } => Ty::Primitive(Primitive::Str),
             Expr::Name(n) => self.name(id, n),

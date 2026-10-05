@@ -356,6 +356,15 @@ fn historical_event_annotation_is_blocked_not_a_nominal_mismatch() {
 /// written type that names nothing an error. Exactly the shape of change this
 /// suite exists to watch: each old text must still be caught for its declared
 /// invariant — now beside a `PW0026` for the import the repair added.
+/// **The C8 texts that no longer parse**, each refused for that instead.
+///
+/// `pw check` keeps a file that does not parse out of the program, and since
+/// ADR-0200 so does `check_sources`: its invariant is not checked. R-019's C8
+/// text writes a comment as `//` in markup, which is text since ADR-0167, so
+/// the `<ul>` it mentions opens an element that never closes. Until ADR-0200
+/// this suite checked what recovery made of it.
+const NO_LONGER_PARSES: &[&str] = &["R-019-invalid-HTML-nesting.pw"];
+
 #[test]
 fn the_c8_text_of_every_repaired_rejected_fixture_is_still_caught() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/history/C8");
@@ -400,6 +409,13 @@ fn the_c8_text_of_every_repaired_rejected_fixture_is_still_caught() {
             .find(|(n, _)| n == name)
             .map(|(_, d)| d.iter().map(|d| d.symbol()).collect())
             .unwrap_or_default();
+        if NO_LONGER_PARSES.contains(&name.as_str()) {
+            assert!(
+                !pw_syntax::parse_tree(src).ok() && symbols.contains(&"unclosed_block"),
+                "{name}: listed as no longer parsing, and it reports {symbols:?}"
+            );
+            continue;
+        }
         // Declaration-header rules run inside `check_sources` since ADR-0090;
         // R-014, R-015 and R-027 are such rules.
         if !symbols.contains(&declared.as_str()) {

@@ -296,6 +296,15 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     "because",
 ];
 
+/// What a template region holds open, waiting to be finished.
+#[derive(PartialEq)]
+enum Open {
+    /// An element, until its close tag.
+    Element,
+    /// A `{#..}` block, until its `{/..}`, or its element's close tag.
+    Block,
+}
+
 struct P<'a> {
     src: &'a str,
     toks: Vec<Token>,
@@ -1122,10 +1131,9 @@ impl<'a> P<'a> {
         let mut guard = 0;
         // Elements are opened and closed by separate tokens, so the tree is
         // built by starting a node on `<tag` and finishing it on `</tag`.
-        // `open` counts how many `Element` nodes are waiting to be finished.
-        let mut open = 0usize;
-        // ...and how many `{#..}` blocks are waiting for their `{/..}`.
-        let mut blocks = 0usize;
+        // `open` holds what waits to be finished, innermost last: an
+        // `Element` its close tag, a `{#..}` block its `{/..}`.
+        let mut open: Vec<Open> = Vec::new();
         while !self.at_eof() {
             guard += 1;
             if guard > 50_000 {
@@ -1151,6 +1159,20 @@ impl<'a> P<'a> {
                     self.markup_comment();
                 }
                 Kind::LAngle if self.nth_is(1, Kind::Slash) => {
+                    // A close tag ends the blocks opened inside its element
+                    // and left open, `<main>{#if a}<p>A</p></main>`. Each
+                    // keeps no closing marker, and the checker says it is
+                    // never closed (PW5019, ADR-0200). Until ADR-0200 the
+                    // block took the element's close tag, and every `}` after
+                    // it, and the error fell at the end of the file.
+                    let blocks = open.iter().rev().take_while(|o| **o == Open::Block).count();
+                    if blocks < open.len() {
+                        for _ in 0..blocks {
+                            open.pop();
+                            depth -= 1;
+                            self.finish(); // MarkupBlock
+                        }
+                    }
                     depth -= 1;
                     self.start(K::CloseTag);
                     while !self.at_eof() && !self.at(Kind::RAngle) {
@@ -1158,8 +1180,8 @@ impl<'a> P<'a> {
                     }
                     self.eat(Kind::RAngle);
                     self.finish(); // CloseTag
-                    if open > 0 {
-                        open -= 1;
+                    if open.last() == Some(&Open::Element) {
+                        open.pop();
                         self.finish(); // Element
                     }
                     if depth <= 0 {
@@ -1174,7 +1196,7 @@ impl<'a> P<'a> {
                         depth -= 1;
                         self.finish(); // Element
                     } else {
-                        open += 1;
+                        open.push(Open::Element);
                     }
                     if depth <= 0 {
                         break;
@@ -1184,8 +1206,8 @@ impl<'a> P<'a> {
                 Kind::LBrace if self.nth_is(1, Kind::Slash) => {
                     depth -= 1;
                     self.interpolation();
-                    if blocks > 0 {
-                        blocks -= 1;
+                    if let Some(i) = open.iter().rposition(|o| *o == Open::Block) {
+                        open.remove(i);
                         self.finish(); // MarkupBlock
                     }
                     if depth <= 0 {
@@ -1199,7 +1221,7 @@ impl<'a> P<'a> {
                     depth += 1;
                     self.start_keeping_trivia(K::MarkupBlock);
                     self.interpolation();
-                    blocks += 1;
+                    open.push(Open::Block);
                 }
                 Kind::LBrace => {
                     self.interpolation();
@@ -1212,7 +1234,7 @@ impl<'a> P<'a> {
         // An unclosed element or block must still produce a well-formed tree.
         // Recovery that leaves nodes open would corrupt every ancestor's text
         // range, and the losslessness suite would then fail far from the cause.
-        for _ in 0..(open + blocks) {
+        for _ in 0..open.len() {
             self.finish();
         }
         self.finish(); // TemplateRegion
@@ -2821,6 +2843,32 @@ mod tests {
             .filter(|n| n.kind() == kind)
             .map(|n| n.text().to_string())
             .collect()
+    }
+
+    #[test]
+    fn a_block_left_open_ends_with_its_element() {
+        // `{#if a}` with no `{/if}`: the block ends with `</main>`, and the
+        // view and the file go on (ADR-0200). The checker says it is never
+        // closed (PW5019). Until ADR-0200 it took `</main>` and every `}`
+        // after it, and the file failed at its end, twice.
+        let src = "view V(a: Bool) !{} {\n    <main>{#if a}<p>A</p></main>\n}\n\nview W() !{} {\n    <p>B</p>\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let main = p
+            .green
+            .descendants()
+            .find(|n| n.kind() == K::Element && n.text().to_string().starts_with("<main>"))
+            .expect("main");
+        assert_eq!(main.text().to_string(), "<main>{#if a}<p>A</p></main>");
+        let block = main
+            .children()
+            .find(|c| c.kind() == K::MarkupBlock)
+            .expect("the block, inside main");
+        assert_eq!(block.text().to_string(), "{#if a}<p>A</p>");
+        // A block closed by its marker is unchanged.
+        let closed = "view V(a: Bool) !{} {\n    <main>{#if a}<p>A</p>{/if}</main>\n}\n";
+        let p = parse_ok(closed);
+        assert_lossless(closed, &p);
     }
 
     #[test]

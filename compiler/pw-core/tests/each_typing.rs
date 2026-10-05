@@ -25,11 +25,14 @@
 
 use pw_core::check::check_sources;
 
+// Written as the language writes a record since `type T = T { .. }`. Until
+// ADR-0200 it was `type ItemId = { id: String }`, which does not parse, and
+// `check_sources` lowered what recovery made of it.
 const DOMAIN: &str = r#"
 module domain
 
-public type ItemId = { id: String }
-public type Bag    = { size: Int }
+public type ItemId = ItemId { id: String }
+public type Bag    = Bag { size: Int }
 "#;
 
 /// Run one page against a fixed domain module.

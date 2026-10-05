@@ -4627,7 +4627,8 @@ fn check_unit_with(
     types: &std::collections::BTreeSet<String>,
     unit: &Unit,
 ) -> Vec<Diagnostic> {
-    let mut out = Vec::new();
+    // What the compiler cannot read, first (ADR-0200).
+    let mut out = unread(&unit.hir, &unit.src);
 
     // Placement is inherited: a `fn` inside a `component placement browser`
     // runs in the browser too. Checking each declaration in isolation misses
@@ -5589,6 +5590,7 @@ fn to_exhaust_pattern(
                         | hir::Literal::Float(t)
                         | hir::Literal::Str(t)
                         | hir::Literal::UnterminatedStr(t) => t.clone(),
+                        hir::Literal::Unit => "()".to_string(),
                     };
                     Err(match &ctors {
                         Some(cs) => foreign(&written, cs),
@@ -5655,19 +5657,109 @@ fn to_exhaust_pattern(
 }
 
 /// Parse, lower and check a set of files together.
+///
+/// As `pw check` does (ADR-0200): a file's syntax errors are its diagnostics,
+/// and a file that does not parse is kept out of the program, since what
+/// recovery makes of it would put declarations no one wrote in every other
+/// file's environment (E0 finding F-4). Until ADR-0200 every file was lowered
+/// whatever the parser said, and its syntax errors were not reported: a
+/// test's program with a typo checked clean.
 pub fn check_sources(files: &[(String, String)]) -> Vec<(String, Vec<Diagnostic>)> {
+    let parsed: Vec<pw_syntax::Parse> = files
+        .iter()
+        .map(|(_, src)| pw_syntax::parse_tree(src))
+        .collect();
     let units: Vec<Unit> = files
         .iter()
-        .map(|(path, src)| {
-            let parsed = pw_syntax::parse_tree(src);
-            Unit {
-                path: path.clone(),
-                src: src.clone(),
-                hir: crate::lower::lower_file(src, &parsed.green),
-            }
+        .zip(&parsed)
+        .filter(|(_, p)| p.ok())
+        .map(|((path, src), p)| Unit {
+            path: path.clone(),
+            src: src.clone(),
+            hir: crate::lower::lower_file(src, &p.green),
         })
         .collect();
-    check_units(&units)
+    let mut checked = check_units(&units).into_iter();
+    files
+        .iter()
+        .zip(parsed)
+        .filter_map(|((path, _), p)| match p.ok() {
+            true => checked.next(),
+            false => Some((
+                path.clone(),
+                p.errors.into_iter().map(syntax_error).collect(),
+            )),
+        })
+        .collect()
+}
+
+/// **A syntax error, as a diagnostic**: the parser's code, message and help,
+/// and the registry's invariant for the code.
+pub(crate) fn syntax_error(e: pw_syntax::SyntaxError) -> Diagnostic {
+    Diagnostic {
+        code: e.code,
+        invariant: crate::codes::lookup(e.code).map_or("a program must parse", |c| c.invariant),
+        reason: "syntax_error",
+        detector: Detector::Parser,
+        severity: Severity::Error,
+        message: e.message,
+        primary_span: e.span,
+        related: Vec::new(),
+        explanation: e.help,
+        repairs: Vec::new(),
+    }
+}
+
+/// **An expression or a pattern the compiler cannot read** (ADR-0200).
+///
+/// Lowering is total: what it has no meaning for becomes an error node, and
+/// the checker types one as anything, since the parser's error says what is
+/// wrong. Every file the checker is given parses (`check_sources`, `pw check`
+/// and the backend's `Checked::of` keep out or refuse one that does not), so
+/// an error node here is text the parser accepted and nothing reported.
+/// `()` was one until ADR-0200, and `fn f() -> Int !{} { () }` checked.
+fn unread(hir: &Hir, src: &str) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        let Some(b) = decl.body else { continue };
+        let body = hir.body(b);
+        let exprs = body
+            .exprs()
+            .filter(|(_, e, _)| matches!(e, Expr::Error))
+            .map(|(_, _, span)| ("an expression", span.clone()));
+        let patterns = body
+            .pats
+            .iter()
+            .filter(|(_, p, _)| matches!(p, HPat::Error))
+            .map(|(_, _, span)| ("a pattern", span.clone()));
+        for (what, span) in exprs.chain(patterns) {
+            let text = src.get(span.clone()).unwrap_or_default().trim();
+            out.push(Diagnostic {
+                code: crate::codes::UNREAD.id,
+                invariant: crate::codes::UNREAD.invariant,
+                reason: "unread",
+                detector: Detector::Parser,
+                severity: Severity::Error,
+                message: format!("`{text}` is {what} this compiler does not read"),
+                primary_span: span,
+                related: vec![Related {
+                    span: hir.decl_span(id),
+                    label: format!("in `{}`", decl.name),
+                }],
+                explanation: Some(
+                    "The parser accepted this text, and the compiler has no meaning for it. \
+                     Until ADR-0200 such an expression was typed as any type at all, and \
+                     the build refused it later."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "write it another way the language reads".to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
 }
 
 /// Declarations that define a type, for callers that need the environment.

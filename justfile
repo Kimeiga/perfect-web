@@ -2613,6 +2613,27 @@ e14-orders:
      } > docs/evidence/E14/orders.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/orders.txt
 
+# ADR-0200: `()` is the unit value, and no expression the compiler cannot
+# read checks. Its tests, the repository's every `.pw` file, and the mutation
+# controls.
+e14-unit-value:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0200 - () is the unit value, and no expression the compiler cannot read checks"; echo; \
+       echo "produced by: just e14-unit-value"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/unit_value.rs)"; echo; \
+       cargo test --locked -p pw-core --test unit_value 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== every .pw file in the repository (compiler/pw-core/tests/every_expression_is_read.rs)"; echo; \
+       cargo test --locked -p pw-core --test every_expression_is_read 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== a block left open (pw-syntax's grammar, compiler/pw-core/tests/template_blocks.rs)"; echo; \
+       cargo test --locked -p pw-syntax --lib a_block_left_open 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-core --test template_blocks an_unclosed_block 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/unit_value_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/unit_value_mutations.py; \
+     } > docs/evidence/E14/unit-value.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/unit-value.txt
+
 # ADR-0199 (ADR-0195's ruling 12): a function or a command named as a
 # handler is the lambda that calls it. Its tests, the store's handlers, and
 # the mutation controls.

@@ -658,6 +658,18 @@ Not covered:
 - **Duplicate ids and ARIA references at build** are checked since
   ADR-0185, within the declaration that renders them.
 
+**An element left open is reported at the end of the file** (ADR-0200). A
+close tag closes the innermost element whatever its name, so in
+`<main><div>A</main>` the `</main>` closes `<div>`, `<main>` takes every `}`
+after it, and `pw check` says "unclosed block" where the file ends. A
+`{#..}` block left open is named where it is (PW5019). Matching a close tag
+to its element by name waits for its own ADR, beside HTML's optional end
+tags.
+
+**A string's hole cannot hold a string** (ADR-0200). `"{f("a")}"` does not
+parse; write the value to a binding first. Swift's and Kotlin's
+interpolations read one.
+
 **A label does not follow a value through storage, a later call of a
 function value, or time** (ADR-0129). A value's label follows it through
 calls, bodies, branches and assignments, and a public log takes only a public

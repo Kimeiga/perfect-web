@@ -989,9 +989,10 @@ impl Lowerer<'_> {
             }
 
             // Parentheses group; the tree already records that (ADR-0014).
+            // Empty, they are the unit value (ADR-0200).
             K::ParenExpr => match node.children().next() {
                 Some(c) => self.expr(b, &c),
-                None => b.expr(Expr::Error, span),
+                None => b.expr(Expr::Literal(Literal::Unit), span),
             },
 
             K::IfExpr => {

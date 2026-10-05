@@ -134,6 +134,11 @@ codes! {
     // or passed it to their targets' rules.
     STRING_ESCAPE = "PW0014" / string_escape / 1, Syntax,
         "a string's escapes and holes must be ones the language defines";
+    // ADR-0200: an expression the parser accepted and the lowering has no
+    // meaning for was an error node the checker typed as anything, since a
+    // parser's error says what is wrong; none did. `()` checked as an `Int`.
+    UNREAD = "PW0015" / unread / 1, Syntax,
+        "every expression and pattern in a file that parses is one the compiler reads";
     NO_PROGRESS = "PW0099" / no_progress / 1, Syntax, "the parser made no progress";
 
     // --- name resolution (PW002x) -----------------------------------------

@@ -13,6 +13,20 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0200, 2026-10-05: `()` is the unit value, and nothing the compiler
+cannot read checks** (found building ADR-0199).
+- **Correction:** `()` lowered to an error node, which the checker types as
+  anything: `fn f() -> Int !{} { () }` checked, and the build refused it. It
+  is typed `Unit` and built now (PW0606 for the `Int`).
+- **Correction:** `check_sources`, which the tests call, reported no syntax
+  error. It does what `pw check` does now, and four tests that had passed on
+  programs that do not parse are corrected.
+- **Correction:** an unclosed `{#if}` swallowed its element's close tag, so
+  `pw check` reported the end of the file, twice. The block ends with its
+  element, and PW5019 names it.
+- An error node in a file that parses is refused (PW0015). A gate holds every
+  `.pw` file in the repository to it. 8 mutants (`just e14-unit-value`).
+
 **ADR-0199, 2026-10-05: a function or a command named as a handler is the
 lambda that calls it** (ADR-0195, ruling 12). `on:submit={save}` was checked
 against its event and refused when built. Now it is `(e) => save(e)`:

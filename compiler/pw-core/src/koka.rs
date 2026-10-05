@@ -197,6 +197,7 @@ fn lower_expr(b: &Body, id: ExprId) -> Result<String, &'static str> {
             Literal::Int(s) | Literal::Float(s) => s.clone(),
             Literal::Str(_) => koka_string(l)?,
             Literal::UnterminatedStr(_) => return Err("an unterminated string"),
+            Literal::Unit => "()".to_string(),
         },
 
         Expr::Name(n) => {

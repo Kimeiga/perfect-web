@@ -114,26 +114,15 @@ impl<'a> Checked<'a> {
     }
 }
 
-/// A unit's syntax errors, as diagnostics.
+/// A unit's syntax errors, as diagnostics, each naming its file.
 fn syntax_errors(unit: &crate::check::Unit) -> Vec<crate::diagnostics::Diagnostic> {
     pw_syntax::parse_tree(&unit.src)
         .errors
         .into_iter()
-        .map(|e| crate::diagnostics::Diagnostic {
-            code: e.code,
-            invariant: crate::codes::ALL
-                .iter()
-                .find(|c| c.id == e.code)
-                .map(|c| c.invariant)
-                .unwrap_or("a program must parse"),
-            reason: "syntax_error",
-            detector: crate::diagnostics::Detector::Parser,
-            severity: crate::diagnostics::Severity::Error,
-            message: format!("{}: {}", unit.path, e.message),
-            primary_span: e.span,
-            related: Vec::new(),
-            explanation: e.help,
-            repairs: Vec::new(),
+        .map(|e| {
+            let mut d = crate::check::syntax_error(e);
+            d.message = format!("{}: {}", unit.path, d.message);
+            d
         })
         .collect()
 }
@@ -1534,6 +1523,8 @@ impl<'a> Lower<'a> {
                             span,
                         };
                     }
+                    // `()` (ADR-0200).
+                    Literal::Unit => (Const::Unit, Type::Unit),
                 };
                 let result = self.fresh();
                 Lowering::Lowered(self.push(Instr::Const {
