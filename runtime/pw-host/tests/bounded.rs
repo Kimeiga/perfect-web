@@ -5,8 +5,8 @@
 
 #![cfg(feature = "engine")]
 
-use pw_host::Bounded;
 use pw_host::engine::holds;
+use pw_host::{Bounded, Measure};
 use wasmtime::component::Val;
 
 fn positive(argument: usize, path: &[&str]) -> Bounded {
@@ -15,8 +15,22 @@ fn positive(argument: usize, path: &[&str]) -> Bounded {
         path: path.iter().map(|s| s.to_string()).collect(),
         ty: "domain.PositiveInt".into(),
         holds: "value >= 1".into(),
+        measure: Measure::Value,
         at_least: Some(1),
         at_most: None,
+    }
+}
+
+/// A post's text (ADR-0225): from 1 to 280 code points.
+fn post_text(argument: usize) -> Bounded {
+    Bounded {
+        argument,
+        path: Vec::new(),
+        ty: "feed.app.PostText".into(),
+        holds: "String.length(value) >= 1 & String.length(value) <= 280".into(),
+        measure: Measure::Length,
+        at_least: Some(1),
+        at_most: Some(280),
     }
 }
 
@@ -107,4 +121,28 @@ fn a_value_of_another_shape_than_the_contract_says_is_refused() {
     assert!(why.contains("is no `Int`"), "{why}");
     let why = holds(&[positive(3, &[])], &[Val::S64(1)]).expect_err("no value 4");
     assert!(why.contains("no value 4"), "{why}");
+}
+
+/// **A `String`'s length is held at both ends, in code points** (ADR-0225),
+/// as the language's `String.length` counts it: an emoji is one, whatever
+/// its bytes, and its UTF-16 units.
+#[test]
+fn a_strings_length_is_held_at_both_ends_in_code_points() {
+    let check = [post_text(0)];
+    let text = |s: &str| [Val::String(s.into())];
+    assert!(holds(&check, &text("a")).is_ok());
+    assert!(holds(&check, &text(&"a".repeat(280))).is_ok());
+    // 280 emoji: 1,120 bytes, 560 UTF-16 units, 280 code points.
+    assert!(holds(&check, &text(&"\u{1F600}".repeat(280))).is_ok());
+    let why = holds(&check, &text("")).expect_err("empty");
+    assert!(why.starts_with("value 1 is 0 code points long"), "{why}");
+    let why = holds(&check, &text(&"\u{1F600}".repeat(281))).expect_err("too long");
+    assert!(
+        why.starts_with("value 1 is 281 code points long, and `feed.app.PostText` holds"),
+        "{why}"
+    );
+    // A length is a `String`'s: another value is refused, as the contract
+    // and the value disagree.
+    let why = holds(&check, &[Val::S64(3)]).expect_err("no String");
+    assert!(why.contains("is no `String`"), "{why}");
 }

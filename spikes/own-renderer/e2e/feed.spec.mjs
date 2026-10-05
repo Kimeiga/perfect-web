@@ -9,7 +9,9 @@
 //     without a reload (ADR-0219), and the draft is cleared;
 //   - a like's count reaches every reader;
 //   - a post shows before the server answers, and is the server's after;
-//     one whose request fails is taken back (ADR-0222).
+//     one whose request fails is taken back (ADR-0222);
+//   - a post's text is at most 280 code points: a longer draft is not sent
+//     (ADR-0225).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -136,4 +138,27 @@ test("a post whose request fails is taken back", async ({ page }, testInfo) => {
   await expect(page.locator("main > ul > li")).toHaveCount(before);
   // The draft is kept, to send again.
   await expect(page.getByLabel("What's happening?")).toHaveValue(text);
+});
+
+test("a post longer than 280 characters is not sent, and 280 emoji are", async ({ page }) => {
+  await home(page);
+  const sent = [];
+  page.on("request", (r) => {
+    if (r.url().includes("/command/feed.app.post")) sent.push(r.postData());
+  });
+  const draft = page.getByLabel("What's happening?");
+  // The page's own check, `post_text`, finds no post's text: nothing is
+  // sent, and the draft is kept to shorten.
+  await draft.fill("x".repeat(281));
+  await page.getByRole("button", { name: "Post" }).click();
+  await expect(draft).toHaveValue("x".repeat(281));
+  // 280 emoji are 280 code points, as `String.length` counts them, though
+  // 560 UTF-16 units: sent, and posted. Its row says the press before it was
+  // answered too.
+  const emoji = "\u{1F600}".repeat(280);
+  await draft.fill(emoji);
+  await page.getByRole("button", { name: "Post" }).click();
+  await expect(post(page, emoji)).toHaveCount(1);
+  await expect(post(page, emoji).getByRole("link")).toHaveText(/^Guest /);
+  expect(sent).toHaveLength(1);
 });

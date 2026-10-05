@@ -382,8 +382,9 @@ codes! {
     // cart as a line of nothing.
     INVARIANT_NOT_SHOWN = "PW0622" / invariant_not_shown / 1, Types,
         "a value is built of an opaque type only where the build shows it holds the type's invariant";
-    INVARIANT_UNREAD = "PW0623" / invariant_unread / 1, Types,
-        "an opaque type's invariant is bounds on its `Int` value, `value >= 1`, joined by `&`, that some value holds";
+    // ADR-0225: and on a `String`'s length, which a post's text needed.
+    INVARIANT_UNREAD = "PW0623" / invariant_unread / 2, Types,
+        "an opaque type's invariant is bounds on its `Int` value, `value >= 1`, or on its `String`'s length, `String.length(value) <= 280`, joined by `&`, that some value holds";
     // ADR-0194: a type may contain itself, and one each of whose values
     // holds another of itself, `type Loop = Loop { again: Loop }`, has no
     // value at all.

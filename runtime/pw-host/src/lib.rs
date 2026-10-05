@@ -140,10 +140,26 @@ pub struct Bounded {
     #[serde(rename = "type")]
     pub ty: String,
     pub holds: String,
+    /// What the bounds are on: the value, or a `String`'s length in code
+    /// points (ADR-0225).
+    #[serde(default)]
+    pub measure: Measure,
     #[serde(default)]
     pub at_least: Option<i64>,
     #[serde(default)]
     pub at_most: Option<i64>,
+}
+
+/// **What a bound is on** (ADR-0225): a value, or a `String`'s length, in
+/// code points, as the language's `String.length` counts them (ADR-0040).
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum Measure {
+    #[default]
+    Value,
+    Length,
 }
 
 /// What class an ACTUAL Wasm import falls into.
@@ -1800,19 +1816,35 @@ pub mod engine {
     ) -> Result<(), String> {
         use wasmtime::component::Val;
         let Some(step) = check.path.get(at.len()) else {
-            let Val::S64(n) = v else {
-                return Err(format!(
-                    "{} is no `Int`, which `{}` is",
-                    place(check, at),
-                    check.ty
-                ));
+            // An `Int`'s value, or a `String`'s length in code points
+            // (ADR-0225), counted as the language counts it.
+            let (n, said) = match (check.measure, v) {
+                (crate::Measure::Value, Val::S64(n)) => (i128::from(*n), format!("{n}")),
+                (crate::Measure::Length, Val::String(s)) => {
+                    let n = s.chars().count();
+                    (n as i128, format!("{n} code points long"))
+                }
+                (crate::Measure::Value, _) => {
+                    return Err(format!(
+                        "{} is no `Int`, which `{}` is",
+                        place(check, at),
+                        check.ty
+                    ));
+                }
+                (crate::Measure::Length, _) => {
+                    return Err(format!(
+                        "{} is no `String`, which `{}` is",
+                        place(check, at),
+                        check.ty
+                    ));
+                }
             };
-            let above = check.at_least.is_none_or(|b| *n >= b);
-            let below = check.at_most.is_none_or(|b| *n <= b);
+            let above = check.at_least.is_none_or(|b| n >= i128::from(b));
+            let below = check.at_most.is_none_or(|b| n <= i128::from(b));
             return match above && below {
                 true => Ok(()),
                 false => Err(format!(
-                    "{} is {n}, and `{}` holds `{}`",
+                    "{} is {said}, and `{}` holds `{}`",
                     place(check, at),
                     check.ty,
                     check.holds

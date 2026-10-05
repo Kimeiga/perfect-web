@@ -1902,3 +1902,10 @@ ADR-0222).
   so a commit between the two was sent first and then undone by the older
   value. It applies in the hold now, and reads again when a change reached
   its document while it read.
+[ADR-0225](DECISIONS/ADR-0225-a-strings-length-is-an-invariant.md): a
+`String`'s length is an invariant (the feed's typed length limit; extends
+ADR-0179).
+- `opaque type PostText = String where String.length(value) >= 1 &
+  String.length(value) <= 280`: bounds on a length in code points, as
+  `String.length` counts it. Every construction is shown to hold them at
+  build, and a host holds a browser's post to them. The feed's post is one.

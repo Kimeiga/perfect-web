@@ -12,12 +12,28 @@
 module feed.app
 
 import List
+import String
 import context.{ current_session }
 import capability.{ Session, SessionId }
 
 opaque type UserId = String
 opaque type PostId = String
 opaque type InteractionId = String
+
+// **A post's text** (ADR-0225): something, and at most 280 characters,
+// each a code point as `String.length` counts it. Every construction is
+// shown to hold it at build, and the host holds a browser's to it.
+opaque type PostText = String where String.length(value) >= 1 & String.length(value) <= 280
+
+// **A draft as a post's text, or none** (ADR-0225): the program's own
+// checked constructor, as ADR-0179 asks.
+fn post_text(draft: String) -> Option<PostText> !{} {
+    if String.length(draft) >= 1 & String.length(draft) <= 280 {
+        Some(PostText(draft))
+    } else {
+        None
+    }
+}
 
 type User = User { id: UserId, handle: String, name: String }
 
@@ -54,7 +70,7 @@ fn thread(id: PostId) -> Result<Post, FeedError> !{ database.read<Post> }
 fn author(s: Session<SessionId>) -> UserId !{ database.read<User> }
     host "feed:data/users#of-session"
 
-fn publish(s: Session<SessionId>, text: String) -> Result<Post, FeedError> !{ database.write<Post> }
+fn publish(s: Session<SessionId>, text: PostText) -> Result<Post, FeedError> !{ database.write<Post> }
     host "feed:data/posts#publish"
 
 fn add_like(s: Session<SessionId>, post: PostId) -> Result<Post, FeedError> !{ database.write<Post> }
@@ -86,7 +102,7 @@ public query Thread(id: PostId) -> Result<Post, FeedError>
     thread(id)
 }
 
-command post(text: String) -> Result<Post, FeedError>
+command post(text: PostText) -> Result<Post, FeedError>
     requires      SignedIn
     idempotent_by InteractionId
     emits         Posted(author(current_session()))
@@ -97,10 +113,10 @@ command post(text: String) -> Result<Post, FeedError>
 
 // **A post shown before the server answers** (ADR-0222): first in the
 // timeline, by "You", keyed apart from every other pending one.
-fn pending(feed: List<Item>, text: String) -> List<Item> !{} {
+fn pending(feed: List<Item>, text: PostText) -> List<Item> !{} {
     let you = User { id: UserId("you"), handle: "@you", name: "You" }
     let id = PostId("pending-{List.length(feed)}")
-    List.concat([Item { id: id, author: you, text: text, likes: 0 }], feed)
+    List.concat([Item { id: id, author: you, text: text.value, likes: 0 }], feed)
 }
 
 command like(post: PostId) -> Result<Post, FeedError>
@@ -124,9 +140,12 @@ session page Home() {
         <title>Home</title>
         <main>
             <h1>Home</h1>
-            <form on:submit|prevent={() => match post(draft) {
-                Ok(_) => draft = "",
-                Err(_) => draft = draft,
+            <form on:submit|prevent={() => match post_text(draft) {
+                Some(text) => match post(text) {
+                    Ok(_) => draft = "",
+                    Err(_) => draft = draft,
+                },
+                None => draft = draft,
             }}>
                 <label>What's happening? <textarea bind:value={draft}></textarea></label>
                 <button type="submit">Post</button>

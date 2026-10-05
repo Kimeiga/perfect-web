@@ -362,11 +362,15 @@ pub struct ClauseKey {
 }
 
 /// **What every value of an opaque type holds** (ADR-0179): `where value >=
-/// 1`, read as bounds on its `value`, each end included. Bounds alone: the
-/// build decides a construction against them, and a host checks a value it
-/// is given against them without running the program's code.
+/// 1`, read as bounds on its `value`, each end included; or, of a `String`,
+/// `where String.length(value) <= 280`, bounds on its length in code points
+/// (ADR-0225). Bounds alone: the build decides a construction against them,
+/// and a host checks a value it is given against them without running the
+/// program's code.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Invariant {
+    /// What the bounds are on: the value, or its length (ADR-0225).
+    pub measure: Measure,
     /// The least value, where the predicate states one.
     pub at_least: Option<i128>,
     /// The greatest value, where the predicate states one.
@@ -377,6 +381,18 @@ pub struct Invariant {
     /// Each part of the predicate that is no bound on `value`, and why
     /// (PW0623).
     pub unread: Vec<(Span, String)>,
+}
+
+/// **What an invariant bounds** (ADR-0225): an `Int`'s value, or a
+/// `String`'s length, in code points, as `String.length` counts them
+/// (ADR-0040).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
+pub enum Measure {
+    /// `value >= 1`.
+    #[default]
+    Value,
+    /// `String.length(value) <= 280`.
+    Length,
 }
 
 impl Invariant {

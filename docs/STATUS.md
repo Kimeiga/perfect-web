@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0225, 2026-10-05: a `String`'s length is an invariant** (the feed's
+length limit). An opaque type's invariant was bounds on an `Int`, and a
+post's text could be empty or a book. `opaque type PostText = String where
+String.length(value) >= 1 & String.length(value) <= 280` now: every
+construction is shown to hold it at build, by literals, tests that narrow a
+length, and bounded values; the contract states the measure; the host counts
+code points, as the language does. In three engines a 281-character draft is
+not sent and 280 emoji are (`just e14-string-invariants`).
+
 **ADR-0224, 2026-10-05: a longer read is not applied over a commit it did
 not see** (found by ADR-0222). "Load more" read the timeline outside the
 session's hold and applied it after: a post committed in between was sent,

@@ -56,9 +56,10 @@ MUTANTS = [
         "a bound written the other way round is read as written",
         "core",
         LOWER,
-        '                    (Some(k), true) => {\n'
+        # Re-anchored by ADR-0225: a side bounds a value or a length.
+        '                    (Some(k), Some(m)) => {\n'
         '                        let flipped = match op.text() {\n',
-        '                    (Some(k), true) => {\n'
+        '                    (Some(k), Some(m)) => {\n'
         '                        let flipped = match "" {\n'
         '                            _ if true => op.text(),\n',
     ),
@@ -73,7 +74,8 @@ MUTANTS = [
         "PW0623 reads any representation",
         "core",
         RULES,
-        '    if representation.as_deref() != Some("Int") {\n',
+        # Re-anchored by ADR-0225: an `Int`'s value, or a `String`'s length.
+        "    if representation.as_deref() != Some(wanted) {\n",
         "    if false {\n",
     ),
     (
@@ -139,8 +141,17 @@ MUTANTS = [
         "a `let`'s local is any `Int`",
         "core",
         VALUES,
-        "            Expr::Name(_) => match self.lexical.binder(e) {\n",
-        "            Expr::Name(_) if false => match self.lexical.binder(e) {\n",
+        # Re-anchored by ADR-0225, whose length reads a `let` the same way.
+        "            Expr::Name(_) => match self.lexical.binder(e) {\n"
+        "                Some(Binder::Pattern(p)) => match self.lets.get(&p) {\n"
+        "                    Some(init) => {\n"
+        "                        let there = self.facts_at(*init);\n"
+        "                        self.interval(*init, &there, next)\n",
+        "            Expr::Name(_) if false => match self.lexical.binder(e) {\n"
+        "                Some(Binder::Pattern(p)) => match self.lets.get(&p) {\n"
+        "                    Some(init) => {\n"
+        "                        let there = self.facts_at(*init);\n"
+        "                        self.interval(*init, &there, next)\n",
     ),
     (
         "subtraction is read as addition",
@@ -190,15 +201,16 @@ MUTANTS = [
         "an upper bound is not held",
         "host",
         HOST,
-        "            let below = check.at_most.is_none_or(|b| *n <= b);\n",
+        # Re-anchored by ADR-0225: a value or a length, compared alike.
+        "            let below = check.at_most.is_none_or(|b| n <= i128::from(b));\n",
         "            let below = true;\n",
     ),
     (
         "a lower bound admits the value below it",
         "host",
         HOST,
-        "            let above = check.at_least.is_none_or(|b| *n >= b);\n",
-        "            let above = check.at_least.is_none_or(|b| *n >= b - 1);\n",
+        "            let above = check.at_least.is_none_or(|b| n >= i128::from(b));\n",
+        "            let above = check.at_least.is_none_or(|b| n >= i128::from(b) - 1);\n",
     ),
     (
         "`arguments_for` decodes as `arguments`",

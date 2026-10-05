@@ -369,10 +369,12 @@ awaited in order. What remains:
   only `item.id`, the loop's key, which a keyed patch never changes.
 - **No invariant relates two fields** (ADR-0180): a delivery estimate's
   least minutes are at most its most because its estimator says so.
-- **An opaque type's invariant is bounds on an `Int`** (ADR-0179). `where
-  value >= 1` is checked at every construction, by the build, and at every
-  boundary, by the host. A `String`'s length, or any other predicate, is
-  refused (PW0623) until a program needs it. A test narrows what it tests in
+- **An opaque type's invariant is bounds on an `Int`, or on a `String`'s
+  length** (ADR-0179, ADR-0225). `where value >= 1` and `where
+  String.length(value) <= 280` are checked at every construction, by the
+  build, and at every boundary, by the host. A length is in code points: no
+  grapheme clusters, no normalization. Any other predicate is refused
+  (PW0623) until a program needs it. A test narrows what it tests in
   an `if`'s branches and across `&` and `|`; a test followed by an early
   `return` narrows nothing after it. A keyed read's key and a route's
   parameter are not held to an invariant: none of the store's is a type

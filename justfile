@@ -2708,6 +2708,34 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0225: a `String`'s length is an invariant. The compiler's, the host's
+# and the server's tests, the feed in three engines, and the mutation
+# controls.
+e14-string-invariants:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0225 - a String's length is an invariant"; echo; \
+       echo "produced by: just e14-string-invariants"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the build (compiler/pw-core/tests/string_invariants.rs, invariants.rs)"; echo; \
+       cargo test --locked -p pw-core --test string_invariants --test invariants 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the host (runtime/pw-host/tests/bounded.rs)"; echo; \
+       cargo test --locked -p pw-host --features engine --test bounded 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_posts_text_is_held_to_its_length_where_it_arrives 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/string_invariants_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/string_invariants_mutations.py; \
+     } > docs/evidence/E14/string-invariants.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/string-invariants.txt
+
 # ADR-0224: a longer read is not applied over a commit it did not see. The
 # server's tests and the mutation control.
 e14-keyed-race:

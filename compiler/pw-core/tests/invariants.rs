@@ -248,15 +248,16 @@ fn an_invariant_the_language_cannot_read_is_refused_where_it_is_written() {
     assert!(refused("Int where value >= 1").is_empty());
     assert!(refused("Int where 1 <= value & value <= 9").is_empty());
     for (inv, why) in [
-        ("String where value >= 1", "only an `Int`'s is read"),
+        // A `String`'s length is read since ADR-0225, and its value is not.
+        ("String where value >= 1", "which only an `Int` has"),
         ("Int where value == 3", "compares `value` with `<`"),
         (
             "Int where size(value) > 0",
-            "compares `value` with an integer",
+            "compares `value`, or `String.length(value)`, with an integer",
         ),
         (
             "Int where value >= other",
-            "compares `value` with an integer",
+            "compares `value`, or `String.length(value)`, with an integer",
         ),
         ("Int where value >= 5 & value <= 2", "holds of no value"),
         (

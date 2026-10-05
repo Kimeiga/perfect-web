@@ -58,9 +58,10 @@
 //!
 //! The module runs in the user's browser, so the server cannot know that the
 //! arguments it receives came from this code. The server types them by the
-//! command component's own parameters and refuses anything else; it does not
-//! re-check what an opaque type's name promises, because the language does not
-//! state it (`opaque type PositiveInt = Int` has no invariant to check).
+//! command component's own parameters and refuses anything else, and holds
+//! each to the invariant its opaque type states, as the contract says where
+//! (ADR-0179): `PositiveInt`'s `value >= 1`, and a post's text's length
+//! (ADR-0225).
 
 use crate::hir::{ExprId, Hir};
 use crate::resolve::Workspace;

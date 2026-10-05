@@ -328,10 +328,33 @@ pub struct Bounded {
     pub ty: String,
     /// The invariant as written: `value >= 1`.
     pub holds: String,
+    /// What the bounds are on: the value, or a `String`'s length in code
+    /// points (ADR-0225). A value's is not written, so a contract that
+    /// bounds none is as it was.
+    #[serde(default, skip_serializing_if = "Measure::is_value")]
+    pub measure: Measure,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at_least: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at_most: Option<i64>,
+}
+
+/// **What a bound is on** (ADR-0225): a value, or a `String`'s length, in
+/// code points, as `String.length` counts them (ADR-0040).
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum Measure {
+    #[default]
+    Value,
+    Length,
+}
+
+impl Measure {
+    fn is_value(&self) -> bool {
+        *self == Measure::Value
+    }
 }
 
 /// **Every invariant a value of `t` holds, wherever it is in the value**
@@ -403,6 +426,10 @@ fn bounds_within(
                     path: path.clone(),
                     ty: sigs.path_of(*def).unwrap_or_default().to_string(),
                     holds: inv.written.clone(),
+                    measure: match inv.measure {
+                        crate::hir::Measure::Value => Measure::Value,
+                        crate::hir::Measure::Length => Measure::Length,
+                    },
                     at_least: inv.at_least.and_then(|b| i64::try_from(b).ok()),
                     at_most: inv.at_most.and_then(|b| i64::try_from(b).ok()),
                 });

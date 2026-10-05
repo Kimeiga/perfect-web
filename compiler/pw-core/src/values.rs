@@ -654,6 +654,18 @@ impl Interval {
         }
     }
 
+    /// A length, as a diagnostic says it (ADR-0225): "12 code points long",
+    /// "a `String` of any length".
+    fn described_length(self) -> String {
+        match (self.lo.map(|l| l.max(0)), self.hi) {
+            (Some(a), Some(b)) if a == b => format!("{a} code points long"),
+            (Some(a), Some(b)) => format!("from {a} to {b} code points long"),
+            (Some(0) | None, None) => "a `String` of any length".to_string(),
+            (Some(a), None) => format!("at least {a} code points long"),
+            (None, Some(b)) => format!("at most {b} code points long"),
+        }
+    }
+
     /// What `x OP k` makes of `x`, holding or not: `>=` and `1` give
     /// "at least 1", and not holding, "at most 0".
     fn compared(op: &str, k: i128, holds: bool) -> Option<Interval> {
@@ -693,6 +705,10 @@ impl Interval {
 /// A place a value is read from that a test can narrow: a local, and the
 /// fields read through it, `n.value`.
 type Path = (Binder, Vec<String>);
+
+/// The name a `String`'s length is read through in a [`Path`] (ADR-0225):
+/// no field is named so, since no name begins with `#`.
+const LENGTH: &str = "#length";
 
 /// What a resolved call is checked against: its parameters, where each is
 /// declared, and its result, all under the binder whose type parameters the
@@ -2337,7 +2353,17 @@ impl<'a> Typer<'a> {
             && arity_ok
             && let Some((_, value)) = supplied.first()
         {
-            let found = self.interval_at(*value);
+            // An `Int`'s value, or a `String`'s length (ADR-0225).
+            let (found, described) = match inv.measure {
+                crate::hir::Measure::Value => {
+                    let found = self.interval_at(*value);
+                    (found, found.described())
+                }
+                crate::hir::Measure::Length => {
+                    let found = self.length_at(*value);
+                    (found, found.described_length())
+                }
+            };
             relations.push(ValueRelation {
                 declaration: self.decl.name.clone(),
                 kind: RelationKind::Invariant,
@@ -2348,7 +2374,7 @@ impl<'a> Typer<'a> {
                     true => Outcome::Agree,
                     false => Outcome::Disagree {
                         expected: inv.written.clone(),
-                        actual: found.described(),
+                        actual: described,
                     },
                 },
                 declared_at: Some((def.unit, inv.span.clone())),
@@ -2439,9 +2465,10 @@ impl<'a> Typer<'a> {
                     ">=" => "<=",
                     other => other,
                 };
-                let (path, op, k) = match (self.path_of(*lhs), self.integer(*rhs)) {
+                // And `String.length(text) <= 280` (ADR-0225).
+                let (path, op, k) = match (self.measured_path(*lhs), self.integer(*rhs)) {
                     (Some(path), Some(k)) => (path, c.as_str(), k),
-                    _ => match (self.integer(*lhs), self.path_of(*rhs)) {
+                    _ => match (self.integer(*lhs), self.measured_path(*rhs)) {
                         (Some(k), Some(path)) => (path, flipped, k),
                         _ => return Vec::new(),
                     },
@@ -2463,6 +2490,116 @@ impl<'a> Typer<'a> {
                 (b, fields)
             }),
             _ => None,
+        }
+    }
+
+    /// **`e` is `String.length(text)`: the `text`** (ADR-0225), however the
+    /// call is written, by what it resolves to.
+    fn length_of(&self, e: ExprId) -> Option<ExprId> {
+        let Expr::Call { callee, args } = self.body.expr(e) else {
+            return None;
+        };
+        let [text] = args.as_slice() else {
+            return None;
+        };
+        match named(self.sigs, self.ws, self.at, self.body, *callee) {
+            Named::Target(Target::Callable(sig)) if sig.path == "String.length" => Some(text.value),
+            _ => None,
+        }
+    }
+
+    /// [`Typer::path_of`], or a `String`'s length (ADR-0225): its text's
+    /// path, with [`LENGTH`] after it, which no field is named.
+    fn measured_path(&self, e: ExprId) -> Option<Path> {
+        match self.length_of(e) {
+            Some(text) => self.path_of(text).map(|(b, mut fields)| {
+                fields.push(LENGTH.to_string());
+                (b, fields)
+            }),
+            None => self.path_of(e),
+        }
+    }
+
+    /// **What a `String`'s length can be, where it is read** (ADR-0225),
+    /// narrowed by every test made around it.
+    fn length_at(&self, e: ExprId) -> Interval {
+        let facts = self.facts_at(e);
+        self.length(e, &facts, 0)
+    }
+
+    /// **The interval of a `String`'s length, in code points, under
+    /// `facts`** (ADR-0225), as [`Typer::interval`] is an `Int`'s: exact for
+    /// a literal; an opaque value's representation as its type bounds it; a
+    /// `let`'s local as its initializer, where the `let` is; either branch of
+    /// an `if` or a `match`. Anything else is any length, and a test of it
+    /// narrows it.
+    fn length(&self, e: ExprId, facts: &[(Path, Interval)], depth: u32) -> Interval {
+        let any = Interval {
+            lo: Some(0),
+            hi: None,
+        };
+        if depth > 64 {
+            return any;
+        }
+        let next = depth + 1;
+        let natural = match self.body.expr(e) {
+            Expr::Literal(l) => l
+                .string_value()
+                .map_or(any, |s| Interval::exactly(s.chars().count() as i128)),
+            Expr::Field { base, name } if name == "value" => match self.of(*base) {
+                Ty::Nominal(def, _) => self
+                    .sigs
+                    .type_decl(def)
+                    .and_then(|t| t.invariant.as_ref())
+                    .filter(|i| i.unread.is_empty() && i.measure == crate::hir::Measure::Length)
+                    .map_or(any, |i| Interval {
+                        lo: Some(i.at_least.unwrap_or(0).max(0)),
+                        hi: i.at_most,
+                    }),
+                _ => any,
+            },
+            Expr::Name(_) => match self.lexical.binder(e) {
+                Some(Binder::Pattern(p)) => match self.lets.get(&p) {
+                    Some(init) => {
+                        let there = self.facts_at(*init);
+                        self.length(*init, &there, next)
+                    }
+                    None => any,
+                },
+                _ => any,
+            },
+            Expr::Block { stmts } => stmts
+                .last()
+                .map_or(any, |last| self.length(*last, facts, next)),
+            Expr::If {
+                cond,
+                then,
+                els: Some(els),
+            } => {
+                let mut yes = facts.to_vec();
+                yes.extend(self.facts(*cond, true));
+                let mut no = facts.to_vec();
+                no.extend(self.facts(*cond, false));
+                self.length(*then, &yes, next)
+                    .hull(self.length(*els, &no, next))
+            }
+            Expr::Match { arms, .. } => arms
+                .iter()
+                .map(|a| self.length(a.body, facts, next))
+                .reduce(Interval::hull)
+                .unwrap_or(any),
+            _ => any,
+        };
+        match self.path_of(e) {
+            Some((binder, mut fields)) => {
+                fields.push(LENGTH.to_string());
+                let path = (binder, fields);
+                facts
+                    .iter()
+                    .filter(|(p, _)| *p == path)
+                    .fold(natural, |acc, (_, i)| acc.meet(*i))
+            }
+            None => natural,
         }
     }
 
@@ -2514,7 +2651,7 @@ impl<'a> Typer<'a> {
                     .sigs
                     .type_decl(def)
                     .and_then(|t| t.invariant.as_ref())
-                    .filter(|i| i.unread.is_empty())
+                    .filter(|i| i.unread.is_empty() && i.measure == crate::hir::Measure::Value)
                     .map_or(Interval::ANY, |i| Interval {
                         lo: i.at_least,
                         hi: i.at_most,

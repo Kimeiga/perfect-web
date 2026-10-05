@@ -10100,6 +10100,50 @@ public query Store(",
         );
     }
 
+    /// **A post's text is held to its length where it arrives** (ADR-0225):
+    /// `PostText` is from 1 to 280 code points, and a browser's request is a
+    /// claim, so the host refuses an empty one and a long one before the
+    /// command runs, by name. 280 emoji are 280 code points, whatever their
+    /// bytes, and are taken.
+    #[test]
+    fn a_posts_text_is_held_to_its_length_where_it_arrives() {
+        let s = served_feed();
+        let posts = |s: &Server| {
+            s.answer(
+                "feed.app.Timeline",
+                "a",
+                &[Val::String("a".into()), Val::S64(100)],
+            )
+        };
+        let before = format!("{:?}", posts(&s));
+        for (text, said) in [
+            (String::new(), "0 code points long"),
+            ("x".repeat(281), "281 code points long"),
+        ] {
+            let refused = s
+                .command_json(
+                    "feed.app.post",
+                    "a",
+                    &[serde_json::json!(text)],
+                    Some("i-no"),
+                )
+                .expect_err("refused before it runs");
+            assert!(
+                refused.contains(said) && refused.contains("feed.app.PostText"),
+                "{refused}"
+            );
+        }
+        assert_eq!(format!("{:?}", posts(&s)), before, "nothing was posted");
+        s.command_json(
+            "feed.app.post",
+            "a",
+            &[serde_json::json!("\u{1F600}".repeat(280))],
+            Some("i-yes"),
+        )
+        .expect("well-formed")
+        .expect("committed");
+    }
+
     /// **A page that reads nothing a commit dropped is not read again**
     /// (ADR-0219): with `Thread` listening for likes alone, a post leaves
     /// another session's open thread as it was, and it is sent nothing.

@@ -558,9 +558,10 @@ fn check_effect_names_no_operation(decl: &Decl, out: &mut Vec<Finding>) {
 }
 
 /// **PW0623: an invariant the language reads** (ADR-0179): bounds on an
-/// `Int` representation's `value`, each a comparison with an integer, joined
-/// by `&`, that some value holds. Anything else is refused by name, so a
-/// predicate is never kept as a claim nothing checks.
+/// `Int` representation's `value`, or on a `String` representation's length
+/// (ADR-0225), each a comparison with an integer, joined by `&`, that some
+/// value holds. Anything else is refused by name, so a predicate is never
+/// kept as a claim nothing checks.
 fn check_invariant(decl: &Decl, out: &mut Vec<Finding>) {
     let Some(inv) = &decl.invariant else {
         return;
@@ -578,7 +579,8 @@ fn check_invariant(decl: &Decl, out: &mut Vec<Finding>) {
             .explain(
                 "an invariant is checked where a value of the type is built, by the build, and \
                  where one arrives from outside, by the host, which runs none of the program's \
-                 code; bounds on an `Int` are what both can decide",
+                 code; bounds on an `Int`, and on a `String`'s length in code points, are what \
+                 both can decide",
             )
             .repair(repair),
         );
@@ -588,19 +590,27 @@ fn check_invariant(decl: &Decl, out: &mut Vec<Finding>) {
             out,
             span.clone(),
             format!("`{name}`'s invariant is not read: {why}"),
-            "write bounds on `value`: `value >= 1`, or `value >= 0 & value <= 100`",
+            "write bounds on `value`: `value >= 1`, or `value >= 0 & value <= 100`; or on a \
+             `String`'s length: `String.length(value) <= 280`",
         );
     }
+    // An `Int`'s value, or a `String`'s length (ADR-0225), and each by its
+    // own representation.
     let representation = decl.opaque_of.as_ref().map(|t| t.written());
-    if representation.as_deref() != Some("Int") {
+    let (wanted, bounded) = match inv.measure {
+        crate::hir::Measure::Value => ("Int", "`value`"),
+        crate::hir::Measure::Length => ("String", "`String.length(value)`"),
+    };
+    if representation.as_deref() != Some(wanted) {
         refuse(
             out,
             inv.span.clone(),
             format!(
-                "`{name}` states an invariant over `{}`, and only an `Int`'s is read",
+                "`{name}` states an invariant on {bounded} over `{}`, which only an `{wanted}` \
+                 has",
                 representation.unwrap_or_default()
             ),
-            "state no invariant, or represent the type by an `Int`",
+            &format!("state no invariant, or represent the type by an `{wanted}`"),
         );
     }
     // A bound past what an `Int` holds is no bound a host could compare a
@@ -617,14 +627,19 @@ fn check_invariant(decl: &Decl, out: &mut Vec<Finding>) {
             "bound `value` within an `Int`'s range, -9223372036854775808 to 9223372036854775807",
         );
     }
-    if let (Some(lo), Some(hi)) = (inv.at_least, inv.at_most)
+    // A length is never below 0 (ADR-0225).
+    let least = match inv.measure {
+        crate::hir::Measure::Value => inv.at_least,
+        crate::hir::Measure::Length => Some(inv.at_least.unwrap_or(0).max(0)),
+    };
+    if let (Some(lo), Some(hi)) = (least, inv.at_most)
         && lo > hi
     {
         refuse(
             out,
             inv.span.clone(),
             format!("`{name}`'s invariant, `{}`, holds of no value", inv.written),
-            "bound `value` so that some value holds it",
+            &format!("bound {bounded} so that some value holds it"),
         );
     }
 }

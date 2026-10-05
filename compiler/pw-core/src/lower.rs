@@ -1785,8 +1785,9 @@ fn declared_type(t: &SyntaxNode) -> crate::hir::DeclaredType {
 }
 
 /// **An opaque type's invariant, as bounds on its `value`** (ADR-0179):
-/// each comparison of `value` with an integer literal, joined by `&`. Any
-/// other part is kept, with why, for PW0623 to refuse.
+/// each comparison of `value` with an integer literal, joined by `&`; or on
+/// its length, `String.length(value)` compared with one (ADR-0225). Any other
+/// part is kept, with why, for PW0623 to refuse.
 fn invariant(src: &str, node: &SyntaxNode) -> Option<crate::hir::Invariant> {
     if node.kind() != K::OpaqueDecl {
         return None;
@@ -1794,6 +1795,7 @@ fn invariant(src: &str, node: &SyntaxNode) -> Option<crate::hir::Invariant> {
     let clause = node.children().find(|c| c.kind() == K::Invariant)?;
     let predicate = clause.children().find(|c| is_expr(c.kind()));
     let mut out = crate::hir::Invariant {
+        measure: crate::hir::Measure::Value,
         at_least: None,
         at_most: None,
         written: predicate
@@ -1803,30 +1805,38 @@ fn invariant(src: &str, node: &SyntaxNode) -> Option<crate::hir::Invariant> {
         span: span_of(&clause),
         unread: Vec::new(),
     };
+    let mut measured = None;
     match predicate {
-        Some(p) => bounds(src, &p, &mut out),
+        Some(p) => bounds(src, &p, &mut out, &mut measured),
         None => out
             .unread
             .push((span_of(&clause), "`where` states no predicate".to_string())),
     }
+    out.measure = measured.unwrap_or_default();
     Some(out)
 }
 
-/// The bounds `e` states on `value`, into `out`.
-fn bounds(src: &str, e: &SyntaxNode, out: &mut crate::hir::Invariant) {
+/// The bounds `e` states on `value`, or on its length, into `out`; and what
+/// they are on, into `measured`, which every bound states alike.
+fn bounds(
+    src: &str,
+    e: &SyntaxNode,
+    out: &mut crate::hir::Invariant,
+    measured: &mut Option<crate::hir::Measure>,
+) {
     let kids: Vec<SyntaxNode> = e.children().filter(|c| is_expr(c.kind())).collect();
     let unread = |out: &mut crate::hir::Invariant, why: &str| {
         out.unread.push((span_of(e), why.to_string()));
     };
     match e.kind() {
-        K::ParenExpr if kids.len() == 1 => bounds(src, &kids[0], out),
+        K::ParenExpr if kids.len() == 1 => bounds(src, &kids[0], out, measured),
         K::BinaryExpr if kids.len() == 2 => {
             let Some(op) = own_tokens(e).into_iter().next() else {
                 return unread(out, "a bound needs its comparison");
             };
             if op.kind() == K::Amp {
-                bounds(src, &kids[0], out);
-                bounds(src, &kids[1], out);
+                bounds(src, &kids[0], out, measured);
+                bounds(src, &kids[1], out, measured);
                 return;
             }
             let compared = matches!(op.kind(), K::Cmp | K::LAngle | K::RAngle)
@@ -1838,24 +1848,47 @@ fn bounds(src: &str, e: &SyntaxNode, out: &mut crate::hir::Invariant) {
                      joined by `&`",
                 );
             }
-            let is_value =
-                |n: &SyntaxNode| n.kind() == K::NameExpr && text(src, n).trim() == "value";
+            // What a side bounds: `value`, or its length (ADR-0225), as
+            // written, whatever the spacing.
+            let subject = |n: &SyntaxNode| -> Option<crate::hir::Measure> {
+                let written: String = text(src, n).split_whitespace().collect();
+                match written.as_str() {
+                    "value" if n.kind() == K::NameExpr => Some(crate::hir::Measure::Value),
+                    "String.length(value)" => Some(crate::hir::Measure::Length),
+                    _ => None,
+                }
+            };
             // `value >= 1`, or `1 <= value` read the other way round.
-            let (op, k) = match (is_value(&kids[0]), integer(&kids[1])) {
-                (true, Some(k)) => (op.text().to_string(), k),
-                _ => match (integer(&kids[0]), is_value(&kids[1])) {
-                    (Some(k), true) => {
+            let (measure, op, k) = match (subject(&kids[0]), integer(&kids[1])) {
+                (Some(m), Some(k)) => (m, op.text().to_string(), k),
+                _ => match (integer(&kids[0]), subject(&kids[1])) {
+                    (Some(k), Some(m)) => {
                         let flipped = match op.text() {
                             "<" => ">",
                             "<=" => ">=",
                             ">" => "<",
                             _ => "<=",
                         };
-                        (flipped.to_string(), k)
+                        (m, flipped.to_string(), k)
                     }
-                    _ => return unread(out, "a bound compares `value` with an integer"),
+                    _ => {
+                        return unread(
+                            out,
+                            "a bound compares `value`, or `String.length(value)`, with an \
+                             integer",
+                        );
+                    }
                 },
             };
+            match measured {
+                Some(m) if *m != measure => {
+                    return unread(
+                        out,
+                        "an invariant bounds one thing: `value`, or `String.length(value)`",
+                    );
+                }
+                _ => *measured = Some(measure),
+            }
             match op.as_str() {
                 ">=" => out.at_least = Some(out.at_least.map_or(k, |lo| lo.max(k))),
                 ">" => out.at_least = Some(out.at_least.map_or(k + 1, |lo| lo.max(k + 1))),
