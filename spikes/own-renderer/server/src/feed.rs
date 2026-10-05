@@ -79,11 +79,13 @@ fn user_of(session: &str) -> String {
 }
 
 fn user_val(state: &State, id: &str) -> Val {
-    let (handle, name) = state
-        .users
-        .get(id)
-        .cloned()
-        .unwrap_or_else(|| ("@you".to_string(), "You".to_string()));
+    // A session's own user, which signed up as no one: a guest named for its
+    // session, the same to every reader. Until ADR-0220 it was "You" to
+    // every reader.
+    let (handle, name) = state.users.get(id).cloned().unwrap_or_else(|| {
+        let session = id.strip_prefix("u-").unwrap_or(id);
+        (format!("@{session}"), format!("Guest {session}"))
+    });
     Val::Record(vec![
         ("id".into(), Val::String(id.to_string())),
         ("handle".into(), Val::String(handle)),

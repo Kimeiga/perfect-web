@@ -62,8 +62,9 @@ MUTANTS = [
     (
         "the style is in the body",
         SERVER,
-        "{metadata}<style>{STYLE}</style>\\n</head>\\n<body>\\n{body}\\n\\\n",
-        "{metadata}</head>\\n<body>\\n{body}\\n\\\n         <style>{STYLE}</style>\\n\\\n",
+        # Re-anchored by ADR-0220: the style is the data layer's.
+        "{metadata}{style}</head>\\n<body>\\n{body}\\n\\\n",
+        "{metadata}</head>\\n<body>\\n{body}\\n\\\n         {style}\\\n",
     ),
 ]
 

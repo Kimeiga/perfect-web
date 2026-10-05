@@ -1866,3 +1866,11 @@ app's second step).
   saw a post when the page was next loaded. Each other session whose open
   page reads a query the commit dropped, whole or by a shared key, is read
   again and sent the change, after the author is answered.
+[ADR-0220](DECISIONS/ADR-0220-the-feed-is-served-in-browsers.md): the feed
+is served in browsers by the host that serves the store (the feed's third
+step).
+- A browser opened its stream at once, and the drain regenerated the store's
+  cart for every program: the feed's page was told to reload, for ever. A
+  layer with no session entry drains nothing, a page's style is its layer's,
+  and a guest is named for its session. The feed runs in three engines on
+  hosts of its own.

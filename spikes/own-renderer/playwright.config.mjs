@@ -89,6 +89,10 @@ export const KIOKUN_PORT = PORT + 40;
 // built into `dist-keyed` by `keyed-store.sh`. One per engine, because which
 // category is slow is one per server. Served only when it is built.
 export const KEYED_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 50 + i]));
+// The feed reference app's hosts (ADR-0220): a second program on the same
+// server, built into `dist-feed` by `feed.sh`. One per engine, because a
+// post is every reader's. Served only when it is built.
+export const FEED_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 60 + i]));
 // A build serves the runtime it was built with. One built before the runtime
 // changed runs the old runtime against the new server, and fails for a reason
 // that is no test's: `dist-keyed` did, once each page's subscription named
@@ -133,6 +137,16 @@ if (KEYED_STALE) {
   console.warn(`${KEYED_WHY}: e2e/keyed.spec.mjs is not run; run keyed-store.sh again`);
 }
 const KEYED_BUILT = existsSync(new URL("./dist-keyed/build", import.meta.url)) && !KEYED_STALE;
+// The feed's build, held to the same: its runtime and its sources.
+const FEED_WHY = !existsSync(new URL("./dist-feed/build", import.meta.url))
+  ? null
+  : builtWith("dist-feed") !== RUNTIME
+    ? "dist-feed was built with another pw-runtime.mjs"
+    : changedSince("dist-feed");
+if (FEED_WHY !== null) {
+  console.warn(`${FEED_WHY}: e2e/feed.spec.mjs is not run; run feed.sh again`);
+}
+const FEED_BUILT = existsSync(new URL("./dist-feed/build", import.meta.url)) && FEED_WHY === null;
 
 const HOSTS = process.env.PW_PERFORMANCE
   ? [MUTABLE_PORTS.performance.chromium]
@@ -151,6 +165,8 @@ export default defineConfig({
     ...(process.env.PW_PERFORMANCE ? [] : ["**/performance.spec.mjs"]),
     // The keyed store's suite needs its build (`keyed-store.sh`).
     ...(KEYED_BUILT ? [] : ["**/keyed.spec.mjs"]),
+    // The feed's needs its (`feed.sh`).
+    ...(FEED_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/feed.spec.mjs"]),
   ],
   fullyParallel: true,
   reporter: [["list"]],
@@ -171,6 +187,15 @@ export default defineConfig({
     ...(KEYED_BUILT && !process.env.PW_PERFORMANCE
       ? Object.values(KEYED_PORTS).map((port) => ({
           command: `../../target/debug/pw-dev-server dist-keyed`,
+          env: { PORT: String(port) },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))
+      : []),
+    ...(FEED_BUILT && !process.env.PW_PERFORMANCE
+      ? Object.values(FEED_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist-feed`,
           env: { PORT: String(port) },
           port,
           reuseExistingServer: !!process.env.PW_REUSE,

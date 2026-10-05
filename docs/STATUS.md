@@ -13,6 +13,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0220, 2026-10-05: the feed is served in browsers** (the feed, third
+step). The first browser to open it was told to reload for ever. A stream's
+request drained the session, and the drain regenerated the store's cart for
+every program, on a page with no cart. A layer with no session entry drains
+nothing now. Every program's page carried the store's menu style, and a
+guest's post read "You" to every reader. The feed runs in three engines on
+hosts of its own: posting, a post reaching another open reader, likes, a
+thread, a 404 (`just e14-feed`).
+
 **ADR-0219, 2026-10-05: what a commit drops reaches every session that
 reads it** (the feed, second step). A commit told the session that made it,
 and another reader's open timeline saw a post when the page was next

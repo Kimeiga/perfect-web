@@ -715,6 +715,15 @@ what it invalidates. **Its sandbox is checked, not
 enforced** (ADR-0124, E14-I): no hidden file is copied in, and a process in
 it can read the repository by absolute path.
 
+**Every page's resume manifest names the document schema `cart-doc`**
+(found by ADR-0220), and so does the browser's resume decision. The two
+agree for every program, so the check compares a constant with itself and
+tells no document from another.
+
+**A `<textarea>`'s bound value is rendered as an attribute** (found by
+ADR-0220): `<textarea value="…">`. A non-empty first value shows nothing
+until the runtime sets it.
+
 **A commit reaches another session's open page by the query it reads, not
 by its key** (ADR-0219). A like drops one post's `Thread`, and every open
 thread page is read again; each other one is sent no change, from the cache.

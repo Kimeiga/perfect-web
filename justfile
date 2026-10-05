@@ -2708,6 +2708,30 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0220: the feed reference app, served in browsers by the host that
+# serves the store. The server's tests, the feed in three engines, and the
+# mutation controls.
+e14-feed:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0220 - the feed reference app, served in browsers by the host that serves the store"; echo; \
+       echo "produced by: just e14-feed"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- the_feeds_page_opening_its_stream_is_not_told_to_reload a_page_carries_its_data_layers_style_and_no_other a_guests_post_names_the_guest_to_every_reader 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/feed_served_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/feed_served_mutations.py; \
+     } > docs/evidence/E14/feed.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/feed.txt
+
 # ADR-0219: what a commit drops reaches every session that reads it
 e14-cross-session:
     @mkdir -p docs/evidence/E14
@@ -4062,6 +4086,7 @@ e10-handlers:
 e10-browser engines="chromium firefox webkit" out="docs/evidence/E10/browser-suite.txt":
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @bash spikes/own-renderer/keyed-store.sh > /dev/null
+    @bash spikes/own-renderer/feed.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server
     @{ echo "E10 - the store page, compiled commands and handlers, in browser engines: {{engines}}"; echo; \
        echo "produced by: just e10-browser \"{{engines}}\" {{out}}"; \

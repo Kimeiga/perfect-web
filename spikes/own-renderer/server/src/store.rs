@@ -781,4 +781,8 @@ impl crate::data::DataLayer for StoreData {
     fn session_entry(&self) -> bool {
         true
     }
+
+    fn style(&self) -> &'static str {
+        crate::STYLE
+    }
 }

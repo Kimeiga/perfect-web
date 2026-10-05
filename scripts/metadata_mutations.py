@@ -307,8 +307,9 @@ MUTANTS = [
         "the store's page is written without its metadata",
         "server",
         SERVER,
-        "         <title>{title}</title>\\n{metadata}<style>",
-        "         <title>{title}</title>\\n<style>",
+        # Re-anchored by ADR-0220: the style is the data layer's.
+        "         <title>{title}</title>\\n{metadata}{style}</head>",
+        "         <title>{title}</title>\\n{style}</head>",
     ),
     (
         "a signal page is written without its metadata",

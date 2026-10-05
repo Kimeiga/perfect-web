@@ -29,6 +29,12 @@ pub(crate) trait DataLayer: Send + Sync {
     /// **The page a document with none recorded is**, where it has one.
     fn default_page(&self) -> Option<&'static str>;
 
+    /// **The style its pages carry in their head** (ADR-0220), where it has
+    /// one: the store's menu's containment (ADR-0187).
+    fn style(&self) -> &'static str {
+        ""
+    }
+
     /// **Whether a session's documents are versioned by an entry of its
     /// own** (the store's cart), which a commit regenerates; otherwise a
     /// commit moves the session's documents on the host's clock.

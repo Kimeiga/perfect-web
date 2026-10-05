@@ -2240,6 +2240,14 @@ impl Server {
 
     /// [`Server::drain`], by a caller that holds the session's lock.
     fn drain_held(&self, session: &str) {
+        // A data layer that keeps no entry for the session has none to
+        // regenerate (ADR-0220): its commits send the session's documents at
+        // the host's clock. Until ADR-0220 the store's cart was regenerated
+        // for every program, and a feed's page, which has no cart, was told
+        // to reload whenever it opened its stream.
+        if !self.data.session_entry() {
+            return;
+        }
         let key = self.cart_key(session);
         let invalidated = self
             .materializer
@@ -6001,6 +6009,7 @@ fn serve_bound(
             &rendered,
             &title,
             &metadata,
+            server.data.style(),
             template,
             &server.templates,
             server.plan_of(page),
@@ -6358,12 +6367,14 @@ fn with_instance_templates(
 }
 
 /// The document shell, with the parts manifest and the runtime: titled as
-/// the page states (ADR-0183).
+/// the page states (ADR-0183), and styled as its data layer styles its pages
+/// (ADR-0220).
 #[allow(clippy::too_many_arguments)]
 fn document(
     body: &str,
     title: &str,
     metadata: &str,
+    style: &str,
     template: &Template,
     templates: &[Template],
     plan: &serde_json::Value,
@@ -6459,11 +6470,17 @@ fn document(
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
     // Laid out at a phone's width, as every page this host serves is
     // (ADR-0182). Its style in its head, where HTML puts it and where it is
-    // read before the body is laid out (ADR-0187).
+    // read before the body is laid out (ADR-0187): its data layer's, and none
+    // where the layer has none. Until ADR-0220 every program's page carried
+    // the store's menu's.
+    let style = match style {
+        "" => String::new(),
+        css => format!("<style>{css}</style>\n"),
+    };
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{title}</title>\n{metadata}<style>{STYLE}</style>\n</head>\n<body>\n{body}\n\
+         <title>{title}</title>\n{metadata}{style}</head>\n<body>\n{body}\n\
          <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         title = pw_render::escape::text(title)
@@ -9528,6 +9545,74 @@ public query Store(",
         );
     }
 
+    /// **The feed's page, opening its stream, is not told to reload**
+    /// (ADR-0220). A stream's request drains the session first, and the
+    /// drain regenerated the store's cart for every program: on the feed's
+    /// page, which has no cart, it read the store's `cart.line_count`, found
+    /// no such part, and told the page to read itself again, which it did,
+    /// for ever.
+    #[test]
+    fn the_feeds_page_opening_its_stream_is_not_told_to_reload() {
+        let s = served_feed();
+        s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        let polled = fetched_as(
+            &s,
+            &format!("/stream?doc={}&since={}", doc.1, doc.1),
+            Some("a"),
+        )
+        .into_iter()
+        .map(|(_, c)| c)
+        .collect::<String>();
+        assert!(polled.starts_with("HTTP/1.1 200"), "{polled}");
+        assert!(!polled.contains("reload"), "{polled}");
+    }
+
+    /// **A page carries its data layer's style, and no other's** (ADR-0220):
+    /// the store's menu's containment (ADR-0187) on the store's page, and
+    /// nothing on the feed's, which has no menu.
+    #[test]
+    fn a_page_carries_its_data_layers_style_and_no_other() {
+        let feed = served_feed();
+        let home = fetched_as(&feed, "/", Some("a"))
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect::<String>();
+        assert!(home.contains("<title>Home</title>"), "{home}");
+        assert!(!home.contains("<style>"), "{home}");
+        let store = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let page = fetched_as(&store, "/StorePage.html", Some("a"))
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect::<String>();
+        assert!(page.contains(&format!("<style>{STYLE}</style>")), "{page}");
+    }
+
+    /// **A guest's post names the guest to every reader** (ADR-0220): a
+    /// session that signed up as no one posts as a guest named for it. Until
+    /// ADR-0220 every reader read "You".
+    #[test]
+    fn a_guests_post_names_the_guest_to_every_reader() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("From a guest".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        let set = format!("{:?}", sets_of(&s, &theirs).pop().expect("a patch set"));
+        assert!(set.contains("Guest a"), "{set}");
+        assert!(!set.contains("You"), "{set}");
+    }
+
     /// **A post sent over HTTP reaches another reader once it is answered**
     /// (ADR-0219): the connection that committed tells the others after its
     /// answer is written and it is closed.
@@ -11797,6 +11882,7 @@ public query Store(",
             &body,
             "Store",
             "",
+            "",
             &templates[0],
             &templates,
             &plan,
@@ -11810,6 +11896,7 @@ public query Store(",
         let manifest = manifest_of(&document(
             &body,
             "Store",
+            "",
             "",
             &templates[0],
             &templates,
