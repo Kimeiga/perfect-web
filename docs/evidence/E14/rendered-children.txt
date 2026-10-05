@@ -1,0 +1,31 @@
+ADR-0204 - an element holds only the children HTML permits, as the page holds them
+
+produced by: just e14-rendered-children
+commit: cabf8519c761c3bd5d8958eee676515b05761a51
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the rule (compiler/pw-core/tests/children_as_rendered.rs)
+
+test a_view_is_the_elements_it_renders ... ok
+test a_view_that_contains_itself_is_read_once ... ok
+test a_blocks_rows_and_branches_are_the_elements_children ... ok
+test a_view_is_read_through_its_blocks_and_the_views_it_uses ... ok
+test a_view_from_another_module_is_read_where_it_is_declared ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== the corpus's expectations, R-019's among them (compiler/pw-core/tests/checking_source.rs)
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.48s
+
+== mutation controls (scripts/rendered_children_mutations.py)
+
+baseline: 5 passed, 0 failed
+the rule is not run: KILLED (5 of 5 tests fail)
+a view's use is read by its name: KILLED (4 of 5 tests fail)
+what a view renders is never refused: KILLED (4 of 5 tests fail)
+a block's rows are not the element's children: KILLED (2 of 5 tests fail)
+a view is read without the blocks at its top: KILLED (1 of 5 tests fail)
+a view is read without the views it uses: KILLED (2 of 5 tests fail)
+a view's views are resolved where it is used: KILLED (1 of 5 tests fail)
+a view met again is read again: KILLED (1 of 1 tests fail)
+8 of 8 mutants killed

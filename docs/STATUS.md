@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `7d3234b`, with ADR-0202.
+**Reviewed:** 2026-10-05, against master `cabf851`, with ADR-0203 and ADR-0204.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2757,6 +2757,19 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`cabf851` (2026-10-05, ADR-0203 and ADR-0204): `just ci` passes locally, the
+workspace's 1979 tests pass, and the browser suite passes 725 in three
+engines, with 13 skipped. ADR-0203's evidence is
+`docs/evidence/E14/view-instances.txt`, recorded at that commit: the
+compiler's 9 tests, the renderer's and the in-browser renderer's, the thread
+page's 5 tests in three engines, and 27 of 27 mutants killed. ADR-0204's is
+`rendered-children.txt`, at that commit: its 5 tests, the corpus's, and 8 of
+8 mutants killed. Recorded again at that commit: `recursive-types.txt` 17 of
+17, its survivor at `7d3234b` retired with the code it changed; and, their
+mutants re-anchored where the runtime's binding and the plan moved,
+`query-blocks.txt` 9 of 9, `command-answers.txt` 16 of 16, `keyed-reads.txt`
+10 of 10 and 1 of 1, `provide.txt` 29 of 29 and `runtime-recovery.txt` 3 of
+3.
 `7d3234b` (2026-10-05, ADR-0202): `just ci` passes locally, the workspace's
 1960 tests pass, and the browser suite passes 710 in three engines, with 13
 skipped. ADR-0202's evidence is `docs/evidence/E14/boxed-types.txt`,

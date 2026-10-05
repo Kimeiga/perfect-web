@@ -1,12 +1,12 @@
 ADR-0155 - the page keeps its subscription, and recovers a refused handler
 
 produced by: just e14-runtime-recovery
-commit: afa2dce96c48120b182928ff71008608f241b192
+commit: cabf8519c761c3bd5d8958eee676515b05761a51
 playwright: Version 1.58.0
 
 == the browser (e2e/transport.spec.mjs, e2e/recovery.spec.mjs), three engines
 
-  48 passed (20.7s)
+  48 passed (38.5s)
 
 == mutation controls (scripts/runtime_recovery_mutations.py)
 
