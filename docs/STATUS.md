@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `ee7bede`, with ADR-0192.
+**Reviewed:** 2026-10-04, against master `9e53158`, with ADR-0193.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2621,10 +2621,13 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`ee7bede` (2026-10-04, ADR-0192): `just ci` passes locally, the workspace's
-1900 tests pass, and the browser suite passes 701 in three engines, with 13
-skipped. Its evidence is `docs/evidence/E14/home.txt`, recorded at that
-commit: the home page at `/`, in three engines with its audit, and 2 of 2
+`9e53158` (2026-10-04, ADR-0193): `just ci` passes locally, the workspace's
+1904 tests pass, and the browser suite passes 710 in three engines, with 13
+skipped. Its evidence is `docs/evidence/E14/orders.txt`, recorded at that
+commit: an order placed from the cart and followed on its page as the store
+moves it along, in three engines with its audit, and 7 of 7 mutants killed.
+Recorded again at that commit, as its spec changed: `accessibility.txt` 14
+of 14. ADR-0192's is `home.txt`, at `ee7bede`: the home page at `/`, in three engines with its audit, and 2 of 2
 mutants killed. Recorded again at that commit, as their specs or tests
 changed: `stable-layout.txt` 6 of 6, `titles.txt` 16 of 16 and
 `accessibility.txt` 14 of 14. ADR-0191's is `page-speculation.txt`, at

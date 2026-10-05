@@ -1,0 +1,42 @@
+ADR-0193 - an order is placed, and its page follows it
+
+produced by: just e14-orders
+commit: 9e53158e4adc30d73c8080870aa2703bd955044e
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the development server (pw-dev-server)
+
+test tests::an_empty_cart_places_no_order ... ok
+test tests::an_order_is_placed_from_the_cart_and_reaches_its_open_page ... ok
+test tests::the_store_moving_an_order_along_reaches_its_open_page ... ok
+test result: ok. 117 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.48s
+
+== the order's flow, in three engines (e2e/pages.spec.mjs, e2e/accessibility.spec.mjs)
+
+  ✓   4 [chromium] › e2e/pages.spec.mjs:158:1 › an empty cart places no order, and says so (486ms)
+  ✓   2 [firefox] › e2e/pages.spec.mjs:158:1 › an empty cart places no order, and says so (1.4s)
+  ✓   5 [chromium] › e2e/accessibility.spec.mjs:184:1 › the order's page keeps every rule, as the store moves it along (2.2s)
+  ✓   1 [chromium] › e2e/pages.spec.mjs:128:1 › an order is placed from the cart, and its page follows it as the store moves it along (2.2s)
+  ✓   8 [chromium] › e2e/accessibility.spec.mjs:358:1 › every control is reached from the keyboard, in the order it is read, and shows its focus (1.1s)
+  ✓   3 [firefox] › e2e/pages.spec.mjs:128:1 › an order is placed from the cart, and its page follows it as the store moves it along (2.2s)
+  ✓   6 [firefox] › e2e/accessibility.spec.mjs:184:1 › the order's page keeps every rule, as the store moves it along (2.9s)
+  ✓   9 [webkit] › e2e/pages.spec.mjs:158:1 › an empty cart places no order, and says so (671ms)
+  ✓   7 [webkit] › e2e/accessibility.spec.mjs:184:1 › the order's page keeps every rule, as the store moves it along (2.6s)
+  ✓  10 [webkit] › e2e/pages.spec.mjs:128:1 › an order is placed from the cart, and its page follows it as the store moves it along (1.5s)
+  ✓  11 [firefox] › e2e/accessibility.spec.mjs:358:1 › every control is reached from the keyboard, in the order it is read, and shows its focus (1.3s)
+  ✓  12 [webkit] › e2e/accessibility.spec.mjs:358:1 › every control is reached from the keyboard, in the order it is read, and shows its focus (1.2s)
+  12 passed (22.9s)
+
+== mutation controls (scripts/orders_mutations.py)
+
+baseline: 3 passed, 0 failed
+an empty cart places an order: KILLED (1 of 3 tests fail)
+a placed order leaves the cart as it was: KILLED (1 of 3 tests fail)
+a placed order is not recorded: KILLED (1 of 3 tests fail)
+the store's change is not sent: KILLED (1 of 3 tests fail)
+the store's change is sent against the cart's entry: KILLED (1 of 3 tests fail)
+the store's change is sent at a version that does not advance: KILLED (1 of 3 tests fail)
+the cart's value is sent with the store's change: KILLED (1 of 3 tests fail)
+7 of 7 mutants killed
