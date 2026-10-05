@@ -1,0 +1,33 @@
+// @corpus: accepted
+// @id: A-031
+// @category: a form control's value where HTML reads it
+// @charter: §8.2
+// @milestone: 14
+//
+// A `<textarea>`'s value is its text, so a draft bound to a signal is
+// written between its tags, and shown before any script runs (ADR-0221). A
+// `<select>`'s value is the option it marks `selected`.
+
+module feed.compose
+
+page Compose() {
+    route "/compose"
+    cache private
+
+    signal draft: String = "What's happening?"
+
+    view {
+        <title>Compose</title>
+        <main>
+            <h1>Compose</h1>
+            <label>Post <textarea bind:value={draft}></textarea></label>
+            <label>Who can reply
+                <select>
+                    <option value="everyone" selected>Everyone</option>
+                    <option value="following">People you follow</option>
+                </select>
+            </label>
+            <p>{draft}</p>
+        </main>
+    }
+}

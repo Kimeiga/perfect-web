@@ -113,7 +113,10 @@ MUTANTS = [
     (
         "a URL attribute is set in place",
         PLAN,
-        "        Part::Attribute { context, .. } => *context == Context::Attribute,\n",
+        # Re-anchored by ADR-0221: a textarea's value is set in place too.
+        "        Part::Attribute { context, .. } => {\n"
+        "            matches!(context, Context::Attribute | Context::Content)\n"
+        "        }\n",
         "        Part::Attribute { .. } => true,\n",
     ),
 ]

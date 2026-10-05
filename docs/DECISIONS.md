@@ -1874,3 +1874,9 @@ step).
   layer with no session entry drains nothing, a page's style is its layer's,
   and a guest is named for its session. The feed runs in three engines on
   hosts of its own.
+[ADR-0221](DECISIONS/ADR-0221-a-form-controls-value-is-written-where-html-reads-it.md):
+a form control's value is written where HTML reads it (found by the feed).
+- `bind:value` on a `<textarea>` was written as an attribute it does not
+  have: a first value showed nothing until a script ran. It is written as
+  the textarea's text now. PW5036 refuses a `<select>`'s value, which is the
+  option it marks `selected`, and what no change would set again.

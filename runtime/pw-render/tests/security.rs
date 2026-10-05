@@ -71,6 +71,18 @@ fn one_hole(context: Context) -> Template {
             },
             "</div>".to_string(),
         ),
+        // A `<textarea>`'s value, written as its text (ADR-0221).
+        Context::Content => (
+            "<textarea data-pw=\"0\">".to_string(),
+            Part::Attribute {
+                id: PartId(0),
+                owner: ElementId(0),
+                name: "value".into(),
+                value: "v".into(),
+                context,
+            },
+            "</textarea>".to_string(),
+        ),
     };
     Template {
         path: "t.T".into(),
@@ -117,6 +129,44 @@ fn text_injection_becomes_inert_text() {
     let out = render_hostile(Context::Text, "<script>alert(1)</script>");
     assert!(!out.contains("<script"), "{out}");
     assert_eq!(out, "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>");
+}
+
+/// **A `<textarea>`'s value is its text** (ADR-0221): escaped as text
+/// between its tags, a newline it starts with kept by writing one more, and
+/// sent in a patch as an attribute's value, which is how a patch reads.
+#[test]
+fn a_textareas_value_is_its_text() {
+    assert_eq!(
+        render_hostile(Context::Content, "</textarea><script>alert(1)</script>"),
+        "<textarea data-pw=\"0\">&lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;</textarea>"
+    );
+    assert_eq!(
+        render_hostile(Context::Content, "a & b"),
+        "<textarea data-pw=\"0\">a &amp; b</textarea>"
+    );
+    // The parser drops the newline after the start tag: one more keeps the
+    // value's own.
+    assert_eq!(
+        render_hostile(Context::Content, "\nfirst line"),
+        "<textarea data-pw=\"0\">\n\nfirst line</textarea>"
+    );
+    assert_eq!(
+        render_hostile(Context::Content, "\r\nfirst line"),
+        "<textarea data-pw=\"0\">\n\r\nfirst line</textarea>"
+    );
+    assert_eq!(
+        render_hostile(Context::Content, ""),
+        "<textarea data-pw=\"0\"></textarea>"
+    );
+    let t = one_hole(Context::Content);
+    let Chunk::Dynamic(part) = &t.chunks[1] else {
+        panic!("the part");
+    };
+    let env = Env::new().set("v", Value::Text("say \"hi\"".to_string()));
+    assert_eq!(
+        attribute_value(part, &env).expect("written"),
+        Some(("value".to_string(), Some("say &quot;hi&quot;".to_string())))
+    );
 }
 
 #[test]
@@ -293,6 +343,7 @@ fn the_matrix_can_fail() {
             Context::Url => format!("<a href=\"{value}\">x</a>"),
             Context::Style => format!("<div style=\"{value}\"></div>"),
             Context::RawHtml => format!("<div>{value}</div>"),
+            Context::Content => format!("<textarea data-pw=\"0\">{value}</textarea>"),
         }
     }
 
@@ -323,6 +374,13 @@ fn the_matrix_can_fail() {
             Context::Style,
             "width: expression(alert(1))",
             |o| !o.contains("expression"),
+        ),
+        // ADR-0221: a value that closes its `<textarea>` and opens a script.
+        (
+            "textarea breakout",
+            Context::Content,
+            "</textarea><script>alert(1)</script>",
+            |o| o.matches("</textarea>").count() == 1 && !o.contains("<script"),
         ),
     ];
 

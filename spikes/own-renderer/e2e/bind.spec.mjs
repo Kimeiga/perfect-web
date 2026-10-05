@@ -9,6 +9,9 @@
 // - a field inside a signal's block keeps its focus, and stays the same
 //   element, while typed in;
 // - markup typed is text.
+//
+// ADR-0221: and a `<textarea>`'s first value is its text, shown with
+// scripts off; typing sets its signal, and a handler sets it back.
 import { expect, test } from "@playwright/test";
 
 const PAGE = "/page/demo.bind.BindPage";
@@ -24,6 +27,34 @@ test("the server renders the first value", async ({ request }) => {
   expect(markup).toMatch(/<input[^>]*id="name"[^>]*value="Ada"/);
   expect(markup).toContain("Hello, <!--pw:");
   expect(markup).toContain(">Ada<!--pw:");
+});
+
+test("a textarea's first value is its text, shown with scripts off", async ({
+  browser,
+  request,
+}) => {
+  const html = await (await request.get(PAGE)).text();
+  const markup = html.split('<script type="application/json"')[0];
+  const textarea = markup.match(/<textarea[^>]*id="bio"[^>]*>([^<]*)<\/textarea>/);
+  expect(textarea, markup).not.toBeNull();
+  expect(textarea[0]).not.toMatch(/<textarea[^>]* value=/);
+  expect(textarea[1]).toBe("Writes about\ntype systems.");
+  const off = await browser.newContext({ javaScriptEnabled: false });
+  const page = await off.newPage();
+  await page.goto(PAGE);
+  await expect(page.locator("#bio")).toHaveValue("Writes about\ntype systems.");
+  await off.close();
+});
+
+test("typing in a textarea sets its signal, and a handler sets it back", async ({ page }) => {
+  await ready(page);
+  const bio = page.locator("#bio");
+  await expect(bio).toHaveValue("Writes about\ntype systems.");
+  await bio.fill("Grace writes compilers.");
+  await expect(page.locator("#bio-echo")).toHaveText("Grace writes compilers.");
+  await page.locator("#clear-bio").click();
+  await expect(bio).toHaveValue("");
+  await expect(page.locator("#bio-echo")).toHaveText("");
 });
 
 test("typing sets the signal, and what reads it", async ({ page }) => {

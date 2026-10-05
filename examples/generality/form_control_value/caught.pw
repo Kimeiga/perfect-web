@@ -1,0 +1,12 @@
+// @status: GENERAL
+// @invariant: form_control_value
+//
+// Structurally different from R-057: a view's `<textarea>`, given its value
+// by a parameter. Written as its text, it is shown; but no change sets it
+// again, and a person types into a field whose value is the page's first.
+
+module generality.form_textarea_prop
+
+view Reply(draft: String) !{} {
+    <textarea aria-label="Reply" value={draft}></textarea>
+}

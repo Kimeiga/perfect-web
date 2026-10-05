@@ -755,3 +755,26 @@ Generality at open:        41/41 invariants generality-tested
 | R-056 | added: a misspelt case in a pattern (`PW0608`) | new category |
 | `case_name_capitalized` | a GENERAL witness, a lowercase case with a payload in a generic type, and a NEIGHBOUR one, cases with capitals, digits and underscores | new invariant |
 | `pattern_constructor` | a GENERAL witness, a misspelt case nested in an `Option`'s, and a NEIGHBOUR one, a binding named like a case in lowercase | new witnesses |
+
+## C15: a form control's value where HTML reads it, 2026-10-05
+
+Opened because the specification changed: a form control's value is written
+where HTML reads it, a `<textarea>`'s as its text and a `<select>`'s by the
+option it marks `selected` (`PW5036`).
+[ADR-0221](DECISIONS/ADR-0221-a-form-controls-value-is-written-where-html-reads-it.md)
+is the decision. No invariant is retired, no `@expect-error` line of an
+earlier fixture changed, and no fixture moved.
+
+```text
+Corpus version:            C15
+Accepted programs:         31
+Rejected programs:         57
+Charter categories:        31/31 accepted, 57/57 rejected
+Generality at open:        42/42 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-031 | added: a draft bound to a `<textarea>`, and a `<select>` whose chosen option is marked | new category, `a form control's value where HTML reads it` |
+| R-057 | added: a `<select>` bound to a signal (`PW5036`) | new category |
+| `form_control_value` | a GENERAL witness, a view's `<textarea>` given its value by a parameter, and a NEIGHBOUR one, a textarea's value as a signal and as its text, and a select's option marked `selected` | new invariant |

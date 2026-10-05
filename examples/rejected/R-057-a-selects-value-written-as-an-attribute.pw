@@ -1,0 +1,36 @@
+// @corpus: rejected
+// @id: R-057
+// @category: a select's value written as an attribute
+// @rule: PW5036
+// @invariant: form_control_value
+// @charter: §8.2
+// @milestone: 14
+// @expect-error: `bind:value` on a `<select>` is written as an attribute HTML does not read: a select's value is the `<option>` it marks `selected`
+// @expect-error: a form control's value is written where HTML reads it: a `<textarea>`'s as its text, a signal or text, once; a `<select>`'s by the option it marks `selected`
+//
+// A `<select>` has no `value` attribute: HTML shows the option it marks
+// `selected`, or else its first. Bound to a signal whose first value is
+// another option, the page would show the first until a script ran, and
+// with scripts off for good.
+
+module feed.audience
+
+page Audience() {
+    route "/audience"
+    cache private
+
+    signal audience: String = "following"
+
+    view {
+        <title>Audience</title>
+        <main>
+            <label>Who can reply
+                <select bind:value={audience}>
+                    <option value="everyone">Everyone</option>
+                    <option value="following">People you follow</option>
+                </select>
+            </label>
+            <p>{audience}</p>
+        </main>
+    }
+}

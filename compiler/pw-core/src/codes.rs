@@ -540,6 +540,11 @@ codes! {
     // it and nothing reads it.
     LINK_NOT_IN_BODY = "PW5035" / link_not_in_body / 1, Markup,
         "a `<link>` in markup is one HTML allows in the body: each relation body-ok, or an item's property";
+    // ADR-0221: `<textarea bind:value={draft}>` was written as an attribute
+    // a textarea does not have, and a first value showed nothing until the
+    // runtime set it; a `<select>`'s likewise. Found by the feed (ADR-0220).
+    FORM_CONTROL_VALUE = "PW5036" / form_control_value / 1, Markup,
+        "a form control's value is written where HTML reads it: a `<textarea>`'s as its text, a signal or text, once; a `<select>`'s by the option it marks `selected`";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

@@ -76,6 +76,8 @@ fn check_body(
     let lexical = Lexical::build(decl, body);
     // The module signals it names, provided to it (ADR-0144).
     let named = module_signals_named(sigs, at, &lexical, body);
+    // Where a form control's value is written (ADR-0221), signals or none.
+    form_controls(body, &lexical, &named, out);
     let handlers = handlers(body);
     // A `<dialog>` is the dialog rule's, signals or none (ADR-0141).
     let dialog = body.walk().into_iter().any(|id| match body.expr(id) {
@@ -390,12 +392,14 @@ fn bindings(
             if !body.bound.contains(handler) {
                 continue;
             }
+            // A `<select>`'s is the option it marks, which is PW5036's to
+            // say (ADR-0221).
             if !matches!(tag.as_str(), "input" | "textarea" | "select") {
                 out.push(bound_value(
                     a.span.clone(),
                     format!(
                         "`<{tag}>` has no value a person types: `bind:value` binds an \
-                         `<input>`, a `<textarea>` or a `<select>`"
+                         `<input>` or a `<textarea>`"
                     ),
                 ));
                 continue;
@@ -488,6 +492,149 @@ fn bound_value(at: crate::hir::Span, message: String) -> Diagnostic {
             description: "declare `signal s: String = \"\"` and write `bind:value={s}`".to_string(),
             replacement: None,
         }],
+    }
+}
+
+/// **A form control's value is written where HTML reads it** (ADR-0221,
+/// PW5036). A `<textarea>` reads its value from its text, so its `value` is
+/// written there: a signal, which the browser sets in place, or text, and
+/// never both a value and text. A `<select>` reads its value from the
+/// `<option>` it marks `selected`, so a `value` on it is refused, `bind:value`
+/// too, until a page computes which option that is. Until ADR-0221 each was
+/// written as an attribute HTML ignores.
+fn form_controls(
+    body: &Body,
+    lexical: &Lexical,
+    named: &[(DefId, ExprId)],
+    out: &mut Vec<Diagnostic>,
+) {
+    let mut roots = Vec::new();
+    for id in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(id) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    // The body's signals by their binders, and a module's by where they are
+    // named.
+    let declared: BTreeSet<Binder> = body
+        .walk()
+        .into_iter()
+        .filter_map(|id| match body.expr(id) {
+            Expr::Let { pat: Some(p), .. } if body.signals.contains(&id) => {
+                Some(Binder::Pattern(*p))
+            }
+            _ => None,
+        })
+        .collect();
+    let is_signal = |e: ExprId| {
+        lexical.binder(e).is_some_and(|b| declared.contains(&b))
+            || named.iter().any(|(_, at)| *at == e)
+    };
+    for n in body.walk_markup(&roots) {
+        let Node::Element {
+            tag,
+            attrs,
+            children,
+            ..
+        } = body.node(n)
+        else {
+            continue;
+        };
+        let control = tag.to_ascii_lowercase();
+        let value = attrs
+            .iter()
+            .find(|a| a.name.eq_ignore_ascii_case("value") && a.event().is_none());
+        // `bind:value` wrote a handler beside the value (ADR-0142).
+        let bound = attrs
+            .iter()
+            .any(|a| matches!(&a.value, AttrValue::Expr(h) if body.bound.contains(h)));
+        let written = if bound { "`bind:value`" } else { "`value`" };
+        let message = match (control.as_str(), value) {
+            ("select", Some(_)) => Some(format!(
+                "{written} on a `<select>` is written as an attribute HTML does not read: a \
+                 select's value is the `<option>` it marks `selected`"
+            )),
+            ("textarea", Some(_)) if !children.is_empty() => Some(
+                "a `<textarea>` has a value and text, and its text is its value: write one"
+                    .to_string(),
+            ),
+            ("textarea", Some(a)) => match &a.value {
+                AttrValue::Expr(e) if matches!(body.expr(*e), Expr::Name(_)) && is_signal(*e) => {
+                    None
+                }
+                AttrValue::Expr(_) => Some(format!(
+                    "{written} on a `<textarea>` is a value no change sets again: a textarea's \
+                     value is a signal, which the browser sets in place, or text"
+                )),
+                AttrValue::Static(_) | AttrValue::None => None,
+            },
+            ("textarea", None)
+                if children
+                    .iter()
+                    .any(|c| !matches!(body.node(*c), Node::Text(_))) =>
+            {
+                Some(
+                    "a `<textarea>`'s text holds a value, which would be written between \
+                     markers it shows as text: its value is `value={s}`, a signal"
+                        .to_string(),
+                )
+            }
+            _ => None,
+        };
+        let Some(message) = message else { continue };
+        // Where it is written, and its boundary (charter §16.3): the element
+        // it is written on, or the text a value meets.
+        let element = body.node_span(n);
+        let (primary, related) = match value {
+            Some(a) if control == "textarea" && !children.is_empty() => (
+                a.span.clone(),
+                Related {
+                    span: body.node_span(children[0]),
+                    label: "its text".to_string(),
+                },
+            ),
+            Some(a) => (
+                a.span.clone(),
+                Related {
+                    span: element,
+                    label: format!("the `<{control}>` it is written on"),
+                },
+            ),
+            None => (
+                children
+                    .iter()
+                    .find(|c| !matches!(body.node(**c), Node::Text(_)))
+                    .map(|c| body.node_span(*c))
+                    .unwrap_or_else(|| element.clone()),
+                Related {
+                    span: element,
+                    label: "the `<textarea>` whose text it is in".to_string(),
+                },
+            ),
+        };
+        let code = crate::codes::FORM_CONTROL_VALUE;
+        out.push(Diagnostic {
+            code: code.id,
+            invariant: code.invariant,
+            reason: "form_control_value",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message,
+            primary_span: primary,
+            related: vec![related],
+            explanation: Some(
+                "HTML reads a `<textarea>`'s value from its text and a `<select>`'s from the \
+                 `<option>` it marks `selected`; neither has a `value` attribute. A value                  written as one shows nothing until a script sets it, and nothing with                  scripts off. A textarea's value is written as its text, from a signal the                  browser sets in place as it is typed, or as text."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: match control.as_str() {
+                    "select" => "mark the chosen `<option>` with `selected={..}`".to_string(),
+                    _ => "write `bind:value={s}`, `s` a signal, or the text alone".to_string(),
+                },
+                replacement: None,
+            }],
+        });
     }
 }
 

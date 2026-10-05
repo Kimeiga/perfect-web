@@ -37,6 +37,12 @@ pub enum Context {
     /// Emitted verbatim. Reachable only from a value that carries the
     /// capability, never from an ordinary string — see [`Part::RawHtml`].
     RawHtml,
+    /// **A form control's value, written as its text** (ADR-0221): a
+    /// `<textarea>`'s `value`, which HTML reads from the element's content
+    /// and from no attribute. Escaped as text, so no `</textarea>` in it ends
+    /// the element, and a leading newline doubled, since the parser drops
+    /// the one after the start tag. A patch carries it as an attribute's.
+    Content,
 }
 
 impl Context {

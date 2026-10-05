@@ -720,9 +720,11 @@ it can read the repository by absolute path.
 agree for every program, so the check compares a constant with itself and
 tells no document from another.
 
-**A `<textarea>`'s bound value is rendered as an attribute** (found by
-ADR-0220): `<textarea value="…">`. A non-empty first value shows nothing
-until the runtime sets it.
+**A `<select>` is not bound to a signal, and a `<textarea>`'s value is a
+signal or text** (ADR-0221, PW5036). A select's chosen option is marked
+`selected={..}` until computed holes (ruling 0073-a) can mark the one whose
+value a signal holds. A textarea a query fills waits for a patch the runtime
+applies to its default value.
 
 **A commit reaches another session's open page by the query it reads, not
 by its key** (ADR-0219). A like drops one post's `Thread`, and every open

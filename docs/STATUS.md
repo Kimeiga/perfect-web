@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0221, 2026-10-05: a form control's value is written where HTML reads
+it** (found by the feed). `bind:value` on a `<textarea>` was written as a
+`value` attribute, which a textarea does not have: a first value showed
+nothing until a script ran, and nothing with scripts off. It is the
+textarea's text now, escaped, a leading newline doubled. PW5036 refuses a
+`<select>`'s value, which is the option it marks `selected`, and a
+textarea's value no change would set again. Corpus C15; generality is 42 /
+42 (`just e14-form-controls`).
+
 **ADR-0220, 2026-10-05: the feed is served in browsers** (the feed, third
 step). The first browser to open it was told to reload for ever. A stream's
 request drained the session, and the drain regenerated the store's cart for

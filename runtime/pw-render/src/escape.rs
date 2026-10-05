@@ -38,6 +38,21 @@ pub fn text(value: &str) -> String {
     out
 }
 
+/// **A form control's value, written as its text** (ADR-0221): a
+/// `<textarea>`'s, between its tags. Text's escaping, so no `</textarea>` in
+/// the value ends the element and no `&` reads as a reference. And a newline
+/// first doubled: the parser drops one newline after a `<textarea>`'s start
+/// tag ("as an authoring convenience"), so a value that starts with one would
+/// lose it. A carriage return reaches the parser as a newline.
+pub fn content(value: &str) -> String {
+    let lead = if value.starts_with(['\n', '\r']) {
+        "\n"
+    } else {
+        ""
+    };
+    format!("{lead}{}", text(value))
+}
+
 /// A double-quoted attribute value.
 ///
 /// `"` is the one that breaks out. `&` because an entity would otherwise be

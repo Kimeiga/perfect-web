@@ -60,6 +60,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "a type that contains itself through a list",
     // ADR-0197, corpus C14: a pattern's name by its capital.
     "cases and bindings told apart by their capital",
+    // ADR-0221, corpus C15: a form control's value where HTML reads it.
+    "a form control's value where HTML reads it",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -140,6 +142,8 @@ const REJECTED_CATEGORIES: &[&str] = &[
     // ADR-0197, corpus C14: PW0625 and PW0608.
     "a case named in lowercase",
     "a misspelt case in a pattern",
+    // ADR-0221, corpus C15: PW5036.
+    "a select's value written as an attribute",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

@@ -1777,6 +1777,23 @@ fn emit_part<'o>(
             Ok(())
         }
 
+        // A form control's value is its text (ADR-0221): written between
+        // its tags, where HTML reads it, and not as an attribute it does not
+        // have.
+        Part::Attribute {
+            value,
+            context: Context::Content,
+            ..
+        } => {
+            let s = env
+                .get(value)
+                .and_then(Value::as_str)
+                .ok_or(Blocked::MissingValue {
+                    path: value.clone(),
+                })?;
+            out.push_str(&escape::content(&s));
+            Ok(())
+        }
         // Each attribute's value is [`attribute_value`]'s, which a patch to
         // it carries too (ADR-0168).
         Part::Attribute { .. } | Part::InterpolatedAttribute { .. } => {
@@ -2081,5 +2098,8 @@ fn escaped(value: &str, context: Context) -> String {
         Context::Url => escape::url(value),
         Context::Style => escape::style(value),
         Context::RawHtml => value.to_string(),
+        // As an attribute's, which a patch to it carries (ADR-0221): the
+        // document writes it as text, in `emit`.
+        Context::Content => escape::attribute(value),
     }
 }

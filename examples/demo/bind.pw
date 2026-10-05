@@ -8,6 +8,9 @@
 // is typed. What reads the signal is set in place, the field's own value
 // included, though never from the field's own typing. Inside a block a signal
 // decides, the field keeps its focus while typed in.
+//
+// ADR-0221: a `<textarea>`'s value is its text, so its first value is
+// written between its tags, and shown with scripts off.
 
 module demo.bind
 
@@ -19,6 +22,7 @@ page BindPage() {
     signal name: String = "Ada"
     signal editing: Bool = false
     signal note: String = ""
+    signal bio: String = "Writes about\ntype systems."
 
     view {
         <main>
@@ -31,6 +35,9 @@ page BindPage() {
             />
             <p id="hello">Hello, {name}</p>
             <button id="grace" type="button" on:press={() => name = "Grace"}>Grace</button>
+            <textarea id="bio" aria-label="Bio" bind:value={bio}></textarea>
+            <p id="bio-echo">{bio}</p>
+            <button id="clear-bio" type="button" on:press={() => bio = ""}>Clear the bio</button>
             <button id="edit" type="button" on:press={() => editing = true}>Edit a note</button>
             {#if editing}
                 <section aria-label="Note">

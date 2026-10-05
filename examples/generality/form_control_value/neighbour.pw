@@ -1,0 +1,26 @@
+// @status: NEIGHBOUR
+// @invariant: form_control_value
+// @dimension: valid neighbour — a textarea's value as a signal and as its text, and a select's chosen option marked `selected`
+//
+// Each value is written where HTML reads it: a signal the browser sets in
+// place, a textarea's own text, and the option a select shows first.
+
+module generality.form_controls_written
+
+page Compose() {
+    cache private
+
+    signal draft: String = "Dear Ada,"
+
+    view {
+        <main>
+            <textarea aria-label="Message" bind:value={draft}></textarea>
+            <textarea aria-label="Signature">Sent from the feed</textarea>
+            <select aria-label="Audience">
+                <option value="everyone" selected>Everyone</option>
+                <option value="followers">Followers</option>
+            </select>
+            <p>{draft}</p>
+        </main>
+    }
+}

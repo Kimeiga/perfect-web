@@ -76,6 +76,12 @@ pub enum Context {
     /// Emitted verbatim. Reachable only from a value that carries the
     /// capability, never from an ordinary string — see [`Part::RawHtml`].
     RawHtml,
+    /// **A form control's value, written as its text** (ADR-0221): a
+    /// `<textarea>`'s `value`, which HTML reads from the element's content
+    /// and from no attribute. Escaped as text, so no `</textarea>` in it ends
+    /// the element, and a leading newline doubled, since the parser drops
+    /// the one after the start tag. A patch carries it as an attribute's.
+    Content,
 }
 
 impl Context {
@@ -1823,7 +1829,49 @@ fn lower_element(
     // browser keeps the first.
     let (handlers, markup): (Vec<&crate::hir::Attr>, Vec<&crate::hir::Attr>) =
         attrs.iter().partition(|a| a.event().is_some());
+    // **A `<textarea>`'s value is its text** (ADR-0221): written after its
+    // start tag, where HTML reads it, numbered where it is written. Until
+    // ADR-0221 it was an attribute a textarea does not have, and a first
+    // value showed nothing until the runtime set it. A `<select>`'s is the
+    // option it marks `selected`, which PW5036 asks for.
+    let control = tag.to_ascii_lowercase();
+    let is_value = |a: &crate::hir::Attr| a.name.eq_ignore_ascii_case("value");
+    let mut content: Option<Chunk> = None;
     for a in markup.into_iter().chain(handlers) {
+        if control == "select" && is_value(a) {
+            out.push(Chunk::Dynamic(Part::Blocked {
+                reason: "a `<select>`'s value is the option it marks `selected` (PW5036)"
+                    .to_string(),
+                at: "<select value>".to_string(),
+            }));
+            continue;
+        }
+        if control == "textarea" && is_value(a) {
+            content = Some(match &a.value {
+                AttrValue::None => Chunk::Static(String::new()),
+                AttrValue::Static(v) => Chunk::Static(escape_static_content(unquote(v))),
+                AttrValue::Expr(e) => match value_path(body, *e).map(|v| ctx.read(v)) {
+                    Some(value) if !matches!(body.expr(*e), Expr::Interpolated { .. }) => {
+                        let owner =
+                            owner.expect("an element with a dynamic attribute owns an identity");
+                        let id = ix.part();
+                        ix.read(id, &value, ReadKind::Attribute, ReadAt::Expr(*e), ctx);
+                        Chunk::Dynamic(Part::Attribute {
+                            id,
+                            owner,
+                            name: a.name.clone(),
+                            value,
+                            context: Context::Content,
+                        })
+                    }
+                    _ => Chunk::Dynamic(Part::Blocked {
+                        reason: "a `<textarea>`'s value is a signal or text (PW5036)".to_string(),
+                        at: "<textarea value={..}>".to_string(),
+                    }),
+                },
+            });
+            continue;
+        }
         // An event handler is not markup. It is a behaviour the browser runtime
         // attaches, and E7-R owns it; emitting anything for it here would be
         // inventing an encoding the runtime does not yet have.
@@ -1988,6 +2036,25 @@ fn lower_element(
     }
 
     out.push(Chunk::Static(">".to_string()));
+    if control == "textarea" {
+        // Its text is its value, written once, as text (PW5036): a value in
+        // it would be written between markers a textarea shows as text.
+        let written = children
+            .iter()
+            .all(|c| matches!(body.node(*c), Node::Text(_)));
+        match content {
+            Some(_) if !children.is_empty() => out.push(Chunk::Dynamic(Part::Blocked {
+                reason: "a `<textarea>` has a value and text (PW5036)".to_string(),
+                at: "<textarea value>".to_string(),
+            })),
+            Some(value) => out.push(value),
+            None if !written => out.push(Chunk::Dynamic(Part::Blocked {
+                reason: "a `<textarea>`'s text holds a value (PW5036)".to_string(),
+                at: "<textarea>".to_string(),
+            })),
+            None => {}
+        }
+    }
     ix.elements += 1;
     for c in children {
         lower_node(body, *c, ctx, ix, out);
@@ -2866,6 +2933,23 @@ fn unquote(v: &str) -> &str {
 
 /// Source text between tags, escaped once at build time.
 fn escape_static_text(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// **A `<textarea>`'s value written in the source, as its text** (ADR-0221),
+/// escaped as the renderer escapes one a value gives
+/// (`pw_render::escape::content`). An attribute written in the source holds
+/// no newline, so none is doubled.
+fn escape_static_content(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {

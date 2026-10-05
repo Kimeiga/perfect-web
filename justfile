@@ -2708,6 +2708,34 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0221: a form control's value is written where HTML reads it. The
+# compiler's and the renderer's tests, the bound fields in three engines, the
+# corpus, and the mutation controls.
+e14-form-controls:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0221 - a form control's value is written where HTML reads it"; echo; \
+       echo "produced by: just e14-form-controls"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the template and the check (compiler/pw-core/tests/form_controls.rs)"; echo; \
+       cargo test --locked -p pw-core --test form_controls 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the renderer's escaping matrix (runtime/pw-render/tests/security.rs)"; echo; \
+       cargo test --locked -p pw-render --test security 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus (C15) and generality"; echo; \
+       cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       echo; echo "== bound fields in three engines (e2e/bind.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/bind.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/form_controls_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/form_controls_mutations.py; \
+     } > docs/evidence/E14/form-controls.txt
+    @grep -E "^test result|passed|corpus-check|mutants killed" docs/evidence/E14/form-controls.txt
+
 # ADR-0220: the feed reference app, served in browsers by the host that
 # serves the store. The server's tests, the feed in three engines, and the
 # mutation controls.

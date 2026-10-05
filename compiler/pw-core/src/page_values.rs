@@ -442,7 +442,11 @@ fn set_in_place(p: &crate::template_ir::Part) -> bool {
     use crate::template_ir::{Context, Part};
     match p {
         Part::Text { .. } | Part::BooleanAttribute { .. } => true,
-        Part::Attribute { context, .. } => *context == Context::Attribute,
+        // And a `<textarea>`'s value, which the browser sets as the element's
+        // value, written as its text (ADR-0221).
+        Part::Attribute { context, .. } => {
+            matches!(context, Context::Attribute | Context::Content)
+        }
         _ => false,
     }
 }
