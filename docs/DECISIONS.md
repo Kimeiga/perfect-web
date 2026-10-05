@@ -1837,3 +1837,11 @@ query's `retry` reaches its runtime as declared, and `fixed` is no strategy
 - The plan carried a query's attempts alone, so `jitter = false` ran with
   jitter, and `fixed` ran as exponential. The plan carries its jitter, and
   `fixed` left the language.
+[ADR-0216](DECISIONS/ADR-0216-every-clause-belongs-to-a-declaration-that-reads-it.md):
+every clause belongs to a declaration that reads it, and a code body admits
+none (rulings 0092-b and 0047-a's interim; urgent defect 5).
+- PW5105 placed four heads and let 61 check anywhere: `freshness` on a
+  command and `retry` on a function were read by nothing. Every head has a
+  place now, and the table fails closed.
+- A policy word in a function's body was a clause whose words were never
+  resolved. It is a name now.

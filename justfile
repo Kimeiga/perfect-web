@@ -2708,6 +2708,24 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0216: every clause belongs to a declaration that reads it, and a code body admits none
+e14-clause-heads:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0216 - every clause belongs to a declaration that reads it, and a code body admits none"; echo; \
+       echo "produced by: just e14-clause-heads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/clause_places.rs)"; echo; \
+       cargo test --locked -p pw-core --test clause_places 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the store, kiokun and the accepted corpus"; echo; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | tail -1; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       echo; echo "== mutation controls (scripts/clause_heads_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/clause_heads_mutations.py; \
+     } > docs/evidence/E14/clause-heads.txt
+    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/clause-heads.txt
+
 # ADR-0215: a query's retry reaches its runtime as declared, and fixed is no strategy
 e14-query-retry:
     @mkdir -p docs/evidence/E14

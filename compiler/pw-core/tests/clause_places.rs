@@ -73,3 +73,57 @@ fn a_materialization_depends() {
         "PW5105 `shift` is a command, and `depends_on` belongs to a materialization",
     );
 }
+
+/// **Every head belongs somewhere, and is refused elsewhere** (ADR-0216, the
+/// owner's ruling 0092-b; ADR-0210's urgent defect 5). Until then only the
+/// graph's four clauses were placed: `freshness` on a command, `retry` on a
+/// function, checked, and nothing read them.
+#[test]
+fn a_head_on_a_declaration_that_does_not_read_it_is_refused() {
+    one(
+        &with("command shift(by: Int)", "freshness 30.seconds"),
+        "PW5105 `shift` is a command, and `freshness` belongs to a query, a subscription or a resource",
+    );
+    one(
+        &with("command shift(by: Int)", "on_key_change cancel"),
+        "PW5105 `shift` is a command, and `on_key_change` belongs to a query or a resource",
+    );
+    one(
+        &with("command shift(by: Int)", "cache shared"),
+        "PW5105 `shift` is a command, and `cache` belongs to a query, a subscription, a resource or a page",
+    );
+    one(
+        &with("fn shift(by: Int)", "retry bounded_exponential(max = 2)"),
+        "PW5105 `shift` is a function, and `retry` belongs to a query, a resource or a command",
+    );
+    // Where each is read, it is not.
+    clean(&with("query Read(by: Int)", "freshness 30.seconds"));
+}
+
+/// **Every head the grammar knows has a place** (ADR-0216): the table fails
+/// closed, so a head added to the language without one would be refused
+/// nowhere and read nowhere.
+#[test]
+fn every_head_the_grammar_knows_has_a_place() {
+    let unplaced: Vec<&str> = pw_syntax::POLICY_KEYWORDS
+        .iter()
+        .copied()
+        .filter(|h| pw_core::policy::declared_by(h).is_none())
+        .collect();
+    assert_eq!(unplaced, Vec::<&str>::new());
+}
+
+/// **A code body admits no clause** (ADR-0216, the owner's ruling 0047-a,
+/// its interim). `cache nothing_y` in a function's body was a clause nothing
+/// read, and `nothing_y` was never resolved.
+#[test]
+fn a_clause_word_in_a_functions_body_is_a_name() {
+    let src = format!("{DECLS}fn f() -> Int !{{}} {{\n    cache nothing_y\n    0\n}}\n");
+    let found = reported(&src);
+    assert!(
+        found
+            .iter()
+            .any(|d| d.starts_with("PW0021") && d.contains("nothing_y")),
+        "{found:#?}"
+    );
+}

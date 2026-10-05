@@ -556,8 +556,9 @@ codes! {
     // up wherever it might be, and did not ask what it found.
     // ADR-0092: a query that `emits`, a command that listens and a `fn` that
     // emits each checked until 2026-09-26, and nothing read what they said.
+    // ADR-0216: every head, since `freshness` on a command did too.
     CLAUSE_OUT_OF_PLACE = "PW5105" / clause_out_of_place / 1, ResourceGraph,
-        "a dependency-graph clause belongs to a declaration that can mean it";
+        "a clause belongs to a declaration that reads it";
     // ADR-0091: `invalidates_on InventoryChanged(id, item)`, with `item`
     // naming nothing, checked until 2026-09-26.
     LISTENER_KEY = "PW5104" / listener_key / 1, ResourceGraph,

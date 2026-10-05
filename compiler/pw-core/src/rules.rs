@@ -136,7 +136,10 @@ fn is_resource_like(kind: DeclKind) -> bool {
 }
 
 /// Effects a placement cannot satisfy, and why.
-fn placement_conflict(placement: &str, effect: &str) -> Option<(&'static str, &'static str)> {
+pub(crate) fn placement_conflict(
+    placement: &str,
+    effect: &str,
+) -> Option<(&'static str, &'static str)> {
     let browser_only = effect.starts_with("device")
         || effect.starts_with("layout")
         || effect.starts_with("dom")

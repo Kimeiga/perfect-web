@@ -428,23 +428,146 @@ pub fn keyed(head: &str) -> Option<(crate::resolve::Namespace, &'static [crate::
     }
 }
 
-/// **Which declarations a dependency-graph clause belongs to** (ADR-0092),
-/// and what they are, for a message.
+/// **Which declarations a clause belongs to, and what they are, for a
+/// message** (ADR-0092; ADR-0216, the owner's ruling 0092-b).
 ///
-/// ADR-0007 made invalidation explicit: a command emits typed events and
-/// invalidates the entries it changes, and a resource or a materialization
-/// listens for events and depends on resources. A clause elsewhere means
-/// nothing: nothing reads a query's `emits`, and a `fn` is not in the graph.
-/// Other heads are not in this table yet (ruling needed).
+/// Every head the language has is here, and a head on a kind it is not
+/// listed for is PW5105: the table fails closed. Until ADR-0216 only the
+/// graph's four clauses were, and every other head checked wherever it was
+/// written: `freshness` on a command, `retry` on a function, read by nothing.
+///
+/// A head another rule places is listed for every kind, so a defect is
+/// reported once (ADR-0112): `requires` (PW0335), `not_found_on` (PW0342),
+/// `rollback` where PW0327 refuses it, and `host` on an effect (PW0332).
+/// A head written only in a statement is listed for no declaration, by the
+/// statement it belongs to.
 pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'static str)> {
     use crate::hir::DeclKind as K;
+    /// Every kind: a head whose place another rule decides.
+    const EVERY: &[K] = &[
+        K::Fn,
+        K::View,
+        K::Component,
+        K::Page,
+        K::Query,
+        K::Command,
+        K::Subscription,
+        K::Resource,
+        K::Materialize,
+        K::Event,
+        K::Effect,
+        K::Source,
+        K::Prelude,
+        K::Task,
+        K::Type,
+        K::Opaque,
+        K::Let,
+        K::Signal,
+        K::Import,
+        K::Other,
+    ];
+    /// What holds code, and so runs somewhere.
+    const PLACED: &[K] = &[
+        K::Fn,
+        K::View,
+        K::Component,
+        K::Page,
+        K::Query,
+        K::Command,
+        K::Subscription,
+        K::Resource,
+        K::Materialize,
+        K::Effect,
+        K::Task,
+        K::Other,
+    ];
+    const READS: &[K] = &[K::Query, K::Subscription, K::Resource];
     Some(match head {
+        // The dependency graph's clauses (ADR-0092).
         "emits" | "invalidates" => (&[K::Command], "a command"),
         "invalidates_on" => (
             &[K::Query, K::Subscription, K::Resource, K::Materialize],
             "a resource or a materialization",
         ),
         "depends_on" => (&[K::Materialize], "a materialization"),
+        // A cached read's: what a host keeps of it, and for how long.
+        "freshness" | "consistency" | "concurrency" | "key" | "dedupe_by" | "timeout" => {
+            (READS, "a query, a subscription or a resource")
+        }
+        "cache" => (
+            &[K::Query, K::Subscription, K::Resource, K::Page],
+            "a query, a subscription, a resource or a page",
+        ),
+        "on_key_change" => (&[K::Query, K::Resource], "a query or a resource"),
+        "delivery" => (&[K::Query], "a query"),
+        "retry" => (
+            &[K::Query, K::Resource, K::Command],
+            "a query, a resource or a command",
+        ),
+        "fallback" => (
+            &[K::Query, K::Resource, K::Materialize],
+            "a query, a resource or a materialization",
+        ),
+        "partition" => (
+            &[
+                K::Query,
+                K::Subscription,
+                K::Resource,
+                K::Materialize,
+                K::Page,
+            ],
+            "a cached read, a materialization or a page",
+        ),
+        "regenerate" | "stampede" | "locale" | "tenant" | "policy_version" | "code_version" => {
+            (&[K::Materialize], "a materialization")
+        }
+        // A command's.
+        "idempotent_by" | "transaction" | "optimistic" => (&[K::Command], "a command"),
+        // A subscription's connection.
+        "transport" | "reconnect" | "on_scope_exit" => (&[K::Subscription], "a subscription"),
+        "scope" => (
+            &[K::Subscription, K::Resource],
+            "a subscription or a resource",
+        ),
+        // A resource's life.
+        "acquire" | "release" | "affine" => (&[K::Resource], "a resource"),
+        // A page's.
+        "route" | "revision" => (&[K::Page], "a page"),
+        "privacy" => (&[K::Page, K::Other], "a page or a replicated value"),
+        // An effect's.
+        "capability" | "impact" => (&[K::Effect], "an effect"),
+        // A function's binding to what supplies it.
+        "intrinsic" => (&[K::Fn], "a function"),
+        "host" => (&[K::Fn, K::Effect], "a function"),
+        // A data source's (ADR-0207).
+        "holds" | "transactions" | "reads" | "changes" => (&[K::Source], "a data source"),
+        // A painter's, a replicated value's, a handler policy's: forms the
+        // grammar keeps as `Other`.
+        "draw" | "inputs" | "isolated" => (&[K::Other], "a painter"),
+        "storage" | "offline" | "sync" | "conflict" | "on_conflict_unresolved" => {
+            (&[K::Other], "a replicated value")
+        }
+        "identity" | "captures" | "load" | "on_version_mismatch" => {
+            (&[K::Other], "a handler policy")
+        }
+        // Where it runs.
+        "placement" => (PLACED, "a declaration that holds code"),
+        // Placed by their own rules.
+        "requires" | "not_found_on" => (EVERY, "a command"),
+        "rollback" => (
+            &[
+                K::Query,
+                K::Command,
+                K::Subscription,
+                K::Resource,
+                K::Materialize,
+            ],
+            "nothing: an optimistic clause is undone by restoring what it held",
+        ),
+        // Written only in statements.
+        "intrinsic_height" => (&[], "a `subtree` block"),
+        "because" | "attributes_forced_layout_to" => (&[], "an `unsafe` statement"),
+        "on_mount" | "on_unmount" | "respects" => (&[], "a component's body"),
         _ => return None,
     })
 }

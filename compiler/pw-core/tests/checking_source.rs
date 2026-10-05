@@ -633,7 +633,10 @@ fn the_privacy_and_placement_rules_catch_their_corpus_cases() {
         ("R-002", "PW5002"), // database read inside a browser-placed component
         ("R-003", "PW5003"), // a secret rendered into markup
         ("R-005", "PW5004"), // shared cache keyed without the tenant
-        ("R-026", "PW5002"), // a secret capability at the edge
+        // A secret capability at the edge. PW5002 until ADR-0216, when its
+        // `placement edge` moved where a function's is read, and the rule it
+        // was written for spoke.
+        ("R-026", "PW5005"),
     ];
     for (file, code) in want {
         let (_, src, diags) = all

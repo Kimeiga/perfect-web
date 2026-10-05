@@ -1034,13 +1034,15 @@ fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) 
     out
 }
 
-/// **A dependency-graph clause belongs to a declaration that can mean it**
-/// (ADR-0092).
+/// **A clause belongs to a declaration that reads it** (ADR-0092, ADR-0216).
 ///
 /// A command emits and invalidates; a resource or a materialization listens;
-/// a materialization depends (`crate::policy::declared_by`). Until 2026-09-26
-/// each clause checked on any declaration: the graph drew a query's `emits`,
-/// which nothing emits, and left out a `fn`'s, which is not in the graph.
+/// a materialization depends; a cached read is kept for its freshness; and so
+/// on for every head (`crate::policy::declared_by`, which fails closed).
+/// Until 2026-09-26 each graph clause checked on any declaration: the graph
+/// drew a query's `emits`, which nothing emits, and left out a `fn`'s, which
+/// is not in the graph. Until ADR-0216 every other head did: `freshness` on a
+/// command, `retry` on a function.
 fn clauses_in_place(hir: &Hir) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {
@@ -1069,11 +1071,10 @@ fn clauses_in_place(hir: &Hir) -> Vec<Diagnostic> {
                     label: format!("`{}` is declared here", decl.name),
                 }],
                 explanation: Some(
-                    "Invalidation is explicit (ADR-0007): a command emits typed events and \
-                     invalidates the entries it changes, and a resource or a materialization \
-                     listens for events and depends on resources. A clause on another \
-                     declaration means nothing: the materializer reads no query's events and \
-                     no command's dependencies, and a function is not in the graph at all."
+                    "A clause is read by the declarations it is written for: a command \
+                     emits and invalidates, a cached read is kept for its freshness and \
+                     retried, a materialization depends. On another declaration nothing \
+                     reads it, and the program would not do what it says (ADR-0216)."
                         .to_string(),
                 ),
                 repairs: vec![Repair {
@@ -6637,6 +6638,21 @@ fn privacy_and_placement(
             !crate::effects::row_covers(&row, e)
                 && w.grants(e, declared) == crate::placement::Grant::No
         })
+    {
+        return;
+    }
+    // And an effect the row declares that the declared world cannot grant is
+    // `rules::check_effects_against_placement`'s, at the effect, with its
+    // reason (ADR-0216): R-026's `secret<Payments>` at `edge`. Its placement
+    // was read by nothing until ADR-0216, so only this rule spoke.
+    let pinned = decl.policy("placement").map(|p| p.value.trim().to_string());
+    if let Some(target) = pinned.as_deref().filter(|t| !t.contains(','))
+        && decl
+            .declared_effects
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .any(|e| crate::rules::placement_conflict(target, &e.path).is_some())
     {
         return;
     }

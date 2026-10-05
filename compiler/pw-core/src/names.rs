@@ -119,6 +119,7 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
             src,
             workspace,
             unit,
+            kind: decl.kind,
             constructors: &constructors,
             scopes: vec![outer, decl.params.iter().map(|p| p.name.clone()).collect()],
             mutable: vec![module_mutable.clone(), BTreeSet::new()],
@@ -172,6 +173,9 @@ struct Walk<'a> {
     src: &'a str,
     workspace: &'a Workspace,
     unit: UnitId,
+    /// What the body belongs to: a function's, a query's or a command's body
+    /// is code, and admits no clause (ADR-0216).
+    kind: crate::hir::DeclKind,
     constructors: &'a BTreeMap<String, BTreeMap<DefId, String>>,
     /// Innermost last. A `let` adds to the innermost.
     scopes: Vec<BTreeSet<String>>,
@@ -496,6 +500,21 @@ impl Walk<'_> {
     fn is_clause(&self, head: &str, s: ExprId, next: Option<ExprId>) -> bool {
         let Some(next) = next else { return false };
         if self.bound(head) {
+            return false;
+        }
+        // **A code body admits no clause** (ADR-0216, the owner's ruling
+        // 0047-a, its interim). A function's, a query's or a command's clauses
+        // are read from before its body; one in it is read by nothing. Until
+        // ADR-0216 `cache nothing_y` in a function's body was a clause nothing
+        // read, and its words were never resolved; R-026's `placement edge`
+        // was one.
+        if matches!(
+            self.kind,
+            crate::hir::DeclKind::Fn
+                | crate::hir::DeclKind::Query
+                | crate::hir::DeclKind::Command
+                | crate::hir::DeclKind::Task
+        ) {
             return false;
         }
         let block_follows = matches!(self.body.expr(next), Expr::Block { .. });

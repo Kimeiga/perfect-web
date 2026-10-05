@@ -348,7 +348,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
           left open by an exit inside a loop~~ (ADR-0211, `just
           e14-affine-loops`); stale captures; ~~a handler calling a `todo`
           command~~ (not reproduced: the build refuses it); ~~a retry's
-          strategy dropped~~ (ADR-0215); misplaced policy heads ignored; ~~`query
+          strategy dropped~~ (ADR-0215); ~~misplaced policy heads ignored~~
+          (ADR-0216); ~~`query
           helper(id)` over a `fn`~~ (ADR-0212); ~~`List.maximum`'s −0~~
           (ADR-0213); ~~an opaque type's member named `value`~~ (ADR-0214);
         - **then the feed reference app** (the owner, 2026-10-05; item 22's
