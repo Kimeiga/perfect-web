@@ -78,12 +78,12 @@ MUTANTS = [
     # now, by the type expected where it is written, and the name check no
     # longer reports it. `expected_cases_mutations.py`'s "where nothing
     # expected says, PW0022 is not reported" controls the report.
-    (
-        "a bare case with a payload is not told its qualified form",
-        CHECK,
-        "    if !case_of.is_empty() {",
-        "    if false && !case_of.is_empty() {",
-    ),
+    # Retired by ADR-0202: "a bare case with a payload is not told its
+    # qualified form". Since ADR-0198 a bare call's owners are resolved before
+    # `unresolved_bare_call`, which is given none, so the branch it mutated
+    # ran for no program: recorded at 53ceb20, it survived. The branch is gone;
+    # where several types have the case, PW0022 names each qualified form, and
+    # `expected_cases_mutations.py` controls it.
     (
         "`_` takes every case, those taken before it too",
         LOWER,

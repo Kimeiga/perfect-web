@@ -716,7 +716,7 @@ fn unresolved_uses(
                     // Several: the typer's, by the type expected where the
                     // call is written (ADR-0201).
                     if owners.is_empty() {
-                        out.push(unresolved_bare_call(hir, decl, body, id, &path, &owners));
+                        out.push(unresolved_bare_call(hir, decl, body, id, &path));
                     }
                 }
                 continue;
@@ -4425,43 +4425,7 @@ fn bare_call_is_unowned(
     matches!(workspace.resolve(unit, path), Resolution::Unresolved)
 }
 
-fn unresolved_bare_call(
-    hir: &Hir,
-    decl: &Decl,
-    body: &Body,
-    id: ExprId,
-    path: &str,
-    case_of: &[String],
-) -> Diagnostic {
-    // A case with a payload, written alone: what it is, and how it is built.
-    if !case_of.is_empty() {
-        let qualified: Vec<String> = case_of
-            .iter()
-            .map(|t| format!("`{t}.{path}(..)`"))
-            .collect();
-        return Diagnostic {
-            code: crate::codes::UNRESOLVED_NAME.id,
-            invariant: crate::codes::UNRESOLVED_NAME.invariant,
-            reason: "unqualified_case",
-            detector: Detector::DeclarationRule,
-            severity: Severity::Error,
-            message: format!("`{path}` does not resolve"),
-            primary_span: body.expr_span(id),
-            related: vec![Related {
-                span: hir.decl_span(decl_id_of(hir, decl)),
-                label: format!("called inside `{}`", decl.name),
-            }],
-            explanation: Some(format!(
-                "`{path}` is a case, not a function: a case with a payload is \
-                 built through its type, as the case's own declaration is \
-                 reached through it (ADR-0059). No term is called `{path}`."
-            )),
-            repairs: vec![Repair {
-                description: format!("write {}", qualified.join(" or ")),
-                replacement: None,
-            }],
-        };
-    }
+fn unresolved_bare_call(hir: &Hir, decl: &Decl, body: &Body, id: ExprId, path: &str) -> Diagnostic {
     Diagnostic {
         code: crate::codes::UNRESOLVED_NAME.id,
         invariant: crate::codes::UNRESOLVED_NAME.invariant,
