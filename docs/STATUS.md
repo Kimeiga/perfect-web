@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `292d193`, with ADR-0215 and ADR-0216.
+**Reviewed:** 2026-10-05, against master `ebed28c`, with ADR-0217.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2871,6 +2871,13 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`ebed28c` (2026-10-05, ADR-0217): `just ci` passes locally, the workspace's
+2035 tests pass, and the browser suite passes 728 in three engines, with 13
+skipped. Recorded at that commit, in `docs/evidence/E14/`: `top-captures.txt`
+(ADR-0217) 5 of 5 mutants killed, and `query-attributes.txt` 6 of 6. **And
+`row-reads.txt` 22 of 23: "a member read in text no host computes passes
+silently" survives**, killed before ADR-0217. Under investigation; its fix
+records the file again.
 `292d193` (2026-10-05, ADR-0215 and ADR-0216): `just ci` passes locally, the
 workspace's 2031 tests pass, and the browser suite passes 728 in three
 engines, with 13 skipped. Recorded at that commit, in `docs/evidence/E14/`:

@@ -1,0 +1,28 @@
+ADR-0217 - what a handler at the top of the page captures is set again when it changes
+
+produced by: just e14-top-captures
+commit: ebed28ca305450a005c3d0629690d0c9952038a3
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the plan and the speculation (compiler/pw-core/tests/top_level_captures.rs)
+
+test a_page_whose_handlers_capture_no_query_plans_none ... ok
+test a_handlers_captures_at_the_top_are_planned_and_speculated ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.82s
+
+== the server's patch, and the browser's renderer
+
+test tests::a_handlers_captures_at_the_top_of_the_page_are_set_again ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 120 filtered out; finished in 2.02s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+== mutation controls (scripts/top_captures_mutations.py)
+
+baseline: 3 passed, 0 failed
+a handler's captures are no read: KILLED (2 of 3 tests fail)
+the plan lists no handler: KILLED (2 of 3 tests fail)
+the server keeps no captures: KILLED (1 of 3 tests fail)
+the server patches no captures: KILLED (1 of 3 tests fail)
+a speculation renders the captures as an attribute: KILLED (1 of 3 tests fail)
+5 of 5 mutants killed

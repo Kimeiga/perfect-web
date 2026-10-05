@@ -1,7 +1,7 @@
 ADR-0171 - an attribute that reads a query's value is set again
 
 produced by: just e14-query-attributes
-commit: f8bd4556be0efa15bf3cb9b543c0818f9af8a111
+commit: ebed28ca305450a005c3d0629690d0c9952038a3
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the plan (compiler/pw-core/tests/query_attributes.rs)
@@ -9,21 +9,21 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test one_a_block_or_a_row_renders_is_not_the_pages_to_set ... ok
 test an_attribute_at_the_top_that_reads_a_query_is_planned ... ok
 test one_written_with_several_values_is_planned_once ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.47s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.53s
 
 == the development server (pw-dev-server)
 
 test tests::an_attribute_that_reads_a_query_is_set_again_when_it_changes ... ok
-test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.85s
+test result: ok. 121 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 40.36s
 
 == mutation controls (scripts/query_attributes_mutations.py)
 
-baseline (core): 1134 passed, 0 failed
-baseline (server): 83 passed, 0 failed
-no attribute is named [core]: KILLED (2 of 833 tests fail)
-one in a block or a row is named [core]: KILLED (1 of 833 tests fail)
-one written with several values is named twice [core]: KILLED (1 of 833 tests fail)
-the attributes are not shown [server]: KILLED (1 of 83 tests fail)
-an unchanged attribute is set again [server]: KILLED (1 of 83 tests fail)
-a boolean attribute that goes is set [server]: KILLED (1 of 83 tests fail)
+baseline (core): 1256 passed, 0 failed
+baseline (server): 121 passed, 0 failed
+no attribute is named [core]: KILLED (1 of 549 tests fail)
+one in a block or a row is named [core]: KILLED (1 of 916 tests fail)
+one written with several values is named twice [core]: KILLED (1 of 916 tests fail)
+the attributes are not shown [server]: KILLED (1 of 121 tests fail)
+an unchanged attribute is set again [server]: KILLED (1 of 121 tests fail)
+a boolean attribute that goes is set [server]: KILLED (1 of 121 tests fail)
 6 of 6 mutants killed
