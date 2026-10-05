@@ -583,6 +583,10 @@ struct Server {
     /// Registered and forgotten with its parameters; a document not in it
     /// is the store's.
     pages: Mutex<BTreeMap<Doc, String>>,
+    /// **What commits dropped that other sessions may hold** (ADR-0219),
+    /// with the session that committed: told once the request that
+    /// committed is answered (`tell_waiting`).
+    telling: Mutex<Vec<(String, Vec<String>)>>,
     /// **What each session's connections meet** (charter §15.5's one-shot
     /// network error and forced reconnect, ADR-0175): whether its next
     /// command's connection is dropped, and when its subscriptions are cut
@@ -1022,6 +1026,7 @@ impl Server {
             documents: std::sync::atomic::AtomicU64::new(1),
             params: Mutex::new(BTreeMap::new()),
             pages: Mutex::new(BTreeMap::new()),
+            telling: Mutex::new(Vec::new()),
             connection_faults: Mutex::new(BTreeMap::new()),
             materializer_faults: Mutex::new(std::collections::BTreeSet::new()),
             keyed: Mutex::new(BTreeMap::new()),
@@ -1271,6 +1276,28 @@ impl Server {
         args: &[Val],
         interaction: Option<&str>,
     ) -> Result<Answered, String> {
+        let (answered, dropped) = self.command_held(component_id, session, args, interaction)?;
+        // Every other session holding what the commit dropped is told after
+        // the author is answered (ADR-0219), so a post's answer does not
+        // wait on every reader.
+        if !dropped.is_empty() {
+            self.telling
+                .lock()
+                .expect("telling")
+                .push((session.to_string(), dropped));
+        }
+        Ok(answered)
+    }
+
+    /// [`Server::command_answered`] within the session's hold, and what its
+    /// commit dropped that other sessions may hold (ADR-0219).
+    fn command_held(
+        &self,
+        component_id: &str,
+        session: &str,
+        args: &[Val],
+        interaction: Option<&str>,
+    ) -> Result<(Answered, Vec<String>), String> {
         // The session's one change at a time, through its frames (ADR-0172).
         let session_lock = self.one_at_a_time(session);
         let _one = session_lock
@@ -1298,19 +1325,21 @@ impl Server {
             if let [Val::Result(Err(_))] = out.as_slice() {
                 // A declared error: nothing commits, and the handler is told
                 // which (ADR-0157).
-                return Ok(Answered {
+                let answered = Answered {
                     committed: false,
                     result,
                     why: None,
-                });
+                };
+                return Ok((answered, Vec::new()));
             }
             let Some(rows) = staging.rows() else {
                 // Nothing was written, so there is nothing to commit.
-                return Ok(Answered {
+                let answered = Answered {
                     committed: true,
                     result,
                     why: None,
-                });
+                };
+                return Ok((answered, Vec::new()));
             };
             let (emitted, invalidated) = {
                 let staged = staged_events.lock().expect("staged");
@@ -1340,7 +1369,7 @@ impl Server {
                     mine.pop_front();
                 }
             }
-            self.invalidate_queries(session, &invalidated, &emitted);
+            let reached = self.invalidate_queries(session, &invalidated, &emitted);
             // The materializer drains the committed event and regenerates the
             // entry it invalidates. The version moves because the RESOURCE
             // moved.
@@ -1355,11 +1384,12 @@ impl Server {
                 let version = Version(self.clock.now());
                 self.send_documents(session, &session_documents(session), version, false);
             }
-            Ok(Answered {
+            let answered = Answered {
                 committed: true,
                 result,
                 why: None,
-            })
+            };
+            Ok((answered, reached))
         }
     }
 
@@ -1746,12 +1776,16 @@ impl Server {
     /// invalidated, as it computed its key (ADR-0209), and each entry an
     /// emitted event reaches through a query's `invalidates_on`. An event that
     /// leaves a key unbound (`_`, ADR-0091) drops every entry of that query.
+    ///
+    /// Returns **what it dropped that another session may hold** (ADR-0219):
+    /// each query dropped whole, or by a key its sessions share. An entry
+    /// keyed by the session is that session's alone.
     fn invalidate_queries(
         &self,
         session: &str,
         invalidated: &[(String, Vec<Val>)],
         events: &[(String, Vec<Val>)],
-    ) {
+    ) -> Vec<String> {
         // A query's policy, which keys its entries: read by a `let`, or by a
         // stream, whose answer is kept too (ADR-0148). Until 2026-10-03 only
         // a `let`'s was found, so an event never reached a stream's kept
@@ -1770,22 +1804,28 @@ impl Server {
                 .find(|b| b["resource"] == resource)
                 .map(|b| b["policy"].clone())
         };
-        let drop_key = |resource: &str, args: Option<Vec<Val>>| {
-            let Some(policy) = policy_of(resource) else {
-                // No binding reads it, so nothing of it is kept.
-                return;
-            };
+        // Each drop says whether another session may hold what it dropped:
+        // not when the entry is keyed by this session (`entry_key`).
+        let drop_key = |resource: &str, args: Option<Vec<Val>>| -> Option<String> {
+            // No binding reads it, so nothing of it is kept.
+            let policy = policy_of(resource)?;
             match args.and_then(|a| entry_key(session, &policy, &a)) {
-                Some(k) => self
-                    .queries
-                    .invalidate_key(&pw_resource::Key::new(resource, &k)),
-                None => self.queries.invalidate(resource),
+                Some(k) => {
+                    self.queries
+                        .invalidate_key(&pw_resource::Key::new(resource, &k));
+                    (!k.starts_with("session=")).then(|| resource.to_string())
+                }
+                None => {
+                    self.queries.invalidate(resource);
+                    Some(resource.to_string())
+                }
             }
         };
+        let mut reached = Vec::new();
         // Until ADR-0209 the server read each key's text, `current_session()`
         // or else the whole query.
         for (query, values) in invalidated {
-            drop_key(query, Some(values.clone()));
+            reached.extend(drop_key(query, Some(values.clone())));
         }
         for (event, values) in events {
             for e in &self.graph.edges {
@@ -1811,9 +1851,71 @@ impl Server {
                         args[p] = Some(v.clone());
                     }
                 }
-                drop_key(&e.from, args.into_iter().collect());
+                reached.extend(drop_key(&e.from, args.into_iter().collect()));
             }
         }
+        reached.sort();
+        reached.dedup();
+        reached
+    }
+
+    /// **What commits dropped, told to every other session that reads it**
+    /// (ADR-0219): run by a connection once its request is answered and
+    /// closed. Whichever connection takes a commit's telling tells it; each
+    /// session is read when it is told, so a session told late is told the
+    /// latest.
+    fn tell_waiting(&self) {
+        let waiting = std::mem::take(&mut *self.telling.lock().expect("telling"));
+        for (session, reached) in waiting {
+            self.tell_others(&session, &reached);
+        }
+    }
+
+    /// **Every other session's open documents that read what a commit
+    /// dropped are read again and sent what changed** (ADR-0219): a post
+    /// reaches every open timeline, not only its author's. Each session in
+    /// its own hold, taken after the committing session's is given up, so
+    /// two sessions committing at once never wait on each other. Until
+    /// ADR-0219 another reader saw a change when it next loaded the page.
+    fn tell_others(&self, session: &str, reached: &[String]) {
+        if reached.is_empty() {
+            return;
+        }
+        // The open documents, read before their pages: no two of these
+        // tables are held at once.
+        let open: Vec<Doc> = self
+            .pending
+            .lock()
+            .expect("pending")
+            .keys()
+            .cloned()
+            .collect();
+        let others: std::collections::BTreeSet<String> = open
+            .into_iter()
+            .filter(|(s, _)| s != session)
+            .filter(|doc| self.reads_any(&self.page_of(doc), reached))
+            .map(|(s, _)| s)
+            .collect();
+        for other in others {
+            let lock = self.one_at_a_time(&other);
+            let _one = lock.lock().expect("one change of a session at a time");
+            self.clock.advance(1);
+            let version = Version(self.clock.now());
+            self.send_documents(&other, &session_documents(&other), version, false);
+        }
+    }
+
+    /// **Whether a page reads any of `resources`**, by a `let` or a stream
+    /// its plan binds.
+    fn reads_any(&self, page: &str, resources: &[String]) -> bool {
+        let plan = self.plan_of(page);
+        ["bindings", "streams"].into_iter().any(|k| {
+            plan[k].as_array().into_iter().flatten().any(|b| {
+                b["resource"]
+                    .as_str()
+                    .is_some_and(|r| resources.iter().any(|x| x == r))
+            })
+        })
     }
 
     /// **Run a query's compiled component** (ADR-0125), with the data layer,
@@ -4733,7 +4835,15 @@ fn main() {
     }
 }
 
-fn handle(server: &Server, mut stream: TcpStream) {
+/// **A connection's request answered, and then what its commit dropped told
+/// to every other session that reads it** (ADR-0219): after the connection
+/// is closed, so the author is answered without waiting for every reader.
+fn handle(server: &Server, stream: TcpStream) {
+    answer_connection(server, stream);
+    server.tell_waiting();
+}
+
+fn answer_connection(server: &Server, mut stream: TcpStream) {
     let mut reader = BufReader::new(stream.try_clone().expect("clone"));
     let mut request = String::new();
     if reader.read_line(&mut request).is_err() {
@@ -8812,10 +8922,11 @@ public query Store(",
         let server_code = &src[..src
             .find(&["#[cfg(test)]\nmod ", "tests"].concat())
             .expect("the tests")];
-        // Where a command's component runs: `command_answered`, which
-        // `command` answers through since ADR-0157.
+        // Where a command's component runs: `command_held`, in the session's
+        // hold, which `command_answered` answers through since ADR-0219, and
+        // `command` since ADR-0157.
         let start = server_code
-            .find("fn command_answered(")
+            .find("fn command_held(")
             .expect("the command path");
         let body =
             &server_code[start..start + server_code[start..].find("\n    }\n").expect("its end")];
@@ -9306,6 +9417,11 @@ public query Store(",
     /// **The feed reference app, built and served** (ADR-0218): its data the
     /// feed's layer, chosen because its contracts import `feed:data/…`.
     fn served_feed() -> Served {
+        served_feed_with(|app| app.to_string())
+    }
+
+    /// [`served_feed`], its `app.pw` changed by `change`.
+    fn served_feed_with(change: fn(&str) -> String) -> Served {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
         let dir = tempfile::TempDir::with_prefix("pw-feed-").expect("a temporary directory");
         let mut units = Vec::new();
@@ -9321,7 +9437,10 @@ public query Store(",
                 .collect();
             paths.sort();
             for p in paths {
-                let src = std::fs::read_to_string(&p).expect("read");
+                let mut src = std::fs::read_to_string(&p).expect("read");
+                if d == "examples/feed" && p.ends_with("app.pw") {
+                    src = change(&src);
+                }
                 units.push(pw_core::check::Unit {
                     hir: pw_core::lower::lower_file(&src, &pw_syntax::parse_tree(&src).green),
                     path: p.display().to_string(),
@@ -9365,6 +9484,134 @@ public query Store(",
             format!("{set:?}").contains("A first post"),
             "the timeline shows the post: {set:?}"
         );
+    }
+
+    /// **A post reaches every open timeline** (ADR-0219): `Timeline` listens
+    /// for `Posted(_)`, so the post drops every session's answer, and each
+    /// other session's open home page is read again and sent the post. Until
+    /// ADR-0219 only the author's page was told, and another reader saw the
+    /// post when the page was next loaded.
+    #[test]
+    fn a_post_reaches_every_open_timeline() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let (mine, theirs) = {
+            let pending = s.pending.lock().expect("pending");
+            (latest(&pending, "a"), latest(&pending, "b"))
+        };
+        let frames = |doc: &Doc| s.pending.lock().expect("pending")[doc].frames.len();
+        let before = frames(&theirs);
+        let answered = s
+            .command_answered(
+                "feed.app.post",
+                "a",
+                &[Val::String("Seen by everyone".into())],
+                Some("i-1"),
+            )
+            .expect("runs");
+        assert!(answered.committed, "{:?}", answered.result);
+        assert_eq!(frames(&theirs), before, "not before the author is answered");
+        let told = frames(&mine);
+        s.tell_waiting();
+        assert_eq!(
+            frames(&mine),
+            told,
+            "the author's page was told with the commit"
+        );
+        let set = sets_of(&s, &theirs).pop().expect("a patch set");
+        assert!(
+            format!("{set:?}").contains("Seen by everyone"),
+            "the other reader's timeline shows the post: {set:?}"
+        );
+    }
+
+    /// **A post sent over HTTP reaches another reader once it is answered**
+    /// (ADR-0219): the connection that committed tells the others after its
+    /// answer is written and it is closed.
+    #[test]
+    fn a_post_over_http_reaches_another_reader_after_its_answer() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        let answer = posted(
+            &s,
+            "/command/feed.app.post",
+            "a",
+            "i-1",
+            "[\"Over the wire\"]",
+        );
+        assert!(answer.starts_with("HTTP/1.1 202"), "{answer}");
+        assert!(answer.contains("\"committed\":true"), "{answer}");
+        let set = sets_of(&s, &theirs).pop().expect("a patch set");
+        assert!(
+            format!("{set:?}").contains("Over the wire"),
+            "the other reader's timeline shows the post: {set:?}"
+        );
+    }
+
+    /// **A page that reads nothing a commit dropped is not read again**
+    /// (ADR-0219): with `Thread` listening for likes alone, a post leaves
+    /// another session's open thread as it was, and it is sent nothing.
+    #[test]
+    fn a_page_reading_nothing_dropped_is_told_nothing() {
+        let s = served_feed_with(|app| {
+            app.replace(
+                "invalidates_on Liked(id), Posted(_)",
+                "invalidates_on Liked(id)",
+            )
+        });
+        let thread = Params::from([("id".to_string(), "p1".to_string())]);
+        s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        s.serve_document_settled("c", "feed.app.PostPage", &thread, &[])
+            .expect("served");
+        let theirs = latest(&s.pending.lock().expect("pending"), "c");
+        let frames = |doc: &Doc| s.pending.lock().expect("pending")[doc].frames.len();
+        let before = frames(&theirs);
+        let answered = s
+            .command_answered(
+                "feed.app.post",
+                "a",
+                &[Val::String("Not in the thread".into())],
+                Some("i-1"),
+            )
+            .expect("runs");
+        assert!(answered.committed, "{:?}", answered.result);
+        s.tell_waiting();
+        assert_eq!(frames(&theirs), before, "the thread's page is sent nothing");
+    }
+
+    /// **What a commit drops of the session's own reaches no other
+    /// session** (ADR-0219): `add_to_cart` drops the cart the session's
+    /// `Cart` keys by it, and another session's open cart page is sent
+    /// nothing.
+    #[test]
+    fn a_sessions_own_change_reaches_no_other_session() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, CART_PAGE, &Params::new(), &[])
+                .expect("served");
+        }
+        let (mine, theirs) = {
+            let pending = s.pending.lock().expect("pending");
+            (latest(&pending, "a"), latest(&pending, "b"))
+        };
+        let frames = |doc: &Doc| s.pending.lock().expect("pending")[doc].frames.len();
+        let (mine_before, theirs_before) = (frames(&mine), frames(&theirs));
+        s.command(ADD, "a", &add_shown("espresso", 1), false)
+            .expect("added");
+        s.tell_waiting();
+        assert!(
+            frames(&mine) > mine_before,
+            "the session's own page is told"
+        );
+        assert_eq!(frames(&theirs), theirs_before, "another's is not");
     }
 
     /// **A build that imports what its data layer does not supply is refused

@@ -110,8 +110,6 @@ Twenty-five mutants anchored in the moved code now name `store.rs`
   presentation and the shared fragment** are still the store's code beside
   the host's. A program that is not the store has an empty `StoreData`
   beside its own layer.
-- **Live data across sessions**: another session's open timeline is not
-  told of a post yet (next).
-- **Live public data across sessions.** A commit tells the committing
-  session's documents. Another session's open timeline is not told of a post
-  yet. The feed needs it.
+- **Live data across sessions**: a commit told the committing session's
+  documents alone. Another session's open timeline is told of a post since
+  ADR-0219.

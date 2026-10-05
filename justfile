@@ -2708,6 +2708,20 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0219: what a commit drops reaches every session that reads it
+e14-cross-session:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0219 - what a commit drops reaches every session that reads it"; echo; \
+       echo "produced by: just e14-cross-session"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_post_reaches_every_open_timeline a_post_over_http_reaches_another_reader_after_its_answer a_page_reading_nothing_dropped_is_told_nothing a_sessions_own_change_reaches_no_other_session the_feed_is_served_by_the_host_its_data_the_deployments 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/cross_session_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/cross_session_mutations.py; \
+     } > docs/evidence/E14/cross-session.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/cross-session.txt
+
 # ADR-0217: what a handler at the top of the page captures is set again when it changes
 e14-top-captures:
     @mkdir -p docs/evidence/E14

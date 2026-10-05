@@ -715,6 +715,10 @@ what it invalidates. **Its sandbox is checked, not
 enforced** (ADR-0124, E14-I): no hidden file is copied in, and a process in
 it can read the repository by absolute path.
 
+**A commit reaches another session's open page by the query it reads, not
+by its key** (ADR-0219). A like drops one post's `Thread`, and every open
+thread page is read again; each other one is sent no change, from the cache.
+
 **E7 gate 8 is unstable on this machine** (2026-10-02, E7-G8). About half
 of runs see one long animation frame of 52-63 ms, with no script attributed
 and 4-6 ms blocking, at HEAD and at `6545029` alike. `just e10-bench` stops at

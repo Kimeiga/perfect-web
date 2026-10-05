@@ -13,6 +13,14 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0219, 2026-10-05: what a commit drops reaches every session that
+reads it** (the feed, second step). A commit told the session that made it,
+and another reader's open timeline saw a post when the page was next
+loaded. A commit's dropped queries, whole or by a key sessions share, are
+its write set, and an open page's bindings its read set. Every other session
+whose page reads one is read again and sent the change, in its own hold,
+after the author is answered (`just e14-cross-session`).
+
 **ADR-0218, 2026-10-05: a host serves any program, and its data is the
 deployment's** (the feed reference app, first step). The development server
 served the store alone, and a second program failed at `from_build`. The

@@ -134,10 +134,10 @@ MUTANTS = [
         "the server sends a refusal without its error",
         "cargo",
         SERVER,
-        "                return Ok(Answered {\n"
+        "                let answered = Answered {\n"
         "                    committed: false,\n"
         "                    result,\n",
-        "                return Ok(Answered {\n"
+        "                let answered = Answered {\n"
         "                    committed: false,\n"
         "                    result: result.filter(|_| false),\n",
     ),

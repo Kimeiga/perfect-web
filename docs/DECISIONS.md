@@ -1859,3 +1859,10 @@ reference app's first step).
   every test green. First the store's state, reads, command staging and
   grants move into `StoreData`, and a build importing what no layer supplies
   is refused at start.
+[ADR-0219](DECISIONS/ADR-0219-what-a-commit-drops-reaches-every-session-that-reads-it.md):
+what a commit drops reaches every session that reads it (the feed reference
+app's second step).
+- A commit told the session that made it. Another reader's open timeline
+  saw a post when the page was next loaded. Each other session whose open
+  page reads a query the commit dropped, whole or by a shared key, is read
+  again and sent the change, after the author is answered.
