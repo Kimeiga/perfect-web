@@ -11,7 +11,9 @@
 //   - a post shows before the server answers, and is the server's after;
 //     one whose request fails is taken back (ADR-0222);
 //   - a post's text is at most 280 code points: a longer draft is not sent
-//     (ADR-0225).
+//     (ADR-0225);
+//   - "Load more" shows the longer page, and a post after it is shown over
+//     the longer page (ADR-0222, ADR-0224).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -161,4 +163,44 @@ test("a post longer than 280 characters is not sent, and 280 emoji are", async (
   await expect(post(page, emoji)).toHaveCount(1);
   await expect(post(page, emoji).getByRole("link")).toHaveText(/^Guest /);
   expect(sent).toHaveLength(1);
+});
+
+test("Load more shows the next page, and a post after it is shown over it", async ({
+  browser,
+  page,
+}, testInfo) => {
+  // Twenty-five posts by another session, through the command route as a
+  // page sends them.
+  const other = await browser.newContext();
+  for (let i = 0; i < 25; i++) {
+    const r = await other.request.post("/command/feed.app.post", {
+      headers: { "content-type": "application/json", "pw-interaction": `seed-${Date.now()}-${i}` },
+      data: [`Older ${testInfo.project.name} ${i}`],
+    });
+    expect(r.status()).toBe(202);
+  }
+  await other.close();
+  await home(page);
+  const rows = page.locator("main > ul > li");
+  await expect(rows).toHaveCount(20);
+  await page.getByRole("button", { name: "Load more" }).click();
+  await expect.poll(() => rows.count()).toBeGreaterThan(20);
+  const longer = await rows.count();
+  expect(longer).toBeLessThanOrEqual(40);
+  // A post held at the network is shown over the page the browser holds now,
+  // the longer one: one row more, the post first.
+  let release;
+  const held = new Promise((r) => (release = r));
+  await page.route("**/command/feed.app.post", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const text = `After more in ${testInfo.project.name}, ${Date.now()}`;
+  await page.getByLabel("What's happening?").fill(text);
+  await page.getByRole("button", { name: "Post" }).click();
+  await expect(rows.first()).toContainText(text);
+  await expect(rows).toHaveCount(longer + 1);
+  release();
+  await expect(post(page, text).getByRole("link")).toHaveText(/^Guest /);
+  expect(await unreloaded(page)).toBe(true);
 });

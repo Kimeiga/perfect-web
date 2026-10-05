@@ -96,6 +96,10 @@ and builds ruling 0105-a's unnamed key. Date: 2026-10-05. Milestone: E14.
   - a post held at the network shows first, by "You". It is the server's
     after, by its guest's name, in one row, with the draft cleared.
   - A post whose request fails is taken back, and its draft kept.
+  - Added with ADR-0225: 25 posts by another session, then "Load more"
+    shows more than twenty. A post held after that shows over the longer
+    page, one row more, its post first. The page holds the longer value, as
+    `a_page_that_reads_more_holds_what_it_shows` says of the server.
 - **`scripts/optimistic_posts_mutations.py`: 11 mutants**, recorded by `just
   e14-optimistic-posts`. `patch_set_mutations.py`'s "what was sent is not
   remembered" is re-anchored, its patches derived with the speculated values

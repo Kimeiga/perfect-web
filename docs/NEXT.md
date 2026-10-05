@@ -365,8 +365,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           arm has arrived~~ (ADR-0223, `just e14-whole-fills`); ~~a longer
           read applied after a commit it did not see~~ (ADR-0224, `just
           e14-keyed-race`); ~~a `String`'s length as an invariant~~
-          (ADR-0225, `just e14-string-invariants`); next computed holes
-          (0073-a), then the rest of the feed, pulling in what it needs: 0073-a computed holes, 0071-a,
+          (ADR-0225, `just e14-string-invariants`); ~~pagination~~ ("Load
+          more", a keyed read, in three engines with a post after it,
+          ADR-0222's browser test); next computed holes (0073-a), then the
+          rest of the feed, pulling in what it needs: 0073-a computed holes, 0071-a,
           0122-d, 0057-a, 0099-a, a `String`'s length as an invariant, and
           ADR-0195's ruling 10, materialization chains;
         - then 0101-a to 0101-d, 0105-a, 0100-a, and the rest below;
