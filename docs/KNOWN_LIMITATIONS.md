@@ -37,13 +37,17 @@ agreement:
   - a handle from a `use` of a host call;
   - a type named as a value (`Element`).
 
-  A declared function's result that its arguments do not fix stays unknown
-  (ruling needed).
+  A declared function's result that its arguments do not fix stays
+  unknown. ADR-0195 (ruling 4) rules it typed from what is expected of it,
+  and refused as "type annotation needed" where nothing fixes it; not built
+  yet.
 - **A record literal whose first field is shorthand** (`P { x }`) parses as
   the name `P` followed by a block `{ x }`. A brace is a record only as `{ }`
   or `{ name:`, so that `if x { .. }` stays a block. `let p = P { x }`
   checks and means something else; `P { a: 1, x }` is a record. Found
-  writing ADR-0063; its fix is a grammar decision (ruling needed).
+  writing ADR-0063. ADR-0195 (ruling 1) rules Rust's rule: a type name and
+  `{` open a record everywhere but the head of `if`, `while`, `for` and
+  `match`, where a record is parenthesized; not built yet.
 - **A `()` body discards its last value** (A-018). A branch mismatch in
   statement position is not refused; as a result, it is.
 - **Generic layouts at the boundary.** Phantom parameters map to one WIT
@@ -151,9 +155,12 @@ refused by name:
   Until 2026-09-25 matches over `Option`, `Result` and calls were not checked
   at all, and four other shapes were proven exhaustive when they were not
   (ADR-0038).
-- **A binding cannot share a constructor's name** (ADR-0038, ruling needed).
-  A bare pattern name that some type has as a constructor is read as that
-  constructor, and against another type it is PW0608.
+- **A binding cannot share a constructor's name** (ADR-0038). A bare
+  pattern name that some type has as a constructor is read as that
+  constructor, and against another type it is PW0608; any other bare name,
+  a misspelt case among them, binds. ADR-0195 (ruling 2) rules that
+  capitalization decides: a case name is uppercase, a lowercase pattern name
+  always binds, and an uppercase one is always a case; not built yet.
 - **`return` is a statement, not an expression.** Its value is the statement
   after it, in a block or on its line in a match arm (ADR-0038).
 - **A template arm takes one case apart** (ADR-0042, ADR-0061). A template's
@@ -371,7 +378,9 @@ awaited in order. What remains:
 - **A clause's key is checked for names, count and types, not labels**
   (ADR-0088). A secret passed in `emits` or `invalidates` reaches the graph
   unlabelled, and what a key performs (`current_session()`'s
-  `session.read`) is not the declaration's (ruling needed).
+  `session.read`) is not the declaration's. ADR-0195 (ruling 9) rules a key
+  labelled by what built it, a secret refused, and what a key performs the
+  declaration's effect; not built yet.
 - **`requires` is held at the invocation boundary** (ADR-0115).
   Predicate names belong to the deployment's authorization vocabulary and
   command-parameter arguments are carried by index in the component contract.
@@ -399,7 +408,8 @@ awaited in order. What remains:
 - **A cache key is held to every parameter its body reads** (ADR-0107),
   including one read only for an effect such as a trace, whose value the
   entry does not depend on. Telling the two apart needs the flow of values
-  to the result (ruling needed).
+  to the result; ADR-0195 (ruling 8) rules it computed by the
+  information-flow labels, and the rule here stands until it is.
 - **A command's write is matched to its readers by domain, not by key**
   (ADR-0101). PW5106 requires a command writing `Carts` to reach each
   cart reader with no staleness window. It does not check that the event
@@ -414,23 +424,28 @@ awaited in order. What remains:
   first value on a Marko page, and a speculation on it stays. PW5106 and
   PW5107 accept both kinds of reach, and the dev server honours both
   (ADR-0105).
-- **Only a resumable handler runs in the browser.** The runtime attaches
-  what `decide` authorises from a resume manifest, and a plain lambda,
-  `on:press={() => clear_cart()}`, or a named function has none, so its
-  element is left inert and the press is logged, not run. `pw check`
-  accepts such a handler, as the corpus writes them (ruling needed: what a
-  handler that is not resumable compiles to).
+- **A handler written as a named function, `on:submit={save}`, is refused
+  when built** (ADR-0134). Every lambda in an `on:` attribute is a resumable
+  handler, its captures inferred; a named function is checked against its
+  event's type, and refused at build with the repair, rather than shipped
+  inert. ADR-0195 (ruling 12) rules it means `e => save(e)`; not built
+  yet.
 - **The dev server computes one event key: `current_session()`**
   (ADR-0104). It commits the events a command declares, and refuses a
-  command whose event carries anything else, such as its own argument, until
-  a compiled command returns its events (ruling needed).
+  command whose event carries anything else, such as its own argument.
+  ADR-0195 (ruling 11) rules that the compiled command returns its typed
+  events with its result, and the host writes them in the writes'
+  transaction; not built yet.
 - **A `style` attribute's value is escaped by refusing what executes**
   (`expression(`, a script scheme in `url(`), then as an attribute. A style
   can still load a URL the value names. A `<style>` element holds text only
   (ADR-0094), and a stylesheet's braces open holes, so none is written.
-- **A view may write `<meta>` and `<link>`** (ADR-0096): a refresh that
-  redirects, a stylesheet from anywhere. Neither runs a script, and which
-  head elements a body may hold needs a ruling.
+- **A `<link>` in markup may name any origin** (ADR-0189): a relation the
+  body allows, a stylesheet or a preconnect, from anywhere. A link the head
+  holds is refused in markup (PW5035), and `http-equiv` is the host's
+  (ADR-0186). ADR-0195 (ruling 13) rules an `href` a literal or a build's
+  asset, a cross-origin one's origin declared by the program, and the host's
+  Content-Security-Policy generated from that list; not built yet.
 - **A single patch that addresses nothing is ignored** (ADR-0168): a patch
   set that does is refused and the page read again, but a lone
   `ReplaceText` or `SetAttribute` is not. It hid E7-P's scrambled list until
@@ -517,7 +532,9 @@ within stated bounds (ADR-0120 found both unexecuted):
   64 interactions of a session;
 - `optimistic` (ADR-0122): in the own renderer only, for a part outside any
   block, where the page binding's key is an invocation-context call. A new
-  cart line is priced zero until the server answers (ruling offered).
+  cart line takes the name and price the page showed (ADR-0172), and the
+  server's answer replaces it: a speculation never invents a value
+  (ADR-0195, ruling 14).
 E14's shared store contract still excludes both, for every stack.
 
 **A signal lives in a page, a use of a view, or a `provide`** (ADR-0133,
