@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `2578341`, with ADR-0200.
+**Reviewed:** 2026-10-05, against master `53ceb20`, with ADR-0201.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2717,9 +2717,19 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`2578341` (2026-10-05, ADR-0200): `just ci` passes locally, the workspace's
-1949 tests pass, and the browser suite passes 710 in three engines, with 13
-skipped. ADR-0200's evidence is `docs/evidence/E14/unit-value.txt`, recorded
+`53ceb20` (2026-10-05, ADR-0201): `just ci` passes locally, the workspace's
+1952 tests pass, and the browser suite passes 710 in three engines, with 13
+skipped. ADR-0201's evidence is `docs/evidence/E14/expected-cases.txt`,
+recorded at that commit: its 12 tests, the components against a model and
+the JavaScript modules agreeing on 600 calls, and 14 of 14 mutants killed.
+`bare-cases.txt` is recorded again at that commit, 3 of 3, one control
+retired. **Correction:** `E10/sum-types.txt`, recorded again at that commit,
+killed 17 of 18: "a bare case with a payload is not told its qualified form"
+mutates a branch no program reaches since ADR-0198, which resolves a bare
+call's owners before it. It is not committed here; the branch goes, the
+control is retired, and the file is recorded with ADR-0202. ADR-0200's is at
+`2578341`, where `just ci` passed and the workspace's 1949 tests did: its
+evidence is `docs/evidence/E14/unit-value.txt`, recorded
 at that commit: its 6 tests, every `.pw` file in the repository lowering
 with no error node, the parser's test of a block left open and the
 checker's, and 8 of 8 mutants killed. `handlers-resumable.txt` is recorded

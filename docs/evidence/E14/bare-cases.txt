@@ -1,49 +1,50 @@
 ADR-0198 - a bare case with a payload is the case of the one type that has it
 
 produced by: just e14-bare-cases
-commit: afb63a39b2204ee231b9bb1fd3dc2e9ecc66246d
+commit: 53ceb20b9049365ce118ed82c071a9eede624795
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 
 == the rule (compiler/pw-core/tests/sum_types.rs)
 
 test a_case_alone_through_a_module_is_a_case_not_a_binding ... ok
-test a_pattern_through_its_type_is_a_case_not_a_binding ... ok
 test an_options_payload_is_typed_in_its_arm ... ok
-test a_patterns_qualifier_must_name_the_type_matched ... ok
 test an_arms_fields_are_typed_in_its_body ... ok
+test a_pattern_through_its_type_is_a_case_not_a_binding ... ok
+test a_case_is_its_types_value ... ok
+test a_patterns_qualifier_must_name_the_type_matched ... ok
 test a_generic_sum_type_is_instantiated_where_it_is_used ... ok
 test a_cases_fields_are_its_arguments ... ok
-test a_case_is_its_types_value ... ok
-test a_case_its_type_does_not_declare_is_refused ... ok
 test a_bare_case_is_the_one_type_that_has_it ... ok
+test a_case_its_type_does_not_declare_is_refused ... ok
 test a_bare_case_with_a_payload_is_the_one_type_that_has_it ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+test a_bare_case_is_the_case_of_the_type_expected ... ok
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
 
 == built (compiler/pw-conformance/tests/sum_types.rs, javascript.rs)
 
 test a_type_that_contains_itself_is_refused_by_name ... ok
-test a_hosts_answer_is_matched_by_its_case ... ok
 test a_generic_sum_type_is_built_and_matched ... ok
 test a_case_inside_an_option ... ok
-test every_joined_slot_is_read_and_written ... ok
+test a_hosts_answer_is_matched_by_its_case ... ok
+test a_bare_case_with_a_payload_is_built ... ok
 test a_parameter_is_returned_as_itself ... ok
 test each_case_is_built ... ok
-test a_bare_case_with_a_payload_is_built ... ok
 test a_union_of_one_case_is_a_variant ... ok
 test a_case_is_a_function_value_and_a_bare_case_a_value ... ok
+test every_joined_slot_is_read_and_written ... ok
 test a_case_inside_a_record_and_a_list ... ok
+test a_case_written_alone_is_built_as_the_type_expected ... ok
 test a_parameter_is_matched_case_by_case ... ok
 test a_type_of_three_hundred_cases_has_a_wider_discriminant ... ok
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
 javascript: 87 queries, 17400 calls, component and module agree (979 trapped in both)
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 61.99s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 52.26s
 
 == mutation controls (scripts/bare_cases_mutations.py)
 
-baseline: 24 passed, 0 failed
-a bare case with a payload resolves to nothing: KILLED (10 of 24 tests fail)
-one of several types' cases is taken: KILLED (1 of 24 tests fail)
-its payload is related to nothing: KILLED (1 of 24 tests fail)
-the backend does not build it: KILLED (1 of 24 tests fail)
-4 of 4 mutants killed
+baseline: 26 passed, 0 failed
+a bare case with a payload resolves to nothing: KILLED (10 of 26 tests fail)
+its payload is related to nothing: KILLED (1 of 26 tests fail)
+the backend does not build it: KILLED (2 of 26 tests fail)
+3 of 3 mutants killed
