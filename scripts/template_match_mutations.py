@@ -66,10 +66,12 @@ MUTANTS = [
         "            let names: Vec<&str> = vec![f];",
     ),
     (
+        # Re-anchored by ADR-0206: every case is named as its WIT case is,
+        # the language's four too.
         "a declared case keeps its Pleris name in the IR",
         TEMPLATE_IR,
-        "                c => crate::wit::ident(c),",
-        "                c => c.to_string(),",
+        "            let case = crate::wit::ident(arm.short());",
+        "            let case = arm.short().to_string();",
     ),
     (
         "a case of several fields binds only its first",

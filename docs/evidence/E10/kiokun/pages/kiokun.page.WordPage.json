@@ -1,0 +1,10 @@
+{
+  "page": "kiokun.page.WordPage",
+  "params": [
+    "word",
+    "entry"
+  ],
+  "bindings": [],
+  "parts": [],
+  "collections": []
+}

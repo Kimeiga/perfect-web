@@ -4787,13 +4787,13 @@ fn val_to_value(v: &Val) -> Value {
             payload: None,
         },
         Val::Option(v) => Value::Variant {
-            case: if v.is_some() { "Some" } else { "None" }.to_string(),
+            case: if v.is_some() { "some" } else { "none" }.to_string(),
             payload: v.as_deref().map(|v| Box::new(val_to_value(v))),
         },
         Val::Result(r) => {
             let (case, v) = match r {
-                Ok(v) => ("Ok", v),
-                Err(v) => ("Err", v),
+                Ok(v) => ("ok", v),
+                Err(v) => ("err", v),
             };
             Value::Variant {
                 case: case.to_string(),
@@ -8424,14 +8424,14 @@ public query Store(",
         assert_eq!(
             val_to_value(&Val::Option(Some(Box::new(Val::S64(3))))),
             Value::Variant {
-                case: "Some".into(),
+                case: "some".into(),
                 payload: Some(Box::new(Value::Int(3)))
             }
         );
         assert_eq!(
             val_to_value(&Val::Result(Err(Some(Box::new(Val::String("x".into())))))),
             Value::Variant {
-                case: "Err".into(),
+                case: "err".into(),
                 payload: Some(Box::new(Value::Text("x".into())))
             }
         );

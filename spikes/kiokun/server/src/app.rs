@@ -362,10 +362,12 @@ pub fn value(v: &Val) -> Option<Value> {
                 .filter_map(|(k, v)| Some((k.replace('-', "_"), value(v)?)))
                 .collect(),
         ),
-        Val::Option(Some(inner)) => case("Some", Some(inner))?,
-        Val::Option(None) => case("None", None)?,
-        Val::Result(Ok(ok)) => case("Ok", ok.as_deref())?,
-        Val::Result(Err(err)) => case("Err", err.as_deref())?,
+        // As their WIT cases are named, as a template's arms name them
+        // (ADR-0206).
+        Val::Option(Some(inner)) => case("some", Some(inner))?,
+        Val::Option(None) => case("none", None)?,
+        Val::Result(Ok(ok)) => case("ok", ok.as_deref())?,
+        Val::Result(Err(err)) => case("err", err.as_deref())?,
         Val::Variant(name, payload) => case(name, payload.as_deref())?,
         // A case's several fields (ADR-0061).
         Val::Tuple(parts) => Value::List(parts.iter().map(value).collect::<Option<_>>()?),

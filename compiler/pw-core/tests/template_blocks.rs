@@ -148,12 +148,12 @@ fn match_takes_an_option_apart_with_its_payload_bound() {
     assert_eq!(arms.len(), 2);
     assert_eq!(
         (arms[0]["case"].as_str(), arms[0]["binding"].as_str()),
-        (Some("Some"), Some("h"))
+        (Some("some"), Some("h"))
     );
     assert_eq!(one(&arms[0]["body"], "text")["value"], "h.word");
     assert_eq!(
         (arms[1]["case"].as_str(), arms[1].get("binding")),
-        (Some("None"), None)
+        (Some("none"), None)
     );
     assert_eq!(statics(&arms[1]["body"]).trim(), "<p>Nothing</p>");
 }

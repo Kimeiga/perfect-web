@@ -1772,3 +1772,10 @@ nodes (ADR-0194's next step).
   handler reads and sets, and a command's argument, which the host passes to
   the component as its nodes.
 - The renderer's values are dropped, cloned and compared without recursion.
+[ADR-0206](DECISIONS/ADR-0206-a-case-has-one-name-where-values-are-rendered.md):
+a case has one name where values are rendered, its WIT case's (found
+building ADR-0205).
+- The template and a host's values named the language's four `Some`,
+  `None`, `Ok`, `Err`, and the browser's wire `some`, `none`, `ok`, `err`, so
+  a `{#match}` on an `Option` a signal holds found no arm. One name now, the
+  wire's.

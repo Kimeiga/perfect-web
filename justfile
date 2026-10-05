@@ -2689,6 +2689,25 @@ e14-graphs-on-the-wire:
      } > docs/evidence/E14/graphs-on-the-wire.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/graphs-on-the-wire.txt
 
+# ADR-0206: a case has one name where values are rendered, its WIT case's.
+# Its tests, the renderer's and the hosts', and the mutation controls.
+e14-one-case-name:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0206 - a case has one name where values are rendered, its WIT case's"; echo; \
+       echo "produced by: just e14-one-case-name"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== a page matching on what its signals hold (compiler/pw-core/tests/one_name_for_a_case.rs)"; echo; \
+       cargo test --locked -p pw-core --test one_name_for_a_case 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the template, the renderer and the hosts"; echo; \
+       cargo test --locked -p pw-core --test template_blocks --test evidence_is_current 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-render 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-dev-server -p kiokun-server 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/one_case_name_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/one_case_name_mutations.py; \
+     } > docs/evidence/E14/one-case-name.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
+
 # ADR-0204: an element holds only the children HTML permits, as the page
 # holds them. The rule's tests, R-019's, and the mutation controls.
 e14-rendered-children:

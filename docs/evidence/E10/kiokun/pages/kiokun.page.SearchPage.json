@@ -1,0 +1,10 @@
+{
+  "page": "kiokun.page.SearchPage",
+  "params": [
+    "q",
+    "hits"
+  ],
+  "bindings": [],
+  "parts": [],
+  "collections": []
+}

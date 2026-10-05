@@ -33,11 +33,11 @@ fn a_graph_is_the_value_its_nodes_make() {
     );
     // A node held where a case holds it, `Some(next)`.
     let chain = json!({ "$graph": [
-        { "n": 1, "next": { "$case": "Some", "value": { "$node": 1 } } },
-        { "n": 2, "next": { "$case": "None" } },
+        { "n": 1, "next": { "$case": "some", "value": { "$node": 1 } } },
+        { "n": 2, "next": { "$case": "none" } },
     ]});
-    let nested = json!({ "n": 1, "next": { "$case": "Some", "value":
-        { "n": 2, "next": { "$case": "None" } } } });
+    let nested = json!({ "n": 1, "next": { "$case": "some", "value":
+        { "n": 2, "next": { "$case": "none" } } } });
     assert_eq!(
         Value::from_wire(&chain).expect("a tree"),
         Value::from_wire(&nested).expect("a value")
@@ -154,7 +154,7 @@ fn a_copy_is_the_value_and_its_own() {
     let tree = json!({ "id": 1, "tags": ["x", "y"], "replies": [
         { "id": 2, "tags": [], "replies": [{ "id": 4, "tags": ["z"], "replies": [] }] },
         { "id": 3, "tags": ["w"], "replies": [] },
-    ], "state": { "$case": "Some", "value": { "seen": true } } });
+    ], "state": { "$case": "some", "value": { "seen": true } } });
     let value = Value::from_wire(&tree).expect("a value");
     let copy = value.clone();
     assert_eq!(copy, value);
@@ -176,12 +176,12 @@ fn a_copy_is_the_value_and_its_own() {
         (json!([1]), json!([1, 1])),
         (json!({ "a": 1 }), json!({ "b": 1 })),
         (
-            json!({ "$case": "Some", "value": 1 }),
-            json!({ "$case": "None" }),
+            json!({ "$case": "some", "value": 1 }),
+            json!({ "$case": "none" }),
         ),
         (
-            json!({ "$case": "Ok", "value": 1 }),
-            json!({ "$case": "Err", "value": 1 }),
+            json!({ "$case": "ok", "value": 1 }),
+            json!({ "$case": "err", "value": 1 }),
         ),
         (json!("1"), json!(1)),
     ] {

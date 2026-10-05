@@ -1,4 +1,4 @@
-//! **A values file states a case** (ADR-0193): `{"$case": "Some", "value":
+//! **A values file states a case** (ADR-0193): `{"$case": "some", "value":
 //! ...}`, the wire form a page's values travel in, so a page that matches on
 //! an option renders from one. Until 2026-10-04 `pw-render` read every object
 //! as a record.
@@ -24,11 +24,11 @@ fn rendered(values: serde_json::Value) -> String {
         "chunks": [{ "chunk": "dynamic", "value": {
             "part": "match", "id": 0, "value": "order",
             "arms": [
-                arm("Some", Some("status"), serde_json::json!([{ "chunk": "dynamic", "value": {
+                arm("some", Some("status"), serde_json::json!([{ "chunk": "dynamic", "value": {
                     "part": "match", "id": 1, "value": "status",
                     "arms": [arm("placed", None, text("<p>Placed</p>")), arm("preparing", None, text("<p>Preparing</p>"))],
                 }}])),
-                arm("None", None, text("<p>No order</p>")),
+                arm("none", None, text("<p>No order</p>")),
             ],
         }}],
     }]);
@@ -61,10 +61,10 @@ fn rendered(values: serde_json::Value) -> String {
 
 #[test]
 fn a_values_file_states_a_case_and_its_payload() {
-    let none = rendered(serde_json::json!({ "order": { "$case": "None" } }));
+    let none = rendered(serde_json::json!({ "order": { "$case": "none" } }));
     assert!(none.contains("<p>No order</p>"), "{none}");
     let preparing = rendered(serde_json::json!({
-        "order": { "$case": "Some", "value": { "$case": "preparing" } },
+        "order": { "$case": "some", "value": { "$case": "preparing" } },
     }));
     assert!(preparing.contains("<p>Preparing</p>"), "{preparing}");
     assert!(!preparing.contains("No order"), "{preparing}");

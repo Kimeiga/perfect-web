@@ -1,0 +1,73 @@
+{
+  "compatibility": "dev",
+  "nodes": [
+    {
+      "path": "kiokun.page.Lookup",
+      "name": "Lookup",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "key": [
+        "word"
+      ],
+      "params": [
+        "word"
+      ]
+    },
+    {
+      "path": "kiokun.page.Search",
+      "name": "Search",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "key": [
+        "q"
+      ],
+      "params": [
+        "q"
+      ]
+    },
+    {
+      "path": "kiokun.page.SearchPage",
+      "name": "SearchPage",
+      "node": "page",
+      "params": [
+        "q",
+        "hits"
+      ]
+    },
+    {
+      "path": "kiokun.page.WordPage",
+      "name": "WordPage",
+      "node": "page",
+      "params": [
+        "word",
+        "entry"
+      ]
+    },
+    {
+      "path": "shards.Place",
+      "name": "Place",
+      "node": "resource",
+      "partition": null,
+      "privacy": "public",
+      "key": [],
+      "params": [
+        "word"
+      ]
+    },
+    {
+      "path": "shards.Places",
+      "name": "Places",
+      "node": "resource",
+      "partition": null,
+      "privacy": "public",
+      "key": [],
+      "params": [
+        "words"
+      ]
+    }
+  ],
+  "edges": [],
+  "dangling": []
+}

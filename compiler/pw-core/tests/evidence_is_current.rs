@@ -315,41 +315,35 @@ fn the_committed_kiokun_build_is_what_the_compiler_builds_now() {
     let b = pw_core::build::build(&units).expect("the slice checks");
     assert!(b.refusals().is_empty(), "{:?}", b.refusals());
 
-    let mut fresh: Vec<(String, Vec<u8>)> = vec![
-        (
-            "templates.json".into(),
-            format!("{}\n", serde_json::to_string_pretty(&b.templates).unwrap()).into_bytes(),
-        ),
-        (
-            "contracts.json".into(),
-            format!("{}\n", serde_json::to_string_pretty(&b.contracts).unwrap()).into_bytes(),
-        ),
-        ("app.wit".into(), b.wit.clone().into_bytes()),
-    ];
-    for (id, built) in &b.components {
-        if let pw_core::backend::component::Built::Component { compiled, .. } = built {
-            fresh.push((
-                format!("components/{id}.wasm"),
-                compiled.component.bytes.clone(),
-            ));
-        }
-    }
-    fresh.sort();
-
-    let dir = root.join("docs/evidence/E10/kiokun");
-    let mut committed: Vec<(String, Vec<u8>)> = Vec::new();
-    for sub in ["", "components"] {
-        for e in std::fs::read_dir(dir.join(sub))
-            .unwrap_or_else(|e| panic!("{}: {e} — run `just e10-kiokun`", dir.display()))
-        {
-            let path = e.expect("entry").path();
-            if path.is_file() {
-                let name = path.strip_prefix(&dir).unwrap().display().to_string();
-                committed.push((name, std::fs::read(&path).expect("read")));
+    // What `pw build` writes, as it writes it: every file, in every
+    // directory. Until 2026-10-05 this compared four kinds of file, and `pw
+    // build` had come to write a graph and page plans beside them, so the
+    // recipe that rebuilds the directory made it fail here.
+    let built = std::env::temp_dir().join(format!("pw-kiokun-build-{}", std::process::id()));
+    std::fs::remove_dir_all(&built).ok();
+    b.write(&built).expect("the build writes");
+    fn files(dir: &std::path::Path) -> Vec<(String, Vec<u8>)> {
+        let mut out = Vec::new();
+        let mut stack = vec![dir.to_path_buf()];
+        while let Some(at) = stack.pop() {
+            for e in std::fs::read_dir(&at)
+                .unwrap_or_else(|e| panic!("{}: {e} — run `just e10-kiokun`", at.display()))
+            {
+                let path = e.expect("entry").path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    let name = path.strip_prefix(dir).unwrap().display().to_string();
+                    out.push((name, std::fs::read(&path).expect("read")));
+                }
             }
         }
+        out.sort();
+        out
     }
-    committed.sort();
+    let fresh = files(&built);
+    std::fs::remove_dir_all(&built).ok();
+    let committed = files(&root.join("docs/evidence/E10/kiokun"));
     let differing: std::collections::BTreeSet<&String> = fresh
         .iter()
         .chain(&committed)

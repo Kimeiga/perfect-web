@@ -112,9 +112,9 @@ fn render_block(cache: &str) -> (bool, String) {
             { "chunk": "dynamic", "value": {
                 "part": "match", "id": 1, "value": "order",
                 "arms": [
-                    { "case": "Some", "binding": "status",
+                    { "case": "some", "binding": "status",
                       "body": [{ "chunk": "static", "value": "<p>an order</p>" }] },
-                    { "case": "None",
+                    { "case": "none",
                       "body": [{ "chunk": "static", "value": "<p>no order</p>" }] },
                 ],
             }},

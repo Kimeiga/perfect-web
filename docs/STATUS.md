@@ -13,6 +13,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0206, 2026-10-05: a case has one name where values are rendered, its
+WIT case's.** Correction, found building ADR-0205: the browser's wire, the
+build and a handler name the language's four cases `some`, `none`, `ok`,
+`err`, and the template and a host's values named them `Some`, `None`, `Ok`,
+`Err`. So a page matching on an `Option` or a `Result` a signal holds found
+no arm and did not render; no page here did that. Every case is named as its
+WIT case is now. The committed kiokun build is rebuilt, and its currency
+test compares every file `pw build` writes: it compared four kinds, so the
+recipe that rebuilds it failed it. 5 mutants (`just e14-one-case-name`).
+
 **ADR-0205, 2026-10-05: a value of a type that contains itself crosses the
 browser's wire as its nodes** (ADR-0194's next step). `{ "$graph": [node,
 ...] }`, each value of the type inside a node `{ "$node": k }`, in ADR-0194's

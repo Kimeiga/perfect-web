@@ -31,14 +31,14 @@ fn text(id: u32, value: &str) -> Chunk {
 
 fn some(v: Value) -> Value {
     Value::Variant {
-        case: "Some".into(),
+        case: "some".into(),
         payload: Some(Box::new(v)),
     }
 }
 
 fn none() -> Value {
     Value::Variant {
-        case: "None".into(),
+        case: "none".into(),
         payload: None,
     }
 }
@@ -59,13 +59,13 @@ fn found_page() -> Template {
         value: "found".into(),
         arms: vec![
             Arm {
-                case: "Some".into(),
+                case: "some".into(),
                 binding: Some("h".into()),
                 fields: vec![],
                 body: vec![st("<p>"), text(1, "h.word"), st("</p>")],
             },
             Arm {
-                case: "None".into(),
+                case: "none".into(),
                 binding: None,
                 fields: vec![],
                 body: vec![st("<p>-</p>")],
@@ -114,7 +114,7 @@ fn a_match_refuses_what_it_cannot_take_apart() {
             Env::new().set(
                 "found",
                 Value::Variant {
-                    case: "Ok".into(),
+                    case: "ok".into(),
                     payload: None,
                 },
             ),
@@ -124,7 +124,7 @@ fn a_match_refuses_what_it_cannot_take_apart() {
             Env::new().set(
                 "found",
                 Value::Variant {
-                    case: "Some".into(),
+                    case: "some".into(),
                     payload: None,
                 },
             ),

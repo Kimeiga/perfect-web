@@ -812,7 +812,7 @@ fn emit_settled<'o>(
         Settled::Failed(why) => (
             failed,
             Value::Variant {
-                case: if why.is_some() { "Some" } else { "None" }.to_string(),
+                case: if why.is_some() { "some" } else { "none" }.to_string(),
                 payload: why.clone().map(Box::new),
             },
         ),

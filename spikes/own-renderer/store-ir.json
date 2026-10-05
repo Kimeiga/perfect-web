@@ -3,7 +3,7 @@
     "path": "store.page.CartPage",
     "name": "CartPage",
     "params": [],
-    "schema": "237c6cc51cf6cc06",
+    "schema": "d10395c54bc23d86",
     "chunks": [
       {
         "chunk": "static",
@@ -292,7 +292,7 @@
           "value": "order",
           "arms": [
             {
-              "case": "Some",
+              "case": "some",
               "binding": "_",
               "body": [
                 {
@@ -302,7 +302,7 @@
               ]
             },
             {
-              "case": "None",
+              "case": "none",
               "body": [
                 {
                   "chunk": "static",
@@ -459,7 +459,7 @@
     "path": "store.page.OrderPage",
     "name": "OrderPage",
     "params": [],
-    "schema": "21a3a0df884cd80a",
+    "schema": "61ec162c990472ca",
     "chunks": [
       {
         "chunk": "static",
@@ -473,7 +473,7 @@
           "value": "order",
           "arms": [
             {
-              "case": "Some",
+              "case": "some",
               "binding": "status",
               "body": [
                 {
@@ -533,7 +533,7 @@
               ]
             },
             {
-              "case": "None",
+              "case": "none",
               "body": [
                 {
                   "chunk": "static",

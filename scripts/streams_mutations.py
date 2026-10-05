@@ -167,8 +167,10 @@ MUTANTS = [
         "a declared error is shown as the host's failure",
         "render",
         RENDER,
-        "                case: if why.is_some() { \"Some\" } else { \"None\" }.to_string(),\n",
-        "                case: \"None\".to_string(),\n",
+        # Re-anchored by ADR-0206: the four cases are named as their WIT
+        # cases are.
+        "                case: if why.is_some() { \"some\" } else { \"none\" }.to_string(),\n",
+        "                case: \"none\".to_string(),\n",
     ),
     (
         "the document waits for its streamed regions",

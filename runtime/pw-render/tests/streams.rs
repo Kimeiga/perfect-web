@@ -63,13 +63,13 @@ fn page(streamed: bool) -> Template {
                     value: "why".into(),
                     arms: vec![
                         Arm {
-                            case: "Some".into(),
+                            case: "some".into(),
                             binding: Some("e".into()),
                             fields: vec![],
                             body: vec![st("<p>declared</p>")],
                         },
                         Arm {
-                            case: "None".into(),
+                            case: "none".into(),
                             binding: None,
                             fields: vec![],
                             body: vec![st("<p>no answer</p>")],

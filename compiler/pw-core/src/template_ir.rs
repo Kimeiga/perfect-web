@@ -2407,13 +2407,11 @@ fn lower_block_at(
                 ));
                 return;
             };
-            // A declared case as a component value names it: `circle` for
-            // `Circle`, as its WIT case is (ADR-0061). The language's own
-            // four keep their names.
-            let case = match arm.short() {
-                c @ ("Some" | "None" | "Ok" | "Err") => c.to_string(),
-                c => crate::wit::ident(c),
-            };
+            // A case as its WIT case is named, `circle` for `Circle`
+            // (ADR-0061), and the language's own four too, `some` for
+            // `Some`: one name, the browser's wire's, whoever wrote the
+            // value (ADR-0206).
+            let case = crate::wit::ident(arm.short());
             let (scope, written) = ctx.binding(&arm.bindings, ix);
             let (binding, fields) = match written.as_slice() {
                 [one] => (Some(one.clone()), Vec::new()),
