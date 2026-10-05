@@ -251,3 +251,25 @@ fn a_signal_s_member_is_refused_since_the_browser_reads_a_signal_by_field() {
     // Control: its field.
     plan_with(signals, "<p>{shown.minor_units}</p>").expect("planned");
 }
+
+#[test]
+fn a_member_read_in_a_row_of_a_list_no_query_gives_is_refused() {
+    // A row of a signal's list, in a block a signal decides: the browser
+    // renders it again and reads its item by field (ADR-0137), so no host
+    // computes a member there. Until ADR-0181 this case was a loop over a
+    // list inside another row's item, which a host computes since, and the
+    // refusal was left with no test.
+    let signals = "    signal picks: List<Item> = []\n    signal open: Bool = true\n";
+    let rows = |li: &str| {
+        format!("{{#if open}}<ul>{{#each picks as item (item.id)}}{li}{{/each}}</ul>{{/if}}")
+    };
+    let why = plan_with(signals, &rows("<li>{item.price.display}</li>")).expect_err("refused");
+    assert!(
+        why.starts_with(
+            "part 2 reads `item.price.display` through a member function in a text part"
+        ),
+        "{why}"
+    );
+    // Control: its field.
+    plan_with(signals, &rows("<li>{item.name}</li>")).expect("planned");
+}
