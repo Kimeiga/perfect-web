@@ -133,8 +133,11 @@ fn a_bare_case_is_the_one_type_that_has_it() {
         reported(&wrong),
         ["PW0606 `t.f` declares its result `Int` and this produces `t.Shape`"]
     );
-    // Two types that have it: neither is meant.
-    let two = program("type Box =\n    | Empty\n    | Full(Int)\n\nfn f() -> Shape { Empty }");
+    // Two types that have it, and nothing expected where it is written:
+    // neither is meant (ADR-0201).
+    let two = program(
+        "type Box =\n    | Empty\n    | Full(Int)\n\nfn f() -> Int {\n    let s = Empty\n    1\n}",
+    );
     assert_eq!(
         reported(&two),
         ["PW0022 `Empty` is a case of `Shape` and `Box`"]
@@ -147,10 +150,7 @@ fn a_bare_case_is_the_one_type_that_has_it() {
         repairs(&two)
     );
     // Control: written through its type, either is fine.
-    let qualified = two.replace(
-        "fn f() -> Shape { Empty }",
-        "fn f() -> Shape { Shape.Empty }",
-    );
+    let qualified = two.replace("let s = Empty", "let s = Shape.Empty");
     assert_eq!(reported(&qualified), CLEAN);
     let right = program("fn f() -> Shape { Empty }");
     assert_eq!(reported(&right), CLEAN);
@@ -173,9 +173,11 @@ fn a_bare_case_with_a_payload_is_the_one_type_that_has_it() {
         reported(&built),
         ["PW0606 `t.f` declares its result `Int` and this produces `t.Shape`"]
     );
-    // Two types that have it: neither is meant, and both are named.
-    let two =
-        program("type Ring =\n    | Circle(Int)\n    | Flat\n\nfn f() -> Shape { Circle(3) }");
+    // Two types that have it, and nothing expected where it is written:
+    // neither is meant, and both are named (ADR-0201).
+    let two = program(
+        "type Ring =\n    | Circle(Int)\n    | Flat\n\nfn f() -> Int {\n    let s = Circle(3)\n    1\n}",
+    );
     assert_eq!(
         reported(&two),
         ["PW0022 `Circle` is a case of `Shape` and `Ring`"]
@@ -190,6 +192,67 @@ fn a_bare_case_with_a_payload_is_the_one_type_that_has_it() {
     // None has it: a name that resolves to nothing.
     let none = program("fn f() -> Shape { Cirlce(3) }");
     assert_eq!(reported(&none), ["PW0021 `Cirlce` does not resolve"]);
+}
+
+#[test]
+fn a_bare_case_is_the_case_of_the_type_expected() {
+    // ADR-0201 (ADR-0195's ruling 5): where several types have `Empty`, the
+    // type expected where it is written says which. Each position the
+    // program states a type at, with the type `Box` has too.
+    let two = |decls: &str| {
+        program(&format!(
+            "type Box =\n    | Empty\n    | Circle(Int)\n\n\
+             type Holder = Holder {{ s: Shape }}\n\n\
+             fn take(s: Shape) -> Int {{ 1 }}\n\n{decls}"
+        ))
+    };
+    for decls in [
+        // The declared result, and through a branch, an arm and a list.
+        "fn f() -> Shape { Empty }",
+        "fn f() -> Box { Empty }",
+        "fn f() -> Shape { Circle(3) }",
+        "fn f() -> Box { Circle(3) }",
+        "fn f(b: Bool) -> Shape {\n    if b {\n        Empty\n    } else {\n        Shape.Label(\"x\")\n    }\n}",
+        "fn f(n: Int) -> Shape {\n    match n {\n        0 => Empty,\n        _ => Circle(n),\n    }\n}",
+        "fn f() -> List<Shape> { [Empty, Circle(1)] }",
+        // An annotation, an argument, a field and a comparison.
+        "fn f() -> Shape {\n    let s: Shape = Empty\n    s\n}",
+        "fn f() -> Int { take(Empty) }",
+        "fn f() -> Holder { Holder { s: Circle(2) } }",
+        "fn f(s: Shape) -> Bool { s == Empty }",
+        // A branch and an arm whose value an annotation expects, not the
+        // declaration's result.
+        "fn f(b: Bool) -> Int {\n    let s: Shape = if b {\n        Empty\n    } else {\n        Shape.Label(\"x\")\n    }\n    1\n}",
+        "fn f(n: Int) -> Int {\n    let s: Shape = match n {\n        0 => Empty,\n        _ => Circle(n),\n    }\n    1\n}",
+    ] {
+        assert_eq!(reported(&two(decls)), CLEAN, "{decls}");
+    }
+    // Chosen, `Circle(..)` is typed as `Shape.Circle(..)`: its payload too.
+    let payload = reported(&two("fn f() -> Shape { Circle(\"three\") }"));
+    assert!(
+        payload.iter().any(|d| d.starts_with("PW0605")),
+        "{payload:?}"
+    );
+    // Expected where it is written, a type neither declares: both named.
+    assert_eq!(
+        reported(&two("fn f() -> Int { Empty }")),
+        ["PW0022 `Empty` is a case of `Shape` and `Box`"]
+    );
+    // Each side's type is the other's: neither chooses, and each is named.
+    assert_eq!(
+        reported(&two("fn f() -> Bool { Empty == Empty }")),
+        [
+            "PW0022 `Empty` is a case of `Shape` and `Box`",
+            "PW0022 `Empty` is a case of `Shape` and `Box`"
+        ]
+    );
+    // And the case is the expected type's: a `Box`'s is no `Shape`.
+    assert_eq!(
+        reported(&two(
+            "fn f() -> Box { Empty }\n\nfn g() -> Int { take(f()) }"
+        )),
+        ["PW0605 argument 1 of `t.take` is declared `t.Shape` and this is `t.Box`"]
+    );
 }
 
 #[test]

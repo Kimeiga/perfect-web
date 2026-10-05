@@ -369,6 +369,10 @@ pub enum RelationKind {
     /// `Shape.Circle`: the case a path names, against the cases its type
     /// declares (PW0608, ADR-0059).
     Case,
+    /// `Empty`, a case written alone that several types have: the type
+    /// expected where it is written, against the types that have it (PW0022,
+    /// ADR-0201).
+    BareCase,
     /// `Box { value: 1, label: "a" }`: the fields a record is built with,
     /// against the fields its type declares, each once (PW0612, ADR-0067).
     Fields,
@@ -517,6 +521,10 @@ struct Typer<'a> {
     parents: BTreeMap<ExprId, ExprId>,
     /// Each `let`'s initializer, by the pattern it binds (ADR-0179).
     lets: BTreeMap<crate::hir::PatternId, ExprId>,
+    /// The expressions whose expected type is being asked, so a question
+    /// that leads back to itself, `Empty == Empty`, answers nothing rather
+    /// than loops (ADR-0201).
+    expecting: RefCell<BTreeSet<ExprId>>,
 }
 
 /// **The integers a value can be, as far as the build can bound it**
@@ -875,25 +883,64 @@ pub(crate) fn bare_case(
     at: UnitId,
     name: &str,
 ) -> Option<(DefId, usize)> {
+    let found = case_owners(sigs, ws, at, name);
+    match found.len() {
+        1 => found.into_iter().next(),
+        _ => None,
+    }
+}
+
+/// **Each type `at` sees with a case `name`**, and the case's position in
+/// it, where `name` alone is a case written alone: no term has the name, and
+/// it is none of the language's own cases. One is the case `bare_case` names;
+/// several, the type expected where it is written chooses (ADR-0201).
+pub(crate) fn case_owners(
+    sigs: &Signatures,
+    ws: &Workspace,
+    at: UnitId,
+    name: &str,
+) -> BTreeSet<(DefId, usize)> {
     if matches!(name, "Some" | "None" | "Ok" | "Err")
         || !matches!(
             ws.resolve_in(at, Namespace::Term, name),
             Resolution::Unresolved
         )
     {
-        return None;
+        return BTreeSet::new();
     }
-    let found: BTreeSet<(DefId, usize)> = ws
-        .visible_types(at)
+    ws.visible_types(at)
         .into_iter()
         .filter_map(|def| {
             let cases = sigs.type_decl(def)?.variants.as_ref()?;
             Some((def, cases.iter().position(|(n, _)| n == name)?))
         })
-        .collect();
-    match found.len() {
-        1 => found.into_iter().next(),
-        _ => None,
+        .collect()
+}
+
+/// **The case a case written alone names at `e`** (ADR-0201, ADR-0195's
+/// ruling 5): the one type this unit sees with it, or, where several have
+/// it, the one expected where it is written. `e` is the name. The backend
+/// asks this, so it builds the case the checker typed.
+pub(crate) fn case_at(
+    sigs: &Signatures,
+    ws: &Workspace,
+    at: UnitId,
+    module: Option<&str>,
+    decl: &Decl,
+    body: &Body,
+    e: ExprId,
+) -> Option<(DefId, usize)> {
+    let Expr::Name(name) = body.expr(e) else {
+        return None;
+    };
+    let owners = case_owners(sigs, ws, at, name);
+    match owners.len() {
+        0 => None,
+        1 => owners.into_iter().next(),
+        _ => {
+            let lexical = Lexical::build(decl, body);
+            Typer::new(sigs, ws, at, module, decl, body, lexical, Vec::new()).case_from_expected(e)
+        }
     }
 }
 
@@ -1141,6 +1188,7 @@ impl<'a> Typer<'a> {
                     _ => None,
                 })
                 .collect(),
+            expecting: RefCell::new(BTreeSet::new()),
         };
 
         // What the program implies: an unannotated `let` or `use` takes its
@@ -1281,7 +1329,14 @@ impl<'a> Typer<'a> {
             // Until ADR-0178 it was typed as a name nothing declares, and
             // `invalidates_on InventoryChanged(id, _)` stayed undecided.
             None if n == "_" && self.listens_with(id) => Ty::Any,
-            None => self.global(n),
+            // A case written alone that several types have: the one expected
+            // here (ADR-0201).
+            None => match self.global(n) {
+                Ty::Unknown => self
+                    .case_from_expected(id)
+                    .map_or(Ty::Unknown, |(def, index)| self.case_value(def, index)),
+                t => t,
+            },
         }
     }
 
@@ -1339,6 +1394,220 @@ impl<'a> Typer<'a> {
             },
             _ => Ty::Unknown,
         }
+    }
+
+    /// **A case written alone that several types have, by the type expected
+    /// where it is written** (ADR-0201, ADR-0195's ruling 5): `Empty` where a
+    /// `Shape` is expected is `Shape.Empty`. `name` is the case's name; its
+    /// value goes where it is written, or where the call it is the callee of
+    /// is, `Circle(3)`. `None` where one type alone has it (`bare_case`'s),
+    /// or the expected type is none of them.
+    fn case_from_expected(&self, name: ExprId) -> Option<(DefId, usize)> {
+        let Expr::Name(n) = self.body.expr(name) else {
+            return None;
+        };
+        if self.lexical.binder(name).is_some() {
+            return None;
+        }
+        let owners = case_owners(self.sigs, self.ws, self.at, n);
+        if owners.len() < 2 {
+            return None;
+        }
+        let site = match self.parents.get(&name) {
+            Some(&call) if matches!(self.body.expr(call), Expr::Call { callee, .. } if *callee == name) => {
+                call
+            }
+            _ => name,
+        };
+        let Some(Ty::Nominal(def, _)) = self.expected(site) else {
+            return None;
+        };
+        owners.into_iter().find(|(owner, _)| *owner == def)
+    }
+
+    /// **The type the program expects at `e`**, from where `e` is written,
+    /// never from what it is (ADR-0201): a result of the declaration, its
+    /// declared result; a `let`'s initializer, its annotation; an argument,
+    /// its parameter's type; a field, the field's; an assignment, what is
+    /// assigned to; a comparison's side, the other side's; a list's item, the
+    /// list's element or another item's; and a branch, or a block's last
+    /// value, what its `if`, `match` or block is expected to be. `None` where
+    /// nothing written says.
+    fn expected(&self, e: ExprId) -> Option<Ty> {
+        if !self.expecting.borrow_mut().insert(e) {
+            return None;
+        }
+        let found = self.expected_at(e);
+        self.expecting.borrow_mut().remove(&e);
+        found.filter(|t| !matches!(t, Ty::Unknown | Ty::Var(_) | Ty::Any))
+    }
+
+    fn expected_at(&self, e: ExprId) -> Option<Ty> {
+        if self.result_sites().contains(&e) {
+            return self.declared_result();
+        }
+        let parent = *self.parents.get(&e)?;
+        match self.body.expr(parent) {
+            Expr::Let {
+                ty: Some(t),
+                init: Some(init),
+                ..
+            } if *init == e => self.written(*t),
+            Expr::Call { callee, .. } if *callee == e => self.expected(parent),
+            Expr::Call { callee, args } => {
+                let k = args.iter().position(|a| a.value == e)?;
+                self.parameter(parent, *callee, args, k)
+            }
+            Expr::Binary {
+                op: BinOp::Assign,
+                lhs,
+                rhs,
+            } if *rhs == e => Some(self.of(*lhs)),
+            Expr::Binary {
+                op: BinOp::Cmp(_),
+                lhs,
+                rhs,
+            } => Some(self.of(if *lhs == e { *rhs } else { *lhs })),
+            Expr::Record {
+                name: Some(record),
+                fields,
+            } => {
+                let field = fields.iter().find(|f| f.value == Some(e))?;
+                self.field_type(record, &field.name)
+            }
+            Expr::List { items } => match self.expected(parent) {
+                Some(Ty::Builtin(Builtin::List, element)) => element.into_iter().next(),
+                _ => items
+                    .iter()
+                    .filter(|i| **i != e)
+                    .map(|i| self.of(*i))
+                    .find(|t| !matches!(t, Ty::Unknown | Ty::Var(_) | Ty::Any)),
+            },
+            Expr::If { then, els, .. } if *then == e || *els == Some(e) => self.expected(parent),
+            Expr::Match { arms, .. } if arms.iter().any(|a| a.body == e) => self.expected(parent),
+            Expr::Block { stmts } if stmts.last() == Some(&e) => self.expected(parent),
+            _ => None,
+        }
+    }
+
+    /// **`Empty` written alone, where several types have it** (ADR-0201):
+    /// the type expected where it is written chooses, or PW0022 names them.
+    fn bare_case_relation(&self, id: ExprId, n: &str) -> Option<ValueRelation> {
+        if self.lexical.binder(id).is_some() {
+            return None;
+        }
+        let owners = case_owners(self.sigs, self.ws, self.at, n);
+        if owners.len() < 2 {
+            return None;
+        }
+        let outcome = match self.case_from_expected(id) {
+            Some(_) => Outcome::Agree,
+            None => Outcome::Disagree {
+                expected: owners
+                    .iter()
+                    .map(|(def, _)| self.declared_name(*def))
+                    .collect::<Vec<_>>()
+                    .join(" and "),
+                actual: n.to_string(),
+            },
+        };
+        Some(ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind: RelationKind::BareCase,
+            span: self.body.expr_span(id),
+            target: n.to_string(),
+            index: None,
+            outcome,
+            declared_at: None,
+            boundary: (
+                self.body.expr_span(id),
+                format!("written alone inside `{}`", self.decl.name),
+            ),
+        })
+    }
+
+    /// A declaration's own name, `Shape` for `t.Shape`.
+    fn declared_name(&self, def: DefId) -> String {
+        let path = self.display_def(def);
+        self.ws
+            .module_of(def.unit)
+            .and_then(|m| path.strip_prefix(m.name.as_str())?.strip_prefix('.'))
+            .map_or(path.clone(), str::to_string)
+    }
+
+    /// What this declaration declares it returns, where its body is its
+    /// result.
+    fn declared_result(&self) -> Option<Ty> {
+        if !returns_its_body(self.decl.kind) {
+            return None;
+        }
+        let written = self.decl.ret.as_ref()?;
+        self.sigs
+            .resolve_type(self.module, self.decl, written, 0..0)
+            .resolved()
+            .map(Ty::of)
+    }
+
+    /// A type written in this body, `let s: Shape = ..`'s.
+    fn written(&self, t: crate::hir::TypeRefId) -> Option<Ty> {
+        let written = crate::resolved::written_in_body(self.body, t)?;
+        self.sigs
+            .resolve_type(self.module, self.decl, &written, 0..0)
+            .resolved()
+            .map(Ty::of)
+    }
+
+    /// The type of the parameter the `k`th written argument of `call` is
+    /// given to, by the rule `apply` arranges them by (ADR-0081).
+    fn parameter(
+        &self,
+        call: ExprId,
+        callee: ExprId,
+        args: &[crate::hir::Arg],
+        k: usize,
+    ) -> Option<Ty> {
+        let target = self.target(call, callee)?;
+        let (names, params): (Vec<String>, Vec<Option<TypeResolution>>) = match &target {
+            Target::Callable(sig) | Target::Member(sig, _) => {
+                (sig.names.clone(), sig.params.clone())
+            }
+            Target::Record(def) => {
+                let fields = self.sigs.type_decl(*def)?.record.clone()?;
+                (
+                    fields.iter().map(|(n, _)| n.clone()).collect(),
+                    fields.into_iter().map(|(_, r)| Some(r)).collect(),
+                )
+            }
+            Target::Case(def, index) => {
+                let (_, fields) = self.sigs.type_decl(*def)?.variants.as_ref()?.get(*index)?;
+                (Vec::new(), fields.iter().cloned().map(Some).collect())
+            }
+            Target::Opaque(def) => (
+                Vec::new(),
+                vec![self.sigs.type_decl(*def)?.representation.clone()],
+            ),
+        };
+        let leading = usize::from(matches!(target, Target::Member(..)))
+            + usize::from(self.piped.contains_key(&call));
+        let written: Vec<Option<&str>> = args.iter().map(|a| a.name.as_deref()).collect();
+        let i = *crate::signatures::arrange(&names, leading, &written)
+            .ok()?
+            .get(k)?;
+        params.get(i)?.as_ref()?.resolved().map(Ty::of)
+    }
+
+    /// The type a record type's field `name` is declared.
+    fn field_type(&self, record: &str, name: &str) -> Option<Ty> {
+        let found = match record.contains('.') {
+            true => self.ws.resolve_path_in(self.at, Namespace::Type, record),
+            false => self.ws.resolve_in(self.at, Namespace::Type, record),
+        };
+        let (Resolution::Local(def) | Resolution::Imported { def, .. }) = found else {
+            return None;
+        };
+        let fields = self.sigs.type_decl(def)?.record.as_ref()?;
+        let (_, t) = fields.iter().find(|(n, _)| n == name)?;
+        t.resolved().map(Ty::of)
     }
 
     /// **A case named as a value** (ADR-0059): one without a payload is a
@@ -1660,6 +1929,11 @@ impl<'a> Typer<'a> {
             Named::Target(t) => return Some(t),
             Named::Refused => return None,
             Named::Nothing => {}
+        }
+        // `Circle(3)`, where several types have `Circle`: the one the call's
+        // expected type is (ADR-0201).
+        if let Some((def, index)) = self.case_from_expected(callee) {
+            return Some(Target::Case(def, index));
         }
         // `x.f(a)`, where `x` is a value whose type declares `f`.
         let Expr::Field { base, name } = self.body.expr(callee) else {
@@ -3365,6 +3639,7 @@ impl<'a> Typer<'a> {
             // comparison was typed `Bool` whatever it compared, so
             // `1 == "a"` checked, and the backend was the first to refuse.
             Expr::Binary { op, lhs, rhs } => out.extend(self.operands(id, op, *lhs, *rhs)),
+            Expr::Name(n) => out.extend(self.bare_case_relation(id, n)),
             Expr::Unary { op, operand } => {
                 let (what, expected) = match op {
                     UnOp::Not => ("the operand of `!`", Some(Ty::Primitive(Primitive::Bool))),
@@ -4516,6 +4791,31 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  declare builds nothing, and a value of the type is not one of them",
             )
             .repair(format!("`{}`'s constructors are {expected}", r.target)),
+            RelationKind::BareCase => {
+                let types: Vec<&str> = expected.split(" and ").collect();
+                let qualified: Vec<String> =
+                    types.iter().map(|t| format!("`{t}.{actual}`")).collect();
+                let named: Vec<String> = types.iter().map(|t| format!("`{t}`")).collect();
+                Diagnostic::error(
+                    crate::codes::AMBIGUOUS_NAME.id,
+                    crate::codes::AMBIGUOUS_NAME.invariant,
+                    Detector::Signature,
+                    format!("`{actual}` is a case of {}", named.join(" and ")),
+                    r.span.clone(),
+                )
+                .reason("ambiguous_case")
+                .explain(format!(
+                    "a case written alone is the case of that name of the one sum type in \
+                     scope that declares it, or of the type expected where it is written. \
+                     Here {} types declare `{actual}`, and nothing expected says which is \
+                     meant",
+                    types.len()
+                ))
+                .repair(format!(
+                    "write it through its type: {}, or where one of them is expected",
+                    qualified.join(" or ")
+                ))
+            }
             RelationKind::Branches => Diagnostic::error(
                 crate::codes::BRANCH_TYPES.id,
                 crate::codes::BRANCH_TYPES.invariant,

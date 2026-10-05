@@ -1729,3 +1729,11 @@ building ADR-0199).
   file in the repository is held to that.
 - A `{#..}` block left open ends with its element, so PW5019 names it where
   `pw check` had reported the end of the file, twice.
+[ADR-0201](DECISIONS/ADR-0201-a-case-written-alone-is-the-expected-types.md):
+a case written alone is the case of the type expected where it is written
+(ADR-0195, ruling 5, its second half).
+- Where several types have `Empty`, the type expected where it is written
+  chooses: a result, an annotation, an argument, a field, an assignment, a
+  comparison's other side, a list's element, and through branches and arms.
+- The typer decides it once and owns PW0022 for it; the backend asks the
+  same function, so it builds the case the checker typed.

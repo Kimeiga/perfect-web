@@ -2,8 +2,9 @@
 """Mutation controls for ADR-0198: a bare case with a payload resolves as a
 case without one does (ADR-0195, ruling 5).
 
-Each mutant undoes one piece: the name check accepting one type's case and
-naming several, the typer relating its payload, and the backend building it.
+Each mutant undoes one piece: the name check accepting one type's case, the
+typer relating its payload, and the backend building it. One control was
+retired by ADR-0201, with its reason, below.
 
 Every mutant must fail the tests of the rule, or the compiled programs'.
 
@@ -27,16 +28,16 @@ BACKEND = ROOT / "compiler/pw-core/src/backend/lower.rs"
 MUTANTS = [
     (
         "a bare case with a payload resolves to nothing",
+        # Re-anchored by ADR-0201: one owner or several are the typer's.
         CHECK,
-        "                        1 => {}\n",
-        "                        1 => out.push(unresolved_bare_call(hir, decl, body, id, &path, &owners)),\n",
+        "                    if owners.is_empty() {\n",
+        "                    if owners.len() < 2 {\n",
     ),
-    (
-        "one of several types' cases is taken",
-        CHECK,
-        "                        _ => out.push(crate::names::ambiguous_case(\n",
-        "                        _ => drop(crate::names::ambiguous_case(\n",
-    ),
+    # Retired by ADR-0201: "one of several types' cases is taken". Where
+    # several types have the case, the type expected where it is written
+    # chooses, and the typer reports PW0022 where nothing does;
+    # `expected_cases_mutations.py`'s "where nothing expected says, PW0022 is
+    # not reported" controls it.
     (
         "its payload is related to nothing",
         VALUES,
@@ -45,9 +46,10 @@ MUTANTS = [
     ),
     (
         "the backend does not build it",
+        # Re-anchored by ADR-0201: the backend asks the typer's `case_at`.
         BACKEND,
-        "            if !path.contains('.')\n                && let Some((def, index)) =\n",
-        "            if false\n                && let Some((def, index)) =\n",
+        "            if !path.contains('.')\n                && let Some((def, index)) = self.case_written_alone(body, callee)\n",
+        "            if false\n                && let Some((def, index)) = self.case_written_alone(body, callee)\n",
     ),
 ]
 

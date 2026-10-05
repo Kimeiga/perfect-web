@@ -20,10 +20,11 @@ agreement:
   states is undecided, as every relation's is.
 - **A sum type's case is typed where it is written through its type**
   (2026-09-26, ADR-0059): `Shape.Circle(3)`, its fields, its arity, and a
-  case the type lacks (PW0608). A case without a payload written alone,
-  `Empty`, is typed where one visible type has it. A case with a payload
-  written alone, `Circle(3)`, is PW0021, naming `Shape.Circle(..)` (ruling
-  needed). Until 2026-09-26 no case had a type, and `Shape.Bogus(1)` passed.
+  case the type lacks (PW0608). A case written alone, `Empty` or
+  `Circle(3)`, is the case of the one visible type with it (ADR-0198), or,
+  where several have it, of the type expected where it is written
+  (ADR-0201); PW0022 names them where nothing expected chooses. Until
+  2026-09-26 no case had a type, and `Shape.Bogus(1)` passed.
 - **What the value relations still leave undecided** since ADR-0065, which
   typed a value that holds at every type (`None`, `[]`, `todo`, ..): 1 of the
   store's relations, 1 of kiokun's, 17 of the accepted corpus's. Since
@@ -155,11 +156,10 @@ refused by name:
   Until 2026-09-25 matches over `Option`, `Result` and calls were not checked
   at all, and four other shapes were proven exhaustive when they were not
   (ADR-0038).
-- **A case written alone resolves by the types the unit sees, not by the
-  type expected of it** (ADR-0198). `Empty` and `Circle(3)` alone are the
-  case of the one type with it; where two have it, `fn f() -> Shape {
-  Empty }` is still PW0022, though only `Shape` fits. ADR-0195 (ruling 5)
-  rules the expected type first; not built yet.
+- **A case written alone is chosen by what is written where it is, not by
+  its later use** (ADR-0201). Where two types have `Empty`, `let s = Empty`
+  then `take(s)` is PW0022: the `let` states no type, and the rule does not
+  infer one from `take`. Write `let s: Shape = Empty`, or `Shape.Empty`.
 - **A `let` name or a parameter may begin with a capital** (ADR-0197). A
   pattern's name is a case by its capital and a binding otherwise, and a
   case is declared with one (PW0625); a `let` and a parameter bind a name

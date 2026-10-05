@@ -5,7 +5,8 @@ Each mutant undoes one piece of how a case is typed where it is written, how
 a pattern names one, how a case is built and matched in the lowering, the
 component or the JavaScript module, or what is refused by name. The checker
 tests, the conformance tests, and the component-against-module differential
-must then fail.
+must then fail. Controls retired by later ADRs are kept below, each with its
+reason.
 
 Run from the repository root; `just e10-sum-types` records the output.
 The source is restored after every mutant, whatever happens.
@@ -72,12 +73,11 @@ MUTANTS = [
         "                    if qualifier(q).is_some_and(|d| subject.defs.get(t) == Some(&d)))",
         "                    if q.len() < usize::MAX)",
     ),
-    (
-        "a bare case two types declare is not reported",
-        NAMES,
-        "            && types.len() > 1",
-        "            && types.len() > 2",
-    ),
+    # Retired by ADR-0201: "a bare case two types declare is not reported".
+    # A case written alone that several types have is the typer's to decide
+    # now, by the type expected where it is written, and the name check no
+    # longer reports it. `expected_cases_mutations.py`'s "where nothing
+    # expected says, PW0022 is not reported" controls the report.
     (
         "a bare case with a payload is not told its qualified form",
         CHECK,

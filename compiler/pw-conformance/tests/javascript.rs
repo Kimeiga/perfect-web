@@ -896,6 +896,65 @@ fn a_type_that_contains_itself_agrees_with_its_component() {
     );
 }
 
+/// **Two types with the same cases** (ADR-0201): a case written alone is the
+/// expected type's, in the module as in the component.
+const TWINS: &str = r#"module tw
+
+type Shape =
+    | Circle(Int)
+    | Empty
+
+type Ring =
+    | Circle(Int)
+    | Empty
+    | Flat
+
+type Holder = Holder { s: Shape }
+
+fn radius(s: Shape) -> Int {
+    match s {
+        Circle(r) => r,
+        Empty => 0,
+    }
+}
+
+public query Pick(n: Int) -> Shape {
+    if n > 0 { Circle(n) } else { Empty }
+}
+
+public query Other(n: Int) -> Ring {
+    match n % 3 {
+        0 => Empty,
+        1 => Flat,
+        _ => Circle(n),
+    }
+}
+
+public query Through(n: Int) -> Int {
+    let s: Shape = Circle(n)
+    let h = Holder { s: Empty }
+    radius(Circle(n + 1)) + radius(s) + radius(h.s)
+}
+"#;
+
+#[test]
+fn a_case_from_its_expected_type_agrees_with_its_component() {
+    let us = units(&[("tw.pw", TWINS)]);
+    let mut rng = Rng(0x0201);
+    let cases: Vec<(String, Vec<Vec<Val>>)> = ["tw.Pick", "tw.Other", "tw.Through"]
+        .into_iter()
+        .map(|id| {
+            let calls = (0..CASES).map(|_| vec![Val::S64(rng.int())]).collect();
+            (id.to_string(), calls)
+        })
+        .collect();
+    let (queries, calls, traps) = agree_on(&us, &cases, 0x0201);
+    println!(
+        "javascript: {queries} queries over cases written alone, {calls} calls, component \
+         and module agree ({traps} trapped in both)"
+    );
+}
+
 /// **kiokun's shard rule, as the browser would run it.** kiokun.com's app
 /// keeps the rule in TypeScript (`shard-utils.ts`); here it is the Pleris
 /// rule `pw build` writes to `modules/`, held to its component.

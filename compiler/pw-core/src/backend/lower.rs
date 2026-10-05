@@ -1571,13 +1571,10 @@ impl<'a> Lower<'a> {
                     }))
                 }
                 // `Empty` alone: the case of that name of the one sum type
-                // this unit sees with one, by the typer's rule (ADR-0059).
-                None if crate::values::bare_case(self.cx.sigs, self.cx.ws, self.unit, n)
-                    .is_some() =>
-                {
-                    let (def, index) =
-                        crate::values::bare_case(self.cx.sigs, self.cx.ws, self.unit, n)
-                            .expect("checked");
+                // this unit sees with one, or of the one expected where it is
+                // written, by the typer's rule (ADR-0059, ADR-0201).
+                None if self.case_written_alone(body, e).is_some() => {
+                    let (def, index) = self.case_written_alone(body, e).expect("checked");
                     self.case_value(def, index, expected, span)
                 }
                 // A declaration's name where a function is wanted: its code,
@@ -3582,6 +3579,24 @@ impl<'a> Lower<'a> {
         }))
     }
 
+    /// **The case a case written alone names, at `e`** (ADR-0201): the one
+    /// type with it, or the one the checker's typer expects where it is
+    /// written, so the backend builds the case the checker typed.
+    fn case_written_alone(&self, body: &Body, e: ExprId) -> Option<(DefId, usize)> {
+        let def = *self.inlining.last()?;
+        let hir = self.cx.hirs.get(def.unit)?;
+        let id = crate::hir::DeclId(def.decl);
+        crate::values::case_at(
+            self.cx.sigs,
+            self.cx.ws,
+            def.unit,
+            hir.module_of(id),
+            hir.decl(id),
+            body,
+            e,
+        )
+    }
+
     /// The unit value.
     fn unit(&mut self) -> ValueId {
         let result = self.fresh();
@@ -5087,11 +5102,11 @@ impl<'a> Lower<'a> {
                 return self.case(body, def, index, args, piped, expected, span);
             }
             // `Circle(3)` alone: the case of the one type this unit sees that
-            // has it, by the rule a case without a payload has (ADR-0198,
-            // ADR-0195's ruling 5).
+            // has it, or of the one the call's expected type is, by the rule a
+            // case without a payload has (ADR-0198, ADR-0201, ADR-0195's
+            // ruling 5).
             if !path.contains('.')
-                && let Some((def, index)) =
-                    crate::values::bare_case(self.cx.sigs, self.cx.ws, self.unit, &path)
+                && let Some((def, index)) = self.case_written_alone(body, callee)
             {
                 return self.case(body, def, index, args, piped, expected, span);
             }

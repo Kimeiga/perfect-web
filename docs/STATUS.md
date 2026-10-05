@@ -13,6 +13,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0201, 2026-10-05: a case written alone is the case of the type
+expected where it is written** (ADR-0195, ruling 5, its second half). Two
+types with an `Empty` made every bare `Empty` PW0022, even in `fn f() ->
+Shape { Empty }`. The type expected where a case is written now chooses, at
+each position the program states one. The typer decides it once, owns
+PW0022 for it, and the backend asks it; the name check and
+`unresolved_uses` no longer decide it. 14 mutants (`just
+e14-expected-cases`).
+
 **ADR-0200, 2026-10-05: `()` is the unit value, and nothing the compiler
 cannot read checks** (found building ADR-0199).
 - **Correction:** `()` lowered to an error node, which the checker types as

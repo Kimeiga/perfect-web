@@ -125,14 +125,10 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
             immutable: Vec::new(),
             visited: BTreeSet::new(),
             found: Vec::new(),
-            ambiguous: Vec::new(),
         };
         walk.expr(body.root);
         for (span, name) in walk.found {
             out.push(diagnostic(hir, id, decl, span, &name));
-        }
-        for (span, name, types) in walk.ambiguous {
-            out.push(ambiguous_case(hir, id, decl, span, &name, &types));
         }
         for (span, name) in walk.immutable {
             // What `bind:value` wrote is PW5304's to refuse (ADR-0142), and
@@ -187,8 +183,6 @@ struct Walk<'a> {
     /// region is not walked again in the outer template's scope.
     visited: BTreeSet<ExprId>,
     found: Vec<(Span, String)>,
-    /// A bare case two visible types declare, and those types (ADR-0059).
-    ambiguous: Vec<(Span, String, Vec<String>)>,
 }
 
 impl Walk<'_> {
@@ -237,23 +231,11 @@ impl Walk<'_> {
         if self.bound(name) {
             return;
         }
+        // `Empty` alone, where two types it sees each declare a case of that
+        // name, is the typer's: the type expected where it is written says
+        // which, or PW0022 names both (ADR-0201).
         if !self.resolves(name) {
             self.found.push((span, name.to_string()));
-            return;
-        }
-        // `Empty` alone, where two types it sees each declare a case of that
-        // name and nothing else has it: it names neither (ADR-0059).
-        if let Some(types) = self.constructors.get(name)
-            && types.len() > 1
-            && !LANGUAGE_VALUES.contains(&name)
-            && !crate::resolve::INTRINSIC_CALLS.contains(&name)
-            && matches!(
-                self.workspace.resolve(self.unit, name),
-                Resolution::Unresolved
-            )
-        {
-            self.ambiguous
-                .push((span, name.to_string(), types.values().cloned().collect()));
         }
     }
 
@@ -727,49 +709,6 @@ fn immutable_target(hir: &Hir, id: DeclId, decl: &Decl, span: Span, name: &str) 
         ),
         repairs: vec![Repair {
             description: format!("declare it `let mut {name} = ..`, or bind a new name"),
-            replacement: None,
-        }],
-    }
-}
-
-/// **PW0022**: a bare case that more than one visible type declares
-/// (ADR-0059), with or without a payload (ADR-0198).
-pub(crate) fn ambiguous_case(
-    hir: &Hir,
-    id: DeclId,
-    decl: &Decl,
-    span: Span,
-    name: &str,
-    types: &[String],
-) -> Diagnostic {
-    let qualified: Vec<String> = types.iter().map(|t| format!("`{t}.{name}`")).collect();
-    Diagnostic {
-        code: crate::codes::AMBIGUOUS_NAME.id,
-        invariant: crate::codes::AMBIGUOUS_NAME.invariant,
-        reason: "ambiguous_case",
-        detector: Detector::DeclarationRule,
-        severity: Severity::Error,
-        message: format!(
-            "`{name}` is a case of {}",
-            types
-                .iter()
-                .map(|t| format!("`{t}`"))
-                .collect::<Vec<_>>()
-                .join(" and ")
-        ),
-        primary_span: span,
-        related: vec![Related {
-            span: hir.decl_span(id),
-            label: format!("used inside `{}`", decl.name),
-        }],
-        explanation: Some(format!(
-            "A case written alone is the case of that name of the one sum type in \
-             scope that declares it. Here {} types declare `{name}`, and nothing \
-             says which is meant.",
-            types.len()
-        )),
-        repairs: vec![Repair {
-            description: format!("write it through its type: {}", qualified.join(" or ")),
             replacement: None,
         }],
     }

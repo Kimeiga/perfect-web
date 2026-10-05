@@ -713,17 +713,10 @@ fn unresolved_uses(
                         .into_values()
                         .map(|d| d.name.clone())
                         .collect();
-                    match owners.len() {
-                        1 => {}
-                        0 => out.push(unresolved_bare_call(hir, decl, body, id, &path, &owners)),
-                        _ => out.push(crate::names::ambiguous_case(
-                            hir,
-                            decl_id_of(hir, decl),
-                            decl,
-                            body.expr_span(id),
-                            &path,
-                            &owners,
-                        )),
+                    // Several: the typer's, by the type expected where the
+                    // call is written (ADR-0201).
+                    if owners.is_empty() {
+                        out.push(unresolved_bare_call(hir, decl, body, id, &path, &owners));
                     }
                 }
                 continue;

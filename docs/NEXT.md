@@ -302,8 +302,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
           ~~3, only statement-starting words
           reserved~~ (ADR-0196, `just e14-reserved-words`); ~~5, a bare case
           with a payload resolved like a nullary one~~ (ADR-0198, `just
-          e14-bare-cases`), and its other half, resolution from the expected
-          type for both forms, still to build; ~~12's remainder, a
+          e14-bare-cases`), and ~~its other half, resolution from the
+          expected type for both forms~~ (ADR-0201, `just
+          e14-expected-cases`); ~~12's remainder, a
           named function as a handler, `e => save(e)`~~ (ADR-0199, `just
           e14-named-handlers`);
         - ~~found beside 12: ADR-0200, `()` as a value, which checks as an

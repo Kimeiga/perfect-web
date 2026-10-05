@@ -48,11 +48,12 @@ Two more were found in the backend's surroundings:
   one sum type the unit sees has a case of that name and no term has it.
   ADR-0047 already resolved such a name, and now it is typed. Where two
   visible types have it, PW0022 says so and names both qualified forms.
-  **(ruling needed)**
+  **Ruled** (ADR-0195, ruling 5): where several have it, the type expected
+  where it is written chooses, built by ADR-0201.
 - **A case with a payload, written alone,** `Circle(3)`, stays PW0021. Its
-  repair now names `Shape.Circle(..)`. **(ruling needed)**: the alternative
-  is to type a bare call to a case, as a bare case without a payload is
-  typed.
+  repair now names `Shape.Circle(..)`. **Ruled** (ADR-0195, ruling 5): it
+  takes the rule a case without a payload has, built by ADR-0198 and
+  ADR-0201.
 - **The language's own cases keep their names.** `Some`, `None`, `Ok` and
   `Err` alone are always the language's. A program's own case of one of
   those names is written through its type.

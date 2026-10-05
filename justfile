@@ -2613,6 +2613,25 @@ e14-orders:
      } > docs/evidence/E14/orders.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/orders.txt
 
+# ADR-0201 (ADR-0195's ruling 5): a case written alone is the case of the
+# type expected where it is written. Its tests, the components and the
+# JavaScript modules, and the mutation controls.
+e14-expected-cases:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0201 - a case written alone is the case of the type expected where it is written"; echo; \
+       echo "produced by: just e14-expected-cases"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/sum_types.rs)"; echo; \
+       cargo test --locked -p pw-core --test sum_types 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== built (compiler/pw-conformance/tests/sum_types.rs, javascript.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test sum_types a_case_written_alone 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-conformance --test javascript a_case_from_its_expected -- --nocapture 2>&1 | grep -E '^javascript:|^test result'; \
+       echo; echo "== mutation controls (scripts/expected_cases_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/expected_cases_mutations.py; \
+     } > docs/evidence/E14/expected-cases.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E14/expected-cases.txt
+
 # ADR-0200: `()` is the unit value, and no expression the compiler cannot
 # read checks. Its tests, the repository's every `.pw` file, and the mutation
 # controls.

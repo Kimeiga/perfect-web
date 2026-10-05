@@ -508,6 +508,80 @@ fn a_bare_case_with_a_payload_is_built() {
     }
 }
 
+/// **Two types with the same cases** (ADR-0201): a case written alone is the
+/// one the type expected where it is written has.
+const TWINS: &str = r#"module tw
+
+type Shape =
+    | Circle(Int)
+    | Empty
+
+type Ring =
+    | Circle(Int)
+    | Empty
+    | Flat
+
+type Holder = Holder { s: Shape }
+
+fn radius(s: Shape) -> Int {
+    match s {
+        Circle(r) => r,
+        Empty => 0,
+    }
+}
+
+public query Pick(n: Int) -> Shape {
+    if n > 0 { Circle(n) } else { Empty }
+}
+
+public query Other(n: Int) -> Ring {
+    match n % 3 {
+        0 => Empty,
+        1 => Flat,
+        _ => Circle(n),
+    }
+}
+
+public query Through(n: Int) -> Int {
+    let s: Shape = Circle(n)
+    let h = Holder { s: Empty }
+    radius(Circle(n + 1)) + radius(s) + radius(h.s)
+}
+"#;
+
+#[test]
+fn a_case_written_alone_is_built_as_the_type_expected() {
+    let (pick, other, through) = (
+        Runnable::new(compile(&units(&[("tw.pw", TWINS)]), "tw.Pick")),
+        Runnable::new(compile(&units(&[("tw.pw", TWINS)]), "tw.Other")),
+        Runnable::new(compile(&units(&[("tw.pw", TWINS)]), "tw.Through")),
+    );
+    let case = |name: &str, payload: Option<i64>| {
+        Val::Variant(name.into(), payload.map(|n| Box::new(Val::S64(n))))
+    };
+    let mut rng = Rng(0x0201);
+    for _ in 0..CASES {
+        let n = rng.int();
+        let want = if n > 0 {
+            case("circle", Some(n))
+        } else {
+            case("empty", None)
+        };
+        assert_eq!(call(&pick, &[Val::S64(n)]), want, "Pick({n})");
+        let want = match n.rem_euclid(3) {
+            0 => case("empty", None),
+            1 => case("flat", None),
+            _ => case("circle", Some(n)),
+        };
+        assert_eq!(call(&other, &[Val::S64(n)]), want, "Other({n})");
+        assert_eq!(
+            call(&through, &[Val::S64(n)]),
+            Val::S64(2 * n + 1),
+            "Through({n})"
+        );
+    }
+}
+
 #[test]
 fn a_union_of_one_case_is_a_variant() {
     // Until 2026-09-26 `wit.rs` wrote a union of one case as a record of
