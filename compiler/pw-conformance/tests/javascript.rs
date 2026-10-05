@@ -323,6 +323,10 @@ fn shape_area(s: Shape) -> Int {
 
 public query ShapeArea(s: Shape) -> Int { shape_area(s) }
 
+public query BareShape(n: Int, label: String) -> Shape {
+    if n > 0 { Rect(n, n + 1) } else { if n < 0 { Circle(-n) } else { Label(label) } }
+}
+
 public query ShapeKind(s: Shape) -> String {
     match s {
         Shape.Circle(_) | Shape.Rect(_, _) => \"figure\",

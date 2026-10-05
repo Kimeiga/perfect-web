@@ -2613,6 +2613,25 @@ e14-orders:
      } > docs/evidence/E14/orders.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/orders.txt
 
+# ADR-0198 (ADR-0195's ruling 5): a bare case with a payload is the case of
+# the one type that has it. Its tests, the components and the JavaScript
+# modules, and the mutation controls.
+e14-bare-cases:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0198 - a bare case with a payload is the case of the one type that has it"; echo; \
+       echo "produced by: just e14-bare-cases"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/sum_types.rs)"; echo; \
+       cargo test --locked -p pw-core --test sum_types 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== built (compiler/pw-conformance/tests/sum_types.rs, javascript.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test sum_types 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-conformance --test javascript every_query_agrees -- --nocapture 2>&1 | grep -E '^javascript:|^test result'; \
+       echo; echo "== mutation controls (scripts/bare_cases_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/bare_cases_mutations.py; \
+     } > docs/evidence/E14/bare-cases.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E14/bare-cases.txt
+
 # ADR-0197 (ADR-0195's ruling 2): a pattern tells a case from a binding by
 # its capital. Its tests, the conformance suite's patterns, the corpus at C14,
 # and the mutation controls.

@@ -1701,3 +1701,12 @@ a pattern tells a case from a binding by its capital (ADR-0195, ruling 2).
 - A capitalized name its type lacks is PW0608 (revision 3); a case named in
   lowercase is PW0625; `{:Some(Draft)}` is no arm. `check::Env` is gone.
 - Corpus C14, generality 41 / 41.
+
+[ADR-0198](DECISIONS/ADR-0198-a-bare-case-with-a-payload-is-the-one-type-that-has-it.md):
+a bare case with a payload is the case of the one type that has it
+(ADR-0195, ruling 5, its first half).
+- `Circle(3)` alone resolves as `Empty` alone does: the name check accepts
+  it, the typer relates its payload, the backend builds it, and PW0022 names
+  every type where several have it. It was PW0021.
+- Resolution from the expected type, for both forms, is the ruling's other
+  half, not built yet.

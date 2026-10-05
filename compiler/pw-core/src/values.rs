@@ -767,7 +767,14 @@ pub(crate) fn named<'s>(
         Resolution::Unresolved if !path.contains('.') => {
             match ws.resolve_in(at, Namespace::Type, &path) {
                 Resolution::Local(d) | Resolution::Imported { def: d, .. } => d,
-                _ => return Named::Nothing,
+                // `Circle(3)` alone: the case of the one type this unit sees
+                // with it, as `Empty` alone is (ADR-0198).
+                _ => {
+                    return match bare_case(sigs, ws, at, &path) {
+                        Some((def, index)) => Named::Target(Target::Case(def, index)),
+                        None => Named::Nothing,
+                    };
+                }
             }
         }
         // `Shape.Circle(3)`, a case through its type (ADR-0059). A case its

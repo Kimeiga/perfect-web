@@ -157,10 +157,39 @@ fn a_bare_case_is_the_one_type_that_has_it() {
 }
 
 #[test]
-fn a_bare_case_with_a_payload_names_its_qualified_form() {
-    let src = program("fn f() -> Shape { Circle(3) }");
-    assert_eq!(reported(&src), ["PW0021 `Circle` does not resolve"]);
-    assert_eq!(repairs(&src), ["write `Shape.Circle(..)`"]);
+fn a_bare_case_with_a_payload_is_the_one_type_that_has_it() {
+    // ADR-0198 (ADR-0195's ruling 5): `Circle(3)` alone is `Shape.Circle(3)`,
+    // by the rule `Empty` alone is `Shape.Empty`. Until then it was PW0021.
+    assert_eq!(reported(&program("fn f() -> Shape { Circle(3) }")), CLEAN);
+    // Typed, so a wrong use is seen: its payload, and what it builds.
+    let payload = program("fn f() -> Shape { Circle(\"three\") }");
+    assert!(
+        reported(&payload).iter().any(|d| d.starts_with("PW0605")),
+        "{:?}",
+        reported(&payload)
+    );
+    let built = program("fn f() -> Int { Circle(3) }");
+    assert_eq!(
+        reported(&built),
+        ["PW0606 `t.f` declares its result `Int` and this produces `t.Shape`"]
+    );
+    // Two types that have it: neither is meant, and both are named.
+    let two =
+        program("type Ring =\n    | Circle(Int)\n    | Flat\n\nfn f() -> Shape { Circle(3) }");
+    assert_eq!(
+        reported(&two),
+        ["PW0022 `Circle` is a case of `Shape` and `Ring`"]
+    );
+    assert!(
+        repairs(&two)
+            .iter()
+            .any(|r| r.contains("`Shape.Circle` or `Ring.Circle`")),
+        "{:?}",
+        repairs(&two)
+    );
+    // None has it: a name that resolves to nothing.
+    let none = program("fn f() -> Shape { Cirlce(3) }");
+    assert_eq!(reported(&none), ["PW0021 `Cirlce` does not resolve"]);
 }
 
 #[test]

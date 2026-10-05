@@ -693,20 +693,38 @@ fn unresolved_uses(
                     _ => bare_call_is_unowned(workspace, unit, &path, &in_scope),
                 };
                 if unowned {
-                    // `Circle(3)`: a case, which is built through its type
-                    // (ADR-0059). The types it sees that declare one.
+                    // `Circle(3)`: a case, alone. The types it sees that
+                    // declare one: one is the case's type, as for a case
+                    // without a payload (ADR-0198, ADR-0195's ruling 5);
+                    // several are named, and none is a name that resolves
+                    // to nothing.
+                    // In declaration order, as a case without a payload
+                    // names them.
                     let owners: Vec<String> = workspace
                         .visible_types(unit)
                         .into_iter()
-                        .filter_map(|def| crate::resolve::declaration(hirs, def))
-                        .filter(|d| {
+                        .filter_map(|def| Some((def, crate::resolve::declaration(hirs, def)?)))
+                        .filter(|(_, d)| {
                             d.variants
                                 .as_ref()
                                 .is_some_and(|vs| vs.iter().any(|v| v.name == path))
                         })
+                        .collect::<BTreeMap<_, _>>()
+                        .into_values()
                         .map(|d| d.name.clone())
                         .collect();
-                    out.push(unresolved_bare_call(hir, decl, body, id, &path, &owners));
+                    match owners.len() {
+                        1 => {}
+                        0 => out.push(unresolved_bare_call(hir, decl, body, id, &path, &owners)),
+                        _ => out.push(crate::names::ambiguous_case(
+                            hir,
+                            decl_id_of(hir, decl),
+                            decl,
+                            body.expr_span(id),
+                            &path,
+                            &owners,
+                        )),
+                    }
                 }
                 continue;
             };

@@ -733,8 +733,8 @@ fn immutable_target(hir: &Hir, id: DeclId, decl: &Decl, span: Span, name: &str) 
 }
 
 /// **PW0022**: a bare case that more than one visible type declares
-/// (ADR-0059).
-fn ambiguous_case(
+/// (ADR-0059), with or without a payload (ADR-0198).
+pub(crate) fn ambiguous_case(
     hir: &Hir,
     id: DeclId,
     decl: &Decl,

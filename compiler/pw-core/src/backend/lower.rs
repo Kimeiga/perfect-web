@@ -5064,6 +5064,15 @@ impl<'a> Lower<'a> {
             {
                 return self.case(body, def, index, args, piped, expected, span);
             }
+            // `Circle(3)` alone: the case of the one type this unit sees that
+            // has it, by the rule a case without a payload has (ADR-0198,
+            // ADR-0195's ruling 5).
+            if !path.contains('.')
+                && let Some((def, index)) =
+                    crate::values::bare_case(self.cx.sigs, self.cx.ws, self.unit, &path)
+            {
+                return self.case(body, def, index, args, piped, expected, span);
+            }
         }
         // **An operation the compiler supplies** (ADR-0040): read from the
         // declaration's `intrinsic` clause, before its arguments are lowered,

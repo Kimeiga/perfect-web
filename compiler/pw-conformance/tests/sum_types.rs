@@ -49,6 +49,10 @@ fn area(s: Shape) -> Int {
     }
 }
 
+public query Bare(n: Int, text: String) -> Shape {
+    if n > 0 { Rect(n, n + 1) } else { if n < 0 { Circle(-n) } else { Label(text) } }
+}
+
 public query Make(kind: Int, n: Int, text: String) -> Shape {
     if kind == 0 {
         Shape.Circle(n)
@@ -481,6 +485,27 @@ fn refused(program: &str, id: &str) -> String {
         .expect_err("refused");
     println!("{id}: {err}");
     err
+}
+
+#[test]
+fn a_bare_case_with_a_payload_is_built() {
+    // ADR-0198 (ADR-0195's ruling 5): `Circle(n)` alone builds the case, as
+    // `Shape.Circle(n)` does.
+    let bare = compiled("shapes.Bare");
+    let mut rng = Rng(0x0198);
+    for _ in 0..CASES {
+        let (n, t) = (rng.int(), rng.text());
+        let want = match n.cmp(&0) {
+            std::cmp::Ordering::Greater => Shape::Rect(n, n + 1),
+            std::cmp::Ordering::Less => Shape::Circle(-n),
+            std::cmp::Ordering::Equal => Shape::Label(t.clone()),
+        };
+        assert_eq!(
+            call(&bare, &[Val::S64(n), text(&t)]),
+            shape_val(&want),
+            "{n} {t:?}"
+        );
+    }
 }
 
 #[test]

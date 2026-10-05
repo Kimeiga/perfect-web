@@ -13,6 +13,14 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0198, 2026-10-05: a bare case with a payload is the case of the one
+type that has it** (ADR-0195, ruling 5, its first half). `Empty` alone was
+typed and `Circle(3)` alone was PW0021. Now both resolve by one rule: the one
+visible type with the case. A call's payload is checked against the case's
+fields, the component and the JavaScript module build it, and several
+candidate types are named (PW0022). Resolution from the expected type, the
+ruling's other half, is not built yet. 4 mutants (`just e14-bare-cases`).
+
 **ADR-0197, 2026-10-05: a pattern tells a case from a binding by its
 capital** (ADR-0195, ruling 2). Six analyses each decided whether a bare
 pattern name was a case, and no two agreed: a misspelt case, `Circel`, bound

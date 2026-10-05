@@ -155,6 +155,11 @@ refused by name:
   Until 2026-09-25 matches over `Option`, `Result` and calls were not checked
   at all, and four other shapes were proven exhaustive when they were not
   (ADR-0038).
+- **A case written alone resolves by the types the unit sees, not by the
+  type expected of it** (ADR-0198). `Empty` and `Circle(3)` alone are the
+  case of the one type with it; where two have it, `fn f() -> Shape {
+  Empty }` is still PW0022, though only `Shape` fits. ADR-0195 (ruling 5)
+  rules the expected type first; not built yet.
 - **A `let` name or a parameter may begin with a capital** (ADR-0197). A
   pattern's name is a case by its capital and a binding otherwise, and a
   case is declared with one (PW0625); a `let` and a parameter bind a name
