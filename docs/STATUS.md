@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `afb63a3`, with ADR-0199.
+**Reviewed:** 2026-10-05, against master `2578341`, with ADR-0200.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2708,9 +2708,16 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`afb63a3` (2026-10-05, ADR-0199, ADR-0198): `just ci` passes locally, the
-workspace's 1940 tests pass, and the browser suite passes 710 in three
-engines, with 13 skipped. ADR-0198's evidence is
+`2578341` (2026-10-05, ADR-0200): `just ci` passes locally, the workspace's
+1949 tests pass, and the browser suite passes 710 in three engines, with 13
+skipped. ADR-0200's evidence is `docs/evidence/E14/unit-value.txt`, recorded
+at that commit: its 6 tests, every `.pw` file in the repository lowering
+with no error node, the parser's test of a block left open and the
+checker's, and 8 of 8 mutants killed. `handlers-resumable.txt` is recorded
+at that commit too, 7 of 7: `42fdd5e` tests the build's refusal of an event
+part with no code, which ADR-0199 had left untested. ADR-0199's is at
+`afb63a3`, where `just ci` passed and the workspace's 1940 tests did:
+ADR-0198's evidence is
 `docs/evidence/E14/bare-cases.txt`, recorded at that commit: its 13 tests,
 the components' 13, the JavaScript modules agreeing with their components on
 87 queries and 17,400 calls, and 4 of 4 mutants killed. ADR-0199's is
