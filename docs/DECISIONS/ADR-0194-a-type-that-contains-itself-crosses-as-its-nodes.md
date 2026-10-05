@@ -224,7 +224,7 @@ Recorded by `just e14-recursive-types` in
 ## Not claimed
 
 - **A type that holds itself in place**, which needs a box: `Option<Node>`,
-  `Add(Expr, Expr)`.
+  `Add(Expr, Expr)`. Built by ADR-0202.
 - **Crossing a boundary** for mutual recursion, a list of lists of itself,
   a node holding another such type, or an opaque type that contains itself.
 - **The browser's wire.**

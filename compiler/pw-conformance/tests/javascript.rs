@@ -896,6 +896,90 @@ fn a_type_that_contains_itself_agrees_with_its_component() {
     );
 }
 
+/// **A type that holds itself in place** (ADR-0202): boxed in a component,
+/// nested in a module, as JavaScript's values are, and the two agree.
+const BOXED: &str = r#"module bx
+
+type Node = Node { value: Int, next: Option<Node> }
+
+type Expr =
+    | Num(Int)
+    | Neg(Expr)
+    | Add(Expr, Expr)
+
+fn build(n: Int) -> Option<Node> {
+    if n <= 0 { None } else { Some(Node { value: n, next: build(n - 1) }) }
+}
+
+fn total(l: Option<Node>) -> Int {
+    match l {
+        None => 0,
+        Some(node) => node.value + total(node.next),
+    }
+}
+
+fn eval(e: Expr) -> Int {
+    match e {
+        Num(n) => n,
+        Neg(x) => 0 - eval(x),
+        Add(a, b) => eval(a) + eval(b),
+    }
+}
+
+public query Chain(n: Int) -> Option<Node> { build(n % 20) }
+
+public query Total(l: Option<Node>) -> Int { total(l) }
+
+public query Value(e: Expr) -> Int { eval(e) }
+
+public query Echo(e: Expr) -> Expr { e }
+
+public query Doubled(e: Expr) -> Expr { Add(e, e) }
+"#;
+
+/// An `Option<Node>`, nested, of up to 12 values.
+fn chain_val(rng: &mut Rng) -> Val {
+    (0..rng.below(12)).fold(Val::Option(None), |next, _| {
+        Val::Option(Some(Box::new(Val::Record(vec![
+            ("value".into(), Val::S64(rng.int())),
+            ("next".into(), next),
+        ]))))
+    })
+}
+
+/// An `Expr`, nested, `depth` deep at most.
+fn expr_val(rng: &mut Rng, depth: u32) -> Val {
+    let case = |name: &str, v: Val| Val::Variant(name.into(), Some(Box::new(v)));
+    match if depth == 0 { 0 } else { rng.below(3) } {
+        0 => case("num", Val::S64(rng.int())),
+        1 => case("neg", expr_val(rng, depth - 1)),
+        _ => case(
+            "add",
+            Val::Tuple(vec![expr_val(rng, depth - 1), expr_val(rng, depth - 1)]),
+        ),
+    }
+}
+
+#[test]
+fn a_type_that_holds_itself_in_place_agrees_with_its_component() {
+    let us = units(&[("bx.pw", BOXED)]);
+    let mut rng = Rng(0x0202);
+    let mut cases: Vec<(String, Vec<Vec<Val>>)> = Vec::new();
+    let calls = (0..CASES).map(|_| vec![Val::S64(rng.int())]).collect();
+    cases.push(("bx.Chain".to_string(), calls));
+    let calls = (0..CASES).map(|_| vec![chain_val(&mut rng)]).collect();
+    cases.push(("bx.Total".to_string(), calls));
+    for id in ["bx.Value", "bx.Echo", "bx.Doubled"] {
+        let calls = (0..CASES).map(|_| vec![expr_val(&mut rng, 5)]).collect();
+        cases.push((id.to_string(), calls));
+    }
+    let (queries, calls, traps) = agree_on(&us, &cases, 0x0202);
+    println!(
+        "javascript: {queries} queries over values held in place, {calls} calls, component \
+         and module agree ({traps} trapped in both)"
+    );
+}
+
 /// **Two types with the same cases** (ADR-0201): a case written alone is the
 /// expected type's, in the module as in the component.
 const TWINS: &str = r#"module tw

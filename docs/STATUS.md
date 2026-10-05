@@ -13,6 +13,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0202, 2026-10-05: a type that holds itself in place is boxed, and
+crosses as its nodes.** ADR-0194 compiled a type that contains itself through
+a list, and refused `next: Option<Node>` and `Add(Expr, Expr)` by name. Each
+value of such a type is now the address of its cell: built, read and matched
+through it by the encoder, with the IR unchanged. At a boundary a box is a
+`u32` in its node and an option of one an `option<u32>`, in ADR-0194's level
+order; a chain 50,000 deep crosses both ways, and malformed nodes trap. Two
+types that hold each other in place, and a generic one, compile inside a
+component. 17 mutants (`just e14-boxed-types`).
+
 **ADR-0201, 2026-10-05: a case written alone is the case of the type
 expected where it is written** (ADR-0195, ruling 5, its second half). Two
 types with an `Empty` made every bare `Empty` PW0022, even in `fn f() ->

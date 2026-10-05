@@ -278,8 +278,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - ~~through a list, inside a component and across its boundary as
           nodes and indices~~ (ADR-0194, `just e14-recursive-types`), with
           PW0624 for a type no finite value has;
-        - next, held in place, boxed: `Option<Node>`, `Add(Expr, Expr)`, and
-          through another declaration across a boundary;
+        - ~~held in place, boxed: `Option<Node>`, `Add(Expr, Expr)`~~
+          (ADR-0202, `just e14-boxed-types`); through another declaration
+          across a boundary still to build;
         - then the browser's wire, as nodes, and views that contain
           themselves (ADR-0130's ruling, unbuilt since ADR-0136), bounded
           below the 512 elements a browser's parser nests.

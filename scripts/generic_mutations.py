@@ -67,8 +67,9 @@ MUTANTS = [
     ),
     (
         "an instance inside another is taken for recursion",
+        # Re-anchored by ADR-0202: the instance is the declaration's key.
         WASM,
-        "                    if self.visiting.contains(&(*def, args.clone())) {",
+        "                    if self.visiting.contains(&key) {",
         "                    if self.visiting.iter().any(|(d, _)| d == def) {",
     ),
     (

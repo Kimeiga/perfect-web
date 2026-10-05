@@ -11,11 +11,12 @@
 //! - **Is it held in place?** A list's elements are where the list points, so
 //!   `replies: List<Comment>` has a layout by its type. `next: Option<Node>`
 //!   holds a `Node` within a `Node`, which no layout by type has
-//!   ([`contains_itself_in_place`]). The backend refuses that by name until it
-//!   boxes the value.
+//!   ([`contains_itself_in_place`]). The backend boxes such a type's values
+//!   (ADR-0202): each is the address of its cell.
 //! - **Which of its fields hold it?** [`self_slots`]: a type that crosses a
-//!   component boundary crosses as its nodes, and each field that holds a list
-//!   of the type is a list of node indices there.
+//!   component boundary crosses as its nodes, and each field that holds the
+//!   type holds node indices there: a list of them for a `List` of it, one
+//!   for the type itself, and an optional one for an `Option` of it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -180,45 +181,63 @@ fn parameter_in_place(
     })
 }
 
+/// **How a part of a type that contains itself holds it**, as a value of
+/// the type crosses a component boundary as its nodes (ADR-0194, ADR-0202).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Slot {
+    /// `List<T>`: a list of node indices.
+    List,
+    /// `T` itself, held in place: one node index.
+    Box,
+    /// `Option<T>`: a node index, or none.
+    Option,
+}
+
+/// The slot a part of `def` is, where its type is `def` itself, an `Option`
+/// of it or a `List` of it, unapplied.
+pub fn slot_of(ty: &ResolvedType, def: DefId) -> Option<Slot> {
+    let is_self = |t: &ResolvedType| t.def_id() == Some(def) && t.args().is_empty();
+    if is_self(ty) {
+        return Some(Slot::Box);
+    }
+    if !ty.args().first().is_some_and(is_self) {
+        return None;
+    }
+    match ty.as_builtin()? {
+        Builtin::List => Some(Slot::List),
+        Builtin::Option => Some(Slot::Option),
+        _ => None,
+    }
+}
+
 /// **Where a type that contains itself holds itself**, as a value of it
-/// crosses a component boundary (ADR-0194): the fields, by their position
-/// among the declaration's parts, whose type is a `List` of it. Each is a
-/// list of node indices there.
+/// crosses a component boundary (ADR-0194, ADR-0202): each part, by its
+/// position among the declaration's parts, that is the type itself, an
+/// `Option` of it or a `List` of it, and how.
 ///
-/// Refused, with why, where any other part holds the type: in place, deeper
-/// in a field (`List<List<Comment>>`, `Map<String, Comment>`), or through
-/// another declaration (`A` holding `List<B>`, `B` holding an `A`); and where
-/// a part holds another type that contains itself, whose own nodes a node
-/// cannot hold yet.
-pub fn self_slots(sigs: &Signatures, def: DefId) -> Result<BTreeSet<usize>, String> {
+/// Refused, with why, where any other part holds the type: deeper in a field
+/// (`List<List<Comment>>`, `Map<String, Comment>`, `Option<List<Comment>>`),
+/// or through another declaration (`A` holding `List<B>`, `B` holding an
+/// `A`); and where a part holds another type that contains itself, whose own
+/// nodes a node cannot hold yet.
+pub fn self_slots(sigs: &Signatures, def: DefId) -> Result<BTreeMap<usize, Slot>, String> {
     let Some(t) = sigs.type_decl(def) else {
         return Err("its declaration is not a type".to_string());
     };
     let name = sigs.path_of(def).unwrap_or_default();
-    if contains_itself_in_place(sigs, def) {
-        return Err(format!(
-            "`{name}` holds itself in place, with no list between, and no layout by type \
-             holds that until the backend boxes the value"
-        ));
-    }
-    let mut slots = BTreeSet::new();
+    let mut slots = BTreeMap::new();
     for (i, part) in parts(t).enumerate() {
         let Some(ty) = part.resolved() else {
             continue;
         };
-        let is_slot = ty.as_builtin() == Some(Builtin::List)
-            && ty
-                .args()
-                .first()
-                .is_some_and(|e| e.def_id() == Some(def) && e.args().is_empty());
-        if is_slot {
-            slots.insert(i);
+        if let Some(slot) = slot_of(ty, def) {
+            slots.insert(i, slot);
             continue;
         }
         if mentions(sigs, ty, def, &mut BTreeSet::new()) {
             return Err(format!(
-                "`{name}` holds itself as `{}`, and only a field that is a `List` of it \
-                 crosses as node indices yet",
+                "`{name}` holds itself as `{}`, and only a field that is it, an `Option` of \
+                 it or a `List` of it crosses as node indices yet",
                 ty.display_name(),
             ));
         }

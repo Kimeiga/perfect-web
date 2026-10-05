@@ -204,7 +204,7 @@ pub fn core_module_with(
         .chain(function.closures.iter().map(|c| &c.function))
         .collect();
     let mut private = world_resolve.clone();
-    let wit = internal_types(&mut private, &all, declared, idents);
+    let (wit, cells) = internal_types(&mut private, &all, declared, idents);
     let resolve = &private;
     let mut sizes = SizeAlign::default();
     sizes.fill(resolve);
@@ -498,6 +498,7 @@ pub fn core_module_with(
         callees: &callees,
         closures: &closures,
         fn_sigs: &fn_sigs,
+        cells: &cells,
     };
     let body = match export_body(shared, function, &export_fn, &export_sig, &mut helpers) {
         Encoding::Encoded(b) => b,
@@ -748,7 +749,7 @@ fn internal_types(
     functions: &[&super::ir::Function],
     declared: &[TypeDef],
     idents: &BTreeMap<DefId, String>,
-) -> BTreeMap<Type, WitType> {
+) -> (BTreeMap<Type, WitType>, Cells) {
     let world_types = resolve.packages.iter().find_map(|(_, p)| {
         (p.name.namespace == "pw" && p.name.name == "types")
             .then(|| p.interfaces.get("types").copied())
@@ -765,6 +766,7 @@ fn internal_types(
         }
     }
     let mut out = BTreeMap::new();
+    let mut cells = Cells::new();
     let mut cx = TypeCx {
         world_types,
         declared,
@@ -772,6 +774,8 @@ fn internal_types(
         out: &mut out,
         visiting: Vec::new(),
         holders: holders_of_cycles(declared),
+        boxed: boxed_cycles(declared),
+        cells: &mut cells,
         deferred: Vec::new(),
         broken: BTreeSet::new(),
     };
@@ -789,8 +793,13 @@ fn internal_types(
     if !broken.is_empty() {
         out.retain(|_, w| !reaches_any(resolve, *w, &broken, &mut BTreeSet::new()));
     }
-    out
+    (out, cells)
 }
+
+/// **Each box's cell** (ADR-0202): a value of a type that holds itself in
+/// place is the address of its cell, so its WIT type is a `u32` of its own,
+/// whose cell is the record or variant the type is.
+type Cells = BTreeMap<wit_parser::TypeId, wit_parser::TypeId>;
 
 /// Does `t` reach one of `ids`, through every type it is built of?
 fn reaches_any(
@@ -871,6 +880,66 @@ fn holders_of_cycles(declared: &[TypeDef]) -> BTreeSet<Instance> {
         .collect()
 }
 
+/// **The instances that hold themselves in place** (ADR-0202): each in a
+/// cycle of the declarations' shapes that passes through no list, map, set or
+/// function value, as `next: Option<Node>` or `Add(Expr, Expr)` does. No
+/// layout by type holds one, so a value of one is boxed: the address of its
+/// cell.
+fn boxed_cycles(declared: &[TypeDef]) -> BTreeSet<Instance> {
+    fn in_place(t: &Type, out: &mut Vec<Instance>) {
+        match t {
+            Type::Nominal(d, args) => out.push((*d, args.clone())),
+            Type::Option(a) => in_place(a, out),
+            Type::Result(a, b) => {
+                in_place(a, out);
+                in_place(b, out);
+            }
+            // Where the value points, or its environment's address.
+            Type::List(_) | Type::Set(_) | Type::Map(..) | Type::Function(..) => {}
+            Type::Int | Type::Float | Type::Bool | Type::Str | Type::Unit => {}
+        }
+    }
+    let edges: BTreeMap<Instance, Vec<Instance>> = declared
+        .iter()
+        .map(|d| {
+            let mut next = Vec::new();
+            match &d.shape {
+                Shape::Alias(of) => in_place(of, &mut next),
+                Shape::Record { fields } => {
+                    for (_, t) in fields {
+                        in_place(t, &mut next);
+                    }
+                }
+                Shape::Variant { cases } => {
+                    for (_, fs) in cases {
+                        for t in fs {
+                            in_place(t, &mut next);
+                        }
+                    }
+                }
+            }
+            ((d.def, d.args.clone()), next)
+        })
+        .collect();
+    edges
+        .keys()
+        .filter(|k| {
+            let mut seen: BTreeSet<&Instance> = BTreeSet::new();
+            let mut stack: Vec<&Instance> = edges.get(*k).into_iter().flatten().collect();
+            while let Some(n) = stack.pop() {
+                if n == *k {
+                    return true;
+                }
+                if seen.insert(n) {
+                    stack.extend(edges.get(n).into_iter().flatten());
+                }
+            }
+            false
+        })
+        .cloned()
+        .collect()
+}
+
 struct TypeCx<'a> {
     world_types: Option<wit_parser::InterfaceId>,
     declared: &'a [TypeDef],
@@ -881,6 +950,9 @@ struct TypeCx<'a> {
     visiting: Vec<(DefId, Vec<Type>)>,
     /// [`holders_of_cycles`].
     holders: BTreeSet<(DefId, Vec<Type>)>,
+    /// [`boxed_cycles`]: each defined as a box, whose cell is its shape.
+    boxed: BTreeSet<Instance>,
+    cells: &'a mut Cells,
     /// **Lists whose elements hold a declaration being defined** (ADR-0194),
     /// each allocated before it with a placeholder element, and its element
     /// set once nothing it holds is being defined. A list's layout does not
@@ -889,6 +961,20 @@ struct TypeCx<'a> {
     deferred: Vec<(wit_parser::TypeId, Element)>,
     /// Deferred lists whose element had no WIT form.
     broken: BTreeSet<wit_parser::TypeId>,
+}
+
+/// An anonymous type in the private `Resolve`: an `option`, a `list`, a
+/// `tuple`, a `result`, compared by `same_type` by its arguments.
+fn anonymous(resolve: &mut Resolve, kind: TypeDefKind) -> WitType {
+    WitType::Id(resolve.types.alloc(WitTypeDef {
+        name: None,
+        kind,
+        owner: TypeOwner::None,
+        docs: Default::default(),
+        stability: Default::default(),
+        span: Default::default(),
+        external_id: None,
+    }))
 }
 
 /// A deferred list's element: a value, or a map's entry.
@@ -903,17 +989,6 @@ impl TypeCx<'_> {
         if let Some(w) = self.out.get(t) {
             return Some(*w);
         }
-        let anonymous = |resolve: &mut Resolve, kind: TypeDefKind| {
-            WitType::Id(resolve.types.alloc(WitTypeDef {
-                name: None,
-                kind,
-                owner: TypeOwner::None,
-                docs: Default::default(),
-                stability: Default::default(),
-                span: Default::default(),
-                external_id: None,
-            }))
-        };
         let w = match t {
             Type::Int => WitType::S64,
             Type::Float => WitType::F64,
@@ -979,94 +1054,40 @@ impl TypeCx<'_> {
                         .declared
                         .iter()
                         .find(|d| d.def == *def && d.args == *args)?;
-                    if self.visiting.contains(&(*def, args.clone())) {
+                    let key = (*def, args.clone());
+                    // A type that holds itself in place (ADR-0202): its value
+                    // is the address of its cell, a `u32` of its own, known
+                    // before the cell, whose parts that hold the type are the
+                    // box.
+                    if self.boxed.contains(&key) {
+                        let ident = self
+                            .idents
+                            .get(def)
+                            .cloned()
+                            .unwrap_or_else(|| crate::wit::ident(&d.name));
+                        let boxed = resolve.types.alloc(WitTypeDef {
+                            name: Some(format!("{ident}-box")),
+                            kind: TypeDefKind::Type(WitType::U32),
+                            owner: TypeOwner::None,
+                            docs: Default::default(),
+                            stability: Default::default(),
+                            span: Default::default(),
+                            external_id: None,
+                        });
+                        self.out.insert(t.clone(), WitType::Id(boxed));
+                        let Some(WitType::Id(cell)) = self.shape(resolve, def, d) else {
+                            self.out.remove(t);
+                            return None;
+                        };
+                        self.cells.insert(boxed, cell);
+                        self.settle_deferred(resolve);
+                        return Some(WitType::Id(boxed));
+                    }
+                    if self.visiting.contains(&key) {
                         return None;
                     }
-                    self.visiting.push((*def, args.clone()));
-                    let defined = match &d.shape {
-                        Shape::Alias(of) => self.wit(resolve, of),
-                        Shape::Record { fields } => {
-                            let mut wit_fields = Vec::new();
-                            let mut whole = true;
-                            for (name, ft) in fields {
-                                match self.wit(resolve, ft) {
-                                    Some(ty) => wit_fields.push(Field {
-                                        name: crate::wit::ident(name),
-                                        ty,
-                                        docs: Default::default(),
-                                        span: Default::default(),
-                                    }),
-                                    None => whole = false,
-                                }
-                            }
-                            whole.then(|| {
-                                WitType::Id(
-                                    resolve.types.alloc(WitTypeDef {
-                                        name: Some(
-                                            self.idents
-                                                .get(def)
-                                                .cloned()
-                                                .unwrap_or_else(|| crate::wit::ident(&d.name)),
-                                        ),
-                                        kind: TypeDefKind::Record(Record { fields: wit_fields }),
-                                        owner: TypeOwner::None,
-                                        docs: Default::default(),
-                                        stability: Default::default(),
-                                        span: Default::default(),
-                                        external_id: None,
-                                    }),
-                                )
-                            })
-                        }
-                        // A declared sum type (ADR-0059): a case of one
-                        // field carries it; of several, a tuple of them, as
-                        // `wit.rs` writes the world's.
-                        Shape::Variant { cases } => {
-                            let mut wit_cases = Vec::new();
-                            let mut whole = true;
-                            for (name, fields) in cases {
-                                let mut types = Vec::new();
-                                for f in fields {
-                                    match self.wit(resolve, f) {
-                                        Some(t) => types.push(t),
-                                        None => whole = false,
-                                    }
-                                }
-                                let ty = match types.as_slice() {
-                                    [] => None,
-                                    [one] => Some(*one),
-                                    _ => Some(anonymous(
-                                        resolve,
-                                        TypeDefKind::Tuple(Tuple { types }),
-                                    )),
-                                };
-                                wit_cases.push(WitCase {
-                                    name: crate::wit::ident(name),
-                                    ty,
-                                    docs: Default::default(),
-                                    span: Default::default(),
-                                });
-                            }
-                            whole.then(|| {
-                                WitType::Id(
-                                    resolve.types.alloc(WitTypeDef {
-                                        name: Some(
-                                            self.idents
-                                                .get(def)
-                                                .cloned()
-                                                .unwrap_or_else(|| crate::wit::ident(&d.name)),
-                                        ),
-                                        kind: TypeDefKind::Variant(Variant { cases: wit_cases }),
-                                        owner: TypeOwner::None,
-                                        docs: Default::default(),
-                                        stability: Default::default(),
-                                        span: Default::default(),
-                                        external_id: None,
-                                    }),
-                                )
-                            })
-                        }
-                    };
+                    self.visiting.push(key);
+                    let defined = self.shape(resolve, def, d);
                     self.visiting.pop();
                     let defined = defined?;
                     // Known before the lists that wait for it are given
@@ -1079,6 +1100,91 @@ impl TypeCx<'_> {
         };
         self.out.insert(t.clone(), w);
         Some(w)
+    }
+
+    /// A declaration's shape, as a record, a variant, or what an alias is.
+    fn shape(&mut self, resolve: &mut Resolve, def: &DefId, d: &TypeDef) -> Option<WitType> {
+        match &d.shape {
+            Shape::Alias(of) => self.wit(resolve, of),
+            Shape::Record { fields } => {
+                let mut wit_fields = Vec::new();
+                let mut whole = true;
+                for (name, ft) in fields {
+                    match self.wit(resolve, ft) {
+                        Some(ty) => wit_fields.push(Field {
+                            name: crate::wit::ident(name),
+                            ty,
+                            docs: Default::default(),
+                            span: Default::default(),
+                        }),
+                        None => whole = false,
+                    }
+                }
+                whole.then(|| {
+                    WitType::Id(
+                        resolve.types.alloc(WitTypeDef {
+                            name: Some(
+                                self.idents
+                                    .get(def)
+                                    .cloned()
+                                    .unwrap_or_else(|| crate::wit::ident(&d.name)),
+                            ),
+                            kind: TypeDefKind::Record(Record { fields: wit_fields }),
+                            owner: TypeOwner::None,
+                            docs: Default::default(),
+                            stability: Default::default(),
+                            span: Default::default(),
+                            external_id: None,
+                        }),
+                    )
+                })
+            }
+            // A declared sum type (ADR-0059): a case of one
+            // field carries it; of several, a tuple of them, as
+            // `wit.rs` writes the world's.
+            Shape::Variant { cases } => {
+                let mut wit_cases = Vec::new();
+                let mut whole = true;
+                for (name, fields) in cases {
+                    let mut types = Vec::new();
+                    for f in fields {
+                        match self.wit(resolve, f) {
+                            Some(t) => types.push(t),
+                            None => whole = false,
+                        }
+                    }
+                    let ty = match types.as_slice() {
+                        [] => None,
+                        [one] => Some(*one),
+                        _ => Some(anonymous(resolve, TypeDefKind::Tuple(Tuple { types }))),
+                    };
+                    wit_cases.push(WitCase {
+                        name: crate::wit::ident(name),
+                        ty,
+                        docs: Default::default(),
+                        span: Default::default(),
+                    });
+                }
+                whole.then(|| {
+                    WitType::Id(
+                        resolve.types.alloc(WitTypeDef {
+                            name: Some(
+                                self.idents
+                                    .get(def)
+                                    .cloned()
+                                    .unwrap_or_else(|| crate::wit::ident(&d.name)),
+                            ),
+                            kind: TypeDefKind::Variant(Variant { cases: wit_cases }),
+                            owner: TypeOwner::None,
+                            docs: Default::default(),
+                            stability: Default::default(),
+                            span: Default::default(),
+                            external_id: None,
+                        }),
+                    )
+                })
+            }
+        }
     }
 
     /// Does `t` hold a declaration being defined, at any depth?
@@ -1343,7 +1449,9 @@ fn holds_index(resolve: &Resolve, t: &WitType) -> bool {
 
 /// **A world's type that is a type that contains itself, as its nodes**
 /// (ADR-0194): `list<node>`, where the node is a record or a variant one of
-/// whose fields is a `list<u32>` of its children's indices. The node's type.
+/// whose fields holds its children's indices: a `list<u32>`, or for a type
+/// that holds itself in place a `u32` or an `option<u32>` (ADR-0202). The
+/// node's type.
 fn node_of(resolve: &Resolve, t: &WitType) -> Option<wit_parser::TypeId> {
     let WitType::Id(list) = dealias(resolve, *t) else {
         return None;
@@ -1354,10 +1462,12 @@ fn node_of(resolve: &Resolve, t: &WitType) -> Option<wit_parser::TypeId> {
     let WitType::Id(node) = dealias(resolve, *element) else {
         return None;
     };
+    // `list<u32>`, `u32` or `option<u32>` (ADR-0194, ADR-0202).
     let indices = |t: &WitType| match dealias(resolve, *t) {
+        WitType::U32 => true,
         WitType::Id(l) => matches!(
             resolve.types[l].kind,
-            TypeDefKind::List(e) if dealias(resolve, e) == WitType::U32
+            TypeDefKind::List(e) | TypeDefKind::Option(e) if dealias(resolve, e) == WitType::U32
         ),
         _ => false,
     };
@@ -1376,16 +1486,32 @@ fn node_of(resolve: &Resolve, t: &WitType) -> Option<wit_parser::TypeId> {
 
 /// **Where a type that contains itself holds itself, and how it is laid
 /// out** (ADR-0194): the body's value and its node have one layout, but for
-/// each list of the type, which in the node is a list of indices.
+/// each part that holds the type, which in the node holds indices.
 #[derive(Debug, Clone)]
 struct GraphLayout {
     size: u32,
     align: u32,
     /// A variant's discriminant, where the type is one.
     tag: Option<Int>,
-    /// Each list of the type: the case that holds it, for a variant, and
-    /// where it sits.
-    slots: Vec<(Option<u32>, u64)>,
+    /// Each part that holds the type: the case that holds it, for a variant,
+    /// where it sits, and how it holds the type.
+    slots: Vec<(Option<u32>, u64, SlotKind)>,
+}
+
+/// **How a part holds the type, in the body and in the node.**
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SlotKind {
+    /// A list of the type, its elements where the list points, one after
+    /// another (ADR-0194); a `list<u32>` in the node.
+    Inline,
+    /// A list of boxes, its elements their cells' addresses (ADR-0202); a
+    /// `list<u32>` in the node.
+    Boxes,
+    /// A box, its cell's address (ADR-0202); a `u32` in the node.
+    Box,
+    /// An option of a box, its payload this far into it (ADR-0202); an
+    /// `option<u32>` in the node.
+    Option(u64),
 }
 
 /// The layout of `tree`, the body's value, against `node`, the world's, or
@@ -1393,31 +1519,45 @@ struct GraphLayout {
 fn graph_layout(
     resolve: &Resolve,
     sizes: &SizeAlign,
+    cells: &Cells,
     tree: wit_parser::TypeId,
     node: wit_parser::TypeId,
 ) -> Result<GraphLayout, String> {
-    let is_self = |t: &WitType| match dealias(resolve, *t) {
-        WitType::Id(l) => matches!(
-            resolve.types[l].kind,
-            TypeDefKind::List(e) if dealias(resolve, e) == WitType::Id(tree)
-        ),
-        _ => false,
+    // The element of a list, or the payload of an option, undealiased: a
+    // box is an alias whose cell is `tree`.
+    let inner = |t: &WitType, list: bool| match dealias(resolve, *t) {
+        WitType::Id(l) => match (&resolve.types[l].kind, list) {
+            (TypeDefKind::List(e), true) | (TypeDefKind::Option(e), false) => Some(*e),
+            _ => None,
+        },
+        _ => None,
     };
-    let is_index = |t: &WitType| match dealias(resolve, *t) {
-        WitType::Id(l) => matches!(
-            resolve.types[l].kind,
-            TypeDefKind::List(e) if dealias(resolve, e) == WitType::U32
-        ),
-        _ => false,
-    };
-    // One part of the value against the node's: a list of the type against
-    // a list of indices, anything else against one type.
-    let part = |a: &WitType, b: &WitType| -> Result<bool, String> {
-        match (is_self(a), is_index(b)) {
-            (true, true) => Ok(true),
-            (false, false) if same_type(resolve, a, b) => Ok(false),
-            _ => Err("a field of the value and of its node differ".to_string()),
-        }
+    let is_box = |t: &WitType| matches!(t, WitType::Id(b) if cells.get(b) == Some(&tree));
+    let is_u32 = |t: &WitType| dealias(resolve, *t) == WitType::U32;
+    // One part of the value against the node's: a part that holds the type
+    // against indices, anything else against one type.
+    let part = |a: &WitType, b: &WitType| -> Result<Option<SlotKind>, String> {
+        let a_list = inner(a, true);
+        let b_list = inner(b, true).is_some_and(|e| is_u32(&e));
+        let a_option = inner(a, false);
+        let b_option = inner(b, false).is_some_and(|e| is_u32(&e));
+        let kind = if a_list.is_some_and(|e| dealias(resolve, e) == WitType::Id(tree)) && b_list {
+            Some(SlotKind::Inline)
+        } else if a_list.is_some_and(|e| is_box(&e)) && b_list {
+            Some(SlotKind::Boxes)
+        } else if is_box(a) && is_u32(b) {
+            Some(SlotKind::Box)
+        } else if let Some(payload) = a_option.filter(|e| is_box(e)).filter(|_| b_option) {
+            let offset = sizes
+                .payload_offset(Int::U8, [None, Some(&payload)])
+                .size_wasm32() as u64;
+            Some(SlotKind::Option(offset))
+        } else if same_type(resolve, a, b) {
+            None
+        } else {
+            return Err("a field of the value and of its node differ".to_string());
+        };
+        Ok(kind)
     };
     let size = sizes.size(&WitType::Id(tree)).size_wasm32() as u32;
     let align = sizes.align(&WitType::Id(tree)).align_wasm32() as u32;
@@ -1429,8 +1569,8 @@ fn graph_layout(
         (TypeDefKind::Record(a), TypeDefKind::Record(b)) if a.fields.len() == b.fields.len() => {
             let offsets = sizes.field_offsets(a.fields.iter().map(|f| &f.ty));
             for ((o, _), (fa, fb)) in offsets.iter().zip(a.fields.iter().zip(&b.fields)) {
-                if part(&fa.ty, &fb.ty)? {
-                    slots.push((None, o.size_wasm32() as u64));
+                if let Some(kind) = part(&fa.ty, &fb.ty)? {
+                    slots.push((None, o.size_wasm32() as u64, kind));
                 }
             }
             None
@@ -1460,17 +1600,18 @@ fn graph_layout(
                             Some((xs, ys)) => {
                                 let offsets = sizes.field_offsets(xs.iter());
                                 for ((o, _), (x, y)) in offsets.iter().zip(xs.iter().zip(&ys)) {
-                                    if part(x, y)? {
+                                    if let Some(kind) = part(x, y)? {
                                         slots.push((
                                             Some(c as u32),
                                             payload + o.size_wasm32() as u64,
+                                            kind,
                                         ));
                                     }
                                 }
                             }
                             None => {
-                                if part(&pa, &pb)? {
-                                    slots.push((Some(c as u32), payload));
+                                if let Some(kind) = part(&pa, &pb)? {
+                                    slots.push((Some(c as u32), payload, kind));
                                 }
                             }
                         }
@@ -1483,7 +1624,7 @@ fn graph_layout(
         _ => return Err("the value and its node are not one kind of type".to_string()),
     };
     if slots.is_empty() {
-        return Err("the value holds no list of itself".to_string());
+        return Err("the value holds nothing of itself".to_string());
     }
     Ok(GraphLayout {
         size,
@@ -1546,6 +1687,8 @@ struct Shared<'a> {
     closures: &'a BTreeMap<u32, ClosureCode>,
     /// How each function type is called (ADR-0052).
     fn_sigs: &'a BTreeMap<Type, FnSig>,
+    /// Each box's cell (ADR-0202).
+    cells: &'a Cells,
 }
 
 /// **How a function value of one type is called** (ADR-0052): the core type
@@ -1646,6 +1789,7 @@ fn export_body(
         imports,
         realloc_index,
         wit: shared.wit,
+        cells: shared.cells,
         literals: shared.literals,
         helpers,
         callees: shared.callees,
@@ -1762,6 +1906,7 @@ fn closure_body(
         imports: shared.imports,
         realloc_index: shared.realloc_index,
         wit: shared.wit,
+        cells: shared.cells,
         literals: shared.literals,
         helpers,
         callees: shared.callees,
@@ -1856,6 +2001,7 @@ fn internal_body(
         imports: shared.imports,
         realloc_index: shared.realloc_index,
         wit: shared.wit,
+        cells: shared.cells,
         literals: shared.literals,
         helpers,
         callees: shared.callees,
@@ -2262,6 +2408,7 @@ struct Enc<'a> {
     callees: &'a BTreeMap<(DefId, Vec<Type>), Callee>,
     closures: &'a BTreeMap<u32, ClosureCode>,
     fn_sigs: &'a BTreeMap<Type, FnSig>,
+    cells: &'a Cells,
     exit: Exit,
     export: &'a str,
     ops: Vec<wasm_encoder::Instruction<'static>>,
@@ -2443,6 +2590,64 @@ impl Enc<'_> {
             ]);
             return Encoding::Encoded(());
         }
+        // A box, as its nodes, and its nodes as a box (ADR-0202): the box is
+        // its cell's address, one word read or written.
+        if let Some(WitType::Id(cell)) = self.cell_of(from)
+            && let Some(node) = node_of(resolve, &to)
+        {
+            let layout = match graph_layout(resolve, sizes, self.cells, cell, node) {
+                Ok(l) => l,
+                Err(why) => refuse!(
+                    "a type that contains itself whose nodes this backend does not lay out",
+                    "`{}`: {why}",
+                    self.export
+                ),
+            };
+            let n = self.helpers.graph((cell, node), layout);
+            let call = self.helpers.index(Helper::Encode(n));
+            let (ptr, len) = (
+                self.locals.fresh(ValType::I32),
+                self.locals.fresh(ValType::I32),
+            );
+            self.ops.extend([
+                I::LocalGet(src),
+                I::I32Load(word(so)),
+                I::Call(call),
+                I::LocalSet(len),
+                I::LocalSet(ptr),
+                I::LocalGet(dst),
+                I::LocalGet(ptr),
+                I::I32Store(word(d)),
+                I::LocalGet(dst),
+                I::LocalGet(len),
+                I::I32Store(word(d + 4)),
+            ]);
+            return Encoding::Encoded(());
+        }
+        if let Some(WitType::Id(cell)) = self.cell_of(to)
+            && let Some(node) = node_of(resolve, &from)
+        {
+            let layout = match graph_layout(resolve, sizes, self.cells, cell, node) {
+                Ok(l) => l,
+                Err(why) => refuse!(
+                    "a type that contains itself whose nodes this backend does not lay out",
+                    "`{}`: {why}",
+                    self.export
+                ),
+            };
+            let n = self.helpers.graph((cell, node), layout);
+            let call = self.helpers.index(Helper::Decode(n));
+            self.ops.extend([
+                I::LocalGet(dst),
+                I::LocalGet(src),
+                I::I32Load(word(so)),
+                I::LocalGet(src),
+                I::I32Load(word(so + 4)),
+                I::Call(call),
+                I::I32Store(word(d)),
+            ]);
+            return Encoding::Encoded(());
+        }
         let (f, t) = (dealias(resolve, from), dealias(resolve, to));
         let (WitType::Id(fid), WitType::Id(tid)) = (f, t) else {
             blocked!(
@@ -2455,7 +2660,7 @@ impl Enc<'_> {
         if matches!(kinds.0, TypeDefKind::Record(_) | TypeDefKind::Variant(_))
             && let Some(node) = node_of(resolve, &to)
         {
-            let layout = match graph_layout(resolve, sizes, fid, node) {
+            let layout = match graph_layout(resolve, sizes, self.cells, fid, node) {
                 Ok(l) => l,
                 Err(why) => refuse!(
                     "a type that contains itself whose nodes this backend does not lay out",
@@ -2488,7 +2693,7 @@ impl Enc<'_> {
         if matches!(kinds.1, TypeDefKind::Record(_) | TypeDefKind::Variant(_))
             && let Some(node) = node_of(resolve, &from)
         {
-            let layout = match graph_layout(resolve, sizes, tid, node) {
+            let layout = match graph_layout(resolve, sizes, self.cells, tid, node) {
                 Ok(l) => l,
                 Err(why) => refuse!(
                     "a type that contains itself whose nodes this backend does not lay out",
@@ -3725,6 +3930,45 @@ impl Enc<'_> {
 
     /// **A record, built in the region**: its canonical layout, each field
     /// stored at the offset `SizeAlign` gives (ADR-0039 §6).
+    /// **The cell a box holds** (ADR-0202), where `t` is a box: the WIT type
+    /// of a value of a type that holds itself in place.
+    fn cell_of(&self, t: WitType) -> Option<WitType> {
+        match t {
+            WitType::Id(id) => self.cells.get(&id).map(|c| WitType::Id(*c)),
+            _ => None,
+        }
+    }
+
+    /// **A box, as its cell** (ADR-0202): a box held flat is its cell's
+    /// address, and one held in memory is read from there first. Anything
+    /// else is held as it is.
+    fn unboxed(&mut self, h: Held) -> Held {
+        use wasm_encoder::Instruction as I;
+        let Some(cell) = h.ty().and_then(|t| self.cell_of(*t)) else {
+            return h;
+        };
+        match h {
+            Held::Flat { locals, .. } => Held::Memory {
+                ty: cell,
+                ptr: locals[0],
+            },
+            Held::Memory { ptr, .. } => {
+                let at = self.locals.fresh(ValType::I32);
+                self.ops.extend([
+                    I::LocalGet(ptr),
+                    I::I32Load(MemArg {
+                        offset: 0,
+                        align: 2,
+                        memory_index: 0,
+                    }),
+                    I::LocalSet(at),
+                ]);
+                Held::Memory { ty: cell, ptr: at }
+            }
+            Held::Nothing => Held::Nothing,
+        }
+    }
+
     fn construct(&mut self, result: ValueId, args: &[ValueId], ty: &Type) -> Encoding<()> {
         use wasm_encoder::Instruction as I;
         let (resolve, sizes) = (self.resolve, self.sizes);
@@ -3734,6 +3978,12 @@ impl Enc<'_> {
                 "`{}` builds a {ty:?}, which has no component type here",
                 self.export
             );
+        };
+        // A type that holds itself in place is built in its cell, and the
+        // value is the cell's address (ADR-0202).
+        let (rt, boxed) = match self.cell_of(rt) {
+            Some(cell) => (cell, Some(rt)),
+            None => (rt, None),
         };
         let WitType::Id(id) = dealias(resolve, rt) else {
             blocked!(
@@ -3807,7 +4057,16 @@ impl Enc<'_> {
                 Held::Nothing => blocked!("`{}` stores a call with no result", self.export),
             }
         }
-        self.held.insert(result, Held::Memory { ty: rt, ptr: area });
+        self.held.insert(
+            result,
+            match boxed {
+                Some(b) => Held::Flat {
+                    ty: b,
+                    locals: vec![area],
+                },
+                None => Held::Memory { ty: rt, ptr: area },
+            },
+        );
         Encoding::Encoded(())
     }
 
@@ -5761,6 +6020,8 @@ impl Enc<'_> {
                 self.export
             );
         };
+        // A box's field is its cell's (ADR-0202).
+        let h = self.unboxed(h);
         let Some(t) = h.ty().copied() else {
             blocked!("`{}` reads a field of a call with no result", self.export);
         };
@@ -5931,10 +6192,14 @@ impl Enc<'_> {
         let Some(t) = self.type_of(result, ty) else {
             refuse!(
                 "a sum type with no component type",
-                "`{}` builds a {ty:?}, which has no component type here: a type that \
-                 contains itself has no canonical layout",
+                "`{}` builds a {ty:?}, which has no component type here",
                 self.export
             );
+        };
+        // Built in its cell where the type holds itself in place (ADR-0202).
+        let (t, boxed) = match self.cell_of(t) {
+            Some(cell) => (cell, Some(t)),
+            None => (t, None),
         };
         let (Some((disc, payload, offset)), Some((_, tag))) = (
             case_layout(resolve, sizes, t, VariantCase::Declared(case)),
@@ -5967,7 +6232,16 @@ impl Enc<'_> {
                 other => return other,
             }
         }
-        self.held.insert(result, Held::Memory { ty: t, ptr: area });
+        self.held.insert(
+            result,
+            match boxed {
+                Some(b) => Held::Flat {
+                    ty: b,
+                    locals: vec![area],
+                },
+                None => Held::Memory { ty: t, ptr: area },
+            },
+        );
         Encoding::Encoded(())
     }
 
@@ -5988,7 +6262,9 @@ impl Enc<'_> {
         // The result's holder: locals for a value that flattens without
         // variant slots, an address for anything else. A match whose arms
         // are statements has none (ADR-0051).
-        let (st, ptr, holder) = match self.held.get(&scrutinee).cloned() {
+        // A box is matched by its cell (ADR-0202).
+        let scrutinee_held = self.held.get(&scrutinee).cloned().map(|h| self.unboxed(h));
+        let (st, ptr, holder) = match scrutinee_held {
             Some(Held::Memory { ty: st, ptr }) => (st, ptr, self.match_holder(result, ty)),
             Some(Held::Flat { ty: st, locals }) => {
                 let holder = self.match_holder(result, ty);
@@ -6462,22 +6738,22 @@ fn encode_graph(
     if let Some(t) = layout.tag {
         ops.extend([I::LocalGet(node), load_tag(t, 0), I::LocalSet(tag)]);
     }
-    for (case, offset) in &layout.slots {
-        let mut body = vec![
-            I::LocalGet(node),
-            I::I32Load(word(*offset)),
-            I::LocalSet(src),
-            I::LocalGet(node),
-            I::I32Load(word(offset + 4)),
-            I::LocalSet(k),
-            // Room for `k` more nodes, and their indices.
+    let byte = |offset: u64| MemArg {
+        offset,
+        align: 0,
+        memory_index: 0,
+    };
+    // Room for `k` more nodes, and their indices: both grown to the larger
+    // of twice as many and as many as needed, within what one region holds,
+    // and `node` found again in the grown nodes.
+    let grow = || {
+        let mut v = vec![
             I::LocalGet(n),
             I::LocalGet(k),
             I::I32Add,
             I::LocalGet(cap),
             I::I32GtU,
             I::If(Empty),
-            // grown = max(cap * 2, n + k), within what one region holds.
             I::LocalGet(cap),
             I::I32Const(1),
             I::I32Shl,
@@ -6497,12 +6773,12 @@ fn encode_graph(
             I::Unreachable,
             I::End,
         ];
-        body.extend(alloc(grown, size, layout.align as i32, tmp));
-        body.extend([I::LocalGet(tmp), I::LocalGet(nodes), I::LocalGet(n)]);
-        body.extend([I::I32Const(size), I::I32Mul, copy.clone()]);
-        body.extend([I::LocalGet(tmp), I::LocalSet(nodes)]);
-        body.extend(alloc(grown, 4, 4, tmp));
-        body.extend([
+        v.extend(alloc(grown, size, layout.align as i32, tmp));
+        v.extend([I::LocalGet(tmp), I::LocalGet(nodes), I::LocalGet(n)]);
+        v.extend([I::I32Const(size), I::I32Mul, copy.clone()]);
+        v.extend([I::LocalGet(tmp), I::LocalSet(nodes)]);
+        v.extend(alloc(grown, 4, 4, tmp));
+        v.extend([
             I::LocalGet(tmp),
             I::LocalGet(idx),
             I::LocalGet(n),
@@ -6516,17 +6792,63 @@ fn encode_graph(
             I::LocalGet(grown),
             I::LocalSet(cap),
         ]);
-        body.extend(address(nodes, i, size));
-        body.extend([I::LocalSet(node), I::End]);
-        // The children, after the nodes so far.
-        body.extend(address(nodes, n, size));
+        v.extend(address(nodes, i, size));
+        v.extend([I::LocalSet(node), I::End]);
+        v
+    };
+    // `k` children from a list at `offset` in the node, made a run of
+    // indices: copied after the nodes so far, as one run of cells, or, a
+    // list of boxes, each from its cell (ADR-0202).
+    let list = |offset: u64, boxes: bool| {
+        let mut body = vec![
+            I::LocalGet(node),
+            I::I32Load(word(offset)),
+            I::LocalSet(src),
+            I::LocalGet(node),
+            I::I32Load(word(offset + 4)),
+            I::LocalSet(k),
+        ];
+        body.extend(grow());
+        if boxes {
+            body.extend([
+                I::I32Const(0),
+                I::LocalSet(j),
+                I::Block(Empty),
+                I::Loop(Empty),
+                I::LocalGet(j),
+                I::LocalGet(k),
+                I::I32GeU,
+                I::BrIf(1),
+                I::LocalGet(nodes),
+                I::LocalGet(n),
+                I::LocalGet(j),
+                I::I32Add,
+                I::I32Const(size),
+                I::I32Mul,
+                I::I32Add,
+                I::LocalGet(src),
+                I::LocalGet(j),
+                I::I32Const(4),
+                I::I32Mul,
+                I::I32Add,
+                I::I32Load(word(0)),
+                I::I32Const(size),
+                copy.clone(),
+            ]);
+            body.extend(increment(j));
+            body.extend([I::Br(0), I::End, I::End]);
+        } else {
+            body.extend(address(nodes, n, size));
+            body.extend([
+                I::LocalGet(src),
+                I::LocalGet(k),
+                I::I32Const(size),
+                I::I32Mul,
+                copy.clone(),
+            ]);
+        }
+        // Their indices: n, n + 1, .., at idx[n - 1 ..].
         body.extend([
-            I::LocalGet(src),
-            I::LocalGet(k),
-            I::I32Const(size),
-            I::I32Mul,
-            copy.clone(),
-            // Their indices: n, n + 1, .., at idx[n - 1 ..].
             I::I32Const(0),
             I::LocalSet(j),
             I::Block(Empty),
@@ -6563,12 +6885,50 @@ fn encode_graph(
             I::I32Const(4),
             I::I32Mul,
             I::I32Add,
-            I::I32Store(word(*offset)),
+            I::I32Store(word(offset)),
             I::LocalGet(n),
             I::LocalGet(k),
             I::I32Add,
             I::LocalSet(n),
         ]);
+        body
+    };
+    // One child from a box at `offset`: its cell copied after the nodes so
+    // far, and its index written where its address was (ADR-0202).
+    let one = |offset: u64| {
+        let mut body = vec![
+            I::LocalGet(node),
+            I::I32Load(word(offset)),
+            I::LocalSet(src),
+            I::I32Const(1),
+            I::LocalSet(k),
+        ];
+        body.extend(grow());
+        body.extend(address(nodes, n, size));
+        body.extend([
+            I::LocalGet(src),
+            I::I32Const(size),
+            copy.clone(),
+            I::LocalGet(node),
+            I::LocalGet(n),
+            I::I32Store(word(offset)),
+        ]);
+        body.extend(increment(n));
+        body
+    };
+    for (case, offset, kind) in &layout.slots {
+        let body = match kind {
+            SlotKind::Inline => list(*offset, false),
+            SlotKind::Boxes => list(*offset, true),
+            SlotKind::Box => one(*offset),
+            // An option of a box holds a child where it is `some`.
+            SlotKind::Option(payload) => {
+                let mut b = vec![I::LocalGet(node), I::I32Load8U(byte(*offset)), I::If(Empty)];
+                b.extend(one(offset + payload));
+                b.push(I::End);
+                b
+            }
+        };
         match case {
             Some(c) => {
                 ops.extend([
@@ -6647,10 +7007,26 @@ fn decode_graph(
     if let Some(t) = layout.tag {
         ops.extend([I::LocalGet(node), load_tag(t, 0), I::LocalSet(tag)]);
     }
-    for (case, offset) in &layout.slots {
+    let byte = |offset: u64| MemArg {
+        offset,
+        align: 0,
+        memory_index: 0,
+    };
+    // A child's cell: `nodes + at * size`.
+    let cell = |at: Vec<I<'static>>| {
+        let mut v = vec![I::LocalGet(nodes)];
+        v.extend(at);
+        v.extend([I::I32Const(size), I::I32Mul, I::I32Add]);
+        v
+    };
+    // `k` children's indices, a list at `offset` in the node, each
+    // continuing the run. A list of cells is made to point at its children,
+    // which in level order lie one after another; a list of boxes is made
+    // its children's addresses, each where its index was (ADR-0202).
+    let list = |offset: u64, boxes: bool| {
         let mut body = vec![
             I::LocalGet(node),
-            I::I32Load(word(*offset)),
+            I::I32Load(word(offset)),
             I::LocalSet(ptr),
             I::LocalGet(node),
             I::I32Load(word(offset + 4)),
@@ -6690,24 +7066,61 @@ fn decode_graph(
             I::I32Add,
             I::I32Ne,
         ]));
+        if boxes {
+            body.extend([
+                I::LocalGet(ptr),
+                I::LocalGet(j),
+                I::I32Const(4),
+                I::I32Mul,
+                I::I32Add,
+            ]);
+            body.extend(cell(vec![I::LocalGet(next), I::LocalGet(j), I::I32Add]));
+            body.push(I::I32Store(word(0)));
+        }
         body.extend(increment(j));
-        body.extend([
-            I::Br(0),
-            I::End,
-            I::End,
+        body.extend([I::Br(0), I::End, I::End]);
+        if !boxes {
             // The list, as its children: in level order, where they lie.
-            I::LocalGet(node),
-            I::LocalGet(nodes),
-            I::LocalGet(next),
-            I::I32Const(size),
-            I::I32Mul,
-            I::I32Add,
-            I::I32Store(word(*offset)),
+            body.push(I::LocalGet(node));
+            body.extend(cell(vec![I::LocalGet(next)]));
+            body.push(I::I32Store(word(offset)));
+        }
+        body.extend([
             I::LocalGet(next),
             I::LocalGet(k),
             I::I32Add,
             I::LocalSet(next),
         ]);
+        body
+    };
+    // One child's index, a box at `offset`: continuing the run, after its
+    // own node, and made its child's address (ADR-0202).
+    let one = |offset: u64| {
+        let mut body = trap_if(vec![I::LocalGet(next), I::LocalGet(i), I::I32LeU]);
+        body.extend(trap_if(vec![
+            I::LocalGet(node),
+            I::I32Load(word(offset)),
+            I::LocalGet(next),
+            I::I32Ne,
+        ]));
+        body.push(I::LocalGet(node));
+        body.extend(cell(vec![I::LocalGet(next)]));
+        body.push(I::I32Store(word(offset)));
+        body.extend(increment(next));
+        body
+    };
+    for (case, offset, kind) in &layout.slots {
+        let body = match kind {
+            SlotKind::Inline => list(*offset, false),
+            SlotKind::Boxes => list(*offset, true),
+            SlotKind::Box => one(*offset),
+            SlotKind::Option(payload) => {
+                let mut b = vec![I::LocalGet(node), I::I32Load8U(byte(*offset)), I::If(Empty)];
+                b.extend(one(offset + payload));
+                b.push(I::End);
+                b
+            }
+        };
         match case {
             Some(c) => {
                 ops.extend([

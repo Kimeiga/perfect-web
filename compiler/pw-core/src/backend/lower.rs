@@ -1432,19 +1432,8 @@ fn ty_resolved_with(
     if let Some(def) = ty.def_id() {
         // A type that contains itself through a list is laid out by its type
         // (ADR-0194): a list's elements are where it points. One that holds
-        // itself in place is refused by name here, where a type first meets
-        // the backend, until the backend boxes the value.
-        if crate::recursion::contains_itself_in_place(sigs, def) {
-            return Lowering::Unsupported {
-                construct: "a type that contains itself in place",
-                span: span.clone(),
-                reason: format!(
-                    "`{ty}` holds a value of its own type with no list between: a list's \
-                     elements are where it points, so a `List<{ty}>` field has a layout, and a \
-                     value held within its own type has none until the backend boxes it"
-                ),
-            };
-        }
+        // itself in place is boxed by the encoder (ADR-0202): its value is the
+        // address of its cell.
         // An instance, by its arguments (ADR-0062): `Box<Int>` is laid out
         // with an `Int` where `Box` declares its `T`.
         let mut args = Vec::new();

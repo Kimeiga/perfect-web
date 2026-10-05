@@ -157,9 +157,19 @@ type Json =
     | Array(List<Json>)
     | Keyed(String, List<Json>)
 
+type Node = Node { value: Int, next: Option<Node> }
+
+type Expr =
+    | Num(Int)
+    | Add(Expr, Expr)
+
 public query Thread() -> Comment { Comment { text: "a", replies: [] } }
 
 public query Value() -> Json { Json.Null }
+
+public query Chain() -> Node { Node { value: 1, next: None } }
+
+public query Sum() -> Expr { Expr.Add(Expr.Num(1), Expr.Num(2)) }
 "#;
 
 #[test]
@@ -171,6 +181,10 @@ fn a_type_that_contains_itself_crosses_as_its_nodes() {
         "type m-json = list<m-json-node>;",
         "variant m-json-node {\n            null,\n            num(f64),\n            array(list<u32>),\n            keyed(tuple<string, list<u32>>),\n        }",
         "/// `m.Comment` contains itself, so it crosses as its nodes: node 0 is the",
+        // Held in place, boxed (ADR-0202): one index, or an optional one.
+        "type m-node = list<m-node-node>;",
+        "record m-node-node {\n            value: s64,\n            next: option<u32>,\n        }",
+        "variant m-expr-node {\n            num(s64),\n            add(tuple<u32, u32>),\n        }",
     ] {
         assert!(text.contains(expected), "missing {expected:?} in:\n{text}");
     }
@@ -185,9 +199,14 @@ fn a_type_that_contains_itself_crosses_as_its_nodes() {
 fn a_type_that_contains_itself_otherwise_crosses_no_boundary_yet() {
     for (what, types, needle) in [
         (
-            "in place",
-            "type Chain =\n    | End\n    | Link(Int, Chain)\n",
-            "holds itself in place",
+            "an option of a list of it",
+            "type T = T { kids: Option<List<T>> }\n",
+            "holds itself as `Option<List<",
+        ),
+        (
+            "in place, through another declaration",
+            "type A = A { b: Option<B> }\n\ntype B = B { a: A }\n",
+            "holds itself as `Option<",
         ),
         (
             "through another declaration",
@@ -212,7 +231,7 @@ fn a_type_that_contains_itself_otherwise_crosses_no_boundary_yet() {
             .expect("a name");
         let refused_name = match what {
             "holding another type that contains itself" => "T",
-            "through another declaration" => "A",
+            "through another declaration" | "in place, through another declaration" => "A",
             _ => first,
         };
         let program = format!(
@@ -228,8 +247,10 @@ fn a_type_that_contains_itself_otherwise_crosses_no_boundary_yet() {
 }
 
 #[test]
-fn a_type_that_contains_itself_in_place_is_refused_by_the_backend_by_name() {
-    // Never in a signature, so the world is whole; the body holds one.
+fn a_type_that_contains_itself_in_place_is_compiled_boxed() {
+    // Never in a signature, so the world is whole; the body holds one, each
+    // value of it the address of its cell (ADR-0202). Until ADR-0202 the
+    // lowering refused it by name.
     let program = "module m\n\ntype Chain =\n    | End\n    | Link(Int, Chain)\n\nfn length(c: Chain) -> Int {\n    match c {\n        End => 0,\n        Link(_, rest) => 1 + length(rest),\n    }\n}\n\npublic query Two() -> Int { length(Chain.Link(1, Chain.Link(2, Chain.End))) }\n";
     let units: Vec<pw_core::check::Unit> = sources(program)
         .into_iter()
@@ -239,13 +260,9 @@ fn a_type_that_contains_itself_in_place_is_refused_by_the_backend_by_name() {
             src,
         })
         .collect();
-    let err = pw_core::backend::component::compile(&units, "m.Two")
-        .map(|_| ())
-        .expect_err("refused");
-    assert!(
-        err.contains("a type that contains itself in place") && err.contains("no list between"),
-        "{err}"
-    );
+    if let Err(err) = pw_core::backend::component::compile(&units, "m.Two") {
+        panic!("{err}");
+    }
 }
 
 #[test]

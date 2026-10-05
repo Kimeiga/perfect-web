@@ -1305,19 +1305,33 @@ pub mod engine {
         pub const NESTED_DEPTH: usize = 128;
 
         /// Where a node holds its children: each field (or case payload, or a
-        /// payload tuple's element) that is a `list<u32>`.
+        /// payload tuple's element) that holds indices, and how many.
         #[derive(Debug, Clone, PartialEq)]
         enum Slot {
             /// A record's field, by name.
-            Field(String),
+            Field(String, Kind),
             /// A case's payload, by the case's name.
-            Payload(String),
+            Payload(String, Kind),
             /// An element of a case's payload tuple.
-            Element(String, usize),
+            Element(String, usize, Kind),
         }
 
-        fn is_indices(ty: &Type) -> bool {
-            matches!(ty, Type::List(l) if l.ty() == Type::U32)
+        /// How many children a slot holds: a `list<u32>` any number, a `u32`
+        /// one, held in place, and an `option<u32>` one or none (ADR-0202).
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        enum Kind {
+            List,
+            One,
+            Maybe,
+        }
+
+        fn indices(ty: &Type) -> Option<Kind> {
+            match ty {
+                Type::List(l) if l.ty() == Type::U32 => Some(Kind::List),
+                Type::Option(o) if o.ty() == Type::U32 => Some(Kind::Maybe),
+                Type::U32 => Some(Kind::One),
+                _ => None,
+            }
         }
 
         /// **The node type, when `ty` is a type that contains itself, as
@@ -1332,25 +1346,27 @@ pub mod engine {
             match &node {
                 Type::Record(r) => {
                     for f in r.fields() {
-                        if is_indices(&f.ty) {
-                            slots.push(Slot::Field(f.name.to_string()));
+                        if let Some(k) = indices(&f.ty) {
+                            slots.push(Slot::Field(f.name.to_string(), k));
                         }
                     }
                 }
                 Type::Variant(v) => {
                     for c in v.cases() {
                         match &c.ty {
-                            Some(t) if is_indices(t) => {
-                                slots.push(Slot::Payload(c.name.to_string()))
-                            }
                             Some(Type::Tuple(t)) => {
                                 for (i, e) in t.types().enumerate() {
-                                    if is_indices(&e) {
-                                        slots.push(Slot::Element(c.name.to_string(), i));
+                                    if let Some(k) = indices(&e) {
+                                        slots.push(Slot::Element(c.name.to_string(), i, k));
                                     }
                                 }
                             }
-                            _ => {}
+                            Some(t) => {
+                                if let Some(k) = indices(t) {
+                                    slots.push(Slot::Payload(c.name.to_string(), k));
+                                }
+                            }
+                            None => {}
                         }
                     }
                 }
@@ -1359,58 +1375,69 @@ pub mod engine {
             (!slots.is_empty()).then_some((node, slots))
         }
 
-        /// A node's lists of children, in the order the encoding reads them,
-        /// each taken out of the node.
+        /// The value at a slot of a node, where the node's case holds one.
+        fn at<'v>(node: &'v mut Val, slot: &Slot) -> Option<Option<&'v mut Val>> {
+            // Another case of a variant holds no children here.
+            if let (Slot::Payload(case, _) | Slot::Element(case, _, _), Val::Variant(name, _)) =
+                (slot, &*node)
+                && name != case
+            {
+                return None;
+            }
+            Some(match (slot, node) {
+                (Slot::Field(name, _), Val::Record(fields)) => {
+                    fields.iter_mut().find(|(n, _)| n == name).map(|(_, v)| v)
+                }
+                (Slot::Payload(..), Val::Variant(_, Some(p))) => Some(&mut **p),
+                (Slot::Element(_, i, _), Val::Variant(_, Some(p))) => match &mut **p {
+                    Val::Tuple(items) => items.get_mut(*i),
+                    _ => None,
+                },
+                _ => None,
+            })
+        }
+
+        fn kind(slot: &Slot) -> Kind {
+            match slot {
+                Slot::Field(_, k) | Slot::Payload(_, k) | Slot::Element(_, _, k) => *k,
+            }
+        }
+
+        /// A node's children, or their indices, in the order the encoding
+        /// reads them, each slot's taken out of the node: a list's items, a
+        /// box's one, an option's one or none.
         fn take_lists(node: &mut Val, slots: &[Slot]) -> Result<Vec<Vec<Val>>, String> {
             let mut out = Vec::new();
             for slot in slots {
-                let held = match (slot, &mut *node) {
-                    (Slot::Field(name), Val::Record(fields)) => {
-                        fields.iter_mut().find(|(n, _)| n == name).map(|(_, v)| v)
-                    }
-                    (Slot::Payload(case), Val::Variant(name, Some(p))) if name == case => {
-                        Some(&mut **p)
-                    }
-                    (Slot::Element(case, i), Val::Variant(name, Some(p))) if name == case => {
-                        match &mut **p {
-                            Val::Tuple(items) => items.get_mut(*i),
-                            _ => None,
-                        }
-                    }
-                    // Another case: it holds no children here.
-                    (Slot::Payload(_) | Slot::Element(..), Val::Variant(..)) => continue,
-                    _ => None,
+                let Some(held) = at(node, slot) else {
+                    continue;
                 };
-                let Some(Val::List(items)) = held else {
-                    return Err(format!("a node has no list of children at {slot:?}"));
+                let taken = match (kind(slot), held) {
+                    (Kind::List, Some(Val::List(items))) => std::mem::take(items),
+                    (Kind::One, Some(v)) => vec![std::mem::replace(v, Val::Bool(false))],
+                    (Kind::Maybe, Some(Val::Option(o))) => {
+                        o.take().map(|b| *b).into_iter().collect()
+                    }
+                    _ => return Err(format!("a node has no children at {slot:?}")),
                 };
-                out.push(std::mem::take(items));
+                out.push(taken);
             }
             Ok(out)
         }
 
-        /// Put each list back, in the order [`take_lists`] took them.
+        /// Put each slot's back, in the order [`take_lists`] took them.
         fn put_lists(node: &mut Val, slots: &[Slot], mut lists: Vec<Vec<Val>>) {
             lists.reverse();
             for slot in slots {
-                let held = match (slot, &mut *node) {
-                    (Slot::Field(name), Val::Record(fields)) => {
-                        fields.iter_mut().find(|(n, _)| n == name).map(|(_, v)| v)
-                    }
-                    (Slot::Payload(case), Val::Variant(name, Some(p))) if name == case => {
-                        Some(&mut **p)
-                    }
-                    (Slot::Element(case, i), Val::Variant(name, Some(p))) if name == case => {
-                        match &mut **p {
-                            Val::Tuple(items) => items.get_mut(*i),
-                            _ => None,
-                        }
-                    }
-                    _ => None,
+                let Some(Some(held)) = at(node, slot) else {
+                    continue;
                 };
-                if let Some(v) = held {
-                    *v = Val::List(lists.pop().unwrap_or_default());
-                }
+                let mut values = lists.pop().unwrap_or_default();
+                *held = match kind(slot) {
+                    Kind::List => Val::List(values),
+                    Kind::One => values.pop().unwrap_or(Val::Bool(false)),
+                    Kind::Maybe => Val::Option(values.pop().map(Box::new)),
+                };
             }
         }
 

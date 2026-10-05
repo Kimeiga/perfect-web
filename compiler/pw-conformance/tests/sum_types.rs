@@ -595,12 +595,23 @@ fn a_union_of_one_case_is_a_variant() {
 }
 
 #[test]
-fn a_type_that_contains_itself_is_refused_by_name() {
-    let err = refused(
-        "module m\n\ntype Chain =\n    | End\n    | Link(Int, Chain)\n\npublic query Length(c: Chain) -> Int {\n    match c {\n        End => 0,\n        Link(_, rest) => 1,\n    }\n}\n",
-        "m.Length",
-    );
-    assert!(err.contains("a type that contains itself"), "{err}");
+fn a_sum_type_that_holds_itself_in_place_is_built() {
+    // Refused by name until ADR-0202 boxed it: each value of `Chain` is the
+    // address of its cell, and it crosses as its nodes.
+    let program = "module m\n\ntype Chain =\n    | End\n    | Link(Int, Chain)\n\nfn length(c: Chain) -> Int {\n    match c {\n        End => 0,\n        Link(_, rest) => 1 + length(rest),\n    }\n}\n\npublic query Length(c: Chain) -> Int { length(c) }\n";
+    let length = Runnable::new(compile(&units(&[("m.pw", program)]), "m.Length"));
+    for n in 0..12 {
+        let chain = (0..n).fold(Val::Variant("end".into(), None), |rest, k| {
+            Val::Variant(
+                "link".into(),
+                Some(Box::new(Val::Tuple(vec![Val::S64(k), rest]))),
+            )
+        });
+        assert_eq!(
+            length.call_untangled(&BTreeMap::new(), &[chain]),
+            Ok(vec![Val::S64(n)])
+        );
+    }
 }
 
 #[test]

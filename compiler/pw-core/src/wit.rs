@@ -1062,24 +1062,23 @@ fn render_graph(
         ty: name.to_string(),
         why,
     })?;
-    let slot = |ty: &TypeResolution| {
-        ty.resolved().is_some_and(|t| {
-            t.as_builtin() == Some(Builtin::List)
-                && t.args().first().is_some_and(|e| e.def_id() == Some(id))
-        })
-    };
+    // Each part that holds the type holds node indices (ADR-0194, ADR-0202).
     let field = |ty: &TypeResolution| -> Result<String, WitError> {
-        match slot(ty) {
-            true => Ok("list<u32>".to_string()),
-            false => wit_type(ty, types, name),
+        use crate::recursion::Slot;
+        match ty.resolved().and_then(|t| crate::recursion::slot_of(t, id)) {
+            Some(Slot::List) => Ok("list<u32>".to_string()),
+            Some(Slot::Box) => Ok("u32".to_string()),
+            Some(Slot::Option) => Ok("option<u32>".to_string()),
+            None => wit_type(ty, types, name),
         }
     };
     let me = escaped(&ident(name));
     let node = escaped(&ident(&node_name(name)));
     let mut out = format!(
         "    /// `{name}` contains itself, so it crosses as its nodes: node 0 is the\n    \
-         /// value, and each `list<u32>` holds a node's children's indices, which\n    \
-         /// continue the indices the nodes before it hold, in level order.\n    \
+         /// value, and each `list<u32>`, `u32` or `option<u32>` holds a node's\n    \
+         /// children's indices, which continue the indices the nodes before it\n    \
+         /// hold, in level order.\n    \
          type {me} = list<{node}>;\n"
     );
     if let TypeDef::Alias { .. } = def {

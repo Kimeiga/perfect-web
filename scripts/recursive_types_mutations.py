@@ -3,7 +3,6 @@
 crosses a component boundary as its nodes.
 
 Each mutant undoes one piece:
-- the lowering refuses every type that contains itself again;
 - the checker's rules for which types have a value, and which hold
   themselves in place;
 - the component's private layout: a list waiting for its element, and a
@@ -21,6 +20,7 @@ Every mutant must fail the tests of a type that contains itself.
 
 Run from the repository root; `just e14-recursive-types` records the output.
 The source is restored after every mutant, whatever happens.
+Three controls were retired by ADR-0202, with their reason, below.
 """
 
 import os
@@ -41,24 +41,12 @@ HOST = ROOT / "runtime/pw-host/src/lib.rs"
 
 # (what, file, anchor, replacement)
 MUTANTS = [
-    (
-        "every type that contains itself is refused again",
-        LOWER,
-        "        if crate::recursion::contains_itself_in_place(sigs, def) {\n",
-        "        if crate::recursion::contains_itself(sigs, def) {\n",
-    ),
-    (
-        "a type that holds itself in place reaches the backend",
-        LOWER,
-        "        if crate::recursion::contains_itself_in_place(sigs, def) {\n",
-        "        if false && crate::recursion::contains_itself_in_place(sigs, def) {\n",
-    ),
-    (
-        "a type that holds itself in place is written as its nodes",
-        RECURSION,
-        "    if contains_itself_in_place(sigs, def) {\n        return Err(format!(\n",
-        "    if false && contains_itself_in_place(sigs, def) {\n        return Err(format!(\n",
-    ),
+    # Retired by ADR-0202: "every type that contains itself is refused
+    # again", "a type that holds itself in place reaches the backend" and "a
+    # type that holds itself in place is written as its nodes". The lowering
+    # and the WIT refused a type held in place by name; ADR-0202 boxes it, so
+    # it reaches the backend and is written as its nodes by design, and
+    # `boxed_types_mutations.py` controls how.
     (
         "a result needs both its sides to have a value",
         RECURSION,
@@ -131,9 +119,10 @@ MUTANTS = [
     ),
     (
         "a node's list of children is written as a list of the type",
+        # Re-anchored by ADR-0202: a slot is one of three kinds.
         WIT,
-        '            true => Ok("list<u32>".to_string()),\n',
-        '            true => Ok("list<u64>".to_string()),\n',
+        '            Some(Slot::List) => Ok("list<u32>".to_string()),\n',
+        '            Some(Slot::List) => Ok("list<u64>".to_string()),\n',
     ),
     (
         "the browser's wire writes such a value out by its shape",

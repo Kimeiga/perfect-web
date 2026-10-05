@@ -1737,3 +1737,11 @@ a case written alone is the case of the type expected where it is written
   comparison's other side, a list's element, and through branches and arms.
 - The typer decides it once and owns PW0022 for it; the backend asks the
   same function, so it builds the case the checker typed.
+[ADR-0202](DECISIONS/ADR-0202-a-type-that-holds-itself-in-place-is-boxed.md):
+a type that holds itself in place is boxed, and crosses as its nodes.
+- `next: Option<Node>` and `Add(Expr, Expr)` compile: each value of such a
+  type is the address of its cell, a `u32` of its own in the private
+  layout, built, read and matched through the cell. The IR is unchanged.
+- At a boundary a node's slot is a `u32` for a box and an `option<u32>` for
+  an option of one, beside ADR-0194's `list<u32>`, in the same level order,
+  encoded and decoded in place without recursion.

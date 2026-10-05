@@ -2613,6 +2613,27 @@ e14-orders:
      } > docs/evidence/E14/orders.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/orders.txt
 
+# ADR-0202: a type that holds itself in place is boxed, and crosses as its
+# nodes. The WIT and the lowering, the components through the E8 host, the
+# JavaScript modules, and the mutation controls.
+e14-boxed-types:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0202 - a type that holds itself in place is boxed, and crosses as its nodes"; echo; \
+       echo "produced by: just e14-boxed-types"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the WIT, the refusals and the lowering (compiler/pw-core/tests/recursive_types.rs)"; echo; \
+       cargo test --locked -p pw-core --test recursive_types 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== components through the E8 host (compiler/pw-conformance/tests/boxed_types.rs, recursive_types.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test boxed_types -- --test-threads=1 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-conformance --test recursive_types -- --test-threads=1 2>&1 | grep -E '^test result'; \
+       echo; echo "== the JavaScript modules, against their components under Node (compiler/pw-conformance/tests/javascript.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test javascript a_type_that_holds_itself -- --nocapture 2>&1 | grep -E '^javascript:|^test result'; \
+       echo; echo "== mutation controls (scripts/boxed_types_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/boxed_types_mutations.py; \
+     } > docs/evidence/E14/boxed-types.txt
+    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E14/boxed-types.txt
+
 # ADR-0201 (ADR-0195's ruling 5): a case written alone is the case of the
 # type expected where it is written. Its tests, the components and the
 # JavaScript modules, and the mutation controls.
