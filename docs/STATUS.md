@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `2cbd5d8`, with ADR-0205 and ADR-0206.
+**Reviewed:** 2026-10-05, against master `63ce91d`, with ADR-0207 and ADR-0208.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2813,6 +2813,19 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`63ce91d` (2026-10-05, ADR-0207 and ADR-0208): `just ci` passes locally, the
+workspace's 2012 tests pass, and the browser suite passes 728 in three
+engines, with 13 skipped. ADR-0207's evidence is
+`docs/evidence/E14/data-sources.txt`, recorded at that commit: its 9 tests,
+the store checked with its source, and 17 of 17 mutants killed. ADR-0208's
+is `command-events.txt`, at that commit: the command's component, the
+outbox's values, the server's 3 tests, the store's artifacts as the compiler
+emits them, and 4 of 4 mutants killed; `E10/committed-events.txt` records
+the same controls, ADR-0104's four of the server's evaluation retired.
+**Correction:** at `558e35b` one of them survived, `CartChanged` committed
+whatever the command computed; ADR-0208 had deleted the half of ADR-0104's
+test that killed it. `63ce91d` restores it, building the store with
+`add_to_cart`'s `emits` removed.
 `2cbd5d8` (2026-10-05, ADR-0205 and ADR-0206): `just ci` passes locally, the
 workspace's 1997 tests pass, and the browser suite passes 728 in three
 engines, with 13 skipped. ADR-0205's evidence is
