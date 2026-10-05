@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `9e53158`, with ADR-0193.
+**Reviewed:** 2026-10-05, against master `712546f`, with ADR-0195.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2645,13 +2645,20 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`9e53158` (2026-10-04, ADR-0193): `just ci` passes locally, the workspace's
-1904 tests pass, and the browser suite passes 710 in three engines, with 13
-skipped. Its evidence is `docs/evidence/E14/orders.txt`, recorded at that
-commit: an order placed from the cart and followed on its page as the store
-moves it along, in three engines with its audit, and 7 of 7 mutants killed.
-Recorded again at that commit, as its spec changed: `accessibility.txt` 14
-of 14. ADR-0192's is `home.txt`, at `ee7bede`: the home page at `/`, in three engines with its audit, and 2 of 2
+`712546f` (2026-10-05, ADR-0195, ADR-0194): `just ci` passes locally, the
+workspace's 1922 tests pass, and the browser suite passes 710 in three
+engines, with 13 skipped. ADR-0194's evidence is
+`docs/evidence/E14/recursive-types.txt`, recorded at that commit: the
+checker's, the WIT's and the lowering's 7 tests, the components' 10 through
+the E8 host, five queries over trees agreeing with their JavaScript modules
+on 1,000 calls, the corpus at C13, and 21 of 21 mutants killed. Recorded
+again at that commit, as their mutants were re-anchored or retired:
+`descriptions.txt` 8 of 8, `E10/wit-names.txt` 5 of 5 and
+`E10/sum-types.txt` 19 of 19. ADR-0195 records rulings and has no evidence
+of its own. ADR-0193's is `orders.txt`, at `9e53158`: an order placed from
+the cart and followed on its page as the store moves it along, in three
+engines with its audit, and 7 of 7 mutants killed, and `accessibility.txt`
+recorded again at that commit, 14 of 14. ADR-0192's is `home.txt`, at `ee7bede`: the home page at `/`, in three engines with its audit, and 2 of 2
 mutants killed. Recorded again at that commit, as their specs or tests
 changed: `stable-layout.txt` 6 of 6, `titles.txt` 16 of 16 and
 `accessibility.txt` 14 of 14. ADR-0191's is `page-speculation.txt`, at

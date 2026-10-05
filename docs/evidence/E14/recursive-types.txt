@@ -1,0 +1,76 @@
+ADR-0194 - a type that contains itself compiles, and crosses as its nodes
+
+produced by: just e14-recursive-types
+commit: 712546f48a0ab4209e08f71d9b021931b2b5ea8b
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+
+== the checker, the WIT and the lowering (compiler/pw-core/tests/recursive_types.rs)
+
+test an_invariant_inside_a_tree_holds_at_every_node ... ok
+test a_type_that_contains_itself_crosses_as_its_nodes ... ok
+test a_type_that_contains_itself_in_place_is_refused_by_the_backend_by_name ... ok
+test a_type_that_contains_itself_otherwise_crosses_no_boundary_yet ... ok
+test a_value_of_a_type_that_contains_itself_is_not_put_on_the_browsers_wire_yet ... ok
+test a_type_no_finite_value_has_is_refused_where_it_is_declared ... ok
+test a_type_that_can_be_built_without_itself_is_not ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+== components through the E8 host (compiler/pw-conformance/tests/recursive_types.rs)
+
+test a_chain_deeper_than_any_stack_crosses_both_ways ... ok
+test a_host_answers_with_a_tree_and_is_given_one ... ok
+test a_sum_type_that_contains_itself_crosses_both_ways ... ok
+test a_tree_crosses_as_its_nodes_in_level_order_and_back_unchanged ... ok
+test a_tree_is_built_and_walked_in_the_component ... ok
+test a_tree_is_rebuilt_in_the_component ... ok
+test a_value_as_deep_as_a_host_nests_stays_within_half_a_thread_stack ... ok
+test nodes_that_are_not_one_tree_in_level_order_trap ... ok
+test trees_held_by_other_types_cross_both_ways ... ok
+test two_types_that_hold_each_other_through_a_list_compile_inside_a_component ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.65s
+
+== the JavaScript modules, against their components under Node (compiler/pw-conformance/tests/javascript.rs)
+
+javascript: 5 queries over trees, 1000 calls, component and module agree (155 trapped in both)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 1.01s
+
+== the corpus at C13 (corpus-check, generality.rs, checking_source.rs)
+
+accepted: 29 files
+accepted: 29/29 charter §16 categories covered
+rejected: 54 files
+rejected: 54/54 charter §16 categories covered
+corpus-check: OK
+test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
+test every_rejected_fixture_emits_only_its_own_defect ... ok
+test every_diagnostic_carries_what_charter_16_3_requires ... ok
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.81s
+test generality_is_reported_separately_from_conformance ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.69s
+
+== mutation controls (scripts/recursive_types_mutations.py)
+
+baseline: 17 passed, 0 failed
+every type that contains itself is refused again: KILLED (11 of 17 tests fail)
+a type that holds itself in place reaches the backend: KILLED (1 of 17 tests fail)
+a type that holds itself in place is written as its nodes: KILLED (1 of 17 tests fail)
+a result needs both its sides to have a value: KILLED (1 of 17 tests fail)
+a list holds its elements in place: KILLED (13 of 17 tests fail)
+a list waiting for its element never gets it: KILLED (10 of 17 tests fail)
+a type that contains itself takes the world's layout: KILLED (8 of 17 tests fail)
+a world's type never holds a node index: KILLED (8 of 17 tests fail)
+an export's parameter stays its nodes: KILLED (7 of 17 tests fail)
+a host's answer stays its nodes: KILLED (1 of 17 tests fail)
+the encoder numbers each list's children from zero: KILLED (6 of 17 tests fail)
+the decoder lets a node hold one at or before itself: KILLED (1 of 17 tests fail)
+the decoder takes any index as the run's next: KILLED (1 of 17 tests fail)
+the decoder takes nodes no list holds: KILLED (1 of 17 tests fail)
+a node's list of children is written as a list of the type: KILLED (10 of 17 tests fail)
+the browser's wire writes such a value out by its shape: KILLED (1 of 11 tests fail)
+an invariant inside a tree is checked at its root alone: KILLED (1 of 17 tests fail)
+the host passes a nested argument as it is: KILLED (6 of 17 tests fail)
+a data layer is given nodes: KILLED (1 of 17 tests fail)
+a data layer's nested answer is read as it is: KILLED (1 of 17 tests fail)
+a host nests a value of any depth: KILLED (1 of 8 tests fail)
+21 of 21 mutants killed

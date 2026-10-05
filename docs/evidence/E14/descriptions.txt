@@ -1,43 +1,43 @@
 ADR-0166 - the store and its items say what they are
 
 produced by: just e14-descriptions
-commit: 7e18799d9a515ad4b0be47011dc95fd36234d1d9
+commit: 712546f48a0ab4209e08f71d9b021931b2b5ea8b
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
 == a host's answer, read through the declared type (runtime/pw-host/tests/host_answers.rs)
 
+test a_field_the_type_declares_and_the_answer_lacks_is_refused ... ok
 test an_answer_as_the_type_declares_it_is_passed_as_it_is ... ok
 test a_field_in_another_order_is_read_by_its_name ... ok
 test a_field_the_type_does_not_declare_is_not_passed_in ... ok
-test a_field_the_type_declares_and_the_answer_lacks_is_refused ... ok
 test a_list_s_rows_and_a_declared_error_are_read_through_their_types ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
 
 == the store checks
 
-pw check: 50 file(s), no diagnostics
+pw check: 51 file(s), no diagnostics
 
 == the development server (pw-dev-server), the benchmark's store among its tests
 
 test tests::the_store_and_each_item_say_what_they_are ... ok
-test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.67s
+test result: ok. 117 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.30s
 
 == the slots, three engines, WebKit painting the store before them (e2e/slots.spec.mjs)
 
-  15 passed (24.7s)
+  18 passed (32.9s)
 
 == mutation controls (scripts/descriptions_mutations.py)
 
-baseline (engine): 83 passed, 0 failed
-baseline (server): 78 passed, 0 failed
-baseline (webkit): 5 passed, 0 failed
-a host's answer is passed as it is [engine]: KILLED (35 of 83 tests fail)
-a field the type does not declare is passed in [engine]: KILLED (33 of 83 tests fail)
-a field the answer lacks is filled with nothing [engine]: KILLED (1 of 83 tests fail)
-a list's rows are passed as they are [engine]: KILLED (32 of 83 tests fail)
-a result's value is passed as it is [engine]: KILLED (35 of 83 tests fail)
-the store's page does not say what the store is [server]: KILLED (1 of 78 tests fail)
-the store's page does not say what each item is [server]: KILLED (1 of 78 tests fail)
+baseline (engine): 122 passed, 0 failed
+baseline (server): 117 passed, 0 failed
+baseline (webkit): 6 passed, 0 failed
+a host's answer is passed as it is [engine]: KILLED (40 of 122 tests fail)
+a field the type does not declare is passed in [engine]: KILLED (38 of 122 tests fail)
+a field the answer lacks is filled with nothing [engine]: KILLED (1 of 122 tests fail)
+a list's rows are passed as they are [engine]: KILLED (35 of 122 tests fail)
+a result's value is passed as it is [engine]: KILLED (40 of 122 tests fail)
+the store's page does not say what the store is [server]: KILLED (1 of 117 tests fail)
+the store's page does not say what each item is [server]: KILLED (4 of 117 tests fail)
 the store says too little for WebKit to paint it before its slots [webkit]: KILLED (1 of 2 tests fail)
 8 of 8 mutants killed
