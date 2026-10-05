@@ -99,9 +99,10 @@ fn a_command_named_as_a_handler_is_compiled_as_the_lambda_that_calls_it() {
         ),
         "{compiled:?}"
     );
-    // Its lambda form compiles to the same behaviour.
+    // Its lambda form compiles to the same module, but for its identity.
     let lambda = program("", "() => clear()");
     assert_eq!(reported(&lambda), Vec::<String>::new());
+    assert_eq!(module_of(&src), module_of(&lambda));
 }
 
 #[test]
@@ -230,26 +231,48 @@ fn a_named_handlers_identity_is_what_its_name_resolves_to() {
     assert_ne!(a, b);
 }
 
+/// The one module `t.P`'s handler compiles to, its identity written `ID`.
+fn module_of(src: &str) -> String {
+    let compiled = pw_core::backend::js::compile(&units(src)).expect("checks");
+    let modules: Vec<String> = compiled
+        .iter()
+        .filter(|c| c.declaration == "t.P")
+        .filter_map(|c| match &c.module {
+            pw_core::backend::wasm::Encoding::Encoded(m) => {
+                Some(m.source.replace(&m.identity, "ID"))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(modules.len(), 1, "{modules:?}");
+    modules[0].clone()
+}
+
 #[test]
 fn a_named_handler_is_given_its_event() {
     // `on:input={rename}` is `(e) => rename(e)`: the command is sent the
-    // event.
-    let src = "module t\n\nimport events.{ InputEvent }\n\n\
-               opaque type InteractionId = String\n\n\
-               command rename(e: InputEvent) -> Int\n    requires      SignedIn\n    \
-               idempotent_by InteractionId\n{\n    1\n}\n\n\
-               page P() {\n    cache private\n\n    \
-               view {\n        <main><input aria-label=\"Name\" on:input={rename} /></main>\n    }\n}\n";
-    assert_eq!(reported(src), Vec::<String>::new());
-    let b = pw_core::build::build(&units(src)).expect("builds");
-    assert!(b.refusals().is_empty(), "{:?}", b.refusals());
+    // event, and the module is the lambda form's, but for its identity.
+    let src = |handler: &str| {
+        format!(
+            "module t\n\nimport events.{{ InputEvent }}\n\n\
+             opaque type InteractionId = String\n\n\
+             command rename(e: InputEvent) -> Int\n    requires      SignedIn\n    \
+             idempotent_by InteractionId\n{{\n    1\n}}\n\n\
+             page P() {{\n    cache private\n\n    \
+             view {{\n        <main><input aria-label=\"Name\" on:input={{{handler}}} /></main>\n    }}\n}}\n"
+        )
+    };
+    assert_eq!(reported(&src("rename")), Vec::<String>::new());
+    let named = module_of(&src("rename"));
+    assert_eq!(named, module_of(&src("(e) => rename(e)")));
     assert!(
-        b.handlers.iter().any(|h| matches!(
-            &h.module,
-            pw_core::backend::wasm::Encoding::Encoded(m) if m.commands.iter().any(|c| c.ends_with("rename"))
-        )),
-        "a module that sends `rename`"
+        named.contains(
+            "context.command(\"t.rename\", [((o) => ({ \"value\": o[\"value\"] }))(v0)])"
+        ),
+        "{named}"
     );
+    let b = pw_core::build::build(&units(&src("rename"))).expect("builds");
+    assert!(b.refusals().is_empty(), "{:?}", b.refusals());
 }
 
 #[test]
@@ -263,6 +286,10 @@ fn a_name_that_is_no_function_or_command_is_refused_when_checked() {
         (program("", "P"), "`P`, a page"),
         (program("", "InteractionId"), "`InteractionId`, a type"),
         (program("", "Some"), "`Some`, a case"),
+        (
+            program("query Menu() -> List<Int> {\n    [1]\n}", "Menu"),
+            "`Menu`, a query",
+        ),
     ] {
         let found = reported(&src);
         assert_eq!(found.len(), 1, "{what}: {found:?}");

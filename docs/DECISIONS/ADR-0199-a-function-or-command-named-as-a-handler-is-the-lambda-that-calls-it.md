@@ -88,13 +88,15 @@ remainder of ADR-0195's ruling 12. Date: 2026-10-05. Milestone: E14.
 ## Acceptance
 
 - **`compiler/pw-core/tests/named_handlers.rs`**, 10 tests:
-  - a command named as a handler compiles, and sends it;
+  - a command named as a handler compiles to its lambda form's module, but
+    for its identity, and sends it;
   - it is held to PW0618, PW0338 and PW0602;
   - a function that changes nothing is refused, as its lambda form is;
   - it builds with an identity and a module;
   - its identity follows what its name resolves to;
-  - it is given its event;
-  - a local, a page, a type and a case are each refused when checked, once;
+  - it is given its event: its module is `(e) => rename(e)`'s;
+  - a local, a page, a type, a case and a query are each refused when
+    checked, once;
   - a local that shadows a command is refused as a local;
   - the event is checked through a module's path;
   - its name is its lambda form's.
