@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `712546f`, with ADR-0195.
+**Reviewed:** 2026-10-05, against master `6985f81`, with ADR-0197.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2671,9 +2671,20 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`712546f` (2026-10-05, ADR-0195, ADR-0194): `just ci` passes locally, the
-workspace's 1922 tests pass, and the browser suite passes 710 in three
-engines, with 13 skipped. ADR-0194's evidence is
+`6985f81` (2026-10-05, ADR-0197, ADR-0196): `just ci` passes locally, the
+workspace's 1928 tests pass, and the browser suite passes 710 in three
+engines, with 13 skipped. ADR-0196's evidence is
+`docs/evidence/E14/reserved-words.txt`, recorded at that commit: the parser's
+test of every reserved word and its repair, every program checking as
+before, and 6 of 6 mutants killed. ADR-0197's is `case-names.txt`, at that
+commit: its 6 tests and the sum types' 11, the compiled patterns, the corpus
+at C14, and 5 of 5 mutants killed. Recorded again at that commit, as their
+mutants were re-anchored on lines ADR-0197 moved: `E10/match.txt` 14 of 14,
+`E10/keys-cover-reads.txt` 4 of 4, `E10/handler-captures.txt` 6 of 6,
+`E10/built-pages.txt` 3 of 3, `E10/template-sum-types.txt` 10 of 10,
+`E10/patterns.txt` 11 of 11, `E10/kiokun-mutants.txt` 11 of 11 and
+`E10/sum-types.txt` 19 of 19. ADR-0194's is at `712546f`, where `just ci`
+passed and the workspace's 1922 tests did: its evidence is
 `docs/evidence/E14/recursive-types.txt`, recorded at that commit: the
 checker's, the WIT's and the lowering's 7 tests, the components' 10 through
 the E8 host, five queries over trees agreeing with their JavaScript modules

@@ -1,0 +1,33 @@
+ADR-0196 - only a word that begins a statement or an expression is reserved
+
+produced by: just e14-reserved-words
+commit: 6985f81fcf605db4b9167008cf188417cc9ce3f5
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the parser (compiler/pw-syntax/src/grammar.rs)
+
+test grammar::tests::a_statement_keyword_cannot_name_a_value ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 77 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+== every program checks as before
+
+pw check: 43 file(s), no diagnostics
+pw check: 26 file(s), no diagnostics
+rejected: 56 files
+rejected: 56/56 charter §16 categories covered
+corpus-check: OK
+
+== mutation controls (scripts/reserved_words_mutations.py)
+
+baseline: 1 passed, 0 failed
+a word that begins an expression names a binding: KILLED (1 of 1 tests fail)
+a pattern's binding is not checked: KILLED (1 of 1 tests fail)
+`true` in a pattern is refused as a name: KILLED (1 of 1 tests fail)
+a declaration is refused a statement word: KILLED (1 of 1 tests fail)
+a function named by an expression word is accepted: KILLED (1 of 1 tests fail)
+the repair suggests no name: KILLED (1 of 1 tests fail)
+6 of 6 mutants killed
