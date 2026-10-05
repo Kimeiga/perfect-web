@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `f2060c6`, with ADR-0190.
+**Reviewed:** 2026-10-04, against master `4f19028`, with ADR-0191.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2598,11 +2598,14 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`f2060c6` (2026-10-04, ADR-0190): `just ci` passes locally, the workspace's
-1899 tests pass, and the browser suite passes 686 in three engines, with 13
-skipped. Its evidence is `docs/evidence/E14/pages.txt`, recorded at that
-commit: the server's tests of a second page, the cart's own page in three
-engines, and 9 of 9 mutants killed. Recorded again at that commit, as their
+`4f19028` (2026-10-04, ADR-0191): `just ci` passes locally, the workspace's
+1899 tests pass, and the browser suite passes 692 in three engines, with 13
+skipped. Its evidence is `docs/evidence/E14/page-speculation.txt`, recorded
+at that commit: the cart's page shows a press before the server answers, in
+three engines, and 4 of 4 mutants are killed. `pages.txt` is recorded again
+at that commit, 7 of 7, its two speculation mutants now ADR-0191's, and
+`titles.txt`, 16 of 16. ADR-0190's evidence was `pages.txt` at `f2060c6`,
+with 9 of 9 mutants killed; and recorded again at that commit, as their
 mutants were re-anchored on lines ADR-0190 moved: `accessibility.txt` 14 of
 14, `titles.txt` 16 of 16, `metadata.txt` 34 of 34, `document-reads.txt` 4
 of 4, `not-found.txt` 17 of 17, `query-values.txt` 7 of 7, `slots.txt` 7 of
