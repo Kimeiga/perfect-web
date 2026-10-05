@@ -296,10 +296,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
         against primary sources, then implement:
         - first, the quick, correctness-critical ones: 14, a speculation
           never invents a value (the new line takes the price the page
-          shows); 12 and 13, KNOWN_LIMITATIONS' stale entries; 2, a case
-          name is uppercase and a lowercase pattern name always a binding;
-          3, only statement-starting words reserved; 5, a bare case with a
-          payload resolved like a nullary one;
+          shows, done by ADR-0172); 12 and 13, KNOWN_LIMITATIONS' stale
+          entries (done); 2, a case name is uppercase and a lowercase pattern
+          name always a binding; ~~3, only statement-starting words
+          reserved~~ (ADR-0196, `just e14-reserved-words`); 5, a bare case
+          with a payload resolved like a nullary one; 12's remainder, a
+          named function as a handler, `e => save(e)`;
         - with the app layer: 10, a materialization may read another (no
           cycles, transitive invalidation) for the feed; 11, `emits` keys
           evaluated by the command and written with its writes (an outbox),

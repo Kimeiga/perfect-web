@@ -175,6 +175,14 @@ const EXPR_KEYWORDS: &[&str] = &[
     "signal", "provide",
 ];
 
+/// **Is `word` reserved?** (ADR-0195, ruling 3): a word that can begin a
+/// statement or an expression in a body, so a name spelled so would read as
+/// one there. Every other keyword is contextual, as `session` is, and names
+/// whatever the program likes.
+pub fn reserved(word: &str) -> bool {
+    STMT_KEYWORDS.contains(&word) || EXPR_KEYWORDS.contains(&word) || word == "derived"
+}
+
 pub const STMT_CLAUSE_KEYWORDS: &[&str] =
     &["because", "attributes_forced_layout_to", "when", "respects"];
 
@@ -1671,18 +1679,39 @@ impl<'a> P<'a> {
     /// statement: the program checked, because the checker reads such a
     /// statement as a value of no known type, and meant something else. Found
     /// 2026-09-25, writing kiokun's ranking in Pleris.
+    ///
+    /// Since ADR-0195 (ruling 3), every reserved word: each that can begin a
+    /// statement or an expression in a body. `let return = n` checked, and
+    /// the binding's next use read as a `return`. The repair suggests a name,
+    /// with the trailing underscore PEP 8 gives a name that would be a
+    /// keyword.
     fn not_a_statement_keyword(&mut self, what: &str) {
-        if self.at(Kind::Ident)
-            && (STMT_KEYWORDS.contains(&self.cur_text()) || self.cur_text() == "derived")
-        {
+        if self.at(Kind::Ident) && reserved(self.cur_text()) {
             let word = self.cur_text().to_string();
-            self.error(
+            self.error_help(
                 "PW0013",
                 format!(
-                    "`{word}` is a statement keyword and cannot name {what}: a use of it \
-                     would read as a `{word} ..` statement"
+                    "`{word}` begins a statement or an expression, and cannot name {what}: a \
+                     use of it would read as `{word} ..`"
                 ),
+                format!("name it `{word}_`, or after what it holds"),
             );
+        }
+    }
+
+    /// **A declaration's name is not a word that begins an expression**
+    /// (ADR-0195, ruling 3). A declaration is used by a call, and a call by
+    /// a statement word reads as a call (`document.query(..)`, `query(..)`),
+    /// so those name declarations, as the platform's `query`, `measure` and
+    /// `mutate` do. A call by an expression word does not: `if (..)`,
+    /// `return (..)` and `fn (..)` read as what they begin.
+    fn not_an_expression_keyword(&mut self, what: &str) {
+        if self.at(Kind::Ident)
+            && (self.cur_text() == "derived"
+                || (EXPR_KEYWORDS.contains(&self.cur_text())
+                    && !matches!(self.cur_text(), "signal" | "provide")))
+        {
+            self.not_a_statement_keyword(what);
         }
     }
 
@@ -1903,6 +1932,9 @@ impl<'a> P<'a> {
                 }
                 let takes_args = self.nth_is(after, Kind::LParen);
                 let is_ctor = takes_args || after > 1;
+                if !is_ctor && !matches!(self.cur_text(), "true" | "false") {
+                    self.not_a_statement_keyword("a binding");
+                }
                 self.start(if is_ctor { K::CtorPat } else { K::BindingPat });
                 self.dotted_name("a pattern");
                 if takes_args {
@@ -2347,6 +2379,7 @@ impl<'a> P<'a> {
         if self.at_kw("fn") {
             self.start(K::FnDecl);
             self.bump();
+            self.not_an_expression_keyword("a function");
             self.name("a function name");
             // **A callable may bind type parameters**: `fn map<T, U>(items:
             // List<T>, ..) -> List<U>`. E9-V2 (ADR-0031). Until 2026-09-24 this
@@ -2387,6 +2420,7 @@ impl<'a> P<'a> {
                 self.bump();
             }
             self.bump(); // noun
+            self.not_an_expression_keyword("a declaration");
             self.name("a name");
             self.param_list();
             if self.at(Kind::Bang) {
@@ -2470,6 +2504,7 @@ impl<'a> P<'a> {
                 self.bump();
             }
             self.bump(); // noun
+            self.not_an_expression_keyword("a declaration");
             self.name("a name");
             self.param_list();
             if self.eat(Kind::Arrow) {
@@ -3358,21 +3393,69 @@ mod tests {
 
     #[test]
     fn a_statement_keyword_cannot_name_a_value() {
-        for src in [
-            "fn f() -> Int {\n    let query = 1\n    query\n}\n",
-            "fn f(query: Int) -> Int {\n    query\n}\n",
+        // Every word that begins a statement or an expression in a body
+        // (ADR-0195, ruling 3), wherever a name is bound: a `let`, a
+        // parameter, a loop's binding, a pattern's. `let return = n` checked
+        // until then, and its next use read as a `return`.
+        for (word, src) in [
+            (
+                "query",
+                "fn f() -> Int {\n    let query = 1\n    query\n}\n",
+            ),
+            ("query", "fn f(query: Int) -> Int {\n    query\n}\n"),
+            (
+                "return",
+                "fn f(n: Int) -> Int {\n    let return = n\n    n\n}\n",
+            ),
+            (
+                "match",
+                "fn f(n: Int) -> Int {\n    let match = n\n    n\n}\n",
+            ),
+            ("if", "fn f(if: Int) -> Int {\n    0\n}\n"),
+            (
+                "frame",
+                "fn f(xs: List<Int>) -> Int {\n    for frame in xs {\n    }\n    0\n}\n",
+            ),
+            (
+                "use",
+                "fn f(o: Option<Int>) -> Int {\n    match o {\n        Some(use) => 1,\n        None => 0,\n    }\n}\n",
+            ),
+            (
+                "signal",
+                "fn f(n: Int) -> Int {\n    let signal = n\n    n\n}\n",
+            ),
         ] {
             let p = parse_tree(src);
+            let found = p.errors.iter().find(|e| e.code == "PW0013");
             assert!(
-                p.errors
-                    .iter()
-                    .any(|e| e.code == "PW0013"
-                        && e.message.contains("`query` is a statement keyword")),
+                found.is_some_and(|e| e
+                    .message
+                    .contains(&format!("`{word}` begins a statement or an expression"))
+                    && e.help.as_deref()
+                        == Some(&*format!("name it `{word}_`, or after what it holds"))),
                 "{src:?}: {:?}",
                 p.errors
             );
         }
+        // A declaration is used by a call, and a call by a statement word
+        // reads as one: the platform's `query`, `measure` and `mutate`. An
+        // expression word's does not.
+        parse_ok("fn query(selector: String) -> Int {\n    0\n}\n");
+        let p = parse_tree("fn return(n: Int) -> Int {\n    n\n}\n");
+        assert!(
+            p.errors.iter().any(|e| e.code == "PW0013"),
+            "{:?}",
+            p.errors
+        );
+        // Every other keyword names what the program likes; `true` and
+        // `false` in a pattern are literals.
         parse_ok("fn f(term: Int) -> Int {\n    let queried = term\n    queried\n}\n");
+        parse_ok(
+            "fn f(session: Int, page: Int, cache: Int) -> Int {\n    let view = session\n    view\n}\n",
+        );
+        parse_ok(
+            "fn f(b: Bool) -> Int {\n    match b {\n        true => 1,\n        false => 0,\n    }\n}\n",
+        );
     }
 
     #[test]

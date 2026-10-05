@@ -13,6 +13,19 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0196, 2026-10-05: only a word that begins a statement or an
+expression is reserved** (ADR-0195, ruling 3). `let return = n` checked, and
+the binding's next use read as a `return`; `let match = n` was a parse error
+naming the wrong invariant.
+- PW0013 now refuses every such word as a binding: a `let`, a parameter, a
+  loop's or a pattern's.
+- A declaration may not be named by a word that begins an expression; a
+  statement word stays allowed, since a call by one reads as a call.
+- The repair suggests `match_`. Every other keyword names what a program
+  likes.
+
+6 mutants (`just e14-reserved-words`).
+
 **ADR-0195, 2026-10-05: the owner's rulings on fifteen open questions.**
 The owner ruled on fifteen "(ruling needed)" items, relayed by another
 session. Each is recorded, checked against a primary source and confirmed;

@@ -1681,3 +1681,14 @@ the owner's rulings on fifteen open questions.
 - Each checked against a primary source and confirmed, `%` refined by
   `rem_euclid`'s own contract, and ordered behind the app layer except
   where it fixes a wrong value.
+
+[ADR-0196](DECISIONS/ADR-0196-only-a-word-that-begins-a-statement-or-an-expression-is-reserved.md):
+only a word that begins a statement or an expression is reserved (ADR-0195,
+ruling 3).
+- PW0013, revision 2: no such word names a binding (a `let`, a parameter, a
+  loop's or a pattern's, a signal), and a declaration is not named by a word
+  that begins an expression. `let return = n` had checked, its use read as a
+  `return`.
+- Every other keyword is contextual. The platform's `query`, `measure` and
+  `mutate` stand, since a call by a statement word reads as a call.
+- The repair suggests a name: `match_`, PEP 8's trailing underscore.

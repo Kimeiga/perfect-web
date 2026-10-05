@@ -2613,6 +2613,27 @@ e14-orders:
      } > docs/evidence/E14/orders.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/orders.txt
 
+# ADR-0196 (ADR-0195's ruling 3): only a word that begins a statement or an
+# expression is reserved. The parser's test, every program checked as before,
+# and the mutation controls.
+e14-reserved-words:
+    @cargo build --quiet --locked -p pw-cli
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0196 - only a word that begins a statement or an expression is reserved"; echo; \
+       echo "produced by: just e14-reserved-words"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the parser (compiler/pw-syntax/src/grammar.rs)"; echo; \
+       cargo test --locked -p pw-syntax -- a_statement_keyword_cannot_name_a_value 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== every program checks as before"; echo; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | tail -1; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
+       cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -3; \
+       echo; echo "== mutation controls (scripts/reserved_words_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/reserved_words_mutations.py; \
+     } > docs/evidence/E14/reserved-words.txt
+    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/reserved-words.txt
+
 # ADR-0194: a type that contains itself compiles, and crosses a boundary as
 # its nodes. The checker's, the WIT generator's and the lowering's tests; the
 # components through the E8 host against a Rust model; the JavaScript modules

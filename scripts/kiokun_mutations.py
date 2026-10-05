@@ -49,12 +49,12 @@ MUTANTS = [
     # declared `List<T>`, and a guard dropped such a binding. They no longer
     # read `infer.rs`'s environment, every type they record is closed over its
     # callee's parameters, and the guard, which nothing could reach, is gone.
+    # Re-anchored by ADR-0196: one predicate, `reserved`, for every word that
+    # begins a statement or an expression.
     (
         "a statement keyword can name a value",
         GRAMMAR,
-        """        if self.at(Kind::Ident)
-            && (STMT_KEYWORDS.contains(&self.cur_text()) || self.cur_text() == "derived")
-        {""",
+        "        if self.at(Kind::Ident) && reserved(self.cur_text()) {",
         "        if false {",
     ),
     (

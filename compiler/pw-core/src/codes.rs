@@ -124,8 +124,11 @@ codes! {
     UNCLOSED_MATCH = "PW0012" / unclosed_match / 1, Syntax, "a match must be closed";
     // Its own code, not PW0009's "an expression was expected": ADR-0041 first
     // emitted PW0009 for it, which named the wrong invariant.
-    KEYWORD_AS_NAME = "PW0013" / keyword_as_name / 1, Syntax,
-        "a statement keyword cannot name a binding or a parameter";
+    // Revision 2, ADR-0195 (ruling 3): every word that begins a statement or
+    // an expression, and a declaration named by one that begins an
+    // expression; `let return = n` had checked.
+    KEYWORD_AS_NAME = "PW0013" / keyword_as_name / 2, Syntax,
+        "a word that begins a statement or an expression in a body names no binding, parameter or declaration";
     // ADR-0049: a string's escapes are the language's. Until 2026-09-25 a
     // backslash had no defined meaning (A-023), and backends either refused it
     // or passed it to their targets' rules.
