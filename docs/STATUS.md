@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `6985f81`, with ADR-0197.
+**Reviewed:** 2026-10-05, against master `afb63a3`, with ADR-0199.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2694,9 +2694,20 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`6985f81` (2026-10-05, ADR-0197, ADR-0196): `just ci` passes locally, the
-workspace's 1928 tests pass, and the browser suite passes 710 in three
-engines, with 13 skipped. ADR-0196's evidence is
+`afb63a3` (2026-10-05, ADR-0199, ADR-0198): `just ci` passes locally, the
+workspace's 1940 tests pass, and the browser suite passes 710 in three
+engines, with 13 skipped. ADR-0198's evidence is
+`docs/evidence/E14/bare-cases.txt`, recorded at that commit: its 13 tests,
+the components' 13, the JavaScript modules agreeing with their components on
+87 queries and 17,400 calls, and 4 of 4 mutants killed. ADR-0199's is
+`named-handlers.txt`, at that commit: its 10 tests, the browser's and the
+resumable handlers' 6, and 17 of 17 mutants killed. **Correction:**
+`handlers-resumable.txt`, recorded again at that commit since ADR-0199
+re-anchored a mutant, killed 6 of 7. ADR-0199 had turned the test of the
+build's refusal of an event part with no code into a test of the check, and
+the refusal was left untested; the next commit tests it, and the file is
+recorded there. ADR-0197's is at `6985f81`, where `just ci` passed and the
+workspace's 1928 tests did: ADR-0196's evidence is
 `docs/evidence/E14/reserved-words.txt`, recorded at that commit: the parser's
 test of every reserved word and its repair, every program checking as
 before, and 6 of 6 mutants killed. ADR-0197's is `case-names.txt`, at that
