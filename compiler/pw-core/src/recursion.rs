@@ -10,9 +10,9 @@
 //!   it is declared (PW0624).
 //! - **Is it held in place?** A list's elements are where the list points, so
 //!   `replies: List<Comment>` has a layout by its type. `next: Option<Node>`
-//!   holds a `Node` within a `Node`, which no layout by type has
-//!   ([`contains_itself_in_place`]). The backend boxes such a type's values
-//!   (ADR-0202): each is the address of its cell.
+//!   holds a `Node` within a `Node`, which no layout by type has. The
+//!   backend boxes such a type's values (ADR-0202): each is the address of
+//!   its cell, and the encoder finds them, where it lays the types out.
 //! - **Which of its fields hold it?** [`self_slots`]: a type that crosses a
 //!   component boundary crosses as its nodes, and each field that holds the
 //!   type holds node indices there: a list of them for a `List` of it, one
@@ -65,119 +65,6 @@ pub fn contains_itself(sigs: &Signatures, def: DefId) -> bool {
     parts(t).any(|r| {
         r.resolved()
             .is_some_and(|x| reaches(sigs, x, def, &mut seen))
-    })
-}
-
-/// **Does a declared type hold a value of its own type in place**: with no
-/// `List`, `Map` or `Set` between, as `Option<Node>`, `Add(Expr, Expr)` or a
-/// `Pair<Node>` whose `Pair` holds its argument in a field (ADR-0194)?
-pub fn contains_itself_in_place(sigs: &Signatures, def: DefId) -> bool {
-    let Some(t) = sigs.type_decl(def) else {
-        return false;
-    };
-    let mut seen = BTreeSet::new();
-    parts(t).any(|r| {
-        r.resolved()
-            .is_some_and(|x| in_place(sigs, x, def, &mut seen))
-    })
-}
-
-/// Does `ty` hold a `target` in place?
-fn in_place(
-    sigs: &Signatures,
-    ty: &ResolvedType,
-    target: DefId,
-    seen: &mut BTreeSet<DefId>,
-) -> bool {
-    if ty.parameter_binding().is_some() || ty.as_primitive().is_some() {
-        return false;
-    }
-    if let Some(b) = ty.as_builtin() {
-        return match b {
-            Builtin::Option | Builtin::Result => {
-                ty.args().iter().any(|a| in_place(sigs, a, target, seen))
-            }
-            // A list's, a map's and a set's elements are where the value
-            // points; a function value is its environment's address.
-            Builtin::List | Builtin::Map | Builtin::Set | Builtin::Function => false,
-        };
-    }
-    // `Session<T>` is its argument (ADR-0033).
-    if sigs.privacy_qualifier(ty).is_some() {
-        return ty.args().iter().any(|a| in_place(sigs, a, target, seen));
-    }
-    let Some(d) = ty.def_id() else {
-        return false;
-    };
-    if d == target {
-        return true;
-    }
-    if seen.insert(d)
-        && let Some(t) = sigs.type_decl(d)
-        && parts(t).any(|r| {
-            r.resolved()
-                .is_some_and(|x| in_place(sigs, x, target, seen))
-        })
-    {
-        return true;
-    }
-    // An argument, where the declaration holds that parameter in place.
-    ty.args().iter().enumerate().any(|(i, a)| {
-        holds_parameter_in_place(sigs, d, i as u32, &mut BTreeSet::new())
-            && in_place(sigs, a, target, seen)
-    })
-}
-
-/// Does `def` hold its `index`th type parameter in place?
-fn holds_parameter_in_place(
-    sigs: &Signatures,
-    def: DefId,
-    index: u32,
-    seen: &mut BTreeSet<(DefId, u32)>,
-) -> bool {
-    if !seen.insert((def, index)) {
-        return false;
-    }
-    let Some(t) = sigs.type_decl(def) else {
-        return false;
-    };
-    parts(t).any(|r| {
-        r.resolved()
-            .is_some_and(|x| parameter_in_place(sigs, x, (def, index), seen))
-    })
-}
-
-fn parameter_in_place(
-    sigs: &Signatures,
-    ty: &ResolvedType,
-    parameter: (DefId, u32),
-    seen: &mut BTreeSet<(DefId, u32)>,
-) -> bool {
-    if let Some(key) = ty.parameter_binding() {
-        return key == parameter;
-    }
-    if ty.as_primitive().is_some() {
-        return false;
-    }
-    if let Some(b) = ty.as_builtin() {
-        return matches!(b, Builtin::Option | Builtin::Result)
-            && ty
-                .args()
-                .iter()
-                .any(|a| parameter_in_place(sigs, a, parameter, seen));
-    }
-    if sigs.privacy_qualifier(ty).is_some() {
-        return ty
-            .args()
-            .iter()
-            .any(|a| parameter_in_place(sigs, a, parameter, seen));
-    }
-    let Some(d) = ty.def_id() else {
-        return false;
-    };
-    ty.args().iter().enumerate().any(|(j, a)| {
-        parameter_in_place(sigs, a, parameter, seen)
-            && holds_parameter_in_place(sigs, d, j as u32, seen)
     })
 }
 

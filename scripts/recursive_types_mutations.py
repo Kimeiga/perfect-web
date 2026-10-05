@@ -3,8 +3,7 @@
 crosses a component boundary as its nodes.
 
 Each mutant undoes one piece:
-- the checker's rules for which types have a value, and which hold
-  themselves in place;
+- the checker's rule for which types have a value;
 - the component's private layout: a list waiting for its element, and a
   type that contains itself taking the world's layout;
 - the conversions where such a value crosses: an export's parameter, a host's
@@ -20,7 +19,8 @@ Every mutant must fail the tests of a type that contains itself.
 
 Run from the repository root; `just e14-recursive-types` records the output.
 The source is restored after every mutant, whatever happens.
-Three controls were retired by ADR-0202, with their reason, below.
+Three controls were retired by ADR-0202, and one with the code it changed,
+each with its reason, below.
 """
 
 import os
@@ -53,12 +53,10 @@ MUTANTS = [
         "                Builtin::Result => t.args().iter().any(|a| self.ty(a, binder, args)),\n",
         "                Builtin::Result => t.args().iter().all(|a| self.ty(a, binder, args)),\n",
     ),
-    (
-        "a list holds its elements in place",
-        RECURSION,
-        "            Builtin::List | Builtin::Map | Builtin::Set | Builtin::Function => false,\n",
-        "            Builtin::List | Builtin::Map | Builtin::Set | Builtin::Function => true,\n",
-    ),
+    # Retired at 7d3234b, where it survived: "a list holds its elements in
+    # place". It changed `contains_itself_in_place`, which nothing has called
+    # since ADR-0202 moved the boxing into the encoder; the function is gone.
+    # Which types are boxed is `boxed_types_mutations.py`'s.
     (
         "a list waiting for its element never gets it",
         WASM,
