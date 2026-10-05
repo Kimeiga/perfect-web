@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `a518902`, with ADR-0210 to ADR-0214.
+**Reviewed:** 2026-10-05, against master `292d193`, with ADR-0215 and ADR-0216.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2863,6 +2863,13 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`292d193` (2026-10-05, ADR-0215 and ADR-0216): `just ci` passes locally, the
+workspace's 2031 tests pass, and the browser suite passes 728 in three
+engines, with 13 skipped. Recorded at that commit, in `docs/evidence/E14/`:
+`query-retry.txt` (ADR-0215) 4 of 4 mutants killed and `clause-heads.txt`
+(ADR-0216) 5 of 5; and again, their scripts changed with them,
+`command-retry.txt` 9 of 9 (`fixed` retired), `E10/clause-places.txt` 5 of
+5, and `E10/handlers.txt`, the handlers emitted again without `backoff`.
 `a518902` (2026-10-05, ADR-0210 to ADR-0214): `just ci` passes locally, the
 workspace's 2025 tests pass, and the browser suite passes 728 in three
 engines, with 13 skipped. Recorded at that commit, in `docs/evidence/E14/`:
