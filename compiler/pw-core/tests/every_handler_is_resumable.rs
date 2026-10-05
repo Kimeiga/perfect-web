@@ -198,15 +198,19 @@ fn a_listed_capture_is_still_held_to_what_the_handler_reads() {
 }
 
 #[test]
-fn a_handler_that_is_not_a_lambda_is_refused_at_build() {
-    let src = "module t\n\nfn save() -> () !{} { () }\n\npage P() {\n    cache private\n\n    \
+fn a_handler_named_by_a_local_is_refused_when_checked() {
+    // A local's value has no code a handler is compiled from: refused when
+    // the program is checked (ADR-0199), where until then the build refused
+    // its event part as one with no code to run. A declaration's name is
+    // `(e) => save(e)` (`named_handlers.rs`).
+    let src = "module t\n\npage P() {\n    cache private\n\n    \
+               let save = () => 1\n\n    \
                view {\n        <main><button type=\"button\" on:press={save}>Save</button></main>\n    }\n}\n";
-    let b = pw_core::build::build(&units(src)).expect("builds");
-    assert!(
-        b.refusals()
-            .iter()
-            .any(|r| r.contains("`t.P`") && r.contains("no code to run")),
-        "{:?}",
-        b.refusals()
+    assert_eq!(
+        reported(src),
+        [
+            "PW0614 `on:press` names `save`, a value this declaration binds, which is no \
+          function or command to call"
+        ]
     );
 }

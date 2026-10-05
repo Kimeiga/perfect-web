@@ -97,8 +97,12 @@ fn manifest_of(
     // A handler, not "captures something". A handler that captures nothing is
     // still a handler with an identity, an ABI, a build and a document schema;
     // its capture schema is simply the schema of nothing.
-    let Expr::Lambda { descriptor, .. } = body.expr(lambda) else {
-        return None;
+    let descriptor = match body.expr(lambda) {
+        Expr::Lambda { descriptor, .. } => *descriptor,
+        // A declaration named as the handler (ADR-0199): it captures nothing,
+        // since its code is compiled, not carried.
+        _ if names_a_declaration(body, types, lambda) => None,
+        _ => return None,
     };
     let captures = crate::resume::capture_names_and_types(body, types, lambda);
     let capture_schema = schema_of(&captures, types);
@@ -127,8 +131,12 @@ fn artifact_of(
     build: &str,
 ) -> Option<HandlerArtifact> {
     let declared = crate::resume::capture_names_and_types(body, types, lambda);
-    let Expr::Lambda { body: inner, .. } = body.expr(lambda) else {
-        return None;
+    let inner = match body.expr(lambda) {
+        Expr::Lambda { body: inner, .. } => inner,
+        // A declaration named as the handler (ADR-0199): its name, which is
+        // no capture.
+        _ if names_a_declaration(body, types, lambda) => &lambda,
+        _ => return None,
     };
     // The captures this body reads, in the order the attribute declared them —
     // order comes from the declaration because a schema is a shape, not a
@@ -256,29 +264,36 @@ fn handler_id(
     lambda: ExprId,
     capture_schema: &str,
 ) -> String {
-    let Expr::Lambda { body: inner, .. } = body.expr(lambda) else {
-        return hash("<not a lambda>");
+    // A reference, with the declaration it resolved to.
+    let reference = |callee: ExprId| {
+        let path = crate::infer::path_of(body, callee);
+        let target = types
+            .callee(body, callee)
+            .map(|s| s.path.clone())
+            .unwrap_or_else(|| "<unresolved>".to_string());
+        format!("{path}->{target}")
     };
-    let span = body.expr_span(*inner);
-
-    // Every reference, with what it resolved to. `foo()` with identical tokens
-    // may name a different declaration after an import change, and the
-    // implementation hash must see that.
-    let resolved: Vec<String> = body
-        .walk_from(*inner)
-        .into_iter()
-        .filter_map(|e| match body.expr(e) {
-            Expr::Call { callee, .. } => {
-                let path = crate::infer::path_of(body, *callee);
-                let target = types
-                    .callee(body, *callee)
-                    .map(|s| s.path.clone())
-                    .unwrap_or_else(|| "<unresolved>".to_string());
-                Some(format!("{path}->{target}"))
-            }
-            _ => None,
-        })
-        .collect();
+    let (span, resolved): (Span, Vec<String>) = match body.expr(lambda) {
+        // Every reference, with what it resolved to. `foo()` with identical
+        // tokens may name a different declaration after an import change, and
+        // the implementation hash must see that.
+        Expr::Lambda { body: inner, .. } => (
+            body.expr_span(*inner),
+            body.walk_from(*inner)
+                .into_iter()
+                .filter_map(|e| match body.expr(e) {
+                    Expr::Call { callee, .. } => Some(reference(*callee)),
+                    _ => None,
+                })
+                .collect(),
+        ),
+        // A declaration named as the handler (ADR-0199): its name, and
+        // what it resolves to, as a lambda's call of it would be.
+        _ if names_a_declaration(body, types, lambda) => {
+            (body.expr_span(lambda), vec![reference(lambda)])
+        }
+        _ => return hash("<not a handler>"),
+    };
 
     let implementation = implementation_hash(src, &span, &resolved);
 
@@ -297,6 +312,13 @@ fn handler_id(
         "{implementation}\u{1}{}\u{1}{capture_schema}\u{1}{PLATFORM_ABI}",
         deps.join("\u{2}")
     ))
+}
+
+/// **Does an `on:` value name a function or a command** (ADR-0199):
+/// `on:submit={save}`, which is `(e) => save(e)`? A local's value is no
+/// handler.
+fn names_a_declaration(body: &crate::hir::Body, types: &Types<'_>, e: ExprId) -> bool {
+    types.named_handler(body, e).is_some()
 }
 
 /// Generate both records for one declaration, for the mutation controls.

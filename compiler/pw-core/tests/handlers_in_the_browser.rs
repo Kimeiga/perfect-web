@@ -93,3 +93,44 @@ fn a_handler_performs_only_what_the_browser_may() {
     ));
     assert!(found.is_empty(), "{found:#?}");
 }
+
+#[test]
+fn a_function_named_as_a_handler_performs_only_what_the_browser_may() {
+    // `on:press={peek}` is `() => peek()` (ADR-0199), and runs `peek` in the
+    // browser: what it performs is held as the lambda's call of it is. A
+    // helper with no row performs what its body does.
+    let peek = "fn peek() -> () {\n    let _cart = Carts.current(current_session())\n    ()\n}\n\n";
+    let expected = [
+        "PW5005 `ShopPage`'s handler `peek` performs `database.read<Carts>`, which \
+                     the browser cannot grant",
+    ];
+    assert_eq!(reported(&page_with(peek, "peek")), expected);
+    let declared = peek.replace("-> () {", "-> () !{ database.read<Carts>, session.read } {");
+    assert_eq!(reported(&page_with(&declared, "peek")), expected);
+    // Its lambda form is refused for the same effect.
+    let found = reported(&page_with(peek, "() => peek()"));
+    assert!(
+        found
+            .iter()
+            .any(|d| d.starts_with("PW5005") && d.contains("`database.read<Carts>`")),
+        "{found:#?}"
+    );
+    // The controls: a command named as the handler is a request, which the
+    // command performs; a function that performs nothing is the browser's.
+    let touch = "command touch() -> ()\n    requires      SignedIn\n    \
+                 idempotent_by InteractionId\n{\n    \
+                 let _cart = Carts.current(current_session())\n    ()\n}\n\n";
+    let found = reported(&page_with(touch, "touch"));
+    assert!(found.is_empty(), "{found:#?}");
+    let found = reported(&page_with("fn idle() -> () !{} {\n    ()\n}\n\n", "idle"));
+    assert!(found.is_empty(), "{found:#?}");
+    // A local that shadows `peek` is the page's value, refused as no handler
+    // (PW0614), and `peek`'s read is not the handler's.
+    let shadowed = page_with(peek, "peek").replace(
+        "    let menu = query Menu(id)",
+        "    let peek = () => 1\n\n    let menu = query Menu(id)",
+    );
+    let found = reported(&shadowed);
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].starts_with("PW0614"), "{found:#?}");
+}

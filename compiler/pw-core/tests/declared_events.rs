@@ -44,7 +44,7 @@ fn reported(src: &str, platform: bool) -> Vec<String> {
 
 fn button(event: &str) -> String {
     format!(
-        "module t\n\ncommand go() -> Int !{{}} {{ 1 }}\n\n\
+        "module t\n\nfn go() -> () !{{}} {{ () }}\n\n\
          view Button(n: Int) !{{}} {{\n    <button on:{event}={{go}}>{{n}}</button>\n}}\n"
     )
 }

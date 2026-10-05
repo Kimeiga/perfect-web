@@ -13,6 +13,21 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0199, 2026-10-05: a function or a command named as a handler is the
+lambda that calls it** (ADR-0195, ruling 12). `on:submit={save}` was checked
+against its event and refused when built. Now it is `(e) => save(e)`:
+compiled as that lambda, with an identity from what the name resolves to,
+and held to the event, its answer (PW0618), idempotency (PW0338) and what it
+performs in the browser.
+- **Corrections:** a handler named through a module, `on:press={other.rename}`,
+  was never checked against its event; a local's value, a page, a type or a
+  case as a handler checked, and only the build refused them. Each is
+  refused when checked now (PW0602, PW0614).
+- **Found beside it:** `()` as a value is an expression that did not parse,
+  and nothing reported it: `fn f() -> Int !{} { () }` checks. ADR-0200.
+- No program changes; the store's 66 artifacts are byte-identical. 17 mutants
+  (`just e14-named-handlers`).
+
 **ADR-0198, 2026-10-05: a bare case with a payload is the case of the one
 type that has it** (ADR-0195, ruling 5, its first half). `Empty` alone was
 typed and `Circle(3)` alone was PW0021. Now both resolve by one rule: the one

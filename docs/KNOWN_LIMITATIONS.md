@@ -338,13 +338,13 @@ awaited in order. What remains:
   (ADR-0138): `press`, `input`, `change`, `keydown`, `submit`. An element
   does not refine its event: a checkbox's `change` gives `value`, not
   `checked`. `bind:value` and forms wait for ADR-0131's later rulings. A
-  named `fn` bound to `on:input` is checked against its event type (PW0602)
-  and not compiled.
+  function or a command named as a handler, `on:input={save}`, is
+  `(e) => save(e)` (ADR-0199).
 - **A handler reads what its command answered, never the value**
   (ADR-0157): `Result<(), E>`, whether it committed and its declared error
   if not. A handler takes it apart or discards it by name; one that gives it
-  to the runtime is refused (ADR-0159, PW0618). A named function bound as a
-  handler, `on:submit={save}`, is not yet held to that. A command called
+  to the runtime is refused (ADR-0159, PW0618), and so is a command named
+  as a handler, `on:submit={save}`, that answers one (ADR-0199). A command called
   inside a function value, or a function value that reads what the handler
   captured, is refused, and so is a command parameter that is not a
   primitive or an opaque type over one. A command is called by a page's
@@ -427,12 +427,11 @@ awaited in order. What remains:
   first value on a Marko page, and a speculation on it stays. PW5106 and
   PW5107 accept both kinds of reach, and the dev server honours both
   (ADR-0105).
-- **A handler written as a named function, `on:submit={save}`, is refused
-  when built** (ADR-0134). Every lambda in an `on:` attribute is a resumable
-  handler, its captures inferred; a named function is checked against its
-  event's type, and refused at build with the repair, rather than shipped
-  inert. ADR-0195 (ruling 12) rules it means `e => save(e)`; not built
-  yet.
+- **A handler names a function or a command, or is a lambda written in the
+  attribute** (ADR-0199). A local's function value, React's
+  `onClick={handle}`, is refused when checked (PW0614): a lambda written
+  where it is used shows what it captures and the signals it writes, and a
+  declaration is how a behaviour is shared.
 - **The dev server computes one event key: `current_session()`**
   (ADR-0104). It commits the events a command declares, and refuses a
   command whose event carries anything else, such as its own argument.
@@ -658,11 +657,6 @@ Not covered:
 - **A phone's layout in Firefox**, which Playwright does not emulate.
 - **Duplicate ids and ARIA references at build** are checked since
   ADR-0185, within the declaration that renders them.
-
-**A handler that is not a lambda is refused at build** (ADR-0134).
-`on:submit={save}` has no code to run until the event is passed to a
-handler (ADR-0131); `pw build` refuses it with the repair, and `pw check`
-accepts it.
 
 **A label does not follow a value through storage, a later call of a
 function value, or time** (ADR-0129). A value's label follows it through

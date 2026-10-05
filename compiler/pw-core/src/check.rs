@@ -1773,6 +1773,42 @@ fn handlers_read_their_captures(hir: &Hir) -> Vec<Diagnostic> {
 /// the handler performs itself is the browser's to grant. Until 2026-09-26 a
 /// handler calling `Carts.add` itself checked, and nothing asked where it
 /// ran: the page's contract leaves its handlers out, and the handler has none.
+/// A function named as a handler performs, in the browser, an effect the
+/// browser cannot grant (ADR-0199): what `(e) => save(e)` would report.
+fn named_handler_outside_the_browser(
+    decl: &Decl,
+    body: &Body,
+    handler: ExprId,
+    path: &str,
+    effect: &str,
+) -> Diagnostic {
+    Diagnostic {
+        code: crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.id,
+        invariant: crate::codes::DECLARED_PLACEMENT_CANNOT_GRANT.invariant,
+        reason: "handler_performs_outside_the_browser",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: format!(
+            "`{}`'s handler `{path}` performs `{effect}`, which the browser cannot grant",
+            decl.name
+        ),
+        primary_span: body.expr_span(handler),
+        related: Vec::new(),
+        explanation: Some(
+            "A handler runs in the browser, and a function named as one runs there with \
+             it: what it performs, the browser must grant. A command named as one is a \
+             request, which the command performs where it runs (ADR-0199)."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: format!(
+                "perform `{effect}` in a command, and name the command as the handler"
+            ),
+            replacement: None,
+        }],
+    }
+}
+
 fn handlers_run_in_the_browser(
     inference: &crate::effects::Inference,
     platform: &dyn Placements,
@@ -1788,7 +1824,44 @@ fn handlers_run_in_the_browser(
             continue;
         };
         // Every handler (ADR-0134), written `resumable(..)` or not.
-        for lambda in crate::resume::handlers_in(body) {
+        let handlers = crate::resume::handlers_in(body);
+        if handlers.is_empty() {
+            continue;
+        }
+        let lexical = crate::lexical::Lexical::build(decl, body);
+        for lambda in handlers {
+            // A declaration named as the handler (ADR-0199): a command is a
+            // request, which it performs; any other runs here, and performs
+            // what a call of it would, its row or, with none, what its body
+            // does. A local's value is no handler, refused as one.
+            if matches!(body.expr(lambda), Expr::Name(_) | Expr::Field { .. }) {
+                if crate::resume::root_name(body, lambda)
+                    .is_some_and(|r| lexical.binder(r).is_some())
+                {
+                    continue;
+                }
+                let path = path_of(body, lambda);
+                let resolution = match path.contains('.') {
+                    true => workspace.resolve_path(unit, &path),
+                    false => workspace.resolve(unit, &path),
+                };
+                let (Resolution::Local(def) | Resolution::Imported { def, .. }) = resolution else {
+                    continue;
+                };
+                if crate::resolve::declaration(hirs, def)
+                    .is_none_or(|d| d.kind == DeclKind::Command)
+                {
+                    continue;
+                }
+                for effect in inference.effects_of_def(def).into_iter().flatten() {
+                    if World::Browser.grants(effect, platform) == crate::placement::Grant::No {
+                        out.push(named_handler_outside_the_browser(
+                            decl, body, lambda, &path, effect,
+                        ));
+                    }
+                }
+                continue;
+            }
             let Expr::Lambda { body: inner, .. } = body.expr(lambda) else {
                 continue;
             };

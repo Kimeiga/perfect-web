@@ -223,8 +223,30 @@ fn captures_with_spans(
         .collect()
 }
 
-/// **Each `on:` attribute's value that is a lambda** (ADR-0134): a handler,
-/// written `resumable(..)` or not.
+/// **Is `e`, an `on:` attribute's value, a handler?** A lambda (ADR-0134),
+/// or a declaration named by its path, `on:submit={save}`, which is
+/// `(e) => save(e)` (ADR-0199, ADR-0195's ruling 12). A name that is no
+/// declaration's is no handler: the build refuses its event part.
+pub(crate) fn is_handler_value(body: &crate::hir::Body, e: ExprId) -> bool {
+    matches!(
+        body.expr(e),
+        Expr::Lambda { .. } | Expr::Name(_) | Expr::Field { .. }
+    )
+}
+
+/// **The name an `on:` value is read through**: `save`, or `forms` in
+/// `forms.save` (ADR-0199). Where a local binds it, the value is the local's,
+/// which is no handler, and the checker refuses it (`annotations.rs`).
+pub(crate) fn root_name(body: &crate::hir::Body, e: ExprId) -> Option<ExprId> {
+    let mut root = e;
+    while let Expr::Field { base, .. } = body.expr(root) {
+        root = *base;
+    }
+    matches!(body.expr(root), Expr::Name(_)).then_some(root)
+}
+
+/// **Each `on:` attribute's value that is a handler** (ADR-0134): a lambda,
+/// written `resumable(..)` or not, or a declaration's name (ADR-0199).
 pub(crate) fn handler_lambdas(body: &crate::hir::Body) -> std::collections::BTreeSet<ExprId> {
     let mut out = std::collections::BTreeSet::new();
     for id in body.walk() {
@@ -237,7 +259,7 @@ pub(crate) fn handler_lambdas(body: &crate::hir::Body) -> std::collections::BTre
             };
             for a in attrs {
                 if let (Some(("on", _)), crate::hir::AttrValue::Expr(e)) = (a.namespace(), &a.value)
-                    && matches!(body.expr(*e), Expr::Lambda { .. })
+                    && is_handler_value(body, *e)
                 {
                     out.insert(*e);
                 }
@@ -263,7 +285,7 @@ pub(crate) fn handler_events(body: &crate::hir::Body) -> Vec<(String, ExprId)> {
         };
         for a in attrs {
             if let (Some((event, _)), AttrValue::Expr(e)) = (a.event(), &a.value)
-                && matches!(body.expr(*e), Expr::Lambda { .. })
+                && is_handler_value(body, *e)
             {
                 out.push((event.to_string(), *e));
             }
@@ -280,10 +302,26 @@ pub fn sent_commands(hirs: &[&Hir], sigs: &Signatures) -> BTreeMap<DefId, Vec<cr
         for (_, decl) in hir.all_decls() {
             let Some(b) = decl.body else { continue };
             let body = hir.body(b);
-            for handler in handlers_in(body) {
+            let handlers = handlers_in(body);
+            if handlers.is_empty() {
+                continue;
+            }
+            let lexical = crate::lexical::Lexical::build(decl, body);
+            for handler in handlers {
                 for e in body.walk_from(handler) {
-                    let Expr::Call { callee, .. } = body.expr(e) else {
-                        continue;
+                    // A command named as the handler, `on:press={clear}`, is
+                    // sent as a call of it is (ADR-0199); a local's value is
+                    // not.
+                    let callee = match body.expr(e) {
+                        Expr::Call { callee, .. } => callee,
+                        Expr::Name(_) | Expr::Field { .. }
+                            if e == handler
+                                && !root_name(body, e)
+                                    .is_some_and(|r| lexical.binder(r).is_some()) =>
+                        {
+                            &handler
+                        }
+                        _ => continue,
                     };
                     let path = crate::infer::path_of(body, *callee);
                     let Some(def) = crate::page_values::resolve_term(sigs.workspace(), unit, &path)
@@ -313,7 +351,7 @@ pub(crate) fn handlers_in(body: &crate::hir::Body) -> Vec<ExprId> {
                 descriptor: Some(d),
                 ..
             } if is_resumable(body, *d) => true,
-            Expr::Lambda { .. } => on.contains(e),
+            Expr::Lambda { .. } | Expr::Name(_) | Expr::Field { .. } => on.contains(e),
             _ => false,
         })
         .collect()

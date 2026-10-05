@@ -26,9 +26,10 @@ LOWER = ROOT / "compiler/pw-core/src/lower.rs"
 MUTANTS = [
     (
         "an `on:` lambda is not a handler",
+        # Re-anchored by ADR-0199: a declaration's name is a handler too.
         RESUME,
-        "            Expr::Lambda { .. } => on.contains(e),\n",
-        "            Expr::Lambda { .. } => false,\n",
+        "            Expr::Lambda { .. } | Expr::Name(_) | Expr::Field { .. } => on.contains(e),\n",
+        "            Expr::Lambda { .. } | Expr::Name(_) | Expr::Field { .. } => false,\n",
     ),
     (
         "an unlisted handler captures nothing",

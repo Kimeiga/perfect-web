@@ -16,7 +16,7 @@ use pw_core::check::check_sources;
 
 fn reported(markup: &str) -> Vec<String> {
     let src = format!(
-        "module t\n\ncommand go() -> Int !{{}} {{ 1 }}\n\n\
+        "module t\n\nfn go() -> () !{{}} {{ () }}\n\n\
          view Note(msg: String) !{{}} {{\n    <div>\n        {markup}\n    </div>\n}}\n"
     );
     check_sources(&[("t.pw".to_string(), src)])

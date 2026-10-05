@@ -52,7 +52,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         let types = crate::infer::Types::of_decl(sigs, hir, id, body);
         optional_used_as_present(hir, &types, body, decl, &at, out);
         unchecked_cast(hir, sigs, &types, body, decl, &at, out);
-        handler_matches_event(hir, body, sigs, decl, module, &at, out);
+        handler_matches_event(hir, body, sigs, &types, decl, module, &at, out);
         results_are_handled(&types, body, decl, &at, out);
     }
 }
@@ -90,10 +90,22 @@ fn results_are_handled(
         false => Fate::Used,
     };
     unused(body, body.root, fate, false, &handlers, &mut dropped);
-    for (e, fate) in dropped {
-        let Some(ty) = types.of(body, e) else {
-            continue;
-        };
+    let mut found: Vec<(crate::hir::ExprId, Fate, crate::resolved::ResolvedType)> = dropped
+        .into_iter()
+        .filter_map(|(e, fate)| Some((e, fate, types.of(body, e)?)))
+        .collect();
+    // A declaration named as the handler, `on:press={clear}`, gives the
+    // runtime its answer, as `() => clear()` does (ADR-0199).
+    for &h in &handlers {
+        if let Some(answer) = types
+            .named_handler(body, h)
+            .and_then(|s| s.returns.as_ref())
+            .and_then(crate::resolved::TypeResolution::resolved)
+        {
+            found.push((h, Fate::ToTheRuntime, answer.clone()));
+        }
+    }
+    for (e, fate, ty) in found {
         if ty.as_builtin() != Some(crate::resolved::Builtin::Result) {
             continue;
         }
@@ -441,6 +453,7 @@ fn handler_matches_event(
     hir: &Hir,
     body: &Body,
     sigs: &Signatures,
+    types: &crate::infer::Types<'_>,
     decl: &Decl,
     module: Option<&str>,
     at: &Span,
@@ -533,12 +546,35 @@ fn handler_matches_event(
                 }
                 continue;
             }
-            let Expr::Name(handler) = body.expr(e) else {
+            // Otherwise a function or a command named as the handler,
+            // `on:submit={save}` or `{forms.save}`, which is `(e) => save(e)`
+            // (ADR-0199). Anything else is refused here, not when built.
+            if !matches!(body.expr(e), Expr::Name(_) | Expr::Field { .. }) {
+                continue;
+            }
+            let handler = crate::infer::path_of(body, e);
+            let Some(sig) = types.named_handler(body, e) else {
+                if let Some(what) = names_no_handler(decl, body, sigs, types, module, e, &handler) {
+                    out.push(not_a_handler(decl, at, body, e, event, &handler, &what));
+                }
                 continue;
             };
-            let Some(actual) = sigs
-                .in_module(module, handler)
-                .and_then(|s| s.params.first())
+            // It is given one value, its event.
+            if sig.params.len() > 1 {
+                out.push(lambda_takes_another_event(
+                    decl,
+                    at,
+                    body,
+                    e,
+                    event,
+                    expected,
+                    &format!("`{handler}`, which takes {} parameters", sig.params.len()),
+                ));
+                continue;
+            }
+            let Some(actual) = sig
+                .params
+                .first()
                 .and_then(Option::as_ref)
                 .and_then(crate::resolved::TypeResolution::resolved)
             else {
@@ -579,6 +615,123 @@ fn handler_matches_event(
         }
     }
     let _ = hir;
+}
+
+/// **What an `on:` value names, where it is no function or command**
+/// (ADR-0199): a local's value that is a function, or a declaration of
+/// another kind, described. `None` where another rule reports it: a value
+/// that is no function at all (PW0614), or a name that resolves to nothing
+/// (PW0021).
+fn names_no_handler(
+    decl: &Decl,
+    body: &Body,
+    sigs: &Signatures,
+    types: &crate::infer::Types<'_>,
+    module: Option<&str>,
+    e: crate::hir::ExprId,
+    path: &str,
+) -> Option<String> {
+    use crate::hir::DeclKind;
+    use crate::resolve::{Namespace, Resolution};
+    let workspace = sigs.workspace();
+    let unit = sigs.unit_of(module)?;
+    if crate::resume::root_name(body, e).is_some_and(|r| types.lexical().binder(r).is_some()) {
+        // A local's value: one whose type is known, and no function, is
+        // the value relation's to report (PW0614, `values.rs`).
+        use crate::values::Ty;
+        return match crate::values::type_of(sigs, workspace, unit, module, decl, body, e).0 {
+            Ty::Builtin(crate::resolved::Builtin::Function, _)
+            | Ty::Any
+            | Ty::Unknown
+            | Ty::Var(_)
+            | Ty::Parameter { .. } => Some("a value this declaration binds".to_string()),
+            _ => None,
+        };
+    }
+    let def = [
+        Namespace::Term,
+        Namespace::Type,
+        Namespace::Ui,
+        Namespace::Event,
+    ]
+    .into_iter()
+    .find_map(|ns| {
+        let found = match path.contains('.') {
+            true => workspace.resolve_path_in(unit, ns, path),
+            false => workspace.resolve_in(unit, ns, path),
+        };
+        match found {
+            Resolution::Local(d) | Resolution::Imported { def: d, .. } => Some(d),
+            _ => None,
+        }
+    });
+    let Some(def) = def else {
+        // A case, the language's `Some` or one of a type this unit sees;
+        // any other name that resolves to nothing is PW0021's.
+        let case = matches!(path, "Some" | "None" | "Ok" | "Err")
+            || crate::values::bare_case(sigs, workspace, unit, path).is_some();
+        return case.then(|| "a case".to_string());
+    };
+    Some(
+        match sigs.kind_of(def)? {
+            DeclKind::View => "a view",
+            DeclKind::Component => "a component",
+            DeclKind::Page => "a page",
+            DeclKind::Query => "a query",
+            DeclKind::Subscription => "a subscription",
+            DeclKind::Resource => "a resource",
+            DeclKind::Task => "a task",
+            DeclKind::Materialize => "a materialization",
+            DeclKind::Event => "an event",
+            DeclKind::Type | DeclKind::Opaque => "a type",
+            // A function or a command is a handler; a signal or a module's
+            // value that is no function is PW0614's.
+            _ => return None,
+        }
+        .to_string(),
+    )
+}
+
+/// `on:press={save}`, where `save` is a local's value or a page: no function
+/// or command the program declares (ADR-0199).
+fn not_a_handler(
+    decl: &Decl,
+    at: &Span,
+    body: &Body,
+    e: crate::hir::ExprId,
+    event: &str,
+    handler: &str,
+    what: &str,
+) -> Diagnostic {
+    Diagnostic {
+        code: codes::NOT_CALLABLE.id,
+        invariant: codes::NOT_CALLABLE.invariant,
+        reason: "event_attribute_names_no_handler",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: format!(
+            "`on:{event}` names `{handler}`, {what}, which is no function or command to call"
+        ),
+        primary_span: body.expr_span(e),
+        related: vec![Related {
+            span: at.clone(),
+            label: format!("`{}` binds the handler here", decl.name),
+        }],
+        explanation: Some(
+            "An event attribute is given a lambda, its handler, or names a function or a \
+             command the program declares, which is `(e) => save(e)` (ADR-0199). A \
+             handler is compiled from the code it names, and a local's value or a \
+             declaration of another kind has none to compile."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: format!(
+                "write the handler in the attribute, `on:{event}={{() => ..}}`, or name a \
+                 function or a command"
+            ),
+            replacement: None,
+        }],
+    }
 }
 
 /// `on:input={(e: PressEvent) => ..}`: a handler written for another event,

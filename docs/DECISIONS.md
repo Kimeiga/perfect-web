@@ -1710,3 +1710,11 @@ a bare case with a payload is the case of the one type that has it
   every type where several have it. It was PW0021.
 - Resolution from the expected type, for both forms, is the ruling's other
   half, not built yet.
+[ADR-0199](DECISIONS/ADR-0199-a-function-or-command-named-as-a-handler-is-the-lambda-that-calls-it.md):
+a function or a command named as a handler is the lambda that calls it
+(ADR-0195, ruling 12, its remainder).
+- `on:submit={save}` is `(e) => save(e)`: compiled as that lambda, and held
+  to its event, its answer, idempotency and the browser, as it is.
+- A local's value, a page, a type or a case named as a handler is refused
+  when checked (PW0614), and a handler named through a module is checked
+  against its event (PW0602). Each checked before.

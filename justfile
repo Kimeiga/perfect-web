@@ -2613,6 +2613,25 @@ e14-orders:
      } > docs/evidence/E14/orders.txt
     @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/orders.txt
 
+# ADR-0199 (ADR-0195's ruling 12): a function or a command named as a
+# handler is the lambda that calls it. Its tests, the store's handlers, and
+# the mutation controls.
+e14-named-handlers:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0199 - a function or a command named as a handler is the lambda that calls it"; echo; \
+       echo "produced by: just e14-named-handlers"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/named_handlers.rs)"; echo; \
+       cargo test --locked -p pw-core --test named_handlers 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== what it performs, and a local (handlers_in_the_browser.rs, every_handler_is_resumable.rs)"; echo; \
+       cargo test --locked -p pw-core --test handlers_in_the_browser 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-core --test every_handler_is_resumable 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/named_handlers_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/named_handlers_mutations.py; \
+     } > docs/evidence/E14/named-handlers.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/named-handlers.txt
+
 # ADR-0198 (ADR-0195's ruling 5): a bare case with a payload is the case of
 # the one type that has it. Its tests, the components and the JavaScript
 # modules, and the mutation controls.

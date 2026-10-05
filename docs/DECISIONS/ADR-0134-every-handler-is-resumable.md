@@ -44,6 +44,9 @@ event.
    code is a handler that is not a lambda, `on:submit={save}`, which waits
    for the event to be passed (ADR-0131). It is refused at build, with the
    repair, instead of shipping inert.
+   Superseded in part by ADR-0199: a function or a command named as a
+   handler is the lambda that calls it, and anything else named there is
+   refused when the program is checked.
 
 ## Alternatives
 

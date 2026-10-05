@@ -660,6 +660,27 @@ impl<'a> Types<'a> {
         }
     }
 
+    /// **The function or command an `on:` value names** (ADR-0199): `save`
+    /// or `forms.save`, which is `(e) => save(e)`, named by its path where no
+    /// local binds its first segment. A local's value, or a declaration of
+    /// another kind, names none, and the checker refuses it as a handler.
+    pub fn named_handler(
+        &self,
+        body: &Body,
+        e: ExprId,
+    ) -> Option<&'a crate::signatures::Signature> {
+        let root = crate::resume::root_name(body, e)?;
+        if self.lexical.binder(root).is_some() {
+            return None;
+        }
+        self.by_path(&path_of(body, e)).filter(|s| {
+            matches!(
+                self.sigs.kind_of(s.definition),
+                Some(DeclKind::Fn | DeclKind::Command)
+            )
+        })
+    }
+
     /// The signature a call resolves to, **only** when the receiver's type is
     /// known. Never guesses from a name.
     pub fn callee(&self, body: &Body, callee: ExprId) -> Option<&'a crate::signatures::Signature> {

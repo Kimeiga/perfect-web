@@ -1214,10 +1214,14 @@ pub(crate) fn module_signal(
 /// that calls a named thing — in which case there is no separately loadable
 /// behaviour to name, and the runtime says so rather than guessing.
 pub(crate) fn called_name(body: &Body, expr: crate::hir::ExprId) -> String {
-    let Expr::Lambda { body: inner, .. } = body.expr(expr) else {
-        return String::new();
-    };
-    named_call(body, *inner).unwrap_or_default()
+    match body.expr(expr) {
+        Expr::Lambda { body: inner, .. } => named_call(body, *inner).unwrap_or_default(),
+        // A declaration named as the handler, `on:submit={save}`, is what it
+        // calls, as `(e) => save(e)` is; through its module, `forms.save`, it
+        // is named as `(e) => forms.save(e)` is, by nothing (ADR-0199).
+        Expr::Name(n) => n.clone(),
+        _ => String::new(),
+    }
 }
 
 /// The name a call is made by, where `e` is the call, a `match` on it, a

@@ -404,22 +404,46 @@ pub fn handler(
         };
     };
     let body = hir.body(body_id);
-    let Expr::Lambda {
-        params,
-        body: inner,
-        ..
-    } = body.expr(lambda)
-    else {
-        return Lowering::Blocked {
-            why: "a handler identity that is not a lambda".to_string(),
-            span,
-        };
+    // A lambda's body, or a declaration named as the handler, which is
+    // `(e) => save(e)`, or `() => save()` for one that takes nothing
+    // (ADR-0199, ADR-0195's ruling 12).
+    let (inner, takes): (Option<ExprId>, usize) = match body.expr(lambda) {
+        Expr::Lambda {
+            params,
+            body: inner,
+            ..
+        } => (
+            Some(*inner),
+            crate::values::lambda_params(body, params).len(),
+        ),
+        Expr::Name(_) | Expr::Field { .. } => {
+            let types = crate::infer::Types::of_decl(cx.sigs, hir, decl_id, body);
+            match types.named_handler(body, lambda) {
+                Some(sig) => (None, sig.params.len()),
+                None => {
+                    return Lowering::Blocked {
+                        why: "a handler named by what is no function or command".to_string(),
+                        span,
+                    };
+                }
+            }
+        }
+        _ => {
+            return Lowering::Blocked {
+                why: "a handler identity that is neither a lambda nor a name".to_string(),
+                span,
+            };
+        }
+    };
+    let param = match body.expr(lambda) {
+        Expr::Lambda { params, .. } => crate::values::lambda_params(body, params).first().copied(),
+        _ => None,
     };
     // The event, read in the listener and given to the module (ADR-0138):
     // an `on:` handler's one parameter, typed by its event.
-    let event = match crate::values::lambda_params(body, params).as_slice() {
-        [] => None,
-        [p] => {
+    let event = match takes {
+        0 => None,
+        1 => {
             let Some(ty) = crate::resume::handler_events(body)
                 .into_iter()
                 .find(|(_, e)| *e == lambda)
@@ -432,9 +456,9 @@ pub fn handler(
                         .to_string(),
                 };
             };
-            let name = match body.pat(*p) {
-                crate::hir::Pattern::Bind { name, .. } => Some(name.clone()),
-                crate::hir::Pattern::Wild => None,
+            let name = match param.map(|p| body.pat(p)) {
+                Some(crate::hir::Pattern::Bind { name, .. }) => Some(name.clone()),
+                Some(crate::hir::Pattern::Wild) | None => None,
                 _ => {
                     return Lowering::Unsupported {
                         construct: "an event taken apart in a handler's parameter",
@@ -552,6 +576,7 @@ pub fn handler(
     // The event, after the captures: the module decodes it from what the
     // listener read (ADR-0138).
     let takes_event = event.is_some();
+    let mut event_value = None;
     if let Some((name, ty)) = event {
         let ty = match ty_resolved(cx.sigs, &ty, &span) {
             Lowering::Lowered(t) => t,
@@ -563,8 +588,14 @@ pub fn handler(
             f.locals.insert(name, v);
         }
         captured.push((v, ty));
+        event_value = Some(v);
     }
-    let result = match f.expr(body, *inner, None) {
+    let lowered = match inner {
+        Some(inner) => f.expr(body, inner, None),
+        // The declaration, called with the event where it takes one.
+        None => f.call(body, lambda, &[], event_value, None, span.clone()),
+    };
+    let result = match lowered {
         Lowering::Lowered(v) => v,
         other => return other.map(|_| unreachable!()),
     };
