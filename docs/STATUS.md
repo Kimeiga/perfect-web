@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `699900d`, with ADR-0189.
+**Reviewed:** 2026-10-04, against master `f2060c6`, with ADR-0190.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2587,13 +2587,18 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`699900d` (2026-10-04, ADR-0189): `just ci` passes locally, and the
-workspace's 1896 tests pass. Its evidence is `docs/evidence/E14/links.txt`,
-recorded at that commit: 9 of 9 mutants killed, the corpus at C12, and every
-program the repository checks clean. ADR-0189 changes no page, so the
-browser suite is `673ae11`'s: 674 passed in three engines, with 13 skipped.
-ADR-0188's is `runtime-size.txt`, at `673ae11`: the sizes as served and as
-sent, and 2 of 2 controls failing their bounds. E7's record,
+`f2060c6` (2026-10-04, ADR-0190): `just ci` passes locally, the workspace's
+1899 tests pass, and the browser suite passes 686 in three engines, with 13
+skipped. Its evidence is `docs/evidence/E14/pages.txt`, recorded at that
+commit: the server's tests of a second page, the cart's own page in three
+engines, and 9 of 9 mutants killed. Recorded again at that commit, as their
+mutants were re-anchored on lines ADR-0190 moved: `accessibility.txt` 14 of
+14, `titles.txt` 16 of 16, `metadata.txt` 34 of 34, `document-reads.txt` 4
+of 4, `not-found.txt` 17 of 17, `query-values.txt` 7 of 7, `slots.txt` 7 of
+7 and `store-signals.txt` 2 of 2. ADR-0189's is `links.txt`, at `699900d`:
+9 of 9 mutants killed and the corpus at C12. ADR-0188's is
+`runtime-size.txt`, at `673ae11`: the sizes as served and as sent, and 2 of
+2 controls failing their bounds. E7's record,
 `docs/evidence/E7/performance.txt`, is recorded again at that commit, the
 first time since 2026-08-07: gate items 7 to 10 pass. ADR-0187's is
 `stable-layout.txt`, at `bdb3330`: the page in three engines, E7's gate item

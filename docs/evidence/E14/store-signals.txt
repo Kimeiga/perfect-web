@@ -1,18 +1,21 @@
 ADR-0140 - a page that reads queries holds signals too
 
 produced by: just e14-store-signals
-commit: 12fae691125db8b2e369ab65eb0ac50e670d380c
+commit: f2060c69f769e550f4298458d76936e47cac57ae
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the server (spikes/own-renderer/server)
 
 test tests::the_store_s_document_carries_its_signals ... ok
+test tests::a_line_records_the_stores_name_and_price_not_the_requests ... ok
 test tests::the_store_renders_its_signals_at_their_first_values ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.16s
+test tests::the_store_and_each_item_say_what_they_are ... ok
+test tests::the_store_sends_its_slots_after_its_own_content ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 108 filtered out; finished in 2.98s
 
 == mutation controls (scripts/store_signals_mutations.py)
 
-baseline: 2 passed, 0 failed
-the store renders without its signals: KILLED (1 of 2 tests fail)
-the store's document carries no signals: KILLED (1 of 2 tests fail)
+baseline: 5 passed, 0 failed
+the store renders without its signals: KILLED (3 of 5 tests fail)
+the store's document carries no signals: KILLED (1 of 5 tests fail)
 2 of 2 mutants killed
