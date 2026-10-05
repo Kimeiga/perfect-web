@@ -188,12 +188,20 @@ pub enum Part {
         segments: Vec<Segment>,
         context: Context,
     },
-    /// Another template, rendered in place.
-    Component {
+    /// **A use of a view that contains itself** (ADR-0203): an instance of
+    /// the view's own template, rendered in a frame of its own, each
+    /// parameter given the value its path reads where the use is.
+    Instance {
         id: PartId,
-        /// The resolved path, not the name as written.
+        /// The view's template, by its path.
         path: String,
         args: Vec<(String, String)>,
+        /// How many elements enclose the use, in its template.
+        #[serde(default)]
+        elements: u32,
+        /// How many elements the view's template nests, from its root.
+        #[serde(default)]
+        deepest: u32,
     },
     /// `<title>{store.name}</title>` at the top of a page's view (ADR-0183):
     /// the page's title. Its host writes it into the document's `<head>`
@@ -306,7 +314,7 @@ impl Part {
             | Part::Match { id, .. }
             | Part::Stream { id, .. }
             | Part::InterpolatedAttribute { id, .. }
-            | Part::Component { id, .. }
+            | Part::Instance { id, .. }
             | Part::RawHtml { id, .. }
             | Part::Title { id, .. }
             | Part::Meta { id, .. } => *id,
@@ -337,7 +345,7 @@ impl Part {
             | Part::Each { .. }
             | Part::Match { .. }
             | Part::Stream { .. }
-            | Part::Component { .. }
+            | Part::Instance { .. }
             | Part::RawHtml { .. } => Anchor::Range,
             Part::Title { .. } | Part::Meta { .. } => Anchor::Document,
             Part::Blocked { .. } => return None,
@@ -355,7 +363,7 @@ impl Part {
             Part::Match { .. } => "match",
             Part::Stream { .. } => "stream",
             Part::InterpolatedAttribute { .. } => "interpolated_attribute",
-            Part::Component { .. } => "component",
+            Part::Instance { .. } => "instance",
             Part::RawHtml { .. } => "raw_html",
             Part::Title { .. } => "title",
             Part::Meta { .. } => "meta",
@@ -462,7 +470,7 @@ impl Template {
                             .join(" "),
                         Part::Each { collection, .. } => collection.clone(),
                         Part::Event { handler, .. } => handler.clone(),
-                        Part::Component { path, .. } => path.clone(),
+                        Part::Instance { path, .. } => path.clone(),
                         Part::Stream { query, .. } => query.clone(),
                         // Every value the title or the metadata reads, in
                         // order.

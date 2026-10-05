@@ -2634,6 +2634,50 @@ e14-boxed-types:
      } > docs/evidence/E14/boxed-types.txt
     @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E14/boxed-types.txt
 
+# ADR-0203 (ADR-0130's ruling 2): a view that contains itself is an
+# instance of its own template, made at run time. The compiler's, the
+# renderer's and the in-browser renderer's tests, the thread page in three
+# engines, and the mutation controls.
+e14-view-instances:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0203 - a view that contains itself is an instance of its own template, made at run time"; echo; \
+       echo "produced by: just e14-view-instances"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/views_contain_themselves.rs)"; echo; \
+       cargo test --locked -p pw-core --test views_contain_themselves 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the renderer (runtime/pw-render/tests/properties.rs) and the browser's (runtime/pw-render-wasm)"; echo; \
+       cargo test --locked -p pw-render --test properties 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-render-wasm 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the thread page (spikes/own-renderer/e2e/thread.spec.mjs), three engines"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/thread.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/view_instances_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/view_instances_mutations.py; \
+     } > docs/evidence/E14/view-instances.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/view-instances.txt
+
+# ADR-0204: an element holds only the children HTML permits, as the page
+# holds them. The rule's tests, R-019's, and the mutation controls.
+e14-rendered-children:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0204 - an element holds only the children HTML permits, as the page holds them"; echo; \
+       echo "produced by: just e14-rendered-children"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rule (compiler/pw-core/tests/children_as_rendered.rs)"; echo; \
+       cargo test --locked -p pw-core --test children_as_rendered 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus's expectations, R-019's among them (compiler/pw-core/tests/checking_source.rs)"; echo; \
+       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/rendered_children_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/rendered_children_mutations.py; \
+     } > docs/evidence/E14/rendered-children.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/rendered-children.txt
+
 # ADR-0201 (ADR-0195's ruling 5): a case written alone is the case of the
 # type expected where it is written. Its tests, the components and the
 # JavaScript modules, and the mutation controls.

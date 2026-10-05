@@ -213,10 +213,12 @@ fn a_nested_template_renders_in_place_with_its_own_arguments() {
     };
     let parent = t(vec![
         Chunk::Static("<div>".into()),
-        Chunk::Dynamic(Part::Component {
+        Chunk::Dynamic(Part::Instance {
             id: PartId(0),
             path: "t.Card".into(),
             args: vec![("label".into(), "title".into())],
+            elements: 1,
+            deepest: 1,
         }),
         Chunk::Static("</div>".into()),
     ]);
@@ -428,18 +430,141 @@ fn a_value_with_no_text_form_is_refused_rather_than_stringified() {
 }
 
 #[test]
-fn an_unknown_component_is_refused_rather_than_skipped() {
-    let tpl = t(vec![Chunk::Dynamic(Part::Component {
+fn an_instance_of_an_unknown_template_is_refused_rather_than_skipped() {
+    let tpl = t(vec![Chunk::Dynamic(Part::Instance {
         id: PartId(0),
         path: "t.Missing".into(),
         args: vec![],
+        elements: 0,
+        deepest: 0,
     })]);
     assert_eq!(
         render(&tpl, &Env::new(), &[]),
-        Err(Blocked::UnknownComponent {
+        Err(Blocked::UnknownInstance {
             path: "t.Missing".into()
         })
     );
+}
+
+#[test]
+fn an_error_inside_an_instance_is_the_first_the_document_meets() {
+    // An instance is written after the markup around it (ADR-0203), and its
+    // error is still the first in the document: here, before the parent's
+    // own missing value after it.
+    let child = Template {
+        path: "t.Card".into(),
+        name: "Card".into(),
+        params: vec!["label".into()],
+        schema: "test".into(),
+        chunks: vec![Chunk::Dynamic(Part::Text {
+            id: PartId(0),
+            value: "missing".into(),
+            context: Context::Text,
+        })],
+    };
+    let instance = Chunk::Dynamic(Part::Instance {
+        id: PartId(0),
+        path: "t.Card".into(),
+        args: vec![("label".into(), "title".into())],
+        elements: 0,
+        deepest: 0,
+    });
+    let absent = Chunk::Dynamic(Part::Text {
+        id: PartId(1),
+        value: "absent".into(),
+        context: Context::Text,
+    });
+    let env = Env::new().set("title", Value::Text("Menu".into()));
+    let others = std::slice::from_ref(&child);
+    assert_eq!(
+        render(&t(vec![instance.clone(), absent.clone()]), &env, others),
+        Err(Blocked::MissingValue {
+            path: "missing".into()
+        })
+    );
+    // And the parent's, where it comes first.
+    assert_eq!(
+        render(&t(vec![absent, instance]), &env, others),
+        Err(Blocked::MissingValue {
+            path: "absent".into()
+        })
+    );
+}
+
+#[test]
+fn an_instance_rendered_alone_is_the_bytes_the_page_has_there() {
+    // A host renders a view's instance again, whole, when what it is given
+    // changed (ADR-0203): rendered alone, it is its frame and its markup,
+    // byte for byte what the page's render wrote where it is.
+    let child = Template {
+        path: "t.Card".into(),
+        name: "Card".into(),
+        params: vec!["label".into()],
+        schema: "test".into(),
+        chunks: vec![
+            Chunk::Static("<b>".into()),
+            Chunk::Dynamic(Part::Text {
+                id: PartId(0),
+                value: "label".into(),
+                context: Context::Text,
+            }),
+            Chunk::Static("</b>".into()),
+        ],
+    };
+    let parent = t(vec![
+        Chunk::Static("<div>".into()),
+        Chunk::Dynamic(Part::Instance {
+            id: PartId(3),
+            path: "t.Card".into(),
+            args: vec![("label".into(), "title".into())],
+            elements: 1,
+            deepest: 1,
+        }),
+        Chunk::Static("</div>".into()),
+    ]);
+    let env = Env::new().set("title", Value::Text("Menu".into()));
+    let others = std::slice::from_ref(&child);
+    let whole = render(&parent, &env, others).unwrap();
+    let alone = render_part(&parent, PartId(3), &env, others).unwrap();
+    assert!(alone.starts_with("<!--pw:s3@"), "{alone}");
+    assert_eq!(format!("<div>{alone}</div>"), whole);
+}
+
+#[test]
+fn the_templates_a_page_reaches_are_each_view_its_instances_reach() {
+    // What a host sends the browser with a page (ADR-0203): each view an
+    // instance renders, and each one those render, once.
+    let view = |path: &str, inner: Option<&str>| Template {
+        path: path.into(),
+        name: path.into(),
+        params: vec![],
+        schema: "test".into(),
+        chunks: inner
+            .map(|p| {
+                vec![Chunk::Dynamic(Part::Instance {
+                    id: PartId(0),
+                    path: p.into(),
+                    args: vec![],
+                    elements: 0,
+                    deepest: 0,
+                })]
+            })
+            .unwrap_or_default(),
+    };
+    // `A` renders `B`, which renders itself; `C` is rendered by nothing.
+    let others = vec![
+        view("t.A", Some("t.B")),
+        view("t.B", Some("t.B")),
+        view("t.C", None),
+    ];
+    let page = view("t.Page", Some("t.A"));
+    let reached: Vec<&str> = instances_reached(&page, &others)
+        .into_iter()
+        .map(|t| t.path.as_str())
+        .collect();
+    assert_eq!(reached, ["t.A", "t.B"]);
+    // One not among them is left out, and refused where it is rendered.
+    assert!(instances_reached(&view("t.Page", Some("t.Missing")), &others).is_empty());
 }
 
 // --- E7-R: part identity in the document ---------------------------------

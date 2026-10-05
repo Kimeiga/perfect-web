@@ -84,6 +84,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(unresolved_uses(&workspace, &hirs, i, &u.hir));
         // ADR-0072: an element named with a capital letter is a view.
         per_unit.extend(view_elements(&workspace, &hirs, i, &u.hir));
+        // ADR-0204: an element holds the children HTML permits, as it
+        // renders them.
+        per_unit.extend(nesting(&workspace, &hirs, i, &u.hir));
         // ADR-0148: a streamed query is read by a `<stream>`, which shows
         // each state its query can be in.
         per_unit.extend(crate::streams::check(&workspace, &hirs, &sigs, i, &u.hir));
@@ -3944,56 +3947,39 @@ fn composes(
             decl.name
         ));
     }
-    if reaches(workspace, hirs, def, def, &mut Vec::new()) {
+    // A view that contains itself is an instance made at run time, where a
+    // block, `{#if}`, `{#match}` or `{#each}`, is on the way back to it:
+    // the data ends it (ADR-0203, ADR-0130's ruling 2). With none, no data
+    // does.
+    if crate::template_ir::contains_itself_endlessly(workspace, hirs, def) {
         return Some(format!(
-            "`<{}>` contains itself, and a view that contains itself is not composed yet",
+            "`<{}>` contains itself with no `{{#if}}`, `{{#match}}` or `{{#each}}` on the way \
+             back to it, so it would never end",
+            decl.name
+        ));
+    }
+    if crate::template_ir::contains_itself(workspace, hirs, def)
+        && !(crate::page_values::signals_of(body).is_empty()
+            && crate::template_ir::provides_of(hirs, workspace, def.unit, body).is_empty())
+    {
+        return Some(format!(
+            "`<{}>` contains itself and holds a signal, and a view that contains itself holds \
+             none yet",
+            decl.name
+        ));
+    }
+    // A host runs the streams its page's plan names, and an instance's are
+    // its view's own template's (ADR-0148, ADR-0203).
+    if crate::template_ir::contains_itself(workspace, hirs, def)
+        && crate::template_ir::shows_a_stream(body)
+    {
+        return Some(format!(
+            "`<{}>` contains itself and shows a query's state in a `<stream>`, and a view that \
+             contains itself shows none yet",
             decl.name
         ));
     }
     None
-}
-
-/// Does the markup of the view `from` use `target`, directly or through the
-/// views it uses? `seen` is each view already followed.
-fn reaches(
-    workspace: &crate::resolve::Workspace,
-    hirs: &[&Hir],
-    from: crate::resolve::DefId,
-    target: crate::resolve::DefId,
-    seen: &mut Vec<crate::resolve::DefId>,
-) -> bool {
-    use crate::resolve::Resolution;
-    if seen.contains(&from) {
-        return false;
-    }
-    seen.push(from);
-    let Some(body) = crate::resolve::declaration(hirs, from)
-        .and_then(|d| d.body)
-        .map(|b| hirs[from.unit].body(b))
-    else {
-        return false;
-    };
-    let mut roots = Vec::new();
-    for e in body.walk() {
-        if let Expr::Template { roots: r, .. } = body.expr(e) {
-            roots.extend(r.iter().copied());
-        }
-    }
-    body.walk_markup(&roots).into_iter().any(|n| {
-        let Node::Element { tag, .. } = body.node(n) else {
-            return false;
-        };
-        if !tag.starts_with(|c: char| c.is_ascii_uppercase()) {
-            return false;
-        }
-        let (Resolution::Local(d) | Resolution::Imported { def: d, .. }) =
-            workspace.resolve(from.unit, tag)
-        else {
-            return false;
-        };
-        crate::resolve::declaration(hirs, d).is_some_and(|x| x.kind == DeclKind::View)
-            && (d == target || reaches(workspace, hirs, d, target, seen))
-    })
 }
 
 /// **An optimistic transition performs nothing.**
@@ -7125,6 +7111,170 @@ fn permitted_children(tag: &str) -> Option<&'static [&'static str]> {
     })
 }
 
+/// **An element holds only the children HTML permits, as the page holds
+/// them** (ADR-0204). A block's rows and branches are the element's
+/// children, and a view used there is the elements it renders at its top.
+/// Until 2026-10-05 only the elements written directly inside were read: a
+/// `<div>` in an `{#each}` inside a `<ul>` passed, and `<ul><Item /></ul>`
+/// was refused by the view's name though `Item` renders an `<li>`.
+fn nesting(
+    workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
+    unit: usize,
+    hir: &Hir,
+) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (_, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        for id in body.walk_markup(&template_roots(body)) {
+            let Node::Element { tag, children, .. } = body.node(id) else {
+                continue;
+            };
+            let Some(allowed) = permitted_children(tag) else {
+                continue;
+            };
+            let mut held = Vec::new();
+            for &c in children {
+                held_at(body, c, &mut held);
+            }
+            for c in held {
+                let Node::Element { tag: child, .. } = body.node(c) else {
+                    continue;
+                };
+                let (rendered, message) = if is_view_tag(child) {
+                    let mut tops = Vec::new();
+                    view_tops(
+                        workspace,
+                        hirs,
+                        unit,
+                        child,
+                        &mut BTreeSet::new(),
+                        &mut tops,
+                    );
+                    let Some(top) = tops.into_iter().find(|t| !allowed.contains(&t.as_str()))
+                    else {
+                        continue;
+                    };
+                    let message = format!(
+                        "`<{child}>` renders `<{top}>`, which is not permitted as a child of \
+                         `<{tag}>`"
+                    );
+                    (top, message)
+                } else if allowed.contains(&child.as_str()) {
+                    continue;
+                } else {
+                    let message = format!("`<{child}>` is not permitted as a child of `<{tag}>`");
+                    (child.clone(), message)
+                };
+                out.push(Diagnostic {
+                    code: crate::codes::INVALID_NESTING.id,
+                    invariant: crate::codes::INVALID_NESTING.invariant,
+                    reason: "invalid_nesting",
+                    detector: Detector::DeclarationRule,
+                    severity: Severity::Error,
+                    message,
+                    primary_span: body.node_span(c),
+                    related: vec![Related {
+                        span: body.node_span(id),
+                        label: format!("`<{tag}>` starts here"),
+                    }],
+                    explanation: Some(format!(
+                        "`<{tag}>` accepts only {}: HTML's content model, which validators and \
+                         assistive technology read a page by. A block's rows are the element's \
+                         children, and a view's are the elements it renders. A browser's parser \
+                         moves some of what HTML does not permit, as a table's stray content is \
+                         placed before the table, so the DOM stops matching the source.",
+                        allowed
+                            .iter()
+                            .map(|t| format!("`<{t}>`"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )),
+                    repairs: vec![Repair {
+                        description: format!(
+                            "wrap `<{rendered}>` in `<{}>`, or move it outside `<{tag}>`",
+                            allowed[0]
+                        ),
+                        replacement: None,
+                    }],
+                });
+            }
+        }
+    }
+    out
+}
+
+/// A declaration's markup roots.
+fn template_roots(body: &crate::hir::Body) -> Vec<crate::hir::NodeId> {
+    let mut roots = Vec::new();
+    for e in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(e) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    roots
+}
+
+/// An element named with a capital letter is a view (ADR-0072).
+fn is_view_tag(tag: &str) -> bool {
+    tag.starts_with(|c: char| c.is_ascii_uppercase())
+}
+
+/// The elements `node` puts where it is written: itself, or a block's rows
+/// and branches, through the blocks inside.
+fn held_at(body: &crate::hir::Body, node: crate::hir::NodeId, out: &mut Vec<crate::hir::NodeId>) {
+    match body.node(node) {
+        Node::Element { .. } => out.push(node),
+        Node::Block { children, .. } => {
+            for &c in children {
+                held_at(body, c, out);
+            }
+        }
+        Node::Text(_) | Node::Interpolation(_) | Node::Branch { .. } => {}
+    }
+}
+
+/// The elements the view `tag` renders at its top, resolved from `unit`:
+/// through its blocks, and through the views it uses there. A view met
+/// again on the way is not read twice, so one that contains itself ends.
+fn view_tops(
+    workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
+    unit: usize,
+    tag: &str,
+    seen: &mut BTreeSet<crate::resolve::DefId>,
+    out: &mut Vec<String>,
+) {
+    use crate::resolve::Resolution;
+    let (Resolution::Local(def) | Resolution::Imported { def, .. }) = workspace.resolve(unit, tag)
+    else {
+        return;
+    };
+    let Some(decl) = crate::resolve::declaration(hirs, def) else {
+        return;
+    };
+    if decl.kind != DeclKind::View || !seen.insert(def) {
+        return;
+    }
+    let Some(body_id) = decl.body else { return };
+    let body = hirs[def.unit].body(body_id);
+    let mut held = Vec::new();
+    for r in template_roots(body) {
+        held_at(body, r, &mut held);
+    }
+    for n in held {
+        let Node::Element { tag, .. } = body.node(n) else {
+            continue;
+        };
+        if is_view_tag(tag) {
+            view_tops(workspace, hirs, def.unit, tag, seen, out);
+        } else if !out.contains(tag) {
+            out.push(tag.clone());
+        }
+    }
+}
+
 /// Structural rules over a declaration's markup.
 ///
 /// None of these needs effect inference: they are properties of the tree the
@@ -7894,56 +8044,9 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
                 });
             }
 
-            Node::Element {
-                tag,
-                attrs,
-                children,
-                ..
-            } => {
-                // Invalid nesting.
-                if let Some(allowed) = permitted_children(tag) {
-                    for c in children {
-                        let Node::Element { tag: child, .. } = body.node(*c) else {
-                            continue;
-                        };
-                        if allowed.contains(&child.as_str()) {
-                            continue;
-                        }
-                        out.push(Diagnostic {
-                            code: "PW5012",
-                            invariant: "an element may only contain the children HTML permits",
-                            reason: "invalid_nesting",
-                            detector: Detector::DeclarationRule,
-                            severity: Severity::Error,
-                            message: format!(
-                                "`<{child}>` is not permitted as a child of `<{tag}>`"
-                            ),
-                            primary_span: body.node_span(*c),
-                            related: vec![Related {
-                                span: body.node_span(id),
-                                label: format!("`<{tag}>` starts here"),
-                            }],
-                            explanation: Some(format!(
-                                "`<{tag}>` accepts only {}. A browser silently reparses \
-                                 invalid nesting, so the DOM stops matching the source and \
-                                 every selector, test and assistive technology sees a \
-                                 different tree than the author wrote.",
-                                allowed
-                                    .iter()
-                                    .map(|t| format!("`<{t}>`"))
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
-                            )),
-                            repairs: vec![Repair {
-                                description: format!(
-                                    "wrap it in `<{}>`, or move it outside `<{tag}>`",
-                                    allowed[0]
-                                ),
-                                replacement: None,
-                            }],
-                        });
-                    }
-                }
+            Node::Element { tag, attrs, .. } => {
+                // Invalid nesting is `nesting`'s, which sees what a view
+                // renders (ADR-0204).
 
                 // Interactive behaviour on a non-interactive element. A
                 // handler `bind:value` wrote is PW5304's (ADR-0142).

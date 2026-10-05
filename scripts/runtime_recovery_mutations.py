@@ -34,8 +34,8 @@ MUTANTS = [
     (
         "a press on a refused handler does nothing",
         RUNTIME,
-        "      recoverOnPress(part, owners, verdict);\n",
-        "      void recoverOnPress;\n",
+        "    recoverOnPress(part, owners, verdict);\n",
+        "    void recoverOnPress;\n",
     ),
     (
         "the recovery codes are read one place off",

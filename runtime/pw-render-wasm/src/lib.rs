@@ -20,7 +20,9 @@
 //! ```
 //!
 //! A request is JSON: `{ "part": <a template part>, "values": { name: value } }`,
-//! each value in the wire form a page's signals are held in. An instance's
+//! each value in the wire form a page's signals are held in, and
+//! `"templates"`, each view's template an instance in the part is rendered
+//! with (ADR-0203). An instance's
 //! request names its row as `item`; an instance's changes, its row before and
 //! after as `was` and `now`.
 //!
@@ -105,11 +107,10 @@ pub unsafe extern "C" fn attribute_value(ptr: *const u8, len: usize) -> u32 {
     code
 }
 
-/// A request read: its JSON, its part, and the values it gives, set into a
-/// rendering environment. `Err((2, why))` for a request that is not one.
-fn read(
-    request: &[u8],
-) -> Result<(serde_json::Value, pw_render::ir::Part, pw_render::Env), (u32, String)> {
+/// A request read: its JSON, its part, the values it gives, set into a
+/// rendering environment, and the templates of the views it renders an
+/// instance of (ADR-0203). `Err((2, why))` for a request that is not one.
+fn read(request: &[u8]) -> Result<Read, (u32, String)> {
     let request = serde_json::from_slice::<serde_json::Value>(request)
         .map_err(|_| (2, "the request is not JSON".to_string()))?;
     let part: pw_render::ir::Part = serde_json::from_value(request["part"].clone())
@@ -120,8 +121,22 @@ fn read(
             env = env.set(name, pw_render::Value::from_wire(value));
         }
     }
-    Ok((request, part, env))
+    let templates = match request.get("templates") {
+        None => Vec::new(),
+        Some(t) => {
+            serde_json::from_value(t.clone()).map_err(|e| (2, format!("the templates: {e}")))?
+        }
+    };
+    Ok((request, part, env, templates))
 }
+
+/// What [`read`] reads.
+type Read = (
+    serde_json::Value,
+    pw_render::ir::Part,
+    pw_render::Env,
+    Vec<pw_render::Template>,
+);
 
 /// The one-part template a request's part is rendered in.
 fn template_of(part: pw_render::ir::Part) -> pw_render::Template {
@@ -137,11 +152,11 @@ fn template_of(part: pw_render::ir::Part) -> pw_render::Template {
 /// The request's part, rendered: `(0, html)`, `(1, why)` refused by the
 /// renderer, or `(2, why)` for a request that is not one.
 pub fn render(request: &[u8]) -> (u32, String) {
-    let (_, part, env) = match read(request) {
+    let (_, part, env, templates) = match read(request) {
         Ok(read) => read,
         Err(refused) => return refused,
     };
-    match pw_render::render(&template_of(part), &env, &[]) {
+    match pw_render::render(&template_of(part), &env, &templates) {
         Ok(html) => (0, html),
         Err(why) => (1, format!("{why:?}")),
     }
@@ -149,7 +164,7 @@ pub fn render(request: &[u8]) -> (u32, String) {
 
 /// One instance of the request's loop, for its `item`: `(0, html)`.
 pub fn instance(request: &[u8]) -> (u32, String) {
-    let (request, part, env) = match read(request) {
+    let (request, part, env, templates) = match read(request) {
         Ok(read) => read,
         Err(refused) => return refused,
     };
@@ -157,7 +172,7 @@ pub fn instance(request: &[u8]) -> (u32, String) {
         return (2, "the part is no loop".to_string());
     };
     let item = pw_render::Value::from_wire(&request["item"]);
-    match pw_render::render_instance(&template_of(part), each, &item, &env, &[]) {
+    match pw_render::render_instance(&template_of(part), each, &item, &env, &templates) {
         Ok(html) => (0, html),
         Err(why) => (1, format!("{why:?}")),
     }
@@ -167,7 +182,7 @@ pub fn instance(request: &[u8]) -> (u32, String) {
 /// each change as `[part, {"text": ..}]` or `[part, {"attribute": name,
 /// "value": ..}]`, or `null` where the instance must be rendered again.
 pub fn changes(request: &[u8]) -> (u32, String) {
-    let (request, part, env) = match read(request) {
+    let (request, part, env, templates) = match read(request) {
         Ok(read) => read,
         Err(refused) => return refused,
     };
@@ -176,7 +191,7 @@ pub fn changes(request: &[u8]) -> (u32, String) {
     };
     let was = pw_render::Value::from_wire(&request["was"]);
     let now = pw_render::Value::from_wire(&request["now"]);
-    match pw_render::instance_changes(&template_of(part), each, &was, &now, &env, &[]) {
+    match pw_render::instance_changes(&template_of(part), each, &was, &now, &env, &templates) {
         Ok(None) => (0, "null".to_string()),
         // A list inside a speculated row is refused at build (ADR-0170), and
         // the browser sets no list's operations of its own: rendered again.
@@ -209,7 +224,7 @@ pub fn changes(request: &[u8]) -> (u32, String) {
 /// The request's attribute, as the document writes it: `(0, json)`, the JSON
 /// `[name, value]`, `value` `null` for a boolean attribute that is absent.
 pub fn attribute(request: &[u8]) -> (u32, String) {
-    let (_, part, env) = match read(request) {
+    let (_, part, env, _) = match read(request) {
         Ok(read) => read,
         Err(refused) => return refused,
     };
@@ -394,5 +409,39 @@ mod tests {
             ask(&hidden, serde_json::json!({ "cart": { "lines": [] } })),
             (0, r#"["hidden",null]"#.to_string())
         );
+    }
+
+    /// A block holding an instance of a view that contains itself is
+    /// rendered with the view's template its request carries (ADR-0203),
+    /// and refused without it.
+    #[test]
+    fn an_instance_is_rendered_with_the_template_the_request_carries() {
+        let request = |templates: &str| {
+            format!(
+                r#"{{
+                "part": {{ "part": "conditional", "id": 1, "value": "open", "otherwise": [],
+                    "then": [{{ "chunk": "dynamic", "value": {{ "part": "instance", "id": 2,
+                        "path": "t.Card", "args": [["label", "title"]],
+                        "elements": 0, "deepest": 1 }} }}] }},
+                "values": {{ "open": true, "title": "<i>Menu</i>" }}
+                {templates}
+            }}"#
+            )
+        };
+        let card = r#", "templates": [{ "path": "t.Card", "name": "Card", "params": ["label"],
+            "schema": "s", "chunks": [
+                { "chunk": "static", "value": "<b>" },
+                { "chunk": "dynamic", "value": { "part": "text", "id": 0, "value": "label",
+                    "context": "text" } },
+                { "chunk": "static", "value": "</b>" }] }]"#;
+        let (code, html) = render(request(card).as_bytes());
+        assert_eq!(code, 0, "{html}");
+        let shown: String = html
+            .split("<!--")
+            .map(|piece| piece.split_once("-->").map_or(piece, |(_, after)| after))
+            .collect();
+        assert_eq!(shown, "<b>&lt;i&gt;Menu&lt;/i&gt;</b>");
+        assert!(html.contains("<!--pw:s2@"), "{html}");
+        assert_eq!(render(request("").as_bytes()).0, 1);
     }
 }

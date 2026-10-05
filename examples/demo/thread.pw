@@ -1,0 +1,132 @@
+// @corpus: fixture
+// @id: DEMO-thread
+// @category: composition — a view that contains itself, a reply thread
+// @charter: §8.1, §8.5
+// @milestone: E14
+//
+// ADR-0203: a view that contains itself. A comment's view shows each reply
+// as the same view, as deep as the thread goes: each use is an instance of
+// the view's template, made where it is used, in a frame of its own.
+// - The discussion is a query's: the server renders it, and each comment's
+//   button is bound in its own instance and sends its own comment.
+// - Its outline is a signal's, given whether it is expanded: the browser's
+//   copy of the renderer renders it again when that changes, as it does a
+//   block a signal decides that holds it.
+//
+// Outside the store on purpose, as the panel is: the benchmark's baseline is
+// the store's markup.
+
+module demo.thread
+
+import domain.{ CartError, InteractionId }
+
+type Comment = Comment { id: Int, author: String, text: String, replies: List<Comment> }
+
+// The discussion, the same for everybody.
+public query Discussion() -> Comment
+    freshness     30.seconds
+    consistency   snapshot
+    cache         shared
+    concurrency   one_per_key
+    timeout       2.seconds
+{
+    Comment {
+        id: 1,
+        author: "ana",
+        text: "Is the espresso good?",
+        replies: [
+            Comment {
+                id: 2,
+                author: "bo",
+                text: "Yes, ask for it short.",
+                replies: [
+                    Comment {
+                        id: 4,
+                        author: "ana",
+                        text: "How short?",
+                        replies: [
+                            Comment { id: 5, author: "bo", text: "Twenty grams in.", replies: [] }
+                        ]
+                    }
+                ]
+            },
+            Comment { id: 3, author: "cy", text: "The cortado is better.", replies: [] }
+        ]
+    }
+}
+
+// What a press asks the server: nothing changes, and the comment comes back.
+command upvote(comment: Int) -> Result<Int, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+{
+    Ok(comment)
+}
+
+// One comment, and each reply to it, as this view again. The `{#each}` is
+// on the way back to it: the thread's data ends it.
+view Thread(c: Comment) !{} {
+    <li>
+        <p><b>{c.author}</b>: {c.text}</p>
+        <button type="button" on:press={() => { let _voted = upvote(c.id) }}>Upvote</button>
+        <ul>
+            {#each c.replies as r (r.id)}
+                <Thread c={r} />
+            {/each}
+        </ul>
+    </li>
+}
+
+// A heading, and, open, each one under it.
+view Outline(c: Comment, open: Bool) !{} {
+    <li>
+        {c.text}
+        {#if open}
+            <ol>
+                {#each c.replies as r (r.id)}
+                    <Outline c={r} open={open} />
+                {/each}
+            </ol>
+        {/if}
+    </li>
+}
+
+page ThreadPage() {
+    cache private
+
+    let discussion = query Discussion()
+
+    signal shown: Bool = false
+    signal expanded: Bool = false
+    signal outline: Comment = Comment {
+        id: 1,
+        author: "",
+        text: "Espresso",
+        replies: [
+            Comment {
+                id: 2,
+                author: "",
+                text: "How to order it",
+                replies: [Comment { id: 3, author: "", text: "Short", replies: [] }]
+            }
+        ]
+    }
+
+    view {
+        <title>Discussion</title>
+        <main>
+            <h1>Discussion</h1>
+            <ul id="thread"><Thread c={discussion} /></ul>
+            <button id="expand" type="button" on:press={() => expanded = !expanded}>Expand</button>
+            <ol id="outline"><Outline c={outline} open={expanded} /></ol>
+            <button id="toggle" type="button" on:press={() => shown = !shown}>Summary</button>
+            {#if shown}
+                <section id="summary" aria-label="Summary">
+                    <ol><Outline c={outline} open={expanded} /></ol>
+                </section>
+            {:else}
+                <p id="no-summary">The summary is hidden.</p>
+            {/if}
+        </main>
+    }
+}

@@ -59,8 +59,14 @@ pub enum Blocked {
     MissingValue { path: String },
     /// A `RawHtml` part whose capability the caller did not present.
     UnauthorisedRawHtml { capability: String },
-    /// A template naming another that is not in the set given.
-    UnknownComponent { path: String },
+    /// An instance naming a template that is not in the set given.
+    UnknownInstance { path: String },
+    /// **An instance that would take the page past what a browser's parser
+    /// nests** (ADR-0203). Blink's HTML parser nests no more than 512 open
+    /// elements, and attaches a deeper one beside its parent, so the document
+    /// a browser builds would not be the one rendered, and no part in it
+    /// could be found where it was written.
+    TooDeep { path: String, elements: u32 },
     /// Two different loop keys derived the same instance token.
     ///
     /// Vanishingly unlikely with a 96-bit keyed derivation, and refused rather
@@ -98,7 +104,12 @@ impl std::fmt::Display for Blocked {
             Blocked::UnauthorisedRawHtml { capability } => {
                 write!(f, "raw HTML requires the `{capability}` capability")
             }
-            Blocked::UnknownComponent { path } => write!(f, "no template named `{path}`"),
+            Blocked::UnknownInstance { path } => write!(f, "no template named `{path}`"),
+            Blocked::TooDeep { path, elements } => write!(
+                f,
+                "an instance of `{path}` nests {elements} elements, past the \
+                 {NESTED_ELEMENTS} a page may"
+            ),
             Blocked::InstanceTokenCollision {
                 token,
                 first,
@@ -261,6 +272,9 @@ pub struct Env {
     /// entry is pending: a streamed one shows its placeholder, and one the
     /// page waits for is refused, since nothing gave its answer.
     settled: BTreeMap<PartId, Settled>,
+    /// How many elements enclose the root of the template being rendered,
+    /// through the instances around it (ADR-0203).
+    elements: u32,
 }
 
 impl Env {
@@ -348,6 +362,147 @@ impl Env {
         next.path.push(InstanceFrame { scope, instance });
         next
     }
+
+    /// **What an instance of a view renders in** (ADR-0203): its frame on
+    /// the path, `elements` deep in the page, with the capabilities and
+    /// identity domain of the page around it, and none of its values: it
+    /// reads its parameters alone.
+    fn instance(&self, scope: PartId, instance: InstanceToken, elements: u32) -> Env {
+        let mut path = self.path.clone();
+        path.push(InstanceFrame { scope, instance });
+        Env {
+            values: BTreeMap::new(),
+            granted: self.granted.clone(),
+            domain: self.domain.clone(),
+            path,
+            materialized: BTreeMap::new(),
+            settled: BTreeMap::new(),
+            elements,
+        }
+    }
+}
+
+/// **The most elements a page may nest** (ADR-0203): Blink's HTML parser
+/// nests no more than 512 open elements (`kMaximumHTMLParserDOMTreeDepth`,
+/// `html_construction_site.h`), and the document's own `<html>` and `<body>`
+/// are two of them. Ten more are left for a host's shell around the page.
+pub const NESTED_ELEMENTS: u32 = 500;
+
+/// **Markup being written, and each instance inside it, written later**
+/// (ADR-0203). A view that contains itself goes as deep as its data, and a
+/// renderer that went down with each instance would overflow its thread's
+/// stack before the page reached what a browser nests: a 2 MiB thread, a
+/// server's worker's, held about 250 in a debug build. So an instance is a
+/// place in `html`, filled by [`rendered`].
+#[derive(Default)]
+struct Out<'o> {
+    html: String,
+    /// Each instance, by where its markup goes in `html`, in order.
+    later: Vec<Later<'o>>,
+}
+
+/// An instance to render, and where.
+struct Later<'o> {
+    /// Its offset in the markup around it, between its frame's markers.
+    at: usize,
+    chunks: &'o [Chunk],
+    env: Env,
+}
+
+impl std::ops::Deref for Out<'_> {
+    type Target = String;
+    fn deref(&self) -> &String {
+        &self.html
+    }
+}
+
+impl std::ops::DerefMut for Out<'_> {
+    fn deref_mut(&mut self) -> &mut String {
+        &mut self.html
+    }
+}
+
+/// Markup whose instances are not written yet, and how far it is written.
+struct Open<'o> {
+    html: String,
+    later: std::vec::IntoIter<Later<'o>>,
+    written: usize,
+    /// Where it stopped, if it did: after the instances it holds so far.
+    failed: Option<Blocked>,
+}
+
+impl<'o> Open<'o> {
+    fn new(out: Out<'o>, failed: Option<Blocked>) -> Open<'o> {
+        Open {
+            html: out.html,
+            later: out.later.into_iter(),
+            written: 0,
+            failed,
+        }
+    }
+}
+
+/// **The markup `first` writes, each instance in it written where it is**
+/// (ADR-0203), depth first, so the document is written in order and an
+/// error is the first in it. What is open is a stack on the heap, not the
+/// call stack, so a page as deep as its data takes the renderer no deeper.
+fn rendered<'o>(
+    others: &'o [Template],
+    first: impl FnOnce(&mut Out<'o>) -> Result<(), Blocked>,
+) -> Result<String, Blocked> {
+    let mut out = Out::default();
+    let failed = first(&mut out).err();
+    let mut open = vec![Open::new(out, failed)];
+    let mut doc = String::new();
+    while let Some(top) = open.last_mut() {
+        if let Some(next) = top.later.next() {
+            doc.push_str(&top.html[top.written..next.at]);
+            top.written = next.at;
+            let mut out = Out::default();
+            let failed = emit(next.chunks, &next.env, others, &mut out).err();
+            open.push(Open::new(out, failed));
+            continue;
+        }
+        let done = open.pop().expect("one is open");
+        if let Some(e) = done.failed {
+            return Err(e);
+        }
+        doc.push_str(&done.html[done.written..]);
+    }
+    Ok(doc)
+}
+
+/// **The templates a template's instances reach** (ADR-0203): each view
+/// that contains itself it renders an instance of, and each one those
+/// reach, once, in the order met. A host sends each one's manifest with the
+/// page, so the browser reads an instance's parts in its own template. One
+/// not in `others` is left out, and refused where it is rendered.
+pub fn instances_reached<'o>(t: &Template, others: &'o [Template]) -> Vec<&'o Template> {
+    fn walk<'c>(chunks: &'c [Chunk], out: &mut Vec<&'c str>) {
+        for c in chunks {
+            let Chunk::Dynamic(p) = c else { continue };
+            if let Part::Instance { path, .. } = p {
+                out.push(path);
+            }
+            for inner in p.nested() {
+                walk(inner, out);
+            }
+        }
+    }
+    let mut reached: Vec<&'o Template> = Vec::new();
+    let mut paths = Vec::new();
+    walk(&t.chunks, &mut paths);
+    let mut i = 0;
+    while i < paths.len() {
+        if let Some(found) = others.iter().find(|o| o.path == paths[i])
+            && !reached.iter().any(|r| r.path == found.path)
+        {
+            reached.push(found);
+            walk(&found.chunks, &mut paths);
+        }
+        i += 1;
+    }
+    reached
 }
 
 /// Render one template to HTML bytes.
@@ -373,9 +528,7 @@ pub fn render_part(
             at: t.path.clone(),
         });
     };
-    let mut out = String::new();
-    emit_part(p, env, others, &mut out)?;
-    Ok(out)
+    rendered(others, |out| emit_part(p, env, others, out))
 }
 
 /// **The name a streamed region's range has**, which the patch that fills it
@@ -385,12 +538,12 @@ pub fn stream_name(part: PartId) -> String {
 }
 
 /// The arm a stream's query settled to, rendered with its value bound.
-fn emit_settled(
+fn emit_settled<'o>(
     p: &Part,
     outcome: &Settled,
     env: &Env,
-    others: &[Template],
-    out: &mut String,
+    others: &'o [Template],
+    out: &mut Out<'o>,
 ) -> Result<(), Blocked> {
     let Part::Stream { ready, failed, .. } = p else {
         return Ok(());
@@ -432,8 +585,7 @@ pub fn settled_patch(
     let outcome = env.settled.get(&part).ok_or(Blocked::MissingValue {
         path: format!("the answer of stream {part}"),
     })?;
-    let mut inner = String::new();
-    emit_settled(p, outcome, env, others, &mut inner)?;
+    let inner = rendered(others, |out| emit_settled(p, outcome, env, others, out))?;
     Ok(format!(
         "<template for=\"{}\">{inner}</template>",
         stream_name(part)
@@ -523,10 +675,12 @@ fn each_instance(
 
     let token = env.domain.instance_token(&env.path, *id, &raw);
     let scoped = env.with(binding, item.clone()).within(*id, token.clone());
-    let mut out = format!("<!--pw:s{id}@{token}-->");
-    emit(body, &scoped, others, &mut out)?;
-    out.push_str(&format!("<!--pw:e{id}@{token}-->"));
-    Ok(out)
+    rendered(others, |out| {
+        out.push_str(&format!("<!--pw:s{id}@{token}-->"));
+        emit(body, &scoped, others, out)?;
+        out.push_str(&format!("<!--pw:e{id}@{token}-->"));
+        Ok(())
+    })
 }
 
 /// The instance token an item would get in this template's loop.
@@ -810,9 +964,7 @@ fn changes_within(
     out: &mut Vec<(PartId, InstanceChange)>,
 ) -> Result<bool, Blocked> {
     let rendered = |c: &Chunk, e: &Env| -> Result<String, Blocked> {
-        let mut out = String::new();
-        emit(std::slice::from_ref(c), e, others, &mut out)?;
-        Ok(out)
+        rendered(others, |out| emit(std::slice::from_ref(c), e, others, out))
     };
     for c in chunks {
         let Chunk::Dynamic(p) = c else { continue };
@@ -1116,9 +1268,7 @@ pub fn attribute_value(p: &Part, env: &Env) -> Result<Option<(String, Option<Str
 }
 
 pub fn render(t: &Template, env: &Env, others: &[Template]) -> Result<String, Blocked> {
-    let mut out = String::new();
-    emit(&t.chunks, env, others, &mut out)?;
-    Ok(out)
+    rendered(others, |out| emit(&t.chunks, env, others, out))
 }
 
 /// **A page's metadata, as its head writes it** (ADR-0186): each `<meta>` at
@@ -1205,7 +1355,12 @@ pub fn title_text(t: &Template, env: &Env) -> Result<Option<String>, Blocked> {
     ))
 }
 
-fn emit(chunks: &[Chunk], env: &Env, others: &[Template], out: &mut String) -> Result<(), Blocked> {
+fn emit<'o>(
+    chunks: &[Chunk],
+    env: &Env,
+    others: &'o [Template],
+    out: &mut Out<'o>,
+) -> Result<(), Blocked> {
     let mut i = 0;
     while i < chunks.len() {
         match &chunks[i] {
@@ -1283,7 +1438,12 @@ fn captures_value(parts: &[&Part], env: &Env) -> Result<Option<String>, Blocked>
     Ok(Some(escape::attribute(&json)))
 }
 
-fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Result<(), Blocked> {
+fn emit_part<'o>(
+    p: &Part,
+    env: &Env,
+    others: &'o [Template],
+    out: &mut Out<'o>,
+) -> Result<(), Blocked> {
     // A materialized part is EMITTED, not rendered. The bytes were produced by
     // this same renderer in the fragment's own identity domain, and using them
     // verbatim is the difference between a shared fragment and two renders that
@@ -1551,23 +1711,49 @@ fn emit_part(p: &Part, env: &Env, others: &[Template], out: &mut String) -> Resu
 
         // Text as written, and each value escaped for the attribute's context:
         // a URI component in a URL, attribute-escaped elsewhere (ADR-0042).
-        Part::Component { id, path, args } => {
+        // A use of a view that contains itself (ADR-0203, ADR-0130's ruling
+        // 2): an instance of its template, in a frame of its own, as a loop's
+        // row is, so its parts are addressed apart from every other
+        // instance's. It reads its parameters alone, from the values its
+        // arguments read here. Each takes the page deeper, and none may take
+        // it past what a browser's parser nests.
+        Part::Instance {
+            id,
+            path,
+            args,
+            elements,
+            deepest,
+        } => {
             let t = others
                 .iter()
                 .find(|t| t.path == *path)
-                .ok_or(Blocked::UnknownComponent { path: path.clone() })?;
-            let mut child = Env::new();
-            child.granted = env.granted.clone();
+                .ok_or(Blocked::UnknownInstance { path: path.clone() })?;
+            let root = env.elements + elements;
+            if root + deepest > NESTED_ELEMENTS {
+                return Err(Blocked::TooDeep {
+                    path: path.clone(),
+                    elements: root + deepest,
+                });
+            }
+            let token = env.domain.instance_token(&env.path, *id, path);
+            let mut child = env.instance(*id, token.clone(), root);
             for (param, source) in args {
                 let v = env.get(source).ok_or(Blocked::MissingValue {
                     path: source.clone(),
                 })?;
                 child = child.set(param, v.clone());
             }
-            let rendered = render(t, &child, others)?;
-            out.push_str(&format!("<!--pw:s{id}-->"));
-            out.push_str(&rendered);
-            out.push_str(&format!("<!--pw:e{id}-->"));
+            // Its markup is written here by `rendered`, after this
+            // template's, so no instance is on the stack of the one around
+            // it.
+            out.push_str(&format!("<!--pw:s{id}@{token}-->"));
+            let at = out.len();
+            out.later.push(Later {
+                at,
+                chunks: &t.chunks,
+                env: child,
+            });
+            out.push_str(&format!("<!--pw:e{id}@{token}-->"));
             Ok(())
         }
 

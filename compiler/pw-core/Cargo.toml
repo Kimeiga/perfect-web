@@ -48,3 +48,6 @@ wasmparser = "0.257.1"
 [dev-dependencies]
 # ADR-0158: a test leaves nothing behind.
 tempfile.workspace = true
+# ADR-0203: a view that contains itself, compiled here and rendered by the
+# renderer the hosts use, in one test. A workspace path: nothing is fetched.
+pw-render = { path = "../../runtime/pw-render" }

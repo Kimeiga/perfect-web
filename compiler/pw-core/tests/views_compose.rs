@@ -535,7 +535,7 @@ fn what_a_view_captures_is_checked_where_it_is_given() {
              opaque type SessionId = String\n\n\
              session query Basket(s: SessionId) -> Result<List<Line>, CartError>\n    cache private\n{{\n    todo\n}}\n\n\
              session view Lines(lines: List<Line>) !{{}} {{\n    \
-             <ul>{{#each lines as line (line.n)}}<button on:press={{resumable({capture}) => {reads}}}>go</button>{{/each}}</ul>\n}}\n\n\
+             <ul>{{#each lines as line (line.n)}}<li><button on:press={{resumable({capture}) => {reads}}}>go</button></li>{{/each}}</ul>\n}}\n\n\
              page Checkout(lines: List<Line>) {{\n    cache private\n    view {{ <Lines lines={{lines}} /> }}\n}}\n"
         )
     };

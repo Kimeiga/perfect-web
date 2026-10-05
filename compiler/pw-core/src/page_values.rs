@@ -243,7 +243,7 @@ fn rendered_again(
                     Segment::Static(_) => None,
                 })
                 .collect(),
-            Part::Component { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
+            Part::Instance { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
             Part::Title { pieces, .. } => title_reads(pieces),
             Part::Meta { content, .. } => title_reads(content),
             // A stream's query's arguments, each a value's path or an
@@ -284,6 +284,17 @@ fn rendered_again(
                             Part::Text { .. } | Part::Conditional { .. } | Part::Match { .. },
                             Reach::Top,
                         ) => {}
+                        // A view's instance, rendered again whole in the
+                        // browser, from the page's signals alone (ADR-0203).
+                        (Part::Instance { .. }, Reach::Top) => {
+                            if let Some(other) = own.iter().find(|v| !signal(v)) {
+                                return Err(format!(
+                                    "part {id} is an instance given the signal `{s}` and \
+                                     `{other}`, and the browser renders it again from the \
+                                     page's signals alone (ADR-0203)"
+                                ));
+                            }
+                        }
                         // Set in place (ADR-0142).
                         (Part::Attribute { .. } | Part::BooleanAttribute { .. }, Reach::Top)
                             if set_in_place(p) => {}
@@ -391,7 +402,7 @@ fn own_reads(p: &crate::template_ir::Part) -> Vec<String> {
                 Segment::Static(_) => None,
             })
             .collect(),
-        Part::Component { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
+        Part::Instance { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
         Part::Stream { args, .. } => args.iter().filter(|a| !a.ends_with(')')).cloned().collect(),
         Part::Title { pieces, .. } => title_reads(pieces),
         Part::Meta { content, .. } => title_reads(content),
@@ -1388,6 +1399,46 @@ fn plan(
             )
         {
             blocks.push(entry.id.0);
+        }
+        // A view's instance a query's value gives, at the top of the page
+        // (ADR-0203): a host renders it, and again, whole, when what it
+        // renders changed, as it does a block.
+        if entry.kind == "instance"
+            && let Some(crate::template_ir::Part::Instance { args, .. }) =
+                find_part(&template.chunks, entry.id.0)
+            && args.iter().any(|(_, v)| {
+                let root = v.split('.').next().unwrap_or_default();
+                found.iter().any(|(n, ..)| n == root)
+            })
+            && template.chunks.iter().any(
+                |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),
+            )
+        {
+            blocks.push(entry.id.0);
+        }
+        // And one the page's signals give: rendered again in the browser,
+        // whole, when one of them changes. One given anything else as well
+        // was refused above.
+        if entry.kind == "instance"
+            && let Some(part @ crate::template_ir::Part::Instance { args, .. }) =
+                find_part(&template.chunks, entry.id.0)
+            && let Some(root) = args
+                .iter()
+                .map(|(_, v)| v.split('.').next().unwrap_or_default())
+                .find(|r| signals.iter().any(|s| s == r))
+            && template.chunks.iter().any(
+                |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),
+            )
+        {
+            live.push(Live {
+                part: entry.id.0,
+                signal: root.to_string(),
+                path: String::new(),
+                kind: entry.kind.to_string(),
+                reads: block_reads(part, &signals),
+                attribute: String::new(),
+                owns: Vec::new(),
+            });
         }
         // A block a signal decides (ADR-0130). What the browser cannot
         // render again was refused above (ADR-0137).

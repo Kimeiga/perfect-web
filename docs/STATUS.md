@@ -13,6 +13,36 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0203, 2026-10-05: a view that contains itself is an instance of its
+own template, made at run time** (ADR-0130, ruling 2). A reply thread's view
+shows each reply as itself, as deep as its data: each use is an `instance`
+part, rendered in a frame of its own, with addresses of its own. One with no
+block on the way back to it, holding a signal or showing a stream, is
+refused (PW5020). The
+renderer writes each instance after the markup around it, not on its stack:
+rendered one inside another, a chain of 247 overflowed a 4 MiB thread in a
+debug build. It refuses a page nesting more than 500 elements, under the 512
+Blink's and WebKit's parsers nest. The browser reads each instance in its
+own template, binds its handlers in every instance, and renders a block
+holding instances again; the host renders an instance a query gives again,
+whole. `examples/demo/thread.pw` in three engines; 27 mutants (`just
+e14-view-instances`).
+
+**ADR-0204, 2026-10-05: an element holds only the children HTML permits, as
+the page holds them.** Correction, found by ADR-0203's first test: PW5012
+read only the elements written directly inside. `<ul><Thread /></ul>` was
+refused though `Thread` renders an `<li>`, and a `<div>` row of an `{#each}`
+in a `<ul>` passed; one of the compiler's own test fixtures had such rows. A
+block's rows and branches, and what a view renders at its top, are read now.
+8 mutants (`just e14-rendered-children`).
+
+**Correction, 2026-10-05: a mutant survived at 7d3234b.**
+`docs/evidence/E14/recursive-types.txt` recorded 17 of 18: "a list holds its
+elements in place" changed `contains_itself_in_place`, which nothing had
+called since ADR-0202 moved boxing into the encoder. It and the three
+functions only it reached are removed, and the mutant retired with them
+(`a2fc80f`).
+
 **ADR-0202, 2026-10-05: a type that holds itself in place is boxed, and
 crosses as its nodes.** ADR-0194 compiled a type that contains itself through
 a list, and refused `next: Option<Node>` and `Add(Expr, Expr)` by name. Each

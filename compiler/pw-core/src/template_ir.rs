@@ -322,12 +322,23 @@ pub enum Part {
         segments: Vec<Segment>,
         context: Context,
     },
-    /// Another template, rendered in place.
-    Component {
+    /// **A use of a view that contains itself** (ADR-0203, ADR-0130's
+    /// ruling 2): an instance of the view's own template, made at run time,
+    /// each parameter given a value path read where the use is. Its parts
+    /// are addressed inside a frame it opens.
+    Instance {
         id: PartId,
-        /// The resolved path, not the name as written.
+        /// The view's template, by its path.
         path: String,
         args: Vec<(String, String)>,
+        /// How many elements enclose the use, in its template.
+        #[serde(default)]
+        elements: u32,
+        /// How many elements the deepest part of the view's template nests
+        /// in, from its root: with `elements`, how deep each instance takes
+        /// the page, which the renderer bounds.
+        #[serde(default)]
+        deepest: u32,
     },
     /// `<title>{store.name}</title>` at the top of a page's view (ADR-0183):
     /// the page's title. Its host writes it into the document's `<head>`,
@@ -435,6 +446,24 @@ impl Part {
         }
     }
 
+    /// [`Part::nested`], to change.
+    fn nested_mut(&mut self) -> Vec<&mut Vec<Chunk>> {
+        match self {
+            Part::Conditional {
+                then, otherwise, ..
+            } => vec![then, otherwise],
+            Part::Each { body, .. } => vec![body],
+            Part::Match { arms, .. } => arms.iter_mut().map(|a| &mut a.body).collect(),
+            Part::Stream {
+                placeholder,
+                ready,
+                failed,
+                ..
+            } => vec![placeholder, &mut ready.body, &mut failed.body],
+            _ => Vec::new(),
+        }
+    }
+
     /// This part's identity, or `None` for a `Blocked` one — which has no
     /// identity because it is never rendered.
     pub fn id(&self) -> Option<PartId> {
@@ -448,7 +477,7 @@ impl Part {
             | Part::Match { id, .. }
             | Part::Stream { id, .. }
             | Part::InterpolatedAttribute { id, .. }
-            | Part::Component { id, .. }
+            | Part::Instance { id, .. }
             | Part::RawHtml { id, .. }
             | Part::Title { id, .. }
             | Part::Meta { id, .. } => *id,
@@ -479,7 +508,7 @@ impl Part {
             | Part::Each { .. }
             | Part::Match { .. }
             | Part::Stream { .. }
-            | Part::Component { .. }
+            | Part::Instance { .. }
             | Part::RawHtml { .. } => Anchor::Range,
             Part::Title { .. } | Part::Meta { .. } => Anchor::Document,
             Part::Blocked { .. } => return None,
@@ -497,7 +526,7 @@ impl Part {
             Part::Match { .. } => "match",
             Part::Stream { .. } => "stream",
             Part::InterpolatedAttribute { .. } => "interpolated_attribute",
-            Part::Component { .. } => "component",
+            Part::Instance { .. } => "instance",
             Part::RawHtml { .. } => "raw_html",
             Part::Title { .. } => "title",
             Part::Meta { .. } => "meta",
@@ -555,6 +584,10 @@ struct Indexer {
     /// Each signal instance the template holds, in the order written
     /// (ADR-0144).
     instances: Vec<Instance>,
+    /// How many elements enclose the node being lowered (ADR-0203).
+    elements: u32,
+    /// The most elements any node of the template nests in.
+    deepest: u32,
 }
 
 /// **A signal the template holds** (ADR-0144): a page's own, a composed
@@ -772,7 +805,7 @@ impl Template {
                             .join(" "),
                         Part::Each { collection, .. } => collection.clone(),
                         Part::Event { handler, .. } => handler.clone(),
-                        Part::Component { path, .. } => path.clone(),
+                        Part::Instance { path, .. } => path.clone(),
                         // The query whose state the region shows.
                         Part::Stream { query, .. } => query.clone(),
                         // Every value the title or the metadata reads, in
@@ -911,12 +944,93 @@ pub fn build_with(hirs: &[&Hir], handlers: &Handlers) -> Vec<Template> {
                 continue;
             }
             if let Some(l) = lowered(hirs, &ws, handlers, unit, id) {
-                out.push(l.template);
+                out.push((l.template, l.deepest));
             }
         }
     }
+    // Each instance, how deep its view's template nests (ADR-0203).
+    let deepest: BTreeMap<String, u32> = out.iter().map(|(t, d)| (t.path.clone(), *d)).collect();
+    let mut out: Vec<Template> = out.into_iter().map(|(t, _)| t).collect();
+    for t in &mut out {
+        fill_deepest(&mut t.chunks, &deepest);
+    }
+    close_schemas(&mut out);
     out.sort_by(|a, b| a.path.cmp(&b.path));
     out
+}
+
+/// Each instance's template, by path, in `chunks` at any depth.
+fn instance_paths(chunks: &[Chunk], out: &mut BTreeSet<String>) {
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if let Part::Instance { path, .. } = p {
+            out.insert(path.clone());
+        }
+        for nested in p.nested() {
+            instance_paths(nested, out);
+        }
+    }
+}
+
+/// **Each template's schema, over every template its instances reach**
+/// (ADR-0203). The parts inside an instance are numbered by its view's own
+/// template, so a change there changes what the page's addresses mean, as a
+/// change to the page's own markup does.
+fn close_schemas(templates: &mut [Template]) {
+    let own: BTreeMap<String, String> = templates
+        .iter()
+        .map(|t| (t.path.clone(), t.schema.clone()))
+        .collect();
+    let reaches: BTreeMap<String, BTreeSet<String>> = templates
+        .iter()
+        .map(|t| {
+            let mut paths = BTreeSet::new();
+            instance_paths(&t.chunks, &mut paths);
+            (t.path.clone(), paths)
+        })
+        .collect();
+    let feed = |h: &mut u64, bytes: &[u8]| {
+        for b in bytes {
+            *h ^= *b as u64;
+            *h = h.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    };
+    for t in templates.iter_mut() {
+        let mut seen = BTreeSet::new();
+        let mut stack: Vec<&String> = reaches[&t.path].iter().collect();
+        while let Some(p) = stack.pop() {
+            if seen.insert(p) {
+                stack.extend(reaches.get(p).into_iter().flatten());
+            }
+        }
+        if seen.is_empty() {
+            continue;
+        }
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        feed(&mut h, own[&t.path].as_bytes());
+        for p in seen {
+            feed(&mut h, p.as_bytes());
+            feed(&mut h, own.get(p).map(String::as_bytes).unwrap_or_default());
+        }
+        t.schema = format!("{h:016x}");
+    }
+}
+
+/// Each instance in `chunks`, at any depth, told how deep its view's
+/// template nests (ADR-0203).
+fn fill_deepest(chunks: &mut [Chunk], deepest: &BTreeMap<String, u32>) {
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if let Part::Instance {
+            path, deepest: d, ..
+        } = p
+        {
+            *d = deepest.get(path.as_str()).copied().unwrap_or_default();
+        }
+        for nested in p.nested_mut() {
+            fill_deepest(nested, deepest);
+        }
+    }
 }
 
 /// One declaration's template, as one traversal lowered it.
@@ -932,6 +1046,8 @@ pub struct Lowered {
     pub views: Vec<DefId>,
     /// **Each signal it holds** (ADR-0144).
     pub instances: Vec<Instance>,
+    /// The most elements any of its parts nests in (ADR-0203).
+    pub deepest: u32,
 }
 
 /// **One renderable declaration's template, and its text holes** (ADR-0122),
@@ -984,7 +1100,6 @@ pub fn lowered(
         unit,
         decl: id,
         names: BTreeMap::new(),
-        within: Vec::new(),
         provided,
         signals,
     };
@@ -1025,6 +1140,7 @@ pub fn lowered(
         reads: ix.reads,
         views: ix.views,
         instances: ix.instances,
+        deepest: ix.deepest,
     })
 }
 
@@ -1052,9 +1168,6 @@ struct Lowering<'a> {
     /// a name the view binds renamed where it would hide one of those paths.
     /// Empty in a declaration's own markup, whose names are its own.
     names: BTreeMap<String, String>,
-    /// The views composed around this one. A view that contains itself is
-    /// refused, not followed.
-    within: Vec<DefId>,
     /// **The instance each provided signal is, here** (ADR-0144): the
     /// nearest `provide` around this body, by the signal's declaration.
     provided: BTreeMap<DefId, String>,
@@ -1123,6 +1236,92 @@ impl<'a> Lowering<'a> {
             _ => None,
         }
     }
+}
+
+/// **The views a view's markup uses** (ADR-0203), each with whether a
+/// block, `{#if}`, `{#match}` or `{#each}`, encloses the use, resolved as
+/// [`Lowering::view_named`] resolves a tag.
+fn view_uses(ws: &Workspace, hirs: &[&Hir], def: DefId) -> Vec<(DefId, bool)> {
+    let Some(body) = crate::resolve::declaration(hirs, def)
+        .and_then(|d| d.body)
+        .map(|b| hirs[def.unit].body(b))
+    else {
+        return Vec::new();
+    };
+    let mut roots = Vec::new();
+    for e in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(e) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    let mut out = Vec::new();
+    let mut stack: Vec<(NodeId, bool)> = roots.iter().rev().map(|r| (*r, false)).collect();
+    while let Some((n, in_block)) = stack.pop() {
+        let kids: Vec<(NodeId, bool)> = match body.node(n) {
+            Node::Element { tag, children, .. } => {
+                if tag.starts_with(|c: char| c.is_ascii_uppercase())
+                    && let Resolution::Local(d) | Resolution::Imported { def: d, .. } =
+                        ws.resolve(def.unit, tag)
+                    && crate::resolve::declaration(hirs, d)
+                        .is_some_and(|x| x.kind == crate::hir::DeclKind::View)
+                {
+                    out.push((d, in_block));
+                }
+                children.iter().map(|c| (*c, in_block)).collect()
+            }
+            Node::Block { children, .. } => children.iter().map(|c| (*c, true)).collect(),
+            _ => Vec::new(),
+        };
+        stack.extend(kids.into_iter().rev());
+    }
+    out
+}
+
+/// Does `from` reach `target` through the views it uses, every one of them,
+/// or, with `blocks` false, only those no block encloses?
+fn view_reaches(
+    ws: &Workspace,
+    hirs: &[&Hir],
+    from: DefId,
+    target: DefId,
+    blocks: bool,
+    seen: &mut BTreeSet<DefId>,
+) -> bool {
+    if !seen.insert(from) {
+        return false;
+    }
+    view_uses(ws, hirs, from)
+        .into_iter()
+        .filter(|(_, in_block)| blocks || !in_block)
+        .any(|(d, _)| d == target || view_reaches(ws, hirs, d, target, blocks, seen))
+}
+
+/// **Does a body's markup show a query's state**, in a `<stream>`
+/// (ADR-0148)? A host runs the streams its page's plan names, so a view that
+/// contains itself shows none yet (ADR-0203).
+pub(crate) fn shows_a_stream(body: &crate::hir::Body) -> bool {
+    let mut roots = Vec::new();
+    for e in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(e) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    body.walk_markup(&roots)
+        .into_iter()
+        .any(|n| matches!(body.node(n), Node::Element { tag, .. } if tag == "stream"))
+}
+
+/// **Does a view contain itself** (ADR-0203), through the views it uses?
+/// Each use of one is an instance made at run time (ADR-0130, ruling 2).
+pub(crate) fn contains_itself(ws: &Workspace, hirs: &[&Hir], def: DefId) -> bool {
+    view_reaches(ws, hirs, def, def, true, &mut BTreeSet::new())
+}
+
+/// **Does a view contain itself with no block between** (ADR-0203): a
+/// cycle of uses no `{#if}`, `{#match}` or `{#each}` encloses, which no data
+/// ends?
+pub(crate) fn contains_itself_endlessly(ws: &Workspace, hirs: &[&Hir], def: DefId) -> bool {
+    view_reaches(ws, hirs, def, def, false, &mut BTreeSet::new())
 }
 
 /// **Is a view's body what composition writes in place?** Its markup
@@ -1758,6 +1957,9 @@ fn lower_element(
         }
     }
 
+    // How deep the template nests (ADR-0203): this element, inside those
+    // around it.
+    ix.deepest = ix.deepest.max(ix.elements + 1);
     if VOID_ELEMENTS.contains(&tag) {
         // `<br>`, not `<br/>` and not `<br></br>`. The slash is ignored by the
         // HTML parser and the closing tag is a parse error it repairs — both
@@ -1767,9 +1969,11 @@ fn lower_element(
     }
 
     out.push(Chunk::Static(">".to_string()));
+    ix.elements += 1;
     for c in children {
         lower_node(body, *c, ctx, ix, out);
     }
+    ix.elements -= 1;
     // A closing tag for everything that is not void, whether or not the source
     // wrote `/>`. A first version branched on `self_closing` and produced the
     // same bytes on both sides, which is the shape of a decision that was never
@@ -1808,10 +2012,6 @@ fn compose(
         out.push(blocked(format!("`{tag}` has no body")));
         return;
     };
-    if ctx.within.contains(&def) {
-        out.push(blocked(format!("`<{tag}>` contains itself")));
-        return;
-    }
     if !composable(view) {
         out.push(blocked(format!(
             "`{tag}` declares values of its own, and a composed view holds its markup and its \
@@ -1849,6 +2049,48 @@ fn compose(
     // need one of its own, which the browser does not hold yet (PW5307).
     let own = crate::page_values::signals_of(view);
     let gives = provides_of(ctx.hirs, ctx.ws, def.unit, view);
+    // A view that contains itself is an instance made at run time (ADR-0203,
+    // ADR-0130's ruling 2): its own template, compiled once, its parameters
+    // given the value paths its props are, read here. Composed in place, it
+    // would never end. An instance is a run-time scope, as a loop's row is,
+    // and holds no signal yet.
+    if contains_itself(ctx.ws, ctx.hirs, def) {
+        if !(own.is_empty() && gives.is_empty()) {
+            out.push(blocked(format!(
+                "`<{tag}>` contains itself and holds a signal, and a view that contains \
+                 itself holds none yet"
+            )));
+            return;
+        }
+        if shows_a_stream(view) {
+            out.push(blocked(format!(
+                "`<{tag}>` contains itself and shows a query's state in a `<stream>`, and a \
+                 view that contains itself shows none yet"
+            )));
+            return;
+        }
+        if !ix.views.contains(&def) {
+            ix.views.push(def);
+        }
+        let module = hir.module_of(DeclId(def.decl)).unwrap_or_default();
+        let path = if module.is_empty() {
+            decl.name.clone()
+        } else {
+            format!("{module}.{}", decl.name)
+        };
+        out.push(Chunk::Dynamic(Part::Instance {
+            id: ix.part(),
+            path,
+            args: decl
+                .params
+                .iter()
+                .filter_map(|p| Some((p.name.clone(), names.get(&p.name)?.clone())))
+                .collect(),
+            elements: ix.elements,
+            deepest: 0,
+        }));
+        return;
+    }
     if ix.frames > 0 && !(own.is_empty() && gives.is_empty()) {
         out.push(blocked(format!(
             "`<{tag}>` holds a signal, and a view used in a loop's row holds none yet"
@@ -1900,8 +2142,6 @@ fn compose(
     if !ix.views.contains(&def) {
         ix.views.push(def);
     }
-    let mut within = ctx.within.clone();
-    within.push(def);
     let inner = Lowering {
         handlers: ctx.handlers,
         hirs: ctx.hirs,
@@ -1909,7 +2149,6 @@ fn compose(
         unit: def.unit,
         decl: DeclId(def.decl),
         names,
-        within,
         provided,
         signals,
     };
@@ -2541,7 +2780,7 @@ fn schema_of(params: &[String], chunks: &[Chunk]) -> String {
                             }
                             feed(h, format!("{context:?}").as_bytes());
                         }
-                        Part::Component { path, args, .. } => {
+                        Part::Instance { path, args, .. } => {
                             feed(h, path.as_bytes());
                             for (a, b) in args {
                                 feed(h, a.as_bytes());

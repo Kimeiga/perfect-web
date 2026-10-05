@@ -281,9 +281,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - ~~held in place, boxed: `Option<Node>`, `Add(Expr, Expr)`~~
           (ADR-0202, `just e14-boxed-types`); through another declaration
           across a boundary still to build;
-        - then the browser's wire, as nodes, and views that contain
-          themselves (ADR-0130's ruling, unbuilt since ADR-0136), bounded
-          below the 512 elements a browser's parser nests.
+        - ~~views that contain themselves, each use an instance of the
+          view's template, bounded below the 512 elements a browser's parser
+          nests~~ (ADR-0203, `just e14-view-instances`), which found
+          PW5012 reading neither a view's markup nor a block's rows
+          (ADR-0204, `just e14-rendered-children`);
+        - then the browser's wire, as nodes, so a signal's thread may be
+          deeper than serde_json's 128 nested values and a handler may set
+          one; and a signal in a view that contains itself.
     21. **A data source states what it guarantees**: transactions,
         consistency and its change feed. The compiler refuses a query or a
         command that asks more of its source than it gives.

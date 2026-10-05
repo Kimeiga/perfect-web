@@ -86,8 +86,10 @@ rather than approximated:
     each other), held deeper than one `List` or `Option` of itself, holding
     another such type, or as an opaque type: refused by name where its WIT is
     written. Each compiles inside a component;
-  - **on the browser's wire**: a handler, a signal or a browser's argument
-    holding one is refused by name;
+  - **on the browser's wire**: a handler capturing one, setting a signal to
+    one or sending one to a command, and a browser's argument holding one,
+    are refused by name. A signal holds one at its first value, and the
+    browser renders it, as JSON, within serde_json's 128 nested values;
   - **nested deeper than 128 in a host** (`NESTED_DEPTH`): a host reads such
     a value's nodes instead.
 - **`==` compares primitives only.** Two records, two sum-type values or two
@@ -248,8 +250,16 @@ refused by name:
 - **A view composes when its body is its markup, its signals and its
   `provide`s** (ADR-0136, ADR-0144). Refused by name (PW5020):
   - a view with other bindings of its own;
-  - a view that contains itself, which ADR-0130 rules a run-time instance;
   - a prop that is not a value path, a literal included (`label="Add"`).
+- **A view that contains itself is an instance made at run time**
+  (ADR-0203), each use rendered in a frame of its own. Refused by name
+  (PW5020): one with no `{#if}`, `{#match}` or `{#each}` on the way back to
+  it, one that holds or provides a signal, and one that shows a `<stream>`.
+  A page nests at most 500 elements, and the renderer refuses one deeper
+  (`TooDeep`). A change inside an instance renders it again whole: a list
+  in it is not kept in place, and what has focus there loses it. An
+  instance at the top of a page given a signal and anything else is
+  refused, as the browser holds the signals alone.
 
   A signal given to a view as a prop is shown, not changed: a view's
   handler that would capture one is refused (PW5301). A view changes a
@@ -628,6 +638,13 @@ case after the page is shown fails as any read does.
 - whether an ARIA attribute is allowed on its element's role, and what a
   role requires: ADR-0182's audit reads these at run time;
 - a `<label for>` that names an element that is not a control.
+
+**An element's children are its elements, for nine elements** (ADR-0204).
+PW5012 reads what `<ul>`, `<ol>`, `<dl>`, `<table>`, `<thead>`, `<tbody>`,
+`<tfoot>`, `<tr>` and `<select>` hold as the page holds it: each element
+written there, a block's rows and branches, and what a view renders at its
+top. Not read: text in one of them, and the content models of the other
+elements.
 
 **A form control is named only in the declaration that renders it**
 (ADR-0143). PW5014 matches a `<label for>`, a wrapping `<label>` and an

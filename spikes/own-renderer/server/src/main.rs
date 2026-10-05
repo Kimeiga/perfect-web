@@ -6523,7 +6523,11 @@ fn signal_manifest(
         .collect();
     let mut blocks = serde_json::Map::new();
     for live in plan["live"].as_array().into_iter().flatten() {
-        if !matches!(live["kind"].as_str(), Some("conditional" | "match")) {
+        // A block, or a view's instance (ADR-0203): rendered again whole.
+        if !matches!(
+            live["kind"].as_str(),
+            Some("conditional" | "match" | "instance")
+        ) {
             continue;
         }
         let id = live["part"].as_u64().unwrap_or_default() as u32;
@@ -6587,6 +6591,8 @@ fn signal_document(
         // Nothing on this page is a resource's, so nothing is listened for.
         "listens": false,
     });
+    let mut manifest = manifest;
+    with_instance_templates(&mut manifest, template, templates);
     // No `<` in a script element's text (ADR-0097).
     let json =
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
@@ -6670,6 +6676,30 @@ fn resume_manifest(templates: &[Template]) -> serde_json::Value {
     })
 }
 
+/// **Each view's template the page's instances reach** (ADR-0203), by its
+/// path: its parts, which the browser reads an instance's in, and the
+/// template, which the browser's renderer renders an instance in a block
+/// with. Nothing for a page that renders no view that contains itself.
+fn with_instance_templates(
+    manifest: &mut serde_json::Value,
+    template: &Template,
+    templates: &[Template],
+) {
+    let reached: serde_json::Map<String, serde_json::Value> =
+        pw_render::instances_reached(template, templates)
+            .into_iter()
+            .map(|t| {
+                (
+                    t.path.clone(),
+                    serde_json::json!({ "parts": t.manifest(), "template": t }),
+                )
+            })
+            .collect();
+    if !reached.is_empty() {
+        manifest["templates"] = serde_json::Value::Object(reached);
+    }
+}
+
 /// The document shell, with the parts manifest and the runtime: titled as
 /// the page states (ADR-0183).
 #[allow(clippy::too_many_arguments)]
@@ -6703,6 +6733,7 @@ fn document(
     // The page's speculation module and the values it starts from (ADR-0122).
     // A private page's own session's values: this document is `cache private`.
     let mut manifest = manifest;
+    with_instance_templates(&mut manifest, template, templates);
     // And its signals (ADR-0140): a page that reads queries holds UI state
     // too, and the browser renders what they decide, as on a page of
     // signals alone.

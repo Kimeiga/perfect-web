@@ -24,7 +24,7 @@ yet: each step under "Order of work" is its own ADR, with tests.
    - Props, effect rows, labels, placement and signal requirements are
      resolved per use site, at compile time.
    - A view may contain itself only inside `{#if}`, `{#match}` or `{#each}`.
-     There it is an instance made at run time.
+     There it is an instance made at run time (built by ADR-0203).
    - The alternative ADR-0072 described, rendering a child in place at run
      time, keeps all three defects it found: repeated addresses, lost loop
      identity, and unattached handlers.

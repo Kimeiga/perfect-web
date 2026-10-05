@@ -48,13 +48,44 @@ function addressOf(path, part) {
   return `${parts.schema}/${frames.join("/")}|${part}`;
 }
 
-/** address → { element } or { start, end } */
+/** address → { element, template } or { start, end, template } */
 const index = new Map();
+
+/**
+ * **Each template's parts, by its path** (ADR-0203): the page's, and each
+ * one a view that contains itself renders an instance of. A part's id is
+ * its template's, so an instance's parts are read in its own manifest, and
+ * its button numbered as one of the page's is not taken for it.
+ */
+const PAGE = parts.template ?? "";
+const manifests = new Map([
+  [PAGE, parts.parts ?? []],
+  ...Object.entries(parts.templates ?? {}).map(([path, t]) => [path, t.parts ?? []]),
+]);
+const entries = new Map(
+  [...manifests].map(([path, list]) => [path, new Map(list.map((p) => [p.id, p]))]),
+);
+
+/** Each view's template, as JSON: what the browser's renderer renders an
+ * instance in a block with (ADR-0203). Empty where the page has none. */
+const TEMPLATES = Object.values(parts.templates ?? {}).map((t) => t.template);
+const TEMPLATES_JSON = TEMPLATES.length ? JSON.stringify(TEMPLATES) : "";
+
+/** A renderer's request, with each view's template where the page has one. */
+function withTemplates(request) {
+  return TEMPLATES_JSON ? `${request.slice(0, -1)},"templates":${TEMPLATES_JSON}}` : request;
+}
 
 function buildIndex() {
   index.clear();
   const path = [];
-  const open = new Map(); // partId → start comment, for ranges being walked
+  // The template each frame's parts are in: a loop's row is its loop's, and
+  // an instance is its view's (ADR-0203).
+  const within = [PAGE];
+  // A range being walked, by its path and its id: a view inside itself has
+  // a part of the same id open around it (ADR-0203).
+  const open = new Map();
+  const at = () => path.map(([e, t]) => `${e}@${t}`).join("/");
   const walker = document.createTreeWalker(
     document.body,
     NodeFilter.SHOW_COMMENT | NodeFilter.SHOW_ELEMENT,
@@ -67,7 +98,7 @@ function buildIndex() {
         // An element-anchored part is addressed by the path it sits in, which
         // is what distinguishes the three Add buttons that all carry
         // `data-pw="0"`.
-        index.set(addressOf(path, `e${owner}`), { element: node });
+        index.set(addressOf(path, `e${owner}`), { element: node, template: within.at(-1) });
       }
       continue;
     }
@@ -79,18 +110,44 @@ function buildIndex() {
     const [, side, id, token] = m;
 
     if (token) {
-      // A loop INSTANCE boundary: push a frame, or pop it.
-      if (side === "s") path.push([Number(id), token]);
-      else path.pop();
+      // An INSTANCE boundary, a loop's row or a view's (ADR-0203): push a
+      // frame, or pop it. A view's instance is a range too, of its part in
+      // the template around it, which a change replaces whole.
+      const template = within.at(-1);
+      if (side === "s") {
+        const part = entries.get(template)?.get(Number(id));
+        const view = part?.kind === "instance";
+        if (view) open.set(`${at()}|${id}@${token}`, { start: node, path: [...path], template });
+        path.push([Number(id), token]);
+        within.push(view ? part.value : template);
+      } else {
+        path.pop();
+        within.pop();
+        const key = `${at()}|${id}@${token}`;
+        const started = open.get(key);
+        if (started) {
+          index.set(addressOf(started.path, id), {
+            start: started.start,
+            end: node,
+            template: started.template,
+          });
+          open.delete(key);
+        }
+      }
       continue;
     }
+    const key = `${at()}|${id}`;
     if (side === "s") {
-      open.set(id, { start: node, path: [...path] });
+      open.set(key, { start: node, path: [...path], template: within.at(-1) });
     } else {
-      const started = open.get(id);
+      const started = open.get(key);
       if (started) {
-        index.set(addressOf(started.path, id), { start: started.start, end: node });
-        open.delete(id);
+        index.set(addressOf(started.path, id), {
+          start: started.start,
+          end: node,
+          template: started.template,
+        });
+        open.delete(key);
       }
     }
   }
@@ -101,10 +158,13 @@ function buildIndex() {
   return index.size;
 }
 
-/** Every address for a part id, across every instance. */
-function addressesFor(part) {
+/** Every address for a part id of `template`, the page's unless named,
+ * across every instance of it. */
+function addressesFor(part, template = PAGE) {
   const suffix = `|${part}`;
-  return [...index.keys()].filter((k) => k.endsWith(suffix));
+  return [...index]
+    .filter(([k, v]) => k.endsWith(suffix) && (v.template ?? PAGE) === template)
+    .map(([k]) => k);
 }
 
 /**
@@ -699,7 +759,7 @@ let speculationLoaded = null;
 
 /** One call into the renderer: the request as JSON, the answer as text. */
 function renderCall(name, request) {
-  const bytes = new TextEncoder().encode(request);
+  const bytes = new TextEncoder().encode(withTemplates(request));
   const ptr = wasm.alloc(bytes.length);
   new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
   const code = wasm[name](ptr, bytes.length);
@@ -1081,7 +1141,7 @@ function signalAt(path) {
 async function renderBlock(id) {
   const x = await renderModule();
   const request = new TextEncoder().encode(
-    JSON.stringify({ part: parts.blocks[id], values: Object.fromEntries(signals) }),
+    withTemplates(JSON.stringify({ part: parts.blocks[id], values: Object.fromEntries(signals) })),
   );
   const ptr = x.alloc(request.length);
   new Uint8Array(x.memory.buffer, ptr, request.length).set(request);
@@ -1555,167 +1615,175 @@ let booted = false;
  * their listeners, and the elements still standing keep theirs.
  */
 function bindEvents() {
-  for (const part of parts.parts ?? []) {
-    if (part.kind !== "event") continue;
-    // Every INSTANCE of this template position. A template-scoped id names a
-    // position in the template; the document has one instance per loop item,
-    // and all three Add buttons carry `data-pw="0"`.
-    const addresses = addressesFor(`e${part.owner}`);
-    const owners = addresses.map((a) => index.get(a).element).filter(Boolean);
-    if (owners.length === 0) {
-      // A part in a block not rendered now (ADR-0130) is bound when it is.
-      if (!booted) log.push(`no element ${part.owner} for part ${part.id}`);
-      continue;
-    }
+  for (const [template, list] of manifests) {
+    for (const part of list) bindEvent(template, part);
+  }
+}
 
-    // The decision, before anything is bound. `decide` returning anything but
-    // "attach" leaves the element without a listener — the button is inert
-    // rather than wrong.
-    //
-    // Asked NOW rather than on interaction, deliberately. A refused handler
-    // must never load its code: fetching first and checking after would make
-    // the refusal a formality the network had already ignored.
-    let verdict = verdicts.get(part.id);
-    if (!verdict) {
-      const manifest = manifestFor(part);
-      verdict =
-        decide && manifest ? decide(manifest) : { attach: false, recovery: "no-decision" };
-      verdicts.set(part.id, verdict);
-      if (!verdict.attach) {
-        // The CODE as well as the recovery. "refused 5: none" says a handler
-        // was refused and nothing about why; the code is the one field that
-        // distinguishes an unknown handler from a widened privacy scope from
-        // a stale document schema.
-        log.push(`refused ${part.id}: code ${verdict.code} recovery ${verdict.recovery}`);
-      }
-    }
-    if (!verdict.attach) {
-      recoverOnPress(part, owners, verdict);
-      continue;
-    }
-
-    // The event the part handles, and what to do before any code loads.
-    const event = part.event || "press";
-    const listens = DOM_EVENTS[event];
-    if (!listens) {
-      log.push(`no listener for event ${event} of part ${part.id}`);
-      continue;
-    }
-    const modifiers = part.modifiers ?? [];
-
-    let fresh = 0;
-    for (const el of owners) {
-      // Bound once: a block a signal renders again binds what it made, and
-      // leaves what was bound before alone (ADR-0130).
-      const parts = bound.get(el) ?? new Set();
-      if (parts.has(part.id)) continue;
-      parts.add(part.id);
-      bound.set(el, parts);
-      fresh++;
-      el.addEventListener(listens, async (e) => {
-        // Declared, so done now, synchronously (ADR-0131).
-        if (modifiers.includes("prevent")) e.preventDefault();
-        if (modifiers.includes("stop")) e.stopPropagation();
-        lastActed = el;
-        const record = eventRecord(event, e);
-        // Which instance each signal the handler names is, for this use of
-        // its view (ADR-0144). Read at the press: the element is the one the
-        // block rendered last.
-        const instances = JSON.parse(el.dataset.pwSignals ?? "{}");
-        const instance = (name) => instances[name] ?? name;
-        // **Presses run in the order they were made** (ADR-0152). Each
-        // handler's module loads on its own, so a second press's could arrive
-        // first; its handler waits for the press before it to start. Until
-        // 2026-10-03 it did not wait: Hot then Cold, pressed quickly, could
-        // leave Hot chosen.
-        const myTurn = lastPressStarted;
-        let started;
-        lastPressStarted = new Promise((resolve) => (started = resolve));
-        try {
-          // Authorised above; loaded here. The order is the point of E7-L:
-          // the bytes for this handler do not exist in this page until
-          // somebody presses this button.
-          let module;
-          try {
-            module = await loadHandler(part.value);
-          } finally {
-            // Its turn, loaded or not: a press whose code failed to load
-            // must not hold up every press after it.
-            await myTurn;
-            started();
-          }
-          // The command COMMITS and returns nothing about the cart. The
-          // browser learns the new value from the RESOURCE, because that is
-          // what the program declares the page depends on:
-          //
-          //   command add_to_cart(..) invalidates Cart(current_session())
-          //
-          // A response carrying the value would make the UI change because an
-          // endpoint said so, which is the thing E6 exists to replace.
-          //
-          // The module is the handler's compiled BODY (E10, 2026-09-25). It
-          // reads what it captured from this element, where the renderer
-          // serialized exactly the paths it reads, and calls its command with
-          // the arguments it computed.
-          // `getRandomValues`, not `randomUUID`: the second exists only in a
-          // secure context, and a press must have an interaction everywhere.
-          const press = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
-            b.toString(16).padStart(2, "0"),
-          ).join("");
-          let calls = 0;
-          await module.run({
-            captures: JSON.parse(el.dataset.pwCaptures ?? "{}"),
-            // What the event was, read in the listener (ADR-0138).
-            event: record,
-            // The page's signals (ADR-0130), as JSON carries them, and where
-            // a change came from (ADR-0142).
-            // Through the instance this element's use of a view holds each
-            // signal as, where the compiler wrote one (ADR-0144).
-            get: (name) => signals.get(instance(name)),
-            set: (name, value) => setSignal(instance(name), value, { el, event }),
-            // Each command speculates before its request (ADR-0122), and its
-            // speculation is resolved by the answer, whatever it is.
-            command: async (component, args, how = {}) => {
-              const interaction = `${press}-${calls++}`;
-              const ids = await speculate(component, args, interaction);
-              let answer;
-              try {
-                answer = await command(component, args, interaction, how.retry);
-              } catch (error) {
-                await resolveSpeculation(ids, false);
-                throw error;
-              }
-              await resolveSpeculation(ids, answer.committed === true, answer.basis);
-              // What the command answered, as its handler's code reads it
-              // (ADR-0157): `Ok`, or a declared `Err` the handler can show.
-              // A command that trapped or was refused answered no value, and
-              // the press fails visibly.
-              if (!("result" in answer)) {
-                throw new Error(`${component} answered no value`);
-              }
-              return answer.result;
-            },
-          });
-        } catch (error) {
-          // A load or a refused command is VISIBLE and leaves the button
-          // usable. A silent failure here is the worst outcome available: the
-          // press did nothing, the page looks fine, and the next press is the
-          // user's only way to find out.
-          loaded.delete(part.value);
-          attempts.set(part.value, (attempts.get(part.value) ?? 0) + 1);
-          el.dataset.pwHandlerError = "1";
-          log.push(`handler ${part.value} failed: ${error.message ?? error}`);
-          window.__pw.handlerErrors = (window.__pw.handlerErrors ?? 0) + 1;
-        }
-      });
-    }
-    if (fresh > 0) {
-      log.push(
-        `attached ${part.id} to ${owners.length} instance(s): ${addresses.join(" ")}`,
-      );
-    }
+/** One event part of `template`, bound to every element it has: the
+ * page's, or a view's in each of its instances (ADR-0203). */
+function bindEvent(template, part) {
+  if (part.kind !== "event") return;
+  // A part of a view's instance is named by its template, and the page's
+  // as it always was.
+  const named = template === PAGE ? `${part.id}` : `${template}:${part.id}`;
+  // Every INSTANCE of this template position. A template-scoped id names a
+  // position in the template; the document has one instance per loop item,
+  // and all three Add buttons carry `data-pw="0"`.
+  const addresses = addressesFor(`e${part.owner}`, template);
+  const owners = addresses.map((a) => index.get(a).element).filter(Boolean);
+  if (owners.length === 0) {
+    // A part in a block not rendered now (ADR-0130) is bound when it is.
+    if (!booted) log.push(`no element ${part.owner} for part ${named}`);
+    return;
   }
 
+  // The decision, before anything is bound. `decide` returning anything but
+  // "attach" leaves the element without a listener — the button is inert
+  // rather than wrong.
+  //
+  // Asked NOW rather than on interaction, deliberately. A refused handler
+  // must never load its code: fetching first and checking after would make
+  // the refusal a formality the network had already ignored.
+  let verdict = verdicts.get(named);
+  if (!verdict) {
+    const manifest = manifestFor(part);
+    verdict =
+      decide && manifest ? decide(manifest) : { attach: false, recovery: "no-decision" };
+    verdicts.set(named, verdict);
+    if (!verdict.attach) {
+      // The CODE as well as the recovery. "refused 5: none" says a handler
+      // was refused and nothing about why; the code is the one field that
+      // distinguishes an unknown handler from a widened privacy scope from
+      // a stale document schema.
+      log.push(`refused ${named}: code ${verdict.code} recovery ${verdict.recovery}`);
+    }
+  }
+  if (!verdict.attach) {
+    recoverOnPress(part, owners, verdict);
+    return;
+  }
+
+  // The event the part handles, and what to do before any code loads.
+  const event = part.event || "press";
+  const listens = DOM_EVENTS[event];
+  if (!listens) {
+    log.push(`no listener for event ${event} of part ${named}`);
+    return;
+  }
+  const modifiers = part.modifiers ?? [];
+
+  let fresh = 0;
+  for (const el of owners) {
+    // Bound once: a block a signal renders again binds what it made, and
+    // leaves what was bound before alone (ADR-0130).
+    const parts = bound.get(el) ?? new Set();
+    if (parts.has(part.id)) continue;
+    parts.add(part.id);
+    bound.set(el, parts);
+    fresh++;
+    el.addEventListener(listens, async (e) => {
+      // Declared, so done now, synchronously (ADR-0131).
+      if (modifiers.includes("prevent")) e.preventDefault();
+      if (modifiers.includes("stop")) e.stopPropagation();
+      lastActed = el;
+      const record = eventRecord(event, e);
+      // Which instance each signal the handler names is, for this use of
+      // its view (ADR-0144). Read at the press: the element is the one the
+      // block rendered last.
+      const instances = JSON.parse(el.dataset.pwSignals ?? "{}");
+      const instance = (name) => instances[name] ?? name;
+      // **Presses run in the order they were made** (ADR-0152). Each
+      // handler's module loads on its own, so a second press's could arrive
+      // first; its handler waits for the press before it to start. Until
+      // 2026-10-03 it did not wait: Hot then Cold, pressed quickly, could
+      // leave Hot chosen.
+      const myTurn = lastPressStarted;
+      let started;
+      lastPressStarted = new Promise((resolve) => (started = resolve));
+      try {
+        // Authorised above; loaded here. The order is the point of E7-L:
+        // the bytes for this handler do not exist in this page until
+        // somebody presses this button.
+        let module;
+        try {
+          module = await loadHandler(part.value);
+        } finally {
+          // Its turn, loaded or not: a press whose code failed to load
+          // must not hold up every press after it.
+          await myTurn;
+          started();
+        }
+        // The command COMMITS and returns nothing about the cart. The
+        // browser learns the new value from the RESOURCE, because that is
+        // what the program declares the page depends on:
+        //
+        //   command add_to_cart(..) invalidates Cart(current_session())
+        //
+        // A response carrying the value would make the UI change because an
+        // endpoint said so, which is the thing E6 exists to replace.
+        //
+        // The module is the handler's compiled BODY (E10, 2026-09-25). It
+        // reads what it captured from this element, where the renderer
+        // serialized exactly the paths it reads, and calls its command with
+        // the arguments it computed.
+        // `getRandomValues`, not `randomUUID`: the second exists only in a
+        // secure context, and a press must have an interaction everywhere.
+        const press = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+          b.toString(16).padStart(2, "0"),
+        ).join("");
+        let calls = 0;
+        await module.run({
+          captures: JSON.parse(el.dataset.pwCaptures ?? "{}"),
+          // What the event was, read in the listener (ADR-0138).
+          event: record,
+          // The page's signals (ADR-0130), as JSON carries them, and where
+          // a change came from (ADR-0142).
+          // Through the instance this element's use of a view holds each
+          // signal as, where the compiler wrote one (ADR-0144).
+          get: (name) => signals.get(instance(name)),
+          set: (name, value) => setSignal(instance(name), value, { el, event }),
+          // Each command speculates before its request (ADR-0122), and its
+          // speculation is resolved by the answer, whatever it is.
+          command: async (component, args, how = {}) => {
+            const interaction = `${press}-${calls++}`;
+            const ids = await speculate(component, args, interaction);
+            let answer;
+            try {
+              answer = await command(component, args, interaction, how.retry);
+            } catch (error) {
+              await resolveSpeculation(ids, false);
+              throw error;
+            }
+            await resolveSpeculation(ids, answer.committed === true, answer.basis);
+            // What the command answered, as its handler's code reads it
+            // (ADR-0157): `Ok`, or a declared `Err` the handler can show.
+            // A command that trapped or was refused answered no value, and
+            // the press fails visibly.
+            if (!("result" in answer)) {
+              throw new Error(`${component} answered no value`);
+            }
+            return answer.result;
+          },
+        });
+      } catch (error) {
+        // A load or a refused command is VISIBLE and leaves the button
+        // usable. A silent failure here is the worst outcome available: the
+        // press did nothing, the page looks fine, and the next press is the
+        // user's only way to find out.
+        loaded.delete(part.value);
+        attempts.set(part.value, (attempts.get(part.value) ?? 0) + 1);
+        el.dataset.pwHandlerError = "1";
+        log.push(`handler ${part.value} failed: ${error.message ?? error}`);
+        window.__pw.handlerErrors = (window.__pw.handlerErrors ?? 0) + 1;
+      }
+    });
+  }
+  if (fresh > 0) {
+    log.push(
+      `attached ${named} to ${owners.length} instance(s): ${addresses.join(" ")}`,
+    );
+  }
 }
 
 async function attach() {

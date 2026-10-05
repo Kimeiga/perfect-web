@@ -39,14 +39,22 @@ MUTANTS = [
         "a block a query decides is not planned",
         "plan",
         PLAN,
-        "            blocks.push(entry.id.0);\n",
-        "            let _ = entry.id.0;\n",
+        "            && found.iter().any(|(n, ..)| n == root)\n"
+        "            && template.chunks.iter().any(\n"
+        "                |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),\n"
+        "            )\n        {\n            blocks.push(entry.id.0);\n",
+        "            && found.iter().any(|(n, ..)| n == root)\n"
+        "            && template.chunks.iter().any(\n"
+        "                |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),\n"
+        "            )\n        {\n            let _ = entry.id.0;\n",
     ),
     (
         "a block inside one is planned as if at the top",
         "plan",
         PLAN,
+        "            && found.iter().any(|(n, ..)| n == root)\n"
         "            && template.chunks.iter().any(\n",
+        "            && found.iter().any(|(n, ..)| n == root)\n"
         "            && template.chunks.iter().any(|_| true) | template.chunks.iter().any(\n",
     ),
     (

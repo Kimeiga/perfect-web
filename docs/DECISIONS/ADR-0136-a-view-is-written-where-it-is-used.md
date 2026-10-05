@@ -179,7 +179,7 @@ page StorePage(id: StoreId) {
   (ADR-0130, step 3).
 - **A view that contains itself** (a tree, a thread of replies). ADR-0130
   rules it an instance made at run time, inside a block, and that needs
-  instance-qualified addresses.
+  instance-qualified addresses. Built by ADR-0203 (2026-10-05).
 - **A literal prop**, `label="Add"`.
 - **The Marko adapter** (ADR-0017) is unchanged. It writes a view used in
   another as a tag named after the view, and each view to a file of its

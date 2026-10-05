@@ -1745,3 +1745,22 @@ a type that holds itself in place is boxed, and crosses as its nodes.
 - At a boundary a node's slot is a `u32` for a box and an `option<u32>` for
   an option of one, beside ADR-0194's `list<u32>`, in the same level order,
   encoded and decoded in place without recursion.
+[ADR-0203](DECISIONS/ADR-0203-a-view-that-contains-itself-is-an-instance-made-at-run-time.md):
+a view that contains itself is an instance of its own template, made at run
+time (ADR-0130, ruling 2).
+- A reply thread's view shows each reply as itself, as deep as the data:
+  each use is an `instance` part, rendered in a frame of its own, its
+  template compiled once. One with no block on the way back to it, or
+  holding a signal, is refused (PW5020).
+- The renderer writes each instance after the markup around it, not on its
+  stack, and refuses a page nesting more than 500 elements, under what
+  Blink and WebKit's parsers nest (512).
+- The browser reads each instance in its own template: its parts, its
+  range, and its handlers, bound in every instance.
+[ADR-0204](DECISIONS/ADR-0204-an-element-holds-the-children-html-permits-as-the-page-holds-them.md):
+an element holds only the children HTML permits, as the page holds them
+(found building ADR-0203).
+- PW5012 read only the elements written inside: `<ul><Thread /></ul>` was
+  refused though `Thread` renders an `<li>`, and a `<div>` row of an
+  `{#each}` in a `<ul>` passed. A block's rows and what a view renders are
+  read now.
