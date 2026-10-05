@@ -143,13 +143,15 @@ fn the_component_imports_exactly_the_operations_the_function_calls() {
     let (_, component) = add_to_cart();
     // `store:data/carts` declares `add`, `clear` and `current`, and
     // `store:data/menus` `for-store`, `is-available` and more. The command
-    // reads the session for its event's key and hands `CartChanged` to the
-    // outbox (ADR-0208), asks whether the item can be ordered (ADR-0157), and
-    // calls `add`: exactly those four.
+    // reads the session for its entry's and its event's keys, hands its cart's
+    // entry to the invalidations and `CartChanged` to the outbox (ADR-0208,
+    // ADR-0209), asks whether the item can be ordered (ADR-0157), and calls
+    // `add`: exactly those five.
     assert_eq!(
         component.imports,
         [
             "pw:host/session#read",
+            "pw:host/invalidations#store-page-cart",
             "pw:host/outbox#cart-changed",
             "store:data/menus#is-available",
             "store:data/carts#add"
@@ -163,10 +165,10 @@ fn the_component_has_exactly_the_types_its_world_fixed() {
     let (c, component) = add_to_cart();
     let compared = component::audit(&component.bytes, &c.wit, &component.world)
         .unwrap_or_else(|wrong| panic!("the component disagrees with its world: {wrong:#?}"));
-    // `menus#is-available`, `session#read`, `outbox#cart-changed`,
-    // `carts#add` and `add-to-cart`: an audit that compared nothing would
-    // agree with anything.
-    assert_eq!(compared, 5, "the audit compared {compared} functions");
+    // `menus#is-available`, `session#read`, `invalidations#store-page-cart`,
+    // `outbox#cart-changed`, `carts#add` and `add-to-cart`: an audit that
+    // compared nothing would agree with anything.
+    assert_eq!(compared, 6, "the audit compared {compared} functions");
 }
 
 /// The WIT with `carts#add` returning a store instead of a cart. At the core

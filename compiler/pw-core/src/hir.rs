@@ -427,6 +427,11 @@ pub enum ExecutionContext {
     /// outbox: so what it performs is the command's work (ADR-0195, ruling
     /// 9).
     Emitted,
+    /// **An invalidated entry's key** (ADR-0209): an argument of
+    /// `Cart(current_session())` in `invalidates Cart(..)`. The command
+    /// evaluates it, before its body, and hands the entry to the outbox, so
+    /// what it performs is the command's work too.
+    Invalidated,
     /// **A listener's argument** (ADR-0091): `id` in `invalidates_on
     /// MenuChanged(id)`. The declaration's parameter an event's value must
     /// equal, or `_`. Nothing in it is evaluated; it says which part of an
@@ -477,6 +482,7 @@ impl ExecutionContext {
                 | ExecutionContext::Acquire
                 | ExecutionContext::Release
                 | ExecutionContext::Emitted
+                | ExecutionContext::Invalidated
         )
     }
 
@@ -490,6 +496,7 @@ impl ExecutionContext {
             ExecutionContext::Release => "a resource's release block",
             ExecutionContext::Key => "a clause's key",
             ExecutionContext::Emitted => "an event's key",
+            ExecutionContext::Invalidated => "an invalidated entry's key",
             ExecutionContext::Listener => "a listener's argument",
         }
     }

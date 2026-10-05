@@ -47,6 +47,7 @@ fn contract(id: &str, placements: &[&str], capabilities: &[&str]) -> ComponentCo
             .iter()
             .map(|c| Import {
                 event: None,
+                invalidates: None,
                 interface: format!("pw:host/{}", c.family),
                 name: if c.operation.is_empty() {
                     "use".to_string()
@@ -471,6 +472,7 @@ fn a_contract_from_an_unknown_capability_mapping_is_refused() {
 fn with_component_dep(mut c: ComponentContract) -> ComponentContract {
     c.imports.push(Import {
         event: None,
+        invalidates: None,
         interface: "pw:app/shop.Store".into(),
         name: "Store".into(),
         capability: String::new(),
@@ -510,6 +512,7 @@ fn an_import_is_classified_before_it_is_compared() {
     let mut spike = contract("spike.Store", &["origin"], &[]);
     spike.imports.push(Import {
         event: None,
+        invalidates: None,
         interface: "perfect-web:store/stores@0.1.0".into(),
         name: "read".into(),
         capability: "store.read".into(),
@@ -606,6 +609,7 @@ fn a_runtime_import_can_never_be_authorised() {
     let mut c = contract("shop.Menu", &["origin"], &["database.read<Stores>"]);
     c.imports.push(Import {
         event: None,
+        invalidates: None,
         interface: "wasi:cli/exit@0.2.9".into(),
         name: "exit".into(),
         capability: "database.read<Stores>".into(),

@@ -394,7 +394,10 @@ fn the_stores_commands_agree_with_their_reference() {
     // (ADR-0157). Run with each answer, so each branch is compared. The item
     // is the one the page showed (ADR-0172); the command writes by its id.
     let add: Reference = |args, host| {
-        // Its event first, its key computed before its body (ADR-0208).
+        // Its entry and its event first, their keys computed before its
+        // body, in the order they are written (ADR-0208, ADR-0209).
+        let key = host("pw:host/session#read", vec![]);
+        host("pw:host/invalidations#store-page-cart", vec![key]);
         let key = host("pw:host/session#read", vec![]);
         host("pw:host/outbox#cart-changed", vec![key]);
         let id = field(&args[0], "id");
@@ -418,7 +421,10 @@ fn the_stores_commands_agree_with_their_reference() {
     // One more of a line's item (ADR-0172): its availability read again, as
     // `add_to_cart`'s is, and one added.
     let increase: Reference = |args, host| {
-        // Its event first, its key computed before its body (ADR-0208).
+        // Its entry and its event first, their keys computed before its
+        // body, in the order they are written (ADR-0208, ADR-0209).
+        let key = host("pw:host/session#read", vec![]);
+        host("pw:host/invalidations#store-page-cart", vec![key]);
         let key = host("pw:host/session#read", vec![]);
         host("pw:host/outbox#cart-changed", vec![key]);
         if host("store:data/menus#is-available", vec![args[0].clone()]) != Val::Bool(true) {
@@ -451,7 +457,10 @@ fn the_stores_commands_agree_with_their_reference() {
         "store.page.decrease_in_cart",
         &Runnable::new(compile(&u, "store.page.decrease_in_cart")),
         |args, host| {
-            // Its event first, its key computed before its body (ADR-0208).
+            // Its entry and its event first, their keys computed before its
+            // body, in the order they are written (ADR-0208, ADR-0209).
+            let key = host("pw:host/session#read", vec![]);
+            host("pw:host/invalidations#store-page-cart", vec![key]);
             let key = host("pw:host/session#read", vec![]);
             host("pw:host/outbox#cart-changed", vec![key]);
             let session = host("pw:host/session#read", vec![]);
@@ -463,7 +472,10 @@ fn the_stores_commands_agree_with_their_reference() {
         "store.page.remove_from_cart",
         &Runnable::new(compile(&u, "store.page.remove_from_cart")),
         |args, host| {
-            // Its event first, its key computed before its body (ADR-0208).
+            // Its entry and its event first, their keys computed before its
+            // body, in the order they are written (ADR-0208, ADR-0209).
+            let key = host("pw:host/session#read", vec![]);
+            host("pw:host/invalidations#store-page-cart", vec![key]);
             let key = host("pw:host/session#read", vec![]);
             host("pw:host/outbox#cart-changed", vec![key]);
             let session = host("pw:host/session#read", vec![]);
@@ -475,7 +487,10 @@ fn the_stores_commands_agree_with_their_reference() {
         "store.page.clear_cart",
         &Runnable::new(compile(&u, "store.page.clear_cart")),
         |_, host| {
-            // Its event first, its key computed before its body (ADR-0208).
+            // Its entry and its event first, their keys computed before its
+            // body, in the order they are written (ADR-0208, ADR-0209).
+            let key = host("pw:host/session#read", vec![]);
+            host("pw:host/invalidations#store-page-cart", vec![key]);
             let key = host("pw:host/session#read", vec![]);
             host("pw:host/outbox#cart-changed", vec![key]);
             let session = host("pw:host/session#read", vec![]);

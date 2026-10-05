@@ -130,6 +130,41 @@ pub fn emitted_event(
     }
 }
 
+/// **The query an `invalidates` key names** (ADR-0209), resolved as the
+/// checker resolves it (ADR-0088): a query, a subscription or a resource.
+pub fn invalidated_query(
+    ws: &crate::resolve::Workspace,
+    sigs: &crate::signatures::Signatures,
+    unit: usize,
+    key: &crate::hir::ClauseKey,
+) -> Option<crate::resolve::DefId> {
+    use crate::resolve::Resolution;
+    let (ns, kinds) = crate::policy::keyed("invalidates")?;
+    let found = match key.name.contains('.') {
+        true => ws.resolve_path_in(unit, ns, &key.name),
+        false => ws.resolve_in(unit, ns, &key.name),
+    };
+    let (Resolution::Local(def) | Resolution::Imported { def, .. }) = found else {
+        return None;
+    };
+    sigs.kind_of(def)
+        .is_some_and(|k| kinds.contains(&k))
+        .then_some(def)
+}
+
+/// **The platform's invalidations** (ADR-0209): each query a command
+/// invalidates is a function of it, taking the query's parameters, by the
+/// query's whole path, since two modules' queries may share a name.
+pub const INVALIDATIONS_INTERFACE: &str = "pw:host/invalidations";
+
+/// The invalidations' function for the query `path` (ADR-0209).
+pub fn invalidation_binding(path: &str) -> ir::ImportId {
+    ir::ImportId {
+        interface: INVALIDATIONS_INTERFACE.to_string(),
+        name: crate::wit::ident(path),
+    }
+}
+
 /// **Is this declaration an operation the compiler supplies, and which?**
 ///
 /// The `intrinsic` policy and nothing else (ADR-0040), for the reason

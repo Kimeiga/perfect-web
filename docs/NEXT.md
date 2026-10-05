@@ -301,8 +301,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - ~~ruling 11's other half, a command's events computed by the
           command and committed by the host with its writes~~ (ADR-0208,
           `just e14-command-events`);
-        - then `invalidates` keys computed the same way, and a host
-          comparing a source's clauses with the database it opens.
+        - ~~`invalidates` keys computed the same way~~ (ADR-0209, `just
+          e14-command-invalidations`): the server evaluates no key of a
+          command;
+        - then a host comparing a source's clauses with the database it
+          opens.
     22. **Reference apps unlike the store**, to find the gaps: a feed
         (pagination, live public data, threads, optimistic posting), a
         multi-tenant SaaS (organizations, roles, forms, uploads), and one app

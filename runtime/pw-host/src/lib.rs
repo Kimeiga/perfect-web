@@ -122,6 +122,9 @@ pub struct Import {
     /// declaration's path. Mirrored by field name, ADR-0018.
     #[serde(default)]
     pub event: Option<String>,
+    /// **The query whose entry this import drops** (ADR-0209), by its path.
+    #[serde(default)]
+    pub invalidates: Option<String>,
 }
 
 /// **One place a value from outside must hold an invariant** (ADR-0179), as

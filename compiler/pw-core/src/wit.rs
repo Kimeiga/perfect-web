@@ -808,6 +808,47 @@ pub fn package(
             slot.1.push(text);
         }
     }
+    // **The invalidations' functions** (ADR-0209): each query a command
+    // invalidates, taking its parameters and answering nothing.
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (decl_id, d) in hir.all_decls() {
+            if !matches!(
+                d.kind,
+                DeclKind::Query | DeclKind::Subscription | DeclKind::Resource
+            ) {
+                continue;
+            }
+            let Some(sig) = sigs.by_def(DefId {
+                unit,
+                decl: decl_id.0,
+            }) else {
+                continue;
+            };
+            let id = crate::backend::invalidation_binding(&sig.path);
+            if !wanted.contains(&id.qualified()) {
+                continue;
+            }
+            let Some((pkg, iface)) = id.interface.split_once('/') else {
+                continue;
+            };
+            let taking = Interface {
+                params: sig.params.clone(),
+                returns: None,
+            };
+            let (text, used) = wit_func(&id.name, &taking, &types)?;
+            host_uses.extend(used.iter().cloned());
+            let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
+                name: pkg.to_string(),
+                interfaces: BTreeMap::new(),
+            });
+            let slot = entry
+                .interfaces
+                .entry(iface.to_string())
+                .or_insert_with(|| (BTreeSet::new(), Vec::new()));
+            slot.0.extend(used);
+            slot.1.push(text);
+        }
+    }
     for h in hosts.values_mut() {
         for (_, funcs) in h.interfaces.values_mut() {
             funcs.sort();

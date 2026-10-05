@@ -2708,6 +2708,28 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0209: a command computes the entries it invalidates. The command's
+# calls, the server's drops, the store against its references, and the
+# mutation controls.
+e14-command-invalidations:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0209 - a command computes the entries it invalidates"; echo; \
+       echo "produced by: just e14-command-invalidations"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the command's component (compiler/pw-conformance/tests/invalidations.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test invalidations 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the store's commands, against their references"; echo; \
+       cargo test --locked -p pw-conformance --test oracle 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server's drops"; echo; \
+       cargo test --locked -p pw-dev-server -- an_invalidated_entry_is_dropped_by_the_key_the_command_computed 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the store's artifacts, as the compiler emits them"; echo; \
+       cargo test --locked -p pw-core --test evidence_is_current 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/command_invalidations_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/command_invalidations_mutations.py; \
+     } > docs/evidence/E14/command-invalidations.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/command-invalidations.txt
+
 # ADR-0208: a command computes its events, and the outbox commits them with
 # its writes. The component's calls, the outbox's values, the server's
 # commits, and the mutation controls.

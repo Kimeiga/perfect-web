@@ -13,6 +13,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0209, 2026-10-05: a command computes the entries it invalidates**
+(ADR-0195's ruling 11, completed). The server read each `invalidates` key's
+text, `current_session()`, and dropped every entry of the query for anything
+else: a feed's like would drop every post. Each query a command invalidates
+is now a function of the platform's invalidations,
+`pw:host/invalidations#store-page-cart`; the command calls it before its body
+with the values it computed, and the server drops that entry once the writes
+commit. The server evaluates no key of a command (`just
+e14-command-invalidations`).
+
 **ADR-0208, 2026-10-05: a command computes its events, and the outbox
 commits them with its writes** (ADR-0195's ruling 11's other half). The
 server computed an event's values from its key's text, `current_session()`

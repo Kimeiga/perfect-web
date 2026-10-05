@@ -123,7 +123,7 @@ Recorded by `just e14-command-events` in
 
 - **`invalidates` keys are still read off their text by the server**:
   `current_session()`, or else the whole query. It is sound, since it drops
-  more, but it is the same work. It is next.
+  more, but it is the same work. ADR-0209 builds it.
 - **An event whose value is not a key** (a record, a list) checks, and is
   refused when the command runs. A rule for an event's parameters belongs
   with ruling 9's labels.

@@ -824,9 +824,12 @@ impl<'a> Inference<'a> {
             }
             out.extend(self.infer_rooted(unit, b, root.root).effects);
         }
-        // **And the events it emits** (ADR-0208), each written to the outbox
-        // with its writes.
-        if decl.policy("emits").is_some_and(|p| !p.keys.is_empty()) {
+        // **And the events it emits and the entries it invalidates**
+        // (ADR-0208, ADR-0209), each written to the outbox with its writes.
+        if ["emits", "invalidates"]
+            .iter()
+            .any(|c| decl.policy(c).is_some_and(|p| !p.keys.is_empty()))
+        {
             out.push(crate::signatures::OUTBOX_WRITE.to_string());
         }
     }

@@ -1797,3 +1797,12 @@ computes its events, and the outbox commits them with its writes
 - The server stages them and commits them with the writes; it evaluates no
   key's text for an event. Found: an `Int` key missed its entry, and an
   empty value reached every entry.
+[ADR-0209](DECISIONS/ADR-0209-a-command-computes-the-entries-it-invalidates.md):
+a command computes the entries it invalidates (ADR-0195's ruling 11,
+completed).
+- Each query a command invalidates is a function of the platform's
+  invalidations, `pw:host/invalidations#store-page-cart`, called before its
+  body with the values it computed, under `outbox.write`.
+- The server drops the entry by that key once the writes commit, and reads
+  no key's text: until then anything but `current_session()` dropped every
+  entry of the query.

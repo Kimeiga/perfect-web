@@ -27,7 +27,7 @@ SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 STORE = ROOT / "examples/store/app.pw"
 
 # Re-anchored by ADR-0178, whose stock change is an event of its own.
-EVENT = "        self.invalidate_queries(\"\", \"\", &[(event.name.clone(), values)]);\n"
+EVENT = "        self.invalidate_queries(\"\", &[], &[(event.name.clone(), values)]);\n"
 
 # (what, file, anchor, replacement)
 MUTANTS = [

@@ -206,6 +206,57 @@ fn host_imports(cx: &Context<'_>, p: &Program) -> Vec<CallableImport> {
             out.push(callable);
         }
     }
+    // **And the invalidations' functions** (ADR-0209): one for each query a
+    // command invalidates, taking the query's parameters and answering
+    // nothing, under the outbox's authority.
+    let outbox = cx
+        .contracts
+        .iter()
+        .flat_map(|c| c.imports.iter())
+        .flat_map(|i| i.capabilities.iter())
+        .find(|c| c.name() == crate::signatures::OUTBOX_WRITE)
+        .cloned();
+    for (unit, hir) in cx.hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            let def = crate::resolve::DefId { unit, decl: id.0 };
+            let Some(signature) = cx.sigs.by_def(def) else {
+                continue;
+            };
+            let invalidable = matches!(
+                decl.kind,
+                crate::hir::DeclKind::Query
+                    | crate::hir::DeclKind::Subscription
+                    | crate::hir::DeclKind::Resource
+            );
+            let import = crate::backend::invalidation_binding(&signature.path);
+            if !invalidable || !wanted.contains(&import) {
+                continue;
+            }
+            let params: Option<Vec<Type>> = signature
+                .params
+                .iter()
+                .map(
+                    |p| match ty_resolved(cx.sigs, p.as_ref()?.resolved()?, &decl.name_span) {
+                        Lowering::Lowered(t) => Some(t),
+                        _ => None,
+                    },
+                )
+                .collect();
+            let Some(params) = params else {
+                continue;
+            };
+            out.push(CallableImport {
+                id: import,
+                callee: def,
+                binding: crate::backend::ir::ImportBinding::PlatformHost,
+                signature: crate::backend::ir::BackendSignature {
+                    params,
+                    result: Type::Unit,
+                },
+                required_capabilities: outbox.iter().cloned().map(CapabilityId).collect(),
+            });
+        }
+    }
     out.sort_by(|a, b| a.id.cmp(&b.id));
     out.dedup_by(|a, b| a.id == b.id);
     out
@@ -337,14 +388,22 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
     f.ret = ret.clone();
 
     let body = cx.hirs[unit].body(body_id);
-    // **A command's events, computed by the command** (ADR-0208). Each
-    // `emits` key's values are evaluated before its body, on what it was
-    // given, and handed to the platform's outbox, which commits them with the
-    // command's writes or not at all. The server never reads a key's text.
-    for key in decl.policy("emits").iter().flat_map(|p| &p.keys) {
-        match f.emit(body, key) {
-            Lowering::Lowered(()) => {}
-            other => return other.map(|_| unreachable!()),
+    // **A command's events and the entries it invalidates, computed by the
+    // command** (ADR-0208, ADR-0209). Each `emits` and `invalidates` key's
+    // values are evaluated before its body, on what it was given, in the
+    // order they are written, and handed to the platform, which commits them
+    // with the command's writes or not at all. The server never reads a
+    // key's text.
+    for policy in decl
+        .policies
+        .iter()
+        .filter(|p| p.name == "emits" || p.name == "invalidates")
+    {
+        for key in &policy.keys {
+            match f.outboxed(body, &policy.name, key) {
+                Lowering::Lowered(()) => {}
+                other => return other.map(|_| unreachable!()),
+            }
         }
     }
     let result = match f.expr(body, body.root, Some(&ret)) {
@@ -1462,24 +1521,33 @@ fn ty_resolved_with(
 }
 
 impl<'a> Lower<'a> {
-    /// **An event a command emits** (ADR-0208): its values, at the
-    /// parameters the event declares, then the outbox's call.
-    fn emit(&mut self, body: &Body, key: &crate::hir::ClauseKey) -> Lowering<()> {
+    /// **An event a command emits, or an entry it invalidates** (ADR-0208,
+    /// ADR-0209): its values, at the parameters the event or the query
+    /// declares, then the platform's call.
+    fn outboxed(&mut self, body: &Body, clause: &str, key: &crate::hir::ClauseKey) -> Lowering<()> {
         let blocked = |why: String| Lowering::Blocked {
             why,
             span: key.span.clone(),
         };
-        let Some(event) = crate::backend::emitted_event(self.cx.ws, self.unit, key) else {
-            return blocked(format!("`emits {}` names no event", key.name));
+        let target = match clause {
+            "emits" => crate::backend::emitted_event(self.cx.ws, self.unit, key),
+            _ => crate::backend::invalidated_query(self.cx.ws, self.cx.sigs, self.unit, key),
+        };
+        let Some(target) = target else {
+            return blocked(format!("`{clause} {}` names nothing it may", key.name));
         };
         let (Some(decl), Some(sig)) = (
-            crate::resolve::declaration(self.cx.hirs, event),
-            self.cx.sigs.by_def(event),
+            crate::resolve::declaration(self.cx.hirs, target),
+            self.cx.sigs.by_def(target),
         ) else {
             return blocked(format!("`{}` has no resolved signature", key.name));
         };
-        let Some(import) = crate::backend::host_binding(decl) else {
-            return blocked(format!("`{}` is not the outbox's", key.name));
+        let import = match clause {
+            "emits" => match crate::backend::host_binding(decl) {
+                Some(import) => import,
+                None => return blocked(format!("`{}` is not the outbox's", key.name)),
+            },
+            _ => crate::backend::invalidation_binding(&sig.path),
         };
         // Each value at its parameter: by its name where it is named, and
         // otherwise in order, as the checker related them (ADR-0088).

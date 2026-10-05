@@ -1343,6 +1343,39 @@
     ],
     "imports": [
       {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-cart",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Cart"
+      },
+      {
         "interface": "pw:host/outbox",
         "name": "cart-changed",
         "capability": "outbox.write",
@@ -1564,6 +1597,39 @@
     ],
     "imports": [
       {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-cart",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Cart"
+      },
+      {
         "interface": "pw:host/outbox",
         "name": "cart-changed",
         "capability": "outbox.write",
@@ -1740,6 +1806,39 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-cart",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Cart"
+      },
       {
         "interface": "pw:host/outbox",
         "name": "cart-changed",
@@ -1927,6 +2026,39 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-cart",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Cart"
+      },
       {
         "interface": "pw:host/outbox",
         "name": "cart-changed",
@@ -2146,6 +2278,72 @@
     ],
     "imports": [
       {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-cart",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Cart"
+      },
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-order",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Order"
+      },
+      {
         "interface": "pw:host/outbox",
         "name": "cart-changed",
         "capability": "outbox.write",
@@ -2338,6 +2536,39 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-cart",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.Session",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.SessionId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Cart"
+      },
       {
         "interface": "pw:host/outbox",
         "name": "cart-changed",

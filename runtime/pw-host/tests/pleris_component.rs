@@ -164,9 +164,19 @@ fn stocked(calls: &Calls, add_result: Val, available: bool) -> BTreeMap<String, 
             .push(("pw:host/outbox#cart-changed".into(), args.to_vec()));
         Ok(Vec::new())
     });
+    // And the invalidations, which it hands its cart's entry to (ADR-0209).
+    let entry_calls = calls.clone();
+    let entry: HostFn = Arc::new(move |args: &[Val]| {
+        entry_calls.lock().unwrap().push((
+            "pw:host/invalidations#store-page-cart".into(),
+            args.to_vec(),
+        ));
+        Ok(Vec::new())
+    });
     BTreeMap::from([
         ("store:data/menus#is-available".to_string(), stock),
         ("pw:host/session#read".to_string(), read),
+        ("pw:host/invalidations#store-page-cart".to_string(), entry),
         ("pw:host/outbox#cart-changed".to_string(), outbox),
         ("store:data/carts#add".to_string(), add),
     ])
@@ -230,6 +240,7 @@ fn the_artifact_imports_exactly_what_its_contract_allows() {
     assert_eq!(
         actual,
         [
+            "pw:host/invalidations#store-page-cart",
             "pw:host/outbox#cart-changed",
             "pw:host/session#read",
             "store:data/carts#add",
@@ -353,25 +364,23 @@ fn the_compiled_command_runs_through_the_host() {
     // to the outbox (ADR-0208), asked whether the item can be ordered, read
     // the session, then called the data layer with it and with its own
     // arguments, in that order.
-    assert_eq!(seen.len(), 5, "{seen:?}");
-    assert_eq!(seen[0], ("pw:host/session#read".to_string(), vec![]));
+    assert_eq!(seen.len(), 7, "{seen:?}");
+    let session = || ("pw:host/session#read".to_string(), vec![]);
+    let given = |op: &str| (op.to_string(), vec![Val::String("session-7".into())]);
+    assert_eq!(seen[0], session());
+    assert_eq!(seen[1], given("pw:host/invalidations#store-page-cart"));
+    assert_eq!(seen[2], session());
+    assert_eq!(seen[3], given("pw:host/outbox#cart-changed"));
     assert_eq!(
-        seen[1],
-        (
-            "pw:host/outbox#cart-changed".to_string(),
-            vec![Val::String("session-7".into())]
-        )
-    );
-    assert_eq!(
-        seen[2],
+        seen[4],
         (
             "store:data/menus#is-available".to_string(),
             vec![Val::String("cortado".into())]
         )
     );
-    assert_eq!(seen[3], ("pw:host/session#read".to_string(), vec![]));
+    assert_eq!(seen[5], session());
     assert_eq!(
-        seen[4],
+        seen[6],
         (
             "store:data/carts#add".to_string(),
             vec![
@@ -419,11 +428,16 @@ fn an_item_that_cannot_be_ordered_is_refused_before_anything_is_written() {
             Some(Box::new(Val::String("cortado".into()))),
         )))))]
     );
-    // Its event was handed to the outbox first (ADR-0208), and a refusal
-    // commits it no more than it commits a write.
+    // Its entry and its event were handed over first (ADR-0208, ADR-0209),
+    // and a refusal commits them no more than it commits a write.
     assert_eq!(
         *calls.lock().unwrap(),
         [
+            ("pw:host/session#read".to_string(), vec![]),
+            (
+                "pw:host/invalidations#store-page-cart".to_string(),
+                vec![Val::String("session-7".into())]
+            ),
             ("pw:host/session#read".to_string(), vec![]),
             (
                 "pw:host/outbox#cart-changed".to_string(),

@@ -1104,15 +1104,10 @@ impl Server {
         )
     }
 
-    /// **Run one compiled command through the host.**
-    ///
-    /// Authority first — `admit` against the artifact's real imports — then
-    /// the component, with the deployment's implementation of each granted
-    /// operation. The command's result is whatever the COMPONENT returns.
-    /// **The platform's outbox, for one command** (ADR-0208): each event its
-    /// contract imports, linked to a function that stages what the command
-    /// gives it, to be committed with its writes or not at all. The server
-    /// never computes an event's values.
+    /// **The platform's outbox, for one command** (ADR-0208, ADR-0209): each
+    /// event and each invalidated entry its contract imports, linked to a
+    /// function that stages what the command gives it, to be committed with
+    /// its writes or not at all. The server never computes a key's values.
     fn outbox(
         &self,
         component_id: &str,
@@ -1125,23 +1120,34 @@ impl Server {
             .ok_or_else(|| format!("no contract for `{component_id}`"))?;
         let staged: StagedEvents = Arc::default();
         for import in &contract.imports {
-            let Some(event) = import.event.clone() else {
-                continue;
-            };
             let into = staged.clone();
-            host.insert(
-                import.key(),
-                Arc::new(move |values: &[Val]| {
+            let f: HostFn = match (import.event.clone(), import.invalidates.clone()) {
+                (Some(event), _) => Arc::new(move |values: &[Val]| {
                     into.lock()
                         .expect("staged events")
+                        .events
                         .push((event.clone(), values.to_vec()));
                     Ok(Vec::new())
                 }),
-            );
+                (None, Some(query)) => Arc::new(move |values: &[Val]| {
+                    into.lock()
+                        .expect("staged entries")
+                        .invalidated
+                        .push((query.clone(), values.to_vec()));
+                    Ok(Vec::new())
+                }),
+                (None, None) => continue,
+            };
+            host.insert(import.key(), f);
         }
         Ok(staged)
     }
 
+    /// **Run one compiled command through the host.**
+    ///
+    /// Authority first — `admit` against the artifact's real imports — then
+    /// the component, with the deployment's implementation of each granted
+    /// operation. The command's result is whatever the COMPONENT returns.
     fn run(
         &self,
         component_id: &str,
@@ -1332,7 +1338,10 @@ impl Server {
                 });
             };
             let total: i64 = lines.iter().map(|l| l.quantity).sum();
-            let emitted = staged_events.lock().expect("staged events").clone();
+            let (emitted, invalidated) = {
+                let staged = staged_events.lock().expect("staged");
+                (staged.events.clone(), staged.invalidated.clone())
+            };
             let events = emitted
                 .iter()
                 .map(|(event, values)| outboxed(event, values))
@@ -1360,7 +1369,7 @@ impl Server {
                     mine.pop_front();
                 }
             }
-            self.invalidate_queries(component_id, session, &emitted);
+            self.invalidate_queries(session, &invalidated, &emitted);
             // The materializer drains the committed event and regenerates the
             // entry it invalidates. The version moves because the RESOURCE
             // moved.
@@ -1735,8 +1744,8 @@ impl Server {
             .lock()
             .expect("one change of a session at a time");
         self.invalidate_queries(
-            "",
             session,
+            &[],
             &[(event.to_string(), vec![Val::String(session.into())])],
         );
         self.clock.advance(1);
@@ -2199,10 +2208,15 @@ impl Server {
     }
 
     /// **Drop what a commit made stale** (ADR-0127): each entry a command
-    /// names in `invalidates`, and each entry an emitted event reaches through
-    /// a query's `invalidates_on`. An event that leaves a key unbound (`_`,
-    /// ADR-0091) drops every entry of that query.
-    fn invalidate_queries(&self, command: &str, session: &str, events: &[(String, Vec<Val>)]) {
+    /// invalidated, as it computed its key (ADR-0209), and each entry an
+    /// emitted event reaches through a query's `invalidates_on`. An event that
+    /// leaves a key unbound (`_`, ADR-0091) drops every entry of that query.
+    fn invalidate_queries(
+        &self,
+        session: &str,
+        invalidated: &[(String, Vec<Val>)],
+        events: &[(String, Vec<Val>)],
+    ) {
         // A query's policy, which keys its entries: read by a `let`, or by a
         // stream, whose answer is kept too (ADR-0148). Until 2026-10-03 only
         // a `let`'s was found, so an event never reached a stream's kept
@@ -2233,15 +2247,10 @@ impl Server {
                 None => self.queries.invalidate(resource),
             }
         };
-        for e in &self.graph.edges {
-            if e.from == command && e.kind == pw_materialize::EdgeKind::Invalidates {
-                let args: Option<Vec<Val>> = e
-                    .key
-                    .iter()
-                    .map(|a| (a == "current_session()").then(|| Val::String(session.into())))
-                    .collect();
-                drop_key(&e.to, args);
-            }
+        // Until ADR-0209 the server read each key's text, `current_session()`
+        // or else the whole query.
+        for (query, values) in invalidated {
+            drop_key(query, Some(values.clone()));
         }
         for (event, values) in events {
             for e in &self.graph.edges {
@@ -3089,7 +3098,7 @@ impl Server {
         };
         // The store's ids are `String`s (`domain.pw`), as they key here.
         let values = event.args.iter().map(|a| Val::String(a.clone())).collect();
-        self.invalidate_queries("", "", &[(event.name.clone(), values)]);
+        self.invalidate_queries("", &[], &[(event.name.clone(), values)]);
 
         // The menu E7-P changes is store 47's (ADR-0162), read again with
         // the change.
@@ -4280,10 +4289,16 @@ impl Server {
     }
 }
 
-/// **The events a command handed the outbox** (ADR-0208), each by its
-/// declaration's path with the values it computed, staged until its writes
-/// commit.
-type StagedEvents = Arc<Mutex<Vec<(String, Vec<Val>)>>>;
+/// **What a command handed the platform** (ADR-0208, ADR-0209): its events
+/// and the entries it invalidates, each by its declaration's path with the
+/// values it computed, staged until its writes commit.
+#[derive(Default)]
+struct Staged {
+    events: Vec<(String, Vec<Val>)>,
+    invalidated: Vec<(String, Vec<Val>)>,
+}
+
+type StagedEvents = Arc<Mutex<Staged>>;
 
 /// **A region a document leaves for its query to fill** (ADR-0148): which
 /// part, the plan's entry for it (its query's component and policies), and
@@ -10649,6 +10664,32 @@ public query Store(",
         let (blue, _) = s.serve_store_document("c", STORE_ID).expect("served");
         assert_eq!(reads(), read + 1, "store 47's new menu was not kept");
         assert!(visible(&blue).contains("Espresso Doppio"), "{blue}");
+    }
+
+    /// **An entry a command invalidates is dropped by the key the command
+    /// computed, and no other** (ADR-0209). Store 47's `Menu`, as a command
+    /// hands it over: store 48's stays kept. Until ADR-0209 the server read a
+    /// key's text, and anything but `current_session()` dropped every store's
+    /// menu.
+    #[test]
+    fn an_invalidated_entry_is_dropped_by_the_key_the_command_computed() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let reads = || calls(&s, "store:data/menus#sections");
+        s.serve_store_document("a", STORE_ID).expect("served");
+        s.serve_store_document("a", "48").expect("served");
+        let read = reads();
+        s.invalidate_queries(
+            "a",
+            &[(
+                "store.page.Menu".to_string(),
+                vec![Val::String(STORE_ID.into())],
+            )],
+            &[],
+        );
+        s.serve_store_document("b", "48").expect("served");
+        assert_eq!(reads(), read, "store 48's menu is kept");
+        s.serve_store_document("b", STORE_ID).expect("served");
+        assert_eq!(reads(), read + 1, "store 47's was dropped, and read again");
     }
 
     /// **A change reaches every part that reads it** (ADR-0168): renaming

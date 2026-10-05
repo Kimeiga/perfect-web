@@ -305,6 +305,11 @@ pub struct Import {
     /// given as that event, with the command's writes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event: Option<String>,
+    /// **The query whose entry this import drops** (ADR-0209), by its path,
+    /// `store.page.Cart`: the host drops the entry it is given once the
+    /// command's writes commit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invalidates: Option<String>,
 }
 
 /// **One place a value from outside must hold an invariant** (ADR-0179):
@@ -846,11 +851,12 @@ fn host_calls(
     let body = hir.body(body_id);
     let mut out = Vec::new();
     let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
-    // What the body calls, and what its events' keys call: the command
-    // computes those (ADR-0208).
+    // What the body calls, and what its events' and invalidated entries'
+    // keys call: the command computes those (ADR-0208, ADR-0209).
     let mut exprs = body.walk();
     let emitted = hir.decl(id).policy("emits");
-    for root in emitted.iter().flat_map(|p| &p.roots) {
+    let invalidated = hir.decl(id).policy("invalidates");
+    for root in emitted.iter().chain(&invalidated).flat_map(|p| &p.roots) {
         exprs.extend(body.walk_from(root.root));
     }
     let mut callees: Vec<crate::resolve::DefId> = Vec::new();
@@ -944,6 +950,46 @@ fn host_calls(
                 .map(|t| bounded_in(sigs, t, 0))
                 .unwrap_or_default(),
             event: (decl.kind == crate::hir::DeclKind::Event).then(|| signature.path.clone()),
+            invalidates: None,
+        });
+    }
+    // **And the invalidations' function for each entry it invalidates**
+    // (ADR-0209): the query's parameters, under the outbox's authority, since
+    // the entry is dropped once the writes commit and not before.
+    for key in invalidated.iter().flat_map(|p| &p.keys) {
+        let Some(def) = crate::backend::invalidated_query(sigs.workspace(), sigs, unit, key) else {
+            continue;
+        };
+        let Some(signature) = sigs.by_def(def) else {
+            continue;
+        };
+        let Some(params) = signature
+            .params
+            .iter()
+            .map(|p| sigs.stable_type(p.as_ref()?.resolved()?))
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        let import = crate::backend::invalidation_binding(&signature.path);
+        if !seen.insert((import.interface.clone(), import.name.clone())) {
+            continue;
+        }
+        let outbox = Capability::parse(crate::signatures::OUTBOX_WRITE);
+        out.push(Import {
+            interface: import.interface,
+            name: import.name,
+            capability: outbox.name(),
+            capabilities: vec![outbox],
+            signature: Some(Signature {
+                params,
+                result: crate::resolved::StableTypeId::Primitive("Unit".into()),
+            }),
+            owner: Ownership::Platform,
+            kind: ImportKind::HostCapability,
+            bounded: Vec::new(),
+            event: None,
+            invalidates: Some(signature.path.clone()),
         });
     }
     out
@@ -1031,6 +1077,7 @@ fn component_calls(
                 // Another component's answer is built by checked code.
                 bounded: Vec::new(),
                 event: None,
+                invalidates: None,
             });
         }
     }

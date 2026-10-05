@@ -792,11 +792,13 @@ impl Lowerer<'_> {
         b.pats.shift_spans_from(before.1, offset);
         b.types.shift_spans_from(before.2, offset);
         b.nodes.shift_spans_from(before.3, offset);
-        // A listener's arguments bind; a key's are evaluated (ADR-0091), and
-        // an event's by the command that emits it (ADR-0208).
+        // A listener's arguments bind; a key's are evaluated (ADR-0091), an
+        // event's and an invalidated entry's by the command (ADR-0208,
+        // ADR-0209).
         let context = match crate::policy::domain_of(&p.name) {
             Some(crate::policy::Domain::Listener) => crate::hir::ExecutionContext::Listener,
             Some(crate::policy::Domain::EventRef) => crate::hir::ExecutionContext::Emitted,
+            _ if p.name == "invalidates" => crate::hir::ExecutionContext::Invalidated,
             _ => crate::hir::ExecutionContext::Key,
         };
         p.roots = keys

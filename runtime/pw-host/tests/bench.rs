@@ -177,6 +177,7 @@ fn a_hand_written_rust_guest_through_the_host() {
                 let (interface, name) = i.split_once('#').unwrap_or((i.as_str(), "use"));
                 Import {
                     event: None,
+                    invalidates: None,
                     interface: interface.into(),
                     name: name.into(),
                     capability: "store.read".into(),
