@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-04, against master `4f19028`, with ADR-0191.
+**Reviewed:** 2026-10-04, against master `ee7bede`, with ADR-0192.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2608,10 +2608,14 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
-`4f19028` (2026-10-04, ADR-0191): `just ci` passes locally, the workspace's
-1899 tests pass, and the browser suite passes 692 in three engines, with 13
-skipped. Its evidence is `docs/evidence/E14/page-speculation.txt`, recorded
-at that commit: the cart's page shows a press before the server answers, in
+`ee7bede` (2026-10-04, ADR-0192): `just ci` passes locally, the workspace's
+1900 tests pass, and the browser suite passes 701 in three engines, with 13
+skipped. Its evidence is `docs/evidence/E14/home.txt`, recorded at that
+commit: the home page at `/`, in three engines with its audit, and 2 of 2
+mutants killed. Recorded again at that commit, as their specs or tests
+changed: `stable-layout.txt` 6 of 6, `titles.txt` 16 of 16 and
+`accessibility.txt` 14 of 14. ADR-0191's is `page-speculation.txt`, at
+`4f19028`: the cart's page shows a press before the server answers, in
 three engines, and 4 of 4 mutants are killed. `pages.txt` is recorded again
 at that commit, 7 of 7, its two speculation mutants now ADR-0191's, and
 `titles.txt`, 16 of 16. ADR-0190's evidence was `pages.txt` at `f2060c6`,
