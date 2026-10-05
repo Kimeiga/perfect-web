@@ -2,6 +2,11 @@
 // estimate and its recommendations come after the store's own content, in
 // the same response, and hold up neither the menu nor an Add. Read by role
 // and text.
+//
+// ADR-0223: a test that needs the page seen before the recommendations holds
+// the recommender, and lets it go when it has seen it. A delay it outwaited,
+// 2.5 s, ran past the query's own 3 s timeout on a loaded machine, and the
+// slot rightly said "No recommendations right now".
 import { expect, test } from "@playwright/test";
 import { MUTABLE_PORTS } from "../playwright.config.mjs";
 
@@ -16,6 +21,7 @@ test.use({
 test.describe.configure({ mode: "serial" });
 test.afterEach(async ({ request }) => {
   await request.post("/bench/recommendations");
+  await request.post("/bench/split-fills?ms=0");
 });
 
 const delivery = (page) => page.getByRole("region", { name: "Delivery" });
@@ -27,30 +33,34 @@ const ready = (page) =>
   page.waitForFunction(() => document.documentElement.dataset.pwReady, null, { polling: 50 });
 
 test("the slots come after the store's own content (test 3)", async ({ page, request }) => {
-  await request.post("/bench/recommendations?delay=2500");
+  await request.post("/bench/recommendations?hold=1&delay=0");
   await page.goto("/stores/47", { waitUntil: "commit" });
   // The store's own content, while the recommendations are still coming:
   // the placeholder first, so a slow engine under load does not race it.
   await expect(recommendations(page)).toHaveText("Finding recommendations");
   await expect(page.locator("#store-name")).toHaveText("Blue Bottle");
   await expect(page.locator("#menu li")).toHaveCount(3);
-  // Then each slot, filled where it is. The estimate is said to a screen
+  // Then each slot, filled where it is, as it comes: the estimate while the
+  // recommendations are still coming (ADR-0223). It is said to a screen
   // reader when it comes: a range, in words (ADR-0180).
   await expect(delivery(page)).toHaveText("Delivery in 25 to 35 min");
   await expect(delivery(page)).toHaveAttribute("aria-live", "polite");
+  await expect(recommendations(page)).toHaveText("Finding recommendations");
+  await request.post("/bench/recommendations/release");
   await expect(recommendations(page).getByRole("listitem")).toHaveText(["Cortado", "Cold Brew"]);
 });
 
 test("slow recommendations do not hold up an Add (test 17)", async ({ page, request }) => {
   // A press needs a page that is shown: Playwright waits for the button to
   // be still across two frames, and a person for it to be there at all.
-  await request.post("/bench/recommendations?delay=2500");
+  await request.post("/bench/recommendations?hold=1&delay=0");
   await page.goto("/stores/47", { waitUntil: "commit" });
   await ready(page);
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
   // The press was answered while the recommender was still answering.
   await expect(recommendations(page)).toHaveText("Finding recommendations");
+  await request.post("/bench/recommendations/release");
   await expect(recommendations(page).getByRole("listitem")).toHaveText(["Cortado", "Cold Brew"]);
 });
 
@@ -94,8 +104,8 @@ test("the store is shown before its slots are filled", async ({ page, request })
   // characters of text, or 32 by 32 pixels of an image (WebKit's
   // `LocalFrameView`). The store says enough of itself and its items to
   // (ADR-0166); until it did, Safari showed it only when its slots were
-  // filled.
-  await request.post("/bench/recommendations?delay=2500");
+  // filled. Held, and let go after, by the reset after each test.
+  await request.post("/bench/recommendations?hold=1&delay=0");
   await page.goto("/stores/47", { waitUntil: "commit" });
   await page.waitForFunction(
     () => performance.getEntriesByType("paint").some((p) => p.name === "first-contentful-paint"),
@@ -103,4 +113,16 @@ test("the store is shown before its slots are filled", async ({ page, request })
     { polling: 50, timeout: 1500 },
   );
   await expect(recommendations(page)).toHaveText("Finding recommendations");
+});
+
+test("a region whose fill arrives in two parts is shown whole", async ({ page, request }) => {
+  // ADR-0223: the response pauses half way through the region's template.
+  // The runtime applied a template as soon as it saw one, and the region
+  // showed what had been parsed of it: one recommendation of two.
+  await request.post("/bench/split-fills?ms=400");
+  await request.post("/bench/recommendations?hold=1&delay=0");
+  await page.goto("/stores/47", { waitUntil: "commit" });
+  await expect(recommendations(page)).toHaveText("Finding recommendations");
+  await request.post("/bench/recommendations/release");
+  await expect(recommendations(page).getByRole("listitem")).toHaveText(["Cortado", "Cold Brew"]);
 });

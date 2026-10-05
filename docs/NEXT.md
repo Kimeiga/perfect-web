@@ -361,9 +361,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           browsers~~ (ADR-0220, `just e14-feed`); ~~a `<textarea>`'s
           bound value rendered as its text~~ (ADR-0221, `just
           e14-form-controls`); ~~optimistic posting~~ (ADR-0222, `just
-          e14-optimistic-posts`); next a longer read applied after a commit
-          it did not see (ADR-0223, found by ADR-0222); then the rest of the
-          feed, pulling in what it needs: 0073-a computed holes, 0071-a,
+          e14-optimistic-posts`); ~~a streamed region filled when its whole
+          arm has arrived~~ (ADR-0223, `just e14-whole-fills`); next a
+          longer read applied after a commit it did not see (ADR-0224, found
+          by ADR-0222); then the rest of the feed, pulling in what it needs: 0073-a computed holes, 0071-a,
           0122-d, 0057-a, 0099-a, a `String`'s length as an invariant, and
           ADR-0195's ruling 10, materialization chains;
         - then 0101-a to 0101-d, 0105-a, 0100-a, and the rest below;

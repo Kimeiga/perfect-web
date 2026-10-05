@@ -825,10 +825,14 @@ fn emit_settled<'o>(
 }
 
 /// **A streamed region's settled arm, as the patch that fills it**
-/// (ADR-0148): `<template for="pw-7">..</template>`. A browser with the
-/// platform's out-of-order streaming applies it as it parses; the runtime
-/// applies it in one without. `env` gives the stream what its query settled
-/// to, and the document's identity domain.
+/// (ADR-0148): `<template for="pw-7">..</template><!--/pw-7-->`. A browser
+/// with the platform's out-of-order streaming applies it as it parses; the
+/// runtime applies it in one without, once the comment after it has arrived
+/// (ADR-0223). The parser puts the comment after the template's end tag, so a
+/// template followed by it is whole: until then a response that arrives in
+/// parts can show a template only part parsed, and its region only part
+/// filled. `env` gives the stream what its query settled to, and the
+/// document's identity domain.
 pub fn settled_patch(
     t: &Template,
     part: PartId,
@@ -845,9 +849,9 @@ pub fn settled_patch(
         path: format!("the answer of stream {part}"),
     })?;
     let inner = rendered(others, |out| emit_settled(p, outcome, env, others, out))?;
+    let name = stream_name(part);
     Ok(format!(
-        "<template for=\"{}\">{inner}</template>",
-        stream_name(part)
+        "<template for=\"{name}\">{inner}</template><!--/{name}-->"
     ))
 }
 

@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0223, 2026-10-05: a streamed region is filled when its whole arm has
+arrived** (found by an intermittent `slots.spec.mjs`). The runtime applied a
+`<template for>` as soon as it saw one, and a response that arrived in parts
+gave the region the part parsed so far: one recommendation of two, the rest
+lost with the template. It waits for the comment the renderer writes after
+each template now, as the platform waits for the end tag. The tests that
+slept 2.5 s against a 3 s timeout hold the recommender instead (`just
+e14-whole-fills`).
+
 **ADR-0222, 2026-10-05: a post is shown before the server answers** (the
 feed's optimistic posting). Speculation was the store's cart's: the server
 sent no other value, and the feed's timeline has a key, its length, a post

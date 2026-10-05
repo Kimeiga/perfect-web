@@ -471,6 +471,10 @@ impl StoreData {
             let [Val::String(store)] = args else {
                 return Err(format!("recommendations#for-store received {args:?}"));
             };
+            // Held until a test lets it go (ADR-0223), then slow.
+            if let Some(gate) = &recommender.gate {
+                gate.wait();
+            }
             std::thread::sleep(std::time::Duration::from_millis(recommender.delay_ms));
             let items = match (&recommender.items, store.as_str()) {
                 (Some(items), _) => items.clone(),

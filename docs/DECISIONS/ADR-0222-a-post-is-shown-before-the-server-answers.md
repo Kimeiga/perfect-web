@@ -73,7 +73,7 @@ and builds ruling 0105-a's unnamed key. Date: 2026-10-05. Milestone: E14.
   read (ADR-0152) fetches outside the session's hold. Its value, read before
   a commit, can be applied after the commit's change was sent. The page then
   shows the list without the commit until the next change. It predates this
-  ADR, and is ADR-0223's to fix.
+  ADR, and is ADR-0224's to fix.
 
 ## Acceptance
 

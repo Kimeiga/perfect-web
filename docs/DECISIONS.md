@@ -1887,3 +1887,11 @@ ruling 0105-a's unnamed key).
   target may leave a key unnamed, `_`, and the server sends any value a page
   speculates on, read with what the page shows, when it changes. The feed's
   post shows first, by "You", and is the server's when its value arrives.
+[ADR-0223](DECISIONS/ADR-0223-a-streamed-region-is-filled-when-its-whole-arm-has-arrived.md):
+a streamed region is filled when its whole arm has arrived (found by an
+intermittent `slots.spec.mjs`).
+- The runtime applied a `<template for>` as soon as it saw one, and a
+  response that arrived in parts gave a region the part of it parsed: one
+  recommendation of two. It waits for the comment the renderer writes after
+  each template now. The slots' tests hold the recommender instead of
+  outwaiting a delay half a second short of the query's timeout.

@@ -2708,6 +2708,28 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0223: a streamed region is filled when its whole arm has arrived. The
+# renderer's tests, the slots in three engines, and the mutation controls.
+e14-whole-fills:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0223 - a streamed region is filled when its whole arm has arrived"; echo; \
+       echo "produced by: just e14-whole-fills"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the patch and the comment after it (runtime/pw-render/tests/streams.rs)"; echo; \
+       cargo test --locked -p pw-render --test streams 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the slots in three engines (e2e/slots.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/slots.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/whole_fills_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/whole_fills_mutations.py; \
+     } > docs/evidence/E14/whole-fills.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/whole-fills.txt
+
 # ADR-0222: a post is shown before the server answers. The compiler's and
 # the server's tests, the feed in three engines, and the mutation controls.
 e14-optimistic-posts:

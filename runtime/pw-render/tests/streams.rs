@@ -162,9 +162,11 @@ fn the_patch_holds_what_the_settled_region_holds() {
             .strip_prefix("<section><!--pw:s0-->")
             .and_then(|r| r.strip_suffix("<!--pw:e0--></section>"))
             .expect("the region's range");
+        // And a comment after it, which says the template has all arrived
+        // (ADR-0223).
         assert_eq!(
             settled_patch(&page(true), PartId(0), &env, &[]).expect("a patch"),
-            format!("<template for=\"pw-0\">{inner}</template>")
+            format!("<template for=\"pw-0\">{inner}</template><!--/pw-0-->")
         );
     }
     // And a stream not settled has no patch to send.

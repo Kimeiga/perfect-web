@@ -398,6 +398,11 @@ struct Recommender {
     /// (ADR-0165), so what it suggests is what the store sells, and changes
     /// when its menu does.
     items: Option<Vec<(String, String)>>,
+    /// **Held until a test releases it** (ADR-0223), then answered after
+    /// `delay_ms`. A test that needs its page seen before the answer holds
+    /// the recommender rather than outwaiting a delay, which a loaded machine
+    /// stretched past the query's own timeout.
+    gate: Option<Arc<Gate>>,
 }
 
 impl Default for Recommender {
@@ -406,7 +411,31 @@ impl Default for Recommender {
             delay_ms: 1200,
             fail: None,
             items: None,
+            gate: None,
         }
+    }
+}
+
+/// **A gate a held source waits at** (ADR-0223): closed until opened, and
+/// waited at for ten seconds at most, so a test that never opens it holds no
+/// thread for good.
+#[derive(Debug, Default)]
+struct Gate {
+    open: Mutex<bool>,
+    opened: std::sync::Condvar,
+}
+
+impl Gate {
+    fn open(&self) {
+        *self.open.lock().expect("gate") = true;
+        self.opened.notify_all();
+    }
+
+    fn wait(&self) {
+        let open = self.open.lock().expect("gate");
+        let _ = self
+            .opened
+            .wait_timeout_while(open, std::time::Duration::from_secs(10), |open| !*open);
     }
 }
 
@@ -597,6 +626,11 @@ struct Server {
     /// keeps its speculation until the value that includes the commit
     /// arrives.
     speculated_versions: Mutex<BTreeMap<(String, String, String), Version>>,
+    /// **How long a streamed region's fill pauses half written**
+    /// (ADR-0223), in milliseconds: none unless a test sets it through
+    /// `/bench/split-fills`, as a network that delivers a response in parts
+    /// would.
+    split_fills: std::sync::atomic::AtomicU64,
     /// **What each session's connections meet** (charter §15.5's one-shot
     /// network error and forced reconnect, ADR-0175): whether its next
     /// command's connection is dropped, and when its subscriptions are cut
@@ -1055,6 +1089,7 @@ impl Server {
             pages: Mutex::new(BTreeMap::new()),
             telling: Mutex::new(Vec::new()),
             speculated_versions: Mutex::new(BTreeMap::new()),
+            split_fills: std::sync::atomic::AtomicU64::new(0),
             connection_faults: Mutex::new(BTreeMap::new()),
             materializer_faults: Mutex::new(std::collections::BTreeSet::new()),
             keyed: Mutex::new(BTreeMap::new()),
@@ -3737,12 +3772,35 @@ impl Server {
                 patch(Settled::Failed(None))
             });
             let Ok(written) = written else { continue };
+            // In two parts, a pause between them, where a test asks for it
+            // (ADR-0223): the browser then parses a template it has only part
+            // of.
+            let pause = self.split_fills.load(std::sync::atomic::Ordering::SeqCst);
+            let mut half = if pause > 0 {
+                written.len() / 2
+            } else {
+                written.len()
+            };
+            while !written.is_char_boundary(half) {
+                half -= 1;
+            }
+            let (first, rest) = written.split_at(half);
             if stream
-                .write_all(written.as_bytes())
+                .write_all(first.as_bytes())
                 .and_then(|_| stream.flush())
                 .is_err()
             {
                 return;
+            }
+            if !rest.is_empty() {
+                std::thread::sleep(std::time::Duration::from_millis(pause));
+                if stream
+                    .write_all(rest.as_bytes())
+                    .and_then(|_| stream.flush())
+                    .is_err()
+                {
+                    return;
+                }
             }
         }
         let _ = stream.write_all(DOCUMENT_END.as_bytes());
@@ -5180,6 +5238,9 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             if let Some(ms) = q("delay").and_then(|v| v.parse().ok()) {
                 set.delay_ms = ms;
             }
+            if q("hold").as_deref() == Some("1") {
+                set.gate = Some(Arc::new(Gate::default()));
+            }
             set.fail = q("fail").filter(|f| !f.is_empty());
             if let Some(items) = q("items") {
                 set.items = Some(
@@ -5190,7 +5251,15 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                         .collect(),
                 );
             }
-            *server.store.recommender.lock().expect("recommender") = set;
+            // A read held as it was is let go (ADR-0223): a test that set the
+            // recommender again has done with it.
+            let was = std::mem::replace(
+                &mut *server.store.recommender.lock().expect("recommender"),
+                set,
+            );
+            if let Some(gate) = was.gate {
+                gate.open();
+            }
             // Every query a page of this build reads: what it kept, and what
             // is still running with the recommender as it was.
             let resources: std::collections::BTreeSet<String> = server
@@ -5208,6 +5277,27 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .collect();
             for resource in resources {
                 server.queries.invalidate(&resource);
+            }
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
+        // **Each streamed region's fill written in two parts** (ADR-0223),
+        // `?ms=` apart; `0` writes each whole again.
+        ("POST", "/bench/split-fills") => {
+            let ms = query
+                .split('&')
+                .find_map(|p| p.strip_prefix("ms="))
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
+            server
+                .split_fills
+                .store(ms, std::sync::atomic::Ordering::SeqCst);
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
+        // **The recommender's held reads, let go** (ADR-0223), its settings
+        // kept.
+        ("POST", "/bench/recommendations/release") => {
+            if let Some(gate) = &server.store.recommender.lock().expect("recommender").gate {
+                gate.open();
             }
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
@@ -7161,13 +7251,21 @@ public query Store(",
             !whole.contains("content-length"),
             "a streamed document's length is not known first"
         );
-        // The arm, and then the document's end, and nothing after it.
+        // The arm, the comment that says it has all arrived (ADR-0223), and
+        // then the document's end, and nothing after it.
         let arm = &whole[whole.find("<template for=").expect("arm")..];
         assert!(
             arm.contains("Cortado") && arm.contains("Cold Brew"),
             "{arm}"
         );
-        assert!(whole.ends_with("</template></body>\n</html>\n"), "{whole}");
+        let name = arm["<template for=\"".len()..]
+            .split('"')
+            .next()
+            .expect("its region");
+        assert!(
+            whole.ends_with(&format!("</template><!--/{name}--></body>\n</html>\n")),
+            "{whole}"
+        );
     }
 
     #[test]
@@ -11932,7 +12030,11 @@ public query Store(",
         // A range, in words (ADR-0180).
         assert_eq!(slot(&whole, "Delivery"), "Delivery in 30 to 40 min");
         assert_eq!(slot(&whole, "Recommendations"), "Cortado Cold Brew");
-        assert!(whole.ends_with("</template></body>\n</html>\n"), "{whole}");
+        // Each arm with the comment after it (ADR-0223).
+        assert!(
+            whole.ends_with("</template><!--/pw-30--></body>\n</html>\n"),
+            "{whole}"
+        );
         // An estimator that is down fills its slot with the failure, and the
         // page is served.
         estimate(&s, "b", Some("down"), 0);

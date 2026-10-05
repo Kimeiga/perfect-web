@@ -1255,12 +1255,20 @@ function streamPending(id) {
   return false;
 }
 
-/** Apply each `<template for>` the browser left in the document: the
- * region's contents, between its anchors, become the template's. Returns the
- * parts it filled. */
+/** Apply each `<template for>` the browser left in the document, once it has
+ * all arrived: the region's contents, between its anchors, become the
+ * template's. Returns the parts it filled.
+ *
+ * A template is whole once the parser has put a node after it, the comment
+ * the server writes after each one, or has read the whole document (ADR-0223).
+ * Until 2026-10-05 one was applied as soon as it was seen, and a response that
+ * arrived in parts gave the region the part of it parsed so far: the
+ * recommendations showed one item of two, and the second was lost with the
+ * template. The platform's own streaming applies one at its end tag. */
 function applyStreamPatches() {
   const applied = new Set();
   for (const t of document.querySelectorAll("template[for]")) {
+    if (!t.nextSibling && document.readyState === "loading") continue;
     const m = STREAM_NAME.exec(t.getAttribute("for") ?? "");
     const r = m && index.get(addressOf([], m[1]));
     if (!r?.start) continue;
