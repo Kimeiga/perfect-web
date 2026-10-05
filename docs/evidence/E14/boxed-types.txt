@@ -1,0 +1,56 @@
+ADR-0202 - a type that holds itself in place is boxed, and crosses as its nodes
+
+produced by: just e14-boxed-types
+commit: 7d3234bd4e57292d9c278a3227fd7d7b1757e3d7
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+
+== the WIT, the refusals and the lowering (compiler/pw-core/tests/recursive_types.rs)
+
+test an_invariant_inside_a_tree_holds_at_every_node ... ok
+test a_type_that_contains_itself_crosses_as_its_nodes ... ok
+test a_type_that_contains_itself_in_place_is_compiled_boxed ... ok
+test a_value_of_a_type_that_contains_itself_is_not_put_on_the_browsers_wire_yet ... ok
+test a_type_that_contains_itself_otherwise_crosses_no_boundary_yet ... ok
+test a_type_no_finite_value_has_is_refused_where_it_is_declared ... ok
+test a_type_that_can_be_built_without_itself_is_not ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+== components through the E8 host (compiler/pw-conformance/tests/boxed_types.rs, recursive_types.rs)
+
+test a_chain_deeper_than_any_stack_crosses_both_ways ... ok
+test a_host_answers_with_a_value_held_in_place_and_is_given_one ... ok
+test a_list_of_boxes_crosses_as_its_nodes ... ok
+test a_value_held_in_place_crosses_as_its_nodes ... ok
+test a_value_held_in_place_is_built_and_walked_in_the_component ... ok
+test nodes_that_are_not_one_tree_in_level_order_trap ... ok
+test types_that_hold_each_other_in_place_compile_inside_a_component ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.64s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.72s
+
+== the JavaScript modules, against their components under Node (compiler/pw-conformance/tests/javascript.rs)
+
+javascript: 5 queries over values held in place, 1000 calls, component and module agree (132 trapped in both)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 1.05s
+
+== mutation controls (scripts/boxed_types_mutations.py)
+
+baseline: 25 passed, 0 failed
+no type is boxed: KILLED (9 of 25 tests fail)
+an option's payload is not held in place: KILLED (8 of 25 tests fail)
+a record is built as its box's word: KILLED (7 of 25 tests fail)
+a case is built as its box's word: KILLED (5 of 25 tests fail)
+a box held in memory is its cell, unread: KILLED (7 of 25 tests fail)
+a box's field is read without its cell: KILLED (7 of 25 tests fail)
+a box is matched without its cell: KILLED (6 of 25 tests fail)
+a list of boxes is no slot: KILLED (1 of 25 tests fail)
+a box is no slot: KILLED (3 of 25 tests fail)
+an option of a box is no slot: KILLED (6 of 25 tests fail)
+a box's child is not copied: KILLED (5 of 25 tests fail)
+a box's child may come before its node: KILLED (1 of 25 tests fail)
+a box's index is not held to the run: KILLED (1 of 25 tests fail)
+the host reads a u32 as no slot: KILLED (2 of 25 tests fail)
+the host reads an option<u32> as no slot: KILLED (5 of 25 tests fail)
+a box crosses as the type it is: KILLED (9 of 25 tests fail)
+the type itself is no slot: KILLED (9 of 25 tests fail)
+17 of 17 mutants killed

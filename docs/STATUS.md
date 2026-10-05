@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `53ceb20`, with ADR-0201.
+**Reviewed:** 2026-10-05, against master `7d3234b`, with ADR-0202.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2727,6 +2727,21 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`7d3234b` (2026-10-05, ADR-0202): `just ci` passes locally, the workspace's
+1960 tests pass, and the browser suite passes 710 in three engines, with 13
+skipped. ADR-0202's evidence is `docs/evidence/E14/boxed-types.txt`,
+recorded at that commit: the WIT's, the refusals' and the lowering's 7
+tests, the components' 7 through the E8 host against a Rust model and
+ADR-0194's 10, five queries over values held in place agreeing with their
+JavaScript modules on 1,000 calls, and 17 of 17 mutants killed. Recorded
+again at that commit: `E10/generics.txt` 9 of 9, and `E10/sum-types.txt` 17
+of 17, its control retired with the branch it controlled (`a69a0cf`).
+**Correction:** `E14/recursive-types.txt`, recorded again at that commit,
+killed 17 of 18: "a list holds its elements in place" mutates
+`contains_itself_in_place`, which nothing has called since ADR-0202 moved
+boxing into the encoder. It is not committed here; the function goes, the
+control is retired ("Remove the in-place check nothing has called since
+ADR-0202"), and the file is recorded with ADR-0203.
 `53ceb20` (2026-10-05, ADR-0201): `just ci` passes locally, the workspace's
 1952 tests pass, and the browser suite passes 710 in three engines, with 13
 skipped. ADR-0201's evidence is `docs/evidence/E14/expected-cases.txt`,
