@@ -2,7 +2,7 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `cabf851`, with ADR-0203 and ADR-0204.
+**Reviewed:** 2026-10-05, against master `2cbd5d8`, with ADR-0205 and ADR-0206.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2781,6 +2781,17 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`2cbd5d8` (2026-10-05, ADR-0205 and ADR-0206): `just ci` passes locally, the
+workspace's 1997 tests pass, and the browser suite passes 728 in three
+engines, with 13 skipped. ADR-0205's evidence is
+`docs/evidence/E14/graphs-on-the-wire.txt`, recorded at that commit: its
+tests, the renderer's and the browser's, and 19 of 19 mutants killed.
+ADR-0206's is `one-case-name.txt`, at that commit: its 2 tests, the
+template's, the renderer's and the hosts', and 5 of 5 mutants killed.
+Recorded again at that commit: `recursive-types.txt` 16 of 16, its refusal's
+control retired with the refusal ADR-0205 lifted; `view-instances.txt` 27 of
+27; `streams.txt` 26 of 26; `E10/template-sum-types.txt` 10 of 10; and
+`E10/kiokun.txt`, its build rebuilt with the cases named as WIT names them.
 `cabf851` (2026-10-05, ADR-0203 and ADR-0204): `just ci` passes locally, the
 workspace's 1979 tests pass, and the browser suite passes 725 in three
 engines, with 13 skipped. ADR-0203's evidence is
