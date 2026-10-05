@@ -2593,8 +2593,8 @@ impl Server {
         // was read here, so a command asked each of the page's queries for
         // the cart's count, and a slow one held up every command.
         let bindings = self.binding(session, part["binding"].as_str().unwrap_or_default())?;
-        Ok(match val_to_value(&self.read_part(&bindings, &part)?) {
-            Value::Text(t) => t,
+        Ok(match &val_to_value(&self.read_part(&bindings, &part)?) {
+            Value::Text(t) => t.clone(),
             Value::Int(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
             other => return Err(format!("`{path}` has no text form: {other:?}")),
@@ -6546,7 +6546,9 @@ fn signal_manifest(
 fn with_signals(mut env: Env, plan: &serde_json::Value) -> Env {
     for s in plan["signals"].as_array().into_iter().flatten() {
         let name = s["name"].as_str().unwrap_or_default();
-        env = env.set(name, Value::from_wire(&s["initial"]));
+        let first = Value::from_wire(&s["initial"])
+            .unwrap_or_else(|e| panic!("the plan's first value of `{name}`: {e}"));
+        env = env.set(name, first);
     }
     env
 }

@@ -746,11 +746,12 @@ fn an_element_carries_exactly_the_paths_its_handler_reads() {
     // What a host computed for a row is set in it by its path (ADR-0170),
     // and is the page's to show, not a field of the item: a handler given
     // the item is not given it (ADR-0172).
-    let Value::Record(mut fields) = item("cortado", "Cortado") else {
+    let mut computed = item("cortado", "Cortado");
+    let Value::Record(fields) = &mut computed else {
         unreachable!()
     };
     fields.insert("price.display".into(), Value::Text("$4.25".into()));
-    let computed = Env::new().set("item", Value::Record(fields));
+    let computed = Env::new().set("item", computed);
     let html = render(&button_capturing(&["item"]), &computed, &[]).unwrap();
     assert_eq!(
         captures_of(&html),

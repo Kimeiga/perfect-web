@@ -305,10 +305,11 @@ public query Fetched(id: Int) -> Int { List.length(fetch(id).replies) }
 }
 
 #[test]
-fn a_value_of_a_type_that_contains_itself_is_not_put_on_the_browsers_wire_yet() {
-    // A handler's assignment is written out by the type's shape, which for
-    // this type would never end: it is refused by name instead, and nothing
-    // recurses without end. The signal's first value is data, as any is.
+fn a_value_of_a_type_that_contains_itself_is_put_on_the_browsers_wire_as_its_nodes() {
+    // A handler's assignment was written out by the type's shape, which for
+    // this type would never end, and was refused by name until ADR-0205. It
+    // is written as its nodes now, as the signal's first value is
+    // (`graphs_on_the_wire.rs` runs it).
     let program = r#"module m
 
 import List
@@ -339,17 +340,22 @@ page P() {
         .find(|c| c.page.ends_with(".P"))
         .expect("the page's signals");
     let held = page.signals.as_ref().expect("its first value is data");
-    assert_eq!(held.len(), 1, "{held:?}");
+    assert_eq!(
+        held[0].initial,
+        serde_json::json!({ "$graph": [{ "text": "", "replies": [] }] })
+    );
     let handlers = pw_core::backend::js::compile(&units).expect("checks");
-    let refused: Vec<String> = handlers
+    let written: Vec<&str> = handlers
         .iter()
         .filter_map(|h| match &h.module {
-            pw_core::backend::wasm::Encoding::Encoded(_) => None,
-            other => Some(format!("{other:?}")),
+            pw_core::backend::wasm::Encoding::Encoded(m) => Some(m.source.as_str()),
+            _ => None,
         })
         .collect();
     assert!(
-        refused.iter().any(|r| r.contains("contains itself")),
-        "{refused:?}"
+        written
+            .iter()
+            .any(|s| s.contains("return { $graph: nodes };")),
+        "{written:?}"
     );
 }

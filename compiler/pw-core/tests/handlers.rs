@@ -136,8 +136,15 @@ fn run_answered(
     refuse: &str,
     answer: &str,
 ) -> serde_json::Value {
-    let dir =
-        std::env::temp_dir().join(format!("pw-handler-{}-{}", std::process::id(), m.identity));
+    // One directory each run: two tests may run one module at once, and one's
+    // cleanup would take the other's files.
+    static RUNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let dir = std::env::temp_dir().join(format!(
+        "pw-handler-{}-{}-{}",
+        std::process::id(),
+        m.identity,
+        RUNS.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    ));
     std::fs::create_dir_all(&dir).expect("temp");
     std::fs::write(dir.join("handler.mjs"), &m.source).expect("write");
     std::fs::write(

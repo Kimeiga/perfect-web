@@ -179,7 +179,7 @@ fn it_renders_to_the_depth_its_data_has_each_instance_in_a_frame() {
         1,
         vec![comment(2, vec![comment(4, vec![])]), comment(3, vec![])],
     );
-    let env = pw_render::Env::new().set("c", pw_render::Value::from_wire(&tree));
+    let env = pw_render::Env::new().set("c", pw_render::Value::from_wire(&tree).expect("a value"));
     let html = pw_render::render(root, &env, &all).expect("renders");
     assert_eq!(
         visible(&html).split_whitespace().collect::<String>(),
@@ -217,7 +217,10 @@ fn past_what_a_browser_nests_it_is_refused() {
             .fold(comment(depth, vec![]), |c, k| comment(k, vec![c]))
     };
     let render = |depth: i64| {
-        let env = pw_render::Env::new().set("c", pw_render::Value::from_wire(&chain(depth)));
+        let env = pw_render::Env::new().set(
+            "c",
+            pw_render::Value::from_wire(&chain(depth)).expect("a value"),
+        );
         pw_render::render(root, &env, &all)
     };
     // `Root`'s `<ul>`, then two for each comment: 1 + 2 × 249 = 499.
@@ -240,7 +243,7 @@ fn the_renderer_goes_no_deeper_for_each_instance() {
     let chain = (0..247)
         .rev()
         .fold(comment(247, vec![]), |c, k| comment(k, vec![c]));
-    let env = pw_render::Env::new().set("c", pw_render::Value::from_wire(&chain));
+    let env = pw_render::Env::new().set("c", pw_render::Value::from_wire(&chain).expect("a value"));
     let html = std::thread::scope(|s| {
         std::thread::Builder::new()
             .stack_size(2 * 1024 * 1024)

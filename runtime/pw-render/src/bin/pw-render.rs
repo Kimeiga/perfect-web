@@ -120,7 +120,13 @@ fn main() -> std::process::ExitCode {
                         let mut env = env;
                         for s in plan["signals"].as_array().into_iter().flatten() {
                             let name = s["name"].as_str().unwrap_or_default();
-                            env = env.set(name, Value::from_wire(&s["initial"]));
+                            match Value::from_wire(&s["initial"]) {
+                                Ok(v) => env = env.set(name, v),
+                                Err(e) => {
+                                    eprintln!("pw-render: {path}: the signal `{name}`: {e}");
+                                    return std::process::ExitCode::from(2);
+                                }
+                            }
                         }
                         // A list a session's query fills, the values not giving
                         // it: this render is no session's, and no session's list

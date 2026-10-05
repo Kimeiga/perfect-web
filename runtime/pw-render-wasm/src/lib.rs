@@ -118,7 +118,7 @@ fn read(request: &[u8]) -> Result<Read, (u32, String)> {
     let mut env = pw_render::Env::new();
     if let Some(values) = request["values"].as_object() {
         for (name, value) in values {
-            env = env.set(name, pw_render::Value::from_wire(value));
+            env = env.set(name, wire(value, name)?);
         }
     }
     let templates = match request.get("templates") {
@@ -128,6 +128,12 @@ fn read(request: &[u8]) -> Result<Read, (u32, String)> {
         }
     };
     Ok((request, part, env, templates))
+}
+
+/// A value the request gives, or a malformed graph refused as a request
+/// that is not one (ADR-0205).
+fn wire(value: &serde_json::Value, name: &str) -> Result<pw_render::Value, (u32, String)> {
+    pw_render::Value::from_wire(value).map_err(|e| (2, format!("`{name}`: {e}")))
 }
 
 /// What [`read`] reads.
@@ -171,7 +177,10 @@ pub fn instance(request: &[u8]) -> (u32, String) {
     let Some(each) = part.id() else {
         return (2, "the part is no loop".to_string());
     };
-    let item = pw_render::Value::from_wire(&request["item"]);
+    let item = match wire(&request["item"], "item") {
+        Ok(item) => item,
+        Err(refused) => return refused,
+    };
     match pw_render::render_instance(&template_of(part), each, &item, &env, &templates) {
         Ok(html) => (0, html),
         Err(why) => (1, format!("{why:?}")),
@@ -189,8 +198,10 @@ pub fn changes(request: &[u8]) -> (u32, String) {
     let Some(each) = part.id() else {
         return (2, "the part is no loop".to_string());
     };
-    let was = pw_render::Value::from_wire(&request["was"]);
-    let now = pw_render::Value::from_wire(&request["now"]);
+    let (was, now) = match (wire(&request["was"], "was"), wire(&request["now"], "now")) {
+        (Ok(was), Ok(now)) => (was, now),
+        (Err(refused), _) | (_, Err(refused)) => return refused,
+    };
     match pw_render::instance_changes(&template_of(part), each, &was, &now, &env, &templates) {
         Ok(None) => (0, "null".to_string()),
         // A list inside a speculated row is refused at build (ADR-0170), and
@@ -340,7 +351,7 @@ mod tests {
         let server = pw_render::render_instance(
             &template,
             PartId(0),
-            &pw_render::Value::from_wire(&item),
+            &pw_render::Value::from_wire(&item).expect("a value"),
             &env,
             &[],
         )

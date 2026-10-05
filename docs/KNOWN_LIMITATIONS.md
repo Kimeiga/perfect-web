@@ -86,10 +86,11 @@ rather than approximated:
     each other), held deeper than one `List` or `Option` of itself, holding
     another such type, or as an opaque type: refused by name where its WIT is
     written. Each compiles inside a component;
-  - **on the browser's wire**: a handler capturing one, setting a signal to
-    one or sending one to a command, and a browser's argument holding one,
-    are refused by name. A signal holds one at its first value, and the
-    browser renders it, as JSON, within serde_json's 128 nested values;
+  - **on the browser's wire** it crosses as its nodes (ADR-0205): a
+    signal's value, which a handler reads and sets, and a command's
+    argument. Refused by name: a handler's capture of one, a command's
+    declared error holding one, a speculation's value holding one, two
+    types that hold each other, and a case of one as a browser's argument;
   - **nested deeper than 128 in a host** (`NESTED_DEPTH`): a host reads such
     a value's nodes instead.
 - **`==` compares primitives only.** Two records, two sum-type values or two

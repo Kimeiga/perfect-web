@@ -133,7 +133,12 @@ impl std::fmt::Display for Blocked {
 }
 
 /// A value a template can render.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// **As deep as its data, and never on the stack** (ADR-0205): a value of a
+/// type that contains itself, a reply thread, is cloned, compared and dropped
+/// with a stack on the heap, so its depth is no thread's business. Printed
+/// with `{:?}`, it is still read by recursion.
+#[derive(Debug)]
 pub enum Value {
     Text(String),
     Bool(bool),
@@ -169,28 +174,134 @@ impl Value {
     /// The server renders a signal's first value with this, and the browser's
     /// copy of this renderer each value after it, so the two agree by being
     /// one function.
-    pub fn from_wire(j: &serde_json::Value) -> Value {
+    ///
+    /// **A value of a type that contains itself is its nodes**
+    /// (ADR-0205): `{ "$graph": [node, ...] }`, node 0 the value, each value
+    /// of the type inside a node written `{ "$node": k }` for a later node
+    /// `k`. Each node but the first is held by exactly one, so the value is
+    /// a tree. It is built from its last node to its first, without
+    /// recursion, so the JSON stays as shallow as the type and the value is
+    /// as deep as its data. A graph that is not a tree is refused.
+    pub fn from_wire(j: &serde_json::Value) -> Result<Value, String> {
+        Value::read(j, &mut None)
+    }
+
+    /// One JSON value, inside the graph `nodes` is building, if any: a
+    /// `$node` there takes the node it names. Read with a stack on the heap,
+    /// children first, so nested JSON is no deeper on the call stack than a
+    /// graph is.
+    fn read(j: &serde_json::Value, nodes: &mut Option<Nodes>) -> Result<Value, String> {
         use serde_json::Value as J;
-        match j {
-            J::Null => Value::Text(String::new()),
-            J::Bool(b) => Value::Bool(*b),
-            J::Number(n) => match n.as_i64() {
-                Some(i) => Value::Int(i),
-                None => Value::Text(n.to_string()),
-            },
-            J::String(s) => Value::Text(s.clone()),
-            J::Array(items) => Value::List(items.iter().map(Value::from_wire).collect()),
-            J::Object(o) => match o.get("$case").and_then(J::as_str) {
-                Some(case) => Value::Variant {
-                    case: case.to_string(),
-                    payload: o.get("value").map(|v| Box::new(Value::from_wire(v))),
+        enum Step<'j> {
+            Into(&'j J),
+            List(usize),
+            Record(Vec<&'j String>),
+            Case(&'j str, bool),
+        }
+        let mut steps = vec![Step::Into(j)];
+        let mut done: Vec<Value> = Vec::new();
+        while let Some(step) = steps.pop() {
+            match step {
+                Step::Into(j) => match j {
+                    J::Null => done.push(Value::Text(String::new())),
+                    J::Bool(b) => done.push(Value::Bool(*b)),
+                    J::Number(n) => done.push(match n.as_i64() {
+                        Some(i) => Value::Int(i),
+                        None => Value::Text(n.to_string()),
+                    }),
+                    J::String(s) => done.push(Value::Text(s.clone())),
+                    J::Array(items) => {
+                        steps.push(Step::List(items.len()));
+                        steps.extend(items.iter().rev().map(Step::Into));
+                    }
+                    J::Object(o) if o.len() == 1 && o.contains_key("$graph") => {
+                        done.push(Value::graph(&o["$graph"])?);
+                    }
+                    J::Object(o) if o.len() == 1 && o.contains_key("$node") => {
+                        let at = o["$node"]
+                            .as_u64()
+                            .ok_or("a `$node` that is not an index")?;
+                        done.push(
+                            nodes
+                                .as_mut()
+                                .ok_or("a `$node` outside any `$graph`")?
+                                .take(at)?,
+                        );
+                    }
+                    J::Object(o) => match o.get("$case").and_then(J::as_str) {
+                        Some(case) => {
+                            let payload = o.get("value");
+                            steps.push(Step::Case(case, payload.is_some()));
+                            steps.extend(payload.map(Step::Into));
+                        }
+                        None => {
+                            steps.push(Step::Record(o.keys().collect()));
+                            steps.extend(o.values().rev().map(Step::Into));
+                        }
+                    },
                 },
-                None => Value::Record(
-                    o.iter()
-                        .map(|(k, v)| (k.clone(), Value::from_wire(v)))
-                        .collect(),
-                ),
-            },
+                Step::List(n) => {
+                    let items = done.split_off(done.len() - n);
+                    done.push(Value::List(items));
+                }
+                Step::Record(keys) => {
+                    let values = done.split_off(done.len() - keys.len());
+                    done.push(Value::Record(
+                        keys.into_iter().cloned().zip(values).collect(),
+                    ));
+                }
+                Step::Case(case, held) => {
+                    let payload = match held {
+                        true => Some(Box::new(done.pop().expect("its payload, read"))),
+                        false => None,
+                    };
+                    done.push(Value::Variant {
+                        case: case.to_string(),
+                        payload,
+                    });
+                }
+            }
+        }
+        Ok(done.pop().expect("the value, read"))
+    }
+
+    /// A `$graph`'s value, from its last node to its first.
+    fn graph(j: &serde_json::Value) -> Result<Value, String> {
+        let list = j
+            .as_array()
+            .ok_or("a `$graph` that is not a list of nodes")?;
+        if list.is_empty() {
+            return Err("a `$graph` with no node".into());
+        }
+        let mut nodes = Some(Nodes {
+            built: (0..list.len()).map(|_| None).collect(),
+            at: 0,
+        });
+        for (k, node) in list.iter().enumerate().rev() {
+            if let Some(n) = nodes.as_mut() {
+                n.at = k;
+            }
+            let v = Value::read(node, &mut nodes)?;
+            nodes.as_mut().expect("building").built[k] = Some(v);
+        }
+        let mut built = nodes.expect("built").built;
+        if built.iter().skip(1).any(Option::is_some) {
+            return Err("a `$graph` whose node no other holds".into());
+        }
+        Ok(built[0].take().expect("the first node"))
+    }
+
+    /// Move this value's children onto `out`, leaving it none.
+    fn give_children(&mut self, out: &mut Vec<Value>) {
+        match self {
+            Value::List(items) => out.append(items),
+            Value::Record(fields) => out.extend(std::mem::take(fields).into_values()),
+            Value::Variant { payload, .. } => {
+                if let Some(p) = payload.take() {
+                    out.push(*p);
+                }
+            }
+            Value::Text(_) | Value::Bool(_) | Value::Int(_) | Value::Raw { .. } => {}
         }
     }
 
@@ -228,6 +339,154 @@ impl Value {
             }),
             v => Ok(v.truthy()),
         }
+    }
+}
+
+/// The nodes of a `$graph` being built (ADR-0205): each built and not yet
+/// taken, and the one being read.
+struct Nodes {
+    built: Vec<Option<Value>>,
+    at: usize,
+}
+
+impl Nodes {
+    /// The node `k` names, taken: it must come after the one being read, and
+    /// be held once.
+    fn take(&mut self, k: u64) -> Result<Value, String> {
+        let k = usize::try_from(k).map_err(|_| "a `$node` past the graph")?;
+        if k <= self.at || k >= self.built.len() {
+            return Err(format!(
+                "node {} holds node {k}, which is not a later node of the graph",
+                self.at
+            ));
+        }
+        self.built[k]
+            .take()
+            .ok_or_else(|| format!("node {k} is held twice"))
+    }
+}
+
+impl Drop for Value {
+    /// Taken apart with a stack on the heap, not by recursion (ADR-0205).
+    fn drop(&mut self) {
+        let mut stack = Vec::new();
+        self.give_children(&mut stack);
+        while let Some(mut v) = stack.pop() {
+            v.give_children(&mut stack);
+        }
+    }
+}
+
+impl Clone for Value {
+    /// Copied children first, with a stack on the heap (ADR-0205).
+    fn clone(&self) -> Value {
+        enum Step<'a> {
+            Into(&'a Value),
+            Up(&'a Value),
+        }
+        let mut steps = vec![Step::Into(self)];
+        let mut done: Vec<Value> = Vec::new();
+        while let Some(step) = steps.pop() {
+            match step {
+                Step::Into(v) => match v {
+                    Value::List(items) => {
+                        steps.push(Step::Up(v));
+                        steps.extend(items.iter().rev().map(Step::Into));
+                    }
+                    Value::Record(fields) => {
+                        steps.push(Step::Up(v));
+                        steps.extend(fields.values().rev().map(Step::Into));
+                    }
+                    Value::Variant {
+                        payload: Some(p), ..
+                    } => {
+                        steps.push(Step::Up(v));
+                        steps.push(Step::Into(p));
+                    }
+                    Value::Variant {
+                        case,
+                        payload: None,
+                    } => done.push(Value::Variant {
+                        case: case.clone(),
+                        payload: None,
+                    }),
+                    Value::Text(s) => done.push(Value::Text(s.clone())),
+                    Value::Bool(b) => done.push(Value::Bool(*b)),
+                    Value::Int(i) => done.push(Value::Int(*i)),
+                    Value::Raw { html, capability } => done.push(Value::Raw {
+                        html: html.clone(),
+                        capability: capability.clone(),
+                    }),
+                },
+                Step::Up(v) => match v {
+                    Value::List(items) => {
+                        let copied = done.split_off(done.len() - items.len());
+                        done.push(Value::List(copied));
+                    }
+                    Value::Record(fields) => {
+                        let copied = done.split_off(done.len() - fields.len());
+                        done.push(Value::Record(fields.keys().cloned().zip(copied).collect()));
+                    }
+                    Value::Variant { case, .. } => {
+                        let p = done.pop().expect("the payload, copied");
+                        done.push(Value::Variant {
+                            case: case.clone(),
+                            payload: Some(Box::new(p)),
+                        });
+                    }
+                    _ => unreachable!("only a value with children is gone up from"),
+                },
+            }
+        }
+        done.pop().expect("the value, copied")
+    }
+}
+
+impl PartialEq for Value {
+    /// Compared pair by pair, with a stack on the heap (ADR-0205).
+    fn eq(&self, other: &Value) -> bool {
+        let mut pairs = vec![(self, other)];
+        while let Some(pair) = pairs.pop() {
+            match pair {
+                (Value::Text(a), Value::Text(b)) if a == b => {}
+                (Value::Bool(a), Value::Bool(b)) if a == b => {}
+                (Value::Int(a), Value::Int(b)) if a == b => {}
+                (
+                    Value::Raw {
+                        html: a,
+                        capability: x,
+                    },
+                    Value::Raw {
+                        html: b,
+                        capability: y,
+                    },
+                ) if a == b && x == y => {}
+                (Value::List(a), Value::List(b)) if a.len() == b.len() => {
+                    pairs.extend(a.iter().zip(b));
+                }
+                (Value::Record(a), Value::Record(b))
+                    if a.len() == b.len() && a.keys().eq(b.keys()) =>
+                {
+                    pairs.extend(a.values().zip(b.values()));
+                }
+                (
+                    Value::Variant {
+                        case: a,
+                        payload: x,
+                    },
+                    Value::Variant {
+                        case: b,
+                        payload: y,
+                    },
+                ) if a == b => match (x, y) {
+                    (None, None) => {}
+                    (Some(x), Some(y)) => pairs.push((x, y)),
+                    _ => return false,
+                },
+                _ => return false,
+            }
+        }
+        true
     }
 }
 

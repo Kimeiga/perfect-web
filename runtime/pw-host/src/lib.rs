@@ -1441,6 +1441,84 @@ pub mod engine {
             }
         }
 
+        /// **A value of a type that contains itself, from a browser**
+        /// (ADR-0205): `{ "$graph": [node, ...] }`, each node a record whose
+        /// fields that hold the type are `{ "$node": k }`, a list of them, or
+        /// a case holding one. Each is the index the component's node holds
+        /// there; every other field is read by `field`, as any argument's.
+        pub fn from_browser(
+            ty: &Type,
+            v: &serde_json::Value,
+            at: &str,
+            field: &dyn Fn(&Type, &serde_json::Value, &str) -> Result<Val, String>,
+        ) -> Result<Val, String> {
+            let Some((node, slots)) = node_of(ty) else {
+                return Err(format!("{at}: not a type that contains itself"));
+            };
+            let Type::Record(record) = &node else {
+                return Err(format!(
+                    "{at}: a case of a type that contains itself is not accepted from a browser"
+                ));
+            };
+            let nodes = v
+                .get("$graph")
+                .and_then(serde_json::Value::as_array)
+                .ok_or_else(|| format!("{at}: expected a `$graph`, got {v}"))?;
+            let index = |r: &serde_json::Value, at: &str| -> Result<Val, String> {
+                r.get("$node")
+                    .and_then(serde_json::Value::as_u64)
+                    .and_then(|k| u32::try_from(k).ok())
+                    .map(Val::U32)
+                    .ok_or_else(|| format!("{at}: expected a `$node`, got {r}"))
+            };
+            let mut out = Vec::with_capacity(nodes.len());
+            for (k, n) in nodes.iter().enumerate() {
+                let at = format!("{at}.$graph[{k}]");
+                let o = n
+                    .as_object()
+                    .ok_or_else(|| format!("{at}: expected an object, got {n}"))?;
+                let mut fields = Vec::new();
+                for f in record.fields() {
+                    let written = f.name.replace('-', "_");
+                    let value = o
+                        .get(&written)
+                        .ok_or_else(|| format!("{at}: the node has no field `{written}`"))?;
+                    let place = format!("{at}.{written}");
+                    let slot = slots.iter().find_map(|s| match s {
+                        Slot::Field(name, kind) if name == f.name => Some(*kind),
+                        _ => None,
+                    });
+                    fields.push((
+                        f.name.to_string(),
+                        match slot {
+                            Some(Kind::List) => Val::List(
+                                value
+                                    .as_array()
+                                    .ok_or_else(|| format!("{place}: expected a list of nodes"))?
+                                    .iter()
+                                    .map(|r| index(r, &place))
+                                    .collect::<Result<_, _>>()?,
+                            ),
+                            Some(Kind::One) => index(value, &place)?,
+                            Some(Kind::Maybe) => {
+                                match value.get("$case").and_then(serde_json::Value::as_str) {
+                                    Some("some") => Val::Option(Some(Box::new(index(
+                                        value.get("value").unwrap_or(&serde_json::Value::Null),
+                                        &place,
+                                    )?))),
+                                    Some("none") => Val::Option(None),
+                                    _ => return Err(format!("{place}: expected `some` or `none`")),
+                                }
+                            }
+                            None => field(&f.ty, value, &place)?,
+                        },
+                    ));
+                }
+                out.push(Val::Record(fields));
+            }
+            Ok(Val::List(out))
+        }
+
         /// Is `ty` a type that contains itself, as its nodes?
         pub fn is_nodes(ty: &Type) -> bool {
             node_of(ty).is_some()
@@ -1864,13 +1942,10 @@ pub mod engine {
                 }
                 Val::Record(fields)
             }
-            // The browser's wire does not carry one yet (ADR-0194).
-            Type::List(_) if graph::is_nodes(ty) => {
-                return Err(format!(
-                    "{at}: a value of a type that contains itself is not accepted from a \
-                     browser yet"
-                ));
-            }
+            // **As its nodes** (ADR-0205): the browser's `$graph`, each
+            // `$node` the index the component reads where its node holds the
+            // type. The component checks the nodes, as it checks a host's.
+            Type::List(_) if graph::is_nodes(ty) => graph::from_browser(ty, v, at, &from_json)?,
             Type::List(list) => {
                 let items = v.as_array().ok_or_else(|| expected("an array"))?;
                 let element = list.ty();

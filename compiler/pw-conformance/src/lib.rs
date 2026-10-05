@@ -177,6 +177,17 @@ impl Runnable {
             .untangled(&[&export.interface, &export.function], results)
     }
 
+    /// **Arguments a browser sent, as JSON**, typed by the export's own
+    /// parameters, as a server types a command's (ADR-0205).
+    pub fn arguments(&self, json: &[serde_json::Value]) -> Result<Vec<Val>, String> {
+        let export = self.contract.exports[0]
+            .component
+            .clone()
+            .expect("the contract locates its export");
+        self.prepared
+            .arguments(&[&export.interface, &export.function], json)
+    }
+
     pub fn compiled(&self) -> &Compiled {
         &self.compiled
     }

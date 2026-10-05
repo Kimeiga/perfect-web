@@ -13,6 +13,20 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0205, 2026-10-05: a value of a type that contains itself crosses the
+browser's wire as its nodes** (ADR-0194's next step). `{ "$graph": [node,
+...] }`, each value of the type inside a node `{ "$node": k }`, in ADR-0194's
+level order, so the JSON is as shallow as the type and a component reads the
+same indices. The build writes a signal's first value so; a handler reads a
+signal's tree and writes one, 20,000 deep under Node, and sends one to a
+command, which the host passes to the component as its nodes, 50,000 deep.
+The renderer reads any graph, refusing one that is not a tree, and reads,
+drops, clones and compares its values without recursion: 100,000 deep on
+256 KiB.
+What a host writes knowing no type, a capture, a command's error or a
+speculation's value, stays refused by name. 19 mutants (`just
+e14-graphs-on-the-wire`).
+
 **ADR-0203, 2026-10-05: a view that contains itself is an instance of its
 own template, made at run time** (ADR-0130, ruling 2). A reply thread's view
 shows each reply as itself, as deep as its data: each use is an `instance`

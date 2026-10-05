@@ -13,14 +13,14 @@ Each mutant undoes one piece:
 - the host's conversions: an argument, an answer, what a data layer is given,
   and how deep a value it nests;
 - the contract's invariant paths through every node;
-- the browser's wire, which refuses such a value by name.
+- (the browser's wire, which refused such a value by name until ADR-0205).
 
 Every mutant must fail the tests of a type that contains itself.
 
 Run from the repository root; `just e14-recursive-types` records the output.
 The source is restored after every mutant, whatever happens.
-Three controls were retired by ADR-0202, and one with the code it changed,
-each with its reason, below.
+Three controls were retired by ADR-0202, one with the code it changed, and
+one by ADR-0205, each with its reason, below.
 """
 
 import os
@@ -122,14 +122,10 @@ MUTANTS = [
         '            Some(Slot::List) => Ok("list<u32>".to_string()),\n',
         '            Some(Slot::List) => Ok("list<u64>".to_string()),\n',
     ),
-    (
-        "the browser's wire writes such a value out by its shape",
-        JS,
-        "    fn wire_value(&mut self, v: &str, ty: &Type) -> Result<String, String> {\n"
-        "        if holds_itself(self.program, ty) {\n",
-        "    fn wire_value(&mut self, v: &str, ty: &Type) -> Result<String, String> {\n"
-        "        if false {\n",
-    ),
+    # Retired by ADR-0205: "the browser's wire writes such a value out by its
+    # shape". The browser's wire refused such a value by name; ADR-0205
+    # writes it as its nodes, and `graphs_on_the_wire_mutations.py` controls
+    # how.
     (
         "an invariant inside a tree is checked at its root alone",
         CONTRACT,

@@ -2661,6 +2661,34 @@ e14-view-instances:
      } > docs/evidence/E14/view-instances.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/view-instances.txt
 
+# ADR-0205: a value of a type that contains itself crosses the browser's
+# wire as its nodes. The renderer's, the modules', the host's and the
+# component's tests, the thread page in three engines, and the controls.
+e14-graphs-on-the-wire:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0205 - a value of a type that contains itself crosses the browser's wire as its nodes"; echo; \
+       echo "produced by: just e14-graphs-on-the-wire"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the renderer (runtime/pw-render/tests/graphs.rs)"; echo; \
+       cargo test --locked -p pw-render --test graphs 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the browser's modules, under Node (compiler/pw-core/tests/graphs_on_the_wire.rs, recursive_types.rs)"; echo; \
+       cargo test --locked -p pw-core --test graphs_on_the_wire 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-core --test recursive_types 2>&1 | grep -E '^test result'; \
+       echo; echo "== the host and a component (compiler/pw-conformance/tests/browser_graphs.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test browser_graphs 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the thread page (spikes/own-renderer/e2e/thread.spec.mjs), three engines"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/thread.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/graphs_on_the_wire_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/graphs_on_the_wire_mutations.py; \
+     } > docs/evidence/E14/graphs-on-the-wire.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/graphs-on-the-wire.txt
+
 # ADR-0204: an element holds only the children HTML permits, as the page
 # holds them. The rule's tests, R-019's, and the mutation controls.
 e14-rendered-children:

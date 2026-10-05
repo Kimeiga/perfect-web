@@ -1764,3 +1764,11 @@ an element holds only the children HTML permits, as the page holds them
   refused though `Thread` renders an `<li>`, and a `<div>` row of an
   `{#each}` in a `<ul>` passed. A block's rows and what a view renders are
   read now.
+[ADR-0205](DECISIONS/ADR-0205-a-value-that-contains-itself-crosses-the-browsers-wire-as-its-nodes.md):
+a value of a type that contains itself crosses the browser's wire as its
+nodes (ADR-0194's next step).
+- `{ "$graph": [node, ...] }`, each value of the type inside a node
+  `{ "$node": k }`, in ADR-0194's level order: a signal's first value, what a
+  handler reads and sets, and a command's argument, which the host passes to
+  the component as its nodes.
+- The renderer's values are dropped, cloned and compared without recursion.

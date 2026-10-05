@@ -9,7 +9,9 @@
 //   sends its own comment;
 // - the browser renders an instance a signal gives again, and a block
 //   holding instances, from the view's template the document carries, and
-//   binds what it rendered.
+//   binds what it rendered;
+// - a handler reads a signal that holds a tree from its nodes, writes a new
+//   one as its nodes, and sends one to a command so (ADR-0205).
 import { expect, test } from "@playwright/test";
 
 const THREAD = "/page/demo.thread.ThreadPage";
@@ -184,4 +186,30 @@ test("a change the server sends replaces an instance whole, and binds it", async
   await upvote(page, "Eighteen grams in.").click();
   const response = await answered;
   expect(JSON.parse(response.request().postData())).toEqual([5]);
+});
+
+test("a handler changes a tree a signal holds, and sends it, as its nodes", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.locator("#expand").click();
+  await expect(page.locator("#outline li")).toHaveCount(3);
+  // Read from its nodes, written as its nodes, and rendered from them.
+  await page.locator("#add").click();
+  await expect(page.locator("#outline > li > ol > li")).toHaveCount(2);
+  await expect(page.locator("#outline > li > ol > li").nth(1)).toHaveText("Added 0");
+  await page.locator("#add").click();
+  await expect(page.locator("#outline > li > ol > li").nth(2)).toHaveText("Added 1");
+  const held = await page.evaluate(() => window.__pw.signals.outline);
+  expect(held.$graph.length).toBe(5);
+  expect(held.$graph[0].replies).toEqual([{ $node: 1 }, { $node: 2 }, { $node: 3 }]);
+  // Sent to a command as its nodes, and the component the compiler built
+  // reads them.
+  const answered = page.waitForResponse((r) => r.url().includes("/command/demo.thread.keep"));
+  await page.locator("#keep").click();
+  const response = await answered;
+  expect(response.status()).toBe(202);
+  expect((await response.json()).committed).toBe(true);
+  const sent = JSON.parse(response.request().postData());
+  expect(sent).toEqual([held]);
 });

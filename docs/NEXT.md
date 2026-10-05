@@ -286,9 +286,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
           nests~~ (ADR-0203, `just e14-view-instances`), which found
           PW5012 reading neither a view's markup nor a block's rows
           (ADR-0204, `just e14-rendered-children`);
-        - then the browser's wire, as nodes, so a signal's thread may be
-          deeper than serde_json's 128 nested values and a handler may set
-          one; and a signal in a view that contains itself.
+        - ~~the browser's wire, as nodes: a signal's tree, read and set by
+          a handler, and a command's argument~~ (ADR-0205, `just
+          e14-graphs-on-the-wire`);
+        - then a query's value rendered from its nodes, past the host's
+          `NESTED_DEPTH`; a capture, a command's error and a speculation's
+          value as nodes, which need what writes them to know the type; and
+          a signal in a view that contains itself.
     21. **A data source states what it guarantees**: transactions,
         consistency and its change feed. The compiler refuses a query or a
         command that asks more of its source than it gives.

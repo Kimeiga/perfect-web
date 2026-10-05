@@ -12,12 +12,15 @@
 // - Its outline is a signal's, given whether it is expanded: the browser's
 //   copy of the renderer renders it again when that changes, as it does a
 //   block a signal decides that holds it.
+// - A press adds a heading to the outline, read from its nodes and written
+//   as its nodes, and another sends the outline to a command so (ADR-0205).
 //
 // Outside the store on purpose, as the panel is: the benchmark's baseline is
 // the store's markup.
 
 module demo.thread
 
+import List
 import domain.{ CartError, InteractionId }
 
 type Comment = Comment { id: Int, author: String, text: String, replies: List<Comment> }
@@ -63,6 +66,15 @@ command upvote(comment: Int) -> Result<Int, CartError>
     Ok(comment)
 }
 
+// What a press asks the server: nothing changes, and the outline's heading
+// comes back. The outline is sent as its nodes (ADR-0205).
+command keep(outline: Comment) -> Result<Int, CartError>
+    requires      SignedIn
+    idempotent_by InteractionId
+{
+    Ok(outline.id)
+}
+
 // One comment, and each reply to it, as this view again. The `{#each}` is
 // on the way back to it: the thread's data ends it.
 view Thread(c: Comment) !{} {
@@ -98,6 +110,7 @@ page ThreadPage() {
 
     signal shown: Bool = false
     signal expanded: Bool = false
+    signal added: Int = 0
     signal outline: Comment = Comment {
         id: 1,
         author: "",
@@ -119,6 +132,19 @@ page ThreadPage() {
             <ul id="thread"><Thread c={discussion} /></ul>
             <button id="expand" type="button" on:press={() => expanded = !expanded}>Expand</button>
             <ol id="outline"><Outline c={outline} open={expanded} /></ol>
+            <button id="add" type="button" on:press={() => {
+                outline = Comment {
+                    id: outline.id,
+                    author: outline.author,
+                    text: outline.text,
+                    replies: List.concat(
+                        outline.replies,
+                        [Comment { id: 100 + added, author: "", text: "Added {added}", replies: [] }]
+                    )
+                }
+                added = added + 1
+            }}>Add a heading</button>
+            <button id="keep" type="button" on:press={() => { let _kept = keep(outline) }}>Keep</button>
             <button id="toggle" type="button" on:press={() => shown = !shown}>Summary</button>
             {#if shown}
                 <section id="summary" aria-label="Summary">

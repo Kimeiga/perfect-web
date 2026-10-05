@@ -149,7 +149,11 @@ fn first_value(
         other => return Err(format!("`{name}`'s first value: {}", describe(&other))),
     };
     let program = lower::program_of(cx, vec![function]);
-    super::js_pure::constant(&program, &program.functions[0])
+    let first = super::js_pure::constant(&program, &program.functions[0])
+        .map_err(|why| format!("`{name}`'s first value: {why}"))?;
+    // As the browser's wire carries it: a value of a type that contains
+    // itself as its nodes (ADR-0205).
+    super::js_pure::wire_json(&program, &ty, first)
         .map_err(|why| format!("`{name}`'s first value: {why}"))
 }
 
