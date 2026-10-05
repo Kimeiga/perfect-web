@@ -13,6 +13,21 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0207, 2026-10-05: a data source states what it guarantees, and
+nothing asks it for more** (the owner's priority 21; ADR-0195's ruling 11).
+`source X  holds A, B  transactions …  reads …  changes …`: the isolation a
+command's writes commit with, what its reads may promise, and whether it
+tells what changed. It cannot be inferred: one PostgreSQL is serializable and
+another read committed, and a standalone MongoDB has no change streams. A
+query asking a consistency its source does not read, a command writing two
+sources, asking more isolation than its source gives, emitting events its
+source commits in no transaction and tells no change of, or idempotent where
+it commits in no transaction, is refused (PW0344-PW0349). A resource no
+source holds is the host's SQLite database's, which gives each. The store
+states its own, and declared as a search index is, it is refused 21 times.
+Whether a deployment's database gives what its source states is not checked
+yet. 17 mutants (`just e14-data-sources`).
+
 **ADR-0206, 2026-10-05: a case has one name where values are rendered, its
 WIT case's.** Correction, found building ADR-0205: the browser's wire, the
 build and a handler name the language's four cases `some`, `none`, `ok`,

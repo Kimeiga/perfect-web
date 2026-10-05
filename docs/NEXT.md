@@ -293,9 +293,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
           `NESTED_DEPTH`; a capture, a command's error and a speculation's
           value as nodes, which need what writes them to know the type; and
           a signal in a view that contains itself.
-    21. **A data source states what it guarantees**: transactions,
-        consistency and its change feed. The compiler refuses a query or a
-        command that asks more of its source than it gives.
+    21. **A data source states what it guarantees**:
+        - ~~its transactions, its reads and its change feed, stated by a
+          `source`; a query or a command that asks more of its source than
+          it gives is refused~~ (ADR-0207, `just e14-data-sources`), and the
+          store states its own;
+        - then ruling 11's other half, a command's events computed by the
+          command and written by the host in its writes' transaction; and a
+          host comparing a source's clauses with the database it opens.
     22. **Reference apps unlike the store**, to find the gaps: a feed
         (pagination, live public data, threads, optimistic posting), a
         multi-tenant SaaS (organizations, roles, forms, uploads), and one app

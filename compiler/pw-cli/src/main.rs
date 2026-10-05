@@ -143,6 +143,13 @@ fn explain_with(
             DeclKind::Effect => {
                 let _ = writeln!(s, "effect       {name}");
             }
+            // ADR-0207: a database, what it holds and what it guarantees.
+            DeclKind::Source => {
+                let _ = writeln!(s, "source       {name}");
+                for p in &d.policies {
+                    let _ = writeln!(s, "             {} {}", p.name, p.value);
+                }
+            }
             DeclKind::Opaque => {
                 let _ = writeln!(s, "opaque type  {name}");
                 let _ = writeln!(

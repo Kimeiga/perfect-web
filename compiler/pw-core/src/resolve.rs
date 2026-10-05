@@ -100,7 +100,10 @@ impl Namespace {
             }
             DeclKind::Event => Namespace::Event,
             DeclKind::Effect => Namespace::Effect,
-            DeclKind::Import | DeclKind::Prelude | DeclKind::Other => return None,
+            // A source is named by nothing a program writes (ADR-0207).
+            DeclKind::Import | DeclKind::Prelude | DeclKind::Source | DeclKind::Other => {
+                return None;
+            }
         })
     }
 }

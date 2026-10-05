@@ -63,6 +63,8 @@ pub const DECL_STARTERS: &[&str] = &[
     "resource",
     "materialize",
     "event",
+    // ADR-0207: a data source, and what it guarantees.
+    "source",
     "effect",
     "prelude",
     "replicated",
@@ -128,6 +130,9 @@ pub const RESOURCE_NOUNS: &[&str] = &[
     // something — otherwise a materialization can name an event that does not
     // exist and nothing notices until the materializer never fires.
     "event",
+    // ADR-0207: what a database the program's effects name guarantees:
+    // `source StoreData  holds Carts, Orders  transactions serializable`.
+    "source",
     "replicated",
     "paint",
 ];
@@ -234,6 +239,13 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     // event names a fact about the world, and which resources it affects is
     // the graph's answer rather than the command's.
     "emits",
+    // ADR-0207: what a data source holds and guarantees: the isolation its
+    // transactions have, what its reads may promise, and whether it tells
+    // what changed.
+    "holds",
+    "transactions",
+    "reads",
+    "changes",
     "fallback",
     "retry",
     "concurrency",

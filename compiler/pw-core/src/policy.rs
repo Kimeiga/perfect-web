@@ -54,6 +54,13 @@ pub enum Domain {
     /// set is the domain's whole content — an unlisted word is an error, not
     /// an extension point.
     Word(&'static [&'static str]),
+    /// Words from a closed set, one or more, by commas: `reads snapshot,
+    /// read_your_writes` (ADR-0207).
+    Words(&'static [&'static str]),
+    /// **What a data source holds**, by the names its effects give them:
+    /// `holds Carts, Orders` (ADR-0207). Each is resolved as an effect's
+    /// argument is, where the program's sources are read (`check.rs`).
+    Held,
     /// `30.seconds`, `0.seconds`.
     Duration,
     /// A duration greater than zero: `2.seconds` (ADR-0109).
@@ -332,7 +339,13 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         // outlives its owner (ADR-0089).
         "scope" => Domain::Word(&["component", "page", "session", "application"]),
         "on_scope_exit" => Domain::Word(&["close", "detach"]),
-        "transaction" => Domain::Word(&["serializable", "read_committed"]),
+        "transaction" => Domain::Word(&["serializable", "snapshot", "read_committed"]),
+
+        // --- what a data source guarantees (ADR-0207)
+        "holds" => Domain::Held,
+        "transactions" => Domain::Word(&["serializable", "snapshot", "read_committed", "none"]),
+        "reads" => Domain::Words(&["strong", "snapshot", "read_your_writes", "eventual"]),
+        "changes" => Domain::Word(&["none", "feed"]),
         "captures" => Domain::Word(&["serializable_only"]),
         "on_version_mismatch" => Domain::Word(&["safe_refetch", "refuse"]),
         "load" => Domain::Word(&["on_first_interaction", "eager"]),
@@ -637,6 +650,11 @@ pub fn value_fault(head: &str, value: &str) -> Option<ValueFault> {
     let value = value.trim();
     match domain_of(head)? {
         Domain::Word(words) => (!words.contains(&value)).then_some(ValueFault::Word(words)),
+        Domain::Words(words) => value
+            .split(',')
+            .map(str::trim)
+            .any(|w| !words.contains(&w))
+            .then_some(ValueFault::Word(words)),
         Domain::ConditionedWord(words) => {
             let word = value.split_once(" when ").map_or(value, |(w, _)| w).trim();
             (!words.contains(&word)).then_some(ValueFault::Word(words))

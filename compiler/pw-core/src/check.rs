@@ -72,6 +72,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // ADR-0101: what a command's write has to reach, over every unit, since
     // a command in one module writes what a query in another reads.
     let readers = cached_readers(&inference, &graph, &hirs);
+    // ADR-0207: every data source the program declares.
+    let sources = declared_sources(&hirs);
     let mut resolution: BTreeMap<usize, Vec<Diagnostic>> = BTreeMap::new();
     for e in &workspace.errors {
         resolution
@@ -87,6 +89,15 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // ADR-0204: an element holds the children HTML permits, as it
         // renders them.
         per_unit.extend(nesting(&workspace, &hirs, i, &u.hir));
+        // ADR-0207: a data source states what it guarantees, and nothing
+        // asks it for more.
+        per_unit.extend(sources_give_what_is_asked(
+            &inference,
+            &sources,
+            &visible_types[i],
+            i,
+            &u.hir,
+        ));
         // ADR-0148: a streamed query is read by a `<stream>`, which shows
         // each state its query can be in.
         per_unit.extend(crate::streams::check(&workspace, &hirs, &sigs, i, &u.hir));
@@ -2005,6 +2016,7 @@ fn described(kind: DeclKind) -> &'static str {
         DeclKind::Page => "a page",
         DeclKind::Task => "a task",
         DeclKind::Event => "an event",
+        DeclKind::Source => "a data source",
         DeclKind::Effect => "an effect",
         DeclKind::Prelude => "a prelude",
         DeclKind::Fn => "a function",
@@ -3924,6 +3936,355 @@ fn view_elements(
                     replacement: None,
                 }],
             });
+        }
+    }
+    out
+}
+
+/// **A data source, as the program states it** (ADR-0207): what it holds,
+/// by the names the program's effects give them, and what it guarantees.
+/// A clause left out guarantees nothing.
+#[derive(Debug, Clone)]
+struct Source {
+    name: String,
+    unit: usize,
+    span: crate::hir::Span,
+    holds: Vec<(String, crate::hir::Span)>,
+    /// The isolation its transactions have, `none` for none.
+    transactions: String,
+    /// What its reads may promise.
+    reads: BTreeSet<String>,
+    /// Whether it tells what changed, once committed.
+    feed: bool,
+}
+
+/// Every source the program declares.
+fn declared_sources(hirs: &[&Hir]) -> Vec<Source> {
+    let mut out = Vec::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind != DeclKind::Source {
+                continue;
+            }
+            let words = |head: &str| -> Vec<String> {
+                decl.policy(head)
+                    .map(|p| {
+                        p.value
+                            .split(',')
+                            .map(|w| w.trim().to_string())
+                            .filter(|w| !w.is_empty())
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            };
+            let holds = decl
+                .policy("holds")
+                .map(|p| {
+                    p.value
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|w| !w.is_empty())
+                        .map(|w| (w.to_string(), p.span.clone()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let reads: BTreeSet<String> = words("reads").into_iter().collect();
+            out.push(Source {
+                name: decl.name.clone(),
+                unit,
+                span: hir.decl_span(id),
+                holds,
+                transactions: words("transactions")
+                    .into_iter()
+                    .next()
+                    .unwrap_or_else(|| "none".to_string()),
+                reads: if reads.is_empty() {
+                    BTreeSet::from(["eventual".to_string()])
+                } else {
+                    reads
+                },
+                feed: words("changes").first().is_some_and(|w| w == "feed"),
+            });
+        }
+    }
+    out
+}
+
+/// How much a transaction's isolation prevents, as a command is written
+/// against it: each level prevents what the one below does, and more
+/// (Berenson et al., SIGMOD 1995; Jepsen's consistency models).
+fn isolation(word: &str) -> u8 {
+    match word {
+        "serializable" => 3,
+        "snapshot" => 2,
+        "read_committed" => 1,
+        _ => 0,
+    }
+}
+
+/// Does a source whose reads give `given` give a query that asks `asked`?
+/// `strong` gives every promise, and every source gives `eventual`.
+fn reads_give(given: &BTreeSet<String>, asked: &str) -> bool {
+    asked == "eventual" || given.contains("strong") || given.contains(asked)
+}
+
+/// **A data source states what it guarantees, and nothing asks it for more**
+/// (ADR-0207, ADR-0195's ruling 11).
+///
+/// A resource no source holds is the host's own database's (ADR-0005,
+/// ADR-0019): serializable, read strongly, a command's events committed
+/// with its writes. A declared source may give less, and each query and
+/// command is held to what it gives:
+/// - a query's `consistency`, to the source's `reads`;
+/// - a command's writes, to one source, one transaction;
+/// - a command's `transaction`, to the source's `transactions`;
+/// - a command's `emits`, to a transaction its events commit in, the
+///   outbox, or a feed of the source's changes;
+/// - a command's `idempotent_by`, to a transaction its record commits in.
+fn sources_give_what_is_asked(
+    inference: &crate::effects::Inference<'_>,
+    sources: &[Source],
+    visible: &BTreeSet<String>,
+    unit: usize,
+    hir: &Hir,
+) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    let diagnostic = |code: crate::codes::Code,
+                      reason: &'static str,
+                      message: String,
+                      span: crate::hir::Span,
+                      source: &Source,
+                      explanation: &str,
+                      repair: String| Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason,
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message,
+        primary_span: span,
+        related: vec![Related {
+            span: source.span.clone(),
+            label: format!("`{}` states what it guarantees here", source.name),
+        }],
+        explanation: Some(explanation.to_string()),
+        repairs: vec![Repair {
+            description: repair,
+            replacement: None,
+        }],
+    };
+    // The sources this unit declares, held to what they name.
+    for source in sources.iter().filter(|s| s.unit == unit) {
+        if source.holds.is_empty() {
+            out.push(diagnostic(
+                crate::codes::SOURCE_MALFORMED,
+                "source_malformed",
+                format!("`{}` holds nothing", source.name),
+                source.span.clone(),
+                source,
+                "A source states what a database the program's effects name guarantees, \
+                 and holds the resources its effects name: `holds Carts, Orders` for \
+                 `database.write<Carts>`.",
+                format!("write `holds` and the resources `{}` holds", source.name),
+            ));
+        }
+        for (held, span) in &source.holds {
+            if !visible.contains(held) {
+                out.push(diagnostic(
+                    crate::codes::SOURCE_MALFORMED,
+                    "source_malformed",
+                    format!(
+                        "`{}` holds `{held}`, which names no type or module visible here",
+                        source.name
+                    ),
+                    span.clone(),
+                    source,
+                    "A source holds what an effect names: `database.read<Carts>` names \
+                     `Carts`, a type or a module the program can see.",
+                    format!("name what `database.read<..>` names, or import `{held}`"),
+                ));
+            }
+            if let Some(other) = sources
+                .iter()
+                .find(|o| o.name != source.name && o.holds.iter().any(|(h, _)| h == held))
+            {
+                out.push(diagnostic(
+                    crate::codes::SOURCE_MALFORMED,
+                    "source_malformed",
+                    format!(
+                        "`{held}` is held by `{}` and by `{}`",
+                        source.name, other.name
+                    ),
+                    span.clone(),
+                    source,
+                    "One resource is in one database: what a query of it may promise, and \
+                     what a command's writes to it commit with, are that database's.",
+                    format!("hold `{held}` in one of them"),
+                ));
+            }
+        }
+    }
+    let held_by = |resource: &str| {
+        sources
+            .iter()
+            .find(|s| s.holds.iter().any(|(h, _)| h == resource))
+    };
+    for (id, decl) in hir.all_decls() {
+        let effects = inference.effective_effects(unit, hir, id);
+        let span = hir.decl_span(id);
+        match decl.kind {
+            DeclKind::Query | DeclKind::Subscription | DeclKind::Resource => {
+                let Some(asked) = decl.policy("consistency").map(|p| p.value.trim()) else {
+                    continue;
+                };
+                let reads: BTreeSet<&str> = effects
+                    .iter()
+                    .filter_map(|e| crate::effects::database_domain(e, "read"))
+                    .collect();
+                for resource in reads {
+                    let Some(source) = held_by(resource) else {
+                        continue;
+                    };
+                    if reads_give(&source.reads, asked) {
+                        continue;
+                    }
+                    let given: Vec<&str> = source.reads.iter().map(String::as_str).collect();
+                    out.push(diagnostic(
+                        crate::codes::READS_MORE_THAN_GIVEN,
+                        "reads_more_than_given",
+                        format!(
+                            "`{}` asks `consistency {asked}` of `{resource}`, and `{}` reads `{}`",
+                            decl.name,
+                            source.name,
+                            given.join(", ")
+                        ),
+                        span.clone(),
+                        source,
+                        "A query's `consistency` is a promise about what a reader sees, and it \
+                         is the source's to keep: a source whose reads are eventual cannot \
+                         show a reader its own write at once, however the query is written.",
+                        format!(
+                            "ask what `{}` gives, or read `{resource}` from a source that gives \
+                             `{asked}`",
+                            source.name
+                        ),
+                    ));
+                }
+            }
+            DeclKind::Command => {
+                let written: BTreeSet<&str> = effects
+                    .iter()
+                    .filter_map(|e| crate::effects::database_domain(e, "write"))
+                    .collect();
+                if written.is_empty() {
+                    continue;
+                }
+                // Each resource's source: a declared one, or the host's own.
+                let mut by_source: BTreeMap<String, Vec<&str>> = BTreeMap::new();
+                for w in &written {
+                    let name = held_by(w).map_or_else(
+                        || "the host's database".to_string(),
+                        |s| format!("`{}`", s.name),
+                    );
+                    by_source.entry(name).or_default().push(w);
+                }
+                if by_source.len() > 1 {
+                    let spans: Vec<String> = by_source
+                        .iter()
+                        .map(|(source, rs)| {
+                            let rs: Vec<String> = rs.iter().map(|r| format!("`{r}`")).collect();
+                            format!("{} in {source}", rs.join(", "))
+                        })
+                        .collect();
+                    // Two sources include a declared one, since every
+                    // resource no source holds is the one host's database:
+                    // there is always a source to point to.
+                    let Some(first) = written.iter().find_map(|w| held_by(w)) else {
+                        continue;
+                    };
+                    out.push(diagnostic(
+                        crate::codes::WRITES_TWO_SOURCES,
+                        "writes_two_sources",
+                        format!(
+                            "`{}` writes {}, and no one transaction spans two sources",
+                            decl.name,
+                            spans.join(" and ")
+                        ),
+                        span.clone(),
+                        first,
+                        "A command commits all of its writes or none. Two databases commit \
+                         apart: one of them could keep a write the other lost, and nothing \
+                         would undo it.",
+                        "write one source in a command, and the other in a command it leads \
+                         to"
+                        .to_string(),
+                    ));
+                    continue;
+                }
+                let Some(source) = written.iter().find_map(|w| held_by(w)) else {
+                    continue;
+                };
+                if let Some(asked) = decl.policy("transaction").map(|p| p.value.trim())
+                    && isolation(asked) > isolation(&source.transactions)
+                {
+                    out.push(diagnostic(
+                        crate::codes::ISOLATION_MORE_THAN_GIVEN,
+                        "isolation_more_than_given",
+                        format!(
+                            "`{}` asks `transaction {asked}` of `{}`, whose transactions are \
+                             `{}`",
+                            decl.name, source.name, source.transactions
+                        ),
+                        span.clone(),
+                        source,
+                        "A command's `transaction` is the isolation it is written against, and \
+                         its source's to give: an anomaly the command assumes away happens \
+                         where the source does not prevent it.",
+                        format!("ask what `{}` gives", source.name),
+                    ));
+                }
+                let atomic = source.transactions != "none";
+                if decl.policy("emits").is_some() && !atomic && !source.feed {
+                    out.push(diagnostic(
+                        crate::codes::EVENTS_WITHOUT_COMMIT,
+                        "events_without_commit",
+                        format!(
+                            "`{}` emits events of its writes to `{}`, which commits them in no \
+                             transaction and tells no change",
+                            decl.name, source.name
+                        ),
+                        span.clone(),
+                        source,
+                        "An event is sent if and only if its writes commit: written in their \
+                         transaction, the outbox, or read from the source's own feed of what \
+                         changed. With neither, an event could tell of a write that never \
+                         committed, or be lost for one that did.",
+                        format!(
+                            "give `{}` transactions or `changes feed`, or emit nothing",
+                            source.name
+                        ),
+                    ));
+                }
+                if decl.policy("idempotent_by").is_some() && !atomic {
+                    out.push(diagnostic(
+                        crate::codes::IDEMPOTENT_WITHOUT_COMMIT,
+                        "idempotent_without_commit",
+                        format!(
+                            "`{}` is idempotent by its interaction, and `{}` commits its writes \
+                             in no transaction",
+                            decl.name, source.name
+                        ),
+                        span.clone(),
+                        source,
+                        "A command sent again answers what it answered the first time, by a \
+                         record of the interaction committed with its writes. Without a \
+                         transaction, a write could commit and its record not, and the command \
+                         would run twice.",
+                        format!("give `{}` transactions", source.name),
+                    ));
+                }
+            }
+            _ => {}
         }
     }
     out

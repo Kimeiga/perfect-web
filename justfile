@@ -2708,6 +2708,24 @@ e14-one-case-name:
      } > docs/evidence/E14/one-case-name.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
 
+# ADR-0207: a data source states what it guarantees, and nothing asks it for
+# more. The rules' tests, the store checked with its source, and the
+# mutation controls.
+e14-data-sources:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0207 - a data source states what it guarantees, and nothing asks it for more"; echo; \
+       echo "produced by: just e14-data-sources"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the rules, and the store's source (compiler/pw-core/tests/data_sources.rs)"; echo; \
+       cargo test --locked -p pw-core --test data_sources 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the store, checked with examples/lib/StoreData.pw"; echo; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | tail -3; \
+       echo; echo "== mutation controls (scripts/data_sources_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/data_sources_mutations.py; \
+     } > docs/evidence/E14/data-sources.txt
+    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/data-sources.txt
+
 # ADR-0204: an element holds only the children HTML permits, as the page
 # holds them. The rule's tests, R-019's, and the mutation controls.
 e14-rendered-children:

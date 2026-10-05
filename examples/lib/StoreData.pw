@@ -1,0 +1,27 @@
+// @corpus: fixture
+// @id: LIB-StoreData
+// @category: application service — the store's database, and what it guarantees
+// @charter: §7.5, §9.4
+// @milestone: E14
+//
+// ADR-0207: a data source states what it guarantees, and nothing asks it for
+// more. The store's data is one SQLite database the host opens (ADR-0005):
+// - its transactions are serializable, SQLite's isolation between
+//   connections;
+// - a read is of its latest commit, one writer at a time;
+// - it tells no change itself: the program's own events tell them, written
+//   with each command's writes in the outbox (ADR-0019).
+
+module StoreData
+
+import Stores
+import Menus
+import Carts
+import Orders
+import Estimates
+
+source StoreData
+    holds        Stores, Menus, Carts, Orders, Estimates
+    transactions serializable
+    reads        strong
+    changes      none

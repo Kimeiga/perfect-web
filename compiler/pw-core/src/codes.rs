@@ -201,6 +201,20 @@ codes! {
     // only for declared public data.
     LAST_KNOWN_GOOD_IS_PUBLIC = "PW0343" / last_known_good_is_public / 1, DeclarationRules,
         "a last-known-good fallback serves only public data";
+    // ADR-0207: a data source states what it guarantees, and nothing asks it
+    // for more.
+    READS_MORE_THAN_GIVEN = "PW0344" / reads_more_than_given / 1, DeclarationRules,
+        "a query asks no more consistency of a source than its reads give";
+    WRITES_TWO_SOURCES = "PW0345" / writes_two_sources / 1, DeclarationRules,
+        "a command's writes are one transaction, in one source";
+    ISOLATION_MORE_THAN_GIVEN = "PW0346" / isolation_more_than_given / 1, DeclarationRules,
+        "a command asks no more isolation of a source than its transactions give";
+    EVENTS_WITHOUT_COMMIT = "PW0347" / events_without_commit / 1, DeclarationRules,
+        "a command's events are sent if and only if its writes commit";
+    IDEMPOTENT_WITHOUT_COMMIT = "PW0348" / idempotent_without_commit / 1, DeclarationRules,
+        "a command's record of an interaction commits with its writes";
+    SOURCE_MALFORMED = "PW0349" / source_malformed / 1, DeclarationRules,
+        "a source holds what the program's effects name, and each is held by one";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
 

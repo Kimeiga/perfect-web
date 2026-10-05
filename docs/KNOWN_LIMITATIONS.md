@@ -449,6 +449,12 @@ awaited in order. What remains:
   ADR-0195 (ruling 11) rules that the compiled command returns its typed
   events with its result, and the host writes them in the writes'
   transaction; not built yet.
+- **A source's guarantees are its program's statement** (ADR-0207). What a
+  program asks of its data is held to what its `source` declarations give;
+  nothing yet compares a source's clauses with the database a deployment
+  opens. Not counted either: a command's several writes to a source without
+  transactions, which commit apart, and its reads across two sources, which
+  no transaction makes one snapshot.
 - **A `style` attribute's value is escaped by refusing what executes**
   (`expression(`, a script scheme in `url(`), then as an attribute. A style
   can still load a URL the value names. A `<style>` element holds text only
@@ -702,7 +708,8 @@ contract; an audited `declassify` waits for the first program that needs
 one.
 
 **The development server honours query policies except one** (ADR-0127,
-ADR-0152): `consistency` (nothing enforces a mode as such). `on_key_change`
+ADR-0152): `consistency`, which ADR-0207 holds to what its source reads,
+and nothing at run time enforces as such. `on_key_change`
 runs since ADR-0152, for a binding a page's signal keys. Freshness, cache partition, key, retries,
 timeout and one-flight-per-key are `pw-resource`'s, and a commit drops exactly
 what it invalidates. **Its sandbox is checked, not

@@ -153,6 +153,9 @@ pub enum DeclKind {
     /// `database.read` resolves to a declaration rather than being split at
     /// the dot by whoever needs it.
     Effect,
+    /// `source StoreData` (ADR-0207): a database the program's effects name,
+    /// and what it guarantees. Named by nothing a program writes.
+    Source,
     /// `prelude Effect` — this module exports its declarations in one
     /// namespace to every unit in the program. The namespace is the `name`.
     Prelude,

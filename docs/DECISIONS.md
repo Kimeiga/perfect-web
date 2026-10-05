@@ -1779,3 +1779,11 @@ building ADR-0205).
   `None`, `Ok`, `Err`, and the browser's wire `some`, `none`, `ok`, `err`, so
   a `{#match}` on an `Option` a signal holds found no arm. One name now, the
   wire's.
+[ADR-0207](DECISIONS/ADR-0207-a-data-source-states-what-it-guarantees.md):
+a data source states what it guarantees, and nothing asks it for more (the
+owner's priority 21; ADR-0195's ruling 11).
+- `source X  holds A, B  transactions …  reads …  changes …`, stated by the
+  program: what a database gives depends on how it is deployed.
+- A query's consistency, a command's isolation, events and idempotency, and
+  its writes in one source are held to it (PW0344-PW0349). A resource no
+  source holds is the host's database's.
