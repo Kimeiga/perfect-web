@@ -107,6 +107,20 @@ pub unsafe extern "C" fn attribute_value(ptr: *const u8, len: usize) -> u32 {
     code
 }
 
+/// **What an element's handlers capture, as the document writes it**
+/// (ADR-0217).
+///
+/// # Safety
+///
+/// As [`render_part`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn captures_value(ptr: *const u8, len: usize) -> u32 {
+    let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
+    let (code, out) = captures(bytes);
+    *OUT.lock().unwrap() = out;
+    code
+}
+
 /// A request read: its JSON, its part, the values it gives, set into a
 /// rendering environment, and the templates of the views it renders an
 /// instance of (ADR-0203). `Err((2, why))` for a request that is not one.
@@ -246,6 +260,33 @@ pub fn attribute(request: &[u8]) -> (u32, String) {
     }
 }
 
+/// **What an element's handlers capture** (ADR-0217), given its handler
+/// parts as `parts`: `(0, json)`, the attribute's value as the document writes
+/// it, a JSON string, or `null` where nothing is captured.
+pub fn captures(request: &[u8]) -> (u32, String) {
+    let request = match serde_json::from_slice::<serde_json::Value>(request) {
+        Ok(r) => r,
+        Err(_) => return (2, "the request is not JSON".to_string()),
+    };
+    let parts: Vec<pw_render::ir::Part> = match serde_json::from_value(request["parts"].clone()) {
+        Ok(p) => p,
+        Err(e) => return (2, format!("the parts: {e}")),
+    };
+    let mut env = pw_render::Env::new();
+    if let Some(values) = request["values"].as_object() {
+        for (name, value) in values {
+            match wire(value, name) {
+                Ok(v) => env = env.set(name, v),
+                Err(refused) => return refused,
+            }
+        }
+    }
+    match pw_render::element_captures(&parts, &env) {
+        Ok(value) => (0, serde_json::json!(value).to_string()),
+        Err(why) => (1, format!("{why:?}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::render;
@@ -265,6 +306,36 @@ mod tests {
                 "<!--pw:s3-->&lt;b&gt;hi&lt;/b&gt; &amp; bye<!--pw:e3-->".to_string()
             )
         );
+    }
+
+    /// **An element's captures, as the server writes them** (ADR-0217):
+    /// every handler's, one attribute, escaped for one; none where nothing
+    /// is captured.
+    #[test]
+    fn an_elements_captures_are_written_as_the_server_writes_them() {
+        let request = br#"{
+            "parts": [
+                { "part": "event", "id": 4, "owner": 2, "event": "press", "handler": "h1",
+                  "captures": ["cart.lines"] },
+                { "part": "event", "id": 5, "owner": 2, "event": "keydown", "handler": "h2",
+                  "captures": ["note"] }
+            ],
+            "values": { "cart": { "lines": [1, 2] }, "note": "a \"b\"" }
+        }"#;
+        let (code, out) = super::captures(request);
+        assert_eq!(code, 0, "{out}");
+        let written: Option<String> = serde_json::from_str(&out).expect("JSON");
+        assert_eq!(
+            written.as_deref(),
+            Some(
+                "{&quot;cart&quot;:{&quot;lines&quot;:[1,2]},&quot;note&quot;:&quot;a \\&quot;b\\&quot;&quot;}"
+            )
+        );
+        let none = br#"{
+            "parts": [{ "part": "event", "id": 4, "owner": 2, "event": "press", "handler": "h1" }],
+            "values": {}
+        }"#;
+        assert_eq!(super::captures(none), (0, "null".to_string()));
     }
 
     /// A `{#match}` renders the arm its signal's case names.

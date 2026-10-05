@@ -148,8 +148,8 @@ MUTANTS = [
         "a read outside a text part is not checked",
         "core",
         PLAN,
-        "        if !calls_a_member(hirs, ws, sigs, &mut typed, read.origin, read.at) {\n",
-        "        if true || !calls_a_member(hirs, ws, sigs, &mut typed, read.origin, read.at) {\n",
+        "            || !calls_a_member(hirs, ws, sigs, &mut typed, read.origin, read.at)\n",
+        "            || true\n",
     ),
     (
         "a member read outside text no host computes passes silently",

@@ -370,6 +370,10 @@ struct Shown {
     /// by its part: its name, and its value as written, or none for a
     /// boolean one that is absent (ADR-0171).
     attributes: BTreeMap<u32, (String, Option<String>)>,
+    /// What each handler at the top of the page captures of a query's value,
+    /// by its element's first handler part, as the document writes it
+    /// (ADR-0217).
+    captures: BTreeMap<u32, Option<String>>,
     /// The page's title, by its part, as its text (ADR-0183).
     title: Option<(u32, String)>,
 }
@@ -4191,6 +4195,14 @@ impl Server {
                 .ok_or_else(|| format!("part {id} is no attribute"))?;
             shown.attributes.insert(id, written);
         }
+        // What each handler at the top of the page captures of a query's
+        // value (ADR-0217), as the page's render writes it.
+        for handler in plan["captures"].as_array().into_iter().flatten() {
+            let id = handler.as_u64().unwrap_or_default() as u32;
+            let written = pw_render::captures_at(template, PartId(id), &env)
+                .map_err(|b| format!("the captures of part {id}: {b:?}"))?;
+            shown.captures.insert(id, written);
+        }
         // The page's title, as the document's head writes it (ADR-0183).
         if let Some(id) = plan["title"].as_u64() {
             let title = pw_render::title_text(template, &env)
@@ -4273,6 +4285,26 @@ impl Server {
                     Some(value) => PatchOp::SetAttribute { name, value },
                     None => PatchOp::RemoveAttribute { name },
                 },
+            });
+        }
+        // Each handler's captures that changed, set where its element is
+        // (ADR-0217). Until then they were what the page was first rendered
+        // with, and a press after a commit sent that.
+        for (id, written) in &now.captures {
+            if was.captures.get(id) == Some(written) {
+                continue;
+            }
+            let name = "data-pw-captures".to_string();
+            let operation = match written {
+                Some(value) => PatchOp::SetAttribute {
+                    name,
+                    value: value.clone(),
+                },
+                None => PatchOp::RemoveAttribute { name },
+            };
+            out.push(Targeted {
+                target: PartAddress::new(&schema, LocalPartId(*id)),
+                operation,
             });
         }
         // Each block a query decides whose rendering changed, rendered again
@@ -6818,11 +6850,29 @@ fn document(
         // Each part a speculation renders again, as its template writes it
         // (ADR-0172): the browser's copy of the renderer renders it from the
         // speculated value.
+        // A handler's region is its element's handlers, whose captures are
+        // one attribute (ADR-0217).
         let regions: serde_json::Map<String, serde_json::Value> = regions
             .iter()
             .filter_map(|id| {
                 let part = find_part(&template.chunks, *id)?;
-                Some((id.to_string(), serde_json::to_value(part).ok()?))
+                let value = match part {
+                    pw_render::ir::Part::Event { owner, .. } => serde_json::to_value(
+                        template
+                            .chunks
+                            .iter()
+                            .filter_map(|c| match c {
+                                pw_render::ir::Chunk::Dynamic(
+                                    p @ pw_render::ir::Part::Event { owner: o, .. },
+                                ) if o == owner => Some(p),
+                                _ => None,
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                    .ok()?,
+                    _ => serde_json::to_value(part).ok()?,
+                };
+                Some((id.to_string(), value))
             })
             .collect();
         if !regions.is_empty() {
@@ -10393,6 +10443,51 @@ public query Store(",
                 _ => String::new(),
             })
             .collect()
+    }
+
+    /// **What a handler at the top of the page captures is set again when it
+    /// changes** (ADR-0217, ADR-0210's urgent defect 2). A button on the
+    /// cart's page that captures the cart: after a line is added, the patch
+    /// sets its captures to the cart with the line. Until then it kept the
+    /// cart the page was first rendered with, and a press sent that.
+    #[test]
+    fn a_handlers_captures_at_the_top_of_the_page_are_set_again() {
+        let s = served_from_patches_in(
+            "examples",
+            |app| {
+                let page = "    // What the cart last had to say: a line that could not be changed.\n    signal notice: String = \"\"\n\n    view {\n        <title>Your cart</title>\n        <main>\n";
+                assert!(app.contains(page), "the cart's page");
+                app.replacen("import domain.{ ", "import domain.{ CartLine, ", 1)
+                    .replacen(
+                    page,
+                    "    // What the cart last had to say: a line that could not be changed.\n    signal notice: String = \"\"\n    signal kept: List<CartLine> = []\n\n    view {\n        <title>Your cart</title>\n        <main>\n            <button type=\"button\" id=\"keep\" on:press={resumable(captures = { cart }) => kept = cart.lines}>Keep</button>\n",
+                    1,
+                )
+            },
+            &[],
+        );
+        let (html, _, _, _) = s
+            .serve_document_settled("a", CART_PAGE, &Params::new(), &[])
+            .expect("served");
+        assert!(html.contains("id=\"keep\""), "{html}");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        s.command(ADD, "a", &add_shown("espresso", 2), false)
+            .expect("added");
+        let set = sets_of(&s, &doc).pop().expect("a patch set");
+        let captures: Vec<&str> = set
+            .patches
+            .iter()
+            .filter_map(|p| match &p.operation {
+                PatchOp::SetAttribute { name, value } if name == "data-pw-captures" => {
+                    Some(value.as_str())
+                }
+                _ => None,
+            })
+            .collect();
+        assert!(
+            captures.iter().any(|v| v.contains("espresso")),
+            "the button captures the cart with its line: {captures:?}"
+        );
     }
 
     /// **An order is placed from the cart, and its page shows it**

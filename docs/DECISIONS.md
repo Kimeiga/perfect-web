@@ -1845,3 +1845,9 @@ none (rulings 0092-b and 0047-a's interim; urgent defect 5).
   place now, and the table fails closed.
 - A policy word in a function's body was a clause whose words were never
   resolved. It is a name now.
+[ADR-0217](DECISIONS/ADR-0217-a-handlers-captures-are-set-again.md): what
+a handler at the top of the page captures is set again when it changes
+(urgent defect 2).
+- A row's captures were patched with the row. A top-level handler's were in
+  no plan, so a button capturing the cart sent the cart the page was first
+  rendered with. The plan, the server and a speculation set them again now.

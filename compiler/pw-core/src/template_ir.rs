@@ -672,6 +672,9 @@ pub enum ReadKind {
     Title,
     /// A value a page's `<meta>` reads (ADR-0186).
     Meta,
+    /// **What a handler captures** (ADR-0217): written on its element for the
+    /// handler to read when it runs, and set again when the value changes.
+    Captures,
 }
 
 /// Where a [`Read`] is written.
@@ -1855,8 +1858,24 @@ fn lower_element(
                 AttrValue::Expr(e) => called_name(body, *e),
                 _ => String::new(),
             };
+            let id = ix.part();
+            // **What it captures is read where its element is** (ADR-0217):
+            // a host sets the captures again when a value they read changes,
+            // as it sets an attribute's. Until then nothing did, and a press
+            // sent the value the page was first rendered with.
+            if let AttrValue::Expr(e) = &a.value {
+                for c in &captures {
+                    ix.read(
+                        id,
+                        &ctx.read(c.clone()),
+                        ReadKind::Captures,
+                        ReadAt::Expr(*e),
+                        ctx,
+                    );
+                }
+            }
             out.push(Chunk::Dynamic(Part::Event {
-                id: ix.part(),
+                id,
                 owner: owner.expect("an element with a handler owns an identity"),
                 event: event.to_string(),
                 handler,

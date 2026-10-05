@@ -13,6 +13,14 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0217, 2026-10-05: what a handler at the top of the page captures is
+set again when it changes** (urgent defect 2). A row's captures were patched
+with the row (ADR-0172); a top-level handler's were in no plan. A button on
+the cart's page capturing `cart` kept the cart the page was first rendered
+with, after a commit and during a speculation, and a press sent that. The
+page's plan lists such an element now, the server patches its captures, and
+a speculation renders them in the browser (`just e14-top-captures`).
+
 **ADR-0216, 2026-10-05: every clause belongs to a declaration that reads
 it, and a code body admits none** (rulings 0092-b and 0047-a's interim;
 urgent defect 5). PW5105 placed the graph's four heads, and `freshness` on a

@@ -92,6 +92,9 @@ enum RegionKind {
     Attribute,
     Block,
     List,
+    /// What a handler at the top of the page captures (ADR-0217): its
+    /// element's captures, written again.
+    Captures,
 }
 
 /// **A speculated loop's rows** (ADR-0172): what the browser needs to render
@@ -610,6 +613,27 @@ fn page_module(
             crate::template_ir::ReadKind::Attribute => RegionKind::Attribute,
             crate::template_ir::ReadKind::Subject => RegionKind::Block,
             crate::template_ir::ReadKind::List => RegionKind::List,
+            // One for each element: its handlers' captures are one attribute.
+            crate::template_ir::ReadKind::Captures => {
+                let owner =
+                    |part: u32| {
+                        lowered.template.chunks.iter().find_map(|c| match c {
+                            crate::template_ir::Chunk::Dynamic(
+                                crate::template_ir::Part::Event { id, owner, .. },
+                            ) if id.0 == part => Some(*owner),
+                            _ => None,
+                        })
+                    };
+                let mine = owner(read.part.0);
+                if mine.is_none()
+                    || regions
+                        .iter()
+                        .any(|r| r.kind == RegionKind::Captures && owner(r.part) == mine)
+                {
+                    continue;
+                }
+                RegionKind::Captures
+            }
             // Metadata is written into the head as the page is served, and
             // set again by nothing (ADR-0186): what a press speculates is no
             // metadata's.
@@ -655,7 +679,11 @@ fn page_module(
                 lowered
                     .reads
                     .iter()
-                    .filter(|r| parts.contains(&r.part.0))
+                    // A handler's captures are checked below, by name.
+                    .filter(|r| {
+                        parts.contains(&r.part.0)
+                            && r.kind != crate::template_ir::ReadKind::Captures
+                    })
                     .map(|r| (r.part.0, r.path.clone())),
             );
         for (part, path) in paths {
@@ -937,6 +965,9 @@ fn page_module(
                 }
                 RegionKind::Block => {
                     format!("{{ kind: \"block\", part: {} }}", r.part)
+                }
+                RegionKind::Captures => {
+                    format!("{{ kind: \"captures\", part: {} }}", r.part)
                 }
                 RegionKind::List => {
                     let found = rows

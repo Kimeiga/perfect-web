@@ -599,6 +599,11 @@ pub struct PageValues {
     /// block, and one in a row with its row.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attributes: Vec<u32>,
+    /// **Each element at the top of the page whose handlers capture a
+    /// query's value** (ADR-0217), by its first handler's part: a host sets
+    /// its captures again when the value changes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub captures: Vec<u32>,
     /// **The page's title** (ADR-0183), by its part: a host writes it into
     /// the document's head from the bindings' values, and sets it again when
     /// what it reads changes, as it sets a text part.
@@ -1338,7 +1343,11 @@ fn plan(
     // list. Until 2026-10-03 none was planned or refused, and a page that
     // read one built, then failed to render.
     for read in &others {
-        if !calls_a_member(hirs, ws, sigs, &mut typed, read.origin, read.at) {
+        // A handler's captures are paths of data, and where they are read
+        // is the handler itself, whose calls are its own (ADR-0217).
+        if read.kind == crate::template_ir::ReadKind::Captures
+            || !calls_a_member(hirs, ws, sigs, &mut typed, read.origin, read.at)
+        {
             continue;
         }
         let what = match read.kind {
@@ -1347,6 +1356,7 @@ fn plan(
             crate::template_ir::ReadKind::List => "a loop's list",
             crate::template_ir::ReadKind::Title => "the page's title",
             crate::template_ir::ReadKind::Meta => "the page's metadata",
+            crate::template_ir::ReadKind::Captures => "what a handler captures",
         };
         let row = row_read(
             hirs,
@@ -1379,6 +1389,36 @@ fn plan(
             && !attributes.contains(&read.part.0)
         {
             attributes.push(read.part.0);
+        }
+    }
+
+    // **A handler at the top of the page captures a query's value**
+    // (ADR-0217): a host sets its element's captures again when the value
+    // changes, as it sets an attribute's. Until then nothing did, and a
+    // press after a commit sent the value the page was first rendered with.
+    // One part for each element: its handlers' captures are one attribute.
+    let mut captures = Vec::new();
+    let mut owners = BTreeSet::new();
+    for read in &others {
+        let root = read.path.split('.').next().unwrap_or_default();
+        if read.kind != crate::template_ir::ReadKind::Captures
+            || read.nested
+            || !found.iter().any(|(n, ..)| n == root)
+        {
+            continue;
+        }
+        let owner = template.chunks.iter().find_map(|c| match c {
+            crate::template_ir::Chunk::Dynamic(crate::template_ir::Part::Event {
+                id,
+                owner,
+                ..
+            }) if *id == read.part => Some(*owner),
+            _ => None,
+        });
+        if let Some(owner) = owner
+            && owners.insert(owner)
+        {
+            captures.push(read.part.0);
         }
     }
 
@@ -1512,6 +1552,7 @@ fn plan(
             streams,
             rows,
             attributes,
+            captures,
             title,
         },
         members,

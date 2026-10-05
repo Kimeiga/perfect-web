@@ -1010,6 +1010,19 @@ function showRegions(module, binding, value, held) {
         buildIndex();
         bindEvents();
       }
+    } else if (region.kind === "captures") {
+      // What a handler at the top of the page captures (ADR-0217): its
+      // element's captures, as the speculated value makes them, so a press
+      // meanwhile sends what the page shows.
+      const written = JSON.parse(
+        renderCall("captures_value", `{"parts":${template},"values":${values}}`),
+      );
+      setAttributeAt(
+        { template: parts.schema, instances: [], part: region.part },
+        written === null
+          ? { op: "remove_attribute", name: "data-pw-captures" }
+          : { op: "set_attribute", name: "data-pw-captures", value: written },
+      );
     } else if (region.kind === "attribute") {
       const [name, written] = JSON.parse(
         renderCall("attribute_value", `{"part":${template},"values":${values}}`),

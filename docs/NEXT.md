@@ -346,8 +346,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
         relayed 2026-10-05, each in its own ADR:
         - first, the soundness defects its probes found: ~~a transaction
           left open by an exit inside a loop~~ (ADR-0211, `just
-          e14-affine-loops`); stale captures; ~~a handler calling a `todo`
-          command~~ (not reproduced: the build refuses it); ~~a retry's
+          e14-affine-loops`); ~~a handler calling a `todo`
+          command~~ (not reproduced: the build refuses it); ~~stale captures
+          at the top of a page~~ (ADR-0217); ~~a retry's
           strategy dropped~~ (ADR-0215); ~~misplaced policy heads ignored~~
           (ADR-0216); ~~`query
           helper(id)` over a `fn`~~ (ADR-0212); ~~`List.maximum`'s −0~~

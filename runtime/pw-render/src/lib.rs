@@ -1658,6 +1658,30 @@ fn captures_attribute(parts: &[&Part], env: &Env) -> Result<String, Blocked> {
     })
 }
 
+/// **What the handlers of `part`'s element capture, as the document writes
+/// it** (ADR-0217), or none where they capture nothing: what a host sets
+/// again on an element at the top of the page when a value they read
+/// changes, and what a speculation sets in the browser.
+pub fn captures_at(t: &Template, part: PartId, env: &Env) -> Result<Option<String>, Blocked> {
+    let mut handlers: BTreeMap<ElementId, Vec<&Part>> = BTreeMap::new();
+    handlers_within(&t.chunks, &mut handlers);
+    let run = handlers
+        .values()
+        .find(|run| run.iter().any(|p| p.id() == Some(part)))
+        .ok_or(Blocked::UnrepresentedConstruct {
+            reason: "the part is no handler's".into(),
+            at: format!("part {}", part.0),
+        })?;
+    captures_value(run, env)
+}
+
+/// [`captures_at`], given the element's handler parts themselves: what the
+/// browser's copy of the renderer is given for a speculation (ADR-0217).
+pub fn element_captures(parts: &[Part], env: &Env) -> Result<Option<String>, Blocked> {
+    let run: Vec<&Part> = parts.iter().collect();
+    captures_value(&run, env)
+}
+
 /// [`captures_attribute`]'s value, as the document writes it, or none where
 /// nothing is captured.
 fn captures_value(parts: &[&Part], env: &Env) -> Result<Option<String>, Blocked> {
