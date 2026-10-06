@@ -282,24 +282,19 @@ fn a_view_composed_in_the_page_computes_from_the_pages_value() {
 fn what_a_host_does_not_compute_is_refused_by_name() {
     for (markup, why) in [
         (
-            "{#if post.pinned}<p>{counted(post.likes, \"a\", \"b\")}</p>{/if}",
-            "computes a value inside a block, an arm or another value's row, which no host \
-             computes yet (ADR-0229)",
-        ),
-        (
             "{#if open}<p>{counted(post.likes, \"a\", \"b\")}</p>{/if}",
             "computes a value inside a block a signal decides, and the browser, which renders \
-             that block again, computes none yet (ADR-0229)",
+             that block again, computes none yet (ADR-0230)",
         ),
         (
             "<ul>{#each post.replies as r (r.id)}<li>{shown(r.id == post.id)}</li>{/each}</ul>",
             "computes a value from `r` and `post`, and a host computes one from one value \
-             (ADR-0229)",
+             (ADR-0230)",
         ),
         (
             "<p>{counted(post.likes + other.likes, \"a\", \"b\")}</p>",
             "computes a value from `post` and `other`, and a host computes one from one value \
-             (ADR-0229)",
+             (ADR-0230)",
         ),
         (
             "<p>{counted(1, \"a\", \"b\")}</p>",
@@ -330,6 +325,13 @@ fn what_a_host_does_not_compute_is_refused_by_name() {
         assert!(b.refusals().is_empty(), "{markup}: {:?}", b.refusals());
         assert_eq!(plan_of(&b, "t.P").parts.len(), 1, "{markup}");
     }
+    // And inside a block a host renders, since ADR-0229: computed into what
+    // the block is rendered with.
+    let b = build(&page(
+        "{#if post.pinned}<p>{counted(post.likes, \"a\", \"b\")}</p>{/if}",
+    ));
+    assert!(b.refusals().is_empty(), "{:?}", b.refusals());
+    assert_eq!(plan_of(&b, "t.P").derived.len(), 1);
 }
 
 #[test]
@@ -347,7 +349,7 @@ fn a_view_that_contains_itself_computes_nothing_yet_and_a_speculated_value_is_co
     assert!(
         refusals.contains(
             "`<Replies>` contains itself and computes a value in its template, and a view \
-             that contains itself computes none yet (ADR-0229)"
+             that contains itself computes none yet (ADR-0230)"
         ),
         "{refusals}"
     );

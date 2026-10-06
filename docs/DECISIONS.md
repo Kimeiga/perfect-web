@@ -1934,3 +1934,12 @@ a speculated value; the feed's likes).
   words, and a like is shown before the server answers. Found: a field of a
   value was charged a same-named function's effects, and an opaque value did
   not compare.
+[ADR-0229](DECISIONS/ADR-0229-a-computed-condition-decides-its-block.md): a
+computed condition decides its block (ruling 0073-a for a block's subject and
+inside a block; 0071-a's repair).
+- `{#if}`, `{:else if}` and `{#match}` read a computed subject by a path the
+  compiler names: a host's from a query's value, its block rendered again
+  when it changes, and the browser's from a signal's, its block rendered
+  again as the signal changes. A value computed inside a block a host renders
+  is the host's. The feed's draft too long says so; a thread with no reply
+  says that.

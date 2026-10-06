@@ -3426,11 +3426,14 @@ impl Server {
                 continue;
             };
             let part = live["part"].as_u64().unwrap_or_default() as u32;
+            // A text part, an attribute, or a block's subject (ADR-0229).
             let path = match find_part(&template.chunks, part) {
                 Some(
                     pw_render::ir::Part::Text { value, .. }
                     | pw_render::ir::Part::Attribute { value, .. }
-                    | pw_render::ir::Part::BooleanAttribute { value, .. },
+                    | pw_render::ir::Part::BooleanAttribute { value, .. }
+                    | pw_render::ir::Part::Conditional { value, .. }
+                    | pw_render::ir::Part::Match { value, .. },
                 ) => value.clone(),
                 _ => return Err(format!("part {part} reads no value")),
             };
@@ -10558,6 +10561,68 @@ public query Store(",
                 .expect("served");
             assert_eq!(text_in(&html, "<p id=\"which\">"), said, "{id}");
         }
+    }
+
+    /// **A condition a host computes decides its block, and again when what
+    /// it reads changes** (ADR-0229): the thread page's `{#if
+    /// List.length(thread.replies) == 0}`, and `{#if thread.likes > 2}`,
+    /// which a like makes true, and the block is sent rendered again.
+    #[test]
+    fn a_condition_a_host_computes_decides_its_block_and_again_when_it_changes() {
+        let s = served_feed_with(|app| {
+            app.replace(
+                "            <Replies post={thread} />\n",
+                "            <Replies post={thread} />\n            \
+                 {#if thread.likes > 2}<p id=\"popular\">Popular</p>{/if}\n",
+            )
+        });
+        let thread = |id: &str| Params::from([("id".to_string(), id.to_string())]);
+        let page = |id: &str| {
+            s.serve_document_settled("a", "feed.app.PostPage", &thread(id), &[])
+                .expect("served")
+                .0
+        };
+        assert!(page("p3").contains("<p id=\"quiet\">No replies yet.</p>"));
+        let html = page("p1");
+        assert!(!html.contains("id=\"quiet\""), "{html}");
+        assert!(!html.contains("Popular"), "two likes: {html}");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        s.command_answered(
+            "feed.app.like",
+            "b",
+            &[Val::String("p1".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        let set = sets_of(&s, &doc).pop().expect("a patch set");
+        assert!(
+            written(&set).contains("<p id=\"popular\">Popular</p>"),
+            "the block rendered again: {set:?}"
+        );
+    }
+
+    /// **A condition the browser computes is rendered at the signal's first
+    /// value** (ADR-0229): the home page's `{#if String.length(draft) > 280}`,
+    /// false for an empty draft, and true for one too long from the first.
+    #[test]
+    fn a_condition_the_browser_computes_is_rendered_at_its_first_value() {
+        let home = |s: &Server| {
+            s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+                .expect("served")
+                .0
+        };
+        assert!(!home(&served_feed()).contains("id=\"over\""));
+        let s = served_feed_with(|app| {
+            app.replace(
+                "signal draft: String = \"\"",
+                &format!("signal draft: String = \"{}\"", "x".repeat(281)),
+            )
+        });
+        assert!(
+            home(&s).contains("<p id=\"over\" role=\"alert\">Too long to post.</p>"),
+            "a draft too long from the first"
+        );
     }
 
     /// **What a commit drops of the session's own reaches no other

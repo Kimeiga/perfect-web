@@ -107,15 +107,17 @@ MUTANTS = [
         "an `{:else if}` arm is no block of its own",
         "compiler",
         IR,
-        "                        ix.blocks.push(nested);\n                        let chunk = conditional(body, nested, v, run, more, ctx, ix);\n                        ix.blocks.pop();\n",
-        "                        let chunk = conditional(body, nested, v, run, more, ctx, ix);\n",
+        # Re-anchored by ADR-0229, which reads the arm's subject first.
+        "                ix.blocks.push(nested);\n                let chunk = conditional(body, nested, v, run, more, ctx, ix);\n                ix.blocks.pop();\n",
+        "                let chunk = conditional(body, nested, v, run, more, ctx, ix);\n",
     ),
     (
         "a block owns nothing",
         "compiler",
         PLAN,
-        "                owns: owned(entry.id.0),\n",
-        "                owns: Vec::new(),\n",
+        # Re-anchored by ADR-0229, whose computed subject's block owns too.
+        "                reads: block_reads(part, &signals),\n                attribute: String::new(),\n                owns: owned(entry.id.0),\n",
+        "                reads: block_reads(part, &signals),\n                attribute: String::new(),\n                owns: Vec::new(),\n",
     ),
     (
         "the plan holds the page's own signals alone",

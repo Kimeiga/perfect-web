@@ -618,12 +618,13 @@ fn page_module(
         .holes
         .iter()
         .filter_map(|h| Some((h.part.0, h.inputs.as_ref()?, "a value")))
-        .chain(
-            lowered
-                .reads
-                .iter()
-                .filter_map(|r| Some((r.part.0, r.inputs.as_ref()?, "an attribute's value"))),
-        );
+        .chain(lowered.reads.iter().filter_map(|r| {
+            let what = match r.kind {
+                crate::template_ir::ReadKind::Subject => "a block's subject",
+                _ => "an attribute's value",
+            };
+            Some((r.part.0, r.inputs.as_ref()?, what))
+        }));
     for (part, inputs, what) in computed {
         for (name, read) in inputs {
             let root = read.split('.').next().unwrap_or_default();
@@ -632,8 +633,8 @@ fn page_module(
                     construct: "a value computed from a speculated one",
                     reason: format!(
                         "part {part} of `{page}` computes {what} from `{name}`, which the page \
-                         speculates on, and the browser computes one from the value whole, \
-                         and only between tags (ADR-0229)"
+                         speculates on, and the browser computes a text part from the value \
+                         whole, between tags (ADR-0230)"
                     ),
                 };
             }
@@ -858,7 +859,7 @@ fn page_module(
                         reason: format!(
                             "part {} of `{page}` computes a value from `{read}`, a field of a \
                              row the page speculates on, and the browser computes one from \
-                             the row's item whole (ADR-0229)",
+                             the row's item whole (ADR-0230)",
                             region.part
                         ),
                     };

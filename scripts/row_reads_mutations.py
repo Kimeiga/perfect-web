@@ -86,26 +86,16 @@ MUTANTS = [
         "what an `{#if}` decides by is not a read",
         "core",
         TEMPLATE_IR,
-        "        ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);\n"
-        "        out.push(conditional(",
-        "        out.push(conditional(",
+        # Re-anchored by ADR-0229: every subject is read by `subject_of`, a
+        # path's here.
+        "    if let Some(value) = value_path(body, e).map(|v| ctx.read(v)) {\n"
+        "        ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);\n",
+        "    if let Some(value) = value_path(body, e).map(|v| ctx.read(v)) {\n",
     ),
-    (
-        "what an `{:else if}` decides by is not a read",
-        "core",
-        TEMPLATE_IR,
-        "                        ix.read(nested, &v, ReadKind::Subject, ReadAt::Expr(c), ctx);\n",
-        "",
-    ),
-    (
-        "what a `{#match}` decides by is not a read",
-        "core",
-        TEMPLATE_IR,
-        "        ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);\n"
-        "        let stray =",
-        "        let _ = e;\n"
-        "        let stray =",
-    ),
+    # "what an `{:else if}` decides by is not a read" and "what a `{#match}`
+    # decides by is not a read" are retired: since ADR-0229 every subject is
+    # read in one place, `subject_of`, which "what an `{#if}` decides by is
+    # not a read" mutates for all three.
     (
         "a loop's list is not a read",
         "core",

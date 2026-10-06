@@ -373,9 +373,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
           e14-computed-signals`: a draft's characters left, a post button
           disabled while it is empty); ~~rows, and a speculated value~~
           (ADR-0228, `just e14-computed-rows`: the likes in words, and
-          optimistic likes); next where else and from what else (ADR-0229:
-          blocks, conditions for 0071-a, several values, instances), then the
-          rest of the feed, pulling in what it
+          optimistic likes); ~~conditions and blocks~~ (ADR-0229, `just
+          e14-computed-conditions`); next 0071-a, whose repair builds now;
+          then what is still refused (ADR-0230: several values, the browser's
+          values inside a block, instances), then the rest of the feed,
+          pulling in what it
           needs: replies, 0071-a, 0122-d, 0057-a, 0099-a, and ADR-0195's
           ruling 10, materialization chains;
         - then 0101-a to 0101-d, 0105-a, 0100-a, and the rest below;

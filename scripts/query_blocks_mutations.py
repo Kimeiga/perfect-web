@@ -39,11 +39,12 @@ MUTANTS = [
         "a block a query decides is not planned",
         "plan",
         PLAN,
-        "            && found.iter().any(|(n, ..)| n == root)\n"
+        # Re-anchored by ADR-0229, whose computed subject decides one too.
+        "                || derived_values.iter().any(|d| d.path == entry.value))\n"
         "            && template.chunks.iter().any(\n"
         "                |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),\n"
         "            )\n        {\n            blocks.push(entry.id.0);\n",
-        "            && found.iter().any(|(n, ..)| n == root)\n"
+        "                || derived_values.iter().any(|d| d.path == entry.value))\n"
         "            && template.chunks.iter().any(\n"
         "                |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),\n"
         "            )\n        {\n            let _ = entry.id.0;\n",
@@ -52,9 +53,10 @@ MUTANTS = [
         "a block inside one is planned as if at the top",
         "plan",
         PLAN,
-        "            && found.iter().any(|(n, ..)| n == root)\n"
+        # Re-anchored by ADR-0229, as above.
+        "                || derived_values.iter().any(|d| d.path == entry.value))\n"
         "            && template.chunks.iter().any(\n",
-        "            && found.iter().any(|(n, ..)| n == root)\n"
+        "                || derived_values.iter().any(|d| d.path == entry.value))\n"
         "            && template.chunks.iter().any(|_| true) | template.chunks.iter().any(\n",
     ),
     (

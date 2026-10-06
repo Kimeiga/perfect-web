@@ -292,6 +292,9 @@ enum Reach {
 fn rendered_again(
     chunks: &[crate::template_ir::Chunk],
     signals: &[String],
+    // Each block subject the browser computes from a signal (ADR-0229): its
+    // block is one a signal decides.
+    browser: &[String],
     reach: &Reach,
 ) -> Result<(), String> {
     use crate::template_ir::{Chunk, Part, Segment};
@@ -346,7 +349,7 @@ fn rendered_again(
                 if own.iter().any(|v| v.starts_with('#')) {
                     return Err(format!(
                         "part {id} computes a value inside a block a signal decides, and the \
-                         browser, which renders that block again, computes none yet (ADR-0229)"
+                         browser, which renders that block again, computes none yet (ADR-0230)"
                     ));
                 }
                 if let Some(other) = own.iter().find(|v| !signal(v) && !bound.contains(&root(v))) {
@@ -431,7 +434,7 @@ fn rendered_again(
                     }
                     _ => Reach::Frame,
                 };
-                rendered_again(body, signals, &inner)?;
+                rendered_again(body, signals, browser, &inner)?;
             }
             Part::Conditional {
                 value,
@@ -441,21 +444,25 @@ fn rendered_again(
             } => {
                 let inner = match reach {
                     Reach::Live(bound) => Reach::Live(bound.clone()),
-                    Reach::Top if signal(value) => Reach::Live(Vec::new()),
+                    Reach::Top if signal(value) || browser.contains(value) => {
+                        Reach::Live(Vec::new())
+                    }
                     _ => Reach::Frame,
                 };
-                rendered_again(then, signals, &inner)?;
-                rendered_again(otherwise, signals, &inner)?;
+                rendered_again(then, signals, browser, &inner)?;
+                rendered_again(otherwise, signals, browser, &inner)?;
             }
             Part::Match { value, arms, .. } => {
                 for a in arms {
                     let names: Vec<String> = a.binding.iter().chain(&a.fields).cloned().collect();
                     let inner = match reach {
                         Reach::Live(bound) => Reach::Live([bound.clone(), names].concat()),
-                        Reach::Top if signal(value) => Reach::Live(names),
+                        Reach::Top if signal(value) || browser.contains(value) => {
+                            Reach::Live(names)
+                        }
                         _ => Reach::Frame,
                     };
-                    rendered_again(&a.body, signals, &inner)?;
+                    rendered_again(&a.body, signals, browser, &inner)?;
                 }
             }
             _ => {}
@@ -1277,6 +1284,9 @@ fn plan(
     // What a host computes for a computed part (ADR-0226).
     let mut computed: Vec<Derived> = Vec::new();
     let mut derived_values: Vec<Part> = Vec::new();
+    // Each block's subject the browser computes from a signal (ADR-0229): its
+    // signal, the path its value is read at, and its component.
+    let mut browser_subjects: BTreeMap<u32, (String, String, String)> = BTreeMap::new();
     let page_def = DefId { unit, decl: id.0 };
     // The page's template, each view it uses composed in place (ADR-0136):
     // what the build renders, numbered as the build numbers it.
@@ -1298,8 +1308,23 @@ fn plan(
             .map(|i| i.name.clone())
             .collect()
     };
-    // What a signal decides, the browser renders again (ADR-0137).
-    rendered_again(&template.chunks, &signals, &Reach::Top)?;
+    // What a signal decides, the browser renders again (ADR-0137): a block
+    // whose subject the browser computes from one as well (ADR-0229).
+    let browser: Vec<String> = others
+        .iter()
+        .filter(|r| r.kind == crate::template_ir::ReadKind::Subject && !r.nested)
+        .filter(|r| {
+            r.inputs.as_deref().is_some_and(|inputs| {
+                inputs.iter().any(|(_, read)| {
+                    signals
+                        .iter()
+                        .any(|s| Some(s.as_str()) == read.split('.').next())
+                })
+            })
+        })
+        .map(|r| r.path.clone())
+        .collect();
+    rendered_again(&template.chunks, &signals, &browser, &Reach::Top)?;
     let mut rows: Vec<RowRead> = Vec::new();
     let mut typed = BTreeMap::new();
     for hole in holes {
@@ -1323,6 +1348,9 @@ fn plan(
                 &mut members,
             )?;
             match computes {
+                // Inside a block a host renders (ADR-0229), set where the block
+                // is rendered, with it; at the top, a part of its own.
+                Computes::Host(part) if hole.nested => derived_values.push(part),
                 Computes::Host(part) => parts.push(part),
                 Computes::Row(row) => rows.push(row),
                 Computes::Browser { signal, path } => live.push(Live {
@@ -1490,6 +1518,15 @@ fn plan(
             match computes {
                 Computes::Host(part) => derived_values.push(part),
                 Computes::Row(row) => rows.push(row),
+                // A block's subject the browser computes (ADR-0229): its block
+                // is rendered again in the browser, as one a signal decides,
+                // below.
+                Computes::Browser { signal, path }
+                    if read.kind == crate::template_ir::ReadKind::Subject =>
+                {
+                    browser_subjects
+                        .insert(read.part.0, (signal, path, derived.component_id.clone()));
+                }
                 // Set in place, as an attribute a signal decides is (ADR-0142).
                 Computes::Browser { signal, path } => {
                     let (kind, attribute) = match find_part(&template.chunks, read.part.0) {
@@ -1616,9 +1653,11 @@ fn plan(
         // A block a query's value decides (ADR-0146): a host renders it,
         // and renders it again when what it renders changed. At the top of
         // the page, or inside such a block, which renders it again with it.
+        // Its subject a host computes from a query's value too (ADR-0229).
         if matches!(entry.kind, "conditional" | "match")
             && let Some(root) = entry.value.split('.').next()
-            && found.iter().any(|(n, ..)| n == root)
+            && (found.iter().any(|(n, ..)| n == root)
+                || derived_values.iter().any(|d| d.path == entry.value))
             && template.chunks.iter().any(
                 |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),
             )
@@ -1664,6 +1703,39 @@ fn plan(
                 attribute: String::new(),
                 owns: Vec::new(),
                 derived: String::new(),
+            });
+        }
+        // A block whose subject the browser computes from a signal
+        // (ADR-0229): rendered again in the browser when the signal changes,
+        // its subject computed by its function.
+        if matches!(entry.kind, "conditional" | "match")
+            && let Some((signal, path, derived)) = browser_subjects.get(&entry.id.0)
+            && let Some(part) = find_part(&template.chunks, entry.id.0)
+        {
+            // What its arms hold starts again when it shows another arm
+            // (ADR-0144), which the browser knows from the subject's value
+            // before it renders: not computed yet (ADR-0230).
+            if !owned(entry.id.0).is_empty() {
+                return Err(format!(
+                    "part {} is a block whose subject the browser computes, and whose arms \
+                     hold a view's signals, which the browser starts again by its arm \
+                     (ADR-0230)",
+                    entry.id.0
+                ));
+            }
+            let mut reads = block_reads(part, &signals);
+            if !reads.contains(signal) {
+                reads.insert(0, signal.clone());
+            }
+            live.push(Live {
+                part: entry.id.0,
+                signal: signal.clone(),
+                path: path.clone(),
+                kind: entry.kind.to_string(),
+                reads,
+                attribute: String::new(),
+                owns: owned(entry.id.0),
+                derived: derived.clone(),
             });
         }
         // A block a signal decides (ADR-0130). What the browser cannot
@@ -1757,7 +1829,7 @@ enum Computes {
 /// browser's, which runs the function compiled for it, and a host's for the
 /// first value. A row's item is a host's for each row of a query's list.
 /// Anything else is refused by name: one in a block, an arm or an instance,
-/// several values, or a value the page speculates on (ADR-0229); and none,
+/// several values, or a value the page speculates on (ADR-0230); and none,
 /// which is a value to write as it is.
 #[allow(clippy::too_many_arguments)]
 fn computed_part(
@@ -1804,7 +1876,7 @@ fn computed_part(
         return refuse(match inputs {
             [] => "from nothing it reads: write the value itself".to_string(),
             _ => format!(
-                "from {}, and a host computes one from one value (ADR-0229)",
+                "from {}, and a host computes one from one value (ADR-0230)",
                 inputs
                     .iter()
                     .map(|(n, _)| format!("`{n}`"))
@@ -1859,26 +1931,26 @@ fn computed_part(
         let Some(mut row) = row_read(hirs, sigs, chunks, found, part, read, members)? else {
             return refuse(format!(
                 "in a row of `{name}`, a list no query gives, which no host computes yet \
-                 (ADR-0229)"
+                 (ADR-0230)"
             ));
         };
         row.path = path.to_string();
         row.steps.push(Step::Derived(component_id));
         return Ok((derived, Computes::Row(row)));
     }
-    if nested {
-        return refuse(
-            "inside a block, an arm or another value's row, which no host computes yet \
-             (ADR-0229)"
-                .to_string(),
-        );
-    }
     let mut segments = read.split('.');
     let root = segments.next().unwrap_or_default();
     let reads: Vec<&str> = segments.collect();
     // A signal's value is the browser's to compute (ADR-0227), at the path
-    // its expression reads it by.
+    // its expression reads it by: at the top of the page, where it is set in
+    // place, or as a block's subject, where the block is rendered again.
     if signals.iter().any(|s| s == root) {
+        if nested {
+            return refuse(format!(
+                "from the signal `{name}` inside a block, and the browser computes one at the \
+                 top of the page (ADR-0230)"
+            ));
+        }
         return Ok((
             derived,
             Computes::Browser {

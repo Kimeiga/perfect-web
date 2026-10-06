@@ -84,14 +84,6 @@ fn a_computed_hole_checks_and_does_not_build() {
             "a hole in an attribute's text is a value path, and a computed value is \
              written as the attribute's whole value",
         ),
-        (
-            "{#if !b}<p>x</p>{/if}",
-            "an `{#if}` condition must be a value path",
-        ),
-        (
-            "{#if b}<p>x</p>{:else if n > 0}<p>y</p>{/if}",
-            "an `{:else if}` condition must be a value path",
-        ),
         // Until ADR-0074 the name check read this as a name, `same(xs)`, that
         // does not resolve.
         (
@@ -114,6 +106,9 @@ fn a_computed_hole_checks_and_does_not_build() {
         "<p>{mk().a}</p>",
         "<p title={\"lit\"}>x</p>",
         "<button type=\"button\" disabled={!b}>x</button>",
+        // And a condition, since ADR-0229.
+        "{#if !b}<p>x</p>{/if}",
+        "{#if b}<p>x</p>{:else if n > 0}<p>y</p>{/if}",
     ] {
         let src = view(markup);
         let found = reported(&src);

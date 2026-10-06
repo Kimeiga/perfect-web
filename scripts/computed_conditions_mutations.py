@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-0227: a value computed from a signal is the
-browser's, and its first value the host's.
+"""Mutation controls for ADR-0229: a computed condition decides its block.
 
-Each mutant undoes one piece: the signal read as one, the component each
-computed part names, the path a view's field is read at; the page's module,
-each function by its part and given the signal's value decoded, written and
-refused; the host's first value, read through a field, the module named and
-served only where a plan names it; and the runtime computing each part again,
-with the signal's value now, an attribute's included.
+Each mutant undoes one piece: a subject read by the path the compiler names,
+with what it reads; the browser's subject, its block rendered again as the
+signal changes, and its arms holding no view's signals; the host's subject,
+its block among those it renders again; a value the host computes inside a
+block, and one the browser would, refused; the block a computed subject
+decides as one a signal does; the host's first value of a subject; and the
+browser's renderer given the values computed now, and setting no block in
+place.
 
 The compiler's and the server's tests must fail for a mutant of the compiler
 or the server ("cargo"). A mutant of the runtime must fail
 `e2e/feed.spec.mjs` in three engines, against a build of the mutated source
-("browser"): the store's and the feed's pages, and the server.
+("browser").
 
-Run from the repository root; `just e14-computed-signals` records the
+Run from the repository root; `just e14-computed-conditions` records the
 output. The source is restored after every mutant, whatever happens.
 """
 
@@ -26,153 +27,110 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+TEMPLATE = ROOT / "compiler/pw-core/src/template_ir.rs"
 VALUES = ROOT / "compiler/pw-core/src/page_values.rs"
-MODULE = ROOT / "compiler/pw-core/src/backend/computed.rs"
-BUILD = ROOT / "compiler/pw-core/src/build.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 RUNTIME = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
 
 # (what is undone, suite, file, anchor, replacement)
 MUTANTS = [
     (
-        "a signal's value is a query's to compute",
+        "a computed subject reads nothing",
+        "cargo",
+        TEMPLATE,
+        "    let inputs = inputs_of(body, e, ctx);\n",
+        "    let inputs = Vec::new();\n",
+    ),
+    (
+        "a computed subject is read as a path",
+        "cargo",
+        TEMPLATE,
+        "        read.inputs = Some(inputs);\n    }\n    value\n",
+        "        let _ = (read, inputs);\n    }\n    value\n",
+    ),
+    (
+        "a subject the browser computes decides no block",
         "cargo",
         VALUES,
-        # Re-anchored by ADR-0228, which branches on it at once, and by
-        # ADR-0229, which refuses one inside a block first.
-        "    if signals.iter().any(|s| s == root) {\n        if nested {\n",
-        "    if false && signals.iter().any(|s| s == root) {\n        if nested {\n",
+        "                    browser_subjects\n                        .insert(read.part.0, (signal, path, derived.component_id.clone()));\n",
+        "                    let _ = (signal, path);\n",
     ),
     (
-        "a text part computed from a signal names no component",
+        "a block whose subject the browser computes is not rendered again for its signal",
         "cargo",
         VALUES,
-        '                    kind: "text".to_string(),\n'
-        "                    reads: Vec::new(),\n"
-        "                    attribute: String::new(),\n"
-        "                    owns: Vec::new(),\n"
-        "                    derived: derived.component_id.clone(),\n",
-        '                    kind: "text".to_string(),\n'
-        "                    reads: Vec::new(),\n"
-        "                    attribute: String::new(),\n"
-        "                    owns: Vec::new(),\n"
-        "                    derived: String::new(),\n",
-    ),
-    (
-        "an attribute computed from a signal names no component",
-        "cargo",
-        VALUES,
-        "                        attribute,\n"
-        "                        owns: Vec::new(),\n"
-        "                        derived: derived.component_id.clone(),\n",
-        "                        attribute,\n"
-        "                        owns: Vec::new(),\n"
-        "                        derived: String::new(),\n",
-    ),
-    (
-        "a view's field of a signal is read at the signal",
-        "cargo",
-        VALUES,
-        "            path: read.clone(),\n",
-        "            path: root.to_string(),\n",
-    ),
-    (
-        "a page that computes from a signal has no module",
-        "cargo",
-        MODULE,
-        "        if computed.is_empty() {\n",
-        "        if true {\n",
-    ),
-    (
-        "the module names each function by its order",
-        "cargo",
-        MODULE,
-        '        source.push_str(&format!("  \\"{}\\": (j) => f{n}({decode}),\\n", live.part));\n',
-        '        source.push_str(&format!("  \\"{n}\\": (j) => f{n}({decode}),\\n"));\n',
-    ),
-    (
-        "the module does not decode the signal's value",
-        "cargo",
-        MODULE,
-        '        source.push_str(&format!("  \\"{}\\": (j) => f{n}({decode}),\\n", live.part));\n',
-        '        let _ = decode;\n        source.push_str(&format!("  \\"{}\\": (j) => f{n}(j),\\n", live.part));\n',
-    ),
-    (
-        "a module that did not compile is no refusal",
-        "cargo",
-        BUILD,
-        "            .chain(computed)\n",
+        "                reads.insert(0, signal.clone());\n",
         "",
     ),
     (
-        "the build writes no module",
+        "a block whose subject the browser computes may hold a view's signals",
         "cargo",
-        BUILD,
-        '                write(&format!("computed/{}.mjs", c.page), source.as_bytes())?;\n',
+        VALUES,
+        "            if !owned(entry.id.0).is_empty() {\n",
+        "            if false {\n",
+    ),
+    (
+        "a block a host's subject decides is not rendered again",
+        "cargo",
+        VALUES,
+        "                || derived_values.iter().any(|d| d.path == entry.value))\n",
+        "                || false)\n",
+    ),
+    (
+        "a value the host computes in a block is a text part of its own",
+        "cargo",
+        VALUES,
+        "                Computes::Host(part) if hole.nested => derived_values.push(part),\n",
         "",
     ),
     (
-        "the host renders no first value from a signal",
+        "a value the browser would compute in a block is built",
+        "cargo",
+        VALUES,
+        "        if nested {\n",
+        "        if false && nested {\n",
+    ),
+    (
+        "a block a computed subject decides is not one a signal does",
+        "cargo",
+        VALUES,
+        "                    Reach::Top if signal(value) || browser.contains(value) => {\n"
+        "                        Reach::Live(Vec::new())\n",
+        "                    Reach::Top if signal(value) => {\n"
+        "                        Reach::Live(Vec::new())\n",
+    ),
+    (
+        "the host renders no first value of a subject",
         "cargo",
         SERVER,
-        "        let env = self\n"
-        "            .with_computed_signals(env, plan, self.template_of(page))\n"
-        '            .unwrap_or_else(|e| panic!("`{page}`\'s computed values: {e}"));\n',
+        "                    | pw_render::ir::Part::Conditional { value, .. }\n",
         "",
     ),
     (
-        "the host reads no field of a signal's first value",
-        "cargo",
-        SERVER,
-        "                first = first[field].clone();\n",
-        "                let _ = field;\n",
-    ),
-    (
-        "the document names no module",
-        "cargo",
-        SERVER,
-        '        .any(|l| l["derived"].is_string());\n',
-        '        .any(|l| l["derived"].is_string() && false);\n',
-    ),
-    (
-        "a module no plan names is read",
-        "cargo",
-        SERVER,
-        "                    .any(|p| computed_module(p).as_deref() == Some(r))\n",
-        '                    .any(|_| r.starts_with("/computed/"))\n',
-    ),
-    (
-        "the browser does not compute a value from a signal",
+        "the browser renders a block without what it computes",
         "browser",
         RUNTIME,
-        # Re-anchored by ADR-0229, which renders a block whose subject it is.
+        "  const values = [...signals, ...(await computedNow())]\n",
+        "  const values = [...signals]\n",
+    ),
+    (
+        "the browser sets a block in place",
+        "browser",
+        RUNTIME,
         "    if (live.derived && SET_IN_PLACE.has(live.kind)) {\n",
-        "    if (false) {\n",
-    ),
-    (
-        "the browser computes each value from the signal's first",
-        "browser",
-        RUNTIME,
-        "      const v = (await computedValues()).parts[live.part](signalAt(live.path));\n",
-        "      const v = (await computedValues()).parts[live.part](firstValues.get(live.signal));\n",
-    ),
-    (
-        "a computed attribute is set from the signal itself",
-        "browser",
-        RUNTIME,
-        "      else setAttributePart(live, from.get(live.signal), v);\n",
-        "      else setAttributePart(live, from.get(live.signal));\n",
+        "    if (live.derived) {\n",
     ),
 ]
 
 CARGO = [
     [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
-        "--test", "computed_signals", "--test", "computed_holes",
+        "--test", "computed_conditions", "--test", "computed_holes", "--test", "computed_signals",
+        "--test", "template_values",
     ],
     [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
-        "from_a_signal", "signals_alone",
+        "a_condition_", "from_a_signal",
     ],
 ]
 

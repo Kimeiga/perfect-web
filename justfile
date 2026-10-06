@@ -2816,6 +2816,31 @@ e14-computed-rows:
      } > docs/evidence/E14/computed-rows.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/computed-rows.txt
 
+# ADR-0229: a computed condition decides its block. The compiler's and the
+# server's tests, the feed in three engines, and the mutation controls.
+e14-computed-conditions:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0229 - a computed condition decides its block"; echo; \
+       echo "produced by: just e14-computed-conditions"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the build (compiler/pw-core/tests/computed_conditions.rs, template_values.rs)"; echo; \
+       cargo test --locked -p pw-core --test computed_conditions --test template_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_condition_ 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/computed_conditions_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/computed_conditions_mutations.py; \
+     } > docs/evidence/E14/computed-conditions.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/computed-conditions.txt
+
 # ADR-0224: a longer read is not applied over a commit it did not see. The
 # server's tests and the mutation control.
 e14-keyed-race:

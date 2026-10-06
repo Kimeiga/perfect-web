@@ -176,18 +176,24 @@ refused by name:
   `{#if xs}` around the list says the same.
 - **An interpolated attribute is refused in a `style`**, and a URL with holes
   must begin with text (ADR-0042).
-- **A computed value builds from one value** (ADR-0226, ADR-0227,
-  ADR-0228): a text hole or an attribute's whole value, at the top of a page
+- **A computed value builds from one value** (ADR-0226 to ADR-0229): a text
+  hole, an attribute's whole value or a block's subject, at the top of a page
   from a query's value, which a host computes, or a signal's, which the
-  browser computes after the host's first; and in a loop's row from the
-  row's item, which a host computes for each row, and the speculation module
-  for each row it renders. One in a block or an arm outside a row, in a view
-  that contains itself, or in a block a signal decides, a condition (`{#if n
-  > 0}`), one from several values, from none or from a page's parameter, an
-  attribute from a speculated value or a speculated row's value from a field
-  of its item, and a hole in an attribute's text, check and do not build
-  (ADR-0229). A directive other than `on:` (`style:width={w}`) does not build
-  either (ADR-0073).
+  browser computes after the host's first; inside a block a host renders,
+  from a query's value; and in a loop's row from the row's item, which a host
+  computes for each row, and the speculation module for each row it renders.
+  These check and do not build (ADR-0230):
+  - one from several values, from none, or from a page's parameter;
+  - one the browser would compute inside a block, or one from a query's
+    inside a block a signal decides;
+  - one in an arm from the names it binds, or in a view that contains
+    itself;
+  - an attribute or a block's subject from a speculated value, or a
+    speculated row's value from a field of its item;
+  - a hole in an attribute's text.
+
+  A directive other than `on:` (`style:width={w}`) does not build either
+  (ADR-0073).
 - **A value computed from a signal shows its last value until the page's
   module has loaded** (ADR-0227): the first change loads it, once per page.
 - **A `Float` is not written by a template** (ADR-0074). It has no format

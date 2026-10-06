@@ -24,7 +24,9 @@ MUTANTS = [
     (
         "the plan does not ask what the browser renders again",
         PLAN,
-        "    rendered_again(&template.chunks, &signals, &Reach::Top)?;\n",
+        # Re-anchored by ADR-0229, which gives it the subjects the browser
+        # computes.
+        "    rendered_again(&template.chunks, &signals, &browser, &Reach::Top)?;\n",
         "",
     ),
     (
@@ -32,10 +34,10 @@ MUTANTS = [
         PLAN,
         "                    _ => Reach::Frame,\n"
         "                };\n"
-        "                rendered_again(body, signals, &inner)?;\n",
+        "                rendered_again(body, signals, browser, &inner)?;\n",
         "                    _ => Reach::Top,\n"
         "                };\n"
-        "                rendered_again(body, signals, &inner)?;\n",
+        "                rendered_again(body, signals, browser, &inner)?;\n",
     ),
     (
         "a block a signal decides may read anything",

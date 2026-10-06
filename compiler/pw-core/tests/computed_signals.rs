@@ -116,7 +116,8 @@ fn a_value_computed_from_a_signal_is_the_browsers_and_its_first_the_hosts() {
     let computed: Vec<(&str, &str, &str, &str)> = plan
         .live
         .iter()
-        .filter(|l| !l.derived.is_empty())
+        // Set in place; a block whose subject it is, ADR-0229's.
+        .filter(|l| !l.derived.is_empty() && !matches!(l.kind.as_str(), "conditional" | "match"))
         .map(|l| {
             (
                 l.kind.as_str(),
@@ -208,7 +209,8 @@ fn an_attribute_and_a_views_field_of_a_signal_are_computed_as_well() {
     let computed: Vec<(&str, &str, &str, &str)> = plan
         .live
         .iter()
-        .filter(|l| !l.derived.is_empty())
+        // Set in place; a block whose subject it is, ADR-0229's.
+        .filter(|l| !l.derived.is_empty() && !matches!(l.kind.as_str(), "conditional" | "match"))
         .map(|l| {
             (
                 l.kind.as_str(),
@@ -255,16 +257,17 @@ fn what_the_browser_does_not_compute_yet_is_refused_by_name() {
         (
             "<p>{shown(open & post.pinned)}</p>",
             "computes a value from `open` and `post`, and a host computes one from one value \
-             (ADR-0229)",
+             (ADR-0230)",
         ),
         (
             "{#if open}<p>{shown(panel.open)}</p>{/if}",
             "computes a value inside a block a signal decides, and the browser, which renders \
-             that block again, computes none yet (ADR-0229)",
+             that block again, computes none yet (ADR-0230)",
         ),
         (
             "{#if post.pinned}<p>{shown(open)}</p>{/if}",
-            "computes a value inside a block, an arm or another value's row",
+            "computes a value from the signal `open` inside a block, and the browser computes \
+             one at the top of the page (ADR-0230)",
         ),
     ] {
         let files = page(markup);

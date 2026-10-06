@@ -2304,7 +2304,7 @@ fn compose(
         if !computed_values(view).is_empty() {
             out.push(blocked(format!(
                 "`<{tag}>` contains itself and computes a value in its template, and a view \
-                 that contains itself computes none yet (ADR-0229)"
+                 that contains itself computes none yet (ADR-0230)"
             )));
             return;
         }
@@ -2555,9 +2555,6 @@ fn lower_block_at(
             at: d.to_string(),
         })
     };
-    // `c` in `{#if c}`: a value path, as every template value is.
-    let subject_path = subject.and_then(|e| value_path(body, e).map(|v| ctx.read(v)));
-
     if let Some((binding, collection, key)) = parse_each(d) {
         let written = collection.split('.').map(str::trim).all(|s| {
             s.starts_with(|c: char| c.is_alphabetic() || c == '_')
@@ -2613,24 +2610,20 @@ fn lower_block_at(
         return;
     }
     if opens(d, "{#if") {
-        let (Some(value), Some(e)) = (subject_path, subject) else {
-            out.push(blocked(
-                "an `{#if}` condition must be a value path".to_string(),
-            ));
+        let Some(e) = subject else {
+            out.push(blocked("an `{#if}` has a condition".to_string()));
             return;
         };
-        ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);
+        let value = subject_of(body, id, e, ctx, ix);
         out.push(conditional(body, id, value, &lead, &branches, ctx, ix));
         return;
     }
     if opens(d, "{#match") {
-        let (Some(value), Some(e)) = (subject_path, subject) else {
-            out.push(blocked(
-                "a `{#match}` subject must be a value path".to_string(),
-            ));
+        let Some(e) = subject else {
+            out.push(blocked("a `{#match}` has a subject".to_string()));
             return;
         };
-        ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);
+        let value = subject_of(body, id, e, ctx, ix);
         let stray = lead.iter().any(|n| match body.node(*n) {
             Node::Text(t) => !t.trim().is_empty(),
             _ => true,
@@ -2830,6 +2823,24 @@ fn lower_run(body: &Body, nodes: &[NodeId], ctx: &Lowering<'_>, ix: &mut Indexer
 /// `{#if a} A {:else if b} B {:else} C {/if}`: a conditional on `a` whose
 /// `otherwise` is a conditional on `b`, whose `otherwise` is C. Ids follow the
 /// document: the nested conditional's comes after A's parts.
+/// **A block's subject, as the renderer reads it** (ADR-0073, ADR-0229): a
+/// value's path, or a computed one's, which the compiler names, read with the
+/// values it is computed from. Until ADR-0229 a computed one was refused: "an
+/// `{#if}` condition must be a value path".
+fn subject_of(body: &Body, id: PartId, e: ExprId, ctx: &Lowering<'_>, ix: &mut Indexer) -> String {
+    if let Some(value) = value_path(body, e).map(|v| ctx.read(v)) {
+        ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);
+        return value;
+    }
+    let inputs = inputs_of(body, e, ctx);
+    let value = ix.computed_path(id, &inputs);
+    ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);
+    if let Some(read) = ix.reads.last_mut() {
+        read.inputs = Some(inputs);
+    }
+    value
+}
+
 fn conditional(
     body: &Body,
     id: PartId,
@@ -2851,21 +2862,13 @@ fn conditional(
         Some(((marker, run), more)) => match marker.condition {
             Some(c) => {
                 let nested = ix.part();
-                match value_path(body, c).map(|v| ctx.read(v)) {
-                    Some(v) => {
-                        ix.read(nested, &v, ReadKind::Subject, ReadAt::Expr(c), ctx);
-                        // A block of its own: what its arms hold ends when
-                        // it shows another (ADR-0144).
-                        ix.blocks.push(nested);
-                        let chunk = conditional(body, nested, v, run, more, ctx, ix);
-                        ix.blocks.pop();
-                        vec![chunk]
-                    }
-                    None => blocked(
-                        "an `{:else if}` condition must be a value path",
-                        marker.written,
-                    ),
-                }
+                let v = subject_of(body, nested, c, ctx, ix);
+                // A block of its own: what its arms hold ends when it shows
+                // another (ADR-0144).
+                ix.blocks.push(nested);
+                let chunk = conditional(body, nested, v, run, more, ctx, ix);
+                ix.blocks.pop();
+                vec![chunk]
             }
             None if marker.written.trim() == "{:else}"
                 && marker.arm.is_none()

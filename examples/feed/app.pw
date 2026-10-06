@@ -170,6 +170,7 @@ session page Home() {
             }}>
                 <label>What's happening? <textarea bind:value={draft}></textarea></label>
                 <p id="left">{280 - String.length(draft)} left</p>
+                {#if String.length(draft) > 280}<p id="over" role="alert">Too long to post.</p>{/if}
                 <button type="submit" disabled={String.length(draft) == 0 | String.length(draft) > 280}>Post</button>
             </form>
             <ul>
@@ -217,6 +218,7 @@ page PostPage(id: PostId) {
         <main>
             <Replies post={thread} />
             <p id="counts">{counted(List.length(thread.replies), "reply", "replies")} · {counted(thread.likes, "like", "likes")}</p>
+            {#if List.length(thread.replies) == 0}<p id="quiet">No replies yet.</p>{/if}
         </main>
     }
 }

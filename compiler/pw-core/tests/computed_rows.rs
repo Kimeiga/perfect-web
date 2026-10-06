@@ -206,7 +206,7 @@ fn what_a_row_does_not_compute_yet_is_refused_by_name() {
                 "<ul>{#each posts as p (p.id)}<li>{shown(p.likes == List.length(posts))}</li>{/each}</ul>",
             ),
             "computes a value from `p` and `posts`, and a host computes one from one value \
-             (ADR-0229)",
+             (ADR-0230)",
         ),
         // A speculated row's value from a field of its item: the module
         // computes one from the row's item whole.
@@ -218,7 +218,7 @@ fn what_a_row_does_not_compute_yet_is_refused_by_name() {
                 ) + "\nview Named(author: User) !{} {\n    <span>{String.length(author.name)}</span>\n}\n"
             }),
             "computes a value from `p.author`, a field of a row the page speculates on, and the \
-             browser computes one from the row's item whole (ADR-0229)",
+             browser computes one from the row's item whole (ADR-0230)",
         ),
         // An attribute computed from a speculated value.
         (
@@ -229,7 +229,7 @@ fn what_a_row_does_not_compute_yet_is_refused_by_name() {
                 )
             }),
             "computes an attribute's value from `feed`, which the page speculates on, and the \
-             browser computes one from the value whole, and only between tags (ADR-0229)",
+             browser computes a text part from the value whole, between tags (ADR-0230)",
         ),
     ] {
         assert_eq!(reported(&files), Vec::<String>::new());

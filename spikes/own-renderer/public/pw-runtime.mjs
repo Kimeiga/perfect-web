@@ -1151,11 +1151,28 @@ function signalAt(path) {
   return v;
 }
 
-/** The block numbered `id`, rendered at the signals' values now. */
+/** **What the page computes from its signals now** (ADR-0229): each value,
+ * by the path the compiler names it, for a block the browser renders again,
+ * whose subject may be one. None where the page computes none. */
+async function computedNow() {
+  const computed = (parts.live ?? []).filter((l) => l.derived);
+  if (computed.length === 0) return [];
+  const module = await computedValues();
+  return computed.map((l) => [
+    `#${parts.template}~${l.part}`,
+    module.parts[l.part](signalAt(l.path)),
+  ]);
+}
+
+/** The block numbered `id`, rendered at the signals' values now, and what
+ * the page computes from them. */
 async function renderBlock(id) {
   const x = await renderModule();
+  const values = [...signals, ...(await computedNow())]
+    .map(([k, v]) => `${JSON.stringify(k)}:${wire(v)}`)
+    .join(",");
   const request = new TextEncoder().encode(
-    withTemplates(JSON.stringify({ part: parts.blocks[id], values: Object.fromEntries(signals) })),
+    withTemplates(`{"part":${JSON.stringify(parts.blocks[id])},"values":{${values}}}`),
   );
   const ptr = x.alloc(request.length);
   new Uint8Array(x.memory.buffer, ptr, request.length).set(request);
@@ -1384,6 +1401,10 @@ function setAttributePart(live, source, v = signalAt(live.path)) {
 let dirty = new Set();
 let flushing = null;
 
+/** The parts the runtime sets in place: a text part's range and an
+ * attribute (ADR-0142). A block is rendered again whole. */
+const SET_IN_PLACE = new Set(["text", "attribute", "boolean_attribute"]);
+
 let computedModule = null;
 
 /** **What the page computes from its signals** (ADR-0227): the module the
@@ -1421,7 +1442,7 @@ async function flushSignals() {
   let rendered = false;
   const inserted = [];
   for (const live of parts.live ?? []) {
-    if (live.derived) {
+    if (live.derived && SET_IN_PLACE.has(live.kind)) {
       // A value computed from the signal (ADR-0227), by its part's function.
       if (!changed.has(live.signal)) continue;
       const v = (await computedValues()).parts[live.part](signalAt(live.path));

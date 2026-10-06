@@ -14,6 +14,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0229, 2026-10-05: a computed condition decides its block** (ruling
+0073-a for a block's subject; 0071-a's repair builds). `{#if !b}` and
+`{:else if n > 0}` were refused at build. A subject is read by a path the
+compiler names now: a host computes one from a query's value and renders its
+block again when the value changes, and the browser one from a signal's,
+rendering its block again as the signal changes. A value computed inside a
+block a host renders is the host's. The feed's draft too long says "Too long
+to post.", and a thread with no reply "No replies yet.", in three engines
+(`just e14-computed-conditions`).
+
 **ADR-0228, 2026-10-05: a value computed in a row is the row's** (ruling
 0073-a in a row and from a speculated value). A value computed in a loop's
 row was refused at build. Now its path is named from the row's item, a host

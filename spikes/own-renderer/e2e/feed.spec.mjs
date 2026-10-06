@@ -19,7 +19,9 @@
 //   - what is left of a draft, and whether there is a post to send, are
 //     computed from it as it is typed, and the host's first (ADR-0227);
 //   - a row's likes are counted in words, and a like shows before the
-//     server answers, its count computed again in the browser (ADR-0228).
+//     server answers, its count computed again in the browser (ADR-0228);
+//   - a condition computed: the browser's for a draft too long, the host's
+//     for a thread with no reply (ADR-0229).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -84,8 +86,11 @@ test("a post reaches the author's timeline and every other reader's", async ({
   // Another reader's open timeline, told by the host (ADR-0219), and the
   // author named the same to it as to the author (ADR-0220).
   await expect(post(reader, text)).toHaveCount(1);
+  // The author's own row is "You" until the server's arrives (ADR-0222):
+  // waited for, not read at once. In one run of ADR-0229's, Firefox read
+  // the pending row.
+  await expect(post(author, text).getByRole("link")).toHaveText(/^Guest /);
   const name = await post(author, text).getByRole("link").innerText();
-  expect(name).toMatch(/^Guest /);
   await expect(post(reader, text).getByRole("link")).toHaveText(name);
   expect(await unreloaded(author)).toBe(true);
   expect(await unreloaded(reader)).toBe(true);
@@ -134,6 +139,27 @@ test("what is left of a draft is computed as it is typed", async ({ browser }) =
   await expect(button).toBeDisabled();
   expect(await unreloaded(page)).toBe(true);
   await context.close();
+});
+
+test("a condition is computed: a draft too long, and a thread with no reply", async ({
+  page,
+}) => {
+  // ADR-0229. The home page's `{#if String.length(draft) > 280}` is the
+  // browser's, which renders the block again as the draft changes; a
+  // thread's `{#if List.length(thread.replies) == 0}` is the host's.
+  await home(page);
+  const draft = page.getByLabel("What's happening?");
+  await expect(page.locator("#over")).toHaveCount(0);
+  await draft.fill("x".repeat(281));
+  await expect(page.getByRole("alert")).toHaveText("Too long to post.");
+  await draft.fill("x".repeat(280));
+  await expect(page.locator("#over")).toHaveCount(0);
+  expect(await unreloaded(page)).toBe(true);
+  await page.goto("/post/p3");
+  await expect(page.locator("#quiet")).toHaveText("No replies yet.");
+  await page.goto("/post/p1");
+  await expect(page.locator("#counts")).toContainText("1 reply");
+  await expect(page.locator("#quiet")).toHaveCount(0);
 });
 
 test("a thread's counts are computed by the host, and a like's reaches it", async ({
