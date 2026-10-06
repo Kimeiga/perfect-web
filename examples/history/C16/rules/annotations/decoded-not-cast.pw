@@ -7,18 +7,15 @@
 module rules.decode_good
 
 import decode
+import decode.{ Decoder }
 import domain.{ Store }
 
 // 2026-08-10: PW0021 learned to examine bare calls, and this fixture called
 // `store_decoder()` while declaring nothing of that name. Declared here, so
 // the control is a program that resolves rather than one that happened not to
 // be examined.
-//
-// 2026-10-05: and it was given to `decode.run`, which `decode` does not
-// declare. The qualified call check took an import's name for a local, so it
-// passed (ADR-0226). A decoder is a function, as `decode` says: this one.
-fn store_decoder(raw: Unknown) -> Result<Store, DecodeError> !{} { todo }
+fn store_decoder() -> Decoder !{} { todo }
 
 fn parse(raw: Unknown) -> Result<Store, DecodeError> !{} {
-    store_decoder(raw)
+    decode.run(store_decoder(), raw)
 }

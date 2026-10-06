@@ -432,7 +432,7 @@ pub(crate) fn lowered<R>(
             .lowered
             .functions
             .iter()
-            .find(|f| f.def == world.declaration)
+            .find(|f| finds(f, world))
             .ok_or_else(|| {
                 format!(
                     "`{component_id}` did not lower: {}",
@@ -455,11 +455,7 @@ pub(crate) fn pure_queries<R>(
         for (contract, world) in &p.worlds {
             let query = crate::resolve::declaration(p.hirs, world.declaration)
                 .is_some_and(|d| d.kind == crate::hir::DeclKind::Query);
-            if let Some(function) = p
-                .lowered
-                .functions
-                .iter()
-                .find(|f| f.def == world.declaration)
+            if let Some(function) = p.lowered.functions.iter().find(|f| finds(f, world))
                 && query
                 && function.capabilities.is_empty()
             {
@@ -481,12 +477,7 @@ pub fn compile(units: &[crate::check::Unit], component_id: &str) -> Result<Compi
             .iter()
             .find(|(c, _)| c.component_id == component_id)
             .ok_or_else(|| format!("no component `{component_id}` in this program"))?;
-        let Some(function) = p
-            .lowered
-            .functions
-            .iter()
-            .find(|f| f.def == world.declaration)
-        else {
+        let Some(function) = p.lowered.functions.iter().find(|f| finds(f, world)) else {
             return Err(format!(
                 "`{component_id}` did not lower: {}",
                 p.refused(world.declaration)
@@ -523,6 +514,18 @@ pub enum Built {
     Refused(String),
 }
 
+/// **Is `f` the function `world` exports?** Its declaration's, or for a
+/// computed part (ADR-0226) the one lifted beside that declaration, by its
+/// name, which has a `$` no declaration's has: a page has its own function,
+/// and one for each part a host computes.
+fn finds(f: &Function, world: &crate::wit::World) -> bool {
+    f.def == world.declaration
+        && match &world.derived {
+            Some(name) => f.export == *name,
+            None => !f.export.contains('$'),
+        }
+}
+
 /// **Every component of a program, compiled and audited**, in contract order.
 ///
 /// Checked and lowered once. A command or query that does not compile is
@@ -533,11 +536,7 @@ pub fn compile_all(units: &[crate::check::Unit]) -> Result<Vec<(String, Built)>,
         let mut out = Vec::new();
         for (contract, world) in &p.worlds {
             let kind = crate::resolve::declaration(p.hirs, world.declaration).map(|d| d.kind);
-            let function = p
-                .lowered
-                .functions
-                .iter()
-                .find(|f| f.def == world.declaration);
+            let function = p.lowered.functions.iter().find(|f| finds(f, world));
             let built = match (function, kind) {
                 (Some(function), _) => match build(p.wit, world, function, p.lowered, p.idents) {
                     Encoding::Encoded(component) => {

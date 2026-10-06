@@ -512,6 +512,47 @@ fn the_c10_texts_are_reported_where_their_defects_are() {
     );
 }
 
+/// **C16: a value the template computes** (ADR-0226, `docs/CORPUS.md`
+/// §C16). Two witnesses' and a rule fixture's old texts:
+/// - `forbidden_effect`'s valid neighbour read the wall clock in its
+///   template, where a value is computed again when what it reads changes,
+///   and performs nothing since corpus C16. Its old text is that defect, and
+///   no other: the page may read the clock, as it does now, in its body.
+/// - `task_detached`'s nested witness called `List.each`, which no module
+///   declares. The qualified call check took an import's name for a local
+///   until ADR-0226, so it checked clean. Its old text is that, beside the
+///   detached task it is about.
+/// - `decoded-not-cast.pw`, the cast rule's clean control, gave its decoder
+///   to `decode.run`, which `decode` does not declare either.
+#[test]
+fn the_c16_texts_are_reported_where_their_defects_are() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/history/C16");
+    let symbols = |path: &str| -> Vec<&'static str> {
+        let name = path.rsplit('/').next().expect("a file name");
+        let src = std::fs::read_to_string(root.join(path)).expect(path);
+        let mut got: Vec<&'static str> = check_sources(&c8_program(name, &src))
+            .into_iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, d)| d.iter().map(|d| d.symbol()).collect())
+            .unwrap_or_default();
+        got.sort();
+        got.dedup();
+        got
+    };
+    assert_eq!(
+        symbols("generality/forbidden_effect/page-may-read-clock.pw"),
+        ["derived_not_pure"]
+    );
+    assert_eq!(
+        symbols("generality/task_detached/nested.pw"),
+        ["task_detached", "unresolved_name"]
+    );
+    assert_eq!(
+        symbols("rules/annotations/decoded-not-cast.pw"),
+        ["unresolved_name"]
+    );
+}
+
 /// A C8 fixture's program: the library, the accepted modules it imports, and
 /// the fixture. The same assembly `checking_source.rs` uses for the current
 /// rejected corpus, so the old and new texts are asked one question.

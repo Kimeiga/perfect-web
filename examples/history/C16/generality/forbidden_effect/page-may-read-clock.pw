@@ -4,10 +4,6 @@
 //
 // A page may read the wall clock. A page GENERATED ONCE may not. What makes
 // the neighbour file wrong is the reuse, not the kind of declaration.
-//
-// Read in the page's body, as it renders. Until corpus C16 it was read in
-// the template, where a value is computed again when what it reads changes,
-// and performs nothing (ADR-0226).
 module generality.forbid_clock_ok
 
 import clock
@@ -15,6 +11,5 @@ import clock
 page Now() !{ clock.wall } {
     placement origin
     cache     private
-    let now = clock.now_wall()
-    view { <main><p>Now: {now}</p></main> }
+    view { <main><p>Now: {clock.now_wall()}</p></main> }
 }

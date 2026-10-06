@@ -449,6 +449,44 @@ mod resolved_type {
             }
         }
 
+        /// **A type the typer inferred** (ADR-0226): a computed value's, which
+        /// no source writes. Built from what it is, each declaration it names
+        /// by the name `named` gives, and placed where the value is written.
+        /// `None` for a type parameter, which no such value has.
+        pub(crate) fn inferred(
+            key: &TypeKey,
+            named: &dyn Fn(DefId) -> Option<String>,
+            span: &Span,
+        ) -> Option<ResolvedType> {
+            let args_of = |args: &[TypeKey]| {
+                args.iter()
+                    .map(|a| ResolvedType::inferred(a, named, span))
+                    .collect::<Option<Vec<_>>>()
+            };
+            let written = |head: &str, args: &[ResolvedType]| {
+                DeclaredType::new(
+                    head,
+                    args.iter().map(|a| a.origin.written.clone()).collect(),
+                )
+            };
+            Some(match key {
+                TypeKey::Primitive(p) => {
+                    ResolvedType::primitive(*p, span.clone(), written(p.name(), &[]))
+                }
+                TypeKey::Builtin(b, args) => {
+                    let args = args_of(args)?;
+                    let w = written(b.name(), &args);
+                    ResolvedType::builtin(*b, args, span.clone(), w)
+                }
+                TypeKey::Nominal(def, args) => {
+                    let args = args_of(args)?;
+                    let w = written(&named(*def)?, &args);
+                    ResolvedType::nominal(*def, args, span.clone(), w)
+                }
+                TypeKey::Parameter { .. } => return None,
+            })
+        }
+
         /// **`Option<T>`, for a `T` already resolved**: what a stream's
         /// `<failed>` arm is given, the query's declared error or nothing
         /// (ADR-0148). Its provenance is `T`'s, as it was written.

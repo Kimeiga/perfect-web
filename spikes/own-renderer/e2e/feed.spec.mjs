@@ -13,7 +13,9 @@
 //   - a post's text is at most 280 code points: a longer draft is not sent
 //     (ADR-0225);
 //   - "Load more" shows the longer page, and a post after it is shown over
-//     the longer page (ADR-0222, ADR-0224).
+//     the longer page (ADR-0222, ADR-0224);
+//   - a thread's counts are values its template computes, the host's, shown
+//     with scripts off, and a like's reaches the open thread (ADR-0226).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -92,6 +94,38 @@ test("a like's count reaches every reader", async ({ browser }) => {
   await post(liker, "Hello, feed.").getByRole("button", { name: /^Like/ }).click();
   await expect(post(liker, "Hello, feed.").getByRole("button")).toHaveText(`Like (${before + 1})`);
   await expect(post(reader, "Hello, feed.").getByRole("button")).toHaveText(`Like (${before + 1})`);
+  expect(await unreloaded(reader)).toBe(true);
+  await a.close();
+  await b.close();
+});
+
+/** A count in words, as the feed's `counted` writes it. */
+const counted = (n, one, many) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
+
+test("a thread's counts are computed by the host, and a like's reaches it", async ({
+  browser,
+}) => {
+  // With scripts off: the host computed them into the page.
+  const off = await browser.newContext({ javaScriptEnabled: false });
+  const still = await off.newPage();
+  await still.goto("/post/p3");
+  await expect(still.locator("#counts")).toHaveText("0 replies · 1 like");
+  await off.close();
+  const [a, b] = [await browser.newContext(), await browser.newContext()];
+  const [liker, reader] = [await a.newPage(), await b.newPage()];
+  await home(liker);
+  await reader.goto("/post/p1");
+  await reader.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
+  await reader.evaluate(() => {
+    window.__unreloaded = true;
+  });
+  const before = await likes(liker, "Hello, feed.");
+  const counts = reader.locator("#counts");
+  await expect(counts).toHaveText(`1 reply · ${counted(before, "like", "likes")}`);
+  // Another session's like: the thread is a new value, so a new count, sent
+  // to the open page as its text.
+  await post(liker, "Hello, feed.").getByRole("button", { name: /^Like/ }).click();
+  await expect(counts).toHaveText(`1 reply · ${counted(before + 1, "like", "likes")}`);
   expect(await unreloaded(reader)).toBe(true);
   await a.close();
   await b.close();

@@ -1440,6 +1440,39 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             });
         }
     }
+
+    // **Each computed part a host computes** (ADR-0226): the function the
+    // compiler lifts its expression into, a component of its own, of kind
+    // `derived`. It performs no effect and imports nothing; it runs where its
+    // page runs, so it is placed where the page is.
+    for d in crate::page_values::derived(hirs, ws, sigs) {
+        let page = component_id(hirs[d.page.unit], crate::hir::DeclId(d.page.decl));
+        let allowed_placements = out
+            .iter()
+            .find(|c| c.component_id == page)
+            .map(|c| c.allowed_placements.clone())
+            .unwrap_or_default();
+        let name = d.export();
+        let exports = vec![Export {
+            name: name.clone(),
+            kind: "derived".to_string(),
+            binding: crate::binding::BindingSupport {
+                local: crate::binding::LocalSupport::Direct,
+                remote: crate::binding::remote_support(&d.interface(), &type_facts),
+            },
+            component: Some(crate::wit::component_export(&d.component_id, &name)),
+        }];
+        let abi_schema = schema_of(&d.component_id, &exports, &[], &allowed_placements);
+        out.push(ComponentContract {
+            component_id: d.component_id.clone(),
+            capability_mapping: CAPABILITY_MAPPING,
+            abi_schema,
+            required_capabilities: Vec::new(),
+            allowed_placements,
+            imports: Vec::new(),
+            exports,
+        });
+    }
     out.sort_by(|a, b| a.component_id.cmp(&b.component_id));
     out
 }

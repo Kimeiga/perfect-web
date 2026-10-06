@@ -135,6 +135,18 @@ impl Ty {
         matches!(self, Ty::Unknown)
     }
 
+    /// **What it is, where it is known whole** (ADR-0226): `None` where any
+    /// part of it is unknown, any type, a variable or a parameter.
+    pub(crate) fn key(&self) -> Option<TypeKey> {
+        let all = |args: &[Ty]| args.iter().map(Ty::key).collect::<Option<Vec<_>>>();
+        Some(match self {
+            Ty::Primitive(p) => TypeKey::Primitive(*p),
+            Ty::Builtin(b, args) => TypeKey::Builtin(*b, all(args)?),
+            Ty::Nominal(d, args) => TypeKey::Nominal(*d, all(args)?),
+            Ty::Parameter { .. } | Ty::Var(_) | Ty::Unknown | Ty::Any => return None,
+        })
+    }
+
     /// Fully known: no hole and no inference variable anywhere in it.
     fn is_closed(&self) -> bool {
         match self {

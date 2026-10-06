@@ -807,6 +807,32 @@ pub fn pure_expr_as(
     })
 }
 
+/// **A computed part's function** (ADR-0226, ruling 0073-a): its expression,
+/// lifted into a pure function of the one value it reads, typed as the
+/// expression reads it there. The browser's encoder and a component's lower
+/// the same function.
+pub fn hole(cx: &Context<'_>, d: &crate::page_values::Derived) -> Lowering<Function> {
+    let hir = cx.hirs[d.origin.0];
+    let decl = hir.decl(d.origin.1);
+    let span = match decl.body {
+        Some(b) => hir.body(b).expr_span(d.expr),
+        None => hir.decl_span(d.origin.1),
+    };
+    let input = match backend_type(cx, &d.input.1, &span) {
+        Lowering::Lowered(t) => t,
+        other => return other.map(|_| unreachable!()),
+    };
+    pure_expr(
+        cx,
+        d.origin.0,
+        d.origin.1,
+        d.expr,
+        &[(d.input.0.clone(), input)],
+        &d.export(),
+        span,
+    )
+}
+
 /// A declared type, as the backend's [`Type`] (ADR-0122).
 pub(crate) fn backend_type(cx: &Context<'_>, ty: &ResolvedType, span: &Span) -> Lowering<Type> {
     ty_resolved(cx.sigs, ty, span)
@@ -1103,6 +1129,14 @@ pub fn program_by_declaration(
                 Lowering::Lowered(f) => out.functions.push(f),
                 other => refusals.push((DefId { unit, decl: id.0 }, other)),
             }
+        }
+    }
+    // And each computed part a host computes (ADR-0226): the function its
+    // expression is lifted into.
+    for d in crate::page_values::derived(cx.hirs, cx.ws, cx.sigs) {
+        match hole(cx, &d) {
+            Lowering::Lowered(f) => out.functions.push(f),
+            other => refusals.push((d.declaration(), other)),
         }
     }
     out.types = type_defs(cx, &out);

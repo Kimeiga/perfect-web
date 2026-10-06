@@ -609,6 +609,34 @@ fn page_module(
     };
     let speculates = |root: &str| speculated.iter().any(|(n, ..)| n == root);
 
+    // **A value computed from a speculated one** (ADR-0226) is the host's,
+    // and would show the server's beside a list that shows the speculation:
+    // the browser computes none yet (ADR-0227).
+    let computed = lowered
+        .holes
+        .iter()
+        .filter_map(|h| Some((h.part.0, h.inputs.as_ref()?)))
+        .chain(
+            lowered
+                .reads
+                .iter()
+                .filter_map(|r| Some((r.part.0, r.inputs.as_ref()?))),
+        );
+    for (part, inputs) in computed {
+        if let Some((name, _)) = inputs
+            .iter()
+            .find(|(_, read)| speculates(read.split('.').next().unwrap_or_default()))
+        {
+            return Encoding::Unsupported {
+                construct: "a value computed from a speculated one",
+                reason: format!(
+                    "part {part} of `{page}` computes a value from `{name}`, which the page \
+                     speculates on, and the browser computes none yet (ADR-0227)"
+                ),
+            };
+        }
+    }
+
     // **What the browser renders again with a speculation** (ADR-0172):
     // each attribute, block and loop at the top of the page that reads a
     // speculated value. Until 2026-10-03 one was refused (ADR-0170), and

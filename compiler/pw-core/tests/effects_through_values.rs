@@ -85,9 +85,11 @@ fn a_function_named_as_a_value_performs_its_effects_where_it_is_named() {
         // A local bound to it: a platform function, and a program's own.
         "view V() !{} {\n    let f = clock.now\n    <p>{f()}</p>\n}",
         "view V() !{} {\n    let f = stamp\n    <p>{f(1)}</p>\n}",
-        // A helper that calls what it is given.
+        // A helper that calls what it is given. Called in a `let`: in a
+        // template's hole it is a value the template computes, which performs
+        // nothing at all (PW0334, ADR-0226), the stronger statement.
         "fn apply(f: fn(Int) -> Int) -> Int !{} { f(1) }\n\n\
-         view V() !{} {\n    <p>{apply(stamp)}</p>\n}",
+         view V() !{} {\n    let n = apply(stamp)\n    <p>{n}</p>\n}",
         // A record field that holds it.
         "type Box = Box { f: fn(Int) -> Int }\n\n\
          view V() !{} {\n    let b = Box { f: stamp }\n    <p>{b.f(1)}</p>\n}",

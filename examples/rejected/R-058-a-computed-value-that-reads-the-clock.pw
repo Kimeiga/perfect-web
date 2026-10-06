@@ -1,0 +1,44 @@
+// @corpus: rejected
+// @id: R-058
+// @category: a value the template computes that performs an effect
+// @rule: PW0334
+// @invariant: derived_not_pure
+// @charter: §7.5, §8.1
+// @milestone: 14
+// @expect-error: a value `Timeline`'s template computes performs `clock.wall`
+// @expect-error: it performs nothing, as a `derived` value does
+//
+// "3m ago" beside a post. A value a template computes is a function of the
+// values it reads, which a host runs when the page renders and again when
+// they change (ADR-0226). One that read the clock would show the time of
+// whatever changed last, so it performs nothing: the time is a value the
+// page reads, as the post is.
+
+module feed.ages
+
+import clock
+
+type Post = Post { id: String, text: String, posted: Int }
+
+fn ago(posted: Int, now: Int) -> String !{} {
+    "{now - posted} ms ago"
+}
+
+public query Latest() -> Post !{} {
+    Post { id: "p1", text: "Hello, feed.", posted: 0 }
+}
+
+page Timeline() !{ clock.wall } {
+    route "/ages"
+    cache private
+
+    let post = query Latest()
+
+    view {
+        <title>Timeline</title>
+        <main>
+            <p>{post.text}</p>
+            <p>{ago(post.posted, clock.now_wall())}</p>
+        </main>
+    }
+}

@@ -2191,6 +2191,13 @@ impl Server {
                 out.into_iter()
                     .next()
                     .ok_or_else(|| format!("{member} returned nothing"))?
+            } else if let Some(derived) = step["derived"].as_str() {
+                // A computed part's function (ADR-0226), run as a member is:
+                // pure, with the value it reads.
+                let out = self.run(derived, "", &BTreeMap::new(), &[value])?;
+                out.into_iter()
+                    .next()
+                    .ok_or_else(|| format!("{derived} returned nothing"))?
             } else {
                 return Err(format!("a step this server does not know: {step}"));
             };
@@ -3916,7 +3923,14 @@ impl Server {
                 // all of them.
                 .materialized(self.menu_part().1, &fragment);
         }
-        for part in plan["parts"].as_array().into_iter().flatten() {
+        // Each text part a host computes, and each computed attribute's value
+        // (ADR-0226), by the path the compiler names it.
+        for part in plan["parts"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .chain(plan["derived"].as_array().into_iter().flatten())
+        {
             let path = part["path"].as_str().unwrap_or_default();
             let value = self
                 .read_part(bindings, part)
@@ -10174,6 +10188,111 @@ public query Store(",
         assert!(answered.committed, "{:?}", answered.result);
         s.tell_waiting();
         assert_eq!(frames(&theirs), before, "the thread's page is sent nothing");
+    }
+
+    /// **A value the template computes is the host's, and sent when it
+    /// changes** (ADR-0226). The thread page's counts are
+    /// `counted(List.length(thread.replies), ..)` and `counted(thread.likes,
+    /// ..)`: each a function the compiler lifts out of the template, which
+    /// the host runs with the thread. A like of the post is a new thread, so
+    /// a new count of likes, and the page is sent that text alone. Until
+    /// ADR-0226 a computed hole was refused at build.
+    #[test]
+    fn a_value_the_template_computes_is_the_hosts_and_sent_when_it_changes() {
+        let s = served_feed();
+        let shown = |html: &str| {
+            let at = html.find("<p id=\"counts\">").expect("the counts");
+            let end = at + html[at..].find("</p>").expect("their end");
+            let mut text = String::new();
+            let mut rest = &html[at + "<p id=\"counts\">".len()..end];
+            while let Some(open) = rest.find("<!--") {
+                text.push_str(&rest[..open]);
+                rest = &rest[open + rest[open..].find("-->").expect("a comment's end") + 3..];
+            }
+            text + rest
+        };
+        for (id, counts) in [
+            ("p1", "1 reply · 2 likes"),
+            ("p2", "1 reply · 0 likes"),
+            ("p3", "0 replies · 1 like"),
+        ] {
+            let thread = Params::from([("id".to_string(), id.to_string())]);
+            let (html, ..) = s
+                .serve_document_settled("a", "feed.app.PostPage", &thread, &[])
+                .expect("served");
+            assert_eq!(shown(&html), counts, "{id}: {html}");
+        }
+        let thread = Params::from([("id".to_string(), "p1".to_string())]);
+        s.serve_document_settled("c", "feed.app.PostPage", &thread, &[])
+            .expect("served");
+        let theirs = latest(&s.pending.lock().expect("pending"), "c");
+        let answered = s
+            .command_answered(
+                "feed.app.like",
+                "b",
+                &[Val::String("p1".into())],
+                Some("i-1"),
+            )
+            .expect("runs");
+        assert!(answered.committed, "{:?}", answered.result);
+        s.tell_waiting();
+        let set = sets_of(&s, &theirs).pop().expect("a patch set");
+        let texts: Vec<String> = set
+            .patches
+            .iter()
+            .filter_map(|p| match &p.operation {
+                PatchOp::ReplaceText { text } => Some(text.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts, ["3 likes"], "the count that changed, alone: {set:?}");
+    }
+
+    /// **An attribute's computed value is the host's too** (ADR-0226): the
+    /// thread page's counts given a `title` computed from the thread, and
+    /// a boolean attribute. Each is written when the page renders, and set
+    /// again when a like makes the thread a new value.
+    #[test]
+    fn an_attributes_computed_value_is_the_hosts_and_set_again() {
+        let s = served_feed_with(|app| {
+            app.replace(
+                "<p id=\"counts\">",
+                "<p id=\"counts\" title={counted(thread.likes, \"like\", \"likes\")} \
+                 hidden={List.length(thread.replies) == 0}>",
+            )
+        });
+        let thread = |id: &str| Params::from([("id".to_string(), id.to_string())]);
+        let (html, ..) = s
+            .serve_document_settled("a", "feed.app.PostPage", &thread("p1"), &[])
+            .expect("served");
+        assert!(html.contains("title=\"2 likes\""), "{html}");
+        assert!(!html.contains(" hidden"), "a thread with a reply: {html}");
+        let (html, ..) = s
+            .serve_document_settled("a", "feed.app.PostPage", &thread("p3"), &[])
+            .expect("served");
+        assert!(html.contains("title=\"1 like\""), "{html}");
+        assert!(html.contains(" hidden"), "a thread with no reply: {html}");
+        s.serve_document_settled("c", "feed.app.PostPage", &thread("p1"), &[])
+            .expect("served");
+        let theirs = latest(&s.pending.lock().expect("pending"), "c");
+        s.command_answered(
+            "feed.app.like",
+            "b",
+            &[Val::String("p1".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        let set = sets_of(&s, &theirs).pop().expect("a patch set");
+        let titles: Vec<String> = set
+            .patches
+            .iter()
+            .filter_map(|p| match &p.operation {
+                PatchOp::SetAttribute { name, value } if name == "title" => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(titles, ["3 likes"], "{set:?}");
     }
 
     /// **What a commit drops of the session's own reaches no other

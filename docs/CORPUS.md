@@ -778,3 +778,38 @@ Generality at open:        42/42 invariants generality-tested
 | A-031 | added: a draft bound to a `<textarea>`, and a `<select>` whose chosen option is marked | new category, `a form control's value where HTML reads it` |
 | R-057 | added: a `<select>` bound to a signal (`PW5036`) | new category |
 | `form_control_value` | a GENERAL witness, a view's `<textarea>` given its value by a parameter, and a NEIGHBOUR one, a textarea's value as a signal and as its text, and a select's option marked `selected` | new invariant |
+
+## C16: a value the template computes, 2026-10-05
+
+Opened because the specification changed: a value a template computes
+compiles (ruling 0073-a), and performs nothing (`PW0334`, revision 2).
+[ADR-0226](DECISIONS/ADR-0226-a-value-the-template-computes-compiles.md)
+is the decision. No invariant is retired and no `@expect-error` line of an
+earlier fixture changed. Three earlier files changed, each text as it was
+kept in `examples/history/C16/`, and `corpus_history.rs` holds what each old
+text reports:
+
+- `forbidden_effect`'s valid neighbour read the wall clock in its template,
+  which a value computed there may not. It reads it in the page's body, as
+  the page renders: the same effect, recomputed per reader.
+- `task_detached`'s nested witness called `List.each`, and the cast rule's
+  clean control `decode.run`. Neither module declares one: the qualified
+  call check took an import's name for a local, and passed both. They call
+  `List.map` and a decoder function now.
+
+```text
+Corpus version:            C16
+Accepted programs:         32
+Rejected programs:         58
+Charter categories:        32/32 accepted, 58/58 rejected
+Generality at open:        43/43 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-032 | added: a page computing a count in words, a `class` and a `disabled` from a query's value | new category, `a value the template computes` |
+| R-058 | added: "3m ago" computed from the clock in a template (`PW0334`) | new category |
+| `derived_not_pure` | a GENERAL witness, a view's attribute computed through a helper that reads the clock, and a NEIGHBOUR one, the clock read in the page's body and by a handler, and values computed by a helper that performs nothing | new invariant |
+| `forbidden_effect/page-may-read-clock.pw` | the clock read in the page's body, not its template | witness corrected |
+| `task_detached/nested.pw` | `List.map`, not `List.each`, which no module declares | witness corrected |
+| `rules/annotations/decoded-not-cast.pw` | a decoder function, not `decode.run`, which `decode` does not declare | rule fixture corrected |

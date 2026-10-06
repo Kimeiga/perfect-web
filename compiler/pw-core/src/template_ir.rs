@@ -594,6 +594,9 @@ struct Indexer {
     elements: u32,
     /// The most elements any node of the template nests in.
     deepest: u32,
+    /// The template's path, which a computed part's own is named by
+    /// (ADR-0226).
+    template: String,
 }
 
 /// **A signal the template holds** (ADR-0144): a page's own, a composed
@@ -643,6 +646,10 @@ pub struct Hole {
     /// Inside an `{#each}`: an instance's, whose address carries a frame the
     /// browser does not compute (ADR-0142).
     pub framed: bool,
+    /// **A computed hole's inputs** (ADR-0226): each name its expression
+    /// reads that is bound outside it, and the path the template reads it by.
+    /// `None` for a hole that is a path.
+    pub inputs: Option<Vec<(String, String)>>,
 }
 
 /// **A value the template reads outside a text part** (ADR-0169): an
@@ -663,6 +670,8 @@ pub struct Read {
     pub origin: (usize, DeclId),
     /// Inside a block.
     pub nested: bool,
+    /// A computed attribute's inputs (ADR-0226), as a [`Hole`]'s.
+    pub inputs: Option<Vec<(String, String)>>,
 }
 
 /// What reads a [`Read`]'s value.
@@ -701,6 +710,7 @@ impl Indexer {
             at,
             origin: (ctx.unit, ctx.decl),
             nested: self.depth > 0,
+            inputs: None,
         });
     }
 }
@@ -1074,7 +1084,14 @@ pub fn lowered(
     let body = hir.body(decl.body?);
     let module = hir.module_of(id).unwrap_or_default();
     let mut chunks = Vec::new();
-    let mut ix = Indexer::default();
+    let mut ix = Indexer {
+        template: if module.is_empty() {
+            decl.name.clone()
+        } else {
+            format!("{module}.{}", decl.name)
+        },
+        ..Indexer::default()
+    };
     // Its own signals, and the signals it provides, by the names it writes:
     // the outermost body's names are its own (ADR-0144).
     let mut provided = BTreeMap::new();
@@ -1318,6 +1335,57 @@ pub(crate) fn shows_a_stream(body: &crate::hir::Body) -> bool {
     body.walk_markup(&roots)
         .into_iter()
         .any(|n| matches!(body.node(n), Node::Element { tag, .. } if tag == "stream"))
+}
+
+/// **The values a body's markup computes** (ADR-0226): each text hole, each
+/// attribute's value and each hole in an attribute's text, each condition,
+/// each `{#match}` subject and each prop a view is given, that is no path.
+/// Not what the template does not write: an event's handler and any other
+/// directive, a stream's query and the name its part binds, and a mounted
+/// resource's arguments, as the value relations read them (ADR-0074).
+pub(crate) fn computed_values(body: &Body) -> Vec<ExprId> {
+    let mut roots = Vec::new();
+    for e in body.walk() {
+        if let Expr::Template { roots: r, .. } = body.expr(e) {
+            roots.extend(r.iter().copied());
+        }
+    }
+    let mut out = Vec::new();
+    for n in body.walk_markup(&roots) {
+        match body.node(n) {
+            Node::Interpolation(e)
+            | Node::Block {
+                subject: Some(e), ..
+            }
+            | Node::Branch {
+                condition: Some(e), ..
+            } => out.push(*e),
+            Node::Element { tag, attrs, .. } if !attrs.iter().any(mounts) => {
+                for a in attrs {
+                    let AttrValue::Expr(e) = &a.value else {
+                        continue;
+                    };
+                    let directive = a
+                        .name
+                        .split_once(':')
+                        .is_some_and(|(prefix, _)| !matches!(prefix, "xml" | "xlink" | "xmlns"));
+                    if directive
+                        || (tag == "stream" && a.name == "query")
+                        || (matches!(tag.as_str(), "ready" | "failed") && a.name == "as")
+                    {
+                        continue;
+                    }
+                    match body.expr(*e) {
+                        Expr::Interpolated { parts, .. } => out.extend(parts.iter().copied()),
+                        _ => out.push(*e),
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out.retain(|e| value_path(body, *e).is_none());
+    out
 }
 
 /// **Does a view contain itself** (ADR-0203), through the views it uses?
@@ -1623,15 +1691,51 @@ pub fn value_path_of(body: &Body, e: ExprId) -> Option<String> {
     value_path(body, e)
 }
 
-/// What a hole holds when it is not a path, for the reason it is refused.
-fn computed(body: &Body, e: ExprId) -> &'static str {
-    match body.expr(e) {
-        Expr::Call { .. } => "a call",
-        Expr::Binary { .. } | Expr::Unary { .. } => "an operation",
-        Expr::Literal(_) | Expr::Interpolated { .. } => "a literal",
-        Expr::Field { .. } => "a field of a computed value",
-        _ => "a computed value",
+/// **What a computed hole reads** (ADR-0226): each name its expression
+/// writes that is bound outside it, once, in the order first written, with
+/// the path the template reads it by. A query's binding, a signal, a loop's
+/// item, a view's parameter. A name bound inside it, a function's parameter,
+/// a block's `let` or a match arm's, is its own; one no local binds is a
+/// declaration's, a function it calls, unless it is a module's signal.
+fn inputs_of(body: &Body, e: ExprId, ctx: &Lowering<'_>) -> Vec<(String, String)> {
+    let Some(lexical) = crate::lexical::Lexical::build_in(ctx.hirs[ctx.unit], ctx.decl) else {
+        return Vec::new();
+    };
+    // Every pattern bound inside it, and each pattern within those.
+    let mut inner = BTreeSet::new();
+    let mut stack = Vec::new();
+    for x in body.walk_from(e) {
+        match body.expr(x) {
+            Expr::Lambda { params, .. } => stack.extend(params.iter().copied()),
+            Expr::Let { pat: Some(p), .. } | Expr::For { pat: Some(p), .. } => stack.push(*p),
+            Expr::Match { arms, .. } => stack.extend(arms.iter().map(|a| a.pat)),
+            _ => {}
+        }
     }
+    while let Some(p) = stack.pop() {
+        if inner.insert(p) {
+            match body.pat(p) {
+                crate::hir::Pattern::Ctor { args, .. } => stack.extend(args.iter().copied()),
+                crate::hir::Pattern::Or(alts) => stack.extend(alts.iter().copied()),
+                _ => {}
+            }
+        }
+    }
+    let mut out: Vec<(String, String)> = Vec::new();
+    for x in body.walk_from(e) {
+        let Expr::Name(n) = body.expr(x) else {
+            continue;
+        };
+        let outside = match lexical.binder(x) {
+            Some(crate::lexical::Binder::Pattern(p)) => !inner.contains(&p),
+            Some(_) => true,
+            None => ctx.signals.contains(n),
+        };
+        if outside && !out.iter().any(|(m, _)| m == n) {
+            out.push((n.clone(), ctx.read(n.clone())));
+        }
+    }
+    out
 }
 
 fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out: &mut Vec<Chunk>) {
@@ -1648,6 +1752,7 @@ fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out
                     origin: (ctx.unit, ctx.decl),
                     nested: ix.depth > 0,
                     framed: ix.frames > 0,
+                    inputs: None,
                 });
                 Part::Text {
                     id,
@@ -1655,13 +1760,28 @@ fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out
                     context: Context::Text,
                 }
             }
-            None => Part::Blocked {
-                reason: format!(
-                    "a template hole is read by path, and this is {}",
-                    computed(body, *e)
-                ),
-                at: "{..}".to_string(),
-            },
+            // **A computed hole** (ADR-0226, ruling 0073-a): read by a path
+            // the compiler names, `#{template}~{part}`, which no source can
+            // write, and given its value by what computes it. Until ADR-0226
+            // it was refused here: "a template hole is read by path".
+            None => {
+                let id = ix.part();
+                let value = format!("#{}~{}", ix.template, id.0);
+                ix.holes.push(Hole {
+                    part: id,
+                    path: value.clone(),
+                    expr: *e,
+                    origin: (ctx.unit, ctx.decl),
+                    nested: ix.depth > 0,
+                    framed: ix.frames > 0,
+                    inputs: Some(inputs_of(body, *e, ctx)),
+                });
+                Part::Text {
+                    id,
+                    value,
+                    context: Context::Text,
+                }
+            }
         })),
         Node::Element {
             tag,
@@ -1989,21 +2109,22 @@ fn lower_element(
                 }
             }
             AttrValue::Expr(e) => {
-                let Some(value) = value_path(body, *e).map(|v| ctx.read(v)) else {
-                    out.push(Chunk::Dynamic(Part::Blocked {
-                        reason: format!(
-                            "`{}` is read by path, and this is {}",
-                            a.name,
-                            computed(body, *e)
-                        ),
-                        at: format!("{}={{..}}", a.name),
-                    }));
-                    continue;
-                };
                 out.push(Chunk::Static(" ".to_string()));
                 let owner = owner.expect("an element with a dynamic attribute owns an identity");
                 let id = ix.part();
+                // A path, or a computed value read by the path the compiler
+                // names it (ADR-0226), as a computed hole is.
+                let (value, inputs) = match value_path(body, *e).map(|v| ctx.read(v)) {
+                    Some(value) => (value, None),
+                    None => (
+                        format!("#{}~{}", ix.template, id.0),
+                        Some(inputs_of(body, *e, ctx)),
+                    ),
+                };
                 ix.read(id, &value, ReadKind::Attribute, ReadAt::Expr(*e), ctx);
+                if let Some(read) = ix.reads.last_mut() {
+                    read.inputs = inputs;
+                }
                 if BOOLEAN_ATTRIBUTES.contains(&a.name.as_str()) {
                     out.push(Chunk::Dynamic(Part::BooleanAttribute {
                         id,
@@ -2152,6 +2273,13 @@ fn compose(
             out.push(blocked(format!(
                 "`<{tag}>` contains itself and shows a query's state in a `<stream>`, and a \
                  view that contains itself shows none yet"
+            )));
+            return;
+        }
+        if !computed_values(view).is_empty() {
+            out.push(blocked(format!(
+                "`<{tag}>` contains itself and computes a value in its template, and a view \
+                 that contains itself computes none yet (ADR-0228)"
             )));
             return;
         }
@@ -2578,9 +2706,12 @@ fn interpolated_attribute(
         let Some(hole) = holes.next() else {
             return blocked("a hole in the attribute did not parse");
         };
+        // A computed one is the attribute's whole value (ADR-0226), which a
+        // host computes as it does a hole between tags.
         let Some(path) = value_path(body, *hole) else {
             return blocked(
-                "a hole in an attribute must be a value path, as `{..}` between tags is",
+                "a hole in an attribute's text is a value path, and a computed value is \
+                 written as the attribute's whole value, `name={..}` (ADR-0226)",
             );
         };
         let path = ctx.read(path);

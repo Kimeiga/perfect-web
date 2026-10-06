@@ -14,6 +14,19 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0226, 2026-10-05: a value the template computes compiles** (ruling
+0073-a, the host's part). A template read each value by path, and
+`{counted(List.length(thread.replies), ..)}` or `disabled={..}` checked and
+did not build. Now a text hole or an attribute's whole value may compute
+from one query's value at the top of a page. The compiler lifts it into a
+function, a component of its own, read by a path it names. The host runs it
+when the page renders and again when the value changes, sending what
+changed alone. It performs nothing (PW0334, revision 2). The feed's thread
+page shows "1 reply · 2 likes", with scripts off too, and another session's
+like reaches an open thread. Corpus C16; generality is 43 / 43. Found: a
+member an imported module lacks, `String.nope(s)`, checked clean, and two
+corpus files called one (`just e14-computed-holes`).
+
 **ADR-0225, 2026-10-05: a `String`'s length is an invariant** (the feed's
 length limit). An opaque type's invariant was bounds on an `Int`, and a
 post's text could be empty or a book. `opaque type PostText = String where

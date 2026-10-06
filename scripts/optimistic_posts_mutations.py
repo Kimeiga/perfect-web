@@ -29,8 +29,10 @@ MUTANTS = [
     (
         "a key left unnamed is a name that does not resolve",
         CHECK,
-        "                if wildcards.contains(&nid) {\n",
-        "                if false && wildcards.contains(&nid) {\n",
+        # Re-anchored by ADR-0226, which skips a module a path starts with
+        # there too.
+        "                if wildcards.contains(&nid) || heads.contains(&nid) {\n",
+        "                if false && wildcards.contains(&nid) || heads.contains(&nid) {\n",
     ),
     (
         "`_` is unnamed wherever a policy writes it",

@@ -606,6 +606,10 @@ pub struct World {
     /// The exported interface's functions, as the WIT names them, in contract
     /// export order.
     pub functions: Vec<String>,
+    /// **A computed part's function** (ADR-0226): its lowered function's
+    /// name, which a backend finds it by beside the declaration it is of.
+    /// `None` for a declaration's own component.
+    pub derived: Option<String>,
 }
 
 /// The interface name for a component's exports.
@@ -693,6 +697,16 @@ pub fn package(
         }
     }
 
+    // The functions a host computes a computed part by (ADR-0226), by their
+    // contracts' ids: no declaration is one, so each is typed by what it
+    // takes and answers, and found by its name beside the declaration its
+    // expression is written in.
+    let derived: BTreeMap<String, crate::page_values::Derived> =
+        crate::page_values::derived(hirs, ws, &sigs)
+            .into_iter()
+            .map(|d| (d.component_id.clone(), d))
+            .collect();
+
     let mut worlds = Vec::new();
     let mut apis: Vec<Api> = Vec::new();
     for c in contracts {
@@ -719,20 +733,27 @@ pub fn package(
         // One contract per DECLARATION, so the export's signature is the
         // component's own declaration — looked up by the path `contracts()`
         // built the id from, not reconstructed.
-        let declaration = decls
-            .get(&c.component_id)
-            .map(|(def, _)| *def)
-            .ok_or_else(|| WitError::Unmappable {
-                ty: "missing component declaration".into(),
-                at: c.component_id.clone(),
-            })?;
-        let sig = sigs
-            .by_def(declaration)
-            .map(Interface::from)
-            .ok_or_else(|| WitError::Unmappable {
-                ty: "missing component signature".into(),
-                at: c.component_id.clone(),
-            })?;
+        let (declaration, sig, lifted) = match derived.get(&c.component_id) {
+            Some(d) => (d.declaration(), d.interface(), Some(d.export())),
+            None => {
+                let declaration =
+                    decls
+                        .get(&c.component_id)
+                        .map(|(def, _)| *def)
+                        .ok_or_else(|| WitError::Unmappable {
+                            ty: "missing component declaration".into(),
+                            at: c.component_id.clone(),
+                        })?;
+                let sig = sigs
+                    .by_def(declaration)
+                    .map(Interface::from)
+                    .ok_or_else(|| WitError::Unmappable {
+                        ty: "missing component signature".into(),
+                        at: c.component_id.clone(),
+                    })?;
+                (declaration, sig, None)
+            }
+        };
         let mut funcs = Vec::new();
         let mut used: BTreeSet<String> = BTreeSet::new();
         for e in &c.exports {
@@ -756,6 +777,7 @@ pub fn package(
                 .iter()
                 .map(|e| component_export(&c.component_id, &e.name).function)
                 .collect(),
+            derived: lifted,
         });
     }
 

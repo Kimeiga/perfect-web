@@ -1909,3 +1909,11 @@ ADR-0179).
   String.length(value) <= 280`: bounds on a length in code points, as
   `String.length` counts it. Every construction is shown to hold them at
   build, and a host holds a browser's post to them. The feed's post is one.
+[ADR-0226](DECISIONS/ADR-0226-a-value-the-template-computes-compiles.md): a
+value the template computes compiles (ruling 0073-a, the host's part; the
+feed's counts).
+- A text hole or an attribute's whole value may compute from one query's
+  value at the top of a page. The compiler lifts it into a function, a
+  component of its own, which the host runs when the page renders and again
+  when the value changes. It performs nothing (PW0334, revision 2). Found:
+  a member an imported module lacks resolved, and checked clean.

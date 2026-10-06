@@ -69,10 +69,11 @@ MUTANTS = [
         "an attribute's value is not a read",
         "core",
         TEMPLATE_IR,
-        # Re-anchored by ADR-0221, whose textarea writes one more, deeper.
-        "                let id = ix.part();\n"
+        # Re-anchored by ADR-0221, whose textarea writes one more, deeper,
+        # and by ADR-0226, whose computed value is named before it is read.
+        "                };\n"
         "                ix.read(id, &value, ReadKind::Attribute, ReadAt::Expr(*e), ctx);\n",
-        "                let id = ix.part();\n",
+        "                };\n",
     ),
     (
         "a value written in an attribute is not a read",

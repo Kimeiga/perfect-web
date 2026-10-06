@@ -119,6 +119,16 @@ fn pending(feed: List<Item>, text: PostText) -> List<Item> !{} {
     List.concat([Item { id: id, author: you, text: text.value, likes: 0 }], feed)
 }
 
+// **A count, in words** (ADR-0226): "1 reply", "3 likes". The thread
+// page computes its counts with it, in the template.
+fn counted(n: Int, one: String, many: String) -> String !{} {
+    if n == 1 {
+        "1 {one}"
+    } else {
+        "{n} {many}"
+    }
+}
+
 command like(post: PostId) -> Result<Post, FeedError>
     requires      SignedIn
     idempotent_by InteractionId
@@ -193,6 +203,7 @@ page PostPage(id: PostId) {
         <title>Post</title>
         <main>
             <Replies post={thread} />
+            <p id="counts">{counted(List.length(thread.replies), "reply", "replies")} · {counted(thread.likes, "like", "likes")}</p>
         </main>
     }
 }

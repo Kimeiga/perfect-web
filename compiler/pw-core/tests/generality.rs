@@ -549,10 +549,11 @@ fn generality_is_reported_separately_from_conformance() {
     // `no_finite_value`. 41 / 41 the same day: ADR-0197's
     // `case_name_capitalized`, and `pattern_constructor`, whose misspelt
     // case it made a refusal. 42 / 42 the same day: ADR-0221's
-    // `form_control_value`.
+    // `form_control_value`. 43 / 43 the same day: ADR-0226's
+    // `derived_not_pure`, a value a template computes.
     assert_eq!(
         (general.len(), narrow.len(), untested.len()),
-        (42, 0, 0),
+        (43, 0, 0),
         "the published figure moved. If that is intended, update
          docs/STATUS.md and docs/NEXT.md in the same commit — a number in a
          status report that no test holds is a number that drifts."

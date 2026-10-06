@@ -587,9 +587,15 @@ fn unresolved_uses(
     use crate::resolve::Resolution;
 
     let mut out = Vec::new();
-    // A declaration can call itself and its siblings.
-    let declared: std::collections::BTreeSet<String> =
-        hir.all_decls().map(|(_, d)| d.name.clone()).collect();
+    // A declaration can call itself and its siblings. An `import` binds
+    // nothing by its name, as the name check reads it: until ADR-0226 it put
+    // its module's name in scope here, so `String.nope(s)` was a local's
+    // field and checked clean wherever `String` was imported.
+    let declared: std::collections::BTreeSet<String> = hir
+        .all_decls()
+        .filter(|(_, d)| d.kind != crate::hir::DeclKind::Import)
+        .map(|(_, d)| d.name.clone())
+        .collect();
     for (decl_id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
@@ -644,11 +650,26 @@ fn unresolved_uses(
             // the speculation reaches the entry the page shows, whatever its
             // key there (ADR-0222, ruling 0105-a).
             let wildcards = target_wildcards(body, root);
+            // A module a path starts with, `Carts` in `Carts.with_line(..)`,
+            // is no term: the path is the qualified call's, below. Until
+            // ADR-0226 an import's name was in scope here, which is what let
+            // it pass, and every member of an imported module with it.
+            let heads: BTreeSet<ExprId> = body
+                .walk_from(root.root)
+                .into_iter()
+                .filter_map(|x| match body.expr(x) {
+                    Expr::Field { base, .. } => match body.expr(*base) {
+                        Expr::Name(h) if workspace.sees_module(unit, h) => Some(*base),
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .collect();
             for nid in body.walk_from(root.root) {
                 let Expr::Name(n) = body.expr(nid) else {
                     continue;
                 };
-                if wildcards.contains(&nid) {
+                if wildcards.contains(&nid) || heads.contains(&nid) {
                     continue;
                 }
                 if scope.contains(n)
@@ -9169,6 +9190,9 @@ fn effect_rows(
     // query dependency, a named declaration, a streamed region, a handler and
     // a later frame phase are the same fact seen six ways.
     let regions = crate::contexts::elsewhere(body);
+    // A value the template computes performs nothing, wherever it is
+    // rendered (below).
+    let every = found.sources.clone();
     found
         .sources
         .retain(|s| crate::contexts::effects_belong_here(&regions, &s.span));
@@ -9291,6 +9315,62 @@ fn effect_rows(
                 replacement: None,
             }],
         });
+    }
+
+    // **A value the template computes performs no effect** (ADR-0226, ruling
+    // 0073-a). The compiler lifts each into a function of the values it
+    // reads, which a host runs when the page renders and again when they
+    // change, so an effect in one would happen then, and not when it should.
+    // In a streamed region's arm too, which renders when its query settles.
+    // Not an escape hatch's, which its audit record decides (below), and
+    // not one already said to be forbidden here. Not in a page generated at
+    // build either: it renders once, and what it reads is the build's input,
+    // which a build renders and no host computes (ADR-0226 refuses it there).
+    let computed = match reuse {
+        Reuse::Build => Vec::new(),
+        Reuse::PerReader | Reuse::SharedPartition => crate::template_ir::computed_values(body),
+    };
+    for value in computed {
+        let region = body.expr_span(value);
+        for source in every
+            .iter()
+            .filter(|s| s.span.start >= region.start && s.span.end <= region.end)
+        {
+            if crate::effects::family_of(&source.effect) == "unsafe"
+                || !reported.insert(source.effect.clone())
+            {
+                continue;
+            }
+            out.push(Diagnostic {
+                code: crate::codes::DERIVED_NOT_PURE.id,
+                invariant: crate::codes::DERIVED_NOT_PURE.invariant,
+                reason: "computed_value_performs_effects",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: format!(
+                    "a value `{}`'s template computes performs `{}`",
+                    decl.name, source.effect
+                ),
+                primary_span: source.span.clone(),
+                related: vec![Related {
+                    span: region.clone(),
+                    label: "the template computes this value".to_string(),
+                }],
+                explanation: Some(format!(
+                    "A value a template computes is a function of the values it reads: the \
+                     compiler lifts it out, and a host runs it when the page renders and \
+                     again when they change (ADR-0226). It performs nothing, as a `derived` \
+                     value does (charter §7.5). {}.",
+                    source.via.describe()
+                )),
+                repairs: vec![Repair {
+                    description: "read it in a query, and write the query's value in the \
+                                  template"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
+        }
     }
 
     // Charter §8.2, §17.5: an escape hatch needs an audit record, and a

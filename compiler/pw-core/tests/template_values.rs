@@ -12,9 +12,13 @@
 //! - a loop's key was read by its last segment, so `(k.r.id)` keyed on `k.id`
 //!   and `(item.id)` in a loop over `x` on `x.id`.
 //!
-//! A computed hole is valid Pleris, which this backend cannot render, so it
-//! checks and does not build. A key read from another name is wrong in any
-//! backend (PW5021). Each test states one case, with a control.
+//! A computed hole is valid Pleris. Until ADR-0226 this backend could not
+//! render one, so it checked and did not build; since, a text hole and an
+//! attribute's whole value are read by a path the compiler names, and a host
+//! computes them (`computed_holes.rs`). A computed condition, a hole in an
+//! attribute's text and a computed list still do not build. A key read from
+//! another name is wrong in any backend (PW5021). Each test states one case,
+//! with a control.
 
 use pw_core::check::{Unit, check_sources};
 use pw_core::lower::lower_file;
@@ -73,25 +77,12 @@ fn view(markup: &str) -> String {
 #[test]
 fn a_computed_hole_checks_and_does_not_build() {
     for (markup, why) in [
-        (
-            "<p>{n + 1}</p>",
-            "a template hole is read by path, and this is an operation",
-        ),
-        (
-            "<p>{mk().a}</p>",
-            "a template hole is read by path, and this is a field of a computed value",
-        ),
-        (
-            "<p title={\"lit\"}>x</p>",
-            "`title` is read by path, and this is a literal",
-        ),
-        (
-            "<button type=\"button\" disabled={!b}>x</button>",
-            "`disabled` is read by path, and this is an operation",
-        ),
+        // A text hole and an attribute's whole value build since ADR-0226,
+        // below.
         (
             "<a href=\"/x/{r.a + 1}\">x</a>",
-            "a hole in an attribute must be a value path",
+            "a hole in an attribute's text is a value path, and a computed value is \
+             written as the attribute's whole value",
         ),
         (
             "{#if !b}<p>x</p>{/if}",
@@ -115,6 +106,29 @@ fn a_computed_hole_checks_and_does_not_build() {
             Ok(_) => panic!("{markup} built"),
             Err(e) => assert!(e.contains(why), "{markup}: {e}"),
         }
+    }
+    // **A text hole and an attribute's whole value build** (ADR-0226): each
+    // read by the path the compiler names, which a page's plan computes.
+    for markup in [
+        "<p>{n + 1}</p>",
+        "<p>{mk().a}</p>",
+        "<p title={\"lit\"}>x</p>",
+        "<button type=\"button\" disabled={!b}>x</button>",
+    ] {
+        let src = view(markup);
+        let found = reported(&src);
+        assert!(found.is_empty(), "{markup}: {found:#?}");
+        let built = pw_core::build::build(&units(&src)).unwrap_or_else(|e| panic!("{markup}: {e}"));
+        let v = built
+            .templates
+            .iter()
+            .find(|t| t.path == "t.V")
+            .expect("t.V");
+        assert!(
+            format!("{:?}", v.chunks).contains("\"#t.V~"),
+            "{markup}: {:?}",
+            v.chunks
+        );
     }
     // The same values, read by path, build.
     for markup in [

@@ -236,12 +236,13 @@ fn every_accepted_corpus_resource_produces_a_manifest_the_schema_understands() {
         }
     }
 
-    // The accepted corpus declares exactly 9: four queries (two of them
-    // A-029's, a reply thread, since corpus C13), a session query, two
+    // The accepted corpus declares exactly 10: five queries (two of them
+    // A-029's, a reply thread, since corpus C13, and one A-032's, a thread
+    // whose page computes its counts, since C16), a session query, two
     // commands, a subscription and a resource. Pinned, so a lowering that
     // stopped recognising one of the five declaration kinds fails here rather
     // than quietly shrinking the sample.
-    assert_eq!(total, 9, "expected every accepted resource declaration");
+    assert_eq!(total, 10, "expected every accepted resource declaration");
     assert!(
         unparsed.is_empty(),
         "{} policy value(s) the schema does not understand:\n{}",

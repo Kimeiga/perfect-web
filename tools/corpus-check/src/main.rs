@@ -62,6 +62,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "cases and bindings told apart by their capital",
     // ADR-0221, corpus C15: a form control's value where HTML reads it.
     "a form control's value where HTML reads it",
+    // ADR-0226, corpus C16: a value the template computes.
+    "a value the template computes",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -144,6 +146,8 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a misspelt case in a pattern",
     // ADR-0221, corpus C15: PW5036.
     "a select's value written as an attribute",
+    // ADR-0226, corpus C16: PW0334, revision 2.
+    "a value the template computes that performs an effect",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

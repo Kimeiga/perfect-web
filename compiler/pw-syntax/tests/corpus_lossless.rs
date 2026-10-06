@@ -82,24 +82,45 @@ fn every_corpus_file_has_gapless_contiguous_spans() {
     }
 }
 
+/// The `Unknown` tokens in the tree the compiler reads: a character the
+/// grammar has no rule for, where it is.
+fn unknown_in(src: &str) -> Vec<(String, std::ops::Range<usize>)> {
+    pw_syntax::parse_tree(src)
+        .green
+        .descendants_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| t.kind() == pw_syntax::SyntaxKind::Unknown)
+        .map(|t| {
+            let range = t.text_range();
+            (
+                t.text().to_string(),
+                usize::from(range.start())..usize::from(range.end()),
+            )
+        })
+        .collect()
+}
+
 #[test]
 fn no_corpus_file_produces_unknown_tokens() {
-    // An `Unknown` token means the lexer met a byte it has no rule for. In a
-    // *specification* corpus that is a signal the grammar is missing something,
-    // so it is worth failing on rather than tolerating.
+    // An `Unknown` token means the grammar met a character it has no rule
+    // for. In a *specification* corpus that is a signal the grammar is missing
+    // something, so it is worth failing on rather than tolerating.
+    //
+    // Asked of the tree the compiler reads, not of the lexer's tokens. Since
+    // ADR-0167 the parser reads markup's text again, where any character is
+    // text: `·`, `—` or an emoji as much as a letter. The lexer does not know
+    // markup and has no rule for them, and until corpus C16 no fixture wrote
+    // one between tags (A-032's "1 reply · 2 likes", ADR-0226).
     let mut offenders = Vec::new();
     for path in corpus_files() {
         let src = std::fs::read_to_string(&path).expect("read corpus file");
-        for t in lex(&src) {
-            if t.kind == Kind::Unknown {
-                offenders.push(format!(
-                    "{}: {:?} at {}..{}",
-                    path.file_name().unwrap().to_string_lossy(),
-                    &src[t.span.clone()],
-                    t.span.start,
-                    t.span.end
-                ));
-            }
+        for (text, span) in unknown_in(&src) {
+            offenders.push(format!(
+                "{}: {text:?} at {}..{}",
+                path.file_name().unwrap().to_string_lossy(),
+                span.start,
+                span.end
+            ));
         }
     }
     assert!(
@@ -107,6 +128,18 @@ fn no_corpus_file_produces_unknown_tokens() {
         "unknown tokens:\n{}",
         offenders.join("\n")
     );
+}
+
+/// The check above can fail: a character with no rule is `Unknown` in code,
+/// and text between tags.
+#[test]
+fn a_character_with_no_rule_is_unknown_in_code_and_text_in_markup() {
+    let code = "module t\n\nfn f() -> Int !{} {\n    1 · 2\n}\n";
+    assert_eq!(unknown_in(code), [("·".to_string(), 36..38)]);
+    let markup = "module t\n\nview V() !{} {\n    <p>1 reply · 2 likes, 🎉</p>\n}\n";
+    assert_eq!(unknown_in(markup), []);
+    // The lexer alone, which does not know markup, has no rule for either.
+    assert!(lex(markup).iter().any(|t| t.kind == Kind::Unknown));
 }
 
 #[test]

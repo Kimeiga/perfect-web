@@ -2,10 +2,11 @@
 """Mutation controls for ADR-0073: a template reads each value by path.
 
 Each mutant undoes one piece of how a template's values are read: a computed
-hole lowered as a blocked part, `pw build` refusing a blocked part, a
-directive other than `on:`, and a loop's key read as the path from its
-element, by the checker, the template IR and the renderer. The template-value
-tests or the renderer's key tests must then fail.
+hole read by the path the compiler names (ADR-0226; until then lowered as a
+blocked part), `pw build` refusing a blocked part, a directive other than
+`on:`, and a loop's key read as the path from its element, by the checker,
+the template IR and the renderer. The template-value tests or the renderer's
+key tests must then fail.
 
 Run from the repository root; `just e10-template-values` records the output.
 The source is restored after every mutant, whatever happens.
@@ -39,8 +40,10 @@ MUTANTS = [
     (
         "a computed attribute lowers with an empty path",
         IR,
-        "                let Some(value) = value_path(body, *e).map(|v| ctx.read(v)) else {",
-        "                let Some(value) = Some(crate::infer::path_of(body, *e)) else {",
+        # Re-anchored by ADR-0226: a computed attribute is read by the path the
+        # compiler names, where it was refused.
+        "                let (value, inputs) = match value_path(body, *e).map(|v| ctx.read(v)) {",
+        "                let (value, inputs) = match Some(crate::infer::path_of(body, *e)) {",
     ),
     (
         "a field of a computed value is a path",

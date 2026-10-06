@@ -1389,6 +1389,17 @@ impl<'a> P<'a> {
             {
                 break;
             }
+            // A character the lexer has no rule for is text here, `·`, `—`
+            // or an emoji as much as a letter, as HTML reads any character
+            // between tags. In code it stays `Unknown`, an error there. Until
+            // ADR-0226 it was `Unknown` here too, in the tree the compiler
+            // reads: A-032's "1 reply · 2 likes".
+            if self.at(Kind::Unknown)
+                && let Some(i) =
+                    (self.pos..self.toks.len()).find(|&i| !self.toks[i].kind.is_trivia())
+            {
+                self.toks[i].kind = Kind::MarkupText;
+            }
             self.bump();
             moved = true;
         }

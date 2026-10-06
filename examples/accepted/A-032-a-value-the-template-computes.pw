@@ -1,0 +1,56 @@
+// @corpus: accepted
+// @id: A-032
+// @category: a value the template computes
+// @charter: §8.1
+// @milestone: 14
+//
+// A template computes what it shows from the values it reads: a count in
+// words, a boolean attribute, an attribute's value. The compiler lifts each
+// into a function of what it reads, which performs nothing, and a host runs
+// it when the page renders and again when those values change (ADR-0226).
+
+module feed.counts
+
+import List
+
+type Reply = Reply { id: String, text: String }
+
+type Post = Post { id: String, text: String, likes: Int, replies: List<Reply> }
+
+// A count in words: "1 reply", "3 likes".
+fn counted(n: Int, one: String, many: String) -> String !{} {
+    if n == 1 {
+        "1 {one}"
+    } else {
+        "{n} {many}"
+    }
+}
+
+// How a post is shown: a liked one apart.
+fn tone(likes: Int) -> String !{} {
+    if likes > 0 {
+        "liked"
+    } else {
+        "quiet"
+    }
+}
+
+public query Thread(id: String) -> Post !{} {
+    Post { id: id, text: "Hello, feed.", likes: 2, replies: [Reply { id: "r1", text: "Hello." }] }
+}
+
+page Counts(id: String) {
+    route "/counts/{id}"
+    cache private
+
+    let post = query Thread(id)
+
+    view {
+        <title>Counts</title>
+        <main>
+            <p class={tone(post.likes)}>{post.text}</p>
+            <p>{counted(List.length(post.replies), "reply", "replies")} · {counted(post.likes, "like", "likes")}</p>
+            <button type="button" disabled={List.length(post.replies) == 0}>Show replies</button>
+        </main>
+    }
+}

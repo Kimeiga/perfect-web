@@ -1,10 +1,6 @@
 // @status: GENERAL
 // @invariant: task_detached
 // @dimension: nesting — inside a lambda inside a handler
-//
-// The lambda is `List.map`'s. Until corpus C16 it was `List.each`'s, which
-// no module declares, and which checked clean because the qualified call
-// check took an import's name for a local (ADR-0226).
 module generality.task_nested
 
 import Analytics
@@ -14,7 +10,7 @@ import domain.{ MenuItemId }
 view Feed(items: List<MenuItemId>) !{} {
     <ul>
         <li>
-            <button on:press={() => List.map(items, i => {
+            <button on:press={() => List.each(items, i => {
                 task.spawn(detached) { Analytics.record_view(i) }
             })}>All</button>
         </li>

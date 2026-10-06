@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: derived_not_pure
+//
+// Structurally different from R-058: in a view, not a page; in an
+// attribute's value, not between tags; and through a helper that reads the
+// clock for it, which the view's row admits.
+
+module generality.computed_attribute_clock
+
+import clock
+
+fn stamped(label: String) -> String !{ clock.read } {
+    "{label}, {clock.now()}"
+}
+
+view Stamp(label: String) !{ clock.read } {
+    <p title={stamped(label)}>{label}</p>
+}

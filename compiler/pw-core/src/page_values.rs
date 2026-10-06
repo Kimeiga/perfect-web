@@ -146,6 +146,60 @@ pub enum Step {
     Field(String),
     /// A member function, called with the value: its component id.
     Member(String),
+    /// **A computed hole's function** (ADR-0226), called with the value it
+    /// reads: its component id.
+    Derived(String),
+}
+
+/// **A computed part a host computes** (ADR-0226, ruling 0073-a): the pure
+/// function the compiler lifts its expression into, compiled as a component
+/// of its own, and run with the one value it reads.
+#[derive(Debug, Clone)]
+pub struct Derived {
+    /// Its component's id: `feed.app.PostPage.derived_3`. No declaration
+    /// can be named so: the page is no module.
+    pub component_id: String,
+    /// The page whose part it is.
+    pub page: DefId,
+    pub part: u32,
+    /// Where its expression is written: the page's body, or a view's
+    /// composed in it.
+    pub origin: (usize, DeclId),
+    pub expr: ExprId,
+    /// Its input: the name its expression reads it by, and its type there.
+    pub input: (String, ResolvedType),
+    /// What it computes.
+    pub result: ResolvedType,
+}
+
+impl Derived {
+    /// Its function's name, as the program's lowering names it: with a `$`,
+    /// which no declaration's name has, and a JavaScript name may.
+    pub fn export(&self) -> String {
+        format!("derived${}", self.part)
+    }
+
+    /// The declaration its expression is written in, which its lowered
+    /// function is of.
+    pub fn declaration(&self) -> DefId {
+        DefId {
+            unit: self.origin.0,
+            decl: self.origin.1.0,
+        }
+    }
+
+    /// What it takes and answers, as a contract's and a world's export is
+    /// typed.
+    pub fn interface(&self) -> crate::binding::Interface {
+        crate::binding::Interface {
+            params: vec![Some(crate::resolved::TypeResolution::Resolved(
+                self.input.1.clone(),
+            ))],
+            returns: Some(crate::resolved::TypeResolution::Resolved(
+                self.result.clone(),
+            )),
+        }
+    }
 }
 
 /// One text part outside any block: what it shows.
@@ -280,6 +334,14 @@ fn rendered_again(
         };
         match reach {
             Reach::Live(bound) => {
+                // A value the template computes is read by a path no source
+                // writes (ADR-0226): said for what it is.
+                if own.iter().any(|v| v.starts_with('#')) {
+                    return Err(format!(
+                        "part {id} computes a value inside a block a signal decides, and the \
+                         browser, which renders that block again, computes none yet (ADR-0227)"
+                    ));
+                }
                 if let Some(other) = own.iter().find(|v| !signal(v) && !bound.contains(&root(v))) {
                     return Err(format!(
                         "part {id} reads `{other}` inside a block a signal decides, and the \
@@ -603,6 +665,11 @@ pub struct PageValues {
     /// block, and one in a row with its row.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attributes: Vec<u32>,
+    /// **Each computed attribute's value** (ADR-0226), by the path the
+    /// compiler names it: a host computes it into what the page is rendered
+    /// with, and sets the attribute again as it sets any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub derived: Vec<Part>,
     /// **Each element at the top of the page whose handlers capture a
     /// query's value** (ADR-0217), by its first handler's part: a host sets
     /// its captures again when the value changes.
@@ -1116,9 +1183,11 @@ fn plan(
     sigs: &Signatures,
     // What each handler captures (ADR-0137): the document holds it.
     captures: &crate::template_ir::Handlers,
+    // What each body performs, which a computed part may not (ADR-0226).
+    inference: &crate::effects::Inference<'_>,
     unit: usize,
     id: DeclId,
-) -> Result<(PageValues, BTreeSet<DefId>), String> {
+) -> Result<(PageValues, BTreeSet<DefId>, Vec<Derived>), String> {
     let hir = hirs[unit];
     let decl = hir.decl(id);
     let body = hir.body(
@@ -1197,6 +1266,10 @@ fn plan(
     let mut live = Vec::new();
     let mut parts = Vec::new();
     let mut members = BTreeSet::new();
+    // What a host computes for a computed part (ADR-0226).
+    let mut computed: Vec<Derived> = Vec::new();
+    let mut derived_values: Vec<Part> = Vec::new();
+    let page_def = DefId { unit, decl: id.0 };
     // The page's template, each view it uses composed in place (ADR-0136):
     // what the build renders, numbered as the build numbers it.
     let crate::template_ir::Lowered {
@@ -1222,6 +1295,28 @@ fn plan(
     let mut rows: Vec<RowRead> = Vec::new();
     let mut typed = BTreeMap::new();
     for hole in holes {
+        // **A computed hole** (ADR-0226): computed by a host, from the one
+        // query's value it reads at the top of the page.
+        if let Some(inputs) = &hole.inputs {
+            let (derived, part) = computed_part(
+                hirs,
+                ws,
+                sigs,
+                inference,
+                &found,
+                &signals,
+                (&page, page_def),
+                hole.part.0,
+                &hole.path,
+                (hole.origin, hole.expr),
+                inputs,
+                hole.nested,
+                &mut members,
+            )?;
+            parts.push(part);
+            computed.push(derived);
+            continue;
+        }
         // The path as the template reads it, through each view around it.
         let mut segments = hole.path.split('.').map(str::to_string);
         let Some(root) = segments.next() else {
@@ -1347,6 +1442,31 @@ fn plan(
     // list. Until 2026-10-03 none was planned or refused, and a page that
     // read one built, then failed to render.
     for read in &others {
+        // A computed attribute (ADR-0226): its value is computed by a host,
+        // as a computed hole's is, and the attribute set again as any is.
+        if let Some(inputs) = &read.inputs {
+            let crate::template_ir::ReadAt::Expr(expr) = read.at else {
+                return Err(format!("part {} computes no expression", read.part.0));
+            };
+            let (derived, part) = computed_part(
+                hirs,
+                ws,
+                sigs,
+                inference,
+                &found,
+                &signals,
+                (&page, page_def),
+                read.part.0,
+                &read.path,
+                (read.origin, expr),
+                inputs,
+                read.nested,
+                &mut members,
+            )?;
+            derived_values.push(part);
+            computed.push(derived);
+            continue;
+        }
         // A handler's captures are paths of data, and where they are read
         // is the handler itself, whose calls are its own (ADR-0217).
         if read.kind == crate::template_ir::ReadKind::Captures
@@ -1387,9 +1507,11 @@ fn plan(
     let mut attributes = Vec::new();
     for read in &others {
         let root = read.path.split('.').next().unwrap_or_default();
+        // A computed one too (ADR-0226), whose value a host computes.
+        let computed_here = derived_values.iter().any(|d| d.part == read.part.0);
         if read.kind == crate::template_ir::ReadKind::Attribute
             && !read.nested
-            && found.iter().any(|(n, ..)| n == root)
+            && (found.iter().any(|(n, ..)| n == root) || computed_here)
             && !attributes.contains(&read.part.0)
         {
             attributes.push(read.part.0);
@@ -1556,16 +1678,161 @@ fn plan(
             streams,
             rows,
             attributes,
+            derived: derived_values,
             captures,
             title,
         },
         members,
+        computed,
+    ))
+}
+
+/// **A computed part, as a host computes it** (ADR-0226): the function its
+/// expression is lifted into, a component of its own, and the steps that
+/// reach its input from the query's value it reads, then run it. One query's
+/// value, read at the top of the page. Anything else is refused by name:
+/// a signal's, which the browser computes (ADR-0227); one in a block, a row
+/// or an instance, which no host computes yet (ADR-0228); several values;
+/// and none, which is a value to write as it is.
+#[allow(clippy::too_many_arguments)]
+fn computed_part(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    sigs: &Signatures,
+    inference: &crate::effects::Inference<'_>,
+    found: &[(String, DefId, Vec<ExprId>)],
+    signals: &[String],
+    (page, page_def): (&str, DefId),
+    part: u32,
+    path: &str,
+    (origin, expr): ((usize, DeclId), ExprId),
+    inputs: &[(String, String)],
+    nested: bool,
+    members: &mut BTreeSet<DefId>,
+) -> Result<(Derived, Part), String> {
+    let refuse = |why: String| Err(format!("part {part} computes a value {why}"));
+    let hir = hirs[origin.0];
+    let decl = hir.decl(origin.1);
+    let body = hir.body(
+        decl.body
+            .ok_or_else(|| format!("`{}` has no body", decl.name))?,
+    );
+    let types = crate::infer::Types::of_decl(sigs, hir, origin.1, body);
+    // **It performs nothing** (ADR-0226). The checker refuses an effect in
+    // one a request renders (PW0334). What it leaves, a build's input read by
+    // a page placed at build and an audited escape hatch, a host would run as
+    // compiled code: `include_markdown` would answer its stub's "".
+    let region = body.expr_span(expr);
+    if let Some(source) = inference
+        .infer_in_at(origin.0, body, &types)
+        .sources
+        .iter()
+        .find(|s| s.span.start >= region.start && s.span.end <= region.end)
+    {
+        return refuse(format!(
+            "that performs `{}`, and a host computes only a value that performs nothing",
+            source.effect
+        ));
+    }
+    if nested {
+        return refuse(
+            "inside a block, a loop's row or an arm, which no host computes yet (ADR-0228)"
+                .to_string(),
+        );
+    }
+    let [(name, read)] = inputs else {
+        return refuse(match inputs {
+            [] => "from nothing it reads: write the value itself".to_string(),
+            _ => format!(
+                "from {}, and a host computes one from one query's value (ADR-0228)",
+                inputs
+                    .iter()
+                    .map(|(n, _)| format!("`{n}`"))
+                    .collect::<Vec<_>>()
+                    .join(" and ")
+            ),
+        });
+    };
+    let mut segments = read.split('.');
+    let root = segments.next().unwrap_or_default();
+    if signals.iter().any(|s| s == root) {
+        return refuse(format!(
+            "from the signal `{name}`, which the browser computes (ADR-0227)"
+        ));
+    }
+    let Some((_, resource, _)) = found.iter().find(|(n, ..)| n == root) else {
+        return refuse(format!("from `{name}`, which is no query's value"));
+    };
+    let reads: Vec<&str> = segments.collect();
+    let ty = value_of(sigs, *resource)
+        .ok_or_else(|| format!("`{root}`'s query has no resolved result"))?;
+    let mut out = Vec::new();
+    for (step, def) in steps(sigs, ty, &reads)? {
+        out.push(match (step, def) {
+            (Step::Member(_), Some(def)) => {
+                members.insert(def);
+                Step::Member(
+                    component_id_of(hirs, def)
+                        .ok_or_else(|| "a member function with no identity".to_string())?,
+                )
+            }
+            (step, _) => step,
+        });
+    }
+    // Its input's type, where its expression reads it, and its result's.
+    let input = body
+        .walk_from(expr)
+        .into_iter()
+        .find(|x| matches!(body.expr(*x), Expr::Name(n) if n == name))
+        .and_then(|x| types.of(body, x))
+        .ok_or_else(|| format!("part {part}'s `{name}` has no type"))?;
+    // What it computes, as the checker's value relations type it: any
+    // expression they check, where `Types` knows a name, a field and a call.
+    let result = crate::values::type_of(
+        sigs,
+        ws,
+        origin.0,
+        hir.module_of(origin.1),
+        decl,
+        body,
+        expr,
+    )
+    .0
+    .key()
+    .and_then(|key| {
+        crate::resolved::ResolvedType::inferred(
+            &key,
+            &|def| crate::resolve::declaration(hirs, def).map(|d| d.name.clone()),
+            &region,
+        )
+    })
+    .ok_or_else(|| format!("part {part}'s value has no type the build knows"))?;
+    let component_id = format!("{page}.derived_{part}");
+    out.push(Step::Derived(component_id.clone()));
+    Ok((
+        Derived {
+            component_id,
+            page: page_def,
+            part,
+            origin,
+            expr,
+            input: (name.clone(), input),
+            result,
+        },
+        Part {
+            part,
+            path: path.to_string(),
+            binding: root.to_string(),
+            steps: out,
+        },
     ))
 }
 
 /// **Every page's plan.**
 pub fn pages(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Vec<Planned> {
     let captures = crate::resume::capture_map(hirs, sigs);
+    let mut inference = crate::effects::Inference::new(sigs, ws);
+    inference.run(hirs);
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
@@ -1582,7 +1849,7 @@ pub fn pages(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Vec<Planned> {
             };
             out.push(Planned {
                 page,
-                plan: plan(hirs, ws, sigs, &captures, unit, id).map(|(p, _)| p),
+                plan: plan(hirs, ws, sigs, &captures, &inference, unit, id).map(|(p, ..)| p),
             });
         }
     }
@@ -1593,13 +1860,35 @@ pub fn pages(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Vec<Planned> {
 /// kind `function` and is compiled as a component of its own (ADR-0125).
 pub fn members(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> BTreeSet<DefId> {
     let captures = crate::resume::capture_map(hirs, sigs);
+    let mut inference = crate::effects::Inference::new(sigs, ws);
+    inference.run(hirs);
     let mut out = BTreeSet::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             if decl.kind == DeclKind::Page
-                && let Ok((_, m)) = plan(hirs, ws, sigs, &captures, unit, id)
+                && let Ok((_, m, _)) = plan(hirs, ws, sigs, &captures, &inference, unit, id)
             {
                 out.extend(m);
+            }
+        }
+    }
+    out
+}
+
+/// **The computed parts some page's plan has a host compute** (ADR-0226):
+/// each a function the compiler lifts, with a contract of kind `derived`,
+/// compiled as a component of its own.
+pub fn derived(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Vec<Derived> {
+    let captures = crate::resume::capture_map(hirs, sigs);
+    let mut inference = crate::effects::Inference::new(sigs, ws);
+    inference.run(hirs);
+    let mut out = Vec::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind == DeclKind::Page
+                && let Ok((_, _, d)) = plan(hirs, ws, sigs, &captures, &inference, unit, id)
+            {
+                out.extend(d);
             }
         }
     }

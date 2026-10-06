@@ -1,0 +1,34 @@
+// @status: NEIGHBOUR
+// @invariant: derived_not_pure
+// @dimension: valid neighbour — the same effect where a template's values do not compute it
+//
+// The page reads the clock once, in its body, as it renders, and the
+// template shows that value by its path. A handler reads it when it runs.
+// The values the template computes call a helper that performs nothing.
+
+module generality.computed_value_pure
+
+import clock
+
+fn shout(s: String) -> String !{} {
+    "{s}!"
+}
+
+page Clock() !{ clock.wall } {
+    route "/clock"
+    placement origin
+    cache private
+
+    signal pressed: Int = 0
+    let now = clock.now_wall()
+
+    view {
+        <title>Clock</title>
+        <main>
+            <p>Now: {now}</p>
+            <p title={shout("now")}>{shout("hello")}</p>
+            <button type="button" on:press={() => pressed = clock.now_wall()}>Press</button>
+            <p>{pressed}</p>
+        </main>
+    }
+}
