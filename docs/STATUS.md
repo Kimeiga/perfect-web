@@ -14,6 +14,13 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0232, 2026-10-06: an opaque value's representation is read in a
+template** (found by ADR-0231). `{p.id.value}` checked and built, then its
+page was answered 503: the template read `.value` as a field of the text. A
+template reads it by the opaque value's own path now, as the checker types
+the base, in a page's body and in each view it composes; a record's field
+named `value` is a field (`just e14-representations`).
+
 **ADR-0231, 2026-10-05: a page's parameter is rendered on every page**
 (found building the feed's replies). A page that binds a query was rendered
 without its parameters: a title, an attribute or a handler's captures that
@@ -22,8 +29,8 @@ part that read one was refused at build. Each renders now, in the document
 and in each block and row a host renders again. The feed replies: the thread
 page's form passes the page's `id`, and the reply reaches every reader of
 the thread, and no timeline, in three engines. Found: an opaque value's
-representation, `{p.id.value}`, builds and does not render (ADR-0232 is to
-fix it) (`just e14-page-parameters`).
+representation, `{p.id.value}`, built and did not render (ADR-0232)
+(`just e14-page-parameters`).
 
 **ADR-0230, 2026-10-05: a condition is a `Bool`, or tested non-empty**
 (ruling 0071-a). A number and a record were the renderer's truth and checked

@@ -621,10 +621,13 @@ argument read one. The browser holds none:
 - so is one read in a region the browser renders again with a speculation
   (ADR-0172).
 
-A value computed from one waits on ruling 0073-a. A parameter's
-representation, `{id.value}`, checks and builds and does not render, as no
-opaque value's does in a template: the renderer reads `.value` as a field.
-ADR-0232 is to fix it.
+A value computed from one waits on ruling 0073-a. Its representation,
+`{id.value}`, is read as any opaque value's is (ADR-0232).
+
+**An opaque value's representation is read by its own path** (ADR-0232):
+`{p.id.value}` is `p.id`, as the checker types the base. A `.value` neither
+the checker's types nor the value relations type the base of is read as a
+field, and does not render.
 
 The store has no change event of its own, so its title, like its heading,
 changes when the page's values are next read. A title, or metadata, that

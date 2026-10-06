@@ -268,6 +268,7 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
             for v in crate::template_ir::lowered(
                 &hirs,
                 &ws,
+                &sigs,
                 &crate::template_ir::Handlers::new(),
                 unit,
                 id,
@@ -599,6 +600,7 @@ fn page_module(
     let Some(lowered) = crate::template_ir::lowered(
         cx.hirs,
         cx.ws,
+        cx.sigs,
         &crate::resume::capture_map(cx.hirs, cx.sigs),
         unit,
         page_id,
@@ -891,7 +893,9 @@ fn page_module(
             let Some(body) = cx.hirs[u].decl(d).body.map(|b| cx.hirs[u].body(b)) else {
                 continue;
             };
-            let Some(own) = crate::template_ir::value_path_of(body, expr) else {
+            let Some(own) =
+                crate::template_ir::value_path_typed((cx.sigs, cx.ws), (cx.hirs, u, d), body, expr)
+            else {
                 continue;
             };
             let (name, own_rest) = own.split_once('.').unwrap_or((own.as_str(), ""));
@@ -987,7 +991,12 @@ fn page_module(
         let Some(written) = cx.hirs[at].decl(decl).body.map(|b| cx.hirs[at].body(b)) else {
             continue;
         };
-        let Some(own) = crate::template_ir::value_path_of(written, hole.expr) else {
+        let Some(own) = crate::template_ir::value_path_typed(
+            (cx.sigs, cx.ws),
+            (cx.hirs, at, decl),
+            written,
+            hole.expr,
+        ) else {
             continue;
         };
         let tail = |p: &str| p.split_once('.').map(|(_, t)| t.to_string());

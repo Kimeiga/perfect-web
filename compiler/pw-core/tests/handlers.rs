@@ -84,7 +84,7 @@ fn event_parts(units: &[Unit]) -> Vec<(String, String, Vec<String>)> {
             handlers.insert((unit, decl, lambda), (m.handler, m.capture_paths));
         }
     }
-    let ir = serde_json::to_value(pw_core::template_ir::build_with(&hirs, &handlers))
+    let ir = serde_json::to_value(pw_core::template_ir::build_with(&hirs, &sigs, &handlers))
         .expect("the IR serializes");
     let mut out = Vec::new();
     let mut stack = vec![&ir];

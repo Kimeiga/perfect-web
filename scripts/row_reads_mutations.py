@@ -87,10 +87,10 @@ MUTANTS = [
         "core",
         TEMPLATE_IR,
         # Re-anchored by ADR-0229: every subject is read by `subject_of`, a
-        # path's here.
-        "    if let Some(value) = value_path(body, e).map(|v| ctx.read(v)) {\n"
+        # path's here. And by ADR-0232: the path as the template reads it.
+        "    if let Some(value) = ctx.path(body, e).map(|v| ctx.read(v)) {\n"
         "        ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);\n",
-        "    if let Some(value) = value_path(body, e).map(|v| ctx.read(v)) {\n",
+        "    if let Some(value) = ctx.path(body, e).map(|v| ctx.read(v)) {\n",
     ),
     # "what an `{:else if}` decides by is not a read" and "what a `{#match}`
     # decides by is not a read" are retired: since ADR-0229 every subject is

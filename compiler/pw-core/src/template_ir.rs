@@ -53,6 +53,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hir::{AttrValue, Body, DeclId, Expr, ExprId, Hir, Node, NodeId};
 use crate::resolve::{DefId, Resolution, Workspace};
+use crate::signatures::Signatures;
 
 /// Where a value sits in the document, which decides how it is escaped.
 ///
@@ -966,7 +967,8 @@ pub type Handlers = std::collections::BTreeMap<
 /// Without handler identities: an `Event` part gets an empty handler, which is
 /// honest for a caller that has no signatures to derive one from.
 pub fn build(hirs: &[&Hir]) -> Vec<Template> {
-    build_with(hirs, &Handlers::new())
+    let ws = Workspace::build(hirs);
+    build_with(hirs, &Signatures::build(&ws, hirs), &Handlers::new())
 }
 
 /// Build with the handler identities the resume artifacts derived.
@@ -975,7 +977,7 @@ pub fn build(hirs: &[&Hir]) -> Vec<Template> {
 /// derivation could disagree with the manifest the runtime compares against,
 /// and the disagreement would be silent: `decide` would refuse a handler that
 /// is in fact the right one, and the page would simply not respond.
-pub fn build_with(hirs: &[&Hir], handlers: &Handlers) -> Vec<Template> {
+pub fn build_with(hirs: &[&Hir], sigs: &Signatures, handlers: &Handlers) -> Vec<Template> {
     // The views a template uses are found by name, from the file it is
     // written in (ADR-0136).
     let ws = Workspace::build(hirs);
@@ -986,7 +988,7 @@ pub fn build_with(hirs: &[&Hir], handlers: &Handlers) -> Vec<Template> {
             if !matches!(decl.kind, View | Component | Page) {
                 continue;
             }
-            if let Some(l) = lowered(hirs, &ws, handlers, unit, id) {
+            if let Some(l) = lowered(hirs, &ws, sigs, handlers, unit, id) {
                 out.push((l.template, l.deepest));
             }
         }
@@ -1099,6 +1101,7 @@ pub struct Lowered {
 pub fn lowered(
     hirs: &[&Hir],
     ws: &Workspace,
+    sigs: &Signatures,
     handlers: &Handlers,
     unit: usize,
     id: DeclId,
@@ -1147,6 +1150,8 @@ pub fn lowered(
         handlers,
         hirs,
         ws,
+        types: std::rc::Rc::new(crate::infer::Types::of_decl(sigs, hir, id, body)),
+        sigs,
         unit,
         decl: id,
         names: BTreeMap::new(),
@@ -1196,8 +1201,14 @@ pub fn lowered(
 
 /// **Each text part of a renderable declaration, with its hole's expression**
 /// (ADR-0122), numbered by the traversal [`build_with`] numbers them by.
-pub fn holes(hirs: &[&Hir], ws: &Workspace, unit: usize, decl: DeclId) -> Vec<Hole> {
-    lowered(hirs, ws, &Handlers::new(), unit, decl)
+pub fn holes(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    sigs: &Signatures,
+    unit: usize,
+    decl: DeclId,
+) -> Vec<Hole> {
+    lowered(hirs, ws, sigs, &Handlers::new(), unit, decl)
         .map(|l| l.holes)
         .unwrap_or_default()
 }
@@ -1209,6 +1220,11 @@ struct Lowering<'a> {
     handlers: &'a Handlers,
     hirs: &'a [&'a Hir],
     ws: &'a Workspace,
+    sigs: &'a Signatures,
+    /// **What the checker types in this body** (ADR-0232): an opaque value's
+    /// `.value` is read by the opaque value's own path. Shared by the copies a
+    /// scope makes of this context.
+    types: std::rc::Rc<crate::infer::Types<'a>>,
     /// Which file, by its index in the program, and which declaration in it:
     /// the body the nodes being lowered are written in.
     unit: usize,
@@ -1228,6 +1244,16 @@ struct Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+    /// **The path the template reads `e` by** (ADR-0073), an opaque value's
+    /// `.value` by the opaque value's own (ADR-0232). `None` for anything
+    /// computed.
+    fn path(&self, body: &Body, e: ExprId) -> Option<String> {
+        let at = (self.hirs[self.unit], self.unit, self.decl);
+        path_where(body, e, &|x| {
+            is_opaque((self.sigs, self.ws), at, &self.types, body, x)
+        })
+    }
+
     /// `path` as the template reads it: its root as this scope names it.
     fn read(&self, path: String) -> String {
         let (root, rest) = match path.split_once('.') {
@@ -1608,7 +1634,7 @@ fn lower_meta(body: &Body, n: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer) -> P
                     }
                     let Some(path) = holes
                         .next()
-                        .and_then(|h| value_path(body, *h).map(|p| (p, *h)))
+                        .and_then(|h| ctx.path(body, *h).map(|p| (p, *h)))
                     else {
                         return blocked("a value in metadata is read by its path");
                     };
@@ -1622,7 +1648,7 @@ fn lower_meta(body: &Body, n: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer) -> P
                 }
             }
             _ => {
-                let Some(path) = value_path(body, *e) else {
+                let Some(path) = ctx.path(body, *e) else {
                     return blocked("a value in metadata is read by its path");
                 };
                 let read = ctx.read(path);
@@ -1661,7 +1687,7 @@ fn lower_title(body: &Body, n: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer) -> 
         match body.node(*c) {
             Node::Text(t) => pieces.push(TitlePiece::Text(t.clone())),
             Node::Interpolation(e) => {
-                let Some(path) = value_path(body, *e) else {
+                let Some(path) = ctx.path(body, *e) else {
                     return blocked("a value in a title is read by its path");
                 };
                 let path = ctx.read(path);
@@ -1702,17 +1728,70 @@ fn coalesce(chunks: Vec<Chunk>) -> Vec<Chunk> {
 /// and `f(x).name` with the path `.name`, so every render failed; a program
 /// that wrote one now fails to build instead (ADR-0073).
 fn value_path(body: &Body, e: ExprId) -> Option<String> {
+    path_where(body, e, &|_| false)
+}
+
+/// [`value_path`], where `representation` says which `.value` reads an
+/// opaque value's representation (ADR-0232): the same value at run time, so
+/// read by the opaque value's own path. Until 2026-10-06 `{p.id.value}` was
+/// read as a field of the text, and every request for its page was answered
+/// 503. A record's field named `value` is a field.
+fn path_where(body: &Body, e: ExprId, representation: &dyn Fn(ExprId) -> bool) -> Option<String> {
     match body.expr(e) {
         Expr::Name(n) => Some(n.clone()),
-        Expr::Field { base, name } => value_path(body, *base).map(|b| format!("{b}.{name}")),
+        Expr::Field { base, name } if name == "value" && representation(*base) => {
+            path_where(body, *base, representation)
+        }
+        Expr::Field { base, name } => {
+            path_where(body, *base, representation).map(|b| format!("{b}.{name}"))
+        }
         _ => None,
     }
+}
+
+/// **Whether `e` is a value of an opaque type**, whose `.value` is its
+/// representation (ADR-0048, ADR-0232), in `decl`'s body in unit `unit`. As
+/// `types` types it; where they do not, as the value relations do, which
+/// solve a call: the binding of `{:Some(r)}` under `{#match List.get(xs,
+/// 0)}`.
+fn is_opaque(
+    (sigs, ws): (&Signatures, &Workspace),
+    (hir, unit, decl): (&Hir, usize, DeclId),
+    types: &crate::infer::Types<'_>,
+    body: &Body,
+    e: ExprId,
+) -> bool {
+    let def = types.of(body, e).and_then(|t| t.def_id()).or_else(|| {
+        let module = hir.module_of(decl);
+        match crate::values::type_of(sigs, ws, unit, module, hir.decl(decl), body, e).0 {
+            crate::values::Ty::Nominal(d, _) => Some(d),
+            _ => None,
+        }
+    });
+    def.and_then(|d| sigs.type_decl(d))
+        .is_some_and(|t| t.representation.is_some())
 }
 
 /// [`value_path`], for a checker: the path a template reads a value by, or
 /// `None` for anything computed (ADR-0073, ADR-0136).
 pub fn value_path_of(body: &Body, e: ExprId) -> Option<String> {
     value_path(body, e)
+}
+
+/// **The path a template reads a value by, as the template does** (ADR-0232):
+/// an opaque value's `.value` by the opaque value's own path, as the checker
+/// types `body`, the body of `decl` in unit `unit`.
+pub fn value_path_typed(
+    (sigs, ws): (&Signatures, &Workspace),
+    (hirs, unit, decl): (&[&Hir], usize, DeclId),
+    body: &Body,
+    e: ExprId,
+) -> Option<String> {
+    let hir = hirs[unit];
+    let types = crate::infer::Types::of_decl(sigs, hir, decl, body);
+    path_where(body, e, &|x| {
+        is_opaque((sigs, ws), (hir, unit, decl), &types, body, x)
+    })
 }
 
 /// **What a computed hole reads** (ADR-0226): each name its expression
@@ -1765,7 +1844,7 @@ fn inputs_of(body: &Body, e: ExprId, ctx: &Lowering<'_>) -> Vec<(String, String)
 fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out: &mut Vec<Chunk>) {
     match body.node(id) {
         Node::Text(t) => out.push(Chunk::Static(escape_static_text(t))),
-        Node::Interpolation(e) => out.push(Chunk::Dynamic(match value_path(body, *e) {
+        Node::Interpolation(e) => out.push(Chunk::Dynamic(match ctx.path(body, *e) {
             Some(value) => {
                 let value = ctx.read(value);
                 let id = ix.part();
@@ -1995,7 +2074,7 @@ fn lower_element(
             content = Some(match &a.value {
                 AttrValue::None => Chunk::Static(String::new()),
                 AttrValue::Static(v) => Chunk::Static(escape_static_content(unquote(v))),
-                AttrValue::Expr(e) => match value_path(body, *e).map(|v| ctx.read(v)) {
+                AttrValue::Expr(e) => match ctx.path(body, *e).map(|v| ctx.read(v)) {
                     Some(value) if !matches!(body.expr(*e), Expr::Interpolated { .. }) => {
                         let owner =
                             owner.expect("an element with a dynamic attribute owns an identity");
@@ -2139,7 +2218,7 @@ fn lower_element(
                 let id = ix.part();
                 // A path, or a computed value read by the path the compiler
                 // names it (ADR-0226), as a computed hole is.
-                let (value, inputs) = match value_path(body, *e).map(|v| ctx.read(v)) {
+                let (value, inputs) = match ctx.path(body, *e).map(|v| ctx.read(v)) {
                     Some(value) => (value, None),
                     None => {
                         let inputs = inputs_of(body, *e, ctx);
@@ -2264,7 +2343,7 @@ fn compose(
             .iter()
             .find(|a| a.name == p.name)
             .and_then(|a| match &a.value {
-                AttrValue::Expr(e) => value_path(body, *e).map(|v| ctx.read(v)),
+                AttrValue::Expr(e) => ctx.path(body, *e).map(|v| ctx.read(v)),
                 _ => None,
             });
         let Some(path) = given else {
@@ -2385,6 +2464,13 @@ fn compose(
         handlers: ctx.handlers,
         hirs: ctx.hirs,
         ws: ctx.ws,
+        types: std::rc::Rc::new(crate::infer::Types::of_decl(
+            ctx.sigs,
+            ctx.hirs[def.unit],
+            DeclId(def.decl),
+            view,
+        )),
+        sigs: ctx.sigs,
         unit: def.unit,
         decl: DeclId(def.decl),
         names,
@@ -2434,7 +2520,7 @@ fn lower_stream(
     };
     let mut args = Vec::new();
     for a in given.iter().map(|a| a.value) {
-        match (value_path(body, a), body.expr(a)) {
+        match (ctx.path(body, a), body.expr(a)) {
             (Some(path), _) => args.push(ctx.read(path)),
             // An invocation-context call: `current_session()`.
             (None, Expr::Call { callee, args: none }) if none.is_empty() => {
@@ -2729,7 +2815,7 @@ fn interpolated_attribute(
         };
         // A computed one is the attribute's whole value (ADR-0226), which a
         // host computes as it does a hole between tags.
-        let Some(path) = value_path(body, *hole) else {
+        let Some(path) = ctx.path(body, *hole) else {
             return blocked(
                 "a hole in an attribute's text is a value path, and a computed value is \
                  written as the attribute's whole value, `name={..}` (ADR-0226)",
@@ -2828,7 +2914,7 @@ fn lower_run(body: &Body, nodes: &[NodeId], ctx: &Lowering<'_>, ix: &mut Indexer
 /// values it is computed from. Until ADR-0229 a computed one was refused: "an
 /// `{#if}` condition must be a value path".
 fn subject_of(body: &Body, id: PartId, e: ExprId, ctx: &Lowering<'_>, ix: &mut Indexer) -> String {
-    if let Some(value) = value_path(body, e).map(|v| ctx.read(v)) {
+    if let Some(value) = ctx.path(body, e).map(|v| ctx.read(v)) {
         ix.read(id, &value, ReadKind::Subject, ReadAt::Expr(e), ctx);
         return value;
     }

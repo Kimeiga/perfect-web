@@ -376,5 +376,5 @@ pub fn templates(
             identities.insert((unit, decl, lambda), (m.handler, m.capture_paths));
         }
     }
-    crate::template_ir::build_with(hirs, &identities)
+    crate::template_ir::build_with(hirs, sigs, &identities)
 }

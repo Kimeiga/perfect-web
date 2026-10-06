@@ -378,9 +378,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
           e14-condition-truth`: a condition is a `Bool`, or a `List` or
           `String` tested non-empty); ~~replies, and a page's parameter
           rendered on every page~~ (ADR-0231, `just e14-page-parameters`);
-          next an opaque value's representation in a template (ADR-0232,
-          found by ADR-0231), then speculation on a value of a type that
-          contains itself (ADR-0205 §5) and 0122-d's route-keyed
+          ~~an opaque value's representation in a template~~ (ADR-0232,
+          `just e14-representations`); next speculation on a value of a
+          type that contains itself (ADR-0205 §5) and 0122-d's route-keyed
           speculation, for an optimistic reply and a like on the thread
           page; then 0057-a, 0099-a and ADR-0195's ruling 10,
           materialization chains; and what ruling 0073-a still refuses

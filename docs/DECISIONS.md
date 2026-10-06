@@ -1959,3 +1959,10 @@ replies).
   every request was answered 503; a text part is no longer refused. The feed
   replies: the thread page's form passes the page's `id`. Found: an opaque
   value's representation does not render in a template (ADR-0232).
+[ADR-0232](DECISIONS/ADR-0232-an-opaque-values-representation-is-read-in-a-template.md):
+an opaque value's representation is read in a template (found by ADR-0231).
+- `{p.id.value}` was read as a field of the text, and its page was answered
+  503. A template reads an opaque value's `.value` by the opaque value's own
+  path now, as the checker types it, in each body it lowers; a record's
+  field named `value` is a field. Where the checker's types leave a base
+  untyped, the value relations type it.

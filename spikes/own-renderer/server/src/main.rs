@@ -10729,6 +10729,48 @@ public query Store(",
         );
     }
 
+    /// **An opaque value's representation is rendered** (ADR-0232):
+    /// `{p.id.value}` in the home page's rows, and on the thread page its
+    /// parameter's, its query's, a `{#match}` arm's and its view's. Until
+    /// 2026-10-06 each built, then every request for its page was answered
+    /// 503, `MissingValue { path: "p.id.value" }`.
+    #[test]
+    fn an_opaque_values_representation_is_rendered() {
+        let s = served_feed_with(|app| {
+            app.replace(
+                "                        <p>{p.text}</p>\n",
+                "                        <p>{p.text}</p>\n                        \
+                 <p class=\"pid\" title=\"{p.id.value}\"><a href=\"/post/{p.id.value}\">{p.id.value}</a></p>\n",
+            )
+            .replace(
+                "            <Replies post={thread} />\n",
+                "            <Replies post={thread} />\n            \
+                 <p id=\"which\">{id.value} {thread.id.value}</p>\n            \
+                 {#match List.get(thread.replies, 0)}{:Some(r)}<p id=\"first\">{r.id.value}</p>\
+                 {:None}<p id=\"first\">none</p>{/match}\n",
+            )
+            .replace(
+                "        <p>{post.text}</p>\n",
+                "        <p>{post.text}</p>\n        <p class=\"vid\">{post.id.value}</p>\n",
+            )
+        });
+        let page = |path: &str| {
+            fetched_as(&s, path, Some("a"))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect::<String>()
+        };
+        let home = page("/");
+        assert!(home.starts_with("HTTP/1.1 200"), "{home}");
+        assert!(home.contains("class=\"pid\" title=\"p1\">"), "{home}");
+        assert!(home.contains("href=\"/post/p1\">"), "{home}");
+        let thread = page("/post/p1");
+        assert!(thread.starts_with("HTTP/1.1 200"), "{thread}");
+        assert_eq!(text_in(&thread, "<p id=\"which\">"), "p1 p1");
+        assert_eq!(text_in(&thread, "<p id=\"first\">"), "p2");
+        assert_eq!(text_in(&thread, "<p class=\"vid\">"), "p1");
+    }
+
     /// **A reply is its thread's, to every reader, and no timeline's**
     /// (ADR-0231): `reply` stages a post that replies to `to`, and emits
     /// `Posted`, so each open thread page is read again and sent it, with its

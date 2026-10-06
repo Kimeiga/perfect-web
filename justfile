@@ -4542,3 +4542,20 @@ e14-page-parameters:
        CARGO_INCREMENTAL=0 python3 scripts/page_parameters_mutations.py; \
      } > docs/evidence/E14/page-parameters.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/page-parameters.txt
+
+# ADR-0232: an opaque value's representation is read in a template. The
+# compiler's tests, the server's, and the mutation controls.
+e14-representations:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0232 - an opaque value's representation is read in a template"; echo; \
+       echo "produced by: just e14-representations"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the build (compiler/pw-core/tests/template_representations.rs)"; echo; \
+       cargo test --locked -p pw-core --test template_representations 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- an_opaque_values_representation 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/template_representations_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/template_representations_mutations.py; \
+     } > docs/evidence/E14/representations.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/representations.txt

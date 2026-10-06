@@ -34,7 +34,8 @@ MUTANTS = [
     (
         "a computed text hole lowers with an empty path",
         IR,
-        "        Node::Interpolation(e) => out.push(Chunk::Dynamic(match value_path(body, *e) {",
+        # Re-anchored by ADR-0232: the path as the template reads it.
+        "        Node::Interpolation(e) => out.push(Chunk::Dynamic(match ctx.path(body, *e) {",
         "        Node::Interpolation(e) => out.push(Chunk::Dynamic(match Some(crate::infer::path_of(body, *e)) {",
     ),
     (
@@ -42,14 +43,18 @@ MUTANTS = [
         IR,
         # Re-anchored by ADR-0226: a computed attribute is read by the path the
         # compiler names, where it was refused.
-        "                let (value, inputs) = match value_path(body, *e).map(|v| ctx.read(v)) {",
+        "                let (value, inputs) = match ctx.path(body, *e).map(|v| ctx.read(v)) {",
         "                let (value, inputs) = match Some(crate::infer::path_of(body, *e)) {",
     ),
     (
         "a field of a computed value is a path",
         IR,
-        '        Expr::Field { base, name } => value_path(body, *base).map(|b| format!("{b}.{name}")),',
-        '        Expr::Field { base, name } => Some(format!("{}.{name}", value_path(body, *base).unwrap_or_default())),',
+        # Re-anchored by ADR-0232: one function reads every path, given which
+        # `.value` is a representation.
+        "        Expr::Field { base, name } => {\n"
+        '            path_where(body, *base, representation).map(|b| format!("{b}.{name}"))\n',
+        "        Expr::Field { base, name } => {\n"
+        '            Some(format!("{}.{name}", path_where(body, *base, representation).unwrap_or_default()))\n',
     ),
     (
         "a directive is written as an attribute",

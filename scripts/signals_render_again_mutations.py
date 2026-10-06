@@ -72,8 +72,9 @@ MUTANTS = [
     (
         "the plan does not know what a handler captures",
         PLAN,
-        "    } = crate::template_ir::lowered(hirs, ws, captures, unit, id)\n",
-        "    } = crate::template_ir::lowered(hirs, ws, &crate::template_ir::Handlers::new(), unit, id)\n",
+        # Re-anchored by ADR-0232: the lowering is given the signatures.
+        "    } = crate::template_ir::lowered(hirs, ws, sigs, captures, unit, id)\n",
+        "    } = crate::template_ir::lowered(hirs, ws, sigs, &crate::template_ir::Handlers::new(), unit, id)\n",
     ),
 ]
 

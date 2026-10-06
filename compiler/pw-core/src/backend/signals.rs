@@ -63,6 +63,7 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
             let Some(lowered) = crate::template_ir::lowered(
                 &hirs,
                 &ws,
+                &sigs,
                 &crate::template_ir::Handlers::new(),
                 unit,
                 id,

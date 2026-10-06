@@ -1296,7 +1296,7 @@ fn plan(
         reads: others,
         instances,
         ..
-    } = crate::template_ir::lowered(hirs, ws, captures, unit, id)
+    } = crate::template_ir::lowered(hirs, ws, sigs, captures, unit, id)
         .ok_or_else(|| format!("`{}` has no template", decl.name))?;
     // The signals the browser holds: the page's own, and each one the views
     // composed in it hold and are provided (ADR-0144).
