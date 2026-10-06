@@ -1361,10 +1361,9 @@ function replaceRangeAt(key, html) {
  * boolean attribute is its presence, and its property where the element has
  * one (`checked`, `disabled`).
  */
-function setAttributePart(live, source) {
+function setAttributePart(live, source, v = signalAt(live.path)) {
   const part = (parts.parts ?? []).find((p) => p.id === live.part);
   if (!part) return;
-  const v = signalAt(live.path);
   for (const a of addressesFor(`e${part.owner}`)) {
     const el = index.get(a)?.element;
     if (!el) continue;
@@ -1384,6 +1383,19 @@ function setAttributePart(live, source) {
 
 let dirty = new Set();
 let flushing = null;
+
+let computedModule = null;
+
+/** **What the page computes from its signals** (ADR-0227): the module the
+ * compiler wrote, its functions the same ones the host computed the page's
+ * first values with. Loaded when one of those signals first changes. */
+function computedValues() {
+  computedModule ??= import(parts.computed).then((module) => {
+    log.push(`loaded ${parts.computed}`);
+    return module;
+  });
+  return computedModule;
+}
 
 /** Where each signal's latest change came from: the element and the event
  * whose handler set it (ADR-0142). */
@@ -1409,7 +1421,14 @@ async function flushSignals() {
   let rendered = false;
   const inserted = [];
   for (const live of parts.live ?? []) {
-    if (live.kind === "text") {
+    if (live.derived) {
+      // A value computed from the signal (ADR-0227), by its part's function.
+      if (!changed.has(live.signal)) continue;
+      const v = (await computedValues()).parts[live.part](signalAt(live.path));
+      if (live.kind === "text") setRange(addressOf([], live.part), textOf(v));
+      else setAttributePart(live, from.get(live.signal), v);
+      log.push(`signal ${live.signal} -> computed part ${live.part}`);
+    } else if (live.kind === "text") {
       if (!changed.has(live.signal)) continue;
       setRange(addressOf([], live.part), textOf(signalAt(live.path)));
       log.push(`signal ${live.signal} -> part ${live.part}`);

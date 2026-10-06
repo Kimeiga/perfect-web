@@ -1917,3 +1917,11 @@ feed's counts).
   component of its own, which the host runs when the page renders and again
   when the value changes. It performs nothing (PW0334, revision 2). Found:
   a member an imported module lacks resolved, and checked clean.
+[ADR-0227](DECISIONS/ADR-0227-a-value-computed-from-a-signal-is-the-browsers.md):
+a value computed from a signal is the browser's (ruling 0073-a, the browser's
+part; the feed's draft).
+- A text hole or an attribute's whole value may compute from one signal. The
+  host renders its first value with the component ADR-0226 lifts; the build
+  compiles the same function into the page's module, which the browser loads
+  when the signal first changes. The feed's draft says what is left, and its
+  post button is disabled while there is no post to send.

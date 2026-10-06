@@ -3315,6 +3315,8 @@ impl Server {
         for (part, outcome) in settled {
             env = env.settle(PartId(*part), outcome.clone());
         }
+        // What it computes from its signals, at their first values (ADR-0227).
+        let env = self.with_computed_signals(env, plan, template)?;
         let env = with_signals(env, plan).in_domain(
             IdentityDomain::document(
                 path,
@@ -3407,6 +3409,63 @@ impl Server {
     /// plans no other.
     fn plan_of(&self, page: &str) -> &serde_json::Value {
         self.plans.get(page).unwrap_or(&self.plan)
+    }
+
+    /// **What a page computes from its signals, at their first values**
+    /// (ADR-0227): each by the path the compiler names it, computed by its
+    /// component from the signal's first value. The browser computes it from
+    /// then on, with the same function compiled for it.
+    fn with_computed_signals(
+        &self,
+        mut env: Env,
+        plan: &serde_json::Value,
+        template: &Template,
+    ) -> Result<Env, String> {
+        for live in plan["live"].as_array().into_iter().flatten() {
+            let Some(id) = live["derived"].as_str() else {
+                continue;
+            };
+            let part = live["part"].as_u64().unwrap_or_default() as u32;
+            let path = match find_part(&template.chunks, part) {
+                Some(
+                    pw_render::ir::Part::Text { value, .. }
+                    | pw_render::ir::Part::Attribute { value, .. }
+                    | pw_render::ir::Part::BooleanAttribute { value, .. },
+                ) => value.clone(),
+                _ => return Err(format!("part {part} reads no value")),
+            };
+            let mut at = live["path"].as_str().unwrap_or_default().split('.');
+            let mut first = first_value(plan, at.next().unwrap_or_default());
+            for field in at {
+                first = first[field].clone();
+            }
+            let value = self.computed_from(id, &first)?;
+            env = env.set(&path, val_to_value(&value));
+        }
+        Ok(env)
+    }
+
+    /// **A computed value's component, run with `json`** (ADR-0227), typed
+    /// by its parameter as a command's argument is: pure, with what it reads.
+    fn computed_from(&self, id: &str, json: &serde_json::Value) -> Result<Val, String> {
+        let loaded = self
+            .components
+            .get(id)
+            .ok_or_else(|| format!("no compiled component for `{id}`"))?;
+        let export = self
+            .contracts
+            .iter()
+            .find(|c| c.component_id == id)
+            .and_then(|c| c.exports.first())
+            .and_then(|e| e.component.clone())
+            .ok_or_else(|| format!("`{id}`'s contract does not locate its export"))?;
+        let args = loaded
+            .prepared
+            .arguments_for(&export, std::slice::from_ref(json))?;
+        self.run(id, "", &BTreeMap::new(), &args)?
+            .into_iter()
+            .next()
+            .ok_or_else(|| format!("{id} returned nothing"))
     }
 
     /// **A page's template, by its path** (ADR-0190): the store's where this
@@ -3937,6 +3996,10 @@ impl Server {
                 .unwrap_or_else(|e| panic!("part `{path}`: {e}"));
             env = env.set(path, val_to_value(&value));
         }
+        // What it computes from its signals, at their first values (ADR-0227).
+        let env = self
+            .with_computed_signals(env, plan, self.template_of(page))
+            .unwrap_or_else(|e| panic!("`{page}`'s computed values: {e}"));
         // Its signals, at their first values (ADR-0140).
         with_signals(env, plan)
             // A page, not a materialization: its domain is the route identity
@@ -5856,6 +5919,30 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 ),
             }
         }
+        // What a page computes from its signals (ADR-0227), as `pw build`
+        // wrote it: only a module a page's plan names.
+        ("GET", route)
+            if route.split('?').next().is_some_and(|r| {
+                server
+                    .plans
+                    .values()
+                    .any(|p| computed_module(p).as_deref() == Some(r))
+            }) =>
+        {
+            let module = route.split('?').next().unwrap_or(route);
+            let file = module.trim_start_matches("/computed/");
+            match std::fs::read(server.artifacts.join("computed").join(file)) {
+                Ok(bytes) => {
+                    respond_build(&mut stream, 200, "text/javascript; charset=utf-8", &bytes)
+                }
+                Err(_) => respond_build(
+                    &mut stream,
+                    404,
+                    "text/plain; charset=utf-8",
+                    b"this module was not compiled",
+                ),
+            }
+        }
         ("GET", route) if route.starts_with("/handler/") => {
             let id = route
                 .trim_start_matches("/handler/")
@@ -6527,6 +6614,22 @@ fn first_value(plan: &serde_json::Value, signal: &str) -> serde_json::Value {
         .unwrap_or(serde_json::Value::Null)
 }
 
+/// **The module a page's browser computes its signals' values with**
+/// (ADR-0227), as `pw build` wrote it: one a page computes any from.
+fn computed_module(plan: &serde_json::Value) -> Option<String> {
+    let computes = plan["live"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .any(|l| l["derived"].is_string());
+    computes.then(|| {
+        format!(
+            "/computed/{}.mjs",
+            plan["page"].as_str().unwrap_or_default()
+        )
+    })
+}
+
 /// **A page that binds no query, as a document** (ADR-0130, ADR-0148): its
 /// values are its signals and its streams' parts.
 ///
@@ -6556,6 +6659,10 @@ fn signal_document(
         "listens": false,
     });
     let mut manifest = manifest;
+    // What it computes from its signals (ADR-0227).
+    if let Some(module) = computed_module(plan) {
+        manifest["computed"] = serde_json::Value::String(module);
+    }
     with_instance_templates(&mut manifest, template, templates);
     // No `<` in a script element's text (ADR-0097).
     let json =
@@ -6708,6 +6815,10 @@ fn document(
         manifest["signals"] = serde_json::Value::Object(signals);
         manifest["live"] = live;
         manifest["blocks"] = serde_json::Value::Object(blocks);
+    }
+    // What it computes from them (ADR-0227).
+    if let Some(module) = computed_module(plan) {
+        manifest["computed"] = serde_json::Value::String(module);
     }
     // Each binding a signal keys (ADR-0152): the browser reads it again, for
     // the new key, when one of its signals changes, and does what its stale
@@ -10293,6 +10404,110 @@ public query Store(",
             })
             .collect();
         assert_eq!(titles, ["3 likes"], "{set:?}");
+    }
+
+    /// The text of the element `open` starts, its comments left out.
+    fn text_in(html: &str, open: &str) -> String {
+        let at = html
+            .find(open)
+            .unwrap_or_else(|| panic!("no `{open}` in {html}"));
+        let rest = &html[at + open.len()..];
+        let mut rest = &rest[..rest.find("</").expect("its end")];
+        let mut text = String::new();
+        while let Some(start) = rest.find("<!--") {
+            text.push_str(&rest[..start]);
+            rest = &rest[start + rest[start..].find("-->").expect("a comment's end") + 3..];
+        }
+        text + rest
+    }
+
+    /// **What a page computes from a signal is rendered at its first value**
+    /// (ADR-0227). The feed's draft says what is left of it, and its post
+    /// button is disabled while there is no post to send: the host renders
+    /// each from the draft's first value, by the component the browser's
+    /// module was compiled beside, and the browser computes each from then
+    /// on. The module is served to a page that names it, and no other.
+    #[test]
+    fn what_a_page_computes_from_a_signal_is_rendered_at_its_first_value() {
+        let home = |s: &Server| {
+            s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+                .expect("served")
+                .0
+        };
+        let s = served_feed();
+        let html = home(&s);
+        assert_eq!(text_in(&html, "<p id=\"left\">"), "280 left");
+        assert!(html.contains("type=\"submit\" disabled>Post"), "{html}");
+        let body = |path: &str| -> String {
+            fetched_as(&s, path, Some("a"))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        // The document names its module, which the browser loads when the
+        // draft first changes.
+        let document = body("/");
+        assert!(
+            document.contains("\"computed\":\"/computed/feed.app.Home.mjs\""),
+            "{document}"
+        );
+        let module = body("/computed/feed.app.Home.mjs");
+        assert!(
+            module.starts_with("HTTP/1.1 200") && module.contains("export const parts"),
+            "{module}"
+        );
+        // Control: the thread page computes nothing from a signal. And no
+        // path a plan does not name is read, one that leaves the directory
+        // least of all.
+        assert!(
+            !body("/computed/feed.app.PostPage.mjs").contains("export const parts"),
+            "a module no page names"
+        );
+        assert!(
+            !body("/computed/../contracts.json").contains("component_id"),
+            "a file outside the modules"
+        );
+        // From another first value, another first render.
+        let s = served_feed_with(|app| {
+            app.replace(
+                "signal draft: String = \"\"",
+                "signal draft: String = \"Hello\"",
+            )
+        });
+        let html = home(&s);
+        assert_eq!(text_in(&html, "<p id=\"left\">"), "275 left");
+        assert!(html.contains("type=\"submit\">Post"), "{html}");
+    }
+
+    /// **A page of signals alone computes from them too** (ADR-0227), at
+    /// their first values, where the route that renders such a page renders
+    /// it: an `Int`'s, and a view's given a field of a record's.
+    #[test]
+    fn a_page_of_signals_alone_computes_at_their_first_values() {
+        let s = served_feed_with(|app| {
+            format!(
+                "{app}\ntype Panel = Panel {{ open: Bool }}\n\n\
+                 fn said(open: Bool) -> String !{{}} {{\n    if open {{\n        \"open\"\n    }} else {{\n        \"shut\"\n    }}\n}}\n\n\
+                 view Opened(open: Bool) !{{}} {{\n    <p id=\"opened\">{{said(open)}}</p>\n}}\n\n\
+                 page Count() {{\n    route \"/count\"\n    cache private\n\n    \
+                 signal n: Int = 3\n    signal panel: Panel = Panel {{ open: true }}\n\n    \
+                 view {{\n        <title>Count</title>\n        <main>\n            \
+                 <p id=\"twice\">{{n * 2}}</p>\n            <Opened open={{panel.open}} />\n            \
+                 <button type=\"button\" on:press={{() => n = n + 1}}>More</button>\n            \
+                 <button type=\"button\" on:press={{() => panel = Panel {{ open: false }}}}>Close</button>\n        \
+                 </main>\n    }}\n}}\n"
+            )
+        });
+        let page: String = fetched_as(&s, "/count", Some("a"))
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        assert_eq!(text_in(&page, "<p id=\"twice\">"), "6");
+        assert_eq!(text_in(&page, "<p id=\"opened\">"), "open");
+        assert!(
+            page.contains("\"computed\":\"/computed/feed.app.Count.mjs\""),
+            "{page}"
+        );
     }
 
     /// **What a commit drops of the session's own reaches no other

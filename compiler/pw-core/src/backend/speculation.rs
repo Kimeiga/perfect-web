@@ -631,7 +631,7 @@ fn page_module(
                 construct: "a value computed from a speculated one",
                 reason: format!(
                     "part {part} of `{page}` computes a value from `{name}`, which the page \
-                     speculates on, and the browser computes none yet (ADR-0227)"
+                     speculates on, and the browser computes none yet (ADR-0228)"
                 ),
             };
         }

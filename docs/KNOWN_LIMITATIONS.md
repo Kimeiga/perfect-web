@@ -176,14 +176,16 @@ refused by name:
   `{#if xs}` around the list says the same.
 - **An interpolated attribute is refused in a `style`**, and a URL with holes
   must begin with text (ADR-0042).
-- **A computed value builds where a host computes it** (ADR-0226): a text
-  hole or an attribute's whole value, at the top of a page, from one query's
-  value. One from a signal or a value the page speculates on is the
-  browser's, which computes none yet (ADR-0227). One in a block, a loop's
-  row, an arm or a view that contains itself, a condition (`{#if n > 0}`),
-  one from several values, from none or from a page's parameter, and a hole
+- **A computed value builds at the top of a page, from one value** (ADR-0226,
+  ADR-0227): a text hole or an attribute's whole value, from a query's value,
+  which a host computes, or a signal's, which the browser computes after the
+  host's first. One in a block, a loop's row, an arm or a view that contains
+  itself, a condition (`{#if n > 0}`), one from a value the page speculates
+  on, from several values, from none or from a page's parameter, and a hole
   in an attribute's text, check and do not build (ADR-0228). A directive
   other than `on:` (`style:width={w}`) does not build either (ADR-0073).
+- **A value computed from a signal shows its last value until the page's
+  module has loaded** (ADR-0227): the first change loads it, once per page.
 - **A `Float` is not written by a template** (ADR-0074). It has no format
   yet, so `{price}` over a `Float` is refused (PW0609); the host drops a
   `Float` it is given.

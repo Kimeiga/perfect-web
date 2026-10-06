@@ -158,7 +158,8 @@ session page Home() {
                 None => draft = draft,
             }}>
                 <label>What's happening? <textarea bind:value={draft}></textarea></label>
-                <button type="submit">Post</button>
+                <p id="left">{280 - String.length(draft)} left</p>
+                <button type="submit" disabled={String.length(draft) == 0 | String.length(draft) > 280}>Post</button>
             </form>
             <ul>
                 {#each feed as p (p.id)}

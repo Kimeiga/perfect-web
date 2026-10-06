@@ -369,15 +369,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
           more", a keyed read, in three engines with a post after it,
           ADR-0222's browser test); ~~a value the template computes, the
           host's part~~ (0073-a, ADR-0226, `just e14-computed-holes`: the
-          thread's counts); next the browser's part (ADR-0227: a draft's
-          characters left, a post button disabled while it is empty), then
-          where else and from what else (ADR-0228: rows, blocks, conditions,
-          several values), then the rest of the feed, pulling in what it
+          thread's counts); ~~the browser's part~~ (ADR-0227, `just
+          e14-computed-signals`: a draft's characters left, a post button
+          disabled while it is empty); next where else and from what else
+          (ADR-0228: rows with optimistic likes, blocks, conditions, several
+          values, a speculated value), then the rest of the feed, pulling in what it
           needs: replies, 0071-a, 0122-d, 0057-a, 0099-a, and ADR-0195's
           ruling 10, materialization chains;
         - then 0101-a to 0101-d, 0105-a, 0100-a, and the rest below;
         - with the app layer: computed holes (0073-a: the host's part done,
-          ADR-0226; the browser's and the rest next), then 0071-a;
+          ADR-0226, and the browser's, ADR-0227; the rest next), then 0071-a;
           route-keyed speculation (0122-d); map keys (0057-a, 0057-c); `let
           _`, `while`, 0052-a, 0055-b, 0061-a, 0049-b; cheaper instantiation
           (0046-a);

@@ -244,6 +244,13 @@ pub struct Live {
     /// and start again at their first values (ADR-0130, R6).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub owns: Vec<String>,
+    /// **A value computed from the signal** (ADR-0227): the component that
+    /// computes it, which a host runs with the signal's first value, and
+    /// whose function the page's module runs in the browser with the value
+    /// at `path` each time the signal changes. Empty for a part that reads
+    /// the signal as it is.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub derived: String,
 }
 
 /// The part numbered `id`, wherever it is in `chunks`.
@@ -339,7 +346,7 @@ fn rendered_again(
                 if own.iter().any(|v| v.starts_with('#')) {
                     return Err(format!(
                         "part {id} computes a value inside a block a signal decides, and the \
-                         browser, which renders that block again, computes none yet (ADR-0227)"
+                         browser, which renders that block again, computes none yet (ADR-0228)"
                     ));
                 }
                 if let Some(other) = own.iter().find(|v| !signal(v) && !bound.contains(&root(v))) {
@@ -593,6 +600,7 @@ fn live_attributes(
                 reads: Vec::new(),
                 attribute: name.clone(),
                 owns: Vec::new(),
+                derived: String::new(),
             });
         }
         let inner = framed || matches!(p, Part::Each { .. });
@@ -1298,7 +1306,7 @@ fn plan(
         // **A computed hole** (ADR-0226): computed by a host, from the one
         // query's value it reads at the top of the page.
         if let Some(inputs) = &hole.inputs {
-            let (derived, part) = computed_part(
+            let (derived, computes) = computed_part(
                 hirs,
                 ws,
                 sigs,
@@ -1313,7 +1321,19 @@ fn plan(
                 hole.nested,
                 &mut members,
             )?;
-            parts.push(part);
+            match computes {
+                Computes::Host(part) => parts.push(part),
+                Computes::Browser { signal, path } => live.push(Live {
+                    part: hole.part.0,
+                    signal,
+                    path,
+                    kind: "text".to_string(),
+                    reads: Vec::new(),
+                    attribute: String::new(),
+                    owns: Vec::new(),
+                    derived: derived.component_id.clone(),
+                }),
+            }
             computed.push(derived);
             continue;
         }
@@ -1354,6 +1374,7 @@ fn plan(
                 reads: Vec::new(),
                 attribute: String::new(),
                 owns: Vec::new(),
+                derived: String::new(),
             });
             continue;
         }
@@ -1448,7 +1469,7 @@ fn plan(
             let crate::template_ir::ReadAt::Expr(expr) = read.at else {
                 return Err(format!("part {} computes no expression", read.part.0));
             };
-            let (derived, part) = computed_part(
+            let (derived, computes) = computed_part(
                 hirs,
                 ws,
                 sigs,
@@ -1463,7 +1484,29 @@ fn plan(
                 read.nested,
                 &mut members,
             )?;
-            derived_values.push(part);
+            match computes {
+                Computes::Host(part) => derived_values.push(part),
+                // Set in place, as an attribute a signal decides is (ADR-0142).
+                Computes::Browser { signal, path } => {
+                    let (kind, attribute) = match find_part(&template.chunks, read.part.0) {
+                        Some(
+                            p @ (crate::template_ir::Part::Attribute { name, .. }
+                            | crate::template_ir::Part::BooleanAttribute { name, .. }),
+                        ) => (p.kind().to_string(), name.clone()),
+                        _ => return Err(format!("part {} is no attribute", read.part.0)),
+                    };
+                    live.push(Live {
+                        part: read.part.0,
+                        signal,
+                        path,
+                        kind,
+                        reads: Vec::new(),
+                        attribute,
+                        owns: Vec::new(),
+                        derived: derived.component_id.clone(),
+                    });
+                }
+            }
             computed.push(derived);
             continue;
         }
@@ -1616,6 +1659,7 @@ fn plan(
                 reads: block_reads(part, &signals),
                 attribute: String::new(),
                 owns: Vec::new(),
+                derived: String::new(),
             });
         }
         // A block a signal decides (ADR-0130). What the browser cannot
@@ -1633,6 +1677,7 @@ fn plan(
                 reads: block_reads(part, &signals),
                 attribute: String::new(),
                 owns: owned(entry.id.0),
+                derived: String::new(),
             });
         }
     }
@@ -1687,13 +1732,24 @@ fn plan(
     ))
 }
 
-/// **A computed part, as a host computes it** (ADR-0226): the function its
-/// expression is lifted into, a component of its own, and the steps that
-/// reach its input from the query's value it reads, then run it. One query's
-/// value, read at the top of the page. Anything else is refused by name:
-/// a signal's, which the browser computes (ADR-0227); one in a block, a row
-/// or an instance, which no host computes yet (ADR-0228); several values;
-/// and none, which is a value to write as it is.
+/// **Who computes a computed part** (ADR-0226, ADR-0227).
+enum Computes {
+    /// A host, from a query's value, by the part's steps, the last its
+    /// function.
+    Host(Part),
+    /// The browser, from the signal's value at `path`, each time it
+    /// changes; and a host its first, from the signal's first value.
+    Browser { signal: String, path: String },
+}
+
+/// **A computed part** (ADR-0226, ADR-0227): the function its expression is
+/// lifted into, a component of its own, and who runs it with the one value
+/// it reads, at the top of the page. A query's value is a host's: the steps
+/// reach it, then run the function. A signal's is the browser's, which runs
+/// the function compiled for it, and a host's for the first value.
+/// Anything else is refused by name: one in a block, a row or an instance,
+/// several values, or a value the page speculates on (ADR-0228); and none,
+/// which is a value to write as it is.
 #[allow(clippy::too_many_arguments)]
 fn computed_part(
     hirs: &[&Hir],
@@ -1709,7 +1765,7 @@ fn computed_part(
     inputs: &[(String, String)],
     nested: bool,
     members: &mut BTreeSet<DefId>,
-) -> Result<(Derived, Part), String> {
+) -> Result<(Derived, Computes), String> {
     let refuse = |why: String| Err(format!("part {part} computes a value {why}"));
     let hir = hirs[origin.0];
     let decl = hir.decl(origin.1);
@@ -1755,29 +1811,29 @@ fn computed_part(
     };
     let mut segments = read.split('.');
     let root = segments.next().unwrap_or_default();
-    if signals.iter().any(|s| s == root) {
-        return refuse(format!(
-            "from the signal `{name}`, which the browser computes (ADR-0227)"
-        ));
-    }
-    let Some((_, resource, _)) = found.iter().find(|(n, ..)| n == root) else {
-        return refuse(format!("from `{name}`, which is no query's value"));
-    };
     let reads: Vec<&str> = segments.collect();
-    let ty = value_of(sigs, *resource)
-        .ok_or_else(|| format!("`{root}`'s query has no resolved result"))?;
+    // A signal's value is the browser's to compute (ADR-0227), at the path
+    // its expression reads it by.
+    let signal = signals.iter().any(|s| s == root);
     let mut out = Vec::new();
-    for (step, def) in steps(sigs, ty, &reads)? {
-        out.push(match (step, def) {
-            (Step::Member(_), Some(def)) => {
-                members.insert(def);
-                Step::Member(
-                    component_id_of(hirs, def)
-                        .ok_or_else(|| "a member function with no identity".to_string())?,
-                )
-            }
-            (step, _) => step,
-        });
+    if !signal {
+        let Some((_, resource, _)) = found.iter().find(|(n, ..)| n == root) else {
+            return refuse(format!("from `{name}`, which is no query's value"));
+        };
+        let ty = value_of(sigs, *resource)
+            .ok_or_else(|| format!("`{root}`'s query has no resolved result"))?;
+        for (step, def) in steps(sigs, ty, &reads)? {
+            out.push(match (step, def) {
+                (Step::Member(_), Some(def)) => {
+                    members.insert(def);
+                    Step::Member(
+                        component_id_of(hirs, def)
+                            .ok_or_else(|| "a member function with no identity".to_string())?,
+                    )
+                }
+                (step, _) => step,
+            });
+        }
     }
     // Its input's type, where its expression reads it, and its result's.
     let input = body
@@ -1809,6 +1865,18 @@ fn computed_part(
     .ok_or_else(|| format!("part {part}'s value has no type the build knows"))?;
     let component_id = format!("{page}.derived_{part}");
     out.push(Step::Derived(component_id.clone()));
+    let computes = match signal {
+        true => Computes::Browser {
+            signal: root.to_string(),
+            path: read.clone(),
+        },
+        false => Computes::Host(Part {
+            part,
+            path: path.to_string(),
+            binding: root.to_string(),
+            steps: out,
+        }),
+    };
     Ok((
         Derived {
             component_id,
@@ -1819,12 +1887,7 @@ fn computed_part(
             input: (name.clone(), input),
             result,
         },
-        Part {
-            part,
-            path: path.to_string(),
-            binding: root.to_string(),
-            steps: out,
-        },
+        computes,
     ))
 }
 

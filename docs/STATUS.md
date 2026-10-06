@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0227, 2026-10-05: a value computed from a signal is the browser's**
+(ruling 0073-a, the browser's part). A value computed from a signal was
+refused at build. Now the host renders its first value, running the
+component ADR-0226 lifts with the signal's first value, and the build
+compiles the same function into the page's module, which the browser loads
+when the signal first changes. The feed's draft says "280 left" as it is
+typed, and its post button is disabled while there is no post to send, with
+scripts off at their first values (`just e14-computed-signals`).
+
 **ADR-0226, 2026-10-05: a value the template computes compiles** (ruling
 0073-a, the host's part). A template read each value by path, and
 `{counted(List.length(thread.replies), ..)}` or `disabled={..}` checked and

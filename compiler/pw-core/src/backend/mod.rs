@@ -46,6 +46,7 @@
 
 pub mod case;
 pub mod component;
+pub mod computed;
 pub mod ir;
 pub mod js;
 pub mod js_pure;

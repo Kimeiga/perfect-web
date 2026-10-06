@@ -15,7 +15,9 @@
 //   - "Load more" shows the longer page, and a post after it is shown over
 //     the longer page (ADR-0222, ADR-0224);
 //   - a thread's counts are values its template computes, the host's, shown
-//     with scripts off, and a like's reaches the open thread (ADR-0226).
+//     with scripts off, and a like's reaches the open thread (ADR-0226);
+//   - what is left of a draft, and whether there is a post to send, are
+//     computed from it as it is typed, and the host's first (ADR-0227).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -97,6 +99,35 @@ test("a like's count reaches every reader", async ({ browser }) => {
   expect(await unreloaded(reader)).toBe(true);
   await a.close();
   await b.close();
+});
+
+test("what is left of a draft is computed as it is typed", async ({ browser }) => {
+  // ADR-0227: `{280 - String.length(draft)} left`, and the button disabled
+  // while there is no post to send. With scripts off, the host's first
+  // values, from the draft's first value.
+  const off = await browser.newContext({ javaScriptEnabled: false });
+  const still = await off.newPage();
+  await still.goto("/");
+  await expect(still.locator("#left")).toHaveText("280 left");
+  await expect(still.getByRole("button", { name: "Post" })).toBeDisabled();
+  await off.close();
+  // In the browser, as the draft changes: the page's module, loaded with
+  // the first change, computes each again.
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await home(page);
+  const draft = page.getByLabel("What's happening?");
+  const button = page.getByRole("button", { name: "Post" });
+  await expect(page.locator("#left")).toHaveText("280 left");
+  await expect(button).toBeDisabled();
+  await draft.fill("Hello");
+  await expect(page.locator("#left")).toHaveText("275 left");
+  await expect(button).toBeEnabled();
+  await draft.fill("");
+  await expect(page.locator("#left")).toHaveText("280 left");
+  await expect(button).toBeDisabled();
+  expect(await unreloaded(page)).toBe(true);
+  await context.close();
 });
 
 /** A count in words, as the feed's `counted` writes it. */
@@ -183,17 +214,24 @@ test("a post longer than 280 characters is not sent, and 280 emoji are", async (
     if (r.url().includes("/command/feed.app.post")) sent.push(r.postData());
   });
   const draft = page.getByLabel("What's happening?");
-  // The page's own check, `post_text`, finds no post's text: nothing is
-  // sent, and the draft is kept to shorten.
+  const button = page.getByRole("button", { name: "Post" });
+  // The page computes what is left, and whether there is a post to send,
+  // from the draft (ADR-0227): one character over, and nothing to press.
   await draft.fill("x".repeat(281));
-  await page.getByRole("button", { name: "Post" }).click();
+  await expect(page.locator("#left")).toHaveText("-1 left");
+  await expect(button).toBeDisabled();
+  // A submit that comes another way meets the page's own check,
+  // `post_text`, which finds no post's text: nothing is sent, and the draft
+  // is kept to shorten.
+  await page.locator("form").evaluate((form) => form.requestSubmit());
   await expect(draft).toHaveValue("x".repeat(281));
   // 280 emoji are 280 code points, as `String.length` counts them, though
-  // 560 UTF-16 units: sent, and posted. Its row says the press before it was
-  // answered too.
+  // 560 UTF-16 units: none left, sent, and posted. Its row says the press
+  // before it was answered too.
   const emoji = "\u{1F600}".repeat(280);
   await draft.fill(emoji);
-  await page.getByRole("button", { name: "Post" }).click();
+  await expect(page.locator("#left")).toHaveText("0 left");
+  await button.click();
   await expect(post(page, emoji)).toHaveCount(1);
   await expect(post(page, emoji).getByRole("link")).toHaveText(/^Guest /);
   expect(sent).toHaveLength(1);

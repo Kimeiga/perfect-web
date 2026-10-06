@@ -44,6 +44,9 @@ pub struct Build {
     pub graph: crate::graph::Graph,
     /// Each page's optimistic speculation module (ADR-0122).
     pub speculations: Vec<crate::backend::speculation::Compiled>,
+    /// **What each page computes from its signals** (ADR-0227), as the
+    /// browser computes it: a module per page that computes any.
+    pub computed: Vec<crate::backend::computed::Compiled>,
     /// What each page shows, as reads of what its queries return (ADR-0125).
     pub pages: Vec<crate::page_values::Planned>,
 }
@@ -63,6 +66,8 @@ impl Build {
     /// DIR/pages/<page>.json         what each page shows (ADR-0125)
     /// DIR/graph.json                what a materializer consumes (ADR-0123)
     /// DIR/speculations/<page>.*     each page's speculations (ADR-0122)
+    /// DIR/computed/<page>.mjs       what each page computes from its
+    ///                               signals, in the browser (ADR-0227)
     /// ```
     pub fn write(&self, dir: &std::path::Path) -> Result<Vec<String>, String> {
         let write = |rel: &str, bytes: &[u8]| -> Result<(), String> {
@@ -175,6 +180,12 @@ impl Build {
                 ));
             }
         }
+        for c in &self.computed {
+            if let Ok(source) = &c.module {
+                write(&format!("computed/{}.mjs", c.page), source.as_bytes())?;
+                lines.push(format!("  computed   {}  {} bytes", c.page, source.len()));
+            }
+        }
         Ok(lines)
     }
 
@@ -218,6 +229,14 @@ impl Build {
             crate::backend::wasm::Encoding::Encoded(_) => None,
             other => Some(format!("`{}`'s speculations: {other}", s.page)),
         });
+        // A value computed from a signal the browser could not compute
+        // (ADR-0227) would stay at its first value.
+        let computed = self.computed.iter().filter_map(|c| {
+            c.module
+                .as_ref()
+                .err()
+                .map(|why| format!("`{}`'s computed values: {why}", c.page))
+        });
         // A graph edge naming nothing never fires (`pw emit-graph`'s rule).
         let dangling = self
             .graph
@@ -253,6 +272,7 @@ impl Build {
             .chain(components)
             .chain(depended)
             .chain(speculations)
+            .chain(computed)
             .chain(dangling)
             .chain(inert)
             .chain(pages)
@@ -309,6 +329,7 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
 
     let graph = crate::graph::Graph::build(&hirs, &ws);
     let speculations = crate::backend::speculation::compile(units)?;
+    let computed = crate::backend::computed::compile(units)?;
     let mut pages = crate::page_values::pages(&hirs, &ws, &sigs);
     // Each page's signals' first values (ADR-0130), which the backend
     // computes, into the plan the server renders from. A page whose signals
@@ -332,6 +353,7 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
         wit,
         graph,
         speculations,
+        computed,
         pages,
     })
 }

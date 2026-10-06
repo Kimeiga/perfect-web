@@ -84,12 +84,9 @@ MUTANTS = [
         "    let [(name, read)] = inputs else {\n",
         "    let [(name, read), ..] = inputs else {\n",
     ),
-    (
-        "a signal's value is not said to be the browser's",
-        VALUES,
-        "    if signals.iter().any(|s| s == root) {\n",
-        "    if false && signals.iter().any(|s| s == root) {\n",
-    ),
+    # "a signal's value is not said to be the browser's" is retired: since
+    # ADR-0227 the browser computes it, and computed_signals_mutations.py's
+    # "a signal's value is a query's to compute" stands in its place.
     (
         "the lifted function is not run",
         VALUES,

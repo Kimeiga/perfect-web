@@ -187,12 +187,16 @@ fn a_value_the_template_computes_is_lifted_and_planned() {
     let chunks = format!("{:?}", template.chunks);
     assert!(chunks.contains("\"#feed.app.PostPage~1\""), "{chunks}");
     assert!(chunks.contains("\"#feed.app.PostPage~2\""), "{chunks}");
-    // Control: the home page computes nothing, and lifts nothing.
+    // Control: the home page's host computes nothing. What it computes is
+    // from its draft, a signal, which the browser computes (ADR-0227).
+    let home = plan_of(&b, "feed.app.Home");
     assert!(
-        !b.contracts
+        home.parts
             .iter()
-            .any(|c| c.component_id.starts_with("feed.app.Home.derived")),
-        "the home page computes nothing"
+            .chain(&home.derived)
+            .all(|p| !p.steps.iter().any(|s| matches!(s, Step::Derived(_)))),
+        "the home page's host computes nothing: {:?}",
+        home.parts
     );
 }
 
@@ -285,7 +289,7 @@ fn what_a_host_does_not_compute_is_refused_by_name() {
         (
             "{#if open}<p>{counted(post.likes, \"a\", \"b\")}</p>{/if}",
             "computes a value inside a block a signal decides, and the browser, which renders \
-             that block again, computes none yet (ADR-0227)",
+             that block again, computes none yet (ADR-0228)",
         ),
         (
             "<ul>{#each post.replies as r (r.id)}<li>{shown(r.id == post.id)}</li>{/each}</ul>",
@@ -299,10 +303,6 @@ fn what_a_host_does_not_compute_is_refused_by_name() {
         (
             "<p>{counted(1, \"a\", \"b\")}</p>",
             "computes a value from nothing it reads",
-        ),
-        (
-            "<p>{shown(open)}</p>",
-            "computes a value from the signal `open`, which the browser computes (ADR-0227)",
         ),
         (
             "<p>{shown(id == \"p1\")}</p>",
@@ -363,7 +363,7 @@ fn a_view_that_contains_itself_or_a_speculated_value_computes_nothing_yet() {
     assert!(
         refusals.contains(
             "computes a value from `feed`, which the page speculates on, and the browser \
-             computes none yet (ADR-0227)"
+             computes none yet (ADR-0228)"
         ),
         "{refusals}"
     );
