@@ -703,6 +703,35 @@ fn page_module(
             kind,
         });
     }
+    // **A view's instance given a speculated value** (ADR-0234), at the top
+    // of the page: rendered again with it, as a block a speculated value
+    // decides is, by the view's template the document carries, as the
+    // browser renders an instance a signal gives (ADR-0203). Until
+    // 2026-10-06 none was a region: a speculation changed what the page
+    // computes from the value, and the instance kept what the server
+    // rendered, two values at once.
+    let given = |args: &[(String, String)]| {
+        args.iter()
+            .map(|(_, v)| v.split('.').next().unwrap_or_default().to_string())
+            .find(|r| speculates(r))
+    };
+    for c in &lowered.template.chunks {
+        let crate::template_ir::Chunk::Dynamic(crate::template_ir::Part::Instance {
+            id, args, ..
+        }) = c
+        else {
+            continue;
+        };
+        if let Some(root) = given(args)
+            && !regions.iter().any(|r| r.part == id.0)
+        {
+            regions.push(Region {
+                binding: root,
+                part: id.0,
+                kind: RegionKind::Block,
+            });
+        }
+    }
     // What a region holds, the browser renders from what it holds: the
     // speculated value, the page's signals, and the names bound inside it.
     // Anything else it does not hold, as a signal's block does not (ADR-0137).
@@ -741,6 +770,26 @@ fn page_module(
                         region.part, region.binding
                     ),
                 };
+            }
+        }
+        // And what an instance is given, which the region renders it with
+        // (ADR-0234): the speculated value, a signal, or a name bound around
+        // it.
+        if let Some(crate::template_ir::Part::Instance { args, .. }) =
+            part_of(&lowered.template.chunks, region.part)
+        {
+            for (_, path) in args {
+                let root = path.split('.').next().unwrap_or_default();
+                if !held(root) {
+                    return Encoding::Unsupported {
+                        construct: "a value a speculated region reads that the browser does not hold",
+                        reason: format!(
+                            "part {} of `{page}` is a view given `{path}` beside `{}`, which the \
+                             browser renders again with a speculation of it",
+                            region.part, region.binding
+                        ),
+                    };
+                }
             }
         }
         // And what each handler in it captures, which the region writes.
@@ -782,6 +831,40 @@ fn page_module(
                     "part {} of `{page}` reads `{}` inside a block, which a speculation \
                      would not reach",
                     read.part.0, read.path
+                ),
+            };
+        }
+    }
+    // And a view given one there (ADR-0234), whose instance nothing would
+    // render again.
+    fn instances(chunks: &[crate::template_ir::Chunk], out: &mut Vec<(u32, Vec<String>)>) {
+        for c in chunks {
+            let crate::template_ir::Chunk::Dynamic(p) = c else {
+                continue;
+            };
+            if let crate::template_ir::Part::Instance { id, args, .. } = p {
+                out.push((id.0, args.iter().map(|(_, v)| v.clone()).collect()));
+            }
+            for region in p.nested() {
+                instances(region, out);
+            }
+        }
+    }
+    let mut given_one = Vec::new();
+    instances(&lowered.template.chunks, &mut given_one);
+    for (part, args) in given_one {
+        let top = regions.iter().any(|r| r.part == part);
+        if let Some(path) = args
+            .iter()
+            .find(|a| speculates(a.split('.').next().unwrap_or_default()))
+            && !top
+            && !in_a_region(part)
+        {
+            return Encoding::Unsupported {
+                construct: "a speculated value read where this module does not render it again",
+                reason: format!(
+                    "part {part} of `{page}` is a view given `{path}` inside a block, which a \
+                     speculation would not reach"
                 ),
             };
         }

@@ -765,8 +765,9 @@ applies to its default value.
 
 **A pending post is by "You"** (ADR-0222): a transition sees the value it
 changes and its command's arguments, not the page's own user. A value of a
-type that contains itself is speculated on as its nodes (ADR-0233); a page
-that speculates on one keyed by its parameter waits on ruling 0122-d.
+type that contains itself is speculated on as its nodes (ADR-0233), and a
+view's instance given one is rendered again with it (ADR-0234); a page that
+speculates on one keyed by its parameter waits on ruling 0122-d.
 
 **A commit reaches another session's open page by the query it reads, not
 by its key** (ADR-0219). A like drops one post's `Thread`, and every open

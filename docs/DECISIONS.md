@@ -1973,3 +1973,11 @@ for a speculation's value).
   type: a value of a type that contains itself as its nodes, in the level
   order the host reads, each such value inside another a graph of its own.
   The page's module reads it from its nodes, as a handler reads a signal's.
+[ADR-0234](DECISIONS/ADR-0234-a-speculated-views-instance-is-rendered-again.md):
+a view's instance given a speculated value is rendered again with it (found
+building the thread page's optimistic reply).
+- A view that contains itself, given a value a page speculates on, was no
+  region of the speculation: a press changed the page's count and left the
+  thread as the server rendered it. Its instance is a region now, rendered as
+  a block is; one given what the browser does not hold, or nested where no
+  region renders it, is refused by name.

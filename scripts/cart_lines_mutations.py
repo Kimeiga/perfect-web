@@ -76,7 +76,12 @@ MUTANTS = [
         "a region's read of what the browser does not hold is not refused",
         "core",
         SPECULATION,
+        # Re-anchored by ADR-0234, whose instance check reads the same way.
+        "        for (part, path) in paths {\n"
+        "            let root = path.split('.').next().unwrap_or_default();\n"
         "            if !held(root) {\n",
+        "        for (part, path) in paths {\n"
+        "            let root = path.split('.').next().unwrap_or_default();\n"
         "            if false && !held(root) {\n",
     ),
     (

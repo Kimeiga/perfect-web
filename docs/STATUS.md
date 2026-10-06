@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0234, 2026-10-06: a view's instance given a speculated value is
+rendered again with it** (found building the thread page's optimistic reply).
+A view that contains itself, given a value a page speculates on, was no region
+of the speculation: a press would have changed the page's count and left the
+thread as the server rendered it, and nothing refused it. Its instance is a
+region now, rendered as a block is; one given what the browser does not hold,
+or nested where no region renders it, is refused by name
+(`just e14-speculated-instances`).
+
 **ADR-0233, 2026-10-06: a speculation on a value of a type that contains
 itself** (ADR-0205 §5, for a speculation's value). The server wrote each
 value a page speculates on nested, knowing no type, and a page's module could

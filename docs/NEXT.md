@@ -381,8 +381,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           ~~an opaque value's representation in a template~~ (ADR-0232,
           `just e14-representations`); ~~speculation on a value of a type
           that contains itself~~ (ADR-0233, `just e14-speculated-graphs`);
-          next 0122-d's route-keyed speculation, for an optimistic reply
-          and a like on the thread page; then 0057-a, 0099-a and ADR-0195's
+          ~~a speculated view's instance rendered again~~ (ADR-0234, `just
+          e14-speculated-instances`); next a block's subject computed from a
+          speculated value (0073-a), then 0122-d's route-keyed speculation,
+          for an optimistic reply and a like on the thread page; then 0057-a, 0099-a and ADR-0195's
           ruling 10,
           materialization chains; and what ruling 0073-a still refuses
           (several values, a page's parameter, the browser's values inside a

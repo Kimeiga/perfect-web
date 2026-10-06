@@ -4579,3 +4579,18 @@ e14-speculated-graphs:
        CARGO_INCREMENTAL=0 python3 scripts/speculated_graphs_mutations.py; \
      } > docs/evidence/E14/speculated-graphs.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/speculated-graphs.txt
+
+# ADR-0234: a view's instance given a speculated value is rendered again with
+# it. The compiler's tests, and the mutation controls.
+e14-speculated-instances:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0234 - a view's instance given a speculated value is rendered again with it"; echo; \
+       echo "produced by: just e14-speculated-instances"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the module (compiler/pw-core/tests/speculated_instances.rs)"; echo; \
+       cargo test --locked -p pw-core --test speculated_instances 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/speculated_instances_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/speculated_instances_mutations.py; \
+     } > docs/evidence/E14/speculated-instances.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/speculated-instances.txt
