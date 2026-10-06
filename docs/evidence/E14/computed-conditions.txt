@@ -1,0 +1,48 @@
+ADR-0229 - a computed condition decides its block
+
+produced by: just e14-computed-conditions
+commit: c7f999bd5223ae9cc476cade7698b647ec95d1ee
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the build (compiler/pw-core/tests/computed_conditions.rs, template_values.rs)
+
+test an_else_if_a_match_and_a_value_in_a_hosts_block_are_computed_too ... ok
+test a_computed_condition_is_a_hosts_from_a_query_and_the_browsers_from_a_signal ... ok
+test what_a_condition_does_not_compute_yet_is_refused_by_name ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.57s
+test a_key_is_the_path_from_the_element ... ok
+test the_ir_blocks_a_computed_list_and_a_foreign_key ... ok
+test a_loops_key_is_read_from_its_element ... ok
+test a_directive_other_than_on_does_not_build ... ok
+test a_computed_hole_checks_and_does_not_build ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.87s
+
+== the server (spikes/own-renderer/server/src/main.rs)
+
+test tests::a_condition_a_host_computes_decides_its_block_and_again_when_it_changes ... ok
+test tests::a_condition_the_browser_computes_is_rendered_at_its_first_value ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 144 filtered out; finished in 2.46s
+
+== the feed in three engines (e2e/feed.spec.mjs)
+
+  36 passed (35.4s)
+
+== mutation controls (scripts/computed_conditions_mutations.py)
+
+baseline (browser): 36 passed, 0 failed
+baseline (cargo): 22 passed, 0 failed
+a computed subject reads nothing [cargo]: KILLED (6 of 6 tests fail)
+a computed subject is read as a path [cargo]: KILLED (6 of 6 tests fail)
+a subject the browser computes decides no block [cargo]: KILLED (4 of 6 tests fail)
+a block whose subject the browser computes is not rendered again for its signal [cargo]: KILLED (1 of 6 tests fail)
+a block whose subject the browser computes may hold a view's signals [cargo]: KILLED (1 of 6 tests fail)
+a block a host's subject decides is not rendered again [cargo]: KILLED (3 of 6 tests fail)
+a value the host computes in a block is a text part of its own [cargo]: KILLED (1 of 6 tests fail)
+a value the browser would compute in a block is built [cargo]: KILLED (1 of 6 tests fail)
+a block a computed subject decides is not one a signal does [cargo]: KILLED (1 of 6 tests fail)
+the host renders no first value of a subject [cargo]: KILLED (2 of 22 tests fail)
+the browser renders a block without what it computes [browser]: KILLED (3 of 6 tests fail)
+the browser sets a block in place [browser]: KILLED (3 of 15 tests fail)
+12 of 12 mutants killed

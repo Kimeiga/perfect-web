@@ -1,7 +1,7 @@
 ADR-0144 - a view's own signals, and a signal a page provides
 
 produced by: just e14-provide
-commit: cabf8519c761c3bd5d8958eee676515b05761a51
+commit: c7f999bd5223ae9cc476cade7698b647ec95d1ee
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
@@ -10,20 +10,20 @@ playwright: Version 1.58.0
 test the_marko_adapter_refuses_what_it_does_not_model ... ok
 test a_module_signal_is_a_name_and_a_type ... ok
 test a_module_signal_is_read_and_changed_where_a_page_signal_is ... ok
-test a_body_provides_a_module_signal_once ... ok
-test a_view_that_holds_a_signal_is_not_used_in_a_row ... ok
 test binding_and_dialogs_read_a_module_signal ... ok
+test a_view_that_holds_a_signal_is_not_used_in_a_row ... ok
+test a_body_provides_a_module_signal_once ... ok
 test what_nothing_provides_is_refused ... ok
-test a_provided_signal_reaches_sibling_views ... ok
 test a_nearer_provide_keeps_what_it_contains_apart ... ok
+test a_provided_signal_reaches_sibling_views ... ok
 test a_provide_is_checked_against_the_signal_s_type ... ok
-test a_block_owns_the_signals_its_arms_hold ... ok
 test each_use_of_a_view_holds_its_own_signal ... ok
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.05s
+test a_block_owns_the_signals_its_arms_hold ... ok
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
 
 == the browser (spikes/own-renderer/e2e/provide.spec.mjs), three engines
 
-  18 passed (37.9s)
+  18 passed (26.5s)
 
 == mutation controls (scripts/provide_mutations.py)
 
@@ -57,5 +57,5 @@ the Marko adapter drops a `provide` [compiler]: KILLED (1 of 12 tests fail)
 the Marko adapter renders a signal a page provides [compiler]: KILLED (1 of 12 tests fail)
 the browser reads and sets a handler's signal by its own name [browser]: KILLED (4 of 6 tests fail)
 a block's instances go on when it shows another arm [browser]: KILLED (1 of 6 tests fail)
-a block's instances start again at no value [browser]: KILLED (3 of 6 tests fail)
+a block's instances start again at no value [browser]: KILLED (1 of 6 tests fail)
 29 of 29 mutants killed

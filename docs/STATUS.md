@@ -2,8 +2,8 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-06, against master `4e198b9`, with ADR-0221 to
-ADR-0226.
+**Reviewed:** 2026-10-06, against master `c7f999b`, with ADR-0227 to
+ADR-0231.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -3003,6 +3003,24 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`c7f999b` (2026-10-06, ADR-0227 to ADR-0231): `just ci` passes locally, the
+workspace's 2099 tests pass, and the browser suite passes 773 in three
+engines, with 13 skipped. Recorded at that commit, in `docs/evidence/E14/`,
+each new: `computed-signals.txt` (ADR-0227) 16 of 16 mutants killed,
+`computed-rows.txt` (ADR-0228) 12 of 12, `computed-conditions.txt`
+(ADR-0229) 12 of 12, `condition-truth.txt` (ADR-0230) 6 of 6 and
+`page-parameters.txt` (ADR-0231) 8 of 8. Recorded again, their scripts
+re-anchored: `row-reads.txt` 21 of 21, `cart-lines.txt` 41 of 41,
+`optimistic.txt` 6 of 6, `provide.txt` 29 of 29, `query-blocks.txt` 9 of 9,
+`signals-render-again.txt` 8 of 8, `pages.txt` 7 of 7 and `feed.txt` 5 of 5.
+**And two survivors, which the ADRs' own runs missed, since each re-ran only
+the mutants it re-anchored:**
+- **`computed-holes.txt` 23 of 24: "a host computes a value in a block"
+  survives**, likely since ADR-0229 made such a value the host's;
+- **`E10/template-operands.txt` 10 of 11: "a sum type has a truth"
+  survives**, likely since ADR-0230 rewrote a condition's truth.
+
+Under investigation; each fix records its file again.
 `4e198b9` (2026-10-06, ADR-0221 to ADR-0226): `just ci` passes locally, the
 workspace's 2075 tests pass, and the browser suite passes 761 in three
 engines, with 13 skipped. Recorded at that commit, in `docs/evidence/E14/`,
