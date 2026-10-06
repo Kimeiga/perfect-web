@@ -1,17 +1,17 @@
 ADR-0219 - what a commit drops reaches every session that reads it
 
 produced by: just e14-cross-session
-commit: 1a00c28aac753c255cb81af22ce6413b46e0d5a9
+commit: 4e198b9e35f8d4bda5b131a6807b86767209d9de
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
-test tests::a_page_reading_nothing_dropped_is_told_nothing ... ok
 test tests::a_post_reaches_every_open_timeline ... ok
 test tests::a_post_over_http_reaches_another_reader_after_its_answer ... ok
+test tests::a_page_reading_nothing_dropped_is_told_nothing ... ok
 test tests::the_feed_is_served_by_the_host_its_data_the_deployments ... ok
 test tests::a_sessions_own_change_reaches_no_other_session ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 125 filtered out; finished in 2.05s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 132 filtered out; finished in 2.47s
 
 == mutation controls (scripts/cross_session_mutations.py)
 

@@ -2,8 +2,8 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `1a00c28`, with ADR-0218 to
-ADR-0220.
+**Reviewed:** 2026-10-06, against master `4e198b9`, with ADR-0221 to
+ADR-0226.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2955,6 +2955,17 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`4e198b9` (2026-10-06, ADR-0221 to ADR-0226): `just ci` passes locally, the
+workspace's 2075 tests pass, and the browser suite passes 761 in three
+engines, with 13 skipped. Recorded at that commit, in `docs/evidence/E14/`,
+each new: `form-controls.txt` (ADR-0221) 12 of 12 mutants killed,
+`optimistic-posts.txt` (ADR-0222) 11 of 11, `whole-fills.txt` (ADR-0223) 3
+of 3, `keyed-race.txt` (ADR-0224) 1 of 1, `string-invariants.txt`
+(ADR-0225) 12 of 12 and `computed-holes.txt` (ADR-0226) 26 of 26. Recorded
+again, their scripts re-anchored or their tests changed: `bind.txt` 14 of
+14, `row-reads.txt` 23 of 23, `patch-set.txt` 14 of 14, `invariants.txt` 25
+of 25, `slots.txt` 7 of 7, `feed.txt` 5 of 5, `cross-session.txt` 8 of 8 and
+`E10/template-values.txt` 11 of 11.
 `1a00c28` (2026-10-05, ADR-0218 to ADR-0220): `just ci` passes locally, the
 workspace's 2045 tests pass, and the browser suite passes 737 in three
 engines, with 13 skipped. Recorded at that commit, in `docs/evidence/E14/`:

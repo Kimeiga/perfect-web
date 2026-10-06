@@ -1,0 +1,41 @@
+ADR-0222 - a post is shown before the server answers
+
+produced by: just e14-optimistic-posts
+commit: 4e198b9e35f8d4bda5b131a6807b86767209d9de
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== a key left unnamed (compiler/pw-core/tests/optimistic_keys.rs)
+
+test a_target_may_leave_a_key_unnamed ... ok
+test a_key_left_unnamed_is_a_targets_alone ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+
+== the server (spikes/own-renderer/server/src/main.rs)
+
+test tests::a_speculating_page_is_sent_its_carts_value ... ok
+test tests::a_post_is_shown_before_the_server_answers_and_the_page_told_when_it_holds_it ... ok
+test tests::a_speculated_value_that_did_not_change_is_not_sent_again ... ok
+test tests::a_page_that_reads_more_holds_what_it_shows ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 133 filtered out; finished in 0.94s
+
+== the feed in three engines (e2e/feed.spec.mjs)
+
+  24 passed (54.9s)
+
+== mutation controls (scripts/optimistic_posts_mutations.py)
+
+baseline: 6 passed, 0 failed
+a key left unnamed is a name that does not resolve: KILLED (4 of 6 tests fail)
+`_` is unnamed wherever a policy writes it: KILLED (1 of 6 tests fail)
+the speculation reads `_` as no key: KILLED (4 of 6 tests fail)
+a key left unnamed matches no key: KILLED (4 of 6 tests fail)
+what a page shows holds no value it speculates on: KILLED (3 of 6 tests fail)
+a page is served no value it speculates on: KILLED (2 of 6 tests fail)
+a change sends no value a page speculates on: KILLED (2 of 6 tests fail)
+a longer read sends no value a page speculates on: KILLED (1 of 6 tests fail)
+a value that did not change is sent again: KILLED (1 of 6 tests fail)
+a commit's answer names no value it changed: KILLED (1 of 6 tests fail)
+the store's cart is speculated twice: KILLED (1 of 6 tests fail)
+11 of 11 mutants killed

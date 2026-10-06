@@ -1,7 +1,7 @@
 ADR-0142 - an input bound to a signal
 
 produced by: just e14-bind
-commit: 7daddfbf614c54e85d791dc38b83590ead4a4764
+commit: 4e198b9e35f8d4bda5b131a6807b86767209d9de
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the binding (compiler/pw-core/tests/bind.rs)
@@ -9,16 +9,16 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test a_binding_binds_a_signal_of_string_by_its_name ... ok
 test a_binding_is_a_value_and_a_handler ... ok
 test a_block_is_rendered_again_only_for_what_it_cannot_set_in_place ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
 
 == what the browser sets in place (compiler/pw-core/tests/signals_render_again.rs)
 
 test a_list_a_signal_holds_is_rendered_again_only_inside_its_block ... ok
 test what_a_handler_captures_in_a_signal_s_block_is_the_block_s ... ok
-test an_attribute_a_signal_decides_is_set_in_place_or_refused ... ok
 test a_signal_read_in_a_block_a_query_decides_is_refused ... ok
+test an_attribute_a_signal_decides_is_set_in_place_or_refused ... ok
 test a_block_a_signal_decides_reads_the_signals_and_its_own_names ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.45s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.92s
 
 == mutation controls (scripts/bind_mutations.py)
 

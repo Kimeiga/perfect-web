@@ -1,0 +1,64 @@
+ADR-0221 - a form control's value is written where HTML reads it
+
+produced by: just e14-form-controls
+commit: 4e198b9e35f8d4bda5b131a6807b86767209d9de
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the template and the check (compiler/pw-core/tests/form_controls.rs)
+
+test the_template_refuses_what_the_check_refuses ... ok
+test a_textareas_value_is_written_as_its_text ... ok
+test the_browser_sets_a_textareas_value_in_place ... ok
+test a_value_html_does_not_read_is_refused_where_it_is_written ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+== the renderer's escaping matrix (runtime/pw-render/tests/security.rs)
+
+test a_record_field_in_a_hostile_position_is_escaped_the_same_way ... ok
+test lone_surrogates_cannot_reach_the_renderer ... ok
+test an_ordinary_url_is_not_mangled ... ok
+test ampersands_are_encoded_in_both_contexts ... ok
+test raw_html_requires_the_capability_and_is_not_a_flag_on_a_string ... ok
+test an_attribute_breakout_stays_inside_one_attribute ... ok
+test a_style_value_that_executes_is_dropped ... ok
+test embedded_json_cannot_end_its_script ... ok
+test a_textareas_value_is_its_text ... ok
+test text_injection_becomes_inert_text ... ok
+test an_unquoted_breakout_attempt_stays_inside_the_quotes ... ok
+test quotes_and_angles_are_encoded_where_they_matter ... ok
+test a_javascript_url_is_replaced_rather_than_escaped ... ok
+test the_matrix_can_fail ... ok
+test unicode_passes_through_unchanged ... ok
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+== the corpus (C15) and generality
+
+accepted: 32 files
+accepted: 32/32 charter §16 categories covered
+rejected: 58 files
+rejected: 58/58 charter §16 categories covered
+corpus-check: OK
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.03s
+
+== bound fields in three engines (e2e/bind.spec.mjs)
+
+  24 passed (36.5s)
+
+== mutation controls (scripts/form_controls_mutations.py)
+
+baseline: 22 passed, 0 failed
+a textarea's value is written as an attribute: KILLED (2 of 22 tests fail)
+the renderer writes a textarea's value as an attribute: KILLED (2 of 22 tests fail)
+a newline a value starts with is dropped: KILLED (2 of 22 tests fail)
+a patch carries a textarea's value as text: KILLED (1 of 22 tests fail)
+the browser does not set a textarea's value in place: KILLED (1 of 22 tests fail)
+a select's value is not refused: KILLED (1 of 22 tests fail)
+a textarea with a value and text is not refused: KILLED (1 of 22 tests fail)
+a textarea's value read from no signal is not refused: KILLED (1 of 22 tests fail)
+a value in a textarea's text is not refused: KILLED (1 of 22 tests fail)
+the template writes a select's value: KILLED (1 of 22 tests fail)
+the template writes a textarea's value and its text: KILLED (1 of 22 tests fail)
+the template writes a value in a textarea's text: KILLED (1 of 22 tests fail)
+12 of 12 mutants killed
