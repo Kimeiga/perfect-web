@@ -312,7 +312,10 @@ codes! {
         "an annotated binding must be initialised with a value of its declared type";
     // Until 2026-09-25 a comparison was typed `Bool` whatever it compared,
     // and `1 == "a"` checked; the backend was the first to refuse it.
-    OPERAND_TYPE = "PW0609" / operand_type / 1, Types,
+    // Ruling 0071-a (ADR-0230): a condition is a `Bool`, or a `List` or a
+    // `String` tested non-empty, where a number and a record were the
+    // renderer's truth.
+    OPERAND_TYPE = "PW0609" / operand_type / 2, Types,
         "an operator's operands, and a condition, must have the types they take";
     // Until 2026-09-25 such a pattern read as a wildcard, so `Ok(x)` and
     // `Err(e)` arms proved a match over an `Option` exhaustive. Revision 2

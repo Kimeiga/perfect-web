@@ -41,7 +41,8 @@ Milestone: E14.
 3. **The browser's renderer is given what the page computes now.** A block
    it renders again is given each value the page's module computes from the
    signals as they are, beside the signals.
-4. **Refused, by name** (ADR-0230):
+4. **Refused, by name**, each citing ruling 0073-a, which later steps
+   build. They named ADR-0230 until ADR-0230 became ruling 0071-a's.
    - a value the browser would compute inside a block, which it computes at
      the top of the page alone;
    - a value from a query's inside a block a signal decides;
@@ -78,7 +79,7 @@ Milestone: E14.
 - **ADR-0073's `template_values.rs`**: `{#if !b}` and `{:else if n > 0}`
   build.
   - ADR-0226's to ADR-0228's tests: a value in a block a host renders builds,
-    and what moved names ADR-0230.
+    and what moved names ruling 0073-a.
   - ADR-0227's counts what is set in place apart from a block.
 - **The development server's tests:**
   - `a_condition_a_host_computes_decides_its_block_and_again_when_it_changes`:
@@ -100,7 +101,7 @@ Milestone: E14.
 
 ## Not claimed
 
-- **Still refused** (ADR-0230):
+- **Still refused** (ruling 0073-a, later):
   - a value from several values;
   - one the browser would compute inside a block;
   - one from a page's parameter;

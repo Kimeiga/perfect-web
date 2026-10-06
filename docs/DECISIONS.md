@@ -1943,3 +1943,10 @@ inside a block; 0071-a's repair).
   again as the signal changes. A value computed inside a block a host renders
   is the host's. The feed's draft too long says so; a thread with no reply
   says that.
+[ADR-0230](DECISIONS/ADR-0230-a-condition-is-a-bool-or-tested-non-empty.md):
+a condition is a `Bool`, or tested non-empty (ruling 0071-a; answers
+ADR-0071's mark).
+- A template's condition, and a boolean attribute, is a `Bool`, or a `List`
+  or a `String` tested non-empty. A number has no truth, "say what it tests:
+  `n > 0`", which ADR-0229 builds; a record and anything else none. Corpus
+  C17, generality 44 / 44.

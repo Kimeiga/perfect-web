@@ -7,9 +7,10 @@
 //!   renders: a case is taken apart with `{#match}`;
 //! - `on:press={n}`, an event attribute given a value that is not a function.
 //!
-//! `{#if n}` over a number, a string or a list is the renderer's truth, and
-//! stays: ADR-0042 relies on it for a list. Each test states one case, with a
-//! control.
+//! `{#if n}` over a string or a list is tested non-empty: ADR-0042 relies on
+//! it for a list. Over a number it was the renderer's truth until ruling
+//! 0071-a (ADR-0230): a count says what it tests, `n > 0`. Each test states
+//! one case, with a control.
 
 use pw_core::check::{Unit, check_sources};
 use pw_core::lower::lower_file;
@@ -73,15 +74,16 @@ fn an_each_runs_over_a_list() {
 fn an_if_tests_a_value_with_a_truth() {
     let wrong = "module t\n\ntype Shape =\n    | Circle(Int)\n    | Empty\n\nview V(s: Shape, n: Int) !{} {\n    <div>\n        {#if s}\n            <p>yes</p>\n        {/if}\n    </div>\n}\n";
     refused(wrong, "PW0609");
-    // A number has a truth: not zero.
-    none(&wrong.replace("{#if s}", "{#if n}"));
+    // A number has none since ruling 0071-a (ADR-0230); a comparison has.
+    refused(&wrong.replace("{#if s}", "{#if n}"), "PW0609");
+    none(&wrong.replace("{#if s}", "{#if n > 0}"));
     // `{:else if}` tests its condition as `{#if}` does.
     let branch = wrong.replace(
         "{#if s}",
-        "{#if n}\n            <p>n</p>\n        {:else if s}",
+        "{#if n > 0}\n            <p>n</p>\n        {:else if s}",
     );
     refused(&branch, "PW0609");
-    none(&branch.replace("{:else if s}", "{:else if n}"));
+    none(&branch.replace("{:else if s}", "{:else if n < 0}"));
 }
 
 /// An `Option` tested by `{#if}` is PW0600's, which says the same, so it is

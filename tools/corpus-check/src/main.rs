@@ -148,6 +148,8 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a select's value written as an attribute",
     // ADR-0226, corpus C16: PW0334, revision 2.
     "a value the template computes that performs an effect",
+    // ADR-0230, corpus C17: PW0609, revision 2 (ruling 0071-a).
+    "a template condition that tests a number",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

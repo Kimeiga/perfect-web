@@ -2304,7 +2304,7 @@ fn compose(
         if !computed_values(view).is_empty() {
             out.push(blocked(format!(
                 "`<{tag}>` contains itself and computes a value in its template, and a view \
-                 that contains itself computes none yet (ADR-0230)"
+                 that contains itself computes none yet (ruling 0073-a)"
             )));
             return;
         }

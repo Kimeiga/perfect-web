@@ -182,7 +182,7 @@ refused by name:
   browser computes after the host's first; inside a block a host renders,
   from a query's value; and in a loop's row from the row's item, which a host
   computes for each row, and the speculation module for each row it renders.
-  These check and do not build (ADR-0230):
+  These check and do not build (ruling 0073-a, later):
   - one from several values, from none, or from a page's parameter;
   - one the browser would compute inside a block, or one from a query's
     inside a block a signal decides;

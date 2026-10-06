@@ -634,7 +634,7 @@ fn page_module(
                     reason: format!(
                         "part {part} of `{page}` computes {what} from `{name}`, which the page \
                          speculates on, and the browser computes a text part from the value \
-                         whole, between tags (ADR-0230)"
+                         whole, between tags (ruling 0073-a)"
                     ),
                 };
             }
@@ -859,7 +859,7 @@ fn page_module(
                         reason: format!(
                             "part {} of `{page}` computes a value from `{read}`, a field of a \
                              row the page speculates on, and the browser computes one from \
-                             the row's item whole (ADR-0230)",
+                             the row's item whole (ruling 0073-a)",
                             region.part
                         ),
                     };

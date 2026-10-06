@@ -187,14 +187,14 @@ fn what_a_condition_does_not_compute_yet_is_refused_by_name() {
         (
             page("{#if post.pinned}<p>{shown(open)}</p>{/if}"),
             "computes a value from the signal `open` inside a block, and the browser computes \
-             one at the top of the page (ADR-0230)",
+             one at the top of the page (ruling 0073-a)",
         ),
         // A value from a query inside a block a signal decides, which the
         // browser renders again from the signals alone.
         (
             page("{#if open}<p>{shown(post.pinned)}</p>{/if}"),
             "computes a value inside a block a signal decides, and the browser, which renders \
-             that block again, computes none yet (ADR-0230)",
+             that block again, computes none yet (ruling 0073-a)",
         ),
         // A block the browser decides by a computed subject, which reads a
         // query's value inside: it renders it again from the signals alone.
@@ -208,7 +208,7 @@ fn what_a_condition_does_not_compute_yet_is_refused_by_name() {
         (
             page("{#if count > 2}<Counter />{/if}"),
             "is a block whose subject the browser computes, and whose arms hold a view's \
-             signals, which the browser starts again by its arm (ADR-0230)",
+             signals, which the browser starts again by its arm (ruling 0073-a)",
         ),
         // A subject computed from a value the page speculates on.
         (
@@ -219,7 +219,7 @@ fn what_a_condition_does_not_compute_yet_is_refused_by_name() {
                 )
             }),
             "computes a block's subject from `feed`, which the page speculates on, and the \
-             browser computes a text part from the value whole, between tags (ADR-0230)",
+             browser computes a text part from the value whole, between tags (ruling 0073-a)",
         ),
     ] {
         assert_eq!(reported(&files), Vec::<String>::new(), "{why}");

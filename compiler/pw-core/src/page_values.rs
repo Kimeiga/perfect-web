@@ -349,7 +349,7 @@ fn rendered_again(
                 if own.iter().any(|v| v.starts_with('#')) {
                     return Err(format!(
                         "part {id} computes a value inside a block a signal decides, and the \
-                         browser, which renders that block again, computes none yet (ADR-0230)"
+                         browser, which renders that block again, computes none yet (ruling 0073-a)"
                     ));
                 }
                 if let Some(other) = own.iter().find(|v| !signal(v) && !bound.contains(&root(v))) {
@@ -1714,12 +1714,12 @@ fn plan(
         {
             // What its arms hold starts again when it shows another arm
             // (ADR-0144), which the browser knows from the subject's value
-            // before it renders: not computed yet (ADR-0230).
+            // before it renders: not computed yet (ruling 0073-a).
             if !owned(entry.id.0).is_empty() {
                 return Err(format!(
                     "part {} is a block whose subject the browser computes, and whose arms \
                      hold a view's signals, which the browser starts again by its arm \
-                     (ADR-0230)",
+                     (ruling 0073-a)",
                     entry.id.0
                 ));
             }
@@ -1829,7 +1829,7 @@ enum Computes {
 /// browser's, which runs the function compiled for it, and a host's for the
 /// first value. A row's item is a host's for each row of a query's list.
 /// Anything else is refused by name: one in a block, an arm or an instance,
-/// several values, or a value the page speculates on (ADR-0230); and none,
+/// several values, or a value the page speculates on (ruling 0073-a); and none,
 /// which is a value to write as it is.
 #[allow(clippy::too_many_arguments)]
 fn computed_part(
@@ -1876,7 +1876,7 @@ fn computed_part(
         return refuse(match inputs {
             [] => "from nothing it reads: write the value itself".to_string(),
             _ => format!(
-                "from {}, and a host computes one from one value (ADR-0230)",
+                "from {}, and a host computes one from one value (ruling 0073-a)",
                 inputs
                     .iter()
                     .map(|(n, _)| format!("`{n}`"))
@@ -1931,7 +1931,7 @@ fn computed_part(
         let Some(mut row) = row_read(hirs, sigs, chunks, found, part, read, members)? else {
             return refuse(format!(
                 "in a row of `{name}`, a list no query gives, which no host computes yet \
-                 (ADR-0230)"
+                 (ruling 0073-a)"
             ));
         };
         row.path = path.to_string();
@@ -1948,7 +1948,7 @@ fn computed_part(
         if nested {
             return refuse(format!(
                 "from the signal `{name}` inside a block, and the browser computes one at the \
-                 top of the page (ADR-0230)"
+                 top of the page (ruling 0073-a)"
             ));
         }
         return Ok((

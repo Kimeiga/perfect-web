@@ -1,0 +1,35 @@
+// @corpus: rejected
+// @id: R-059
+// @category: a template condition that tests a number
+// @rule: PW0609
+// @invariant: operand_type
+// @charter: §8.1
+// @milestone: 14
+// @expect-error: `{#if}` tests an `Int`, a number, which has no truth
+// @expect-error: say what it tests: `n > 0`
+//
+// JSX's `{count && <Badge />}` shows a `0` where nothing was meant. A
+// template's condition is a `Bool`, or a `List` or a `String` tested
+// non-empty (ruling 0071-a): a count says what it tests, `n > 0`.
+
+module feed.badge
+
+type Post = Post { id: String, likes: Int }
+
+public query Latest() -> Post !{} {
+    Post { id: "p1", likes: 0 }
+}
+
+page Badge() {
+    route "/badge"
+    cache private
+
+    let post = query Latest()
+
+    view {
+        <title>Badge</title>
+        <main>
+            {#if post.likes}<p>Liked</p>{/if}
+        </main>
+    }
+}

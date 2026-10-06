@@ -257,17 +257,17 @@ fn what_the_browser_does_not_compute_yet_is_refused_by_name() {
         (
             "<p>{shown(open & post.pinned)}</p>",
             "computes a value from `open` and `post`, and a host computes one from one value \
-             (ADR-0230)",
+             (ruling 0073-a)",
         ),
         (
             "{#if open}<p>{shown(panel.open)}</p>{/if}",
             "computes a value inside a block a signal decides, and the browser, which renders \
-             that block again, computes none yet (ADR-0230)",
+             that block again, computes none yet (ruling 0073-a)",
         ),
         (
             "{#if post.pinned}<p>{shown(open)}</p>{/if}",
             "computes a value from the signal `open` inside a block, and the browser computes \
-             one at the top of the page (ADR-0230)",
+             one at the top of the page (ruling 0073-a)",
         ),
     ] {
         let files = page(markup);

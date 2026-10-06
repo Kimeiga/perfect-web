@@ -1,0 +1,18 @@
+// @status: NEIGHBOUR
+// @invariant: operand_type
+// @dimension: valid neighbour — a count compared, a list and a string tested non-empty, and a `Bool`
+//
+// Each condition is a `Bool`, or a `List` or a `String` tested non-empty: a
+// count says what it tests, `n > 0`.
+
+module generality.operand_conditions_true
+
+type Post = Post { likes: Int, tags: List<String>, title: String, pinned: Bool }
+
+view Card(post: Post) !{} {
+    <article>
+        {#if post.likes > 0}<p>Liked</p>{/if}
+        {#if post.tags}<p>Tagged</p>{:else if post.title}<p>Titled</p>{/if}
+        <button type="button" disabled={post.pinned}>Pin</button>
+    </article>
+}

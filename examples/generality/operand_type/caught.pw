@@ -1,0 +1,14 @@
+// @status: GENERAL
+// @invariant: operand_type
+//
+// Structurally different from R-059: a boolean attribute, not an `{#if}`;
+// in a view, not a page; and given a record, which is always true, not a
+// number.
+
+module generality.operand_record_attribute
+
+type Draft = Draft { text: String }
+
+view Composer(draft: Draft) !{} {
+    <button type="button" disabled={draft}>Post</button>
+}

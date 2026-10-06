@@ -122,7 +122,13 @@ fn a_boolean_attribute_has_a_truth() {
         "may be absent",
     );
     clean("<button type=\"button\" disabled={b}>x</button>");
-    clean("<button type=\"button\" disabled={n}>x</button>");
+    // A number has none since ruling 0071-a (ADR-0230); a comparison has.
+    one(
+        "<button type=\"button\" disabled={n}>x</button>",
+        "PW0609",
+        "a number, which has no truth",
+    );
+    clean("<button type=\"button\" disabled={n > 0}>x</button>");
 }
 
 #[test]

@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0230, 2026-10-05: a condition is a `Bool`, or tested non-empty**
+(ruling 0071-a). A number and a record were the renderer's truth and checked
+clean: `{#if balance}` was true for a negative balance, and said neither
+`> 0` nor `!= 0`, and a record was always true. A condition, or a boolean
+attribute, is a `Bool`, or a `List` or `String` tested non-empty now; a
+number is PW0609 with the repair `n > 0`, which ADR-0229 builds. No program
+tested either. Corpus C17; generality is 44 / 44 (`just
+e14-condition-truth`).
+
 **ADR-0229, 2026-10-05: a computed condition decides its block** (ruling
 0073-a for a block's subject; 0071-a's repair builds). `{#if !b}` and
 `{:else if n > 0}` were refused at build. A subject is read by a path the

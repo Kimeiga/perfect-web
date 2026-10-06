@@ -813,3 +813,26 @@ Generality at open:        43/43 invariants generality-tested
 | `forbidden_effect/page-may-read-clock.pw` | the clock read in the page's body, not its template | witness corrected |
 | `task_detached/nested.pw` | `List.map`, not `List.each`, which no module declares | witness corrected |
 | `rules/annotations/decoded-not-cast.pw` | a decoder function, not `decode.run`, which `decode` does not declare | rule fixture corrected |
+
+## C17: a template condition that tests a number, 2026-10-05
+
+Opened because the specification changed: a template's condition is a
+`Bool`, or a `List` or a `String` tested non-empty, where a number and a
+record were the renderer's truth (ruling 0071-a; `PW0609`, revision 2).
+[ADR-0230](DECISIONS/ADR-0230-a-condition-is-a-bool-or-tested-non-empty.md)
+is the decision. No invariant is retired, no `@expect-error` line of an
+earlier fixture changed, and no fixture moved: none tested a number or a
+record.
+
+```text
+Corpus version:            C17
+Accepted programs:         32
+Rejected programs:         59
+Charter categories:        32/32 accepted, 59/59 rejected
+Generality at open:        44/44 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| R-059 | added: `{#if post.likes}` over an `Int` (`PW0609`) | new category |
+| `operand_type` | a GENERAL witness, a view's boolean attribute given a record, and a NEIGHBOUR one, a count compared, a list and a string tested non-empty, and a `Bool` | new invariant |

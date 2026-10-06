@@ -3609,12 +3609,24 @@ impl<'a> Typer<'a> {
     /// subject `template_blocks` says so, and anywhere else this relation
     /// does (ADR-0074). Until 2026-09-26 an `{:else if}` over one was
     /// reported by neither.
+    /// **A template's condition has a truth** (ADR-0071, ruling 0071-a): a
+    /// `Bool`, or a `List` or a `String`, tested non-empty. A sum type is
+    /// taken apart with `{#match}`; a number, a record or anything else has
+    /// none (PW0609): a record is always true, and a number tested as one
+    /// does not say what it tests, true for a negative one. Until 0071-a both
+    /// were the renderer's truth, and checked clean.
     fn truth(&self, c: ExprId, block: &str, if_subject: bool) -> Option<ValueRelation> {
         let t = self.of(c);
         let outcome = match &t {
             Ty::Builtin(Builtin::Option | Builtin::Result, _) if if_subject => return None,
             Ty::Builtin(Builtin::Option | Builtin::Result, _) => {
                 return Some(self.absent(&t, block.to_string(), self.body.expr_span(c)));
+            }
+            Ty::Primitive(Primitive::Bool | Primitive::Str)
+            | Ty::Builtin(Builtin::List, _)
+            | Ty::Any => Outcome::Agree,
+            Ty::Unknown | Ty::Var(_) | Ty::Parameter { .. } => {
+                Outcome::Undecided(Undecided::Unknown)
             }
             Ty::Nominal(d, _)
                 if self
@@ -3627,10 +3639,14 @@ impl<'a> Typer<'a> {
                     actual: self.display(&t),
                 }
             }
-            Ty::Unknown | Ty::Var(_) | Ty::Parameter { .. } => {
-                Outcome::Undecided(Undecided::Unknown)
-            }
-            _ => Outcome::Agree,
+            Ty::Primitive(Primitive::Int | Primitive::Float) => Outcome::Disagree {
+                expected: "a number".to_string(),
+                actual: self.display(&t),
+            },
+            other => Outcome::Disagree {
+                expected: "no truth".to_string(),
+                actual: self.display(other),
+            },
         };
         Some(ValueRelation {
             declaration: self.decl.name.clone(),
@@ -4982,22 +4998,64 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  runs, so every branch produces its type",
             )
             .repair(format!("make this branch a `{expected}`")),
-            RelationKind::Truth => Diagnostic::error(
-                crate::codes::OPERAND_TYPE.id,
-                crate::codes::OPERAND_TYPE.invariant,
-                Detector::Signature,
-                format!(
-                    "`{}` tests a `{actual}`, which is taken apart with `{{#match}}`",
-                    r.target
-                ),
-                r.span.clone(),
-            )
-            .reason("template_condition_is_a_case")
-            .explain(
-                "a template's condition is a `Bool`, a number, a string, a list or a record; \
-                 a `Result` or a sum type has no truth, and the renderer refuses it",
-            )
-            .repair("take it apart with `{#match}`"),
+            // A condition is a `Bool`, or a `List` or `String` tested
+            // non-empty (ruling 0071-a).
+            RelationKind::Truth => match expected.as_str() {
+                "a number" => Diagnostic::error(
+                    crate::codes::OPERAND_TYPE.id,
+                    crate::codes::OPERAND_TYPE.invariant,
+                    Detector::Signature,
+                    format!(
+                        "`{}` tests {} `{actual}`, a number, which has no truth",
+                        r.target,
+                        article(actual)
+                    ),
+                    r.span.clone(),
+                )
+                .reason("template_condition_is_a_number")
+                .explain(
+                    "a template's condition is a `Bool`, or a `List` or a `String` tested \
+                     non-empty; a number tested as one does not say what it tests: here it \
+                     was true for a negative number, and JSX's `{count && …}` shows the `0`",
+                )
+                .repair("say what it tests: `n > 0`"),
+                "no truth" => Diagnostic::error(
+                    crate::codes::OPERAND_TYPE.id,
+                    crate::codes::OPERAND_TYPE.invariant,
+                    Detector::Signature,
+                    format!(
+                        "`{}` tests {} `{actual}`, which has no truth",
+                        r.target,
+                        article(actual)
+                    ),
+                    r.span.clone(),
+                )
+                .reason("template_condition_has_no_truth")
+                .explain(
+                    "a template's condition is a `Bool`, or a `List` or a `String` tested \
+                     non-empty; a record is always true, and any other value is no answer \
+                     to a question",
+                )
+                .repair("test a `Bool` it holds, or compare it"),
+                _ => Diagnostic::error(
+                    crate::codes::OPERAND_TYPE.id,
+                    crate::codes::OPERAND_TYPE.invariant,
+                    Detector::Signature,
+                    format!(
+                        "`{}` tests {} `{actual}`, which is taken apart with `{{#match}}`",
+                        r.target,
+                        article(actual)
+                    ),
+                    r.span.clone(),
+                )
+                .reason("template_condition_is_a_case")
+                .explain(
+                    "a template's condition is a `Bool`, or a `List` or a `String` tested \
+                     non-empty; a `Result` or a sum type has no truth, and the renderer refuses \
+                     it",
+                )
+                .repair("take it apart with `{#match}`"),
+            },
             RelationKind::Invariant => {
                 let mut d = Diagnostic::error(
                     crate::codes::INVARIANT_NOT_SHOWN.id,
@@ -5236,4 +5294,13 @@ pub fn analysis(units: &[crate::check::Unit]) -> Vec<(String, Vec<ValueRelation>
         .enumerate()
         .map(|(i, u)| (u.path.clone(), relations(&u.hir, &sigs, &ws, i)))
         .collect()
+}
+
+/// **"a" or "an" before a type's name**, as it is said: "an `Int`", "a
+/// `Shape`". By its first letter, which is all a type's name gives.
+fn article(name: &str) -> &'static str {
+    match name.chars().next().map(|c| c.to_ascii_lowercase()) {
+        Some('a' | 'e' | 'i' | 'o' | 'u') => "an",
+        _ => "a",
+    }
 }

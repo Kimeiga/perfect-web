@@ -61,15 +61,17 @@ MUTANTS = [
     (
         "no value has a truth",
         VALUES,
-        "            _ => Outcome::Agree,\n"
-        "        };\n"
-        "        Some(ValueRelation {",
-        "            _ => Outcome::Disagree {\n"
+        # Re-anchored by ADR-0230 (ruling 0071-a), whose catch-all has none:
+        # the values that have one are named.
+        "            Ty::Primitive(Primitive::Bool | Primitive::Str)\n"
+        "            | Ty::Builtin(Builtin::List, _)\n"
+        "            | Ty::Any => Outcome::Agree,\n",
+        "            Ty::Primitive(Primitive::Bool | Primitive::Str)\n"
+        "            | Ty::Builtin(Builtin::List, _)\n"
+        "            | Ty::Any => Outcome::Disagree {\n"
         "                expected: String::new(),\n"
         "                actual: self.display(&t),\n"
-        "            },\n"
-        "        };\n"
-        "        Some(ValueRelation {",
+        "            },\n",
     ),
     (
         "an `Option` condition is related as agreeing",
