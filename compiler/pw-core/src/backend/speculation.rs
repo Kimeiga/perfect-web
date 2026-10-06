@@ -1046,8 +1046,11 @@ fn page_module(
         }
     }
     source.push_str("export const decode = {\n");
+    // A value of a type that contains itself as its nodes, which the server
+    // writes by its query's type (ADR-0233). Until then the server wrote it
+    // nested, knowing no type, and it was refused here (ADR-0205 §5).
     for (name, _, _, value) in &speculated {
-        match super::js_pure::decoder(&program, value, "j") {
+        match super::js_pure::decoder_of_nodes(&program, value, "j") {
             Ok(d) => source.push_str(&format!("  {}: (j) => {d},\n", json(name))),
             Err(reason) => {
                 return Encoding::Unsupported {

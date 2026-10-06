@@ -188,7 +188,32 @@ impl Runnable {
             .arguments(&[&export.interface, &export.function], json)
     }
 
+    /// **A result as a browser's module reads it** (ADR-0233), by the
+    /// export's result type: each value of a type that contains itself as
+    /// its nodes, every other part as JSON carries it.
+    pub fn browser_value(&self, value: Val) -> Result<serde_json::Value, String> {
+        let export = self.contract.exports[0]
+            .component
+            .clone()
+            .expect("the contract locates its export");
+        self.prepared
+            .browser_value(&[&export.interface, &export.function], value, &leaf_json)
+    }
+
     pub fn compiled(&self) -> &Compiled {
         &self.compiled
+    }
+}
+
+/// A value with no parts, as JSON carries it: a string, a `Bool`, a number.
+fn leaf_json(v: &Val) -> serde_json::Value {
+    match v {
+        Val::String(s) => serde_json::json!(s),
+        Val::Bool(b) => serde_json::json!(b),
+        Val::S64(n) => serde_json::json!(n),
+        Val::S32(n) => serde_json::json!(n),
+        Val::U32(n) => serde_json::json!(n),
+        Val::Float64(x) => serde_json::json!(x),
+        other => serde_json::json!(format!("{other:?}")),
     }
 }

@@ -1966,3 +1966,10 @@ an opaque value's representation is read in a template (found by ADR-0231).
   path now, as the checker types it, in each body it lowers; a record's
   field named `value` is a field. Where the checker's types leave a base
   untyped, the value relations type it.
+[ADR-0233](DECISIONS/ADR-0233-a-speculation-on-a-value-that-contains-itself.md):
+a speculation on a value of a type that contains itself (lifts ADR-0205 §5
+for a speculation's value).
+- The server writes each value a page speculates on by its query's declared
+  type: a value of a type that contains itself as its nodes, in the level
+  order the host reads, each such value inside another a graph of its own.
+  The page's module reads it from its nodes, as a handler reads a signal's.

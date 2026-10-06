@@ -4559,3 +4559,23 @@ e14-representations:
        CARGO_INCREMENTAL=0 python3 scripts/template_representations_mutations.py; \
      } > docs/evidence/E14/representations.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/representations.txt
+
+# ADR-0233: a speculation on a value of a type that contains itself. The
+# compiler's tests under Node, the host's through components the compiler
+# built, the server's, and the mutation controls.
+e14-speculated-graphs:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0233 - a speculation on a value of a type that contains itself"; echo; \
+       echo "produced by: just e14-speculated-graphs"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the module (compiler/pw-core/tests/speculated_graphs.rs)"; echo; \
+       cargo test --locked -p pw-core --test speculated_graphs 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the host (compiler/pw-conformance/tests/browser_graphs.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test browser_graphs 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_value_that_contains_itself_is_written 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/speculated_graphs_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/speculated_graphs_mutations.py; \
+     } > docs/evidence/E14/speculated-graphs.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/speculated-graphs.txt

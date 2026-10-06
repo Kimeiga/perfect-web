@@ -1216,6 +1216,40 @@ impl Server {
         Ok(staged)
     }
 
+    /// **A value a page speculates on, as its module reads it** (ADR-0233):
+    /// by its query's declared result type, a value of a type that contains
+    /// itself as its nodes. Until ADR-0233 it was written nested, knowing
+    /// no type, and such a value was not speculated on (ADR-0205 §5).
+    fn speculated_json(
+        &self,
+        plan: &serde_json::Value,
+        binding: &str,
+        value: &Val,
+    ) -> Result<serde_json::Value, String> {
+        let resource = plan["bindings"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|b| b["binding"] == binding)
+            .and_then(|b| b["resource"].as_str())
+            .ok_or_else(|| format!("no binding `{binding}`"))?;
+        let export = self
+            .contracts
+            .iter()
+            .find(|c| c.component_id == resource)
+            .and_then(|c| c.exports[0].component.clone())
+            .ok_or_else(|| format!("`{resource}`'s contract does not locate its export"))?;
+        self.components
+            .get(resource)
+            .ok_or_else(|| format!("no compiled component `{resource}`"))?
+            .prepared
+            .browser_value(
+                &[&export.interface, &export.function],
+                value.clone(),
+                &val_to_json,
+            )
+    }
+
     /// **Run one compiled command through the host.**
     ///
     /// Authority first — `admit` against the artifact's real imports — then
@@ -4120,10 +4154,12 @@ impl Server {
                 .ok_or_else(|| format!("the plan's title {id} is no part"))?;
             shown.title = Some((id as u32, title));
         }
-        // Each value it speculates on (ADR-0222), from the same read.
+        // Each value it speculates on (ADR-0222), from the same read, as
+        // the page's module reads it (ADR-0233).
         for binding in self.speculated_bindings(page) {
             if let Some(value) = bindings.get(&binding) {
-                shown.speculated.insert(binding, val_to_json(value));
+                let written = self.speculated_json(plan, &binding, value)?;
+                shown.speculated.insert(binding, written);
             }
         }
         Ok(shown)
@@ -10769,6 +10805,47 @@ public query Store(",
         assert_eq!(text_in(&thread, "<p id=\"which\">"), "p1 p1");
         assert_eq!(text_in(&thread, "<p id=\"first\">"), "p2");
         assert_eq!(text_in(&thread, "<p class=\"vid\">"), "p1");
+    }
+
+    /// **A value of a type that contains itself is written for a page's
+    /// module as its nodes** (ADR-0233), by its query's type: the thread
+    /// page's `thread`, `Thread`'s `Ok`, in level order. Until ADR-0233
+    /// every value a page speculates on was written nested, knowing no type,
+    /// and such a value was not speculated on (ADR-0205 §5). A value of no
+    /// such type is written as before.
+    #[test]
+    fn a_value_that_contains_itself_is_written_as_its_nodes() {
+        let s = served_feed();
+        let p1 = Params::from([("id".to_string(), "p1".to_string())]);
+        s.serve_document_settled("a", "feed.app.PostPage", &p1, &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        let bindings = s.bindings("a", doc.1).expect("read");
+        let written = s
+            .speculated_json(
+                s.plan_of("feed.app.PostPage"),
+                "thread",
+                &bindings["thread"],
+            )
+            .expect("written");
+        let nodes = written["$graph"].as_array().expect("a graph");
+        // The post, its reply, and the reply to that, each node's replies
+        // the next run.
+        let ids: Vec<&str> = nodes.iter().filter_map(|n| n["id"].as_str()).collect();
+        assert_eq!(ids, ["p1", "p2", "p3"], "{written}");
+        assert_eq!(nodes[0]["replies"], serde_json::json!([{ "$node": 1 }]));
+        assert_eq!(nodes[1]["replies"], serde_json::json!([{ "$node": 2 }]));
+        assert_eq!(nodes[2]["replies"], serde_json::json!([]));
+        assert_eq!(nodes[0]["author"]["name"], "Ada", "{written}");
+        // The timeline's rows, of no such type: as they were written.
+        s.serve_document_settled("b", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        let home = latest(&s.pending.lock().expect("pending"), "b");
+        let bindings = s.bindings("b", home.1).expect("read");
+        assert_eq!(
+            s.speculated_json(s.plan_of("feed.app.Home"), "feed", &bindings["feed"]),
+            Ok(val_to_json(&bindings["feed"]))
+        );
     }
 
     /// **A reply is its thread's, to every reader, and no timeline's**

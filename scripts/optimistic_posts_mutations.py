@@ -55,8 +55,9 @@ MUTANTS = [
     (
         "what a page shows holds no value it speculates on",
         SERVER,
-        "                shown.speculated.insert(binding, val_to_json(value));\n",
-        "                let _ = (binding, value);\n",
+        # Re-anchored by ADR-0233: written by its query's type.
+        "                shown.speculated.insert(binding, written);\n",
+        "                let _ = (binding, written);\n",
     ),
     (
         "a page is served no value it speculates on",

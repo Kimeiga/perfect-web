@@ -1217,6 +1217,32 @@ pub mod engine {
                 .collect()
         }
 
+        /// **A query's value as a browser's module reads it** (ADR-0233), by
+        /// the export's first result type: a value of a type that contains
+        /// itself as its nodes, anywhere in it (see
+        /// [`graph::browser_json`]). `value` is the result's `Ok`, as a
+        /// page's binding holds it, where the result is a `Result`.
+        pub fn browser_value(
+            &self,
+            export: &[&str],
+            value: wasmtime::component::Val,
+            leaf: &dyn Fn(&wasmtime::component::Val) -> serde_json::Value,
+        ) -> Result<serde_json::Value, String> {
+            let func = export_type(&self.engine, &self.component, export)?;
+            let ty = func
+                .results()
+                .next()
+                .ok_or_else(|| format!("{export:?} returns nothing"))?;
+            let ty = match (&value, &ty) {
+                (wasmtime::component::Val::Result(_), _) => ty,
+                (_, wasmtime::component::types::Type::Result(r)) => r
+                    .ok()
+                    .ok_or_else(|| format!("{export:?}'s `Ok` holds nothing"))?,
+                _ => ty,
+            };
+            graph::browser_json(value, &ty, leaf)
+        }
+
         /// **Arguments that arrived as JSON, typed by the export's own
         /// parameters.**
         ///
@@ -1573,6 +1599,175 @@ pub mod engine {
                 return decode(nodes, &node, &slots);
             }
             walk(v, ty, &untangle)
+        }
+
+        /// **A value as the browser's modules read it** (ADR-0233): each
+        /// value of a type that contains itself as its nodes, a graph (see
+        /// [`to_browser`]); a record an object by its fields' names, `-` as
+        /// `_`; a list or a tuple an array; a case, an option or a result
+        /// `{ "$case": name, "value": payload }`; and anything else as
+        /// `leaf` writes it. A host's own writer of nested values writes the
+        /// same, but knows no type: a value it nests is no graph.
+        pub fn browser_json(
+            v: Val,
+            ty: &Type,
+            leaf: &dyn Fn(&Val) -> serde_json::Value,
+        ) -> Result<serde_json::Value, String> {
+            if node_of(ty).is_some() {
+                return to_browser(v, ty, &|v, t| browser_json(v, t, leaf));
+            }
+            let case = |name: &str, payload: Option<serde_json::Value>| match payload {
+                Some(p) => serde_json::json!({ "$case": name, "value": p }),
+                None => serde_json::json!({ "$case": name }),
+            };
+            let inner = |v: Option<Box<Val>>, ty: Option<Type>| match (v, ty) {
+                (Some(v), Some(ty)) => browser_json(*v, &ty, leaf).map(Some),
+                (Some(v), None) => Ok(Some(leaf(&v))),
+                (None, _) => Ok(None),
+            };
+            Ok(match (v, ty) {
+                (Val::Record(fields), Type::Record(r)) => {
+                    let types: Vec<(String, Type)> =
+                        r.fields().map(|f| (f.name.to_string(), f.ty)).collect();
+                    let mut o = serde_json::Map::new();
+                    for (name, v) in fields {
+                        let written = match types.iter().find(|(n, _)| *n == name) {
+                            Some((_, t)) => browser_json(v, t, leaf)?,
+                            None => leaf(&v),
+                        };
+                        o.insert(name.replace('-', "_"), written);
+                    }
+                    serde_json::Value::Object(o)
+                }
+                (Val::List(items), Type::List(l)) => {
+                    let t = l.ty();
+                    serde_json::Value::Array(
+                        items
+                            .into_iter()
+                            .map(|v| browser_json(v, &t, leaf))
+                            .collect::<Result<_, _>>()?,
+                    )
+                }
+                (Val::Tuple(items), Type::Tuple(t)) => serde_json::Value::Array(
+                    items
+                        .into_iter()
+                        .zip(t.types())
+                        .map(|(v, t)| browser_json(v, &t, leaf))
+                        .collect::<Result<_, _>>()?,
+                ),
+                (Val::Option(v), Type::Option(o)) => match v {
+                    Some(v) => case("some", inner(Some(v), Some(o.ty()))?),
+                    None => case("none", None),
+                },
+                (Val::Result(Ok(v)), Type::Result(r)) => case("ok", inner(v, r.ok())?),
+                (Val::Result(Err(v)), Type::Result(r)) => case("err", inner(v, r.err())?),
+                (Val::Variant(name, v), Type::Variant(t)) => {
+                    let ty = t.cases().find(|c| c.name == name).and_then(|c| c.ty);
+                    let payload = inner(v, ty)?;
+                    case(&name, payload)
+                }
+                (Val::Enum(name), _) => case(&name, None),
+                (v, _) => leaf(&v),
+            })
+        }
+
+        /// **A value of a type that contains itself, for a browser**
+        /// (ADR-0233): `{ "$graph": [node, ...] }` in the level order
+        /// [`from_browser`] reads and a browser's module decodes, each
+        /// node's children `{ "$node": k }`, a list of them, or a case
+        /// holding one. Every other field of a node is written by `field`,
+        /// with its type.
+        pub fn to_browser(
+            v: Val,
+            ty: &Type,
+            field: &dyn Fn(Val, &Type) -> Result<serde_json::Value, String>,
+        ) -> Result<serde_json::Value, String> {
+            let Some((node, slots)) = node_of(ty) else {
+                return Err("not a type that contains itself".into());
+            };
+            let Val::List(nodes) = tangle(v, ty)? else {
+                return Err("a value of a type that contains itself made no nodes".into());
+            };
+            let reference = |k: &Val| match k {
+                Val::U32(k) => Ok(serde_json::json!({ "$node": k })),
+                other => Err(format!("a node's child is no index: {other:?}")),
+            };
+            let children = |kind: Kind, v: Val| -> Result<serde_json::Value, String> {
+                Ok(match (kind, v) {
+                    (Kind::List, Val::List(ks)) => serde_json::Value::Array(
+                        ks.iter().map(reference).collect::<Result<_, _>>()?,
+                    ),
+                    (Kind::One, k) => reference(&k)?,
+                    (Kind::Maybe, Val::Option(Some(k))) => {
+                        serde_json::json!({ "$case": "some", "value": reference(&k)? })
+                    }
+                    (Kind::Maybe, Val::Option(None)) => serde_json::json!({ "$case": "none" }),
+                    (_, other) => return Err(format!("a node's children are {other:?}")),
+                })
+            };
+            let mut out = Vec::with_capacity(nodes.len());
+            for n in nodes {
+                out.push(match (n, &node) {
+                    (Val::Record(fields), Type::Record(r)) => {
+                        let types: Vec<(String, Type)> =
+                            r.fields().map(|f| (f.name.to_string(), f.ty)).collect();
+                        let mut o = serde_json::Map::new();
+                        for (name, v) in fields {
+                            let slot = slots.iter().find_map(|s| match s {
+                                Slot::Field(n, k) if *n == name => Some(*k),
+                                _ => None,
+                            });
+                            let written = match (slot, types.iter().find(|(n, _)| *n == name)) {
+                                (Some(k), _) => children(k, v)?,
+                                (None, Some((_, t))) => field(v, t)?,
+                                (None, None) => {
+                                    return Err(format!("a node has no field `{name}`"));
+                                }
+                            };
+                            o.insert(name.replace('-', "_"), written);
+                        }
+                        serde_json::Value::Object(o)
+                    }
+                    (Val::Variant(case, payload), Type::Variant(t)) => {
+                        let ty = t.cases().find(|c| c.name == case).and_then(|c| c.ty);
+                        let whole = slots.iter().find_map(|s| match s {
+                            Slot::Payload(c, k) if *c == case => Some(*k),
+                            _ => None,
+                        });
+                        let value = match (payload, ty, whole) {
+                            (None, _, _) => None,
+                            (Some(p), _, Some(k)) => Some(children(k, *p)?),
+                            (Some(p), Some(Type::Tuple(tt)), None) => {
+                                let Val::Tuple(items) = *p else {
+                                    return Err(format!("the case `{case}` holds no tuple"));
+                                };
+                                let mut each = Vec::with_capacity(items.len());
+                                for (i, (v, t)) in items.into_iter().zip(tt.types()).enumerate() {
+                                    let slot = slots.iter().find_map(|s| match s {
+                                        Slot::Element(c, j, k) if *c == case && *j == i => Some(*k),
+                                        _ => None,
+                                    });
+                                    each.push(match slot {
+                                        Some(k) => children(k, v)?,
+                                        None => field(v, &t)?,
+                                    });
+                                }
+                                Some(serde_json::Value::Array(each))
+                            }
+                            (Some(p), Some(t), None) => Some(field(*p, &t)?),
+                            (Some(_), None, None) => {
+                                return Err(format!("the case `{case}` holds no payload"));
+                            }
+                        };
+                        match value {
+                            Some(v) => serde_json::json!({ "$case": case, "value": v }),
+                            None => serde_json::json!({ "$case": case }),
+                        }
+                    }
+                    (other, _) => return Err(format!("a node is {other:?}")),
+                });
+            }
+            Ok(serde_json::json!({ "$graph": out }))
         }
 
         /// `f` on every part of `v` its type says may hold such a value.

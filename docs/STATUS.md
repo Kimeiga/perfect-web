@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0233, 2026-10-06: a speculation on a value of a type that contains
+itself** (ADR-0205 §5, for a speculation's value). The server wrote each
+value a page speculates on nested, knowing no type, and a page's module could
+not decode one whose type contains itself, so a thread was never speculated
+on. The server writes it by its query's declared type now, as its nodes,
+which the module reads as a handler reads a signal's. A component's comment,
+written so, is the graph a model writes, for 100 random trees
+(`just e14-speculated-graphs`).
+
 **ADR-0232, 2026-10-06: an opaque value's representation is read in a
 template** (found by ADR-0231). `{p.id.value}` checked and built, then its
 page was answered 503: the template read `.value` as a field of the text. A

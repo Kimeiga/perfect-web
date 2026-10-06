@@ -158,7 +158,11 @@ MUTANTS = [
     (
         "the host reads a node's slots as any field",
         HOST,
+        # Re-anchored by ADR-0233, whose writer reads slots the same way: the
+        # reader's, by the place it names.
+        "                    let place = format!(\"{at}.{written}\");\n"
         "                    let slot = slots.iter().find_map(|s| match s {\n",
+        "                    let place = format!(\"{at}.{written}\");\n"
         "                    let slot = slots.iter().take(0).find_map(|s| match s {\n",
     ),
 ]

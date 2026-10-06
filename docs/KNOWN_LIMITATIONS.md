@@ -87,10 +87,11 @@ rather than approximated:
     another such type, or as an opaque type: refused by name where its WIT is
     written. Each compiles inside a component;
   - **on the browser's wire** it crosses as its nodes (ADR-0205): a
-    signal's value, which a handler reads and sets, and a command's
-    argument. Refused by name: a handler's capture of one, a command's
-    declared error holding one, a speculation's value holding one, two
-    types that hold each other, and a case of one as a browser's argument;
+    signal's value, which a handler reads and sets, a command's argument,
+    and a speculation's value, which the server writes by its query's type
+    (ADR-0233). Refused by name: a handler's capture of one, a command's
+    declared error holding one, two types that hold each other, and a case
+    of one as a browser's argument;
   - **nested deeper than 128 in a host** (`NESTED_DEPTH`): a host reads such
     a value's nodes instead.
 - **`==` compares primitives only.** Two records, two sum-type values or two
@@ -764,7 +765,8 @@ applies to its default value.
 
 **A pending post is by "You"** (ADR-0222): a transition sees the value it
 changes and its command's arguments, not the page's own user. A value of a
-type that contains itself is not speculated on (ADR-0205 §5).
+type that contains itself is speculated on as its nodes (ADR-0233); a page
+that speculates on one keyed by its parameter waits on ruling 0122-d.
 
 **A commit reaches another session's open page by the query it reads, not
 by its key** (ADR-0219). A like drops one post's `Thread`, and every open

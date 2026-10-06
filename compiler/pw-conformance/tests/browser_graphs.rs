@@ -6,7 +6,8 @@
 //! types it by the component's own parameter, each `$node` the index its node
 //! holds there, and the component checks the nodes as it checks a host's
 //! (ADR-0194). The graphs here are written by a model, independently of the
-//! browser's encoder, and each query's answer is the model's.
+//! browser's encoder, and each query's answer is the model's. A host writes
+//! one for a browser as the model does (ADR-0233).
 
 use std::collections::BTreeMap;
 
@@ -45,6 +46,35 @@ public query Liked(c: Comment) -> Int { liked(c) }
 public query Deepest(c: Comment) -> Int { deepest(c) }
 
 public query Root(c: Comment) -> String { c.text }
+
+public query Echo(c: Comment) -> Comment { c }
+
+type Tag =
+    | Plain
+    | Named(String)
+    | Held(Comment)
+
+type Wrapped = Wrapped {
+    first: Option<Comment>,
+    none: Option<Comment>,
+    tag: Tag,
+    plain: Tag,
+    held: Tag,
+    all: List<Comment>,
+    count: Result<Int, String>,
+}
+
+public query Wrap(c: Comment) -> Wrapped {
+    Wrapped {
+        first: Some(c),
+        none: None,
+        tag: Named(c.text),
+        plain: Plain,
+        held: Held(c),
+        all: [c, c],
+        count: Ok(List.length(c.replies)),
+    }
+}
 "#;
 
 struct Rng(u64);
@@ -146,6 +176,59 @@ fn a_browsers_graph_is_the_tree_its_nodes_make() {
         assert_eq!(sent(&liked_, g.clone()), Ok(Val::S64(liked(&c))), "{g}");
         assert_eq!(sent(&deep, g.clone()), Ok(Val::S64(deepest(&c))), "{g}");
         assert_eq!(sent(&root, g), Ok(Val::String(c.text.clone())));
+    }
+}
+
+/// **A host writes such a value for a browser as its nodes** (ADR-0233),
+/// in the level order the browser's module decodes and the host reads: the
+/// model's graph of the same tree, written independently. A comment the
+/// component returns, made nested, is written back as the graph it was sent
+/// as, and the host reads that graph again.
+#[test]
+fn a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order() {
+    let echo = compiled("thread.Echo");
+    let mut rng = Rng(0xFEED_FACE);
+    for _ in 0..CASES {
+        let c = comment(&mut rng, 5);
+        let g = graph(&c);
+        let args = echo.arguments(std::slice::from_ref(&g)).expect("a graph");
+        let nested = echo
+            .call_untangled(&host(), &args)
+            .expect("answered")
+            .remove(0);
+        let written = echo.browser_value(nested).expect("written");
+        assert_eq!(written, g);
+        echo.arguments(&[written]).expect("read again");
+    }
+}
+
+/// **Each such value inside another is a graph of its own** (ADR-0205,
+/// ADR-0233): an option's, a case's payload, each item of a list's; and
+/// around them, a case by its name and payload, a result's `Ok`.
+#[test]
+fn a_hosts_graphs_inside_another_value_are_each_its_own() {
+    let wrap = compiled("thread.Wrap");
+    let mut rng = Rng(0xC0FF_EE00);
+    for _ in 0..CASES / 10 {
+        let c = comment(&mut rng, 4);
+        let g = graph(&c);
+        let args = wrap.arguments(std::slice::from_ref(&g)).expect("a graph");
+        let nested = wrap
+            .call_untangled(&host(), &args)
+            .expect("answered")
+            .remove(0);
+        assert_eq!(
+            wrap.browser_value(nested).expect("written"),
+            json!({
+                "first": { "$case": "some", "value": g.clone() },
+                "none": { "$case": "none" },
+                "tag": { "$case": "named", "value": c.text.clone() },
+                "plain": { "$case": "plain" },
+                "held": { "$case": "held", "value": g.clone() },
+                "all": [g.clone(), g.clone()],
+                "count": { "$case": "ok", "value": c.replies.len() },
+            })
+        );
     }
 }
 

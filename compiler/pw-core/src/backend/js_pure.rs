@@ -668,6 +668,16 @@ pub(crate) fn decoder(program: &Program, ty: &Type, expr: &str) -> Result<String
     Emitter::new(program, &none, &[]).decode(expr, ty)
 }
 
+/// [`decoder`], for a value a host writes by its type: a speculated value
+/// (ADR-0233). A value of a type that contains itself is read from its
+/// nodes, as a signal's is (ADR-0205).
+pub(crate) fn decoder_of_nodes(program: &Program, ty: &Type, expr: &str) -> Result<String, String> {
+    let none = BTreeMap::new();
+    let mut emitter = Emitter::new(program, &none, &[]);
+    emitter.graphs = true;
+    emitter.decode(expr, ty)
+}
+
 fn json(s: &str) -> String {
     serde_json::Value::String(s.to_string()).to_string()
 }
