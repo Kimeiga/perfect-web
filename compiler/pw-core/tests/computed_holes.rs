@@ -302,7 +302,8 @@ fn what_a_host_does_not_compute_is_refused_by_name() {
         ),
         (
             "<p>{shown(id == \"p1\")}</p>",
-            "computes a value from `id`, which is no query's value",
+            "computes a value from the page's parameter `id`, and a host computes one from a \
+             query's value alone (ruling 0073-a)",
         ),
         (
             "<a href=\"/p/{shown(post.pinned)}\">x</a>",

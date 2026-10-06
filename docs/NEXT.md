@@ -376,11 +376,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
           optimistic likes); ~~conditions and blocks~~ (ADR-0229, `just
           e14-computed-conditions`); ~~0071-a~~ (ADR-0230, `just
           e14-condition-truth`: a condition is a `Bool`, or a `List` or
-          `String` tested non-empty); next the rest of the feed, pulling in
-          what it needs: replies, with 0122-d's route-keyed speculation, then
-          0057-a, 0099-a and ADR-0195's ruling 10, materialization chains;
-          and what ruling 0073-a still refuses (several values, the
-          browser's values inside a block, instances);
+          `String` tested non-empty); ~~replies, and a page's parameter
+          rendered on every page~~ (ADR-0231, `just e14-page-parameters`);
+          next an opaque value's representation in a template (ADR-0232,
+          found by ADR-0231), then speculation on a value of a type that
+          contains itself (ADR-0205 §5) and 0122-d's route-keyed
+          speculation, for an optimistic reply and a like on the thread
+          page; then 0057-a, 0099-a and ADR-0195's ruling 10,
+          materialization chains; and what ruling 0073-a still refuses
+          (several values, a page's parameter, the browser's values inside a
+          block, instances);
         - then 0101-a to 0101-d, 0105-a, 0100-a, and the rest below;
         - with the app layer: computed holes (0073-a: the host's part done,
           ADR-0226, and the browser's, ADR-0227, rows, ADR-0228, conditions,

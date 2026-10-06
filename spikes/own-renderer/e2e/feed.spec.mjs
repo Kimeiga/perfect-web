@@ -21,7 +21,9 @@
 //   - a row's likes are counted in words, and a like shows before the
 //     server answers, its count computed again in the browser (ADR-0228);
 //   - a condition computed: the browser's for a draft too long, the host's
-//     for a thread with no reply (ADR-0229).
+//     for a thread with no reply (ADR-0229);
+//   - a reply reaches its thread and every reader of it, and no timeline:
+//     the thread page's form passes the page's parameter (ADR-0231).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -342,4 +344,50 @@ test("Load more shows the next page, and a post after it is shown over it", asyn
   release();
   await expect(post(page, text).getByRole("link")).toHaveText(/^Guest /);
   expect(await unreloaded(page)).toBe(true);
+});
+
+test("a reply reaches its thread and every reader of it, and no timeline", async ({
+  browser,
+}, testInfo) => {
+  // ADR-0231. The thread page's form passes its `id`, the page's parameter,
+  // which its handler captures. Until then a page that bound a query was
+  // rendered without its parameters, and this one answered 503.
+  const [a, b] = [await browser.newContext(), await browser.newContext()];
+  const [author, reader] = [await a.newPage(), await b.newPage()];
+  await home(author);
+  const text = `A thread in ${testInfo.project.name} at ${Date.now()}`;
+  await author.getByLabel("What's happening?").fill(text);
+  await author.getByRole("button", { name: "Post" }).click();
+  // The server's row, whose link is the post's address, not the pending
+  // row's.
+  const link = post(author, text).getByRole("link");
+  await expect(link).toHaveAttribute("href", /^\/post\/p\d+$/);
+  const address = await link.getAttribute("href");
+  for (const page of [author, reader]) {
+    await page.goto(address);
+    await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
+    await page.evaluate(() => {
+      window.__unreloaded = true;
+    });
+    await expect(page.locator("#quiet")).toHaveText("No replies yet.");
+  }
+  const reply = `A reply in ${testInfo.project.name} at ${Date.now()}`;
+  const field = author.getByLabel("Your reply");
+  await field.fill(reply);
+  await author.getByRole("button", { name: "Reply" }).click();
+  // In the thread, as its reply, to the author and to the other reader,
+  // and counted.
+  for (const page of [author, reader]) {
+    await expect(page.locator("main article li").filter({ hasText: reply })).toHaveCount(1);
+    await expect(page.locator("#counts")).toHaveText("1 reply · 0 likes");
+    await expect(page.locator("#quiet")).toHaveCount(0);
+    expect(await unreloaded(page)).toBe(true);
+  }
+  await expect(field).toHaveValue("");
+  // And in no timeline: the post is there, its reply is not.
+  await home(reader);
+  await expect(post(reader, text)).toHaveCount(1);
+  await expect(post(reader, reply)).toHaveCount(0);
+  await a.close();
+  await b.close();
 });

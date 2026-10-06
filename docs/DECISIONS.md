@@ -1950,3 +1950,12 @@ ADR-0071's mark).
   or a `String` tested non-empty. A number has no truth, "say what it tests:
   `n > 0`", which ADR-0229 builds; a record and anything else none. Corpus
   C17, generality 44 / 44.
+[ADR-0231](DECISIONS/ADR-0231-a-pages-parameter-is-rendered-on-every-page.md):
+a page's parameter is rendered on every page (found building the feed's
+replies).
+- A page that binds a query is rendered with its parameters, as one that
+  binds none is: its document, each block and row a host renders again. A
+  title, an attribute or a handler's captures that read one built, then
+  every request was answered 503; a text part is no longer refused. The feed
+  replies: the thread page's form passes the page's `id`. Found: an opaque
+  value's representation does not render in a template (ADR-0232).

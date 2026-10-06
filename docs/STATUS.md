@@ -14,6 +14,17 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0231, 2026-10-05: a page's parameter is rendered on every page**
+(found building the feed's replies). A page that binds a query was rendered
+without its parameters: a title, an attribute or a handler's captures that
+read one built, then every request for the page was answered 503, and a text
+part that read one was refused at build. Each renders now, in the document
+and in each block and row a host renders again. The feed replies: the thread
+page's form passes the page's `id`, and the reply reaches every reader of
+the thread, and no timeline, in three engines. Found: an opaque value's
+representation, `{p.id.value}`, builds and does not render (ADR-0232 is to
+fix it) (`just e14-page-parameters`).
+
 **ADR-0230, 2026-10-05: a condition is a `Bool`, or tested non-empty**
 (ruling 0071-a). A number and a record were the renderer's truth and checked
 clean: `{#if balance}` was true for a negative balance, and said neither

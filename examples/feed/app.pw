@@ -5,8 +5,8 @@
 //
 // The owner's reference app (NEXT 22): a Twitter-shaped feed, to find what
 // the store does not. Users, posts with their replies as deep as they go, a
-// timeline read a page at a time, posting and liking. Its data is the
-// deployment's (ADR-0218): `feed:data/…` is what the host's feed layer
+// timeline read a page at a time, posting, replying and liking. Its data is
+// the deployment's (ADR-0218): `feed:data/…` is what the host's feed layer
 // supplies.
 
 module feed.app
@@ -73,6 +73,9 @@ fn author(s: Session<SessionId>) -> UserId !{ database.read<User> }
 fn publish(s: Session<SessionId>, text: PostText) -> Result<Post, FeedError> !{ database.write<Post> }
     host "feed:data/posts#publish"
 
+fn add_reply(s: Session<SessionId>, to: PostId, text: PostText) -> Result<Post, FeedError> !{ database.write<Post> }
+    host "feed:data/posts#reply"
+
 fn add_like(s: Session<SessionId>, post: PostId) -> Result<Post, FeedError> !{ database.write<Post> }
     host "feed:data/posts#like"
 
@@ -109,6 +112,16 @@ command post(text: PostText) -> Result<Post, FeedError>
     optimistic    Timeline(current_session(), _) as feed => pending(feed, text)
 {
     publish(current_session(), text)
+}
+
+// **A reply** (ADR-0231): a post, in its thread and in no timeline. The
+// thread page passes its `id`, the page's parameter.
+command reply(to: PostId, text: PostText) -> Result<Post, FeedError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    emits         Posted(author(current_session()))
+{
+    add_reply(current_session(), to, text)
 }
 
 // **A post shown before the server answers** (ADR-0222): first in the
@@ -211,6 +224,7 @@ page PostPage(id: PostId) {
     placement    origin
     cache        private
 
+    signal answer: String = ""
     let thread = query Thread(id)
 
     view {
@@ -219,6 +233,16 @@ page PostPage(id: PostId) {
             <Replies post={thread} />
             <p id="counts">{counted(List.length(thread.replies), "reply", "replies")} · {counted(thread.likes, "like", "likes")}</p>
             {#if List.length(thread.replies) == 0}<p id="quiet">No replies yet.</p>{/if}
+            <form on:submit|prevent={resumable(captures = { id }) => match post_text(answer) {
+                Some(text) => match reply(id, text) {
+                    Ok(_) => answer = "",
+                    Err(_) => answer = answer,
+                },
+                None => answer = answer,
+            }}>
+                <label>Your reply <textarea bind:value={answer}></textarea></label>
+                <button type="submit" disabled={String.length(answer) == 0 | String.length(answer) > 280}>Reply</button>
+            </form>
         </main>
     }
 }

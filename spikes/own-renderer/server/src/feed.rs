@@ -245,6 +245,31 @@ impl crate::data::DataLayer for FeedData {
                 other => Err(format!("posts#publish received {other:?}")),
             }),
         );
+        // **A reply** (ADR-0231): a post that replies to `to`, shown in its
+        // thread and in no timeline. To a post that is not there, none.
+        let (s, into) = (seen.clone(), staged.clone());
+        ops.insert(
+            "feed:data/posts#reply".to_string(),
+            Arc::new(move |args: &[Val]| match args {
+                [Val::String(session), Val::String(to), Val::String(text)] => {
+                    if !s.posts.iter().any(|r| r.id == *to) {
+                        return Ok(vec![not_found()]);
+                    }
+                    let mut staged = into.lock().expect("staged");
+                    let row = Row {
+                        id: format!("p{}", s.posts.len() + staged.len() + 1),
+                        author: user_of(session),
+                        text: text.clone(),
+                        likes: 0,
+                        reply_to: Some(to.clone()),
+                    };
+                    let answer = ok(post_val(&s, &row, false));
+                    staged.push(Change::Post(row));
+                    Ok(vec![answer])
+                }
+                other => Err(format!("posts#reply received {other:?}")),
+            }),
+        );
         let (s, into) = (seen, staged.clone());
         ops.insert(
             "feed:data/posts#like".to_string(),

@@ -180,13 +180,19 @@ fn a_value_computed_from_a_signal_is_the_browsers_and_its_first_the_hosts() {
         );
     }
     assert!(source.contains("BigInt(Array.from(v0).length)"), "{source}");
-    // Control: the thread page computes nothing from a signal, and has no
-    // module.
-    assert!(
-        !b.computed.iter().any(|c| c.page == "feed.app.PostPage"),
-        "{:?}",
-        b.computed
-    );
+    // The thread page's, since its reply form (ADR-0231): its button's
+    // `disabled`, from the reply's draft, alone.
+    let thread = plan_of(&b, "feed.app.PostPage");
+    let replied: Vec<(&str, &str)> = thread
+        .live
+        .iter()
+        .filter(|l| !l.derived.is_empty())
+        .map(|l| (l.attribute.as_str(), l.path.as_str()))
+        .collect();
+    assert_eq!(replied, [("disabled", "answer")], "{:?}", thread.live);
+    // Control: a page that computes nothing from a signal has no module.
+    let plain = build(&page("<p>{count}</p>")).unwrap_or_else(|e| panic!("{e}"));
+    assert!(plain.computed.is_empty(), "{:?}", plain.computed);
     // A module the browser's backend could not write is a refusal: the
     // value would stay at its first.
     let mut b = b;

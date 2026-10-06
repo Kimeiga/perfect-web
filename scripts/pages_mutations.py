@@ -62,13 +62,14 @@ MUTANTS = [
     (
         "a change is sent to the store's documents alone",
         SERVER,
+        # Re-anchored by ADR-0231: a document's parameters, not its store.
         "        for doc in documents {\n"
-        "            let store = self.store_of(&doc);\n",
+        "            let params = self.params_of(&doc);\n",
         "        for doc in documents\n"
         "            .into_iter()\n"
         "            .filter(|d| self.page_of(d) == self.store_page())\n"
         "        {\n"
-        "            let store = self.store_of(&doc);\n",
+        "            let params = self.params_of(&doc);\n",
     ),
     (
         "every page renders the store's menu",

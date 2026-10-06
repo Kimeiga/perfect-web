@@ -1338,7 +1338,7 @@ fn plan(
                 inference,
                 &template.chunks,
                 &found,
-                &signals,
+                (&signals, &params),
                 (&page, page_def),
                 hole.part.0,
                 &hole.path,
@@ -1409,6 +1409,13 @@ fn plan(
             continue;
         }
         let Some((_, resource, _)) = found.iter().find(|(n, ..)| *n == root) else {
+            // **A page's parameter** (ADR-0231): the document is rendered
+            // with it, as its address gave it, and it is the document's for
+            // its life, so no host sets the part again. Until 2026-10-05 a
+            // text part that read one was refused here.
+            if !hole.nested && params.contains(&root) {
+                continue;
+            }
             // A loop's or an arm's name: the renderer reads it from the
             // collection, by field.
             if !hole.nested {
@@ -1506,7 +1513,7 @@ fn plan(
                 inference,
                 &template.chunks,
                 &found,
-                &signals,
+                (&signals, &params),
                 (&page, page_def),
                 read.part.0,
                 &read.path,
@@ -1839,7 +1846,7 @@ fn computed_part(
     inference: &crate::effects::Inference<'_>,
     chunks: &[crate::template_ir::Chunk],
     found: &[(String, DefId, Vec<ExprId>)],
-    signals: &[String],
+    (signals, params): (&[String], &[String]),
     (page, page_def): (&str, DefId),
     part: u32,
     path: &str,
@@ -1960,6 +1967,13 @@ fn computed_part(
         ));
     }
     let Some((_, resource, _)) = found.iter().find(|(n, ..)| n == root) else {
+        // A page's parameter, which the page is rendered with (ADR-0231).
+        if params.iter().any(|p| p == root) {
+            return refuse(format!(
+                "from the page's parameter `{name}`, and a host computes one from a query's \
+                 value alone (ruling 0073-a)"
+            ));
+        }
         return refuse(format!("from `{name}`, which is no query's value"));
     };
     let ty = value_of(sigs, *resource)

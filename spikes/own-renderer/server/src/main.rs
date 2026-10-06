@@ -2441,15 +2441,15 @@ impl Server {
         let documents = documents_of(&self.pending.lock().expect("pending"), session);
         let mut read = Vec::new();
         for doc in documents {
-            let store = self.store_of(&doc);
+            let params = self.params_of(&doc);
             // Each by its own page's plan (ADR-0190): the store's, or a cart
             // page's, which reads the same cart.
             let page = self.page_of(&doc);
             let now = self.bindings(session, doc.1).and_then(|bindings| {
-                Ok((self.showing(&page, session, &store, &bindings)?, bindings))
+                Ok((self.showing(&page, session, &params, &bindings)?, bindings))
             });
             match now {
-                Ok((now, bindings)) => read.push((doc, page, store, bindings, now)),
+                Ok((now, bindings)) => read.push((doc, page, params, bindings, now)),
                 Err(why) => self.unshowable(&doc, &why),
             }
         }
@@ -2460,7 +2460,7 @@ impl Server {
         // derive a patch from a change rather than must.
         let mut failed = Vec::new();
         let mut queue = self.pending.lock().expect("pending");
-        for (doc, page, store, bindings, now) in read {
+        for (doc, page, params, bindings, now) in read {
             // And the value itself, to a page that speculates on it
             // (ADR-0122), from the snapshot the patches are derived from.
             // To each page that speculates on it, by its own manifest
@@ -2480,7 +2480,7 @@ impl Server {
             let (patches, speculated) = {
                 let mut shown = self.shown.lock().expect("shown");
                 match shown.get(&doc) {
-                    Some(was) => match self.derive(&page, session, &store, &bindings, was, &now) {
+                    Some(was) => match self.derive(&page, session, &params, &bindings, was, &now) {
                         Ok(patches) => {
                             let speculated =
                                 self.speculated_frames(&doc, &page, was, &now, &applied);
@@ -3501,14 +3501,16 @@ impl Server {
             .is_some_and(|b| !b.is_empty())
     }
 
-    /// The store a document shows (ADR-0162): its `id`.
-    fn store_of(&self, doc: &Doc) -> String {
+    /// **A document's parameters** (ADR-0162), as its address gave them:
+    /// what each render of it reads (ADR-0231), and which store the store's
+    /// page shows.
+    fn params_of(&self, doc: &Doc) -> Params {
         self.params
             .lock()
             .expect("params")
             .get(doc)
-            .and_then(|p| p.get("id").cloned())
-            .unwrap_or_else(|| STORE_ID.to_string())
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// A document, what it shows, and the environment it was rendered in,
@@ -3521,7 +3523,7 @@ impl Server {
         settled: &[(u32, Settled)],
     ) -> Result<(String, Shown, Env), Unread> {
         let session = doc.0.as_str();
-        let store = self.store_of(doc);
+        let params = self.params_of(doc);
         let page = self.page_of(doc);
         let template = self.template_of(&page);
         // Every value is a query's (ADR-0125): each binding runs its compiled
@@ -3533,9 +3535,9 @@ impl Server {
             .bindings_where(session, Some(doc.1), |_| true, &Keys::First)
             .map_err(|e| e.of(&format!("`{}`'s queries", template.name)))?;
         let shown = self
-            .showing(&page, session, &store, &bindings)
+            .showing(&page, session, &params, &bindings)
             .map_err(|e| format!("`{}`'s values: {e}", template.name))?;
-        let mut env = self.document_env(&page, session, &store, &bindings);
+        let mut env = self.document_env(&page, session, &params, &bindings);
         for (part, outcome) in settled {
             env = env.settle(PartId(*part), outcome.clone());
         }
@@ -3713,9 +3715,9 @@ impl Server {
         let mut bindings =
             self.bindings_where(session, Some(document), |n| n != binding, &Keys::Shown)?;
         bindings.insert(binding.to_string(), value);
-        let store = self.store_of(&doc);
+        let params = self.params_of(&doc);
         let page = self.page_of(&doc);
-        let now = self.showing(&page, session, &store, &bindings)?;
+        let now = self.showing(&page, session, &params, &bindings)?;
         // The presses its values include, read before the table (ADR-0172).
         let applied: Vec<String> = self
             .applied
@@ -3740,7 +3742,7 @@ impl Server {
             let Some(was) = shown.get(&doc) else {
                 return Ok(KeyOutcome::Superseded);
             };
-            let patches = self.derive(&page, session, &store, &bindings, was, &now)?;
+            let patches = self.derive(&page, session, &params, &bindings, was, &now)?;
             let speculated = self.speculated_frames(&doc, &page, was, &now, &applied);
             shown.insert(doc.clone(), now);
             (patches, speculated)
@@ -3949,10 +3951,13 @@ impl Server {
         &self,
         page: &str,
         session: &str,
-        store: &str,
+        params: &Params,
         bindings: &BTreeMap<String, Val>,
     ) -> Env {
         let plan = self.plan_of(page);
+        // The store a document of the store's page shows (ADR-0162): its
+        // `id`, or the benchmark's.
+        let store = params.get("id").map_or(STORE_ID, String::as_str);
         // Both bound BEFORE the chain. A `MutexGuard` produced inside a method
         // argument lives until the end of the whole STATEMENT, so locking the
         // menu inside the chain and locking it again inside `menu_fragment`
@@ -3966,10 +3971,18 @@ impl Server {
             // (ADR-0178).
             self.menu_fragment(store, &rows)
         });
+        // **Its parameters, as its address gave them** (ADR-0231): each one
+        // text, as a page that binds no query is rendered with them
+        // (ADR-0130). Until 2026-10-05 none was here, and a title, an
+        // attribute or a handler's captures that read one built, then every
+        // request for the page was answered 503.
+        let mut env = Env::new();
+        for (name, given) in params {
+            env = env.set(name, Value::Text(given.clone()));
+        }
         // Each binding's whole value, so a block a query decides, and what is
         // inside it, reads any field of it (ADR-0146), and each row what it
         // reads through a member (ADR-0169).
-        let mut env = Env::new();
         for (name, value) in bindings {
             let rendered = self
                 .rendered_value(plan, name, value)
@@ -4044,7 +4057,7 @@ impl Server {
         &self,
         page: &str,
         session: &str,
-        store: &str,
+        params: &Params,
         bindings: &BTreeMap<String, Val>,
     ) -> Result<Shown, String> {
         let plan = self.plan_of(page);
@@ -4072,7 +4085,7 @@ impl Server {
             shown.lists.insert(list.clone(), std::mem::take(items));
         }
         // Each block a query decides, as it renders now (ADR-0146).
-        let env = self.document_env(page, session, store, bindings);
+        let env = self.document_env(page, session, params, bindings);
         let template = self.template_of(page);
         for block in plan["blocks"].as_array().into_iter().flatten() {
             let id = block.as_u64().unwrap_or_default() as u32;
@@ -4123,7 +4136,7 @@ impl Server {
         &self,
         page: &str,
         session: &str,
-        store: &str,
+        params: &Params,
         bindings: &BTreeMap<String, Val>,
         was: &Shown,
         now: &Shown,
@@ -4151,7 +4164,7 @@ impl Server {
                 },
             });
         }
-        let env = self.document_env(page, session, store, bindings);
+        let env = self.document_env(page, session, params, bindings);
         for (list, items) in &now.lists {
             // A list at the top of the page only. One inside a block would
             // have no range while the block is not shown, and patching it
@@ -10459,11 +10472,15 @@ public query Store(",
             module.starts_with("HTTP/1.1 200") && module.contains("export const parts"),
             "{module}"
         );
-        // Control: the thread page computes nothing from a signal. And no
-        // path a plan does not name is read, one that leaves the directory
-        // least of all.
+        // And the thread page's, since its reply form (ADR-0231). No path a
+        // plan does not name is read, one that leaves the directory least of
+        // all.
         assert!(
-            !body("/computed/feed.app.PostPage.mjs").contains("export const parts"),
+            body("/computed/feed.app.PostPage.mjs").contains("export const parts"),
+            "the thread page's module"
+        );
+        assert!(
+            !body("/computed/feed.app.Nowhere.mjs").contains("export const parts"),
             "a module no page names"
         );
         assert!(
@@ -10622,6 +10639,157 @@ public query Store(",
         assert!(
             home(&s).contains("<p id=\"over\" role=\"alert\">Too long to post.</p>"),
             "a draft too long from the first"
+        );
+    }
+
+    /// **A page that binds a query is rendered with its parameters**
+    /// (ADR-0231), as one that binds none is (ADR-0130). The thread page's
+    /// title, an attribute, a link and a text part read its `id`, and its
+    /// reply form's handler captures it. Until 2026-10-05 all but the text
+    /// part built, then every request was answered 503, `MissingValue { path:
+    /// "id" }`, and the text part was refused at build. A block a like
+    /// renders again reads it too.
+    #[test]
+    fn a_page_that_binds_a_query_is_rendered_with_its_parameters() {
+        let s = served_feed_with(|app| {
+            app.replace("<title>Post</title>", "<title>Post {id}</title>")
+                .replace(
+                    "            <Replies post={thread} />\n",
+                    "            <Replies post={thread} />\n            \
+                     <p id=\"which\" title=\"{id}\"><a id=\"self\" href=\"/post/{id}\">{id}</a></p>\n            \
+                     {#if thread.likes > 2}<p id=\"popular\">{id} is popular</p>{/if}\n",
+                )
+        });
+        // As a browser asks for it, the title in its head.
+        let html = fetched_as(&s, "/post/p1", Some("a"))
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect::<String>();
+        assert!(html.starts_with("HTTP/1.1 200"), "{html}");
+        assert!(html.contains("<title>Post p1</title>"), "{html}");
+        assert!(html.contains("id=\"which\" title=\"p1\">"), "{html}");
+        assert!(html.contains("id=\"self\" href=\"/post/p1\">"), "{html}");
+        let which = html
+            .split("id=\"which\"")
+            .nth(1)
+            .and_then(|rest| rest.split("</p>").next())
+            .expect("the paragraph");
+        assert_eq!(visible(&format!("<p {which}")), "p1");
+        assert!(
+            html.contains("data-pw-captures=\"{&quot;id&quot;:&quot;p1&quot;}\""),
+            "the reply form captures the thread's `id`: {html}"
+        );
+        assert!(!html.contains("is popular"), "two likes: {html}");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        s.command_answered(
+            "feed.app.like",
+            "b",
+            &[Val::String("p1".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        let set = sets_of(&s, &doc).pop().expect("a patch set");
+        assert!(
+            visible(&written(&set)).contains("p1 is popular"),
+            "the block rendered again with the parameter: {set:?}"
+        );
+    }
+
+    /// **A row a change renders reads the page's parameters** (ADR-0231):
+    /// a list of the thread's replies at the top of its page, each row
+    /// naming the thread by its `id`, is sent the reply's row.
+    #[test]
+    fn a_row_a_change_renders_reads_the_pages_parameters() {
+        let s = served_feed_with(|app| {
+            app.replace(
+                "            <Replies post={thread} />\n",
+                "            <Replies post={thread} />\n            \
+                 <ul id=\"listed\">{#each thread.replies as r (r.id)}<li>{r.text} under {id}</li>{/each}</ul>\n",
+            )
+        });
+        let p3 = Params::from([("id".to_string(), "p3".to_string())]);
+        s.serve_document_settled("b", "feed.app.PostPage", &p3, &[])
+            .expect("served");
+        let reader = latest(&s.pending.lock().expect("pending"), "b");
+        let answered = s
+            .command_answered(
+                "feed.app.reply",
+                "a",
+                &[Val::String("p3".into()), Val::String("Listed".into())],
+                Some("i-1"),
+            )
+            .expect("runs");
+        assert!(answered.committed, "{:?}", answered.result);
+        s.tell_waiting();
+        let set = format!("{:?}", sets_of(&s, &reader).pop().expect("a patch set"));
+        assert!(
+            set.contains("Listed") && set.contains("under <!--pw:") && set.contains("-->p3<!--"),
+            "the row, rendered with the thread's `id`: {set}"
+        );
+    }
+
+    /// **A reply is its thread's, to every reader, and no timeline's**
+    /// (ADR-0231): `reply` stages a post that replies to `to`, and emits
+    /// `Posted`, so each open thread page is read again and sent it, with its
+    /// counts. A reply to a post that is not there is answered not found,
+    /// and nothing commits.
+    #[test]
+    fn a_reply_is_its_threads_to_every_reader_and_no_timelines() {
+        let s = served_feed();
+        let p3 = Params::from([("id".to_string(), "p3".to_string())]);
+        s.serve_document_settled("b", "feed.app.PostPage", &p3, &[])
+            .expect("served");
+        let reader = latest(&s.pending.lock().expect("pending"), "b");
+        let answered = s
+            .command_answered(
+                "feed.app.reply",
+                "a",
+                &[
+                    Val::String("p3".into()),
+                    Val::String("A reply to p3".into()),
+                ],
+                Some("i-1"),
+            )
+            .expect("runs");
+        assert!(answered.committed, "{:?}", answered.result);
+        s.tell_waiting();
+        let sent = visible(&written(&sets_of(&s, &reader).pop().expect("a patch set")));
+        assert!(
+            sent.contains("A reply to p3") && sent.contains("1 reply"),
+            "the reader's thread and its count: {sent}"
+        );
+        // In its thread, and in no timeline.
+        let page = |page: &str, params: &Params| {
+            visible(
+                &s.serve_document_settled("c", page, params, &[])
+                    .expect("served")
+                    .0,
+            )
+        };
+        let thread = page("feed.app.PostPage", &p3);
+        assert!(thread.contains("A reply to p3"), "{thread}");
+        assert!(!thread.contains("No replies yet."), "{thread}");
+        let home = page("feed.app.Home", &Params::new());
+        assert!(home.contains("Hello, feed."), "{home}");
+        assert!(!home.contains("A reply to p3"), "{home}");
+        // To a post that is not there: not found, and nothing commits.
+        let missing = s
+            .command_answered(
+                "feed.app.reply",
+                "a",
+                &[Val::String("none".into()), Val::String("Lost".into())],
+                Some("i-2"),
+            )
+            .expect("runs");
+        assert!(!missing.committed, "{:?}", missing.result);
+        assert!(
+            missing
+                .result
+                .as_ref()
+                .is_some_and(|r| r.to_string().contains("not-found")),
+            "{:?}",
+            missing.result
         );
     }
 
@@ -12538,7 +12706,7 @@ public query Store(",
             .derive(
                 s.store_page(),
                 "a",
-                STORE_ID,
+                &store_params(STORE_ID),
                 &bindings,
                 &shown("Blue Bottle"),
                 &shown("Blue Bottle Coffee"),
@@ -12560,7 +12728,7 @@ public query Store(",
             .derive(
                 s.store_page(),
                 "a",
-                STORE_ID,
+                &store_params(STORE_ID),
                 &bindings,
                 &shown("Blue Bottle"),
                 &shown("Blue Bottle"),

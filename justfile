@@ -4516,3 +4516,29 @@ rq-row-polymorphism:
 ci: evidence-gates fmt-check lint case-check mutation-anchors test-unit test-compile
     @echo ""
     @echo "ci: OK"
+
+# ADR-0231: a page's parameter is rendered on every page, and the feed's
+# replies. The compiler's tests, the server's, the feed in three engines, and
+# the mutation controls.
+e14-page-parameters:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0231 - a page's parameter is rendered on every page"; echo; \
+       echo "produced by: just e14-page-parameters"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the build (compiler/pw-core/tests/page_parameters.rs, computed_holes.rs)"; echo; \
+       cargo test --locked -p pw-core --test page_parameters --test computed_holes 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_page_that_binds_a_query_is_rendered a_row_a_change_renders a_reply_is_its_threads 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/page_parameters_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/page_parameters_mutations.py; \
+     } > docs/evidence/E14/page-parameters.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/page-parameters.txt

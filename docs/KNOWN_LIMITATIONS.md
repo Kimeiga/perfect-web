@@ -608,9 +608,23 @@ that restores pages is held by its header alone.
 PW5029 refuses a routed page that states none. A page without a route is
 titled by the host that serves it, as before: the demos' pages by their
 names, and the benchmark's store "Store". A title reads a page's parameters
-and its queries' values. Refused at build:
+and its queries' values; on a page that binds a query, its parameters since
+ADR-0231. Refused at build:
 - one that reads a signal;
 - one that reads a value a press speculates.
+
+**A page's parameter is read where a host renders** (ADR-0231). Every page
+is rendered with its parameters, each one text as its address gives it. A
+text part, a title, an attribute, a handler's captures and an instance's
+argument read one. The browser holds none:
+- one read inside a block a signal decides is refused at build (ADR-0137);
+- so is one read in a region the browser renders again with a speculation
+  (ADR-0172).
+
+A value computed from one waits on ruling 0073-a. A parameter's
+representation, `{id.value}`, checks and builds and does not render, as no
+opaque value's does in a template: the renderer reads `.value` as a field.
+ADR-0232 is to fix it.
 
 The store has no change event of its own, so its title, like its heading,
 changes when the page's values are next read. A title, or metadata, that
@@ -752,6 +766,7 @@ type that contains itself is not speculated on (ADR-0205 §5).
 **A commit reaches another session's open page by the query it reads, not
 by its key** (ADR-0219). A like drops one post's `Thread`, and every open
 thread page is read again; each other one is sent no change, from the cache.
+A reply is a post, and drops every `Thread` (ADR-0231).
 
 **E7 gate 8 is unstable on this machine** (2026-10-02, E7-G8). About half
 of runs see one long animation frame of 52-63 ms, with no script attributed
