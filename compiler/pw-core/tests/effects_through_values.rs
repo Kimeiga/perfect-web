@@ -150,3 +150,38 @@ fn a_function_named_in_a_handler_is_the_handlers() {
 fn a_binding_named_like_a_function_is_its_value() {
     clean("view V() !{} {\n    let stamp = 5\n    <p>{stamp}</p>\n}");
 }
+
+/// **A field of a value is no function of the same name** (ADR-0228). The
+/// feed's `i.author`, a field of an `Item`, was charged the row of `fn
+/// author`, which the module also declares: the path's last segment was
+/// matched against the declarations in scope. A field of a value is the
+/// value's, typed by its record; only a module's path names a declaration.
+#[test]
+fn a_field_of_a_value_is_no_function_of_the_same_name() {
+    let src = |body: &str| {
+        format!(
+            "module t\n\nimport clock\n\n\
+             type Item = Item {{ stamp: Int, now: Int }}\n\n\
+             fn stamp(n: Int) -> Int !{{ clock.read }} {{ clock.now() + n }}\n\n{body}\n"
+        )
+    };
+    for body in [
+        "fn f(i: Item) -> Int !{} { i.stamp }",
+        "fn f(xs: List<Item>) -> Int !{} { List.fold(xs, 0, (n, i) => n + i.stamp) }",
+    ] {
+        let found = reported(&src(&format!("import List\n\n{body}")));
+        assert!(found.is_empty(), "{body}: {found:#?}");
+    }
+    // Controls: the function named as a value, and a module's path, still
+    // perform what they do.
+    for body in [
+        "fn f(i: Item) -> Int !{} {\n    let g = stamp\n    g(i.now)\n}",
+        "fn f(i: Item) -> Int !{} {\n    let g = clock.now\n    g() + i.stamp\n}",
+    ] {
+        let found = reported(&src(body));
+        assert!(
+            found.len() == 1 && found[0].starts_with("PW0400"),
+            "{body}: {found:#?}"
+        );
+    }
+}

@@ -346,7 +346,7 @@ fn rendered_again(
                 if own.iter().any(|v| v.starts_with('#')) {
                     return Err(format!(
                         "part {id} computes a value inside a block a signal decides, and the \
-                         browser, which renders that block again, computes none yet (ADR-0228)"
+                         browser, which renders that block again, computes none yet (ADR-0229)"
                     ));
                 }
                 if let Some(other) = own.iter().find(|v| !signal(v) && !bound.contains(&root(v))) {
@@ -1311,6 +1311,7 @@ fn plan(
                 ws,
                 sigs,
                 inference,
+                &template.chunks,
                 &found,
                 &signals,
                 (&page, page_def),
@@ -1323,6 +1324,7 @@ fn plan(
             )?;
             match computes {
                 Computes::Host(part) => parts.push(part),
+                Computes::Row(row) => rows.push(row),
                 Computes::Browser { signal, path } => live.push(Live {
                     part: hole.part.0,
                     signal,
@@ -1474,6 +1476,7 @@ fn plan(
                 ws,
                 sigs,
                 inference,
+                &template.chunks,
                 &found,
                 &signals,
                 (&page, page_def),
@@ -1486,6 +1489,7 @@ fn plan(
             )?;
             match computes {
                 Computes::Host(part) => derived_values.push(part),
+                Computes::Row(row) => rows.push(row),
                 // Set in place, as an attribute a signal decides is (ADR-0142).
                 Computes::Browser { signal, path } => {
                     let (kind, attribute) = match find_part(&template.chunks, read.part.0) {
@@ -1732,7 +1736,7 @@ fn plan(
     ))
 }
 
-/// **Who computes a computed part** (ADR-0226, ADR-0227).
+/// **Who computes a computed part** (ADR-0226, ADR-0227, ADR-0228).
 enum Computes {
     /// A host, from a query's value, by the part's steps, the last its
     /// function.
@@ -1740,15 +1744,20 @@ enum Computes {
     /// The browser, from the signal's value at `path`, each time it
     /// changes; and a host its first, from the signal's first value.
     Browser { signal: String, path: String },
+    /// A host, for each row of a query's list, from the row's item, as it
+    /// computes a member read of it (ADR-0169), and the browser for a row it
+    /// renders from a speculated value (ADR-0172).
+    Row(RowRead),
 }
 
-/// **A computed part** (ADR-0226, ADR-0227): the function its expression is
-/// lifted into, a component of its own, and who runs it with the one value
-/// it reads, at the top of the page. A query's value is a host's: the steps
-/// reach it, then run the function. A signal's is the browser's, which runs
-/// the function compiled for it, and a host's for the first value.
-/// Anything else is refused by name: one in a block, a row or an instance,
-/// several values, or a value the page speculates on (ADR-0228); and none,
+/// **A computed part** (ADR-0226, ADR-0227, ADR-0228): the function its
+/// expression is lifted into, a component of its own, and who runs it with
+/// the one value it reads. A query's value at the top of the page is a
+/// host's: the steps reach it, then run the function. A signal's is the
+/// browser's, which runs the function compiled for it, and a host's for the
+/// first value. A row's item is a host's for each row of a query's list.
+/// Anything else is refused by name: one in a block, an arm or an instance,
+/// several values, or a value the page speculates on (ADR-0229); and none,
 /// which is a value to write as it is.
 #[allow(clippy::too_many_arguments)]
 fn computed_part(
@@ -1756,6 +1765,7 @@ fn computed_part(
     ws: &Workspace,
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
+    chunks: &[crate::template_ir::Chunk],
     found: &[(String, DefId, Vec<ExprId>)],
     signals: &[String],
     (page, page_def): (&str, DefId),
@@ -1790,17 +1800,11 @@ fn computed_part(
             source.effect
         ));
     }
-    if nested {
-        return refuse(
-            "inside a block, a loop's row or an arm, which no host computes yet (ADR-0228)"
-                .to_string(),
-        );
-    }
     let [(name, read)] = inputs else {
         return refuse(match inputs {
             [] => "from nothing it reads: write the value itself".to_string(),
             _ => format!(
-                "from {}, and a host computes one from one query's value (ADR-0228)",
+                "from {}, and a host computes one from one value (ADR-0229)",
                 inputs
                     .iter()
                     .map(|(n, _)| format!("`{n}`"))
@@ -1809,32 +1813,6 @@ fn computed_part(
             ),
         });
     };
-    let mut segments = read.split('.');
-    let root = segments.next().unwrap_or_default();
-    let reads: Vec<&str> = segments.collect();
-    // A signal's value is the browser's to compute (ADR-0227), at the path
-    // its expression reads it by.
-    let signal = signals.iter().any(|s| s == root);
-    let mut out = Vec::new();
-    if !signal {
-        let Some((_, resource, _)) = found.iter().find(|(n, ..)| n == root) else {
-            return refuse(format!("from `{name}`, which is no query's value"));
-        };
-        let ty = value_of(sigs, *resource)
-            .ok_or_else(|| format!("`{root}`'s query has no resolved result"))?;
-        for (step, def) in steps(sigs, ty, &reads)? {
-            out.push(match (step, def) {
-                (Step::Member(_), Some(def)) => {
-                    members.insert(def);
-                    Step::Member(
-                        component_id_of(hirs, def)
-                            .ok_or_else(|| "a member function with no identity".to_string())?,
-                    )
-                }
-                (step, _) => step,
-            });
-        }
-    }
     // Its input's type, where its expression reads it, and its result's.
     let input = body
         .walk_from(expr)
@@ -1864,30 +1842,78 @@ fn computed_part(
     })
     .ok_or_else(|| format!("part {part}'s value has no type the build knows"))?;
     let component_id = format!("{page}.derived_{part}");
-    out.push(Step::Derived(component_id.clone()));
-    let computes = match signal {
-        true => Computes::Browser {
-            signal: root.to_string(),
-            path: read.clone(),
-        },
-        false => Computes::Host(Part {
+    let derived = Derived {
+        component_id: component_id.clone(),
+        page: page_def,
+        part,
+        origin,
+        expr,
+        input: (name.clone(), input),
+        result,
+    };
+    // **In a loop's row** (ADR-0228): the compiler named its path from the
+    // row's item, which alone it reads. Computed for each row by the steps
+    // that reach its input from the item, then the function, and set in the
+    // row by that path, as a member read of the item is (ADR-0169).
+    if path.contains(".#") {
+        let Some(mut row) = row_read(hirs, sigs, chunks, found, part, read, members)? else {
+            return refuse(format!(
+                "in a row of `{name}`, a list no query gives, which no host computes yet \
+                 (ADR-0229)"
+            ));
+        };
+        row.path = path.to_string();
+        row.steps.push(Step::Derived(component_id));
+        return Ok((derived, Computes::Row(row)));
+    }
+    if nested {
+        return refuse(
+            "inside a block, an arm or another value's row, which no host computes yet \
+             (ADR-0229)"
+                .to_string(),
+        );
+    }
+    let mut segments = read.split('.');
+    let root = segments.next().unwrap_or_default();
+    let reads: Vec<&str> = segments.collect();
+    // A signal's value is the browser's to compute (ADR-0227), at the path
+    // its expression reads it by.
+    if signals.iter().any(|s| s == root) {
+        return Ok((
+            derived,
+            Computes::Browser {
+                signal: root.to_string(),
+                path: read.clone(),
+            },
+        ));
+    }
+    let Some((_, resource, _)) = found.iter().find(|(n, ..)| n == root) else {
+        return refuse(format!("from `{name}`, which is no query's value"));
+    };
+    let ty = value_of(sigs, *resource)
+        .ok_or_else(|| format!("`{root}`'s query has no resolved result"))?;
+    let mut out = Vec::new();
+    for (step, def) in steps(sigs, ty, &reads)? {
+        out.push(match (step, def) {
+            (Step::Member(_), Some(def)) => {
+                members.insert(def);
+                Step::Member(
+                    component_id_of(hirs, def)
+                        .ok_or_else(|| "a member function with no identity".to_string())?,
+                )
+            }
+            (step, _) => step,
+        });
+    }
+    out.push(Step::Derived(component_id));
+    Ok((
+        derived,
+        Computes::Host(Part {
             part,
             path: path.to_string(),
             binding: root.to_string(),
             steps: out,
         }),
-    };
-    Ok((
-        Derived {
-            component_id,
-            page: page_def,
-            part,
-            origin,
-            expr,
-            input: (name.clone(), input),
-            result,
-        },
-        computes,
     ))
 }
 

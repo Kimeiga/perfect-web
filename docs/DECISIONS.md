@@ -1925,3 +1925,12 @@ part; the feed's draft).
   compiles the same function into the page's module, which the browser loads
   when the signal first changes. The feed's draft says what is left, and its
   post button is disabled while there is no post to send.
+[ADR-0228](DECISIONS/ADR-0228-a-value-computed-in-a-row-is-the-rows.md): a
+value computed in a row is the row's (ruling 0073-a in a loop's row and from
+a speculated value; the feed's likes).
+- A value computed from a row's item is named by a path from the item, and a
+  host computes it for each row as a member read; the speculation module
+  computes it for each row it renders. The feed's rows say their likes in
+  words, and a like is shown before the server answers. Found: a field of a
+  value was charged a same-named function's effects, and an opaque value did
+  not compare.

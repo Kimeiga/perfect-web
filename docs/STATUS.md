@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0228, 2026-10-05: a value computed in a row is the row's** (ruling
+0073-a in a row and from a speculated value). A value computed in a loop's
+row was refused at build. Now its path is named from the row's item, a host
+computes it for each row as a member read of the item, and the speculation
+module for each row it renders. The feed's rows say "2 likes", and a like is
+shown before the server answers, in three engines. Found: the feed's
+`i.author`, a field, was charged `fn author`'s `database.read<User>`, and
+`i.id == post`, two opaque values, did not build (`just e14-computed-rows`).
+
 **ADR-0227, 2026-10-05: a value computed from a signal is the browser's**
 (ruling 0073-a, the browser's part). A value computed from a signal was
 refused at build. Now the host renders its first value, running the

@@ -609,31 +609,34 @@ fn page_module(
     };
     let speculates = |root: &str| speculated.iter().any(|(n, ..)| n == root);
 
-    // **A value computed from a speculated one** (ADR-0226) is the host's,
-    // and would show the server's beside a list that shows the speculation:
-    // the browser computes none yet (ADR-0227).
+    // **A value computed from a speculated one** (ADR-0228) is computed
+    // here, as the browser renders the speculation: a text part's from the
+    // value whole, below, and a row's from its item whole, with its row. An
+    // attribute's, or one from a field of the value, would show the server's
+    // beside a list that shows the speculation: refused, by name.
     let computed = lowered
         .holes
         .iter()
-        .filter_map(|h| Some((h.part.0, h.inputs.as_ref()?)))
+        .filter_map(|h| Some((h.part.0, h.inputs.as_ref()?, "a value")))
         .chain(
             lowered
                 .reads
                 .iter()
-                .filter_map(|r| Some((r.part.0, r.inputs.as_ref()?))),
+                .filter_map(|r| Some((r.part.0, r.inputs.as_ref()?, "an attribute's value"))),
         );
-    for (part, inputs) in computed {
-        if let Some((name, _)) = inputs
-            .iter()
-            .find(|(_, read)| speculates(read.split('.').next().unwrap_or_default()))
-        {
-            return Encoding::Unsupported {
-                construct: "a value computed from a speculated one",
-                reason: format!(
-                    "part {part} of `{page}` computes a value from `{name}`, which the page \
-                     speculates on, and the browser computes none yet (ADR-0228)"
-                ),
-            };
+    for (part, inputs, what) in computed {
+        for (name, read) in inputs {
+            let root = read.split('.').next().unwrap_or_default();
+            if speculates(root) && (what != "a value" || read != root) {
+                return Encoding::Unsupported {
+                    construct: "a value computed from a speculated one",
+                    reason: format!(
+                        "part {part} of `{page}` computes {what} from `{name}`, which the page \
+                         speculates on, and the browser computes one from the value whole, \
+                         and only between tags (ADR-0229)"
+                    ),
+                };
+            }
         }
     }
 
@@ -824,6 +827,7 @@ fn page_module(
                     h.path.clone(),
                     h.origin,
                     crate::template_ir::ReadAt::Expr(h.expr),
+                    h.inputs.clone(),
                 )
             })
             .chain(
@@ -831,21 +835,52 @@ fn page_module(
                     .reads
                     .iter()
                     .filter(|r| parts.contains(&r.part.0))
-                    .map(|r| (r.path.clone(), r.origin, r.at)),
+                    .map(|r| (r.path.clone(), r.origin, r.at, r.inputs.clone())),
             )
             .collect::<Vec<_>>();
-        for (path, origin, at) in written {
+        for (path, origin, at, inputs) in written {
             let Some((root, rest)) = path.split_once('.') else {
                 continue;
             };
             let crate::template_ir::ReadAt::Expr(expr) = at else {
                 continue;
             };
-            if root != binding.as_str()
-                || computed.iter().any(|(p, _)| p == rest)
-                || !crate::page_values::calls_a_member(
-                    cx.hirs, cx.ws, cx.sigs, &mut typed, origin, at,
-                )
+            if root != binding.as_str() || computed.iter().any(|(p, _)| p == rest) {
+                continue;
+            }
+            // **A value computed from the row's item** (ADR-0228), whole: the
+            // function the compiler lifted, compiled here, as a host runs it
+            // for each row. From a field of the item, refused by name.
+            if let Some([(name, read)]) = inputs.as_deref() {
+                if read != binding {
+                    return Encoding::Unsupported {
+                        construct: "a speculated row's value computed from a field of its item",
+                        reason: format!(
+                            "part {} of `{page}` computes a value from `{read}`, a field of a \
+                             row the page speculates on, and the browser computes one from \
+                             the row's item whole (ADR-0229)",
+                            region.part
+                        ),
+                    };
+                }
+                let (u, d) = origin;
+                let Some(body) = cx.hirs[u].decl(d).body.map(|b| cx.hirs[u].body(b)) else {
+                    continue;
+                };
+                let f = lowered!(lower::pure_expr(
+                    cx,
+                    u,
+                    d,
+                    expr,
+                    &[(name.clone(), element.clone())],
+                    &format!("{page}#row{}", region.part),
+                    body.expr_span(expr),
+                ));
+                functions.push(f);
+                computed.push((rest.to_string(), functions.len() - 1));
+                continue;
+            }
+            if !crate::page_values::calls_a_member(cx.hirs, cx.ws, cx.sigs, &mut typed, origin, at)
             {
                 continue;
             }
@@ -894,6 +929,38 @@ fn page_module(
     // composed into it (ADR-0136), by the path the template reads.
     let mut reads: Vec<(String, u32, usize)> = Vec::new();
     for hole in lowered.holes.clone() {
+        // **A text part computed from a speculated value** (ADR-0228), whole:
+        // its function, compiled here, from the value the page holds now.
+        if let Some([(name, read)]) = hole.inputs.as_deref() {
+            let Some((_, _, _, value)) = speculated.iter().find(|(n, ..)| n == read) else {
+                continue;
+            };
+            if hole.nested {
+                continue;
+            }
+            let (at, decl) = hole.origin;
+            let Some(written) = cx.hirs[at].decl(decl).body.map(|b| cx.hirs[at].body(b)) else {
+                continue;
+            };
+            let f = lowered!(lower::pure_expr(
+                cx,
+                at,
+                decl,
+                hole.expr,
+                &[(name.clone(), value.clone())],
+                &format!("{page}#part{}", hole.part.0),
+                written.expr_span(hole.expr),
+            ));
+            if !matches!(f.ret, Type::Int | Type::Str | Type::Bool) {
+                return Encoding::Unsupported {
+                    construct: "a speculated part with no text form here",
+                    reason: format!("part {} of `{page}` is a {:?}", hole.part.0, f.ret),
+                };
+            }
+            functions.push(f);
+            reads.push((read.clone(), hole.part.0, functions.len() - 1));
+            continue;
+        }
         let root = hole.path.split('.').next().unwrap_or_default();
         let Some((_, _, _, value)) = speculated.iter().find(|(n, ..)| n == root) else {
             continue;

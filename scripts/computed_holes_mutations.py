@@ -39,14 +39,16 @@ MUTANTS = [
     (
         "a computed hole reads nothing",
         TEMPLATE,
-        "                    inputs: Some(inputs_of(body, *e, ctx)),\n",
-        "                    inputs: Some(Vec::new()),\n",
+        # Re-anchored by ADR-0228, which names its path by what it reads.
+        "                let inputs = inputs_of(body, *e, ctx);\n                let value = ix.computed_path(id, &inputs);\n",
+        "                let inputs = Vec::new();\n                let value = ix.computed_path(id, &inputs);\n",
     ),
     (
         "a computed attribute reads nothing",
         TEMPLATE,
-        "                        Some(inputs_of(body, *e, ctx)),\n",
-        "                        Some(Vec::new()),\n",
+        # Re-anchored by ADR-0228, as the hole's above.
+        "                        let inputs = inputs_of(body, *e, ctx);\n",
+        "                        let inputs = Vec::new();\n",
     ),
     (
         "a name a lambda binds is read from outside",
@@ -90,7 +92,8 @@ MUTANTS = [
     (
         "the lifted function is not run",
         VALUES,
-        "    out.push(Step::Derived(component_id.clone()));\n",
+        # Re-anchored by ADR-0228, whose host's branch is its own.
+        "    out.push(Step::Derived(component_id));\n",
         "",
     ),
     (
@@ -129,12 +132,10 @@ MUTANTS = [
         "        &[(d.input.0.clone(), input)],\n",
         "        &[],\n",
     ),
-    (
-        "a value computed from a speculated one is built",
-        SPECULATION,
-        "            .find(|(_, read)| speculates(read.split('.').next().unwrap_or_default()))\n",
-        "            .find(|_| false)\n",
-    ),
+    # "a value computed from a speculated one is built" is retired: since
+    # ADR-0228 the speculation computes a text part from the value whole, and
+    # computed_rows_mutations.py's "an attribute computed from a speculated
+    # value is built" stands for what it still refuses.
     (
         "a value the template computes may perform an effect",
         CHECK,

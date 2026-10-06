@@ -34,8 +34,9 @@ MUTANTS = [
     (
         "a speculated read inside a block is compiled as if it were outside",
         SPECULATION,
-        "        if hole.nested {\n",
-        "        if hole.nested && false {\n",
+        # Re-anchored by ADR-0228, whose computed part asks the same, deeper.
+        "        if hole.nested {\n            // Rendered with its region (ADR-0172).\n",
+        "        if hole.nested && false {\n            // Rendered with its region (ADR-0172).\n",
     ),
     (
         "a decoded Int stays a JSON number",

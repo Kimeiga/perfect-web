@@ -176,14 +176,18 @@ refused by name:
   `{#if xs}` around the list says the same.
 - **An interpolated attribute is refused in a `style`**, and a URL with holes
   must begin with text (ADR-0042).
-- **A computed value builds at the top of a page, from one value** (ADR-0226,
-  ADR-0227): a text hole or an attribute's whole value, from a query's value,
-  which a host computes, or a signal's, which the browser computes after the
-  host's first. One in a block, a loop's row, an arm or a view that contains
-  itself, a condition (`{#if n > 0}`), one from a value the page speculates
-  on, from several values, from none or from a page's parameter, and a hole
-  in an attribute's text, check and do not build (ADR-0228). A directive
-  other than `on:` (`style:width={w}`) does not build either (ADR-0073).
+- **A computed value builds from one value** (ADR-0226, ADR-0227,
+  ADR-0228): a text hole or an attribute's whole value, at the top of a page
+  from a query's value, which a host computes, or a signal's, which the
+  browser computes after the host's first; and in a loop's row from the
+  row's item, which a host computes for each row, and the speculation module
+  for each row it renders. One in a block or an arm outside a row, in a view
+  that contains itself, or in a block a signal decides, a condition (`{#if n
+  > 0}`), one from several values, from none or from a page's parameter, an
+  attribute from a speculated value or a speculated row's value from a field
+  of its item, and a hole in an attribute's text, check and do not build
+  (ADR-0229). A directive other than `on:` (`style:width={w}`) does not build
+  either (ADR-0073).
 - **A value computed from a signal shows its last value until the page's
   module has loaded** (ADR-0227): the first change loads it, once per page.
 - **A `Float` is not written by a template** (ADR-0074). It has no format

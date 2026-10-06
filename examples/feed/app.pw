@@ -133,8 +133,19 @@ command like(post: PostId) -> Result<Post, FeedError>
     requires      SignedIn
     idempotent_by InteractionId
     emits         Liked(post)
+    optimistic    Timeline(current_session(), _) as feed => liked(feed, post)
 {
     add_like(current_session(), post)
+}
+
+// **A like shown before the server answers** (ADR-0228): the post's count
+// one more, in the timeline the page shows.
+fn liked(feed: List<Item>, post: PostId) -> List<Item> !{} {
+    List.map(feed, (i) => if i.id == post {
+        Item { id: i.id, author: i.author, text: i.text, likes: i.likes + 1 }
+    } else {
+        i
+    })
 }
 
 session page Home() {
@@ -169,7 +180,8 @@ session page Home() {
                         <button type="button" on:press={resumable(captures = { p }) => match like(p.id) {
                             Ok(_) => draft = draft,
                             Err(_) => draft = draft,
-                        }}>Like ({p.likes})</button>
+                        }}>Like</button>
+                        <span class="likes">{counted(p.likes, "like", "likes")}</span>
                     </li>
                 {/each}
             </ul>

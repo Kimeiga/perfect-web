@@ -2050,6 +2050,32 @@ impl<'a> Lower<'a> {
             other => return other,
         };
         let rt = self.types.get(&r).cloned();
+        // **An opaque type compares as its representation** (ADR-0228): two
+        // `PostId`s are their `String`s. Its values are its representation's,
+        // retyped (ADR-0054), so a comparison retypes them back. Until
+        // ADR-0228 `i.id == post` checked, and did not build.
+        let (l, r, lt, rt) = match (&lt, op.compares()) {
+            (Type::Nominal(def, instance), true) if rt.as_ref() == Some(&lt) => {
+                match self.representation(*def, instance, &span) {
+                    Some(rep) => {
+                        let (lr, rr) = (self.fresh(), self.fresh());
+                        let lv = self.push(Instr::Retype {
+                            result: lr,
+                            value: l,
+                            ty: rep.clone(),
+                        });
+                        let rv = self.push(Instr::Retype {
+                            result: rr,
+                            value: r,
+                            ty: rep.clone(),
+                        });
+                        (lv, rv, rep.clone(), Some(rep))
+                    }
+                    None => (l, r, lt, rt),
+                }
+            }
+            _ => (l, r, lt, rt),
+        };
         if rt.as_ref() != Some(&lt) {
             // `pw check` refuses operands of two known types (PW0609,
             // ADR-0043). This is reached by operands it could not type.
@@ -4174,6 +4200,16 @@ impl<'a> Lower<'a> {
             payload,
             ty,
         }))
+    }
+
+    /// **An opaque type's representation** (ADR-0054), under its instance's
+    /// arguments, where it is one a comparison reads: an `Int`, a `Float`, a
+    /// `Bool` or a `String`. `None` for any other type.
+    fn representation(&self, def: DefId, instance: &[Type], span: &Span) -> Option<Type> {
+        let rep = self.cx.sigs.type_decl(def)?.representation.clone()?;
+        let subst = self.instance_subst(def, instance);
+        let ty = ty_resolved_with(self.cx.sigs, rep.resolved()?, span, &subst).lowered()?;
+        matches!(ty, Type::Int | Type::Float | Type::Bool | Type::Str).then_some(ty)
     }
 
     /// A field of a record value, by the index its declaration gives it.

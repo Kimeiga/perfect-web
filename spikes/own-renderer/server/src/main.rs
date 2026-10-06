@@ -10510,6 +10510,56 @@ public query Store(",
         );
     }
 
+    /// **A value computed in a row is each row's** (ADR-0228): the feed's
+    /// timeline says each post's likes in words, computed by the host for
+    /// each row from its item. Another session's like is a new row, sent with
+    /// its new count.
+    #[test]
+    fn a_value_computed_in_a_row_is_each_rows_and_sent_with_it() {
+        let s = served_feed();
+        let (html, ..) = s
+            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        assert_eq!(text_in(&html, "<span class=\"likes\">"), "2 likes");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        s.command_answered(
+            "feed.app.like",
+            "b",
+            &[Val::String("p1".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        let set = sets_of(&s, &doc).pop().expect("a patch set");
+        let sent = written(&set);
+        assert!(
+            sent.contains("3 likes") && !sent.contains("2 likes"),
+            "the row again, with its count: {set:?}"
+        );
+    }
+
+    /// **An opaque value compares as its representation** (ADR-0228), in a
+    /// component a host runs: `thread.id == PostId("p1")`, two `PostId`s, as
+    /// the feed's own like transition compares them in the browser. Until
+    /// ADR-0228 it checked, and did not build.
+    #[test]
+    fn an_opaque_value_compares_as_its_representation() {
+        let s = served_feed_with(|app| {
+            app.replace(
+                "            <Replies post={thread} />\n",
+                "            <Replies post={thread} />\n            \
+                 <p id=\"which\">{said(thread.id == PostId(\"p1\"))}</p>\n",
+            ) + "\nfn said(first: Bool) -> String !{} {\n    if first {\n        \"the first\"\n    } else {\n        \"a reply\"\n    }\n}\n"
+        });
+        for (id, said) in [("p1", "the first"), ("p2", "a reply")] {
+            let thread = Params::from([("id".to_string(), id.to_string())]);
+            let (html, ..) = s
+                .serve_document_settled("a", "feed.app.PostPage", &thread, &[])
+                .expect("served");
+            assert_eq!(text_in(&html, "<p id=\"which\">"), said, "{id}");
+        }
+    }
+
     /// **What a commit drops of the session's own reaches no other
     /// session** (ADR-0219): `add_to_cart` drops the cart the session's
     /// `Cart` keys by it, and another session's open cart page is sent

@@ -17,7 +17,9 @@
 //   - a thread's counts are values its template computes, the host's, shown
 //     with scripts off, and a like's reaches the open thread (ADR-0226);
 //   - what is left of a draft, and whether there is a post to send, are
-//     computed from it as it is typed, and the host's first (ADR-0227).
+//     computed from it as it is typed, and the host's first (ADR-0227);
+//   - a row's likes are counted in words, and a like shows before the
+//     server answers, its count computed again in the browser (ADR-0228).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -45,11 +47,14 @@ const unreloaded = (page) => page.evaluate(() => window.__unreloaded === true);
 /** The timeline's post with `text`. */
 const post = (page, text) => page.locator("main > ul > li").filter({ hasText: text });
 
-/** A post's like count, as its button shows it. */
+/** A post's like count, as its row says it in words (ADR-0228). */
 async function likes(page, text) {
-  const label = await post(page, text).getByRole("button", { name: /^Like/ }).innerText();
-  return Number(label.match(/\((\d+)\)/)[1]);
+  const said = await post(page, text).locator(".likes").innerText();
+  return Number(said.match(/^(\d+) like/)[1]);
 }
+
+/** A count in words, as the feed's `counted` writes it. */
+const counted = (n, one, many) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 
 test("the home page shows the timeline, and a thread its replies", async ({ page }) => {
   await home(page);
@@ -93,9 +98,10 @@ test("a like's count reaches every reader", async ({ browser }) => {
   const [liker, reader] = [await a.newPage(), await b.newPage()];
   for (const page of [liker, reader]) await home(page);
   const before = await likes(reader, "Hello, feed.");
-  await post(liker, "Hello, feed.").getByRole("button", { name: /^Like/ }).click();
-  await expect(post(liker, "Hello, feed.").getByRole("button")).toHaveText(`Like (${before + 1})`);
-  await expect(post(reader, "Hello, feed.").getByRole("button")).toHaveText(`Like (${before + 1})`);
+  await post(liker, "Hello, feed.").getByRole("button", { name: "Like" }).click();
+  const after = counted(before + 1, "like", "likes");
+  await expect(post(liker, "Hello, feed.").locator(".likes")).toHaveText(after);
+  await expect(post(reader, "Hello, feed.").locator(".likes")).toHaveText(after);
   expect(await unreloaded(reader)).toBe(true);
   await a.close();
   await b.close();
@@ -130,9 +136,6 @@ test("what is left of a draft is computed as it is typed", async ({ browser }) =
   await context.close();
 });
 
-/** A count in words, as the feed's `counted` writes it. */
-const counted = (n, one, many) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
-
 test("a thread's counts are computed by the host, and a like's reaches it", async ({
   browser,
 }) => {
@@ -155,7 +158,7 @@ test("a thread's counts are computed by the host, and a like's reaches it", asyn
   await expect(counts).toHaveText(`1 reply · ${counted(before, "like", "likes")}`);
   // Another session's like: the thread is a new value, so a new count, sent
   // to the open page as its text.
-  await post(liker, "Hello, feed.").getByRole("button", { name: /^Like/ }).click();
+  await post(liker, "Hello, feed.").getByRole("button", { name: "Like" }).click();
   await expect(counts).toHaveText(`1 reply · ${counted(before + 1, "like", "likes")}`);
   expect(await unreloaded(reader)).toBe(true);
   await a.close();
@@ -184,6 +187,44 @@ test("a post shows before the server answers, and is the server's after", async 
   await expect(post(page, text).getByRole("link")).toHaveText(/^Guest /);
   await expect(post(page, text)).toHaveCount(1);
   await expect(page.getByLabel("What's happening?")).toHaveValue("");
+  expect(await unreloaded(page)).toBe(true);
+});
+
+test("a like shows before the server answers, and one that fails is taken back", async ({
+  page,
+}) => {
+  // ADR-0228: the like's transition counts it in the timeline the page
+  // holds, and each row's count in words is computed again from it, in
+  // the browser, as the host computes it for the rows it renders.
+  await home(page);
+  const before = await likes(page, "Hello, feed.");
+  let release;
+  const held = new Promise((r) => (release = r));
+  await page.route("**/command/feed.app.like", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await post(page, "Hello, feed.").getByRole("button", { name: "Like" }).click();
+  const count = post(page, "Hello, feed.").locator(".likes");
+  await expect(count).toHaveText(counted(before + 1, "like", "likes"));
+  // The server's, once it has answered: the same count, in one row.
+  const answered = page.waitForResponse((r) => r.url().includes("/command/feed.app.like"));
+  release();
+  await answered;
+  await expect(count).toHaveText(counted(before + 1, "like", "likes"));
+  await expect(post(page, "Hello, feed.")).toHaveCount(1);
+  await page.unroute("**/command/feed.app.like");
+  // A like whose request fails is taken back.
+  let fail;
+  const failing = new Promise((r) => (fail = r));
+  await page.route("**/command/feed.app.like", async (route) => {
+    await failing;
+    await route.abort("failed");
+  });
+  await post(page, "Hello, feed.").getByRole("button", { name: "Like" }).click();
+  await expect(count).toHaveText(counted(before + 2, "like", "likes"));
+  fail();
+  await expect(count).toHaveText(counted(before + 1, "like", "likes"));
   expect(await unreloaded(page)).toBe(true);
 });
 

@@ -371,9 +371,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
           host's part~~ (0073-a, ADR-0226, `just e14-computed-holes`: the
           thread's counts); ~~the browser's part~~ (ADR-0227, `just
           e14-computed-signals`: a draft's characters left, a post button
-          disabled while it is empty); next where else and from what else
-          (ADR-0228: rows with optimistic likes, blocks, conditions, several
-          values, a speculated value), then the rest of the feed, pulling in what it
+          disabled while it is empty); ~~rows, and a speculated value~~
+          (ADR-0228, `just e14-computed-rows`: the likes in words, and
+          optimistic likes); next where else and from what else (ADR-0229:
+          blocks, conditions for 0071-a, several values, instances), then the
+          rest of the feed, pulling in what it
           needs: replies, 0071-a, 0122-d, 0057-a, 0099-a, and ADR-0195's
           ruling 10, materialization chains;
         - then 0101-a to 0101-d, 0105-a, 0100-a, and the rest below;

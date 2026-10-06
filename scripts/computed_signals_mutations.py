@@ -38,8 +38,9 @@ MUTANTS = [
         "a signal's value is a query's to compute",
         "cargo",
         VALUES,
-        "    let signal = signals.iter().any(|s| s == root);\n",
-        "    let signal = false;\n",
+        # Re-anchored by ADR-0228, which branches on it at once.
+        "    if signals.iter().any(|s| s == root) {\n        return Ok((\n",
+        "    if false && signals.iter().any(|s| s == root) {\n        return Ok((\n",
     ),
     (
         "a text part computed from a signal names no component",

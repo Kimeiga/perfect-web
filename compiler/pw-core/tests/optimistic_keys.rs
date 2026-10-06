@@ -94,7 +94,8 @@ fn a_target_may_leave_a_key_unnamed() {
         )],
         "the binding by the key it names"
     );
-    assert_eq!(module.commands, ["feed.app.post"]);
+    // And a like, which counts it in the same timeline (ADR-0228).
+    assert_eq!(module.commands, ["feed.app.post", "feed.app.like"]);
 }
 
 #[test]

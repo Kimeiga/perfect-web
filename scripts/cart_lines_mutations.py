@@ -183,8 +183,9 @@ MUTANTS = [
         "a row's member reads are not compiled",
         "conformance",
         SPECULATION,
-        "            computed.push((rest.to_string(), functions.len() - 1));\n",
-        "            let _ = rest;\n",
+        # Re-anchored by ADR-0228, whose computed row value is pushed deeper.
+        "            functions.push(f);\n            computed.push((rest.to_string(), functions.len() - 1));\n",
+        "            functions.push(f);\n            let _ = rest;\n",
     ),
     # --- the renderer --------------------------------------------------------
     (

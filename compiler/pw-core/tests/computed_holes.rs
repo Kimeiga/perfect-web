@@ -283,22 +283,23 @@ fn what_a_host_does_not_compute_is_refused_by_name() {
     for (markup, why) in [
         (
             "{#if post.pinned}<p>{counted(post.likes, \"a\", \"b\")}</p>{/if}",
-            "computes a value inside a block, a loop's row or an arm, which no host computes \
-             yet (ADR-0228)",
+            "computes a value inside a block, an arm or another value's row, which no host \
+             computes yet (ADR-0229)",
         ),
         (
             "{#if open}<p>{counted(post.likes, \"a\", \"b\")}</p>{/if}",
             "computes a value inside a block a signal decides, and the browser, which renders \
-             that block again, computes none yet (ADR-0228)",
+             that block again, computes none yet (ADR-0229)",
         ),
         (
             "<ul>{#each post.replies as r (r.id)}<li>{shown(r.id == post.id)}</li>{/each}</ul>",
-            "computes a value inside a block, a loop's row or an arm",
+            "computes a value from `r` and `post`, and a host computes one from one value \
+             (ADR-0229)",
         ),
         (
             "<p>{counted(post.likes + other.likes, \"a\", \"b\")}</p>",
-            "computes a value from `post` and `other`, and a host computes one from one \
-             query's value (ADR-0228)",
+            "computes a value from `post` and `other`, and a host computes one from one value \
+             (ADR-0229)",
         ),
         (
             "<p>{counted(1, \"a\", \"b\")}</p>",
@@ -332,7 +333,7 @@ fn what_a_host_does_not_compute_is_refused_by_name() {
 }
 
 #[test]
-fn a_view_that_contains_itself_or_a_speculated_value_computes_nothing_yet() {
+fn a_view_that_contains_itself_computes_nothing_yet_and_a_speculated_value_is_computed() {
     // A view that contains itself is an instance made at run time, whose
     // template no plan computes for.
     let files = feed(&|s| {
@@ -346,11 +347,13 @@ fn a_view_that_contains_itself_or_a_speculated_value_computes_nothing_yet() {
     assert!(
         refusals.contains(
             "`<Replies>` contains itself and computes a value in its template, and a view \
-             that contains itself computes none yet (ADR-0228)"
+             that contains itself computes none yet (ADR-0229)"
         ),
         "{refusals}"
     );
-    // A value the page speculates on: the browser would show the list with
+    // A value the page speculates on, whole (ADR-0228): computed again from
+    // the speculation, so the count moves with the list it counts. Until
+    // ADR-0228 it was refused: the browser would have shown the list with
     // the post, and the host's count without it.
     let files = feed(&|s| {
         s.replace(
@@ -359,13 +362,26 @@ fn a_view_that_contains_itself_or_a_speculated_value_computes_nothing_yet() {
         )
     });
     assert_eq!(reported(&files), Vec::<String>::new());
-    let refusals = refused(&files);
+    let b = build(&files);
+    assert!(b.refusals().is_empty(), "{:?}", b.refusals());
+    let home = b
+        .speculations
+        .iter()
+        .find(|s| s.page == "feed.app.Home")
+        .expect("the home page speculates");
+    let pw_core::backend::wasm::Encoding::Encoded(module) = &home.module else {
+        panic!("{:?}", home.module);
+    };
+    let part = plan_of(&b, "feed.app.Home")
+        .parts
+        .iter()
+        .find(|p| p.path.starts_with('#'))
+        .expect("the count")
+        .part;
     assert!(
-        refusals.contains(
-            "computes a value from `feed`, which the page speculates on, and the browser \
-             computes none yet (ADR-0228)"
-        ),
-        "{refusals}"
+        module.source.contains(&format!("\"{part}\": f")),
+        "{}",
+        module.source
     );
     // Control: the thread page, which speculates on nothing, computes.
     assert!(build(&feed(&|s| s.to_string())).refusals().is_empty());

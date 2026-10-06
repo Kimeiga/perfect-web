@@ -254,17 +254,17 @@ fn what_the_browser_does_not_compute_yet_is_refused_by_name() {
     for (markup, why) in [
         (
             "<p>{shown(open & post.pinned)}</p>",
-            "computes a value from `open` and `post`, and a host computes one from one \
-             query's value (ADR-0228)",
+            "computes a value from `open` and `post`, and a host computes one from one value \
+             (ADR-0229)",
         ),
         (
             "{#if open}<p>{shown(panel.open)}</p>{/if}",
             "computes a value inside a block a signal decides, and the browser, which renders \
-             that block again, computes none yet (ADR-0228)",
+             that block again, computes none yet (ADR-0229)",
         ),
         (
             "{#if post.pinned}<p>{shown(open)}</p>{/if}",
-            "computes a value inside a block, a loop's row or an arm",
+            "computes a value inside a block, an arm or another value's row",
         ),
     ] {
         let files = page(markup);

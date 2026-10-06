@@ -597,6 +597,30 @@ struct Indexer {
     /// The template's path, which a computed part's own is named by
     /// (ADR-0226).
     template: String,
+    /// The name each `{#each}` around the node binds its item to, outermost
+    /// first: a value computed from the innermost's is the row's (ADR-0228).
+    loops: Vec<String>,
+}
+
+impl Indexer {
+    /// **The path a computed part is read by** (ADR-0226, ADR-0228): one the
+    /// compiler names, which no source can write. A row's, computed from its
+    /// item alone, is the item's, `p.#feed.app.Home~7`, so each row holds its
+    /// own, as a member read of it does (ADR-0169); any other, the template's.
+    fn computed_path(&self, part: PartId, inputs: &[(String, String)]) -> String {
+        let named = format!("#{}~{}", self.template, part.0);
+        match self.loops.last() {
+            Some(item)
+                if !inputs.is_empty()
+                    && inputs
+                        .iter()
+                        .all(|(_, read)| read.split('.').next() == Some(item.as_str())) =>
+            {
+                format!("{item}.{named}")
+            }
+            _ => named,
+        }
+    }
 }
 
 /// **A signal the template holds** (ADR-0144): a page's own, a composed
@@ -1766,7 +1790,8 @@ fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out
             // it was refused here: "a template hole is read by path".
             None => {
                 let id = ix.part();
-                let value = format!("#{}~{}", ix.template, id.0);
+                let inputs = inputs_of(body, *e, ctx);
+                let value = ix.computed_path(id, &inputs);
                 ix.holes.push(Hole {
                     part: id,
                     path: value.clone(),
@@ -1774,7 +1799,7 @@ fn lower_node(body: &Body, id: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer, out
                     origin: (ctx.unit, ctx.decl),
                     nested: ix.depth > 0,
                     framed: ix.frames > 0,
-                    inputs: Some(inputs_of(body, *e, ctx)),
+                    inputs: Some(inputs),
                 });
                 Part::Text {
                     id,
@@ -2116,10 +2141,10 @@ fn lower_element(
                 // names it (ADR-0226), as a computed hole is.
                 let (value, inputs) = match value_path(body, *e).map(|v| ctx.read(v)) {
                     Some(value) => (value, None),
-                    None => (
-                        format!("#{}~{}", ix.template, id.0),
-                        Some(inputs_of(body, *e, ctx)),
-                    ),
+                    None => {
+                        let inputs = inputs_of(body, *e, ctx);
+                        (ix.computed_path(id, &inputs), Some(inputs))
+                    }
                 };
                 ix.read(id, &value, ReadKind::Attribute, ReadAt::Expr(*e), ctx);
                 if let Some(read) = ix.reads.last_mut() {
@@ -2279,7 +2304,7 @@ fn compose(
         if !computed_values(view).is_empty() {
             out.push(blocked(format!(
                 "`<{tag}>` contains itself and computes a value in its template, and a view \
-                 that contains itself computes none yet (ADR-0228)"
+                 that contains itself computes none yet (ADR-0229)"
             )));
             return;
         }
@@ -2573,7 +2598,10 @@ fn lower_block_at(
         ix.read(id, &collection, ReadKind::List, ReadAt::List(node), ctx);
         let (scope, mut written) = ctx.binding(std::slice::from_ref(&binding), ix);
         ix.frames += 1;
+        ix.loops
+            .push(written.last().cloned().unwrap_or_else(|| binding.clone()));
         let inner = lower_run(body, &lead, &scope, ix);
+        ix.loops.pop();
         ix.frames -= 1;
         out.push(Chunk::Dynamic(Part::Each {
             id,

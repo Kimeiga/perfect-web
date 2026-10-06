@@ -339,7 +339,24 @@ impl<'a> Inference<'a> {
                 // A binding in scope is its value, not a declaration's.
                 Expr::Name(_) if types.lexical().binder(id).is_some() => continue,
                 Expr::Name(n) => n.clone(),
-                Expr::Field { .. } => path_of(body, id),
+                // A field of a value in scope is the value's, which
+                // `member_effects` reads by its type. Only a module's path
+                // names a declaration. Until ADR-0228 its last segment was
+                // matched against the declarations in scope, so the feed's
+                // `i.author`, a field of an `Item`, was charged `fn author`'s
+                // `database.read<User>`.
+                Expr::Field { .. } => {
+                    let mut head = id;
+                    while let Expr::Field { base, .. } = body.expr(head) {
+                        head = *base;
+                    }
+                    if matches!(body.expr(head), Expr::Name(_))
+                        && types.lexical().binder(head).is_some()
+                    {
+                        continue;
+                    }
+                    path_of(body, id)
+                }
                 _ => continue,
             };
             if path.is_empty() {
