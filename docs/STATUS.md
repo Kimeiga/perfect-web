@@ -2,7 +2,8 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-05, against master `ebed28c`, with ADR-0217.
+**Reviewed:** 2026-10-05, against master `1a00c28`, with ADR-0218 to
+ADR-0220.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -2898,6 +2899,19 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`1a00c28` (2026-10-05, ADR-0218 to ADR-0220): `just ci` passes locally, the
+workspace's 2045 tests pass, and the browser suite passes 737 in three
+engines, with 13 skipped. Recorded at that commit, in `docs/evidence/E14/`:
+`cross-session.txt` (ADR-0219) 8 of 8 mutants killed and `feed.txt`
+(ADR-0220) 5 of 5, both new. `row-reads.txt` 23 of 23: the survivor at
+`ebed28c` is killed by the test of a member read in a row of a list no query
+gives. Recorded again, the host serving any program since ADR-0218:
+`command-invalidations.txt` 4 of 4, `metadata.txt` 34 of 34,
+`stable-layout.txt` 6 of 6, `availability.txt` 13 of 13, `cart-lines.txt`
+41 of 41, `command-answers.txt` 16 of 16, `estimate-range.txt` 6 of 6,
+`home.txt` 2 of 2, `last-known-good.txt` 11 of 11, `menu-categories.txt` 7
+of 7, `orders.txt` 7 of 7, `query-values.txt` 7 of 7, `slots.txt` 7 of 7,
+`test-controls.txt` 10 of 10 and `accessibility.txt` 14 of 14.
 `ebed28c` (2026-10-05, ADR-0217): `just ci` passes locally, the workspace's
 2035 tests pass, and the browser suite passes 728 in three engines, with 13
 skipped. Recorded at that commit, in `docs/evidence/E14/`: `top-captures.txt`

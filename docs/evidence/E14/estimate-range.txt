@@ -1,7 +1,7 @@
 ADR-0180 - a delivery estimate is a range, and says when it was made
 
 produced by: just e14-estimate-range
-commit: 6ef776a6d069d1f9e1d0dc56897546f677807010
+commit: 1a00c28aac753c255cb81af22ce6413b46e0d5a9
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -12,20 +12,20 @@ test tests::a_failed_estimate_fills_its_region_and_the_page_is_served ... ok
 test tests::a_delivery_estimate_is_a_range ... ok
 test tests::a_session_s_estimate_is_its_estimator_s ... ok
 test tests::the_store_sends_its_slots_after_its_own_content ... ok
-test result: ok. 103 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.98s
+test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.57s
 
 == the page, in three engines (e2e/slots.spec.mjs)
 
-  18 passed (28.9s)
+  18 passed (33.5s)
 
 == mutation controls (scripts/estimate_range_mutations.py)
 
-baseline (server): 103 passed, 0 failed
+baseline (server): 130 passed, 0 failed
 baseline (browser): 6 passed, 0 failed
-no range unless one is asked for [server]: KILLED (2 of 103 tests fail)
-no `generated_at` is answered [server]: KILLED (2 of 103 tests fail)
-the benchmark's own `minutes` is no longer answered [server]: KILLED (2 of 103 tests fail)
-the page says the least minutes alone [server]: KILLED (2 of 103 tests fail)
-a bound is any `Int`, unchecked [server]: KILLED (1 of 103 tests fail)
+no range unless one is asked for [server]: KILLED (2 of 130 tests fail)
+no `generated_at` is answered [server]: KILLED (2 of 130 tests fail)
+the benchmark's own `minutes` is no longer answered [server]: KILLED (2 of 130 tests fail)
+the page says the least minutes alone [server]: KILLED (2 of 130 tests fail)
+a bound is any `Int`, unchecked [server]: KILLED (1 of 130 tests fail)
 the control's `max` is ignored [browser]: KILLED (1 of 5 tests fail)
 6 of 6 mutants killed

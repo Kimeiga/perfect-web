@@ -1,0 +1,28 @@
+ADR-0220 - the feed reference app, served in browsers by the host that serves the store
+
+produced by: just e14-feed
+commit: 1a00c28aac753c255cb81af22ce6413b46e0d5a9
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the server (spikes/own-renderer/server/src/main.rs)
+
+test tests::a_guests_post_names_the_guest_to_every_reader ... ok
+test tests::the_feeds_page_opening_its_stream_is_not_told_to_reload ... ok
+test tests::a_page_carries_its_data_layers_style_and_no_other ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 127 filtered out; finished in 6.35s
+
+== the feed in three engines (e2e/feed.spec.mjs)
+
+  9 passed (34.0s)
+
+== mutation controls (scripts/feed_served_mutations.py)
+
+baseline: 3 passed, 0 failed
+the drain regenerates the store's cart for every program: KILLED (1 of 3 tests fail)
+every page carries the store's style: KILLED (1 of 3 tests fail)
+the store's page carries no style: KILLED (1 of 3 tests fail)
+a page with no style is written an empty one: KILLED (1 of 3 tests fail)
+a guest is You to every reader: KILLED (1 of 3 tests fail)
+5 of 5 mutants killed

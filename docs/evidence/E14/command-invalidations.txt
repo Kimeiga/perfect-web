@@ -1,14 +1,14 @@
 ADR-0209 - a command computes the entries it invalidates
 
 produced by: just e14-command-invalidations
-commit: feea53bd444dce39b4c41c8cfda537ed49bbb795
+commit: 1a00c28aac753c255cb81af22ce6413b46e0d5a9
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the command's component (compiler/pw-conformance/tests/invalidations.rs)
 
 test its_contract_imports_the_invalidations_under_the_outbox ... ok
 test a_command_computes_the_entries_it_invalidates ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
 
 == the store's commands, against their references
 
@@ -18,22 +18,22 @@ test the_kiokun_search_agrees_with_its_reference ... ok
 test the_oracle_notices_a_reference_that_is_wrong ... ok
 test the_stores_queries_agree_with_their_reference ... ok
 test the_stores_commands_agree_with_their_reference ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.28s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.22s
 
 == the server's drops
 
 test tests::an_invalidated_entry_is_dropped_by_the_key_the_command_computed ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 118 filtered out; finished in 3.13s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out; finished in 2.20s
 
 == the store's artifacts, as the compiler emits them
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.60s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.89s
 
 == mutation controls (scripts/command_invalidations_mutations.py)
 
-baseline: 121 passed, 0 failed
-an `invalidates` key is not the command's: KILLED (1 of 121 tests fail)
-the contract imports no invalidation: KILLED (74 of 121 tests fail)
-an invalidated entry is not dropped: KILLED (1 of 121 tests fail)
-an invalidated entry drops every entry of its query: KILLED (2 of 121 tests fail)
+baseline: 132 passed, 0 failed
+an `invalidates` key is not the command's: KILLED (1 of 132 tests fail)
+the contract imports no invalidation: KILLED (78 of 132 tests fail)
+an invalidated entry is not dropped: KILLED (1 of 132 tests fail)
+an invalidated entry drops every entry of its query: KILLED (3 of 132 tests fail)
 4 of 4 mutants killed
