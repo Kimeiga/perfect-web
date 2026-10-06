@@ -74,12 +74,11 @@ MUTANTS = [
         "        .find(|s| s.span.start >= region.start && s.span.end <= region.end)\n",
         "        .find(|s| false && s.span.start >= region.start)\n",
     ),
-    (
-        "a host computes a value in a block",
-        VALUES,
-        "    if nested {\n",
-        "    if false && nested {\n",
-    ),
+    # "a host computes a value in a block" is retired (2026-10-06): since
+    # ADR-0229 a host does, and the line it mutated is the refusal of a value
+    # from a signal in a block, which computed_conditions_mutations.py's "a
+    # value the browser would compute in a block is built" mutates. It
+    # survived the chain at c7f999b, whose tests here do not read that one.
     (
         "a value of two queries is computed from the first",
         VALUES,

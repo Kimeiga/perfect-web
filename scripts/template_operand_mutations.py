@@ -53,7 +53,10 @@ MUTANTS = [
         "                } => {\n                    let _ = c;\n                }",
     ),
     (
-        "a sum type has a truth",
+        # Renamed by the survivor's fix of 2026-10-06: since ADR-0230 a value
+        # with no named truth is refused, so a sum type the branch misses falls
+        # to "has no truth". What the branch says is that it is a case.
+        "a sum type is said to have no truth, not to be a case",
         VALUES,
         "                    .is_some_and(|t| t.variants.is_some()) =>",
         "                    .is_some_and(|t| t.variants.is_some() && false) =>",

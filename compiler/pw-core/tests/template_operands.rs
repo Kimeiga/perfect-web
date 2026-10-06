@@ -74,6 +74,15 @@ fn an_each_runs_over_a_list() {
 fn an_if_tests_a_value_with_a_truth() {
     let wrong = "module t\n\ntype Shape =\n    | Circle(Int)\n    | Empty\n\nview V(s: Shape, n: Int) !{} {\n    <div>\n        {#if s}\n            <p>yes</p>\n        {/if}\n    </div>\n}\n";
     refused(wrong, "PW0609");
+    // A case, taken apart with `{#match}`: not merely a value with no truth,
+    // which every other type is since ADR-0230.
+    let found = reported(wrong);
+    assert!(
+        found
+            .iter()
+            .any(|d| d.starts_with("PW0609") && d.contains("which is taken apart with `{#match}`")),
+        "{found:#?}"
+    );
     // A number has none since ruling 0071-a (ADR-0230); a comparison has.
     refused(&wrong.replace("{#if s}", "{#if n}"), "PW0609");
     none(&wrong.replace("{#if s}", "{#if n > 0}"));
