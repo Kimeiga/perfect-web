@@ -2985,6 +2985,30 @@ e14-feed:
      } > docs/evidence/E14/feed.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/feed.txt
 
+# ADR-XXXX: the feed's data in PostgreSQL, held to what its source states.
+# Needs PW_FEED_DATABASE_URL, a throwaway database (each test uses a schema of
+# its own and drops it), e.g. postgresql://localhost/pw_feed_test; skips
+# without one, and writes no evidence.
+e14-feed-postgres:
+    @if [ -z "${PW_FEED_DATABASE_URL:-}" ]; then \
+       echo "e14-feed-postgres: skipped, PW_FEED_DATABASE_URL is not set (a throwaway PostgreSQL database, e.g. postgresql://localhost/pw_feed_test)"; \
+       exit 0; \
+     fi; \
+     mkdir -p docs/evidence/E14; \
+     { echo "ADR-XXXX - the feed's data in PostgreSQL, held to what its source states"; echo; \
+       echo "produced by: just e14-feed-postgres"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "postgres: $(psql "$PW_FEED_DATABASE_URL" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)')"; echo; \
+       echo "== the feed on PostgreSQL (spikes/own-renderer/server/src/tests/feed_pg.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- tests::feed_pg:: 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the in-memory layer, unchanged (the server's other tests)"; echo; \
+       cargo test --locked -p pw-dev-server -- --skip tests::feed_pg:: 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/feed_postgres_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/feed_postgres_mutations.py; \
+     } > docs/evidence/E14/feed-postgres.txt; \
+     grep -E "^test result|mutants killed" docs/evidence/E14/feed-postgres.txt
+
 # ADR-0219: what a commit drops reaches every session that reads it
 e14-cross-session:
     @mkdir -p docs/evidence/E14
