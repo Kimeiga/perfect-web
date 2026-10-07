@@ -136,7 +136,8 @@ fn a_clauses_values_are_separated_by_commas() {
         .iter()
         .map(|k| k.name.as_str())
         .collect();
-    assert_eq!(keys, ["Liked", "Posted"]);
+    // `Deleted` since the identity track: a post deleted by its author.
+    assert_eq!(keys, ["Liked", "Posted", "Deleted"]);
     // Its help is a repair, rendered as help, as a file's parse errors are.
     let repairs: Vec<String> = check_sources(&program(&[("app.pw", app.clone())]))
         .into_iter()
@@ -158,8 +159,8 @@ fn a_clauses_values_are_separated_by_commas() {
     // What is not a value where a comma is missing is no value: the comma
     // is the error, as rustc reports it, and nothing else.
     let app = feed_with(
-        "invalidates_on Liked(id), Posted(_)",
-        "invalidates_on Liked(id), Posted(_) ;",
+        "invalidates_on Liked(id), Posted(_), Deleted(_)",
+        "invalidates_on Liked(id), Posted(_), Deleted(_) ;",
     );
     assert_eq!(
         found(&app),

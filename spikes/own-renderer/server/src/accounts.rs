@@ -451,6 +451,19 @@ impl Identity {
         self.use_provider(dev, &redirect);
         Ok(())
     }
+
+    /// [`Identity::use_dev_accounts`], and the provider, for a test that
+    /// makes accounts at it.
+    #[cfg(test)]
+    pub fn dev_accounts(
+        &self,
+        deployment: &Deployment,
+    ) -> Result<std::sync::Arc<DevProvider>, String> {
+        let dev = std::sync::Arc::new(DevProvider::start(deployment)?);
+        let redirect = dev.redirect_uri.clone();
+        self.use_provider(dev.clone(), &redirect);
+        Ok(dev)
+    }
 }
 
 #[cfg(test)]

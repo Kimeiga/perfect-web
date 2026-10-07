@@ -118,8 +118,8 @@ MUTANTS = [
         "a like shown before the server answers counts nothing",
         "browser",
         FEED,
-        "        Item { id: i.id, author: i.author, text: i.text, likes: i.likes + 1 }\n",
-        "        Item { id: i.id, author: i.author, text: i.text, likes: i.likes }\n",
+        "        Item { id: i.id, author: i.author, text: i.text, likes: i.likes + 1, mine: i.mine }\n",
+        "        Item { id: i.id, author: i.author, text: i.text, likes: i.likes, mine: i.mine }\n",
     ),
 ]
 

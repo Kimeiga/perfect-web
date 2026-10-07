@@ -105,6 +105,9 @@ fn the_graph_reads_the_keys_lowering_made() {
     assert_eq!(
         listens,
         [
+            // A post deleted (track `identity`): every thread may hold it as
+            // a reply.
+            ("feed.app.Deleted".to_string(), vec!["_".to_string()]),
             ("feed.app.Liked".to_string(), vec!["id".to_string()]),
             ("feed.app.Posted".to_string(), vec!["_".to_string()]),
         ]

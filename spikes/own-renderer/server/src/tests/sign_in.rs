@@ -1,0 +1,873 @@
+//! **Accounts and sign-in, served** (track `identity`, ADR-XXXX): the
+//! relying party's flow over HTTP against a provider of the test's own, the
+//! session it rotates and forgets, `requires SignedIn` and `OwnsPost(post)`
+//! held on the feed, a command from another origin refused, and two users'
+//! pages sharing nothing private.
+//!
+//! The provider here is the test's: it plays the deployment's OpenID
+//! provider, so these tests hold Pleris's half of the flow and nothing of
+//! the development provider's (`accounts.rs`, tested there).
+
+use super::*;
+use crate::identity::{Claims, Principal, Provider, parse_form, s256};
+use std::collections::HashMap;
+
+/// **A deployment's provider, as a test plays it**: it authenticates whom
+/// the test says, issues a code bound to the request's challenge and nonce,
+/// and exchanges it once for that verifier, as RFC 7636 §4.6 asks.
+#[derive(Default)]
+struct TestProvider {
+    /// By code: the subject, their name, the challenge and the nonce.
+    codes: Mutex<HashMap<String, Issued>>,
+    /// What the next token says, where a test makes it wrong.
+    forge: Mutex<Option<fn(&mut Claims)>>,
+}
+
+/// What a code was issued for: subject, name, challenge, nonce.
+type Issued = (String, String, String, Option<String>);
+
+/// A change that makes a token wrong, and what its refusal says.
+type Forgery = (fn(&mut Claims), &'static str);
+
+const ISSUER: &str = "https://id.example.test";
+const CLIENT: &str = "feed-client";
+const REDIRECT: &str = "http://127.0.0.1/sign-in/callback";
+
+impl TestProvider {
+    /// **The browser at the provider, signed in as `sub`**: the
+    /// authentication request in `location` checked as a provider checks
+    /// it, and the redirect back's query, with a code and the request's
+    /// state.
+    fn authenticate(&self, location: &str, sub: &str, name: &str) -> String {
+        let (endpoint, query) = location.split_once('?').expect("a query");
+        assert_eq!(endpoint, "https://id.example.test/authorize");
+        let q = parse_form(query);
+        assert_eq!(q["response_type"], "code");
+        assert!(q["scope"].split(' ').any(|s| s == "openid"), "{q:?}");
+        assert_eq!(q["client_id"], CLIENT);
+        assert_eq!(q["redirect_uri"], REDIRECT);
+        assert_eq!(q["code_challenge_method"], "S256");
+        assert_eq!(q["code_challenge"].len(), 43, "{q:?}");
+        let code = format!("code-{sub}-{}", q["state"].len());
+        self.codes.lock().expect("codes").insert(
+            code.clone(),
+            (
+                sub.to_string(),
+                name.to_string(),
+                q["code_challenge"].clone(),
+                q.get("nonce").cloned(),
+            ),
+        );
+        format!("code={code}&state={}", crate::identity::encode(&q["state"]))
+    }
+}
+
+impl Provider for TestProvider {
+    fn issuer(&self) -> String {
+        ISSUER.to_string()
+    }
+
+    fn client_id(&self) -> String {
+        CLIENT.to_string()
+    }
+
+    fn authorization_endpoint(&self) -> String {
+        format!("{ISSUER}/authorize")
+    }
+
+    fn exchange(&self, code: &str, verifier: &str, redirect_uri: &str) -> Result<Claims, String> {
+        let (sub, name, challenge, nonce) = self
+            .codes
+            .lock()
+            .expect("codes")
+            .remove(code)
+            .ok_or("invalid_grant: unknown code")?;
+        if redirect_uri != REDIRECT {
+            return Err("invalid_grant: redirect_uri".to_string());
+        }
+        if s256(verifier) != challenge {
+            return Err("invalid_grant: code_verifier".to_string());
+        }
+        let mut claims = Claims {
+            iss: ISSUER.to_string(),
+            sub: sub.clone(),
+            aud: vec![CLIENT.to_string()],
+            exp: u64::MAX / 2,
+            nonce,
+            preferred_username: Some(sub),
+            name: Some(name),
+        };
+        if let Some(forge) = *self.forge.lock().expect("forge") {
+            forge(&mut claims);
+        }
+        Ok(claims)
+    }
+}
+
+/// One HTTP request to `s`, written as given, and the whole answer.
+fn exchanged(s: &Server, request: &str) -> String {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+    let at = listener.local_addr().expect("address");
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            let (stream, _) = listener.accept().expect("accept");
+            handle(s, stream);
+        });
+        let mut client = TcpStream::connect(at).expect("connect");
+        client.write_all(request.as_bytes()).expect("request");
+        let mut answer = String::new();
+        let _ = client.read_to_string(&mut answer);
+        answer
+    })
+}
+
+/// A page's text, its parts' markers taken out.
+fn text(html: &str) -> String {
+    let mut out = String::new();
+    let mut rest = html;
+    while let Some(at) = rest.find("<!--pw:") {
+        out.push_str(&rest[..at]);
+        rest = rest[at..].split_once("-->").map_or("", |(_, r)| r);
+    }
+    out.push_str(rest);
+    out
+}
+
+/// A page served to `session`, as text.
+fn page(s: &Server, session: &str, name: &str, params: &Params) -> String {
+    let (html, _, _, _) = s
+        .serve_document_settled(session, name, params, &[])
+        .expect("served");
+    text(&html)
+}
+
+/// The home page served to `session`, as text.
+fn home(s: &Server, session: &str) -> String {
+    page(s, session, "feed.app.Home", &Params::new())
+}
+
+/// The thread page's parameters for the post `id`.
+fn thread_of(id: &str) -> Params {
+    Params::from([("id".to_string(), id.to_string())])
+}
+
+/// A GET with these cookies.
+fn get(s: &Server, path: &str, cookies: &str) -> String {
+    exchanged(
+        s,
+        &format!("GET {path} HTTP/1.1\r\nHost: t\r\nCookie: {cookies}\r\n\r\n"),
+    )
+}
+
+/// A POST of a command, from the page's own origin as a browser says it.
+fn command(s: &Server, id: &str, session: &str, interaction: &str, body: &str) -> String {
+    exchanged(
+        s,
+        &format!(
+            "POST /command/{id} HTTP/1.1\r\nHost: t\r\nCookie: pw-session={session}\r\n\
+             Sec-Fetch-Site: same-origin\r\npw-interaction: {interaction}\r\n\
+             content-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        ),
+    )
+}
+
+/// The value of the cookie `name` an answer sets, and the whole line.
+fn set_cookie(answer: &str, name: &str) -> Option<(String, String)> {
+    answer.lines().find_map(|l| {
+        let rest = l.strip_prefix("set-cookie: ")?;
+        let value = rest.strip_prefix(&format!("{name}="))?;
+        Some((value.split(';').next()?.to_string(), l.to_string()))
+    })
+}
+
+fn location(answer: &str) -> String {
+    answer
+        .lines()
+        .find_map(|l| l.strip_prefix("location: "))
+        .unwrap_or_else(|| panic!("no location: {answer}"))
+        .to_string()
+}
+
+/// **The feed, its sessions signed in through `provider`**.
+fn feed_with(provider: Arc<TestProvider>) -> Served {
+    let s = served_feed();
+    s.identity.use_provider(provider, REDIRECT);
+    s
+}
+
+/// **A browser signed in as `sub` through the flow**, from the session it
+/// came with: the session it is given.
+fn signed_in(s: &Server, provider: &TestProvider, came_with: &str, sub: &str) -> String {
+    let started = get(s, "/sign-in", &format!("pw-session={came_with}"));
+    let (state, _) = set_cookie(&started, "pw-sign-in").expect("the sign-in's cookie");
+    let back = provider.authenticate(&location(&started), sub, &format!("Name of {sub}"));
+    let answer = get(
+        s,
+        &format!("/sign-in/callback?{back}"),
+        &format!("pw-session={came_with}; pw-sign-in={state}"),
+    );
+    assert!(answer.starts_with("HTTP/1.1 303"), "{answer}");
+    set_cookie(&answer, "pw-session").expect("a session").0
+}
+
+/// **A sign-in rotates the session, and the one the browser came with is no
+/// one** (OpenID Connect Core §3.1.2.1, §3.1.3.7; OWASP's session fixation
+/// defence). The request sent to the provider carries `openid`, the client,
+/// its redirect URI, a state, a nonce and an S256 challenge; the state is
+/// also in an HttpOnly cookie on `/sign-in`; and the callback gives a new
+/// session, signed in, and removes the state's cookie.
+#[test]
+fn a_sign_in_rotates_the_session_and_the_old_one_is_no_one() {
+    let provider = Arc::new(TestProvider::default());
+    let s = feed_with(provider.clone());
+    let came_with = "s-fixed-by-someone-else";
+    let host = BTreeMap::new();
+    assert_eq!(
+        s.identity.requires("SignedIn", &[], came_with, &host),
+        Ok(false)
+    );
+
+    let started = get(&s, "/sign-in", &format!("pw-session={came_with}"));
+    assert!(started.starts_with("HTTP/1.1 303"), "{started}");
+    let (state, line) = set_cookie(&started, "pw-sign-in").expect("the state's cookie");
+    assert!(
+        line.contains("HttpOnly") && line.contains("SameSite=Lax"),
+        "{line}"
+    );
+    assert!(line.contains("Path=/sign-in"), "{line}");
+    let to = location(&started);
+    assert!(to.contains(&format!("state={state}")), "{to}");
+    assert!(to.contains("nonce="), "{to}");
+    let back = provider.authenticate(&to, "ada", "Ada Lovelace");
+    let answer = get(
+        &s,
+        &format!("/sign-in/callback?{back}"),
+        &format!("pw-session={came_with}; pw-sign-in={state}"),
+    );
+    assert!(answer.starts_with("HTTP/1.1 303"), "{answer}");
+    assert_eq!(location(&answer), "/");
+    let (rotated, line) = set_cookie(&answer, "pw-session").expect("a new session");
+    assert!(
+        line.contains("HttpOnly") && line.contains("SameSite=Lax"),
+        "{line}"
+    );
+    assert_ne!(rotated, came_with);
+    assert_eq!(rotated.len(), 34, "128 random bits: {rotated}");
+    let (_, removed) = set_cookie(&answer, "pw-sign-in").expect("the state's cookie removed");
+    assert!(removed.contains("Max-Age=0"), "{removed}");
+
+    assert_eq!(
+        s.identity.requires("SignedIn", &[], &rotated, &host),
+        Ok(true)
+    );
+    assert_eq!(
+        s.identity.requires("SignedIn", &[], came_with, &host),
+        Ok(false)
+    );
+    let principal = s.identity.principals().of(&rotated).expect("a principal");
+    assert_eq!(
+        (
+            principal.user.as_str(),
+            principal.name.as_str(),
+            principal.issuer.as_str()
+        ),
+        ("ada", "Ada Lovelace", ISSUER)
+    );
+    // The callback is single use: the same answer again completes nothing.
+    let again = get(
+        &s,
+        &format!("/sign-in/callback?{back}"),
+        &format!("pw-session={came_with}; pw-sign-in={state}"),
+    );
+    assert!(again.starts_with("HTTP/1.1 400"), "{again}");
+    assert!(set_cookie(&again, "pw-session").is_none(), "{again}");
+    // Signing in again from a signed-in session forgets that one too.
+    let newer = signed_in(&s, &provider, &rotated, "grace");
+    assert_eq!(
+        s.identity.requires("SignedIn", &[], &rotated, &host),
+        Ok(false)
+    );
+    assert_eq!(
+        s.identity.requires("SignedIn", &[], &newer, &host),
+        Ok(true)
+    );
+}
+
+/// **A callback this browser did not start is refused** (login CSRF): an
+/// attacker's own code and state, sent to someone else's browser, which
+/// holds no state cookie or another one, signs no one in.
+#[test]
+fn a_callback_another_browser_started_is_refused() {
+    let provider = Arc::new(TestProvider::default());
+    let s = feed_with(provider.clone());
+    // The attacker's sign-in, to the provider and back, in the attacker's
+    // browser, stopped before its callback.
+    let started = get(&s, "/sign-in", "pw-session=s-attacker");
+    let back = provider.authenticate(&location(&started), "mallory", "Mallory");
+    for cookies in [
+        "pw-session=s-victim",
+        "pw-session=s-victim; pw-sign-in=other",
+    ] {
+        let answer = get(&s, &format!("/sign-in/callback?{back}"), cookies);
+        assert!(answer.starts_with("HTTP/1.1 400"), "{answer}");
+        assert!(answer.contains("not started by this browser"), "{answer}");
+        assert!(set_cookie(&answer, "pw-session").is_none(), "{answer}");
+    }
+    assert_eq!(s.identity.principals().signed_in(), 0);
+}
+
+/// **An ID token is held to what was sent** (Core §3.1.3.7): its issuer
+/// exactly, this client in its audience, not expired, and this sign-in's
+/// nonce. Each forged, the sign-in is refused and no session opened.
+#[test]
+fn a_token_not_this_sign_ins_is_refused() {
+    let forgeries: [Forgery; 4] = [
+        (|c| c.iss = "https://evil.example.test".into(), "issuer"),
+        (
+            |c| c.aud = vec!["another-client".into()],
+            "not for this client",
+        ),
+        (|c| c.exp = 1, "expired"),
+        (|c| c.nonce = Some("replayed".into()), "nonce"),
+    ];
+    for (forge, why) in forgeries {
+        let provider = Arc::new(TestProvider::default());
+        *provider.forge.lock().expect("forge") = Some(forge);
+        let s = feed_with(provider.clone());
+        let started = get(&s, "/sign-in", "pw-session=s-a");
+        let (state, _) = set_cookie(&started, "pw-sign-in").expect("state");
+        let back = provider.authenticate(&location(&started), "ada", "Ada");
+        let answer = get(
+            &s,
+            &format!("/sign-in/callback?{back}"),
+            &format!("pw-session=s-a; pw-sign-in={state}"),
+        );
+        assert!(answer.starts_with("HTTP/1.1 400"), "{why}: {answer}");
+        assert!(answer.contains(why), "{why}: {answer}");
+        assert_eq!(s.identity.principals().signed_in(), 0, "{why}");
+    }
+}
+
+/// **Signing out forgets the principal and rotates the session**: the old
+/// id, replayed, is no one, and the browser is given a new one.
+#[test]
+fn signing_out_forgets_the_principal() {
+    let provider = Arc::new(TestProvider::default());
+    let s = feed_with(provider.clone());
+    let session = signed_in(&s, &provider, "s-a", "ada");
+    let host = BTreeMap::new();
+    assert_eq!(
+        s.identity.requires("SignedIn", &[], &session, &host),
+        Ok(true)
+    );
+    let answer = exchanged(
+        &s,
+        &format!(
+            "POST /sign-out HTTP/1.1\r\nHost: t\r\nCookie: pw-session={session}\r\n\
+             Sec-Fetch-Site: same-origin\r\ncontent-length: 0\r\n\r\n"
+        ),
+    );
+    assert!(answer.starts_with("HTTP/1.1 303"), "{answer}");
+    let (fresh, _) = set_cookie(&answer, "pw-session").expect("a new session");
+    assert_ne!(fresh, session);
+    assert_eq!(
+        s.identity.requires("SignedIn", &[], &session, &host),
+        Ok(false)
+    );
+    assert_eq!(
+        s.identity.requires("SignedIn", &[], &fresh, &host),
+        Ok(false)
+    );
+}
+
+/// **A signed-out reader reads, and cannot post** (ADR-0115): the home page
+/// shows the timeline and, where the form's guard is, "Sign in to post"
+/// with a way to; a post sent anyway is refused by `requires SignedIn`
+/// before the command runs, answered 403 with the predicate, and nothing is
+/// written.
+#[test]
+fn a_signed_out_reader_reads_and_cannot_post() {
+    let s = feed_with(Arc::new(TestProvider::default()));
+    let html = home(&s, "s-reader");
+    assert!(html.contains("Hello, feed."), "{html}");
+    assert!(html.contains("Sign in to post"), "{html}");
+    assert!(html.contains("action=\"/sign-in\""), "{html}");
+    assert!(!html.contains("Signed in as"), "{html}");
+    let answer = command(&s, "feed.app.post", "s-reader", "i-1", "[\"Let me in\"]");
+    assert!(answer.starts_with("HTTP/1.1 403"), "{answer}");
+    assert!(answer.contains("\"refused\":\"SignedIn\""), "{answer}");
+    assert!(answer.contains("\"committed\":false"), "{answer}");
+    let html = home(&s, "s-other");
+    assert!(!html.contains("Let me in"), "{html}");
+    // A like and a reply are held to it as well.
+    let liked = command(&s, "feed.app.like", "s-reader", "i-2", "[\"p1\"]");
+    assert!(liked.contains("\"refused\":\"SignedIn\""), "{liked}");
+    let replied = command(&s, "feed.app.reply", "s-reader", "i-3", "[\"p1\",\"Hi\"]");
+    assert!(replied.contains("\"refused\":\"SignedIn\""), "{replied}");
+}
+
+/// **What a signed-in user writes is theirs** (ADR-XXXX): a post and a reply
+/// name their author as their provider named them, to every reader, and the
+/// reader's own page says who is signed in.
+#[test]
+fn a_post_and_a_reply_are_their_signed_in_authors() {
+    let provider = Arc::new(TestProvider::default());
+    let s = feed_with(provider.clone());
+    let ada = signed_in(&s, &provider, "s-a", "ada");
+    let answer = command(&s, "feed.app.post", &ada, "i-1", "[\"Ada's own post\"]");
+    assert!(answer.contains("\"committed\":true"), "{answer}");
+    let answer = command(
+        &s,
+        "feed.app.reply",
+        &ada,
+        "i-2",
+        "[\"p1\",\"Ada's reply\"]",
+    );
+    assert!(answer.contains("\"committed\":true"), "{answer}");
+    let mine = home(&s, &ada);
+    assert!(mine.contains("Signed in as Name of ada"), "{mine}");
+    assert!(!mine.contains("Sign in to post"), "{mine}");
+    let theirs = home(&s, "s-reader");
+    let row = theirs
+        .split("<li")
+        .find(|li| li.contains("Ada's own post"))
+        .unwrap_or_else(|| panic!("the post: {theirs}"));
+    assert!(row.contains("Name of ada"), "{row}");
+    let thread = page(&s, "s-reader", "feed.app.PostPage", &thread_of("p1"));
+    let reply = thread
+        .split("<article")
+        .find(|a| a.contains("Ada's reply"))
+        .unwrap_or_else(|| panic!("the reply: {thread}"));
+    assert!(reply.contains("Name of ada"), "{reply}");
+}
+
+/// **Only its author deletes a post** (`requires SignedIn, OwnsPost(post)`,
+/// ADR-0115): a predicate over the command's parameter, read in the
+/// command's own transaction. Another user's delete is refused with the
+/// predicate and the post stays; the author's deletes it; its Delete button
+/// is on the author's row alone.
+#[test]
+fn only_its_author_deletes_a_post() {
+    let provider = Arc::new(TestProvider::default());
+    let s = feed_with(provider.clone());
+    let ada = signed_in(&s, &provider, "s-a", "ada");
+    let grace = signed_in(&s, &provider, "s-g", "grace");
+    let answer = command(&s, "feed.app.post", &ada, "i-1", "[\"Mine to delete\"]");
+    assert!(answer.contains("\"committed\":true"), "{answer}");
+    let rows = |session: &str| home(&s, session);
+    let row = |html: &str| {
+        html.split("<li")
+            .find(|li| li.contains("Mine to delete"))
+            .map(str::to_string)
+    };
+    let mine = row(&rows(&ada)).expect("ada's row");
+    let id = mine
+        .split("href=\"/post/")
+        .nth(1)
+        .and_then(|r| r.split('"').next())
+        .unwrap_or_else(|| panic!("the post's id: {mine}"))
+        .to_string();
+    assert!(mine.contains(">Delete<"), "{mine}");
+    assert!(
+        !row(&rows(&grace))
+            .expect("grace's row")
+            .contains(">Delete<")
+    );
+
+    let refused = command(&s, "feed.app.delete", &grace, "i-2", &format!("[\"{id}\"]"));
+    assert!(refused.starts_with("HTTP/1.1 403"), "{refused}");
+    assert!(refused.contains("\"refused\":\"OwnsPost\""), "{refused}");
+    assert!(row(&rows(&grace)).is_some(), "the post stays");
+    let signed_out = command(
+        &s,
+        "feed.app.delete",
+        "s-nobody",
+        "i-3",
+        &format!("[\"{id}\"]"),
+    );
+    assert!(
+        signed_out.contains("\"refused\":\"SignedIn\""),
+        "{signed_out}"
+    );
+
+    let deleted = command(&s, "feed.app.delete", &ada, "i-4", &format!("[\"{id}\"]"));
+    assert!(deleted.starts_with("HTTP/1.1 202"), "{deleted}");
+    assert!(deleted.contains("\"committed\":true"), "{deleted}");
+    assert!(row(&rows(&grace)).is_none(), "the post is gone");
+    // Another's post, which the seed's `p1` is, ada's own seed account aside.
+    let theirs = command(&s, "feed.app.delete", &ada, "i-5", "[\"p1\"]");
+    assert!(theirs.contains("\"refused\":\"OwnsPost\""), "{theirs}");
+}
+
+/// **A command from another origin is refused before anything runs**
+/// (charter §17.5, "CSRF for commands"): a cross-site `Sec-Fetch-Site`, or
+/// without it an `Origin` that is not the request's host, is answered 403,
+/// though the request carries a signed-in session's cookie.
+#[test]
+fn a_command_from_another_origin_is_refused() {
+    let provider = Arc::new(TestProvider::default());
+    let s = feed_with(provider.clone());
+    let ada = signed_in(&s, &provider, "s-a", "ada");
+    let body = "[\"Forged\"]";
+    for from in [
+        "Sec-Fetch-Site: cross-site\r\n",
+        "Sec-Fetch-Site: same-site\r\n",
+        "Origin: https://evil.example.test\r\n",
+        "Origin: null\r\n",
+    ] {
+        let answer = exchanged(
+            &s,
+            &format!(
+                "POST /command/feed.app.post HTTP/1.1\r\nHost: t\r\nCookie: pw-session={ada}\r\n\
+                 {from}pw-interaction: i-{}\r\ncontent-type: application/json\r\n\
+                 content-length: {}\r\n\r\n{body}",
+                from.len(),
+                body.len()
+            ),
+        );
+        assert!(answer.starts_with("HTTP/1.1 403"), "{from}: {answer}");
+    }
+    let signed_out = exchanged(
+        &s,
+        &format!(
+            "POST /sign-out HTTP/1.1\r\nHost: t\r\nCookie: pw-session={ada}\r\n\
+             Sec-Fetch-Site: cross-site\r\ncontent-length: 0\r\n\r\n"
+        ),
+    );
+    assert!(signed_out.starts_with("HTTP/1.1 403"), "{signed_out}");
+    let html = home(&s, &ada);
+    assert!(!html.contains("Forged"), "{html}");
+    assert!(html.contains("Signed in as"), "still signed in: {html}");
+    // From this origin, by `Origin` alone, it runs.
+    let answer = exchanged(
+        &s,
+        &format!(
+            "POST /command/feed.app.post HTTP/1.1\r\nHost: t\r\nCookie: pw-session={ada}\r\n\
+             Origin: http://t\r\npw-interaction: i-9\r\ncontent-type: application/json\r\n\
+             content-length: {}\r\n\r\n{body}",
+            body.len()
+        ),
+    );
+    assert!(answer.contains("\"committed\":true"), "{answer}");
+}
+
+/// **A fresh session's cookie is HttpOnly and SameSite=Lax** on a page, and
+/// its id is 128 random bits: not the process id and a counter, which the
+/// next visitor could guess.
+#[test]
+fn a_fresh_sessions_cookie_is_http_only_and_unguessable() {
+    let s = served_feed();
+    let ids: Vec<String> = (0..2)
+        .map(|_| {
+            let answer = exchanged(&s, "GET / HTTP/1.1\r\nHost: t\r\n\r\n");
+            let (id, line) = set_cookie(&answer, "pw-session").expect("a session");
+            assert!(line.contains("HttpOnly"), "{line}");
+            assert!(line.contains("SameSite=Lax"), "{line}");
+            assert!(!line.contains("Secure"), "a loopback origin: {line}");
+            assert!(id.starts_with("s-") && id.len() == 34, "{id}");
+            id
+        })
+        .collect();
+    assert_ne!(ids[0], ids[1]);
+}
+
+/// **Two users' pages share nothing private** (charter §15.6 tests 12 and
+/// 13, ADR-0184): signed in as two users, each reads the home page and a
+/// thread. Each page says who it is and not the other; and what
+/// the query runtime keeps for every reader, and the materializer's public
+/// fragments, name neither session, neither reader, nor anything of
+/// `Me`'s, and are what they are when no one signed in.
+#[test]
+fn two_users_pages_never_share_private_parts() {
+    let kept = |signed: bool| -> (Vec<String>, Vec<String>, Vec<String>) {
+        let provider = Arc::new(TestProvider::default());
+        let s = feed_with(provider.clone());
+        let sessions: Vec<String> = if signed {
+            vec![
+                signed_in(&s, &provider, "s-a", "ada"),
+                signed_in(&s, &provider, "s-g", "grace"),
+            ]
+        } else {
+            vec!["s-a".to_string(), "s-g".to_string()]
+        };
+        let mut pages = Vec::new();
+        for session in &sessions {
+            pages.push(home(&s, session));
+            page(&s, session, "feed.app.PostPage", &thread_of("p1"));
+        }
+        if signed {
+            assert!(
+                pages[0].contains("Signed in as Name of ada"),
+                "{}",
+                pages[0]
+            );
+            assert!(!pages[0].contains("Name of grace"), "{}", pages[0]);
+            assert!(
+                pages[1].contains("Signed in as Name of grace"),
+                "{}",
+                pages[1]
+            );
+            assert!(!pages[1].contains("Name of ada"), "{}", pages[1]);
+        }
+        let mut values: Vec<String> = s
+            .queries
+            .public_cache_contents()
+            .into_iter()
+            .map(|(key, value)| format!("{key:?} = {value:?}"))
+            .collect();
+        values.sort();
+        let mut fragments: Vec<String> = s
+            .materializer
+            .all_entries()
+            .into_iter()
+            .filter(|(key, _)| key.contains("partition=public"))
+            .map(|(key, entry)| format!("{key} = {}", entry.body))
+            .collect();
+        fragments.sort();
+        (values, fragments, sessions)
+    };
+    let (values, fragments, sessions) = kept(true);
+    assert!(!values.is_empty(), "the query runtime keeps the thread");
+    let (unsigned_values, unsigned_fragments, _) = kept(false);
+    assert_eq!(
+        (&values, &fragments),
+        (&unsigned_values, &unsigned_fragments)
+    );
+    for kept in values.iter().chain(&fragments) {
+        for private in sessions.iter().map(String::as_str).chain([
+            "Name of ada",
+            "Name of grace",
+            "signed-in",
+            "Signed in as",
+        ]) {
+            assert!(
+                !kept.contains(private),
+                "{private} is kept for every reader: {kept}"
+            );
+        }
+    }
+}
+
+/// **A principal is the deployment's, not the request's**: a session no
+/// sign-in opened is no one in the accounts model, whatever it calls itself,
+/// and a guest only in the guest model.
+#[test]
+fn a_session_is_no_one_until_a_provider_vouches_for_it() {
+    let s = feed_with(Arc::new(TestProvider::default()));
+    assert_eq!(s.identity.principals().of("u-ada"), None);
+    assert_eq!(s.identity.principals().of("s-anything"), None);
+    s.identity.use_guests();
+    assert_eq!(
+        s.identity.principals().of("s-anything"),
+        Some(Principal::guest("s-anything"))
+    );
+}
+
+/// **On PostgreSQL** (ADR-0246): the same principals, the author's row
+/// written with their post, and a delete held to `OwnsPost` in the command's
+/// transaction. Skipped without `PW_FEED_DATABASE_URL`.
+mod on_postgres {
+    use super::*;
+    use crate::feed_pg::FeedPg;
+
+    /// A schema of the test's own, dropped when it is done.
+    struct Schema {
+        url: String,
+        name: String,
+    }
+
+    impl Schema {
+        fn count(&self, query: &str) -> i64 {
+            let mut c = postgres::Client::connect(&self.url, postgres::NoTls).expect("connected");
+            c.batch_execute(&format!("SET search_path TO {}", self.name))
+                .expect("the test's schema");
+            c.query_one(query, &[]).expect(query).get(0)
+        }
+
+        fn one(&self, query: &str) -> Vec<String> {
+            let mut c = postgres::Client::connect(&self.url, postgres::NoTls).expect("connected");
+            c.batch_execute(&format!("SET search_path TO {}", self.name))
+                .expect("the test's schema");
+            let row = c.query_one(query, &[]).expect(query);
+            (0..row.len()).map(|i| row.get(i)).collect()
+        }
+    }
+
+    impl Drop for Schema {
+        fn drop(&mut self) {
+            if let Ok(mut c) = postgres::Client::connect(&self.url, postgres::NoTls) {
+                let _ = c.batch_execute(&format!("DROP SCHEMA IF EXISTS {} CASCADE", self.name));
+            }
+        }
+    }
+
+    /// The feed on PostgreSQL, signed in through `provider`, or none
+    /// without a database. The server is dropped before the schema.
+    fn served(test: &str, provider: Arc<TestProvider>) -> Option<(Served, Schema)> {
+        let url = match std::env::var("PW_FEED_DATABASE_URL") {
+            Ok(url) if !url.is_empty() => url,
+            _ => {
+                eprintln!("skipped: PW_FEED_DATABASE_URL is not set");
+                return None;
+            }
+        };
+        let schema = Schema {
+            name: format!("pw_identity_{}_{test}", std::process::id()),
+            url: url.clone(),
+        };
+        let layer = FeedPg::open(&url, Some(&schema.name)).expect("opened");
+        let (dir, out) = built_feed_with(|app| app.to_string());
+        let server =
+            Server::from_build_with(out.clone(), out, Some(Arc::new(layer))).expect("served");
+        server.identity.use_provider(provider, REDIRECT);
+        Some((Served { server, _dir: dir }, schema))
+    }
+
+    /// **A signed-in author's post names them**, their row written in the
+    /// command's transaction as their provider named them.
+    #[test]
+    fn a_post_on_postgres_is_its_signed_in_authors() {
+        let provider = Arc::new(TestProvider::default());
+        let Some((s, db)) = served("author", provider.clone()) else {
+            return;
+        };
+        let ada = signed_in(&s, &provider, "s-a", "ada");
+        let answer = command(&s, "feed.app.post", &ada, "i-1", "[\"On the database\"]");
+        assert!(answer.contains("\"committed\":true"), "{answer}");
+        let row = db.one(
+            "SELECT p.author, u.handle, u.name FROM posts p JOIN users u ON u.id = p.author \
+             WHERE p.text = 'On the database'",
+        );
+        assert_eq!(row, ["ada", "@ada", "Name of ada"]);
+        let theirs = home(&s, "s-reader");
+        let row = theirs
+            .split("<li")
+            .find(|li| li.contains("On the database"))
+            .unwrap_or_else(|| panic!("the post: {theirs}"));
+        assert!(row.contains("Name of ada"), "{row}");
+        assert!(!row.contains(">Delete<"), "{row}");
+        assert!(home(&s, &ada).contains(">Delete<"));
+        drop(s);
+    }
+
+    /// **A delete on PostgreSQL is its author's**: another's is refused and
+    /// changes nothing; the author's removes the post, its replies and their
+    /// likes, in one transaction.
+    #[test]
+    fn a_delete_on_postgres_is_its_authors_alone() {
+        let provider = Arc::new(TestProvider::default());
+        let Some((s, db)) = served("delete", provider.clone()) else {
+            return;
+        };
+        let ada = signed_in(&s, &provider, "s-a", "ada");
+        let grace = signed_in(&s, &provider, "s-g", "grace");
+        let posted = command(&s, "feed.app.post", &ada, "i-1", "[\"Going soon\"]");
+        assert!(posted.contains("\"committed\":true"), "{posted}");
+        let id = db
+            .one("SELECT id FROM posts WHERE text = 'Going soon'")
+            .remove(0);
+        let reply = format!("[\"{id}\",\"A reply to it\"]");
+        let replied = command(&s, "feed.app.reply", &grace, "i-2", &reply);
+        assert!(replied.contains("\"committed\":true"), "{replied}");
+        let this = format!("[\"{id}\"]");
+        let liked = command(&s, "feed.app.like", &grace, "i-3", &this);
+        assert!(liked.contains("\"committed\":true"), "{liked}");
+        let before = db.count("SELECT count(*) FROM posts");
+        let likes = db.count("SELECT count(*) FROM likes");
+
+        let refused = command(&s, "feed.app.delete", &grace, "i-4", &this);
+        assert!(refused.contains("\"refused\":\"OwnsPost\""), "{refused}");
+        assert_eq!(db.count("SELECT count(*) FROM posts"), before);
+
+        let deleted = command(&s, "feed.app.delete", &ada, "i-5", &this);
+        assert!(deleted.contains("\"committed\":true"), "{deleted}");
+        assert_eq!(db.count("SELECT count(*) FROM posts"), before - 2);
+        assert_eq!(db.count("SELECT count(*) FROM likes"), likes - 1);
+        let again = command(&s, "feed.app.delete", &ada, "i-6", &this);
+        assert!(
+            again.contains("\"refused\":\"OwnsPost\""),
+            "a post not there is no one's: {again}"
+        );
+        drop(s);
+    }
+}
+
+/// **Through the development provider, end to end**: sign up at its form,
+/// back through the callback signed in; post; sign out; sign in again with
+/// the password, the same user, whose post is still theirs to delete.
+#[test]
+fn the_development_provider_signs_up_and_in_through_the_flow() {
+    let s = served_feed();
+    s.identity
+        .dev_accounts(&crate::identity::Deployment {
+            development: true,
+            origin: "http://127.0.0.1".to_string(),
+        })
+        .expect("started");
+    // Through the provider and back, from `came_with`, with the form's
+    // fields: the session the callback gives.
+    let through = |came_with: &str, start: &str, fields: &str| -> String {
+        let started = get(&s, start, &format!("pw-session={came_with}"));
+        let (state, _) = set_cookie(&started, "pw-sign-in").expect("state");
+        let to = location(&started);
+        assert!(to.starts_with("/dev-idp/authorize?"), "{to}");
+        let form = get(&s, &to, "");
+        assert!(form.starts_with("HTTP/1.1 200"), "{form}");
+        assert!(form.contains("not for production"), "{form}");
+        let body = format!("{}&{fields}", to.split_once('?').expect("query").1);
+        let answer = exchanged(
+            &s,
+            &format!(
+                "POST /dev-idp/authorize HTTP/1.1\r\nHost: t\r\nSec-Fetch-Site: same-origin\r\n\
+                 content-type: application/x-www-form-urlencoded\r\ncontent-length: {}\r\n\r\n{body}",
+                body.len()
+            ),
+        );
+        let back = location(&answer);
+        let path = back
+            .strip_prefix("http://127.0.0.1")
+            .expect("to this origin");
+        assert!(path.starts_with("/sign-in/callback?"), "{back}");
+        let answer = get(
+            &s,
+            path,
+            &format!("pw-session={came_with}; pw-sign-in={state}"),
+        );
+        assert!(answer.starts_with("HTTP/1.1 303"), "{answer}");
+        set_cookie(&answer, "pw-session").expect("signed in").0
+    };
+    let first = through(
+        "s-a",
+        "/sign-up",
+        "handle=ada&name=Ada+Lovelace&password=correct+horse",
+    );
+    assert!(home(&s, &first).contains("Signed in as Ada Lovelace"));
+    let posted = command(
+        &s,
+        "feed.app.post",
+        &first,
+        "i-1",
+        "[\"Through the provider\"]",
+    );
+    assert!(posted.contains("\"committed\":true"), "{posted}");
+    exchanged(
+        &s,
+        &format!(
+            "POST /sign-out HTTP/1.1\r\nHost: t\r\nCookie: pw-session={first}\r\n\
+             Sec-Fetch-Site: same-origin\r\ncontent-length: 0\r\n\r\n"
+        ),
+    );
+    assert!(home(&s, &first).contains("Sign in to post"));
+    let second = through("s-b", "/sign-in", "handle=ada&password=correct+horse");
+    assert_ne!(first, second);
+    let mine = home(&s, &second);
+    let row = mine
+        .split("<li")
+        .find(|li| li.contains("Through the provider"))
+        .unwrap_or_else(|| panic!("the post: {mine}"));
+    assert!(
+        row.contains("Ada Lovelace") && row.contains(">Delete<"),
+        "{row}"
+    );
+}
