@@ -49,6 +49,9 @@ pub struct Build {
     pub computed: Vec<crate::backend::computed::Compiled>,
     /// What each page shows, as reads of what its queries return (ADR-0125).
     pub pages: Vec<crate::page_values::Planned>,
+    /// **What each data source states it guarantees** (ADR-0207), which a
+    /// host compares with what the database it opens provides (ADR-XXXX).
+    pub sources: Vec<crate::check::SourceClauses>,
 }
 
 impl Build {
@@ -65,6 +68,8 @@ impl Build {
     /// DIR/app.wit                   the worlds the components implement
     /// DIR/pages/<page>.json         what each page shows (ADR-0125)
     /// DIR/graph.json                what a materializer consumes (ADR-0123)
+    /// DIR/sources.json              what each data source guarantees, which
+    ///                               a host holds its database to (ADR-XXXX)
     /// DIR/speculations/<page>.*     each page's speculations (ADR-0122)
     /// DIR/computed/<page>.mjs       what each page computes from its
     ///                               signals, in the browser (ADR-0227)
@@ -148,6 +153,10 @@ impl Build {
         // What a host's materializer consumes (ADR-0123).
         let graph = serde_json::to_string_pretty(&self.graph).map_err(|e| e.to_string())?;
         write("graph.json", format!("{graph}\n").as_bytes())?;
+        // What each source guarantees, which a host compares with what its
+        // database provides before it serves (ADR-XXXX).
+        let sources = serde_json::to_string_pretty(&self.sources).map_err(|e| e.to_string())?;
+        write("sources.json", format!("{sources}\n").as_bytes())?;
         for s in &self.speculations {
             if let crate::backend::wasm::Encoding::Encoded(m) = &s.module {
                 let manifest = serde_json::json!({
@@ -355,6 +364,7 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
         speculations,
         computed,
         pages,
+        sources: crate::check::source_clauses(&hirs),
     })
 }
 
