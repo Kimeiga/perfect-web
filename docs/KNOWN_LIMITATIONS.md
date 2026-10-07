@@ -618,10 +618,10 @@ ADR-0231. Refused at build:
 **A page's parameter is read where a host renders** (ADR-0231). Every page
 is rendered with its parameters, each one text as its address gives it. A
 text part, a title, an attribute, a handler's captures and an instance's
-argument read one. The browser holds none:
-- one read inside a block a signal decides is refused at build (ADR-0137);
-- so is one read in a region the browser renders again with a speculation
-  (ADR-0172).
+argument read one. The browser holds them only where a speculation renders:
+- a region it renders again with a speculation reads them, since a
+  speculating document carries them (ADR-0236);
+- one read inside a block a signal decides is refused at build (ADR-0137).
 
 A value computed from one waits on ruling 0073-a. Its representation,
 `{id.value}`, is read as any opaque value's is (ADR-0232).
@@ -767,8 +767,11 @@ applies to its default value.
 **A pending post is by "You"** (ADR-0222): a transition sees the value it
 changes and its command's arguments, not the page's own user. A value of a
 type that contains itself is speculated on as its nodes (ADR-0233), and a
-view's instance given one is rendered again with it (ADR-0234); a page that
-speculates on one keyed by its parameter waits on ruling 0122-d.
+view's instance given one is rendered again with it (ADR-0234). A target keyed
+by a command's parameter matches a page's binding keyed by the page's parameter
+its handlers pass unchanged (ADR-0236); one passed through a name the handler
+binds, or from a composed view, is refused by name. A clause whose target a page
+does not show refuses the page, so the thread page has no like button yet.
 
 **A commit reaches another session's open page by the query it reads, not
 by its key** (ADR-0219). A like drops one post's `Thread`, and every open

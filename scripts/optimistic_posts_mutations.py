@@ -43,14 +43,15 @@ MUTANTS = [
     (
         "the speculation reads `_` as no key",
         SPECULATION,
-        '                    Expr::Name(n) if n == "_" => Some(None),\n',
-        '                    Expr::Name(n) if false && n == "_" => Some(None),\n',
+        # Re-anchored by ADR-0236, whose key places are named.
+        '                    Expr::Name(n) if n == "_" => Some(KeyArg::Any),\n',
+        '                    Expr::Name(n) if false && n == "_" => Some(KeyArg::Any),\n',
     ),
     (
         "a key left unnamed matches no key",
         SPECULATION,
-        "                        Some(None) => true,\n",
-        "                        Some(None) => false,\n",
+        "                        Some(KeyArg::Any) => true,\n",
+        "                        Some(KeyArg::Any) => false,\n",
     ),
     (
         "what a page shows holds no value it speculates on",

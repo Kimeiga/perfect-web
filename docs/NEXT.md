@@ -386,8 +386,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           speculated value~~ (ADR-0235, `just e14-speculated-values`);
         - **then the Twitter gaps, in the owner's order** (relayed
           2026-10-07), each its own ADR as the feed hits it:
-          1. route-keyed speculation (0122-d): an optimistic reply, and a
-             like on the thread page;
+          1. ~~route-keyed speculation (0122-d): an optimistic reply~~
+             (ADR-0236, `just e14-speculated-routes`); next a like on the
+             thread page, where `like`'s clause on the timeline, which the
+             page does not show, refuses it;
           2. map keys (0057-a) and `let _` (0099-a);
           3. ADR-0195's ruling 10, materialization chains: a timeline built
              from who you follow, with follow and unfollow commands and a

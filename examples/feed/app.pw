@@ -115,13 +115,31 @@ command post(text: PostText) -> Result<Post, FeedError>
 }
 
 // **A reply** (ADR-0231): a post, in its thread and in no timeline. The
-// thread page passes its `id`, the page's parameter.
+// thread page passes its `id`, the page's parameter, which keys the thread it
+// shows, so a reply is shown there before the server answers (ADR-0236,
+// ruling 0122-d).
 command reply(to: PostId, text: PostText) -> Result<Post, FeedError>
     requires      SignedIn
     idempotent_by InteractionId
     emits         Posted(author(current_session()))
+    optimistic    Thread(to) as thread => replied(thread, text)
 {
     add_reply(current_session(), to, text)
+}
+
+// **A reply shown before the server answers** (ADR-0236): last among the
+// thread's replies, by "You", keyed apart from every other pending one.
+fn replied(thread: Post, text: PostText) -> Post !{} {
+    let you = User { id: UserId("you"), handle: "@you", name: "You" }
+    let id = PostId("pending-reply-{List.length(thread.replies)}")
+    let mine = Post { id: id, author: you, text: text.value, likes: 0, replies: [] }
+    Post {
+        id: thread.id,
+        author: thread.author,
+        text: thread.text,
+        likes: thread.likes,
+        replies: List.concat(thread.replies, [mine]),
+    }
 }
 
 // **A post shown before the server answers** (ADR-0222): first in the

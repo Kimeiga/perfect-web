@@ -4610,3 +4610,29 @@ e14-speculated-values:
        CARGO_INCREMENTAL=0 python3 scripts/speculated_values_mutations.py; \
      } > docs/evidence/E14/speculated-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/speculated-values.txt
+
+# ADR-0236: a speculation on the entry a page's parameter keys (ruling
+# 0122-d). The compiler's tests, the server's, the feed in three engines, and
+# the mutation controls.
+e14-speculated-routes:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0236 - a speculation on the entry a page's parameter keys"; echo; \
+       echo "produced by: just e14-speculated-routes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the build (compiler/pw-core/tests/speculated_routes.rs)"; echo; \
+       cargo test --locked -p pw-core --test speculated_routes 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_speculated_thread_is_named a_speculating_document_carries 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/speculated_routes_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/speculated_routes_mutations.py; \
+     } > docs/evidence/E14/speculated-routes.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/speculated-routes.txt

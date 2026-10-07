@@ -23,7 +23,10 @@
 //   - a condition computed: the browser's for a draft too long, the host's
 //     for a thread with no reply (ADR-0229);
 //   - a reply reaches its thread and every reader of it, and no timeline:
-//     the thread page's form passes the page's parameter (ADR-0231).
+//     the thread page's form passes the page's parameter (ADR-0231);
+//   - a reply shows before the server answers, its count and the thread's
+//     "No replies yet." with it, and is the server's after; one whose request
+//     fails is taken back (ADR-0236, ruling 0122-d).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -390,4 +393,71 @@ test("a reply reaches its thread and every reader of it, and no timeline", async
   await expect(post(reader, reply)).toHaveCount(0);
   await a.close();
   await b.close();
+});
+
+/** A thread of its own, posted from the home page, open at its address. */
+async function newThread(page, testInfo, what) {
+  await home(page);
+  const text = `${what} in ${testInfo.project.name} at ${Date.now()}`;
+  await page.getByLabel("What's happening?").fill(text);
+  await page.getByRole("button", { name: "Post" }).click();
+  const link = post(page, text).getByRole("link");
+  await expect(link).toHaveAttribute("href", /^\/post\/p\d+$/);
+  await page.goto(await link.getAttribute("href"));
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
+  await page.evaluate(() => {
+    window.__unreloaded = true;
+  });
+  await expect(page.locator("#quiet")).toHaveText("No replies yet.");
+}
+
+test("a reply shows before the server answers, and is the server's after", async ({
+  page,
+}, testInfo) => {
+  // ADR-0236: the thread page binds `Thread(id)`, and its form passes `id`
+  // to `reply`'s `to`, unchanged: the clause's `Thread(to)` is the thread the
+  // page shows. Held at the network, the reply is the page's own meanwhile.
+  await newThread(page, testInfo, "A held thread");
+  let release;
+  const held = new Promise((r) => (release = r));
+  await page.route("**/command/feed.app.reply", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const reply = `A held reply in ${testInfo.project.name} at ${Date.now()}`;
+  await page.getByLabel("Your reply").fill(reply);
+  await page.getByRole("button", { name: "Reply" }).click();
+  const row = page.locator("main article li").filter({ hasText: reply });
+  await expect(row).toHaveCount(1);
+  await expect(row.getByRole("link")).toHaveText("You");
+  await expect(page.locator("#counts")).toHaveText("1 reply · 0 likes");
+  await expect(page.locator("#quiet")).toHaveCount(0);
+  release();
+  // The server's, by the session's guest.
+  await expect(row.getByRole("link")).toHaveText(/^Guest /);
+  await expect(page.locator("#counts")).toHaveText("1 reply · 0 likes");
+  expect(await unreloaded(page)).toBe(true);
+});
+
+test("a reply whose request fails is taken back", async ({ page }, testInfo) => {
+  await newThread(page, testInfo, "A failing thread");
+  let release;
+  const held = new Promise((r) => (release = r));
+  await page.route("**/command/feed.app.reply", async (route) => {
+    await held;
+    await route.abort("failed");
+  });
+  const reply = `A failed reply in ${testInfo.project.name} at ${Date.now()}`;
+  const field = page.getByLabel("Your reply");
+  await field.fill(reply);
+  await page.getByRole("button", { name: "Reply" }).click();
+  const row = page.locator("main article li").filter({ hasText: reply });
+  await expect(row).toHaveCount(1);
+  release();
+  // Taken back: the thread as the server has it, and the draft kept.
+  await expect(row).toHaveCount(0);
+  await expect(page.locator("#counts")).toHaveText("0 replies · 0 likes");
+  await expect(page.locator("#quiet")).toHaveText("No replies yet.");
+  await expect(field).toHaveValue(reply);
+  expect(await unreloaded(page)).toBe(true);
 });

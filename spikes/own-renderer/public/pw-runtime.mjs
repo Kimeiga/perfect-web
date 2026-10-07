@@ -808,7 +808,8 @@ function rowOf(region, item) {
   return row;
 }
 
-/** What a region is rendered with: the value, and the page's signals. */
+/** What a region is rendered with: the value, what the module computes from
+ * it, the page's parameters, and its signals. */
 function regionValues(module, binding, value) {
   // And each value the region computes from it (ADR-0235): a block's
   // subject, and a value inside one, by the path the template reads.
@@ -816,7 +817,9 @@ function regionValues(module, binding, value) {
     path,
     f(value),
   ]);
-  return `{${[[binding, value], ...computed, ...signals]
+  // And the page's parameters (ADR-0236), which the document carries.
+  const params = Object.entries(parts.params ?? {});
+  return `{${[[binding, value], ...computed, ...params, ...signals]
     .map(([k, v]) => `${JSON.stringify(k)}:${wire(v)}`)
     .join(",")}}`;
 }

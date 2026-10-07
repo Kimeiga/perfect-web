@@ -14,6 +14,17 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0236, 2026-10-07: a speculation on the entry a page's parameter keys**
+(ruling 0122-d, the first of the owner's Twitter gaps). A target keyed by a
+command's parameter, `optimistic Thread(to)`, matched no page: the thread page
+binds `Thread(id)`. It matches now when every handler on the page passes the
+page's parameter to that command parameter unchanged; any other flow is refused
+by name. A speculated entry is named by the page's parameters its key reads, so
+two open threads are two entries. The feed's thread page shows a reply before the
+server answers, its count and "No replies yet." with it, and takes back one whose
+request fails, in three engines: ADR-0233 to ADR-0235's browser tests
+(`just e14-speculated-routes`).
+
 **ADR-0235, 2026-10-07: what a speculated value computes, the page's module
 computes** (ruling 0073-a, and a gap beside it). A block's subject computed
 from a value a page speculates on was refused, and a value computed from one

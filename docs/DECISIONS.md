@@ -1989,3 +1989,10 @@ and a gap beside it).
   renderer with the value. A value computed from one inside a block no region
   renders was skipped, leaving the server's beside the speculation's; it is
   refused by name.
+[ADR-0236](DECISIONS/ADR-0236-a-speculation-on-the-entry-a-pages-parameter-keys.md):
+a speculation on the entry a page's parameter keys (ruling 0122-d).
+- A target's key may name a command's parameter; it matches a page's binding
+  keyed by the page's parameter that every handler on the page passes it,
+  unchanged. A speculated entry is named by the page's parameters its key reads.
+  The feed's thread page shows a reply before the server answers, in three
+  engines.

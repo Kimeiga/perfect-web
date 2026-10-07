@@ -353,6 +353,99 @@ fn context_call(ws: &Workspace, unit: usize, body: &crate::hir::Body, e: ExprId)
     resolve_term(ws, unit, &crate::infer::path_of(body, *callee))
 }
 
+/// **One place of a speculation target's key** (ADR-0122, ruling 0122-d):
+/// what the page's binding must read there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KeyArg {
+    /// `_`: any value (ADR-0222).
+    Any,
+    /// An invocation-context call, matched to the page's own:
+    /// `current_session()`.
+    Context(DefId),
+    /// The command's parameter at this index (ADR-0236): the page's
+    /// parameter its handlers pass it, unchanged.
+    Param(usize),
+}
+
+/// **The page's parameter a key reads**, by its position: a name that binds
+/// to it in the page's body.
+fn page_parameter(hir: &Hir, page: DeclId, k: ExprId) -> Option<usize> {
+    let body = hir.body(hir.decl(page).body?);
+    if !matches!(body.expr(k), Expr::Name(_)) {
+        return None;
+    }
+    match crate::lexical::Lexical::build_in(hir, page)?.binder(k)? {
+        crate::lexical::Binder::Param(p) => Some(p),
+        _ => None,
+    }
+}
+
+/// **Whether every handler on the page passes `command` its parameter `i`,
+/// unchanged, from the page's parameter `p`** (ADR-0236, ruling 0122-d): in
+/// each call the page's body makes, at that position or by that name, the
+/// page's parameter by its binding, and at least one call. A call in a view
+/// the page composes, which its use may give anything, is not followed: the
+/// key is not matched.
+fn passes_unchanged(
+    cx: &Context<'_>,
+    (unit, page): (usize, DeclId),
+    command: DefId,
+    (i, name): (usize, &str),
+    p: usize,
+) -> bool {
+    let hir = cx.hirs[unit];
+    let Some(body) = hir.decl(page).body.map(|b| hir.body(b)) else {
+        return false;
+    };
+    let Some(lexical) = crate::lexical::Lexical::build_in(hir, page) else {
+        return false;
+    };
+    let calls = |unit: usize, body: &crate::hir::Body| -> Vec<Vec<crate::hir::Arg>> {
+        body.walk()
+            .into_iter()
+            .filter_map(|e| match body.expr(e) {
+                Expr::Call { callee, args }
+                    if resolve_term(cx.ws, unit, &crate::infer::path_of(body, *callee))
+                        == Some(command) =>
+                {
+                    Some(args.clone())
+                }
+                _ => None,
+            })
+            .collect()
+    };
+    let views = crate::template_ir::lowered(
+        cx.hirs,
+        cx.ws,
+        cx.sigs,
+        &crate::template_ir::Handlers::new(),
+        unit,
+        page,
+    )
+    .map(|l| l.views)
+    .unwrap_or_default();
+    for v in views {
+        let vh = cx.hirs[v.unit];
+        if let Some(vb) = vh.decl(DeclId(v.decl)).body.map(|b| vh.body(b))
+            && !calls(v.unit, vb).is_empty()
+        {
+            return false;
+        }
+    }
+    let own = calls(unit, body);
+    !own.is_empty()
+        && own.iter().all(|args| {
+            let given = args
+                .iter()
+                .find(|a| a.name.as_deref() == Some(name))
+                .or_else(|| args.iter().filter(|a| a.name.is_none()).nth(i));
+            given.is_some_and(|a| {
+                matches!(body.expr(a.value), Expr::Name(_))
+                    && lexical.binder(a.value) == Some(crate::lexical::Binder::Param(p))
+            })
+        })
+}
+
 /// A page binding `let b = query R(k..)`.
 struct PageBinding {
     name: String,
@@ -499,22 +592,46 @@ fn page_module(
                 };
             };
             // Each key: an invocation-context call, matched to the page's
-            // own; or `_`, which matches the page's key whatever it is
-            // (ADR-0222, ruling 0105-a): the timeline the page shows, at the
-            // length it shows it.
-            let target_key: Vec<Option<Option<DefId>>> = args
+            // own; `_`, which matches the page's key whatever it is
+            // (ADR-0222, ruling 0105-a), the timeline the page shows at the
+            // length it shows it; or one of the command's parameters, matched
+            // to the page's parameter every handler on the page passes it
+            // unchanged (ADR-0236, ruling 0122-d), the thread the page shows.
+            let target_key: Vec<Option<KeyArg>> = args
                 .iter()
                 .map(|a| match cbody.expr(a.value) {
-                    Expr::Name(n) if n == "_" => Some(None),
-                    _ => context_call(cx.ws, cu, cbody, a.value).map(Some),
+                    Expr::Name(n) if n == "_" => Some(KeyArg::Any),
+                    Expr::Name(n) => cdecl
+                        .params
+                        .iter()
+                        .position(|p| p.name == *n)
+                        .map(KeyArg::Param),
+                    _ => context_call(cx.ws, cu, cbody, a.value).map(KeyArg::Context),
                 })
                 .collect();
+            let command_def = DefId {
+                unit: cu,
+                decl: cid.0,
+            };
             let shown = bindings.iter().find(|b| {
                 b.resource == resource
                     && b.key.len() == target_key.len()
                     && b.key.iter().zip(&target_key).all(|(k, t)| match t {
-                        Some(None) => true,
-                        Some(Some(call)) => context_call(cx.ws, unit, body, *k) == Some(*call),
+                        Some(KeyArg::Any) => true,
+                        Some(KeyArg::Context(call)) => {
+                            context_call(cx.ws, unit, body, *k) == Some(*call)
+                        }
+                        Some(KeyArg::Param(i)) => {
+                            page_parameter(hir, page_id, *k).is_some_and(|p| {
+                                passes_unchanged(
+                                    cx,
+                                    (unit, page_id),
+                                    command_def,
+                                    (*i, &cdecl.params[*i].name),
+                                    p,
+                                )
+                            })
+                        }
                         None => false,
                     })
             });
@@ -523,7 +640,8 @@ fn page_module(
                     construct: "a speculation on an entry the page does not show by the same key",
                     reason: format!(
                         "`{command}` speculates on an entry `{page}` reads by no binding whose \
-                         key resolves to the same invocation context"
+                         key resolves to the same invocation context, or to the page's parameter \
+                         each of its handlers passes the command unchanged (ruling 0122-d)"
                     ),
                 };
             };
@@ -774,13 +892,25 @@ fn page_module(
     // speculated value, the page's signals, and the names bound inside it.
     // Anything else it does not hold, as a signal's block does not (ADR-0137).
     let signals: BTreeSet<String> = lowered.instances.iter().map(|i| i.name.clone()).collect();
+    // And the page's parameters (ADR-0236), which its document gives the
+    // browser: a thread's page reads its `id` where a speculation renders.
+    let params: BTreeSet<String> = hir
+        .decl(page_id)
+        .params
+        .iter()
+        .map(|p| p.name.clone())
+        .collect();
     let mut within: Vec<(u32, BTreeSet<u32>)> = Vec::new();
     for region in &regions {
         let Some((parts, bound)) = inside(&lowered.template.chunks, region.part) else {
             continue;
         };
-        let held =
-            |root: &str| root == region.binding || bound.contains(root) || signals.contains(root);
+        let held = |root: &str| {
+            root == region.binding
+                || bound.contains(root)
+                || signals.contains(root)
+                || params.contains(root)
+        };
         // And a value the module computes from the region's binding whole
         // (ADR-0235), by its whole path.
         let computes = |path: &str| whole.get(path) == Some(&region.binding);

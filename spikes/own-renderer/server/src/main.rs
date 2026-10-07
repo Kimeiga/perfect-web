@@ -276,6 +276,10 @@ type KeyedFetched = Box<dyn FnOnce(&Server) + Send>;
 /// from `/stores/{id}`.
 type Params = BTreeMap<String, String>;
 
+/// **A speculated entry, by what names it** (ADR-0222, ADR-0236): the
+/// session, the page, the binding, and the page's parameters its key reads.
+type SpeculatedEntry = (String, String, String, Vec<String>);
+
 /// Each of `session`'s documents in `map`, in the order they were served.
 fn documents_of<V>(map: &BTreeMap<Doc, V>, session: &str) -> Vec<Doc> {
     map.range((session.to_string(), 0)..=(session.to_string(), u64::MAX))
@@ -626,10 +630,10 @@ struct Server {
     /// committed is answered (`tell_waiting`).
     telling: Mutex<Vec<(String, Vec<String>)>>,
     /// **The version each speculated value was last sent at** (ADR-0222), by
-    /// session, page and binding: what a commit's answer names, so the page
-    /// keeps its speculation until the value that includes the commit
-    /// arrives.
-    speculated_versions: Mutex<BTreeMap<(String, String, String), Version>>,
+    /// session, page, binding and the page's parameters its key reads
+    /// (ADR-0236): what a commit's answer names, so the page keeps its
+    /// speculation until the value that includes the commit arrives.
+    speculated_versions: Mutex<BTreeMap<SpeculatedEntry, Version>>,
     /// **How long a streamed region's fill pauses half written**
     /// (ADR-0223), in milliseconds: none unless a test sets it through
     /// `/bench/split-fills`, as a network that delivers a response in parts
@@ -722,11 +726,16 @@ fn cart_entry(session: &str) -> ResourceEntryId {
 /// **A value a session's page speculates on, as the browser holds it**
 /// (ADR-0222): one entry for each page's binding, which its `entry_value`
 /// frames carry and a commit's answer names.
-fn speculated_entry(session: &str, page: &str, binding: &str) -> ResourceEntryId {
+fn speculated_entry(session: &str, page: &str, binding: &str, route: &[String]) -> ResourceEntryId {
+    // **And the page's parameters its key reads** (ADR-0236): two threads
+    // one session has open are two entries.
+    let key: Vec<&str> = std::iter::once(session)
+        .chain(route.iter().map(String::as_str))
+        .collect();
     ResourceEntryId::derive(
         &EntryIdentity::new(
             &format!("pw.speculated.{page}#{binding}"),
-            &[session],
+            &key,
             Partition::Session {
                 id: session.to_string(),
             },
@@ -3112,7 +3121,7 @@ impl Server {
         waiting.behind = false;
         waiting.seen = std::time::Instant::now();
         // What it speculates on, as it was read (ADR-0222).
-        let entries = self.speculated_entries(&doc.0, &self.page_of(doc), &shown);
+        let entries = self.speculated_entries(doc, &self.page_of(doc), &shown);
         self.shown.lock().expect("shown").insert(doc.clone(), shown);
         // Its keyed reads start with it (ADR-0152).
         self.keyed
@@ -3184,19 +3193,29 @@ impl Server {
         applied: &[String],
     ) -> Vec<StreamFrame> {
         let mut frames = Vec::new();
+        let params = self.params_of(doc);
         for (binding, value) in &now.speculated {
             if was.speculated.get(binding) == Some(value) {
                 continue;
             }
             self.clock.advance(1);
             let version = Version(self.clock.now());
+            let route = self.speculated_route(page, binding, &params);
             self.speculated_versions
                 .lock()
                 .expect("speculated versions")
-                .insert((doc.0.clone(), page.to_string(), binding.clone()), version);
+                .insert(
+                    (
+                        doc.0.clone(),
+                        page.to_string(),
+                        binding.clone(),
+                        route.clone(),
+                    ),
+                    version,
+                );
             frames.push(StreamFrame::EntryValue {
                 protocol: CURRENT,
-                entry: speculated_entry(&doc.0, page, binding),
+                entry: speculated_entry(&doc.0, page, binding, &route),
                 version,
                 value: value.clone(),
                 applied: applied.to_vec(),
@@ -3205,15 +3224,36 @@ impl Server {
         frames
     }
 
-    /// Each speculated binding's entry, version and value, for a document of
-    /// `page` that shows `shown`. Read in the subscriber table's hold.
-    fn speculated_entries(&self, session: &str, page: &str, shown: &Shown) -> serde_json::Value {
+    /// **The page's parameters a speculated binding's key reads** (ADR-0236),
+    /// by their values in a document: what names its entry beside the
+    /// session. None for a key of invocation-context calls and signals.
+    fn speculated_route(&self, page: &str, binding: &str, params: &Params) -> Vec<String> {
+        self.speculations
+            .get(page)
+            .and_then(|m| m["bindings"].as_array())
+            .into_iter()
+            .flatten()
+            .find(|b| b["binding"] == binding)
+            .and_then(|b| b["key"].as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|k| params.get(k.as_str()?).cloned())
+            .collect()
+    }
+
+    /// Each speculated binding's entry, version and value, for the document
+    /// `doc` of `page` that shows `shown`. Read in the subscriber table's
+    /// hold.
+    fn speculated_entries(&self, doc: &Doc, page: &str, shown: &Shown) -> serde_json::Value {
+        let session = doc.0.as_str();
+        let params = self.params_of(doc);
         let mut out = serde_json::Map::new();
         for (binding, value) in &shown.speculated {
+            let route = self.speculated_route(page, binding, &params);
             out.insert(
                 binding.clone(),
                 serde_json::json!({
-                    "entry": speculated_entry(session, page, binding),
+                    "entry": speculated_entry(session, page, binding, &route),
                     "version": Version(self.clock.now()),
                     "value": value,
                 }),
@@ -3246,9 +3286,9 @@ impl Server {
             let basis: Vec<serde_json::Value> = sent
                 .iter()
                 .filter(|((s, ..), _)| s == session)
-                .map(|((s, page, binding), version)| {
+                .map(|((s, page, binding, route), version)| {
                     serde_json::json!({
-                        "entry": speculated_entry(s, page, binding),
+                        "entry": speculated_entry(s, page, binding, route),
                         "version": version,
                     })
                 })
@@ -6419,7 +6459,12 @@ fn serve_bound(
                 .flatten()
                 .filter_map(|r| r.as_u64().map(|r| r as u32))
                 .collect();
-            Some((format!("/speculation/{module}"), entries, regions))
+            Some((
+                format!("/speculation/{module}"),
+                entries,
+                regions,
+                params.clone(),
+            ))
         });
         // The page's title, from the values it was rendered with
         // (ADR-0183). A store's program that states none, the benchmark's
@@ -6836,7 +6881,7 @@ fn document(
     templates: &[Template],
     plan: &serde_json::Value,
     cursor: u64,
-    speculation: Option<(String, serde_json::Value, Vec<u32>)>,
+    speculation: Option<(String, serde_json::Value, Vec<u32>, Params)>,
 ) -> String {
     let manifest = serde_json::json!({
         "template": template.path,
@@ -6891,9 +6936,12 @@ fn document(
     if !keyed.is_empty() {
         manifest["keyed"] = serde_json::Value::Array(keyed);
     }
-    if let Some((module, entries, regions)) = speculation {
+    if let Some((module, entries, regions, params)) = speculation {
         manifest["speculation"] = serde_json::Value::String(module);
         manifest["entries"] = entries;
+        // And the page's parameters (ADR-0236), as its address gives them:
+        // a region a speculation renders again reads them, as the host does.
+        manifest["params"] = serde_json::json!(params);
         // Each part a speculation renders again, as its template writes it
         // (ADR-0172): the browser's copy of the renderer renders it from the
         // speculated value.
@@ -10131,6 +10179,92 @@ public query Store(",
             .collect()
     }
 
+    /// **A thread a page speculates on is an entry of its own** (ADR-0236,
+    /// ruling 0122-d): the thread page binds `Thread(id)`, and its form passes
+    /// `id` to `reply`, so the page speculates on the thread it shows. Two
+    /// threads one session has open are two entries, each named by its `id`.
+    /// A reply sends its thread's new value, as its nodes, to that thread's
+    /// entry alone. Until ADR-0236 an entry was named by the session, the page
+    /// and the binding, and two open threads would have been one.
+    #[test]
+    fn a_speculated_thread_is_named_by_its_page_parameter() {
+        let s = served_feed();
+        let open = |id: &str| {
+            let thread = Params::from([("id".to_string(), id.to_string())]);
+            let (_, _, entries, _) = s
+                .serve_document_settled("a", "feed.app.PostPage", &thread, &[])
+                .expect("served");
+            let doc = latest(&s.pending.lock().expect("pending"), "a");
+            (entries["thread"]["entry"].clone(), doc)
+        };
+        let (p1, p1_doc) = open("p1");
+        let (p3, p3_doc) = open("p3");
+        assert_eq!(
+            p1,
+            serde_json::json!(speculated_entry(
+                "a",
+                "feed.app.PostPage",
+                "thread",
+                &["p1".to_string()]
+            ))
+        );
+        assert_ne!(p1, p3, "two threads, two entries");
+        s.command_answered(
+            "feed.app.reply",
+            "a",
+            &[Val::String("p3".into()), Val::String("Mine".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        // p3's document is sent p3's new value, at p3's entry, as its nodes.
+        let sent = entry_values(&s, &p3_doc);
+        let Some((_, _, version, _)) = sent.iter().find(|(entry, value, ..)| {
+            serde_json::json!(entry) == p3 && value["$graph"].to_string().contains("Mine")
+        }) else {
+            panic!("{sent:?}");
+        };
+        // And the commit's answer names that entry at that version, which the
+        // page waits for before it lets the speculation go.
+        let basis = s.committed_basis("a");
+        assert!(
+            basis
+                .as_array()
+                .into_iter()
+                .flatten()
+                .any(|b| b["entry"] == p3 && b["version"] == serde_json::json!(version)),
+            "{basis}"
+        );
+        // p1's is sent nothing at p3's entry.
+        assert!(
+            entry_values(&s, &p1_doc)
+                .iter()
+                .all(|(entry, ..)| serde_json::json!(entry) != p3),
+            "p1's document"
+        );
+    }
+
+    /// **A document that speculates carries its page's parameters**
+    /// (ADR-0236): a region a speculation renders again reads them, as the
+    /// host does. The thread page's carries its `id`; the home page's, which
+    /// takes none, carries none.
+    #[test]
+    fn a_speculating_document_carries_its_parameters() {
+        let s = served_feed();
+        let manifest = |path: &str| {
+            manifest_of(
+                &fetched_as(&s, path, Some("a"))
+                    .into_iter()
+                    .map(|(_, c)| c)
+                    .collect::<String>(),
+            )
+        };
+        assert_eq!(
+            manifest("/post/p1")["params"],
+            serde_json::json!({ "id": "p1" })
+        );
+        assert_eq!(manifest("/")["params"], serde_json::json!({}));
+    }
+
     /// **A post is shown before the server answers, and the page is told
     /// when the value it holds includes it** (ADR-0222). The feed's home page
     /// speculates on its timeline: it holds the timeline's value, a post
@@ -10146,7 +10280,7 @@ public query Store(",
         let feed = &entries["feed"];
         assert_eq!(
             feed["entry"],
-            serde_json::json!(speculated_entry("a", "feed.app.Home", "feed"))
+            serde_json::json!(speculated_entry("a", "feed.app.Home", "feed", &[]))
         );
         assert_eq!(feed["value"].as_array().map(Vec::len), Some(1), "{feed}");
         let before = feed["version"].as_u64().expect("a version");
@@ -10326,10 +10460,16 @@ public query Store(",
     /// another session's open thread as it was, and it is sent nothing.
     #[test]
     fn a_page_reading_nothing_dropped_is_told_nothing() {
+        // And with no reply speculated on it, which PW5107 would refuse of a
+        // `Thread` that does not listen for posts (ADR-0236).
         let s = served_feed_with(|app| {
             app.replace(
                 "invalidates_on Liked(id), Posted(_)",
                 "invalidates_on Liked(id)",
+            )
+            .replace(
+                "    optimistic    Thread(to) as thread => replied(thread, text)\n",
+                "",
             )
         });
         let thread = Params::from([("id".to_string(), "p1".to_string())]);
@@ -10417,11 +10557,17 @@ public query Store(",
     /// again when a like makes the thread a new value.
     #[test]
     fn an_attributes_computed_value_is_the_hosts_and_set_again() {
+        // With no reply speculated on the thread: an attribute computed from
+        // a speculated value is refused (ADR-0235), and this is the host's.
         let s = served_feed_with(|app| {
             app.replace(
                 "<p id=\"counts\">",
                 "<p id=\"counts\" title={counted(thread.likes, \"like\", \"likes\")} \
                  hidden={List.length(thread.replies) == 0}>",
+            )
+            .replace(
+                "    optimistic    Thread(to) as thread => replied(thread, text)\n",
+                "",
             )
         });
         let thread = |id: &str| Params::from([("id".to_string(), id.to_string())]);
@@ -10715,7 +10861,9 @@ public query Store(",
             html.contains("data-pw-captures=\"{&quot;id&quot;:&quot;p1&quot;}\""),
             "the reply form captures the thread's `id`: {html}"
         );
-        assert!(!html.contains("is popular"), "two likes: {html}");
+        // Shown, not merely carried: the block's template is in the
+        // document's manifest since the thread is speculated on (ADR-0236).
+        assert!(!visible(&html).contains("is popular"), "two likes: {html}");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         s.command_answered(
             "feed.app.like",
