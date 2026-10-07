@@ -1,0 +1,40 @@
+ADR-0233 - a speculation on a value of a type that contains itself
+
+produced by: just e14-speculated-graphs
+commit: 4310769be543b572da4cad5644b55f101cb803d1
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+
+== the module (compiler/pw-core/tests/speculated_graphs.rs)
+
+test a_speculated_thread_is_read_from_its_nodes_and_replied_to ... ok
+test a_thread_sent_nested_or_not_a_tree_traps ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+== the host (compiler/pw-conformance/tests/browser_graphs.rs)
+
+test what_is_not_a_graph_is_refused_by_the_host ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_component ... ok
+test a_hosts_graphs_inside_another_value_are_each_its_own ... ok
+test a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order ... ok
+test a_browsers_graph_is_the_tree_its_nodes_make ... ok
+test a_chain_as_deep_as_its_data_crosses_from_a_browser ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+
+== the server (spikes/own-renderer/server/src/main.rs)
+
+test tests::a_value_that_contains_itself_is_written_as_its_nodes ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 147 filtered out; finished in 1.17s
+
+== mutation controls (scripts/speculated_graphs_mutations.py)
+
+baseline (cargo): 9 passed, 0 failed
+the speculation module decodes a value by its shape [cargo]: KILLED (2 of 9 tests fail)
+the decoder of nodes reads no graph [cargo]: KILLED (2 of 9 tests fail)
+the server writes a speculated value nested [cargo]: KILLED (1 of 9 tests fail)
+a binding's value is written by the whole result's type [cargo]: KILLED (1 of 9 tests fail)
+a value of a type that contains itself is written by its fields [cargo]: KILLED (3 of 9 tests fail)
+a node's children are written as its other fields are [cargo]: KILLED (3 of 9 tests fail)
+the nodes are written last first [cargo]: KILLED (3 of 9 tests fail)
+a case's payload is written knowing no type [cargo]: KILLED (1 of 9 tests fail)
+8 of 8 mutants killed

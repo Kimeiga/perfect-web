@@ -1,23 +1,26 @@
 ADR-0170 - a loop over a list inside a query's value
 
 produced by: just e14-nested-lists
-commit: 201ca0e6bb4339877b1b1e537ad2284b428441dd
+commit: 4310769be543b572da4cad5644b55f101cb803d1
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the plan, and what a speculation would not reach (compiler/pw-core/tests/nested_lists.rs)
 
+test a_speculated_value_read_in_a_block_no_region_renders_is_refused ... ok
 test the_count_alone_is_speculated_as_before ... ok
+test a_region_whose_handler_captures_what_the_browser_does_not_hold_is_refused ... ok
 test a_list_inside_a_querys_value_is_iterated_by_its_path ... ok
-test a_part_a_speculation_would_not_reach_is_refused ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.03s
+test a_region_that_reads_what_the_browser_does_not_hold_is_refused ... ok
+test a_part_that_reads_a_speculated_value_is_rendered_again ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.73s
 
 == a value computed for a row, read whole (runtime/pw-render/tests/paths.rs)
 
 test a_path_set_whole_is_read_before_the_name_it_begins_with ... ok
-test a_field_the_value_does_not_have_is_missing_not_empty ... ok
-test a_row_whose_computed_value_changed_sets_its_text_where_it_is ... ok
 test a_value_computed_for_a_row_is_read_whole_where_a_field_has_none ... ok
 test a_value_computed_for_a_row_that_changed_is_set_where_it_is ... ok
+test a_field_the_value_does_not_have_is_missing_not_empty ... ok
+test a_row_whose_computed_value_changed_sets_its_text_where_it_is ... ok
 test a_row_reads_a_value_two_fields_deep_in_its_item ... ok
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -26,21 +29,21 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 test tests::a_block_whose_rendering_changed_is_rendered_again ... ok
 test tests::a_block_a_query_decides_is_rendered ... ok
 test tests::a_list_inside_a_querys_value_is_rendered_and_patched_where_it_is ... ok
-test result: ok. 82 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.88s
+test result: ok. 148 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.61s
 
 == the store checks
 
-pw check: 42 file(s), no diagnostics
+pw check: 44 file(s), no diagnostics
 
 == mutation controls (scripts/nested_lists_mutations.py)
 
-baseline (core): 1131 passed, 0 failed
-baseline (server): 82 passed, 0 failed
-baseline (render): 78 passed, 0 failed
-a list is recorded by its binding [core]: KILLED (1 of 737 tests fail)
-a row's read over a list inside a value is not planned [core]: KILLED (1 of 737 tests fail)
-a part a speculation would not reach is not refused [core]: KILLED (1 of 737 tests fail)
-a list is read from its binding, not its path [server]: KILLED (1 of 82 tests fail)
-a row read is applied only to the binding itself [server]: KILLED (1 of 82 tests fail)
-a value computed for a row is not read whole [render]: KILLED (2 of 26 tests fail)
+baseline (core): 1299 passed, 0 failed
+baseline (server): 148 passed, 0 failed
+baseline (render): 103 passed, 0 failed
+a list is recorded by its binding [core]: KILLED (1 of 568 tests fail)
+a row's read over a list inside a value is not planned [core]: KILLED (1 of 247 tests fail)
+a part a speculation would not reach is not refused [core]: KILLED (1 of 840 tests fail)
+a list is read from its binding, not its path [server]: KILLED (53 of 148 tests fail)
+a row read is applied only to the binding itself [server]: KILLED (51 of 148 tests fail)
+a value computed for a row is not read whole [render]: KILLED (2 of 42 tests fail)
 6 of 6 mutants killed

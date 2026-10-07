@@ -1,7 +1,7 @@
 ADR-0163 - a page says when it is absent
 
 produced by: just e14-not-found
-commit: f2060c69f769e550f4298458d76936e47cac57ae
+commit: 4310769be543b572da4cad5644b55f101cb803d1
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
@@ -13,26 +13,26 @@ test a_query_the_page_reads_can_answer_it ... ok
 test an_error_imported_from_another_module_is_named_as_it_is_imported ... ok
 test a_page_that_names_its_absence_is_the_control ... ok
 test the_clause_names_a_case_of_a_declared_type ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
 
 == the store declares it, and checks
 
-pw check: 50 file(s), no diagnostics
+pw check: 53 file(s), no diagnostics
 
 == the development server (pw-dev-server)
 
 test tests::each_store_is_served_at_its_route ... ok
 test tests::a_store_that_is_not_there_is_not_found ... ok
-test result: ok. 113 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.74s
+test result: ok. 148 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.33s
 
 == a store that is not there, three engines (e2e/stores.spec.mjs)
 
-  24 passed (34.9s)
+  24 passed (32.2s)
 
 == mutation controls (scripts/not_found_mutations.py)
 
 baseline (compiler): 6 passed, 0 failed
-baseline (server): 113 passed, 0 failed
+baseline (server): 148 passed, 0 failed
 baseline (browser): 8 passed, 0 failed
 the clause is let be on a declaration that is no page [compiler]: KILLED (1 of 6 tests fail)
 the type is looked for among terms [compiler]: KILLED (5 of 6 tests fail)
@@ -43,12 +43,12 @@ a query's value is taken for its error [compiler]: KILLED (3 of 6 tests fail)
 a query that answers no Result is taken to fail [compiler]: KILLED (1 of 6 tests fail)
 the plan names the case as Pleris spells it [compiler]: KILLED (1 of 6 tests fail)
 the plan marks every binding [compiler]: KILLED (1 of 6 tests fail)
-the parser does not know the clause [compiler]: KILLED (5 of 6 tests fail)
-the plan does not write the case [server]: KILLED (2 of 113 tests fail)
-a declared case is a failure like any other [server]: KILLED (2 of 113 tests fail)
-any declared error is not found [server]: KILLED (1 of 113 tests fail)
-the failure loses its kind on the way up [server]: KILLED (3 of 113 tests fail)
-a page that is not found is answered as one that failed [server]: KILLED (1 of 113 tests fail)
-every response says OK [server]: KILLED (1 of 113 tests fail)
+the parser does not know the clause [compiler]: KILLED (6 of 6 tests fail)
+the plan does not write the case [server]: KILLED (2 of 148 tests fail)
+a declared case is a failure like any other [server]: KILLED (2 of 148 tests fail)
+any declared error is not found [server]: KILLED (1 of 148 tests fail)
+the failure loses its kind on the way up [server]: KILLED (3 of 148 tests fail)
+a page that is not found is answered as one that failed [server]: KILLED (1 of 148 tests fail)
+every response says OK [server]: KILLED (1 of 148 tests fail)
 the not-found page has no heading [browser]: KILLED (1 of 4 tests fail)
 17 of 17 mutants killed

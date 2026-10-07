@@ -1,7 +1,7 @@
 ADR-0138 - a handler is given its event
 
 produced by: just e14-events
-commit: 7c73b8e05ddd8cc078814c2e1264bc438fca83fa
+commit: 4310769be543b572da4cad5644b55f101cb803d1
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the compiler (compiler/pw-core/tests/events.rs)
@@ -12,34 +12,37 @@ test a_modifier_is_one_the_runtime_applies ... ok
 test the_manifest_says_which_event_a_part_handles ... ok
 test an_element_s_handlers_are_lowered_last_and_together ... ok
 test a_handler_is_given_its_event_s_record ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
 
 == the grammar (compiler/pw-syntax)
 
-test grammar::tests::an_arm_without_an_arrow_is_reported ... ok
 test grammar::tests::an_unclosed_element_still_produces_a_well_formed_tree ... ok
 test grammar::tests::an_event_s_modifiers_are_part_of_its_attribute ... ok
 test grammar::tests::an_arrow_lambda_s_parameters_may_be_typed ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 69 filtered out; finished in 0.00s
+test grammar::tests::an_html_comment_in_markup_is_a_comment ... ok
+test grammar::tests::an_arm_without_an_arrow_is_reported ... ok
+test grammar::tests::an_opaque_type_states_its_invariant_after_its_representation ... ok
+test grammar::tests::an_unquoted_attribute_value_is_read_as_html_reads_it ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 72 filtered out; finished in 0.00s
 
 == one capture attribute per element (runtime/pw-render/tests/properties.rs)
 
 test an_element_s_handlers_carry_one_attribute_between_them ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 31 filtered out; finished in 0.00s
 
 == mutation controls (scripts/events_mutations.py)
 
-baseline: 66 passed, 0 failed
-a lambda's written parameter type is dropped: KILLED (2 of 66 tests fail)
-an on: handler's parameter is not typed by its event: KILLED (1 of 66 tests fail)
-a handler's written event type is not compared: KILLED (1 of 66 tests fail)
-a handler may take several parameters: KILLED (1 of 66 tests fail)
-an unknown modifier is accepted: KILLED (1 of 66 tests fail)
-the handler does not bind its event: KILLED (1 of 66 tests fail)
-the manifest does not say which event: KILLED (1 of 66 tests fail)
-a modifier is not carried: KILLED (1 of 66 tests fail)
-an element's handlers are lowered in source order: KILLED (1 of 66 tests fail)
-a typed arrow parameter list does not parse: KILLED (3 of 66 tests fail)
-an element's handlers write an attribute each: KILLED (1 of 66 tests fail)
-one name captured from two places is guessed between: KILLED (1 of 66 tests fail)
+baseline: 74 passed, 0 failed
+a lambda's written parameter type is dropped: KILLED (2 of 74 tests fail)
+an on: handler's parameter is not typed by its event: KILLED (1 of 74 tests fail)
+a handler's written event type is not compared: KILLED (1 of 74 tests fail)
+a handler may take several parameters: KILLED (1 of 74 tests fail)
+an unknown modifier is accepted: KILLED (1 of 74 tests fail)
+the handler does not bind its event: KILLED (1 of 74 tests fail)
+the manifest does not say which event: KILLED (1 of 74 tests fail)
+a modifier is not carried: KILLED (1 of 74 tests fail)
+an element's handlers are lowered in source order: KILLED (1 of 74 tests fail)
+a typed arrow parameter list does not parse: KILLED (3 of 74 tests fail)
+an element's handlers write an attribute each: KILLED (1 of 74 tests fail)
+one name captured from two places is guessed between: KILLED (1 of 74 tests fail)
 12 of 12 mutants killed

@@ -1,7 +1,7 @@
 ADR-0229 - a computed condition decides its block
 
 produced by: just e14-computed-conditions
-commit: c7f999bd5223ae9cc476cade7698b647ec95d1ee
+commit: 4310769be543b572da4cad5644b55f101cb803d1
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -11,23 +11,23 @@ playwright: Version 1.58.0
 test an_else_if_a_match_and_a_value_in_a_hosts_block_are_computed_too ... ok
 test a_computed_condition_is_a_hosts_from_a_query_and_the_browsers_from_a_signal ... ok
 test what_a_condition_does_not_compute_yet_is_refused_by_name ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.57s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.53s
 test a_key_is_the_path_from_the_element ... ok
 test the_ir_blocks_a_computed_list_and_a_foreign_key ... ok
 test a_loops_key_is_read_from_its_element ... ok
 test a_directive_other_than_on_does_not_build ... ok
 test a_computed_hole_checks_and_does_not_build ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.87s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.79s
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
 test tests::a_condition_a_host_computes_decides_its_block_and_again_when_it_changes ... ok
 test tests::a_condition_the_browser_computes_is_rendered_at_its_first_value ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 144 filtered out; finished in 2.46s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 146 filtered out; finished in 2.38s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  36 passed (35.4s)
+  36 passed (30.0s)
 
 == mutation controls (scripts/computed_conditions_mutations.py)
 

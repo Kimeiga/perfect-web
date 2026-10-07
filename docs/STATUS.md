@@ -2,8 +2,8 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-**Reviewed:** 2026-10-06, against master `c7f999b`, with ADR-0227 to
-ADR-0231.
+**Reviewed:** 2026-10-07, against master `4310769`, with ADR-0232 to
+ADR-0234.
 **Charter:** v2, `PROJECT_CHARTER.md`.
 **Numbering:** engineering E0-E15, public proofs P0-P9, risk experiments RQ-*.
 
@@ -3028,6 +3028,28 @@ observations, not the current completion state. No old raw evidence is rewritten
 
 ## last passing commit
 
+`4310769` (2026-10-07, ADR-0232 to ADR-0234, and the two survivors at
+`c7f999b` accounted for): `just ci` passes locally, the workspace's 2110
+tests pass, and the browser suite passes 773 in three engines, with 13
+skipped. Recorded at that commit, each new: `representations.txt` (ADR-0232)
+4 of 4 mutants killed, `speculated-graphs.txt` (ADR-0233) 8 of 8 and
+`speculated-instances.txt` (ADR-0234) 3 of 3. **The survivors are killed**:
+`computed-holes.txt` 23 of 23, its duplicate retired, and
+`E10/template-operands.txt` 11 of 11. Recorded again, every script with a
+mutant within 30 lines of what these changed, all killed: `cart-lines.txt`
+41, `command-answers.txt` 16, `command-events.txt` 4,
+`computed-conditions.txt` 12, `computed-rows.txt` 12, `events.txt` 12,
+`form-controls.txt` 12, `graphs-on-the-wire.txt` 19, `handler-failures.txt`
+6 and 7, `E10/handlers-compute.txt` 10, `handlers-by-file.txt` 2,
+`handlers-resumable.txt` 7, `metadata.txt` 34, `nested-lists.txt` 6,
+`not-found.txt` 17, `optimistic-posts.txt` 11, `optimistic.txt` 6,
+`pages.txt` 7, `patch-set.txt` 14, `provide.txt` 29, `query-attributes.txt`
+6, `row-reads.txt` 21, `signals-render-again.txt` 8, `streams.txt` 26,
+`E10/strings.txt` 16, `E10/templates.txt` 16, `E10/template-values.txt` 11,
+`titles.txt` 16, `top-captures.txt` 5, `view-instances.txt` 27 and
+`views-compose.txt` 17. Two of `view-instances.txt`'s are killed by not
+building, as at `2cbd5d8`: they control nothing, and are to be written so a
+test kills them.
 `c7f999b` (2026-10-06, ADR-0227 to ADR-0231): `just ci` passes locally, the
 workspace's 2099 tests pass, and the browser suite passes 773 in three
 engines, with 13 skipped. Recorded at that commit, in `docs/evidence/E14/`,

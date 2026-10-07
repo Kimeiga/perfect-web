@@ -1,7 +1,7 @@
 ADR-0137 - what the browser renders again, it can
 
 produced by: just e14-signals-render-again
-commit: c7f999bd5223ae9cc476cade7698b647ec95d1ee
+commit: 4310769be543b572da4cad5644b55f101cb803d1
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the plan's refusals (compiler/pw-core/tests/signals_render_again.rs)
@@ -9,9 +9,9 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test what_a_handler_captures_in_a_signal_s_block_is_the_block_s ... ok
 test a_list_a_signal_holds_is_rendered_again_only_inside_its_block ... ok
 test an_attribute_a_signal_decides_is_set_in_place_or_refused ... ok
-test a_signal_read_in_a_block_a_query_decides_is_refused ... ok
 test a_block_a_signal_decides_reads_the_signals_and_its_own_names ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.01s
+test a_signal_read_in_a_block_a_query_decides_is_refused ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.04s
 
 == mutation controls (scripts/signals_render_again_mutations.py)
 

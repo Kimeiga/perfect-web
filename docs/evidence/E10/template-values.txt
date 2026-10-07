@@ -1,17 +1,17 @@
 ADR-0073 - a template reads each value by path
 
 produced by: just e10-template-values
-commit: 4e198b9e35f8d4bda5b131a6807b86767209d9de
+commit: 4310769be543b572da4cad5644b55f101cb803d1
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the checker, the template IR and the build (compiler/pw-core/tests/template_values.rs)
 
-test a_key_is_the_path_from_the_element ... ok
 test the_ir_blocks_a_computed_list_and_a_foreign_key ... ok
+test a_key_is_the_path_from_the_element ... ok
 test a_loops_key_is_read_from_its_element ... ok
 test a_directive_other_than_on_does_not_build ... ok
 test a_computed_hole_checks_and_does_not_build ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.28s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.82s
 
 == the renderer's keys (runtime/pw-render/tests/keys.rs)
 

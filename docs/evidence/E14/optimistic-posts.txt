@@ -1,7 +1,7 @@
 ADR-0222 - a post is shown before the server answers
 
 produced by: just e14-optimistic-posts
-commit: 4e198b9e35f8d4bda5b131a6807b86767209d9de
+commit: 4310769be543b572da4cad5644b55f101cb803d1
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -10,7 +10,7 @@ playwright: Version 1.58.0
 
 test a_target_may_leave_a_key_unnamed ... ok
 test a_key_left_unnamed_is_a_targets_alone ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
@@ -18,11 +18,11 @@ test tests::a_speculating_page_is_sent_its_carts_value ... ok
 test tests::a_post_is_shown_before_the_server_answers_and_the_page_told_when_it_holds_it ... ok
 test tests::a_speculated_value_that_did_not_change_is_not_sent_again ... ok
 test tests::a_page_that_reads_more_holds_what_it_shows ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 133 filtered out; finished in 0.94s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 144 filtered out; finished in 1.39s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  24 passed (54.9s)
+  36 passed (29.0s)
 
 == mutation controls (scripts/optimistic_posts_mutations.py)
 

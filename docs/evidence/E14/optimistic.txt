@@ -1,41 +1,41 @@
 ADR-0122 - an optimistic transition runs in the browser
 
 produced by: just e14-optimistic
-commit: c7f999bd5223ae9cc476cade7698b647ec95d1ee
+commit: 4310769be543b572da4cad5644b55f101cb803d1
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)  node: v22.21.1
 
 == the store's speculation module (compiler/pw-conformance/tests/speculation.rs)
 
 test a_speculated_value_read_inside_a_block_is_refused_by_name ... ok
 test the_stores_transitions_run_and_its_parts_read_the_result ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
 
 == what the server sends a page that speculates (spikes/own-renderer/server)
 
 test tests::a_speculating_page_is_sent_its_carts_value ... ok
 test tests::a_speculated_value_that_did_not_change_is_not_sent_again ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 144 filtered out; finished in 1.19s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 146 filtered out; finished in 1.20s
 
 == the browser, each engine alone (e2e/optimistic.spec.mjs)
 
-  ✓  1 [chromium] › e2e/optimistic.spec.mjs:49:1 › a rejected command restores the value the page held (1.7s)
+  ✓  2 [chromium] › e2e/optimistic.spec.mjs:49:1 › a rejected command restores the value the page held (1.7s)
   ✓  5 [chromium] › e2e/optimistic.spec.mjs:78:1 › two pending presses show two, and reconcile to the server's two (1.8s)
+  ✓  1 [chromium] › e2e/optimistic.spec.mjs:93:1 › one press rejected among two keeps the other's speculation (2.1s)
   ✓  4 [chromium] › e2e/optimistic.spec.mjs:30:1 › the count moves before the server answers (2.1s)
-  ✓  2 [chromium] › e2e/optimistic.spec.mjs:93:1 › one press rejected among two keeps the other's speculation (2.2s)
-  ✓  3 [chromium] › e2e/optimistic.spec.mjs:68:1 › a failed request restores it too (4.4s)
-  5 passed (23.9s)
-  ✓  2 [firefox] › e2e/optimistic.spec.mjs:49:1 › a rejected command restores the value the page held (1.9s)
-  ✓  5 [firefox] › e2e/optimistic.spec.mjs:78:1 › two pending presses show two, and reconcile to the server's two (1.5s)
-  ✓  1 [firefox] › e2e/optimistic.spec.mjs:30:1 › the count moves before the server answers (2.8s)
-  ✓  3 [firefox] › e2e/optimistic.spec.mjs:93:1 › one press rejected among two keeps the other's speculation (1.8s)
-  ✓  4 [firefox] › e2e/optimistic.spec.mjs:68:1 › a failed request restores it too (4.3s)
-  5 passed (21.8s)
-  ✓  5 [webkit] › e2e/optimistic.spec.mjs:49:1 › a rejected command restores the value the page held (2.8s)
-  ✓  4 [webkit] › e2e/optimistic.spec.mjs:78:1 › two pending presses show two, and reconcile to the server's two (2.8s)
-  ✓  3 [webkit] › e2e/optimistic.spec.mjs:93:1 › one press rejected among two keeps the other's speculation (3.1s)
-  ✓  2 [webkit] › e2e/optimistic.spec.mjs:30:1 › the count moves before the server answers (3.2s)
-  ✓  1 [webkit] › e2e/optimistic.spec.mjs:68:1 › a failed request restores it too (3.5s)
-  5 passed (19.6s)
+  ✓  3 [chromium] › e2e/optimistic.spec.mjs:68:1 › a failed request restores it too (3.5s)
+  5 passed (22.8s)
+  ✓  5 [firefox] › e2e/optimistic.spec.mjs:78:1 › two pending presses show two, and reconcile to the server's two (1.3s)
+  ✓  3 [firefox] › e2e/optimistic.spec.mjs:93:1 › one press rejected among two keeps the other's speculation (1.9s)
+  ✓  4 [firefox] › e2e/optimistic.spec.mjs:30:1 › the count moves before the server answers (2.3s)
+  ✓  1 [firefox] › e2e/optimistic.spec.mjs:49:1 › a rejected command restores the value the page held (1.4s)
+  ✓  2 [firefox] › e2e/optimistic.spec.mjs:68:1 › a failed request restores it too (3.9s)
+  5 passed (20.2s)
+  ✓  3 [webkit] › e2e/optimistic.spec.mjs:49:1 › a rejected command restores the value the page held (2.5s)
+  ✓  5 [webkit] › e2e/optimistic.spec.mjs:78:1 › two pending presses show two, and reconcile to the server's two (2.6s)
+  ✓  2 [webkit] › e2e/optimistic.spec.mjs:93:1 › one press rejected among two keeps the other's speculation (2.9s)
+  ✓  1 [webkit] › e2e/optimistic.spec.mjs:30:1 › the count moves before the server answers (3.0s)
+  ✓  4 [webkit] › e2e/optimistic.spec.mjs:68:1 › a failed request restores it too (4.3s)
+  5 passed (19.8s)
 
 == mutation controls (scripts/optimistic_transitions_mutations.py)
 
