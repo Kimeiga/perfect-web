@@ -397,16 +397,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
              type as a literal~~ (ADR-0241, `just e14-transition-values`); ~~an
              `{#each}`'s head read once, by the grammar~~ (ADR-0242, `just
              e14-each-heads`); ~~two statements on one line~~ (ADR-0243,
-             `just e14-statements-separated`); **next**, what it found: a
+             `just e14-statements-separated`). **First of all (owner,
+             relayed 2026-10-07): CI green**: ~~the Wasmtime advisories~~
+             (ADR-0244). **Next**, the heavy verification on GitHub
+             Actions, the mutation scripts and the browser suites as
+             parallel jobs, each recipe's output an artifact a recorded
+             command fetches into `docs/evidence/` (the owner's direction,
+             relayed 2026-10-07). Then what ADR-0243 found, drafted: a
              clause written in a block judged by its domain, as one heading
              a declaration is (`scope bogus` in a resource's block checks).
-             **First of all (owner, relayed 2026-10-07): CI green.** Master's
-             "licenses and advisories" job has failed since 2026-10-05 on
-             three Wasmtime advisories against 48.0.3 (RUSTSEC-2026-0325 to
-             0327), patched in 48.0.4; the bump downloads crates, the
-             owner's to approve. Then the heavy verification on GitHub
-             Actions, the mutation scripts and the browser suites as
-             parallel jobs (the owner's direction, relayed 2026-10-07).
              Further grammar and clause defects go under 0047-a below,
              unless the feed, the next Twitter item or soundness needs one;
           2. map keys (0057-a) and `let _` (0099-a);

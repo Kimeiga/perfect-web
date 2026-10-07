@@ -2044,3 +2044,9 @@ a block's statements are separated, by `;` or a line (a correction).
   and a block after a statement. A clause's word that is no clause where it
   is written, a binding's name or a word in a code body, is refused by the
   names check, and a `;` ends a clause's value there as in the grammar.
+[ADR-0244](DECISIONS/ADR-0244-wasmtime-48-0-5-and-a-host-that-enables-only-what-it-runs.md):
+Wasmtime 48.0.5, and a host that enables only what it runs (a correction).
+- CI's advisory job had failed since 2026-10-05 on three Wasmtime
+  advisories. Every pin is 48.0.5; the host's engines turn off GC,
+  exceptions and the component model's async, each with when to revisit it;
+  the Node audit behind it is fixed or accepted with its reason.

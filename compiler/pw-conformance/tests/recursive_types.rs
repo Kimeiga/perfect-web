@@ -611,7 +611,8 @@ fn nodes_that_are_not_one_tree_in_level_order_trap() {
 
 /// `Size`'s parameter type, as the component declares it.
 fn size_param_type(r: &Runnable) -> wasmtime::component::types::Type {
-    let engine = wasmtime::Engine::default();
+    // The host's own engine (ADR-0244).
+    let engine = wasmtime::Engine::new(&pw_host::engine::engine_config()).expect("engine");
     let component =
         wasmtime::component::Component::new(&engine, &r.compiled().component.bytes).expect("loads");
     let ty = component.component_type();

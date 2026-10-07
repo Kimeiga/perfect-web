@@ -557,9 +557,8 @@ fn params(r: &Runnable) -> Vec<Type> {
         .component
         .clone()
         .expect("located");
-    let mut config = wasmtime::Config::new();
-    config.wasm_component_model(true);
-    let engine = wasmtime::Engine::new(&config).expect("engine");
+    // The host's own engine (ADR-0244).
+    let engine = wasmtime::Engine::new(&pw_host::engine::engine_config()).expect("engine");
     let component = wasmtime::component::Component::new(&engine, &r.compiled().component.bytes)
         .expect("component");
     for (name, item) in component.component_type().exports(&engine) {

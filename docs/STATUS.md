@@ -14,6 +14,18 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0244, 2026-10-07: Wasmtime 48.0.5, and a host that enables only what
+it runs** (a correction). Master's CI had been red since 2026-10-05 on its
+"licenses and advisories" job: three RustSec advisories against Wasmtime
+48.0.3 (RUSTSEC-2026-0325 to 0327, one CVSS 9.3), and behind them, never
+reached, three npm advisories. Nothing read CI's state. Every live pin is
+48.0.5 now, the CLI's from GitHub's release digests, and the host's one
+engine configuration turns off GC, exceptions and the component model's
+async, which Wasmtime enables by default and no Pleris component uses: a
+component using one is refused when it loads. Two npm packages moved inside
+their ranges; `braces`, with no fixed release, is accepted with its reason.
+This machine's CLI had been 47.0.3 since before ADR-0116.
+
 **ADR-0243, 2026-10-07: a block's statements are separated, by `;` or a
 line** (a correction, found with ADR-0237). `fn f(a: Int, b: Int) -> Int !{}
 { a b }` was two statements, `a` dropped, and checked. Two statements on one

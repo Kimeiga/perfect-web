@@ -857,6 +857,33 @@ pub mod engine {
     /// engine does, without depending on a second copy of the engine.
     pub use wasmtime::component::Val;
 
+    /// **The configuration of every engine the host makes** (ADR-0244): the
+    /// component model, and none of the proposals Pleris's components do not
+    /// use, so a component that uses one is refused when it loads.
+    ///
+    /// Wasmtime 48 enables GC, exceptions and the component model's async by
+    /// default, and the host made its engines with `Config::new()`: each was
+    /// on for nothing. Three advisories against 48.0.3 were in them
+    /// (RUSTSEC-2026-0325 to 0327). Each comes back when the compiler emits
+    /// code that uses it, checked against that release's advisories.
+    pub fn engine_config() -> wasmtime::Config {
+        let mut config = wasmtime::Config::new();
+        config.wasm_component_model(true);
+        // Revisit when ADR-0008's move to WASI 0.3 (`wasm32-wasip3`) comes,
+        // for concurrent or streamed host calls inside a query.
+        config.wasm_component_model_async(false);
+        // Revisit if the browser's Wasm (E10-T2) or the boxed recursive
+        // types (ADR-0202) would be smaller or faster on GC references than
+        // on linear memory and regions. The Canonical ABI carries no GC type
+        // across a component's boundary yet.
+        config.wasm_gc(false);
+        // Revisit only if a lowering needs a non-local exit that `Result`
+        // and a trap cannot express. Resumable effect handlers would need
+        // stack switching, not exceptions.
+        config.wasm_exceptions(false);
+        config
+    }
+
     /// Every instance a component imports, as `interface#name` where the name
     /// is known and `interface` alone otherwise.
     ///
@@ -864,12 +891,10 @@ pub mod engine {
     /// nothing", which passes every audit — so a failure to read must never be
     /// able to produce one.
     pub fn imports_of(bytes: &[u8]) -> Result<Vec<String>, String> {
+        use wasmtime::Engine;
         use wasmtime::component::Component;
-        use wasmtime::{Config, Engine};
 
-        let mut config = Config::new();
-        config.wasm_component_model(true);
-        let engine = Engine::new(&config).map_err(|e| e.to_string())?;
+        let engine = Engine::new(&engine_config()).map_err(|e| e.to_string())?;
         let component = Component::new(&engine, bytes).map_err(|e| e.to_string())?;
         let ty = component.component_type();
 
@@ -1138,8 +1163,7 @@ pub mod engine {
         /// Compile a component. The engine meters fuel, so a call can be
         /// given a budget; a call with none gets the whole range.
         pub fn compile(bytes: &[u8]) -> Result<Prepared, String> {
-            let mut config = wasmtime::Config::new();
-            config.wasm_component_model(true);
+            let mut config = engine_config();
             config.consume_fuel(true);
             let engine = wasmtime::Engine::new(&config).map_err(|e| e.to_string())?;
             let component =
@@ -2442,10 +2466,9 @@ pub mod engine {
         limits: &crate::Limits,
     ) -> Result<Instantiated, String> {
         use wasmtime::component::{Component, Linker};
-        use wasmtime::{Config, Engine, Store};
+        use wasmtime::{Engine, Store};
 
-        let mut config = Config::new();
-        config.wasm_component_model(true);
+        let mut config = engine_config();
         // Metering is an ENGINE setting, so it is decided here from the policy
         // rather than being on always. An engine that consumed fuel for an
         // unbounded instance would charge for something nobody bounded.

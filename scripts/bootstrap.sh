@@ -18,13 +18,14 @@ DIST="$TC/dist"
 PREFIX="$TC/prefix"
 
 # Pinned in tools/versions.lock. Koka was verified 2026-08-05; Wasmtime was
-# advanced on 2026-10-01 by ADR-0116 after two RustSec advisories.
+# advanced on 2026-10-01 by ADR-0116 after two RustSec advisories, and on
+# 2026-10-07 by ADR-0244 after three more.
 KOKA_VERSION="3.2.3"
-WASMTIME_VERSION="48.0.3"
+WASMTIME_VERSION="48.0.5"
 
 # SHA-256 of the exact artifacts accepted by this repository. Koka's values were
-# computed from downloaded artifacts on 2026-08-06. Wasmtime 48.0.3's values
-# were pinned from immutable GitHub release-asset digests on 2026-10-01;
+# computed from downloaded artifacts on 2026-08-06. Wasmtime 48.0.5's values
+# were pinned from immutable GitHub release-asset digests on 2026-10-07;
 # bootstrap still verifies every downloaded byte before installing it.
 arch="$(uname -m)"
 os="$(uname -s)"
@@ -34,19 +35,19 @@ case "$os/$arch" in
         KOKA_ASSET="koka-v${KOKA_VERSION}-macos-arm64.tar.gz"
         KOKA_SHA256="ffe84e8c679876894ac67da23066ceae1fd433e244038a7c884a4ca8b4698eb8"
         WASMTIME_DIR="wasmtime-v${WASMTIME_VERSION}-aarch64-macos"
-        WASMTIME_SHA256="20a8eade6aacfaaa3fea0dfc2edee908705b5708c10841e423312a1a899b99a5"
+        WASMTIME_SHA256="36d78cf1a5c8a5f40c0b9e933208ac3d937e868aca44b3cbbe1b48a3a530cf47"
         ;;
     Linux/x86_64)
         KOKA_ASSET="koka-v${KOKA_VERSION}-linux-x64.tar.gz"
         KOKA_SHA256="e82a4b497f1f8791ee171d06c45293ba16432e485d645ddd9688bafa6ccde5a5"
         WASMTIME_DIR="wasmtime-v${WASMTIME_VERSION}-x86_64-linux"
-        WASMTIME_SHA256="97e8a68140986d9a3c1073b2e45499fc8bf36534555cae1c614f6a9c7176861e"
+        WASMTIME_SHA256="f533a0fb3eca20aee34d69192f214839c5227a507fff2ecb3070ae1a37f0c40d"
         ;;
     Linux/aarch64 | Linux/arm64)
         KOKA_ASSET="koka-v${KOKA_VERSION}-linux-arm64.tar.gz"
         KOKA_SHA256="ce0cf566ce2bd1dd3b4fbcc1d07f92d54ff57fb3cc6d6fa0728d4a72df464c02"
         WASMTIME_DIR="wasmtime-v${WASMTIME_VERSION}-aarch64-linux"
-        WASMTIME_SHA256="58160722b647fa825452078a95c7beb084e09599f8cf47e363c983186aee51d5"
+        WASMTIME_SHA256="8713dcbc6f9427eb120d7a4b514b6a58597a369e5b5d79cebeaae11fa24479f5"
         ;;
     *)
         echo "bootstrap: no pinned artifacts for $os/$arch." >&2

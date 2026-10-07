@@ -25,3 +25,20 @@ GHSA-g7r4-m6w7-qqqr
     Revisit: when `@marko/run` releases a version depending on
     `esbuild-plugin-browserslist` with an `^0.28` range, or when ADR-0002's
     deletion condition retires Marko at E7.
+
+GHSA-vfj7-8cjw-p6xm
+    braces <=3.0.3 — a deeply nested brace pattern exhausts the stack (a
+    denial of service). No release is patched: 3.0.3 is the latest, and the
+    advisory lists no fixed version (checked 2026-10-07, ADR-0244).
+
+    Why it cannot be fixed here: braces reaches this repository only through
+    `spikes/marko-stream-resume` -> `@marko/run@0.11.8` -> `@marko/vite` ->
+    `fast-glob` -> `micromatch`, the build's file globbing.
+
+    Why the residual risk is acceptable: the patterns it expands are the
+    spike's own build globs, never input from a request, and no production
+    artifact contains it.
+
+    Revisit: when braces publishes a fixed release, when `@marko/vite` stops
+    depending on micromatch, or when ADR-0002's deletion condition retires
+    Marko at E7.

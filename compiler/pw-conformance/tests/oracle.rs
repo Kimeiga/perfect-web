@@ -177,9 +177,8 @@ struct Types {
 }
 
 fn types(bytes: &[u8], export: &[String; 2]) -> Types {
-    let mut config = wasmtime::Config::new();
-    config.wasm_component_model(true);
-    let engine = wasmtime::Engine::new(&config).expect("engine");
+    // The host's own engine (ADR-0244).
+    let engine = wasmtime::Engine::new(&pw_host::engine::engine_config()).expect("engine");
     let component = wasmtime::component::Component::new(&engine, bytes).expect("component");
     let ty = component.component_type();
     let mut results = BTreeMap::new();
