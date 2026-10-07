@@ -126,10 +126,14 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
             immutable: Vec::new(),
             visited: BTreeSet::new(),
             found: Vec::new(),
+            unseparated: Vec::new(),
         };
         walk.expr(body.root);
         for (span, name) in walk.found {
             out.push(diagnostic(hir, id, decl, span, &name));
+        }
+        for (head, second) in walk.unseparated {
+            out.push(unseparated(head, second, src));
         }
         for (span, name) in walk.immutable {
             // What `bind:value` wrote is PW5304's to refuse (ADR-0142), and
@@ -187,6 +191,9 @@ struct Walk<'a> {
     /// region is not walked again in the outer template's scope.
     visited: BTreeSet<ExprId>,
     found: Vec<(Span, String)>,
+    /// A clause's head that is no clause where it is written, and the
+    /// statement after it on its line (ADR-0243).
+    unseparated: Vec<(Span, Span)>,
 }
 
 impl Walk<'_> {
@@ -449,10 +456,14 @@ impl Walk<'_> {
                     let head = head.clone();
                     self.visited.insert(s);
                     i += 1;
-                    // The value: what follows on the head's line. A block is
-                    // the clause's body, walked as the next statement.
+                    // The value: what follows on the head's line, to a `;`,
+                    // which ends it as it ends a statement (ADR-0243), and a
+                    // `,` does not, a list's. A block is the clause's body,
+                    // walked as the next statement.
                     while let Some(&v) = stmts.get(i) {
-                        if !self.same_line(s, v) || matches!(self.body.expr(v), Expr::Block { .. })
+                        if !self.same_line(s, v)
+                            || self.separators(s, v).contains(&pw_syntax::Kind::Semi)
+                            || matches!(self.body.expr(v), Expr::Block { .. })
                         {
                             break;
                         }
@@ -487,6 +498,21 @@ impl Walk<'_> {
                     continue;
                 }
                 _ => {}
+            }
+            // **A clause's head that is no clause here** (ADR-0243): a name
+            // some scope binds, or a word in a code body (ADR-0216). The
+            // grammar takes what follows such a word on its line for its
+            // clause's value, as it must where a clause can be; read as
+            // statements, they are two on one line.
+            if let Expr::Name(head) = self.body.expr(s)
+                && pw_syntax::heads_a_clause(head)
+                && let Some(n) = next
+                && self.same_line(s, n)
+                && !matches!(self.body.expr(n), Expr::Block { .. })
+                && self.separators(s, n).is_empty()
+            {
+                self.unseparated
+                    .push((self.body.expr_span(s), self.body.expr_span(n)));
             }
             self.expr(s);
             i += 1;
@@ -544,6 +570,21 @@ impl Walk<'_> {
         self.src
             .get(a.end..b.start)
             .is_some_and(|between| !between.contains('\n'))
+    }
+
+    /// The separators between the statements `a` and `b`, each a `;` or a
+    /// `,` (ADR-0243).
+    fn separators(&self, a: ExprId, b: ExprId) -> Vec<pw_syntax::Kind> {
+        let (a, b) = (self.body.expr_span(a), self.body.expr_span(b));
+        self.src
+            .get(a.end..b.start)
+            .map_or_else(Vec::new, |between| {
+                pw_syntax::lex(between)
+                    .into_iter()
+                    .map(|t| t.kind)
+                    .filter(|k| matches!(k, pw_syntax::Kind::Semi | pw_syntax::Kind::Comma))
+                    .collect()
+            })
     }
 
     /// `a.b.c` used as a value: its head must resolve, and a head that names
@@ -722,6 +763,36 @@ fn immutable_target(hir: &Hir, id: DeclId, decl: &Decl, span: Span, name: &str) 
         ),
         repairs: vec![Repair {
             description: format!("declare it `let mut {name} = ..`, or bind a new name"),
+            replacement: None,
+        }],
+    }
+}
+
+/// Two statements on one line, the first a clause's head that is no clause
+/// where it is written (PW0030, ADR-0243).
+fn unseparated(head: Span, second: Span, src: &str) -> Diagnostic {
+    let word = &src[head.clone()];
+    Diagnostic {
+        code: crate::codes::STATEMENTS_SEPARATED.id,
+        invariant: crate::codes::STATEMENTS_SEPARATED.invariant,
+        reason: "no_clause_here",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: "two statements on one line are separated by `;`".to_string(),
+        primary_span: second,
+        related: vec![Related {
+            span: head,
+            label: format!("`{word}` is no clause's head here"),
+        }],
+        explanation: Some(
+            "A clause written in a block is its head's word and its value on one line, \
+             `scope component`. Where the word names a binding, or stands in a \
+             function's, a query's, a command's or a task's body, which admits no \
+             clause, it is no clause, and the two are two statements."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "write `;` between them, or the second on a line of its own".to_string(),
             replacement: None,
         }],
     }

@@ -396,8 +396,19 @@ E14 comes before E11-E13. Its plan, controls and task list are
              `just e14-clauses-read-once`); ~~a transition producing another
              type as a literal~~ (ADR-0241, `just e14-transition-values`); ~~an
              `{#each}`'s head read once, by the grammar~~ (ADR-0242, `just
-             e14-each-heads`); `lexical_mutations.py`'s two label
-             survivors, found with it and older, accounted for; two statements on one line;
+             e14-each-heads`); ~~two statements on one line~~ (ADR-0243,
+             `just e14-statements-separated`); **next**, what it found: a
+             clause written in a block judged by its domain, as one heading
+             a declaration is (`scope bogus` in a resource's block checks).
+             **First of all (owner, relayed 2026-10-07): CI green.** Master's
+             "licenses and advisories" job has failed since 2026-10-05 on
+             three Wasmtime advisories against 48.0.3 (RUSTSEC-2026-0325 to
+             0327), patched in 48.0.4; the bump downloads crates, the
+             owner's to approve. Then the heavy verification on GitHub
+             Actions, the mutation scripts and the browser suites as
+             parallel jobs (the owner's direction, relayed 2026-10-07).
+             Further grammar and clause defects go under 0047-a below,
+             unless the feed, the next Twitter item or soundness needs one;
           2. map keys (0057-a) and `let _` (0099-a);
           3. ADR-0195's ruling 10, materialization chains: a timeline built
              from who you follow, with follow and unfollow commands and a
@@ -418,11 +429,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
              content-type limits, stored through a deployment's blob-storage
              capability (Pleris builds no storage and no CDN), and served
              safely;
-          8. a real database for the feed: Postgres or similar behind the
-             `DataLayer` trait, the host comparing a source's declared
-             guarantees with what the database provides (item 21's last
-             step). Versions and APIs verified against primary sources; a
-             crate or a server to download is the owner's to approve;
+          8. ~~a real database for the feed~~: **a parallel track** (the
+             owner's, relayed 2026-10-07). A cloud agent builds Postgres
+             behind the `DataLayer` trait (ADR-0218), and the host comparing
+             a source's declared guarantees with what the database provides
+             (ADR-0207), on branch `pg-data-layer`, its ADR unnumbered. This
+             track integrates it: numbers the ADR, merges, runs the chain.
+             The trait's shape changes only with a note here, since that
+             branch builds on it;
         - then what ruling 0073-a still refuses (several values, a page's
           parameter, the browser's values inside a block, instances), and
           everything below;
@@ -433,7 +447,21 @@ E14 comes before E11-E13. Its plan, controls and task list are
           route-keyed speculation (0122-d); map keys (0057-a, 0057-c); `let
           _`, `while`, 0052-a, 0055-b, 0061-a, 0049-b; cheaper instantiation
           (0046-a);
-        - after it: 0060-a, 0078-a, 0056-a, 0047-a's parser split;
+        - after it: 0060-a, 0078-a, 0056-a, 0047-a's parser split, and
+          what waits for it, found on the way:
+          - **clauses nothing reads** (ADR-0243): `respects`,
+            `intrinsic_height` and a `handler_policy`'s clauses are read by
+            no analysis, generator or runtime (the rolling deployment a
+            handler policy is for is RISK_REGISTER's R5);
+          - **an index has no message of its own** (ADR-0243): `items[0]`
+            is refused as two statements in a block, and as what an
+            argument list or a hole reads elsewhere; read as an index and
+            refused by name, `List.get(items, 0)`, it would say what it is;
+          - **`lexical_mutations.py`'s two label survivors** (ADR-0242), "a
+            `for` loop's name carries no label" and "a lambda's parameters
+            carry no label": older than ADR-0242, killed at `d569e18`; with
+            either mutant the programs their tests write are refused all the
+            same, and what holds each is not yet accounted for;
         - housekeeping: 0032-a's field made required, 0049-a's wording,
           kiokun's NOTICE, an inlining budget, KNOWN_LIMITATIONS cleaned.
 

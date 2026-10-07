@@ -4758,3 +4758,24 @@ e14-each-heads:
        CARGO_INCREMENTAL=0 python3 scripts/each_heads_mutations.py; \
      } > docs/evidence/E14/each-heads.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/each-heads.txt
+
+# ADR-0243: a block's statements are separated, by `;` or a line. Its tests,
+# the corpus's, and the mutation controls.
+e14-statements-separated:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0243 - a block's statements are separated, by ; or a line"; echo; \
+       echo "produced by: just e14-statements-separated"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/statements_separated.rs)"; echo; \
+       cargo test --locked -p pw-core --test statements_separated 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the parser (compiler/pw-syntax/src/grammar.rs)"; echo; \
+       cargo test --locked -p pw-syntax --lib -- two_statements_on_one_line_are_separated 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== a clause's head takes its value on its line (compiler/pw-core/src/policy.rs)"; echo; \
+       cargo test --locked -p pw-core --lib -- policy::tests::every_clause_head_takes_its_value_on_its_line 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus and the names check (checking_source, every_name_resolves)"; echo; \
+       cargo test --locked -p pw-core --test checking_source --test every_name_resolves 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/statements_separated_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/statements_separated_mutations.py; \
+     } > docs/evidence/E14/statements-separated.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/statements-separated.txt

@@ -2036,3 +2036,11 @@ an `{#each}`'s head is read once, by the grammar (a correction).
   (x)}` and an unclosed key checked, and PW5011 took any `(` for a key. The
   grammar parses the head now, a missing `as` is PW0019, and every reader
   reads its parts.
+[ADR-0243](DECISIONS/ADR-0243-a-blocks-statements-are-separated.md):
+a block's statements are separated, by `;` or a line (a correction).
+- `fn f(a: Int, b: Int) -> Int !{} { a b }` was two statements and checked.
+  Two on one line are PW0030 now, except what a block's readers read as
+  one: a `return` and its value, a clause's head and the rest of its line,
+  and a block after a statement. A clause's word that is no clause where it
+  is written, a binding's name or a word in a code body, is refused by the
+  names check, and a `;` ends a clause's value there as in the grammar.

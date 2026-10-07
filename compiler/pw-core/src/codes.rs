@@ -157,6 +157,10 @@ codes! {
     // one with no `as` was read as a list with no name each row binds.
     EACH_HEAD = "PW0019" / each_head / 1, Syntax,
         "an `{#each}` names its list, and after `as` the name each row binds";
+    // ADR-0243: `{ a b }` was two statements, the first evaluated and
+    // dropped, and checked. PW002x is name resolution's.
+    STATEMENTS_SEPARATED = "PW0030" / statements_separated / 1, Syntax,
+        "a block's statements are separated by `;` or a line";
     NO_PROGRESS = "PW0099" / no_progress / 1, Syntax, "the parser made no progress";
 
     // --- name resolution (PW002x) -----------------------------------------

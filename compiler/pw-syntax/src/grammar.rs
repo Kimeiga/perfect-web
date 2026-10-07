@@ -308,6 +308,29 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     "because",
 ];
 
+/// **Does `word`, a statement alone, head a clause whose value follows it on
+/// its line?** (ADR-0243). A block keeps a clause as statements, its head's
+/// word and then its value, on one line: `scope component`. The names check
+/// reads them as one clause (ADR-0047), and the policy table says what each
+/// head's value is. A head whose value is code takes a block, as any
+/// statement may.
+pub fn heads_a_clause(word: &str) -> bool {
+    POLICY_KEYWORDS.contains(&word) || STMT_CLAUSE_KEYWORDS.contains(&word)
+}
+
+/// **What the statements before, on their line, take after them**
+/// (ADR-0243): what a block's readers read with them as one.
+#[derive(Clone, Copy, PartialEq)]
+enum Takes {
+    /// Nothing: what follows on the line is a second statement.
+    Nothing,
+    /// The one statement after: a `return`'s value, which the checker reads
+    /// as the statement after it (ADR-0038).
+    One,
+    /// The rest of the line, to a block: a clause's value.
+    Rest,
+}
+
 /// What a template region holds open, waiting to be finished.
 #[derive(PartialEq)]
 enum Open {
@@ -453,6 +476,18 @@ impl<'a> P<'a> {
             .iter()
             .take_while(|t| t.kind.is_trivia())
             .any(|t| self.src[t.span.clone()].contains('\n'))
+    }
+
+    /// The word the tokens from `from` to here are, when they are one name
+    /// alone (ADR-0243).
+    fn one_word(&self, from: usize) -> Option<&'a str> {
+        let mut read = self.toks[from..self.pos]
+            .iter()
+            .filter(|t| !t.kind.is_trivia());
+        match (read.next(), read.next()) {
+            (Some(t), None) if t.kind == Kind::Ident => Some(&self.src[t.span.clone()]),
+            _ => None,
+        }
     }
 
     /// Emit pending trivia into the current node, so the tree stays lossless.
@@ -1660,11 +1695,32 @@ impl<'a> P<'a> {
             self.policies(true);
         }
         let mut guard = 0;
+        // Whether the statement before ended with its separator, or there
+        // was none: the block's first.
+        let mut separated = true;
+        let mut takes = Takes::Nothing;
         while !self.at(Kind::RBrace) && !self.at_eof() {
             guard += 1;
             if guard > 20_000 {
                 self.error("PW0099", "block made no progress");
                 break;
+            }
+            // **Two statements on one line are separated** (ADR-0243), by
+            // `;` or a line, as Go, Swift and Kotlin separate them. `{ a b }`
+            // was two statements, `a` evaluated and dropped, and checked.
+            // What a block's readers read as one is not two: a block after
+            // whatever precedes it on its line (`release(h) { .. }`), and
+            // what the statements before take (`Takes`). Reported, and the
+            // second read, so the block means what was written and nothing
+            // after fails for it.
+            let same_line = !separated && !self.newline_ahead();
+            let block = self.at(Kind::LBrace);
+            if same_line && !block && takes == Takes::Nothing {
+                self.error_help(
+                    "PW0030",
+                    "two statements on one line are separated by `;`",
+                    "write `;` between them, or the second on a line of its own",
+                );
             }
             let before = self.pos;
             // A named `fn` nested in a component or view body is a
@@ -1691,8 +1747,17 @@ impl<'a> P<'a> {
             } else {
                 self.expr(0);
             }
-            self.eat(Kind::Comma);
-            self.eat(Kind::Semi);
+            takes = match self.one_word(before) {
+                Some("return") => Takes::One,
+                Some(word) if heads_a_clause(word) => Takes::Rest,
+                // A clause's value runs to its line's end, or to a block,
+                // its body, as the names check reads it.
+                _ if takes == Takes::Rest && same_line && !block => Takes::Rest,
+                _ => Takes::Nothing,
+            };
+            let comma = self.eat(Kind::Comma);
+            let semi = self.eat(Kind::Semi);
+            separated = comma || semi;
             if self.pos == before {
                 self.bump(); // never spin
             }
@@ -3775,12 +3840,20 @@ mod tests {
             "b == 0 | a > b",
             "a > b",
             "a |> f",
-            "items[0]",
         ] {
             let src = format!("public query Q(a: Int, b: Int) -> Int {{ {body} }}\n");
             let p = parse_ok(&src);
             assert_lossless(&src, &p);
         }
+        // `items[0]` is no operand: the grammar has no index, and this was
+        // `items` and then a list, `[0]`, the query's value, and parsed. Two
+        // statements on one line, refused (ADR-0243); and not an unknown
+        // policy `items`, since a `[` follows it.
+        let src = "public query Q(items: List<Int>) -> Int { items[0] }\n";
+        let p = parse_tree(src);
+        assert_lossless(src, &p);
+        let found: Vec<_> = p.errors.iter().map(|e| (e.code, e.span.start)).collect();
+        assert_eq!(found, vec![("PW0030", src.find('[').expect("["))]);
         // A real unknown policy is still one.
         let p = parse_tree("public query Q(a: Int) -> Int {\n    cahce shared\n    a\n}\n");
         assert!(
@@ -3950,6 +4023,54 @@ mod tests {
         assert_eq!(p.errors[0].code, "PW0016");
         assert_eq!(&src[p.errors[0].span.clone()], ", i");
         assert_eq!(texts(&p, K::NameExpr).last().map(String::as_str), Some("x"));
+    }
+
+    #[test]
+    fn two_statements_on_one_line_are_separated() {
+        // ADR-0243: by `;` or by a line.
+        let f = |body: &str| format!("module m\nfn f(a: Int, b: Int) -> Int !{{}} {{ {body} }}\n");
+        // Each is one error, at the second.
+        for (body, second) in [
+            ("a b", "b"),
+            ("let x = a x", "x"),
+            // A `return` takes one statement; a word's path is not the word.
+            ("return a b", "b"),
+            ("cache.a b", "b"),
+            // After a block, the line takes nothing; a clause's value ends
+            // with its line.
+            ("acquire { a } b", "b"),
+            ("release(a) { a } b", "b"),
+            ("scope component\n    a b", "b"),
+        ] {
+            let src = f(body);
+            let p = parse_tree(&src);
+            assert_lossless(&src, &p);
+            let found: Vec<_> = p.errors.iter().map(|e| (e.code, e.span.start)).collect();
+            assert_eq!(
+                found,
+                vec![("PW0030", src.rfind(second).expect("second"))],
+                "{body}"
+            );
+        }
+        // The controls: a `;`, a `,`, a line, and a record's fields.
+        for body in ["a; b", "a, b", "a\n    b", "R { a: 1, b: 2 }"] {
+            assert!(parse_tree(&f(body)).ok(), "{body}");
+        }
+        // What a block's readers read as one: a `return` and its value, a
+        // clause's head and the rest of its line, and a block after what
+        // precedes it.
+        for body in [
+            "return Err(a)",
+            "scope component",
+            "respects prefers_reduced_motion",
+            "impact layout_write when LayoutAffect",
+            "view { a }",
+            "acquire { a }",
+            "release(a) { a }",
+            "task.spawn(detached) { a }",
+        ] {
+            assert!(parse_tree(&f(body)).ok(), "{body}");
+        }
     }
 
     #[test]

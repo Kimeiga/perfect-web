@@ -17,8 +17,10 @@ lowering report what it parses):
 - **An `{#each}`'s list and key are read as written** (ADR-0242): parsed by
   the grammar, and not lowered into the body's arena, so a computed list is
   not typed, and a key's names are not resolved as terms.
-- **Two expressions on one line of a block are two statements**:
-  `fn f(a: Int, b: Int) -> Int !{} { a b }` checks, and is `b`.
+- **A clause, a `return` and a block after a statement are statements**
+  (ADR-0243, ADR-0038): a block separates its statements around them, and
+  their readers read each pair as one. The grammar has no node for any of
+  them.
 
 **E9-V1..V6 are met** (2026-09-24, ADR-0031). What the value relations do not
 decide is Undecided, counted by `pw audit-values`, and never reported as
@@ -437,8 +439,14 @@ awaited in order. What remains:
   deployment integrations.
 - **A policy's value is checked by its domain where it heads a declaration**
   (ADR-0089), not where a block writes it: `observe .. { scope application }`
-  and a `handler_policy { .. }` are body statements, read by the scope graph
-  and the handler rules. A `requires` predicate is checked as deployment
+  and a `handler_policy { .. }` are body statements. **Nothing judges what
+  such a clause holds** (found with ADR-0243): `scope bogus` and `scope
+  component page` in a resource's block check, as do `respects bogus`,
+  `intrinsic_height bogus`, and `captures bogus`, `load bogus` and
+  `on_version_mismatch bogus` in a `handler_policy`. The scope graph reads
+  `scope` and refuses no word it lacks; nothing reads the rest: no
+  analysis, generator or runtime names `respects`, `intrinsic_height` or a
+  `handler_policy`. A `requires` predicate is checked as deployment
   vocabulary over command parameters (ADR-0115); a `privacy` label
   constructor's name, a length, or
   a `conflict` strategy's field.

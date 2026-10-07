@@ -902,6 +902,75 @@ pub fn all_operator_ids() -> BTreeSet<&'static str> {
 mod tests {
     use super::*;
 
+    /// Every head `domain_of` gives a domain, in its order.
+    const HEADS: &[&str] = &[
+        "cache",
+        "partition",
+        "consistency",
+        "freshness",
+        "timeout",
+        "fallback",
+        "stampede",
+        "regenerate",
+        "locale",
+        "tenant",
+        "policy_version",
+        "code_version",
+        "key",
+        "dedupe_by",
+        "concurrency",
+        "on_key_change",
+        "idempotent_by",
+        "depends_on",
+        "invalidates",
+        "invalidates_on",
+        "emits",
+        "requires",
+        "placement",
+        "route",
+        "not_found_on",
+        "privacy",
+        "capability",
+        "host",
+        "intrinsic",
+        "impact",
+        "optimistic",
+        "rollback",
+        "retry",
+        "reconnect",
+        "conflict",
+        "identity",
+        "transport",
+        "delivery",
+        "storage",
+        "offline",
+        "sync",
+        "on_conflict_unresolved",
+        "scope",
+        "on_scope_exit",
+        "transaction",
+        "holds",
+        "transactions",
+        "reads",
+        "changes",
+        "captures",
+        "on_version_mismatch",
+        "load",
+        "inputs",
+        "isolated",
+        "acquire",
+        "release",
+        "draw",
+        "on_mount",
+        "on_unmount",
+        "affine",
+        "intrinsic_height",
+        "revision",
+        "respects",
+        "because",
+        "attributes_forced_layout_to",
+    ];
+
     /// **Fails closed when the parser learns a new policy head.**
     ///
     /// The countermeasure, stated once in `tests/unknown_policy.rs` and owed
@@ -944,70 +1013,7 @@ mod tests {
             "on_mount",
             "on_unmount",
         ];
-        let heads = [
-            "cache",
-            "partition",
-            "consistency",
-            "freshness",
-            "timeout",
-            "fallback",
-            "stampede",
-            "regenerate",
-            "locale",
-            "tenant",
-            "policy_version",
-            "code_version",
-            "key",
-            "dedupe_by",
-            "concurrency",
-            "on_key_change",
-            "idempotent_by",
-            "depends_on",
-            "invalidates",
-            "invalidates_on",
-            "emits",
-            "requires",
-            "placement",
-            "route",
-            "not_found_on",
-            "privacy",
-            "capability",
-            "host",
-            "intrinsic",
-            "impact",
-            "optimistic",
-            "rollback",
-            "retry",
-            "reconnect",
-            "conflict",
-            "identity",
-            "transport",
-            "delivery",
-            "storage",
-            "offline",
-            "sync",
-            "on_conflict_unresolved",
-            "scope",
-            "on_scope_exit",
-            "transaction",
-            "captures",
-            "on_version_mismatch",
-            "load",
-            "inputs",
-            "isolated",
-            "acquire",
-            "release",
-            "draw",
-            "on_mount",
-            "on_unmount",
-            "affine",
-            "intrinsic_height",
-            "revision",
-            "respects",
-            "because",
-            "attributes_forced_layout_to",
-        ];
-        let invented: Vec<&str> = heads
+        let invented: Vec<&str> = HEADS
             .iter()
             .copied()
             .filter(|h| !pw_syntax::POLICY_KEYWORDS.contains(h) && !IN_BLOCK_ONLY.contains(h))
@@ -1016,6 +1022,26 @@ mod tests {
             invented.is_empty(),
             "this table classifies heads the parser does not recognise as \
              policies at all: {invented:?}"
+        );
+    }
+
+    /// **A clause's head takes its value on its line** (ADR-0243). The names
+    /// check reads a head this table gives a domain, and what follows it on
+    /// its line, as one clause (ADR-0047). The grammar separates a block's
+    /// statements around the same heads, so a clause written in a block is
+    /// never refused as two statements. A head whose value is code takes a
+    /// block, which follows any statement.
+    #[test]
+    fn every_clause_head_takes_its_value_on_its_line() {
+        let refused: Vec<&str> = HEADS
+            .iter()
+            .copied()
+            .filter(|h| domain_of(h) != Some(Domain::Body) && !pw_syntax::heads_a_clause(h))
+            .collect();
+        assert!(
+            refused.is_empty(),
+            "the names check reads these heads with a value on their line, and \
+             the grammar would refuse it as a second statement: {refused:?}"
         );
     }
 

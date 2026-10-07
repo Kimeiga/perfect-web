@@ -14,6 +14,21 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0243, 2026-10-07: a block's statements are separated, by `;` or a
+line** (a correction, found with ADR-0237). `fn f(a: Int, b: Int) -> Int !{}
+{ a b }` was two statements, `a` dropped, and checked. Two statements on one
+line are PW0030 now, at the second. A first cut refused 171 lines of the
+repository's programs, each meant: a block keeps a `return` and its value, a
+clause's head and its value, and a block after a statement as statements on
+one line, and its readers read each pair as one. The grammar knows each by
+its shape, and the names check, which knows whether a word is a clause's
+head where it is written, refuses one that is not: `key 1`, where `key` is a
+binding. And a `;` ends a clause's value there, as in the grammar:
+`scope component; nothing_here` read the name as `scope`'s value, unresolved.
+Writing it found that nothing judges what a clause in a block holds: `scope
+bogus` in a resource's block checks. That is next
+(`just e14-statements-separated`).
+
 **ADR-0242, 2026-10-07: an `{#each}`'s head is read once, by the grammar**
 (a correction, found with ADR-0237). The head was kept as text, and five
 places split it at ` as ` and `(`. So `{#each xs ys as x (x)}` and an
