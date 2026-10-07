@@ -51,6 +51,12 @@ pub(crate) trait DataLayer: Send + Sync {
         Ok(Provided::host_database())
     }
 
+    /// **Each session's principal, as the identity keeps it** (track
+    /// `identity`, ADR-XXXX): handed to the layer once, when the server is
+    /// built, so that it maps a session to the user it acts as. A layer that
+    /// knows no users ignores it.
+    fn identified_by(&self, _principals: crate::identity::Principals) {}
+
     /// **Every operation it supplies**, read from the functions it builds,
     /// not from a list kept beside them.
     fn operations(&self) -> BTreeSet<String> {

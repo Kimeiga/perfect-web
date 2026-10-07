@@ -527,6 +527,8 @@ mod feed_pg;
 // The parallel tracks' modules (ADR-0253, docs/PARALLEL.md): each reached
 // from this file only at the seams marked `TRACK SEAM`.
 mod identity;
+// TRACK SEAM (identity): the development identity provider.
+mod accounts;
 mod store;
 mod uploads;
 
@@ -1130,6 +1132,10 @@ impl Server {
         let materializer = Materializer::new(clock.clone(), BUILD);
         materializer.declare("store.page.Cart", FragmentPolicy::default());
         materializer.declare("store.page.Menu", FragmentPolicy::default());
+        // TRACK SEAM (identity): the layer maps a session to its principal's
+        // user through the identity's principals.
+        let identity = identity::Identity::default();
+        data.identified_by(identity.principals());
         Server {
             templates,
             data,
@@ -1171,7 +1177,8 @@ impl Server {
             calls: Arc::default(),
             commands: pw_resource::Resources::new(pw_resource::Clock::new()),
             interactions: Mutex::new(BTreeMap::new()),
-            identity: identity::Identity::default(),
+            // TRACK SEAM (identity): built above, its principals the layer's.
+            identity,
             uploads: uploads::Uploads::default(),
         }
     }
@@ -1356,8 +1363,9 @@ impl Server {
             args,
             // TRACK SEAM (identity, ADR-0253): what `requires` is told. The
             // important property is that each predicate is evaluated, and an
-            // unknown one cannot run.
-            |predicate, _bound| self.identity.requires(predicate, session),
+            // unknown one cannot run. A predicate over the command's
+            // parameters reads through the command's own operations.
+            |predicate, bound| self.identity.requires(predicate, bound, session, host),
         )?;
         // A type that contains itself arrives as its nodes, and a page reads
         // it nested (ADR-0194).
@@ -4000,7 +4008,9 @@ impl Server {
             return;
         }
         let cookie = if fresh {
-            format!("set-cookie: pw-session={session}; Path=/; SameSite=Lax\r\n")
+            // TRACK SEAM (identity): the session cookie, HttpOnly and Secure
+            // outside this machine.
+            identity::session_cookie(session)
         } else {
             String::new()
         };
@@ -5382,8 +5392,26 @@ fn main() {
         );
         std::process::exit(1);
     }
+    // TRACK SEAM (identity): the deployment's identity, as its configuration
+    // states it, refused at start where it may not run.
+    let deployment = identity::Deployment::from_env(port)
+        .and_then(|d| {
+            identity::configure_cookies(&d);
+            let choice = std::env::var("PW_IDENTITY").ok();
+            server.identity.configure(&d, choice.as_deref()).map(|_| d)
+        })
+        .unwrap_or_else(|e| {
+            eprintln!("pw dev server: {e}");
+            std::process::exit(1);
+        });
     let listener = TcpListener::bind(("127.0.0.1", port)).expect("bind");
     println!("pw dev server on {port}");
+    // TRACK SEAM (identity): which identity model runs.
+    println!(
+        "pw dev server identity: {} ({})",
+        server.identity.describe(),
+        deployment.origin
+    );
 
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
@@ -5462,11 +5490,19 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
     }
 
     // TRACK SEAM (identity, ADR-0253): the identity track's routes, before
-    // any other.
-    if server
-        .identity
-        .answer(method, route, &headers, &session, fresh, &body, &mut stream)
-    {
+    // any other, and a request that changes something refused unless it
+    // comes from this origin.
+    let asked = path.split_once('?').map_or("", |(_, q)| q);
+    if server.identity.answer(
+        method,
+        route,
+        &headers,
+        &session,
+        fresh,
+        &body,
+        &mut stream,
+        asked,
+    ) {
         return;
     }
     let query = path.split_once('?').map(|(_, q)| q).unwrap_or("");
@@ -5520,8 +5556,18 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             if drop_at == Some(DropAt::Before) {
                 return;
             }
+            // TRACK SEAM (identity): a `requires` refusal is answered as its
+            // own case, 403 and the predicate, never shaped like a declared
+            // error. Taken before the command, so none is left from another.
+            let _ = identity::take_refusal();
             let answer = server.command_answer(id, &session, &args, interaction.as_deref());
             if drop_at == Some(DropAt::After) {
+                return;
+            }
+            // TRACK SEAM (identity): the refusal, where `requires` refused.
+            if let Some(predicate) = identity::take_refusal() {
+                let refused = serde_json::json!({ "committed": false, "refused": predicate });
+                respond_json(&mut stream, 403, &session, fresh, &refused.to_string());
                 return;
             }
             match answer {
@@ -6373,7 +6419,9 @@ fn stream_open(
 ) {
     let doc: Doc = (session.to_string(), document);
     let cookie = if fresh {
-        format!("set-cookie: pw-session={session}; Path=/; SameSite=Lax\r\n")
+        // TRACK SEAM (identity): the session cookie, HttpOnly and Secure
+        // outside this machine.
+        identity::session_cookie(session)
     } else {
         String::new()
     };
@@ -7174,17 +7222,8 @@ fn session_of(headers: &str) -> String {
         .nth(1)
         .and_then(|rest| rest.split([';', '\r', '\n']).next())
         .map(str::to_string)
-        .unwrap_or_else(|| format!("s-{}", std::process::id() as u64 + rand_ish()))
-}
-
-/// A per-connection value, without a random source.
-///
-/// `Math.random`'s absence is deliberate elsewhere in this project; here a
-/// monotonic counter is enough, because sessions only need to differ.
-fn rand_ish() -> u64 {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static N: AtomicU64 = AtomicU64::new(0);
-    N.fetch_add(1, Ordering::SeqCst)
+        // TRACK SEAM (identity): a fresh session's id, 128 random bits.
+        .unwrap_or_else(identity::new_session_id)
 }
 
 fn respond_json(stream: &mut TcpStream, code: u16, session: &str, fresh: bool, body: &str) {
@@ -7223,7 +7262,9 @@ const PRIVATE: &str = "cache-control: private, no-store\r\n";
 /// cookie that names a fresh session (ADR-0184).
 fn respond(stream: &mut TcpStream, code: u16, mime: &str, session: &str, fresh: bool, body: &[u8]) {
     let cookie = if fresh {
-        format!("set-cookie: pw-session={session}; Path=/; SameSite=Lax\r\n")
+        // TRACK SEAM (identity): the session cookie, HttpOnly and Secure
+        // outside this machine.
+        identity::session_cookie(session)
     } else {
         String::new()
     };

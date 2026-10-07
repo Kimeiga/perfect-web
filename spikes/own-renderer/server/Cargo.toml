@@ -30,6 +30,11 @@ pw-resource = { path = "../../../runtime/pw-resource" }
 postgres.workspace = true
 # The identity track (ADR-XXXX): the development provider's password hashes.
 argon2.workspace = true
+# The identity track (ADR-XXXX): PKCE's S256, and session ids, states and
+# codes from the operating system's random source.
+base64.workspace = true
+getrandom.workspace = true
+sha2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

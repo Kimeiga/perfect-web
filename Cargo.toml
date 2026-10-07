@@ -86,6 +86,14 @@ postgres = "=0.19.14"
 # `PasswordVerifier::verify_password`, checked on docs.rs for 0.6.0 and in
 # the crate's source). A password is kept only as its hash.
 argon2 = "=0.6.0"
+# The identity track's ids and PKCE (ADR-XXXX), each already in the graph
+# before the track, so nothing downloaded: sha2 0.11.0, PKCE's S256 (RFC 7636
+# §4.2); getrandom 0.4.3, the operating system's random source for session
+# ids, states, nonces and codes; base64 0.22.1, base64url without padding
+# (RFC 4648 §5), `engine::general_purpose::URL_SAFE_NO_PAD`.
+base64 = "=0.22.1"
+getrandom = "=0.4.3"
+sha2 = "=0.11.0"
 
 [profile.release]
 lto = "thin"
