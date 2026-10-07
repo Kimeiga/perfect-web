@@ -403,9 +403,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
              (ADR-0245); ~~the `pg-data-layer` branch merged~~ (ADR-0246,
              the owner approved its crates, 2026-10-07). **Next**, the first
              verification runs read, and what Linux finds in the recipes
-             fixed; then what ADR-0243 found, drafted: a
-             clause written in a block judged by its domain, as one heading
-             a declaration is (`scope bogus` in a resource's block checks).
+             fixed; ~~a clause written in a block judged by its domain~~
+             (ADR-0247, `just e14-block-clauses`).
              Further grammar and clause defects go under 0047-a below,
              unless the feed, the next Twitter item or soundness needs one;
           2. map keys (0057-a) and `let _` (0099-a);

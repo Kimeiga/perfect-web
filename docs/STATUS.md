@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0247, 2026-10-07: a clause written in a block is judged by its
+domain** (a correction, found with ADR-0243). PW0335 judged a policy only
+where it headed a declaration; a block's clauses were judged by nothing:
+`scope bogus` in a resource's block, `captures bogus` in a
+`handler_policy`, `respects bogus` and `intrinsic_height bogus` checked.
+The names check returns the clauses it reads, and the same table judges
+each. A length, which nothing judged anywhere, is a count and a unit CSS
+Values 4 defines (`just e14-block-clauses`).
+
 **ADR-0246, 2026-10-07: the feed's data in PostgreSQL, held to what its
 source states** (the owner's parallel track, written on `pg-data-layer` and
 integrated here). Where a deployment names a database

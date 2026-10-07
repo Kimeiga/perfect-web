@@ -33,7 +33,10 @@
 //!   by a block, is syntax and not a use;
 //! - its value is a word of the clause's domain (`component`, from `scope`'s
 //!   closed set), or code where the table says the clause carries terms;
-//! - a block after it is code, and `release(h)` binds `h` in its block.
+//! - a block after it is code, and `release(h)` binds `h` in its block;
+//! - what it holds is judged by its domain, as a policy heading a
+//!   declaration is (ADR-0247): the walk returns each clause it reads, and
+//!   `check::policy_values` judges it.
 //!
 //! What a name refers to past its head is not this walk's question: `box.x`
 //! on a type with no `x` is the member relation's (ADR-0048).
@@ -60,8 +63,29 @@ const EFFECT_HEADS: &[&str] = &["secrets", "style", "clock", "log", "database", 
 /// is the form's (`detached`, a scope's name), not a use.
 const SPAWN_FORMS: &[&str] = &["task.spawn", "durable.spawn"];
 
-/// Every use of a name that resolves to nothing, in `unit`.
-pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> Vec<Diagnostic> {
+/// **A clause written in a block**, as the walk reads it (ADR-0247): its
+/// head, its value as written, and where, head to value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Clause {
+    /// The declaration whose body writes it.
+    pub decl: DeclId,
+    pub head: String,
+    /// What follows the head on its line, its layout removed; empty where a
+    /// block follows it instead.
+    pub value: String,
+    pub span: Span,
+}
+
+/// What the walk finds: each name that resolves to nothing, and each clause
+/// it read.
+pub struct Names {
+    pub diagnostics: Vec<Diagnostic>,
+    pub clauses: Vec<Clause>,
+}
+
+/// Every use of a name that resolves to nothing, in `unit`, and every clause
+/// its bodies write.
+pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> Names {
     let hir = hirs[unit];
     let constructors = visible_constructors(workspace, hirs, unit);
     // A declaration nested in another (`fn load()` inside a component) sees
@@ -101,6 +125,7 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
         }
     }
     let mut out = Vec::new();
+    let mut clauses = Vec::new();
     for (id, decl) in hir.all_decls() {
         let Some(body_id) = decl.body else { continue };
         let body = hir.body(body_id);
@@ -127,6 +152,7 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
             visited: BTreeSet::new(),
             found: Vec::new(),
             unseparated: Vec::new(),
+            clauses: Vec::new(),
         };
         walk.expr(body.root);
         for (span, name) in walk.found {
@@ -135,6 +161,12 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
         for (head, second) in walk.unseparated {
             out.push(unseparated(head, second, src));
         }
+        clauses.extend(walk.clauses.into_iter().map(|(head, value, span)| Clause {
+            decl: id,
+            head,
+            value,
+            span,
+        }));
         for (span, name) in walk.immutable {
             // What `bind:value` wrote is PW5304's to refuse (ADR-0142), and
             // what a `provide` names, PW5306's (ADR-0144).
@@ -148,7 +180,10 @@ pub fn check(workspace: &Workspace, hirs: &[&Hir], unit: UnitId, src: &str) -> V
             out.push(immutable_target(hir, id, decl, span, &name));
         }
     }
-    out
+    Names {
+        diagnostics: out,
+        clauses,
+    }
 }
 
 /// The constructors of every sum type `unit` can see: its own, and those of
@@ -194,6 +229,8 @@ struct Walk<'a> {
     /// A clause's head that is no clause where it is written, and the
     /// statement after it on its line (ADR-0243).
     unseparated: Vec<(Span, Span)>,
+    /// Each clause read: its head, its value, and where (ADR-0247).
+    clauses: Vec<(String, String, Span)>,
 }
 
 impl Walk<'_> {
@@ -460,6 +497,7 @@ impl Walk<'_> {
                     // which ends it as it ends a statement (ADR-0243), and a
                     // `,` does not, a list's. A block is the clause's body,
                     // walked as the next statement.
+                    let mut value: Option<Span> = None;
                     while let Some(&v) = stmts.get(i) {
                         if !self.same_line(s, v)
                             || self.separators(s, v).contains(&pw_syntax::Kind::Semi)
@@ -468,7 +506,19 @@ impl Walk<'_> {
                             break;
                         }
                         self.clause_value(&head, v);
+                        let at = self.body.expr_span(v);
+                        value = Some(value.map_or(at.clone(), |w| w.start..at.end));
                         i += 1;
+                    }
+                    // A policy's head, for its value to be judged; a UI
+                    // section has none.
+                    if crate::policy::domain_of(&head).is_some() {
+                        let start = self.body.expr_span(s);
+                        let end = value.as_ref().map_or(start.end, |v| v.end);
+                        let written = value
+                            .map(|v| pw_syntax::collapse_policy_whitespace(&self.src[v]))
+                            .unwrap_or_default();
+                        self.clauses.push((head, written, start.start..end));
                     }
                     continue;
                 }

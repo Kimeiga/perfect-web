@@ -4814,3 +4814,21 @@ e14-statements-separated:
        CARGO_INCREMENTAL=0 python3 scripts/statements_separated_mutations.py; \
      } > docs/evidence/E14/statements-separated.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/statements-separated.txt
+
+# ADR-0247: a clause written in a block is judged by its domain, and a length
+# is a CSS length. Its tests, the names check's and the corpus's, and the
+# mutation controls.
+e14-block-clauses:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0247 - a clause written in a block is judged by its domain"; echo; \
+       echo "produced by: just e14-block-clauses"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/block_clauses.rs)"; echo; \
+       cargo test --locked -p pw-core --test block_clauses 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== a header's values, the names check, the corpus"; echo; \
+       cargo test --locked -p pw-core --test policy_values --test every_name_resolves --test statements_separated --test checking_source 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/block_clauses_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/block_clauses_mutations.py; \
+     } > docs/evidence/E14/block-clauses.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/block-clauses.txt

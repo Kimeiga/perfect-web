@@ -22,9 +22,9 @@ GRAMMAR = ROOT / "compiler/pw-syntax/src/grammar.rs"
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
     (
-        "the walk is not run",
+        "the walk's reports are dropped",
         CHECK,
-        "per_unit.extend(crate::names::check(&workspace, &hirs, i, &u.src));",
+        "per_unit.extend(names.diagnostics);",
         "",
     ),
     (

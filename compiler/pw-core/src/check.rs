@@ -155,7 +155,11 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // they refuse: R-015's `retry forever` became a component.
         per_unit.extend(crate::rules::check(&u.hir));
         // ADR-0047: a name used as a value resolves too, in lexical scope.
-        per_unit.extend(crate::names::check(&workspace, &hirs, i, &u.src));
+        let names = crate::names::check(&workspace, &hirs, i, &u.src);
+        per_unit.extend(names.diagnostics);
+        // ADR-0247: and a clause the walk reads in a block is judged as one
+        // heading a declaration is.
+        per_unit.extend(clause_values(&workspace, i, &u.hir, &names.clauses));
         // Every effect row, against the declarations. Reported beside the
         // resolution failures because that is what it is: a name in a row that
         // resolves to nothing is the same class of mistake as a name in an
@@ -927,142 +931,195 @@ fn not_a_term(
 /// world, a flag and an operator's arguments are the table's to judge; a
 /// parameter, a type and a declaration a value names are resolved here.
 fn policy_values(workspace: &crate::resolve::Workspace, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
-    use crate::policy::{Domain, ValueFault};
-    use crate::resolve::Resolution;
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {
         for p in &decl.policies {
-            let value = p.value.trim();
-            let fault = match crate::policy::domain_of(&p.name) {
-                Some(domain @ (Domain::ParamRef | Domain::ParamList)) => value
-                    .split(',')
-                    .map(str::trim)
-                    .find(|n| {
-                        !decl.params.iter().any(|q| q.name == *n)
-                            && !(domain == Domain::ParamRef
-                                && crate::privacy::Label::PARTITIONS.contains(n))
-                    })
-                    .map(|n| format!("`{n}` is not a parameter of `{}`", decl.name)),
-                // Authorization predicates are deployment vocabulary, not Pleris
-                // declarations. Their arguments ARE Pleris command parameters,
-                // and must bind to the values the host will receive. Anything
-                // richer would execute application code before authorization.
-                Some(Domain::PredicateRef) => {
-                    if decl.kind != crate::hir::DeclKind::Command {
-                        Some(
-                            "`requires` is an invocation precondition and belongs to a command"
-                                .to_string(),
-                        )
-                    } else {
-                        match crate::policy::predicates(value) {
-                            Err(why) => Some(why),
-                            Ok(predicates) => predicates.into_iter().find_map(|predicate| {
-                                predicate.arguments.into_iter().find_map(|argument| {
-                                    (!decl.params.iter().any(|p| p.name == argument)).then(|| {
-                                        format!(
-                                            "`{}` receives command parameters, and `{argument}` is not a parameter of `{}`",
-                                            predicate.name, decl.name
-                                        )
-                                    })
-                                })
-                            }),
-                        }
-                    }
-                }
-                // Resolved as a written type is, so the language's own types
-                // are types too: `idempotent_by Int` was "no type visible
-                // here" when only declarations were asked (ADR-0089).
-                Some(Domain::TypeRef) => {
-                    let resolved = crate::lower::type_fragment(value).is_some_and(|t| {
-                        crate::resolved::resolve(
-                            workspace,
-                            unit,
-                            None,
-                            &decl.type_params,
-                            &t,
-                            p.span.clone(),
-                        )
-                        .resolved()
-                        .is_some()
-                    });
-                    (!resolved).then(|| format!("`{value}` names no type visible here"))
-                }
-                Some(Domain::DeclRef) => (workspace.resolve(unit, value) == Resolution::Unresolved)
-                    .then(|| format!("`{value}` names no declaration visible here")),
-                _ => crate::policy::value_fault(&p.name, value).map(|f| match f {
-                    ValueFault::Word(words) => format!("`{value}` is not one of {}", listed(words)),
-                    ValueFault::Duration => {
-                        format!("`{value}` is not a duration: a count and a unit, `30.seconds`")
-                    }
-                    ValueFault::ZeroBudget => {
-                        format!("`{value}` is no time: every request would end before it starts")
-                    }
-                    ValueFault::World(w) => format!(
-                        "`{w}` is not a world: {}",
-                        listed(
-                            &crate::placement::ALL_WORLDS
-                                .iter()
-                                .map(|w| w.name())
-                                .collect::<Vec<_>>()
-                        )
-                    ),
-                    ValueFault::Flag => format!("`{}` takes no value", p.name),
-                    ValueFault::Operator(name, ops) => {
-                        format!(
-                            "`{name}` is none of `{}`'s operators: {}",
-                            p.name,
-                            listed(&ops)
-                        )
-                    }
-                    ValueFault::Unclosed(name) => {
-                        format!("`{name}`'s arguments are not closed with `)`")
-                    }
-                    ValueFault::UnknownArgument(op, a) => format!("`{op}` takes no argument `{a}`"),
-                    ValueFault::ArgumentTwice(op, a) => format!("`{op}` is given `{a}` twice"),
-                    ValueFault::MissingArgument(op, a) => format!("`{op}` is not given `{a}`"),
-                    ValueFault::ArgumentKind(op, a, kind, v) => {
-                        format!("`{op}`'s `{a}` is {}, and this is `{v}`", kind.describe())
-                    }
-                    ValueFault::Positional(op, v) => {
-                        format!("`{op}` takes its arguments by name, and `{v}` names none")
-                    }
-                    ValueFault::ArgumentWord(op, v, words) => {
-                        format!("`{v}` is none of what `{op}` takes: {}", listed(words))
-                    }
-                }),
-            };
-            let Some(why) = fault else { continue };
-            out.push(Diagnostic {
-                code: crate::codes::POLICY_VALUE.id,
-                invariant: crate::codes::POLICY_VALUE.invariant,
-                reason: "policy_value",
-                detector: Detector::DeclarationRule,
-                severity: Severity::Error,
-                message: format!("`{} {value}`: {why}", p.name),
-                primary_span: p.span.clone(),
-                related: vec![Related {
-                    span: hir.decl_span(id),
-                    label: format!("a policy of `{}`", decl.name),
-                }],
-                explanation: Some(
-                    "A policy's value is one its domain has: a word the policy lists, a \
-                     duration, a world, a parameter of the declaration, a type, an \
-                     authorization predicate over command parameters, or an operator given \
-                     its arguments by name. A value the compiler does not \
-                     understand is not a policy nobody wrote. Until 2026-09-26 such a \
-                     value checked, and each reader of the clause decided alone what it \
-                     meant: `cache Shared` was no shared cache to the privacy rule, and \
-                     no cache to the manifest."
-                        .to_string(),
-                ),
-                repairs: vec![Repair {
-                    description: "write a value the policy has".to_string(),
-                    replacement: None,
-                }],
-            });
+            out.extend(policy_value(
+                workspace,
+                unit,
+                hir,
+                id,
+                &p.name,
+                p.value.trim(),
+                &p.span,
+                "a policy of",
+            ));
         }
     }
     out
+}
+
+/// **A clause written in a block is judged as one heading a declaration
+/// is** (ADR-0247), by the same table: the words of ruling 0047-a, checked
+/// against the closed set. The names check reads such a clause, `scope
+/// component` in a resource's block, and until ADR-0247 nothing judged what
+/// it held: `scope bogus` checked, and the scope graph, which reads it,
+/// found nothing to refuse.
+fn clause_values(
+    workspace: &crate::resolve::Workspace,
+    unit: usize,
+    hir: &Hir,
+    clauses: &[crate::names::Clause],
+) -> Vec<Diagnostic> {
+    clauses
+        .iter()
+        .filter_map(|c| {
+            policy_value(
+                workspace,
+                unit,
+                hir,
+                c.decl,
+                &c.head,
+                &c.value,
+                &c.span,
+                "a clause in",
+            )
+        })
+        .collect()
+}
+
+/// `head value`, written in the declaration `id` at `span`, against
+/// `head`'s domain: PW0335 where the domain has no such value.
+#[allow(clippy::too_many_arguments)]
+fn policy_value(
+    workspace: &crate::resolve::Workspace,
+    unit: usize,
+    hir: &Hir,
+    id: crate::hir::DeclId,
+    head: &str,
+    value: &str,
+    span: &crate::hir::Span,
+    of: &str,
+) -> Option<Diagnostic> {
+    use crate::policy::{Domain, ValueFault};
+    use crate::resolve::Resolution;
+    let decl = hir.decl(id);
+    let fault = match crate::policy::domain_of(head) {
+        Some(domain @ (Domain::ParamRef | Domain::ParamList)) => value
+            .split(',')
+            .map(str::trim)
+            .find(|n| {
+                !decl.params.iter().any(|q| q.name == *n)
+                    && !(domain == Domain::ParamRef
+                        && crate::privacy::Label::PARTITIONS.contains(n))
+            })
+            .map(|n| format!("`{n}` is not a parameter of `{}`", decl.name)),
+        // Authorization predicates are deployment vocabulary, not Pleris
+        // declarations. Their arguments ARE Pleris command parameters,
+        // and must bind to the values the host will receive. Anything
+        // richer would execute application code before authorization.
+        Some(Domain::PredicateRef) => {
+            if decl.kind != crate::hir::DeclKind::Command {
+                Some(
+                    "`requires` is an invocation precondition and belongs to a command".to_string(),
+                )
+            } else {
+                match crate::policy::predicates(value) {
+                    Err(why) => Some(why),
+                    Ok(predicates) => predicates.into_iter().find_map(|predicate| {
+                        predicate.arguments.into_iter().find_map(|argument| {
+                            (!decl.params.iter().any(|p| p.name == argument)).then(|| {
+                                format!(
+                                    "`{}` receives command parameters, and `{argument}` is not a parameter of `{}`",
+                                    predicate.name, decl.name
+                                )
+                            })
+                        })
+                    }),
+                }
+            }
+        }
+        // Resolved as a written type is, so the language's own types
+        // are types too: `idempotent_by Int` was "no type visible
+        // here" when only declarations were asked (ADR-0089).
+        Some(Domain::TypeRef) => {
+            let resolved = crate::lower::type_fragment(value).is_some_and(|t| {
+                crate::resolved::resolve(workspace, unit, None, &decl.type_params, &t, span.clone())
+                    .resolved()
+                    .is_some()
+            });
+            (!resolved).then(|| format!("`{value}` names no type visible here"))
+        }
+        Some(Domain::DeclRef) => (workspace.resolve(unit, value) == Resolution::Unresolved)
+            .then(|| format!("`{value}` names no declaration visible here")),
+        _ => crate::policy::value_fault(head, value).map(|f| match f {
+            ValueFault::Word(words) => format!("`{value}` is not one of {}", listed(words)),
+            ValueFault::Duration => {
+                format!("`{value}` is not a duration: a count and a unit, `30.seconds`")
+            }
+            ValueFault::Length => {
+                format!("`{value}` is not a length: a count and a CSS unit, `24.px`")
+            }
+            ValueFault::ZeroBudget => {
+                format!("`{value}` is no time: every request would end before it starts")
+            }
+            ValueFault::World(w) => format!(
+                "`{w}` is not a world: {}",
+                listed(
+                    &crate::placement::ALL_WORLDS
+                        .iter()
+                        .map(|w| w.name())
+                        .collect::<Vec<_>>()
+                )
+            ),
+            ValueFault::Flag => format!("`{head}` takes no value"),
+            ValueFault::Operator(name, ops) => {
+                format!(
+                    "`{name}` is none of `{}`'s operators: {}",
+                    head,
+                    listed(&ops)
+                )
+            }
+            ValueFault::Unclosed(name) => {
+                format!("`{name}`'s arguments are not closed with `)`")
+            }
+            ValueFault::UnknownArgument(op, a) => format!("`{op}` takes no argument `{a}`"),
+            ValueFault::ArgumentTwice(op, a) => format!("`{op}` is given `{a}` twice"),
+            ValueFault::MissingArgument(op, a) => format!("`{op}` is not given `{a}`"),
+            ValueFault::ArgumentKind(op, a, kind, v) => {
+                format!("`{op}`'s `{a}` is {}, and this is `{v}`", kind.describe())
+            }
+            ValueFault::Positional(op, v) => {
+                format!("`{op}` takes its arguments by name, and `{v}` names none")
+            }
+            ValueFault::ArgumentWord(op, v, words) => {
+                format!("`{v}` is none of what `{op}` takes: {}", listed(words))
+            }
+        }),
+    };
+    let why = fault?;
+    let written = match value {
+        "" => head.to_string(),
+        _ => format!("{head} {value}"),
+    };
+    Some(Diagnostic {
+        code: crate::codes::POLICY_VALUE.id,
+        invariant: crate::codes::POLICY_VALUE.invariant,
+        reason: "policy_value",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!("`{written}`: {why}"),
+        primary_span: span.clone(),
+        related: vec![Related {
+            span: hir.decl_span(id),
+            label: format!("{of} `{}`", decl.name),
+        }],
+        explanation: Some(
+            "A policy's value is one its domain has: a word the policy lists, a \
+             duration, a length, a world, a parameter of the declaration, a type, an \
+             authorization predicate over command parameters, or an operator given \
+             its arguments by name, wherever the policy is written. A value the \
+             compiler does not understand is not a policy nobody wrote. Until \
+             2026-09-26 such a value checked, and each reader of the clause decided \
+             alone what it meant: `cache Shared` was no shared cache to the privacy \
+             rule, and no cache to the manifest."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "write a value the policy has".to_string(),
+            replacement: None,
+        }],
+    })
 }
 
 /// **A clause belongs to a declaration that reads it** (ADR-0092, ADR-0216).

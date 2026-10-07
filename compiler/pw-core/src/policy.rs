@@ -597,6 +597,31 @@ pub fn operator(head: &str, spelling: &str) -> Option<&'static Op> {
 ///
 /// The one reading, in milliseconds: the manifest reads it, and a value it
 /// cannot read is refused where it is written (ADR-0089).
+/// **The units of a CSS length** (ADR-0247), as CSS Values and Units
+/// Level 4 defines them: absolute, font-relative and viewport-percentage.
+pub const LENGTH_UNITS: &[&str] = &[
+    "cm", "mm", "Q", "in", "pt", "pc", "px", // absolute
+    "em", "rem", "ex", "rex", "cap", "rcap", "ch", "rch", "ic", "ric", "lh", "rlh", // font
+    "vw", "svw", "lvw", "dvw", "vh", "svh", "lvh", "dvh", "vi", "svi", "lvi", "dvi", "vb", "svb",
+    "lvb", "dvb", "vmin", "svmin", "lvmin", "dvmin", "vmax", "svmax", "lvmax",
+    "dvmax", // viewport
+];
+
+/// **Is `v` a length**: a count, whole or with a fraction, then `.` and a
+/// CSS length unit, `24.px`, `1.5.rem` (ADR-0247). Until ADR-0247 no
+/// length was judged, and `intrinsic_height bogus` checked.
+pub fn length(v: &str) -> bool {
+    let Some((count, unit)) = v.trim().rsplit_once('.') else {
+        return false;
+    };
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    let count = match count.split_once('.') {
+        Some((whole, fraction)) => digits(whole) && digits(fraction),
+        None => digits(count),
+    };
+    count && LENGTH_UNITS.contains(&unit)
+}
+
 pub fn duration(v: &str) -> Option<u64> {
     let (n, unit) = v.split_once('.')?;
     let n: u64 = n.trim().parse().ok()?;
@@ -737,6 +762,8 @@ pub enum ValueFault {
     Word(&'static [&'static str]),
     /// Not a duration.
     Duration,
+    /// Not a length (ADR-0247).
+    Length,
     /// A duration of zero, where the domain is a budget (ADR-0109).
     ZeroBudget,
     /// Not a world.
@@ -778,6 +805,7 @@ pub fn value_fault(head: &str, value: &str) -> Option<ValueFault> {
             (!words.contains(&word)).then_some(ValueFault::Word(words))
         }
         Domain::Duration => duration(value).is_none().then_some(ValueFault::Duration),
+        Domain::Length => (!length(value)).then_some(ValueFault::Length),
         Domain::Budget => match duration(value) {
             None => Some(ValueFault::Duration),
             Some(0) => Some(ValueFault::ZeroBudget),

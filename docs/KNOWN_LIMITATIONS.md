@@ -437,16 +437,15 @@ awaited in order. What remains:
   demo session as `SignedIn` and knows no other predicate. Production identity
   verification and application-specific predicate implementations remain
   deployment integrations.
-- **A policy's value is checked by its domain where it heads a declaration**
-  (ADR-0089), not where a block writes it: `observe .. { scope application }`
-  and a `handler_policy { .. }` are body statements. **Nothing judges what
-  such a clause holds** (found with ADR-0243): `scope bogus` and `scope
-  component page` in a resource's block check, as do `respects bogus`,
-  `intrinsic_height bogus`, and `captures bogus`, `load bogus` and
-  `on_version_mismatch bogus` in a `handler_policy`. The scope graph reads
-  `scope` and refuses no word it lacks; nothing reads the rest: no
-  analysis, generator or runtime names `respects`, `intrinsic_height` or a
-  `handler_policy`. A `requires` predicate is checked as deployment
+- **A policy's value is checked by its domain wherever it is written**
+  (ADR-0089, ADR-0247): heading a declaration, or as a clause in a block,
+  `observe .. { scope application }` or a `handler_policy { .. }`. **Some
+  clauses are read by nothing**, judged and then unread: no analysis,
+  generator or runtime names `respects`, `intrinsic_height` or a
+  `handler_policy` (RISK_REGISTER's R5 for the last). Where a block's
+  clause may be written is not judged either: `respects` in a resource's
+  block is judged by its domain and not refused for its place (0047-a's
+  full split). A `requires` predicate is checked as deployment
   vocabulary over command parameters (ADR-0115); a `privacy` label
   constructor's name, a length, or
   a `conflict` strategy's field.

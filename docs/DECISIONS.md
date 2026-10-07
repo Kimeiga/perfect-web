@@ -2062,3 +2062,8 @@ the feed's data in PostgreSQL, held to what its source states.
   serializable transaction, and its events commit in its outbox with its
   writes. The host compares what each source states with what the database
   it opens provides, and refuses to serve on a shortfall.
+[ADR-0247](DECISIONS/ADR-0247-a-clause-written-in-a-block-is-judged-by-its-domain.md):
+a clause written in a block is judged by its domain (a correction).
+- PW0335 judged only a policy heading a declaration; `scope bogus` in a
+  resource's block checked. The names check returns the clauses it reads,
+  the same table judges each, and a length is a CSS length.
