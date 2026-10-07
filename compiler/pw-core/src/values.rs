@@ -4467,7 +4467,10 @@ pub fn relations(hir: &Hir, sigs: &Signatures, ws: &Workspace, at: UnitId) -> Ve
     let mut typed: BTreeMap<DeclId, BTreeMap<Binder, Ty>> = BTreeMap::new();
     for (id, decl) in hir.all_decls() {
         annotations(hir, sigs, ws, at, id, decl, &mut out);
-        let Some(body_id) = decl.body else { continue };
+        // An interface's keys are typed too, in their own arena (ADR-0240).
+        let Some(body_id) = decl.terms_body() else {
+            continue;
+        };
         let body = hir.body(body_id);
         let lexical = Lexical::build_in(hir, id).unwrap_or_else(|| Lexical::build(decl, body));
         let outer: Vec<Ty> = lexical

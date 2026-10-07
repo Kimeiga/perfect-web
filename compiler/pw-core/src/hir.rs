@@ -359,6 +359,11 @@ pub struct ClauseKey {
     /// The name and its arguments, as written.
     pub span: Span,
     pub args: Vec<Arg>,
+    /// Each argument as written, its whitespace collapsed as a policy's
+    /// value's is: what reads a key as text, the resource graph's edge
+    /// labels, reads it here (ADR-0240). The graph split the clause's text
+    /// at its commas until then, a second reading of it.
+    pub written: Vec<String>,
 }
 
 /// **What every value of an opaque type holds** (ADR-0179): `where value >=
@@ -590,6 +595,13 @@ pub struct Decl {
     /// `["database.read"]`. Empty for `!{}`; `None` when no row was written.
     pub declared_effects: Option<Vec<EffectRef>>,
     pub body: Option<BodyId>,
+    /// **The arena an interface's clause terms are in** (ADR-0240). A
+    /// declaration with a body lowers its clauses' terms into the body's
+    /// arena; one with none, an interface, had nowhere to, and its keys were
+    /// never lowered: not resolved, not counted, not typed. `None` where
+    /// there is a body, or no clause with terms. Read through
+    /// [`Decl::terms_body`].
+    pub terms: Option<BodyId>,
     /// Declarations nested inside this one, e.g. a `fn` inside a `component`.
     pub children: Vec<DeclId>,
     /// `let mut x = ..` at module level: a binding a body may assign
@@ -598,6 +610,14 @@ pub struct Decl {
 }
 
 impl Decl {
+    /// **The arena this declaration's clause terms are in** (ADR-0240): its
+    /// body's, or an interface's own. What reads a term root or a key's
+    /// argument reads it from here; `body` says whether the declaration is
+    /// implemented, which an interface's terms do not make it.
+    pub fn terms_body(&self) -> Option<BodyId> {
+        self.body.or(self.terms)
+    }
+
     /// The value of a named policy, if the declaration declares it.
     pub fn policy(&self, name: &str) -> Option<&Policy> {
         self.policies.iter().find(|p| p.name == name)

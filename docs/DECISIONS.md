@@ -2017,3 +2017,10 @@ every code the compiler writes is registered, once (a correction).
   value in a shared cache was two errors, PW0100 and PW5001. The registry's
   tests now read what the compiler writes, both ways, as rustc's `tidy`
   does.
+[ADR-0240](DECISIONS/ADR-0240-a-clause-is-read-once.md):
+a clause is read once (a correction).
+- The resource graph split a clause's text at its commas while lowering read
+  it with the grammar, and the two disagreed: `emits Searched(")"), Other(1)`
+  had no edge to `Other`, which nothing declares. The graph reads the keys
+  now. An interface's clause terms are lowered into an arena of their own,
+  and every rule that reads a term reads them.

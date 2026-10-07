@@ -14,6 +14,17 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0240, 2026-10-07: a clause is read once** (a correction, found with
+ADR-0237). The resource graph split a key clause's text at its commas while
+lowering read it with the grammar. A parenthesis inside a key's string ended
+the key early, so `emits Searched(")"), Other(1)` had no edge to `Other`,
+which nothing declares, and checked. The graph reads the keys lowering made
+now, its labels unchanged, and PW5100 points at the key. An interface's
+clause terms were lowered by nothing. They have an arena of their own now,
+and every rule that reads a term reads them: an unbound listener key on a
+query with no body is PW5104, as on one with a body
+(`just e14-clauses-read-once`).
+
 **ADR-0239, 2026-10-07: every code the compiler writes is registered,
 once** (a correction, found with ADR-0237). The declaration rules wrote
 PW0101 and PW0102, which the registry did not have, so their diagnostics had

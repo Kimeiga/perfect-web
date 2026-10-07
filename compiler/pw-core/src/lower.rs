@@ -170,26 +170,44 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
 }
 
 impl Lowerer<'_> {
-    /// **An interface's clauses, parsed for what they do not read**
-    /// (ADR-0237). A declaration with no body has no arena for its clauses'
-    /// terms, and lowering makes none, so they were never parsed at all. Their
-    /// parses' errors are reported all the same. That an interface's keys are
-    /// not resolved is a limitation of its own.
-    fn clause_syntax(&mut self, policies: &[Policy]) {
-        for p in policies {
-            let parse: fn(&str) -> pw_syntax::Parse = if crate::policy::keyed(&p.name).is_some() {
-                pw_syntax::parse_expr_list
-            } else if crate::policy::domain_of(&p.name) == Some(crate::policy::Domain::Transition) {
-                pw_syntax::parse_transition_clause
-            } else {
-                continue;
-            };
-            let (value, offset) = self.written_value(p);
-            if !value.is_empty() {
-                let parsed = parse(&value);
-                self.read_errors(&parsed, offset);
-            }
+    /// **An interface's clause terms, in an arena of their own** (ADR-0240).
+    ///
+    /// A declaration with no body is an interface (`effects.rs`), and a
+    /// clause's terms are lowered into the body's arena, so an interface's
+    /// were not lowered at all. ADR-0237 parsed them for their errors alone;
+    /// their keys were resolved, counted and typed by nothing, and
+    /// `invalidates_on Changed(nosuch)` checked. They are lowered as a body's
+    /// are now, into a body whose root is an empty block, which says nothing
+    /// is implemented. `None` when no clause has terms.
+    fn interface_terms(
+        &mut self,
+        owner: DeclId,
+        policies: &mut [Policy],
+        span: Span,
+    ) -> Option<BodyId> {
+        let has_terms = policies.iter().any(|p| {
+            crate::policy::keyed(&p.name).is_some()
+                || crate::policy::domain_of(&p.name) == Some(crate::policy::Domain::Transition)
+        });
+        if !has_terms {
+            return None;
         }
+        let mut b = BodyBuilder::default();
+        let root = b.expr(Expr::Block { stmts: Vec::new() }, span.clone());
+        self.policy_terms(&mut b, policies);
+        let body = Body {
+            owner,
+            exprs: b.exprs,
+            pats: b.pats,
+            types: b.types,
+            nodes: b.nodes,
+            root,
+            signals: b.signals,
+            param_types: b.param_types,
+            bound: b.bound,
+            provides: b.provides,
+        };
+        Some(BodyId(self.hir.bodies.alloc(body, span)))
     }
 
     /// **A standalone parse's errors, each moved to its place in the file**
@@ -355,6 +373,7 @@ impl Lowerer<'_> {
                 type_params: self.type_params(node),
                 declared_effects,
                 body: None,
+                terms: None,
                 children: Vec::new(),
                 mutable,
             },
@@ -377,15 +396,18 @@ impl Lowerer<'_> {
             Some(b) => self.body(id, &b, &mut policies),
             None => (None, Vec::new()),
         };
-        if body.is_none() {
-            self.clause_syntax(&policies);
-        }
+        // An interface's clause terms, in an arena of their own (ADR-0240).
+        let terms = match body {
+            Some(_) => None,
+            None => self.interface_terms(id, &mut policies, span_of(node)),
+        };
         // Internal invariant, not a claim about the program: `id` was
         // returned by `alloc` four lines up and arenas do not shrink. No `.pw`
         // source can make this absent.
         let d = self.hir.decls.get_mut(id.index()).expect("just allocated");
         d.policies = policies;
         d.body = body;
+        d.terms = terms;
         d.children = children;
         Some(id)
     }
@@ -835,12 +857,18 @@ impl Lowerer<'_> {
             let Some(name_node) = name_node.filter(names_a_path) else {
                 continue;
             };
-            let args = list.map(|l| sub.args(b, &l)).unwrap_or_default();
+            let args = list.as_ref().map(|l| sub.args(b, l)).unwrap_or_default();
+            let written = list
+                .iter()
+                .flat_map(|l| l.children().filter(|c| is_expr(c.kind())))
+                .map(|a| pw_syntax::collapse_policy_whitespace(text(&value, &a).trim()))
+                .collect();
             keys.push(crate::hir::ClauseKey {
                 name: text(&value, &name_node).trim().to_string(),
                 name_span: shift(span_of(&name_node)),
                 span: shift(span_of(item)),
                 args,
+                written,
             });
         }
         self.hir = std::mem::take(&mut sub.hir);

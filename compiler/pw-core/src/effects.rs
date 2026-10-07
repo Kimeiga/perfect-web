@@ -1389,6 +1389,7 @@ mod tests {
             visibility: None,
             declared_effects: Some(vec![]),
             body: None,
+            terms: None,
             children: vec![],
             mutable: false,
         };
@@ -1462,6 +1463,7 @@ mod tests {
             visibility: None,
             declared_effects: Some(vec![]),
             body: None,
+            terms: None,
             children: vec![],
             mutable: false,
         };

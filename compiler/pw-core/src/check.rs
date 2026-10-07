@@ -597,7 +597,10 @@ fn unresolved_uses(
         .map(|(_, d)| d.name.clone())
         .collect();
     for (decl_id, decl) in hir.all_decls() {
-        let Some(body_id) = decl.body else { continue };
+        // An interface's terms too, in their own arena (ADR-0240).
+        let Some(body_id) = decl.terms_body() else {
+            continue;
+        };
         let body = hir.body(body_id);
         // Which binding a callee's name means where the call is written: a
         // call to a function value out of its binding's scope names nothing
@@ -1490,7 +1493,7 @@ fn speculations(
         if decl.kind != DeclKind::Command {
             continue;
         }
-        let Some(body) = decl.body.map(|b| hir.body(b)) else {
+        let Some(body) = decl.terms_body().map(|b| hir.body(b)) else {
             continue;
         };
         for (policy, target, _) in decl.optimistic_clauses() {
@@ -2222,7 +2225,8 @@ fn described(kind: DeclKind) -> &'static str {
 fn listener_keys(hir: &Hir, src: &str) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for (_, decl) in hir.all_decls() {
-        let Some(body) = decl.body.map(|b| hir.body(b)) else {
+        // An interface's listeners too (ADR-0240).
+        let Some(body) = decl.terms_body().map(|b| hir.body(b)) else {
             continue;
         };
         for p in &decl.policies {
@@ -2340,7 +2344,7 @@ fn declared_once(hir: &Hir) -> Vec<Diagnostic> {
                 ));
             }
         }
-        if let Some(body_id) = decl.body {
+        if let Some(body_id) = decl.terms_body() {
             let body = hir.body(body_id);
             // A pattern, a lambda's parameters and a `let` bind a name once.
             let mut trees = vec![body.root];
@@ -4547,7 +4551,9 @@ fn named_roots_respect_their_context(
     out: &mut Vec<Diagnostic>,
 ) {
     for (_, decl) in hir.all_decls() {
-        let Some(body_id) = decl.body else { continue };
+        let Some(body_id) = decl.terms_body() else {
+            continue;
+        };
         let body = hir.body(body_id);
         // **Every root, asked its own context's question.** Not a rule keyed on
         // the policy's spelling: the context says whether effects are permitted
@@ -4703,7 +4709,9 @@ fn optimistic_transitions_agree_with_their_target(
 ) {
     let hir = hirs[unit];
     for (_, decl) in hir.all_decls() {
-        let Some(body_id) = decl.body else { continue };
+        let Some(body_id) = decl.terms_body() else {
+            continue;
+        };
         let body = hir.body(body_id);
         for (policy, target, transition) in decl.optimistic_clauses() {
             // The target names a resource. `Cart(current_session())` — the

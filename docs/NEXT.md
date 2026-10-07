@@ -392,8 +392,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              found that lowering dropped its parses' errors: ~~what lowering
              parses, it reports~~ (ADR-0237, `just e14-read-whole`). Then the
              findings beside it, first: ~~the registry's gaps~~ (ADR-0239,
-             `just e14-registered-codes`); a clause read once, the graph reading
-             the keys lowering made, an interface's keys resolved too; an
+             `just e14-registered-codes`); ~~a clause read once~~ (ADR-0240,
+             `just e14-clauses-read-once`); a transition producing another
+             type as a literal, which PW0331's typer cannot see; an
              `{#each}`'s head lowered by the grammar, once, for the five
              places that split its text; two statements on one line;
           2. map keys (0057-a) and `let _` (0099-a);

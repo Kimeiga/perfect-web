@@ -309,8 +309,12 @@ impl Graph {
                     let Some(p) = decl.policy(policy) else {
                         continue;
                     };
-                    for (name, key) in calls(&p.value) {
-                        g.push_edge(&from, &name, kind, key, resolve(&name));
+                    // The keys lowering made, each as written (ADR-0240). The
+                    // graph split the clause's text until then: a value read
+                    // past a missing comma was not in it, and a comma inside
+                    // a key's string split the key.
+                    for k in &p.keys {
+                        g.push_edge(&from, &k.name, kind, k.written.clone(), resolve(&k.name));
                     }
                 }
 
@@ -682,66 +686,6 @@ fn varies_by(decl: &Decl) -> Vec<Dimension> {
     out
 }
 
-/// `Store(id), Menu(id)` -> `[("Store", ["id"]), ("Menu", ["id"])]`.
-///
-/// Split at top level only, so `InventoryChanged(id, _)` is one
-/// call with two arguments rather than two calls. A bare name with no argument
-/// list is a call with no arguments: `invalidates_on Rebuild` means "any".
-fn calls(value: &str) -> Vec<(String, Vec<String>)> {
-    let mut out = Vec::new();
-    let (mut depth, mut start) = (0i32, 0usize);
-    let mut items: Vec<&str> = Vec::new();
-    for (i, c) in value.char_indices() {
-        match c {
-            '(' | '[' | '<' => depth += 1,
-            ')' | ']' | '>' => depth -= 1,
-            ',' if depth == 0 => {
-                items.push(&value[start..i]);
-                start = i + 1;
-            }
-            _ => {}
-        }
-    }
-    items.push(&value[start..]);
-    for item in items {
-        let item = item.trim();
-        if item.is_empty() {
-            continue;
-        }
-        match item.split_once('(') {
-            Some((name, rest)) => {
-                let inner = rest.strip_suffix(')').unwrap_or(rest);
-                let args = split_args(inner);
-                out.push((name.trim().to_string(), args));
-            }
-            None => out.push((item.to_string(), Vec::new())),
-        }
-    }
-    out
-}
-
-fn split_args(inner: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let (mut depth, mut start) = (0i32, 0usize);
-    for (i, c) in inner.char_indices() {
-        match c {
-            '(' | '[' | '<' => depth += 1,
-            ')' | ']' | '>' => depth -= 1,
-            ',' if depth == 0 => {
-                out.push(inner[start..i].trim().to_string());
-                start = i + 1;
-            }
-            _ => {}
-        }
-    }
-    let last = inner[start..].trim();
-    if !last.is_empty() || !out.is_empty() {
-        out.push(last.to_string());
-    }
-    out.retain(|a| !a.is_empty());
-    out
-}
-
 /// One key argument as a reader would write it.
 ///
 /// `path_of` answers "which declaration does this name" and returns nothing for
@@ -849,9 +793,10 @@ pub fn check(
                 if d.from != path || d.kind != kind {
                     continue;
                 }
-                if !calls(&p.value).iter().any(|(n, _)| *n == d.name) {
+                // The key that names nothing, where it is written (ADR-0240).
+                let Some(key) = p.keys.iter().find(|k| k.name == d.name) else {
                     continue;
-                }
+                };
                 out.push(Diagnostic {
                     code: codes::GRAPH_EDGE_UNRESOLVED.id,
                     invariant: codes::GRAPH_EDGE_UNRESOLVED.invariant,
@@ -862,7 +807,7 @@ pub fn check(
                         "`{}` {what} `{}`, which nothing declares",
                         decl.name, d.name
                     ),
-                    primary_span: p.span.clone(),
+                    primary_span: key.name_span.clone(),
                     related: vec![Related {
                         span: at.clone(),
                         label: format!("`{}` is the node with the edge", decl.name),

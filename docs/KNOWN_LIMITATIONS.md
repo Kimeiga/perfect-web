@@ -19,12 +19,10 @@ lowering report what it parses):
   never parsed: `{#each xs ys as x (x)}` checks.
 - **Two expressions on one line of a block are two statements**:
   `fn f(a: Int, b: Int) -> Int !{} { a b }` checks, and is `b`.
-- **The resource graph reads a clause's text, not the keys lowering made**:
-  it splits the value at its commas, so a comma inside a key's string splits
-  the key.
-- **An interface's clause keys are not resolved**: a declaration with no body
-  has no arena for their terms. `invalidates_on Changed(nosuch)` on a `query`
-  with no body checks.
+- **An optimistic transition producing another type, written as a
+  literal, checks** (found with ADR-0240). PW0331 reads the transition's type
+  through the older typer, which has no answer for a literal: `optimistic
+  Thing(x) as t => "no"`, where `Thing` holds an `Int`.
 
 **E9-V1..V6 are met** (2026-09-24, ADR-0031). What the value relations do not
 decide is Undecided, counted by `pw audit-values`, and never reported as

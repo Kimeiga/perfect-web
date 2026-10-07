@@ -403,6 +403,7 @@ mod tests {
                 visibility: None,
                 declared_effects: None,
                 body: None,
+                terms: None,
                 children: vec![],
                 mutable: false,
             };

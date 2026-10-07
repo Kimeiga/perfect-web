@@ -51,10 +51,8 @@ MUTANTS = [
     (
         "an interface's clauses are not parsed",
         LOWER,
-        "        if body.is_none() {\n"
-        "            self.clause_syntax(&policies);\n"
-        "        }\n",
-        "",
+        "            None => self.interface_terms(id, &mut policies, span_of(node)),\n",
+        "            None => None,\n",
     ),
     (
         "an error is left at its place in the clause, not the file",
