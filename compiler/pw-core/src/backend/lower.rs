@@ -604,11 +604,7 @@ pub fn handler(
         let root = parts.next().unwrap_or_default();
         let mut ty = roots.get(root).and_then(|e| types.of(body, *e));
         for field in parts {
-            ty = ty.and_then(|t| {
-                cx.sigs
-                    .member_of(&t, field)
-                    .and_then(|s| s.result().cloned())
-            });
+            ty = ty.and_then(|t| types.member(&t, field).and_then(|s| s.result().cloned()));
         }
         let Some(ty) = ty else {
             return Lowering::Unsupported {
@@ -4282,10 +4278,11 @@ impl<'a> Lower<'a> {
         // member table the checker typed it with (ADR-0122). Until 2026-10-02
         // the backend knew only fields, and the page's own count did not build.
         if field.is_none()
-            && let Some(member) = self
-                .cx
-                .sigs
-                .member_by(crate::signatures::Receiver::Nominal(def), name)
+            && let Some(member) = self.cx.sigs.member_by_in(
+                self.cx.sigs.module_name(self.unit),
+                crate::signatures::Receiver::Nominal(def),
+                name,
+            )
         {
             let callee = member.definition;
             return self.inline(callee, vec![of], None, span);

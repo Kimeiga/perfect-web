@@ -683,7 +683,11 @@ fn releases_of<'a>(
 fn function_value(body: &Body, types: &Types<'_>, callee: ExprId) -> bool {
     match body.expr(callee) {
         Expr::Name(_) => types.lexical().binder(callee).is_some(),
-        Expr::Field { base, .. } => function_value(body, types, *base),
+        // A member several modules declare, which this module does not tell
+        // apart, is PW0628's (ADR-0254), and no function value.
+        Expr::Field { base, name } => {
+            !types.ambiguous_member(body, *base, name) && function_value(body, types, *base)
+        }
         _ => false,
     }
 }

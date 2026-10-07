@@ -150,7 +150,13 @@ pub struct TypeDecl {
 pub struct Signatures {
     by_path: BTreeMap<String, Signature>,
     by_def: BTreeMap<DefId, Signature>,
-    by_member: BTreeMap<(Receiver, String), Signature>,
+    /// **Each member, by its receiver's type and its name** (ADR-0254): every
+    /// declaration of one, a record's field or a term whose first parameter
+    /// is the receiver. Until ADR-0254 one per key, and a second declaration
+    /// replaced the first: `h.destroy()` named whichever `destroy(MapHandle)`
+    /// was registered last, `VendorSdk.destroy` in a module that imports only
+    /// `Maps`.
+    by_member: BTreeMap<(Receiver, String), Vec<Signature>>,
     types: BTreeMap<DefId, TypeDecl>,
     /// Immutable resolver snapshot, mechanically copied from the checked set.
     workspace: Workspace,
@@ -308,9 +314,10 @@ impl Signatures {
                         );
                         let label = result.resolved().map(|t| out.label(t)).unwrap_or_default();
                         if let Some(key) = recv.resolved().and_then(receiver) {
-                            out.by_member.insert(
-                                (key, field.name.clone()),
-                                Signature {
+                            out.by_member
+                                .entry((key, field.name.clone()))
+                                .or_default()
+                                .push(Signature {
                                     path: format!("{}.{}", out.paths[&def], field.name),
                                     definition: def,
                                     effects: vec![],
@@ -318,8 +325,7 @@ impl Signatures {
                                     returns: Some(result),
                                     params: vec![Some(recv.clone())],
                                     names: vec![String::new()],
-                                },
-                            );
+                                });
                         }
                     }
                 }
@@ -356,7 +362,10 @@ impl Signatures {
                         .and_then(TypeResolution::resolved)
                         .and_then(receiver)
                     {
-                        out.by_member.insert((key, decl.name.clone()), sig.clone());
+                        out.by_member
+                            .entry((key, decl.name.clone()))
+                            .or_default()
+                            .push(sig.clone());
                     }
                     out.by_path.insert(sig.path.clone(), sig.clone());
                 }
@@ -502,22 +511,140 @@ impl Signatures {
         }
     }
 
+    /// The member `name` of a value of type `ty`, where no module asks: the
+    /// one declaration, or the one of several a module needs no import to
+    /// see (a field, or a term beside its type). Several are none: never
+    /// one chosen by the order they were registered in (ADR-0254).
     pub fn member_of(&self, ty: &ResolvedType, name: &str) -> Option<&Signature> {
-        self.by_member.get(&(receiver(ty)?, name.to_string()))
+        self.member_by_in(None, receiver(ty)?, name)
     }
 
     /// The same lookup, from a receiver's constructor alone. For a value
     /// relation holding a partly inferred type: `List<?>` still has `List`'s
     /// members, and which one is meant does not depend on the hole.
     pub fn member_by(&self, receiver: Receiver, name: &str) -> Option<&Signature> {
-        self.by_member.get(&(receiver, name.to_string()))
+        self.member_by_in(None, receiver, name)
+    }
+
+    /// The module a unit declares, by name.
+    pub fn module_name(&self, unit: usize) -> Option<&str> {
+        self.workspace.module_of(unit).map(|m| m.name.as_str())
+    }
+
+    /// **The member `name` of a value of type `ty`, as `module` sees it**
+    /// (ADR-0254). See [`Signatures::member_by_in`].
+    pub fn member_in(
+        &self,
+        module: Option<&str>,
+        ty: &ResolvedType,
+        name: &str,
+    ) -> Option<&Signature> {
+        self.member_by_in(module, receiver(ty)?, name)
+    }
+
+    /// **The member `name` of a `receiver`, as `module` sees it** (ADR-0254):
+    /// the one declaration of it; or, of several, the one `module` sees,
+    /// [`Signatures::sees`]; and none where it sees several or none of them,
+    /// which [`Signatures::member_choices`] names.
+    pub fn member_by_in(
+        &self,
+        module: Option<&str>,
+        receiver: Receiver,
+        name: &str,
+    ) -> Option<&Signature> {
+        match self
+            .by_member
+            .get(&(receiver, name.to_string()))?
+            .as_slice()
+        {
+            [one] => Some(one),
+            several => {
+                let mut seen = several
+                    .iter()
+                    .filter(|s| self.sees(module, receiver, name, s));
+                match (seen.next(), seen.next()) {
+                    (Some(one), None) => Some(one),
+                    _ => None,
+                }
+            }
+        }
+    }
+
+    /// **The declarations a member of `receiver` named `name` could mean,
+    /// where `module` cannot tell which** (ADR-0254): of several, the ones
+    /// it sees, or every one where it sees none. Empty where it names one, or
+    /// none at all.
+    pub fn member_choices(
+        &self,
+        module: Option<&str>,
+        receiver: Receiver,
+        name: &str,
+    ) -> Vec<String> {
+        let Some(all) = self.by_member.get(&(receiver, name.to_string())) else {
+            return Vec::new();
+        };
+        if all.len() < 2 {
+            return Vec::new();
+        }
+        let seen: Vec<String> = all
+            .iter()
+            .filter(|s| self.sees(module, receiver, name, s))
+            .map(|s| s.path.clone())
+            .collect();
+        match seen.len() {
+            1 => Vec::new(),
+            0 => all.iter().map(|s| s.path.clone()).collect(),
+            _ => seen,
+        }
+    }
+
+    /// [`Signatures::member_choices`], from a value's type.
+    pub fn member_choices_of(
+        &self,
+        module: Option<&str>,
+        ty: &ResolvedType,
+        name: &str,
+    ) -> Vec<String> {
+        receiver(ty)
+            .map(|r| self.member_choices(module, r, name))
+            .unwrap_or_default()
+    }
+
+    /// **Does `module` see the member `s` of `receiver`** (ADR-0254)? What is
+    /// declared beside the receiver's type is its type's, a field and a term
+    /// alike; any other term is seen where its module is `module`, or one
+    /// `module` imports, whole or by the term's name, as a name resolves
+    /// (PW0021).
+    fn sees(&self, module: Option<&str>, receiver: Receiver, name: &str, s: &Signature) -> bool {
+        if let Receiver::Nominal(t) = receiver
+            && t.unit == s.definition.unit
+        {
+            return true;
+        }
+        let Some(from) = self
+            .workspace
+            .module_of(s.definition.unit)
+            .map(|m| m.name.as_str())
+        else {
+            return false;
+        };
+        let Some(here) = module.and_then(|m| self.workspace.modules.iter().find(|x| x.name == m))
+        else {
+            return false;
+        };
+        here.name == from
+            || here.imports.iter().any(|i| {
+                i.module == from && (i.names.is_empty() || i.names.iter().any(|n| n == name))
+            })
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Signature)> {
         self.by_path.iter()
     }
     pub fn all_signatures(&self) -> impl Iterator<Item = &Signature> {
-        self.by_def.values().chain(self.by_member.values())
+        self.by_def
+            .values()
+            .chain(self.by_member.values().flatten())
     }
     pub fn len(&self) -> usize {
         self.by_path.len()

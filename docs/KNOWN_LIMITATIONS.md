@@ -336,6 +336,11 @@ refused by name:
   lowers to `σ`, where Unicode's default conversion gives `ς`. There is no
   case folding and no locale rule. The mapping is Unicode 17.0's, as the
   pinned Rust knows it.
+- **A member with one declaration needs no import** (ADR-0254). A function
+  of another module whose first parameter takes a type is that type's
+  member wherever the type is; only where several modules declare one is the
+  module's import what decides it, and a module that sees several or none is
+  refused (PW0628). A page's planned reads ask as no module.
 - **An affine value has no borrow** (ADR-0045). A function whose row does not
   release a transaction may use it, and one whose row does must end it once
   on every path. There is no way to say "this function reads the value and

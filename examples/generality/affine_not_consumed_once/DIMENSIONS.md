@@ -21,7 +21,7 @@ An affine value is consumed exactly once, in the scope that acquired it.
 | indirect invalid | `dropped-by-a-statement.pw` | no binding holds it: a statement's value, dropped |
 | helper extraction | `given-to-a-helper.pw` | given to a function whose row does not release it |
 | equivalent syntax | `held-behind-try.pw` | `let h = Maps.create(..)?`: a `Result` carries the handle |
-| neighbour | `held-behind-try-and-destroyed.pw` | the same handle, destroyed |
+| neighbour | `held-behind-try-and-destroyed.pw` | the same handle, destroyed as a member, the `destroy` the module imports |
 | deferred execution | `returned-by-a-function-value.pw` | a function value's result, which nothing follows |
 | indirect invalid | `unit-body-drops-its-value.pw` | `moved-to-the-caller.pw` declaring `()`: no caller has the value |
 | neighbour | `ended-where-made.pw` | ended where it is made, `Database.begin().commit()` |

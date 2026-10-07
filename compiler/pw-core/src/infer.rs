@@ -550,7 +550,7 @@ impl<'a> Types<'a> {
             while matches!(ty.as_builtin(), Some(Builtin::Result | Builtin::Option)) {
                 ty = ty.args().first()?.clone();
             }
-            ty = self.sigs.member_of(&ty, field)?.result()?.clone();
+            ty = self.member(&ty, field)?.result()?.clone();
         }
         element_of_type(&ty).cloned()
     }
@@ -590,6 +590,29 @@ impl<'a> Types<'a> {
             }
         }
         None
+    }
+
+    /// **The member `name` of a value of type `ty`, as this body's module
+    /// sees it** (ADR-0254): of several declarations, the one it imports or
+    /// declares.
+    pub fn member(
+        &self,
+        ty: &ResolvedType,
+        name: &str,
+    ) -> Option<&'a crate::signatures::Signature> {
+        self.sigs.member_in(self.module.as_deref(), ty, name)
+    }
+
+    /// **Is `base.name` a member several modules declare, and this body's
+    /// module cannot tell which** (ADR-0254)? PW0628's, and nothing else's to
+    /// read as a call to something.
+    pub fn ambiguous_member(&self, body: &Body, base: ExprId, name: &str) -> bool {
+        self.of(body, base).is_some_and(|t| {
+            !self
+                .sigs
+                .member_choices_of(self.module.as_deref(), &t, name)
+                .is_empty()
+        })
     }
 
     /// A declaration by path, trying this module first.
@@ -644,8 +667,7 @@ impl<'a> Types<'a> {
             },
             Expr::Field { base, name } => {
                 let receiver = self.of(body, *base)?;
-                self.sigs
-                    .member_of(&receiver, name)
+                self.member(&receiver, name)
                     .and_then(|s| s.result().cloned())
             }
             Expr::Call { callee, .. } => {
@@ -720,7 +742,7 @@ impl<'a> Types<'a> {
         match body.expr(callee) {
             Expr::Field { base, name } => {
                 let receiver = self.of(body, *base)?;
-                self.sigs.member_of(&receiver, name)
+                self.member(&receiver, name)
             }
             _ => self.by_path(&path_of(body, callee)),
         }

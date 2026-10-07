@@ -41,6 +41,16 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0254, 2026-10-07: a member names the declaration its module sees** (a
+correction, found with ADR-0250). The member table kept one declaration per
+receiver and name, and a second replaced the first: `h.destroy()` was
+`VendorSdk.destroy`, which releases nothing, in a module importing only
+`Maps`, and `s.current()` was one of three `current`s whatever the module
+imported. Every declaration is kept now; of several, a member is the one the
+module declares or imports, or that is declared beside its type, and a
+module that sees several or none is refused, PW0628
+(`just e14-member-resolution`).
+
 **ADR-0253, 2026-10-07: two tracks are built in parallel, each in files of
 its own** (the owner's approval of parallel workers, charter R10). Accounts
 and sign-in (W1) and image uploads (W2) run beside the integrator, who keeps

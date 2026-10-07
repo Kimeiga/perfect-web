@@ -4917,3 +4917,20 @@ e14-returned-labels:
        CARGO_INCREMENTAL=0 python3 scripts/returned_labels_mutations.py; \
      } > docs/evidence/E14/returned-labels.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/returned-labels.txt
+
+# ADR-0254: a member names the declaration its module sees, and one it cannot
+# tell apart is refused (PW0628).
+e14-member-resolution:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0254 - a member names the declaration its module sees"; echo; \
+       echo "produced by: just e14-member-resolution"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/member_resolution.rs)"; echo; \
+       cargo test --locked -p pw-core --test member_resolution 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the member table (compiler/pw-core/src/signatures.rs)"; echo; \
+       cargo test --locked -p pw-core --lib -- signatures:: 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/member_resolution_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/member_resolution_mutations.py; \
+     } > docs/evidence/E14/member-resolution.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/member-resolution.txt

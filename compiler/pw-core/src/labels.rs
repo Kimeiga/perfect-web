@@ -633,7 +633,7 @@ impl<'a> Labels<'a> {
         for field in collection.split('.').skip(1) {
             let Some(sig) = ty
                 .as_ref()
-                .and_then(|t| self.sigs.member_of(t, field.trim()))
+                .and_then(|t| self.sigs.member_in(self.module, t, field.trim()))
             else {
                 break;
             };
@@ -681,7 +681,7 @@ impl<'a> Labels<'a> {
                 if let Some(sig) = self
                     .types
                     .of(body, *base)
-                    .and_then(|t| self.sigs.member_of(&t, name))
+                    .and_then(|t| self.sigs.member_in(self.module, &t, name))
                 {
                     l = l.join(&sig.label).join(&self.summary(sig.definition));
                 }

@@ -446,6 +446,10 @@ codes! {
     // only when the backend built it.
     MAP_KEY = "PW0627" / map_key / 1, Types,
         "a map's key and a set's element are an `Int`, a `String`, a `Bool`, or an opaque type over one";
+    // ADR-0254: a member named by more than one module's declaration. It was
+    // whichever was registered last.
+    AMBIGUOUS_MEMBER = "PW0628" / ambiguous_member / 1, Types,
+        "a member names one declaration: its type's, or the one its module declares or imports";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

@@ -3,7 +3,9 @@
 // @dimension: valid neighbour — the same handle, destroyed
 //
 // `held-behind-try.pw`, destroying the handle `?` took out of the
-// `Result`: the binding is followed, and its release counted (ADR-0250).
+// `Result`, as a member: `?` gives `handle` its type (ADR-0250), and
+// `handle.destroy()` is the `destroy` this module imports, `Maps.destroy`,
+// which releases it, and not `VendorSdk.destroy` (ADR-0254).
 
 module generality.affine_behind_try_destroyed
 
@@ -15,6 +17,6 @@ fn show(container: ElementRef, center: LatLng) -> Result<(), MapError>
     !{ dom.mutate, layout.measure, resource.acquire<MapHandle>, resource.release<MapHandle> }
 {
     let handle = Maps.create(container, center)?
-    Maps.destroy(handle)
+    handle.destroy()
     Ok(())
 }

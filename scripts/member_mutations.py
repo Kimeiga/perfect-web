@@ -29,16 +29,16 @@ MUTANTS = [
     (
         "every known type has every member",
         VALUES,
-        "            Some(r) if self.sigs.member_by(r, name).is_some() => Outcome::Agree,\n",
+        "            Some(r) if self.sigs.member_by_in(self.module(), r, name).is_some() => Outcome::Agree,\n",
         "            Some(_) if true => Outcome::Agree,\n",
     ),
     (
         "a declaration taking the type is not a member",
         VALUES,
-        "            Some(r) if self.sigs.member_by(r, name).is_some() => Outcome::Agree,\n",
+        "            Some(r) if self.sigs.member_by_in(self.module(), r, name).is_some() => Outcome::Agree,\n",
         # Only a record's fields: a field's signature is defined by the type,
         # which has no callable signature of its own.
-        "            Some(r) if self.sigs.member_by(r, name).is_some_and(|s| self.sigs.by_def(s.definition).is_none()) => Outcome::Agree,\n",
+        "            Some(r) if self.sigs.member_by_in(self.module(), r, name).is_some_and(|s| self.sigs.by_def(s.definition).is_none()) => Outcome::Agree,\n",
     ),
     (
         "a unit on a number is read as a member",

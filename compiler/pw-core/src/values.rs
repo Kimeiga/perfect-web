@@ -522,6 +522,11 @@ const PRIVATE_REPRESENTATION: &str = "its representation, which only its own mod
 /// `Option` or a `Result`, read from the container (PW0600).
 const OPTIONAL_CONTENTS: &str = "its contents, taken apart first";
 
+/// A member relation's expectation, before the declarations it could mean,
+/// when several modules declare it and this one cannot tell which
+/// (ADR-0254, PW0628).
+const AMBIGUOUS_MEMBER: &str = "one of ";
+
 /// Why a relation was not decided.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Undecided {
@@ -1163,6 +1168,11 @@ fn is_ident(s: &str) -> bool {
 const ROUNDS: usize = 8;
 
 impl<'a> Typer<'a> {
+    /// The module this body is in, which a member is looked up as (ADR-0254).
+    fn module(&self) -> Option<&'a str> {
+        self.ws.module_of(self.at).map(|m| m.name.as_str())
+    }
+
     /// A typer for `decl`'s body, reading names by `lexical`. `outer` types
     /// the bindings around a nested declaration, in the order the resolution
     /// numbers them (ADR-0066).
@@ -2018,7 +2028,7 @@ impl<'a> Typer<'a> {
         let receiver = receiver.clone();
         let Some(sig) = receiver
             .receiver()
-            .and_then(|r| self.sigs.member_by(r, name))
+            .and_then(|r| self.sigs.member_by_in(self.module(), r, name))
         else {
             // An opaque type's `.value`, read in its own module (ADR-0048).
             return match self.representation(&receiver, name) {
@@ -2085,7 +2095,7 @@ impl<'a> Typer<'a> {
             return None;
         }
         let receiver = self.of(*base).receiver()?;
-        let sig = self.sigs.member_by(receiver, name)?;
+        let sig = self.sigs.member_by_in(self.module(), receiver, name)?;
         self.sigs.by_def(sig.definition)?;
         Some(Target::Member(sig, *base))
     }
@@ -2095,7 +2105,7 @@ impl<'a> Typer<'a> {
     fn calls_a_member(&self, receiver: &Ty, name: &str) -> bool {
         receiver
             .receiver()
-            .and_then(|r| self.sigs.member_by(r, name))
+            .and_then(|r| self.sigs.member_by_in(self.module(), r, name))
             .is_some_and(|sig| self.sigs.by_def(sig.definition).is_some())
     }
 
@@ -2129,7 +2139,7 @@ impl<'a> Typer<'a> {
         };
         self.of(*base)
             .receiver()
-            .and_then(|r| self.sigs.member_by(r, name))
+            .and_then(|r| self.sigs.member_by_in(self.module(), r, name))
             .is_some_and(|sig| self.sigs.by_def(sig.definition).is_none())
     }
 
@@ -3880,12 +3890,15 @@ impl<'a> Typer<'a> {
                 return None;
             }
             let r = t.receiver()?;
-            let outcome = if self.sigs.member_by(r, name).is_some()
+            let choices = self.sigs.member_choices(self.module(), r, name);
+            let outcome = if self.sigs.member_by_in(self.module(), r, name).is_some()
                 || self
                     .representation(&t, name)
                     .is_some_and(|(def, _)| def.unit == self.at)
             {
                 None
+            } else if !choices.is_empty() {
+                Some(format!("{AMBIGUOUS_MEMBER}{}", choices.join(", ")))
             } else if self.contents_have(&t, name) {
                 Some(OPTIONAL_CONTENTS.to_string())
             } else {
@@ -4155,7 +4168,18 @@ impl<'a> Typer<'a> {
         let receiver = self.of(base);
         let outcome = match receiver.receiver() {
             None => Outcome::Undecided(Undecided::Unknown),
-            Some(r) if self.sigs.member_by(r, name).is_some() => Outcome::Agree,
+            Some(r) if self.sigs.member_by_in(self.module(), r, name).is_some() => Outcome::Agree,
+            // Several modules declare it, and this one sees several or none
+            // of them (ADR-0254): refused, and never one chosen.
+            Some(r) if !self.sigs.member_choices(self.module(), r, name).is_empty() => {
+                Outcome::Disagree {
+                    expected: format!(
+                        "{AMBIGUOUS_MEMBER}{}",
+                        self.sigs.member_choices(self.module(), r, name).join(", ")
+                    ),
+                    actual: self.display(&receiver),
+                }
+            }
             Some(_) => match self.representation(&receiver, name) {
                 Some((def, _)) if def.unit == self.at => Outcome::Agree,
                 Some(_) => Outcome::Disagree {
@@ -4195,7 +4219,7 @@ impl<'a> Typer<'a> {
         };
         args.first()
             .and_then(Ty::receiver)
-            .is_some_and(|r| self.sigs.member_by(r, name).is_some())
+            .is_some_and(|r| self.sigs.member_by_in(self.module(), r, name).is_some())
     }
 
     /// **An opaque type's representation, as `.value`** (ADR-0048): the
@@ -5159,6 +5183,42 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
                  when there are none",
             )
             .repair("`match` it, and read the member in the `Some` or `Ok` arm"),
+            RelationKind::Member if expected.starts_with(AMBIGUOUS_MEMBER) => {
+                let choices: Vec<&str> = expected[AMBIGUOUS_MEMBER.len()..].split(", ").collect();
+                let named = match choices.as_slice() {
+                    [rest @ .., last] if !rest.is_empty() => format!(
+                        "{} or `{last}`",
+                        rest.iter()
+                            .map(|c| format!("`{c}`"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                    _ => format!("`{}`", choices.join("")),
+                };
+                Diagnostic::error(
+                    crate::codes::AMBIGUOUS_MEMBER.id,
+                    crate::codes::AMBIGUOUS_MEMBER.invariant,
+                    Detector::Signature,
+                    format!(
+                        "`{}` of a `{actual}` could be {named}, and this module does not say \
+                         which",
+                        r.target
+                    ),
+                    r.span.clone(),
+                )
+                .reason("member_declared_by_several_modules")
+                .explain(
+                    "a value's member is its type's field, or a declaration whose first \
+                     parameter takes the type; where several modules declare one of a name, \
+                     it is the one this module declares or imports, and here none is, or \
+                     more than one",
+                )
+                .repair(format!(
+                    "call it by its path, `{}(..)`, or import only the module whose `{}` \
+                     is meant",
+                    choices[0], r.target
+                ))
+            }
             RelationKind::Member if expected == PRIVATE_REPRESENTATION => Diagnostic::error(
                 crate::codes::UNKNOWN_MEMBER.id,
                 crate::codes::UNKNOWN_MEMBER.invariant,

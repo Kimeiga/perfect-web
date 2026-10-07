@@ -2102,3 +2102,10 @@ two tracks are built in parallel, each in files of its own.
   uploads each get an imported justfile, a block of diagnostic codes, and a
   module of the development server reached at marked seams; the protocol is
   `docs/PARALLEL.md`, and `verify` runs on a track's push.
+[ADR-0254](DECISIONS/ADR-0254-a-member-names-what-its-module-sees.md):
+a member names the declaration its module sees (a correction).
+- A second declaration of a member replaced the first, and `h.destroy()`
+  named whichever was registered last, `VendorSdk.destroy` in a module that
+  imports only `Maps`. Of several, a member is now the one the module
+  declares or imports, or that is declared beside its type; a module that
+  sees several or none is refused, PW0628.

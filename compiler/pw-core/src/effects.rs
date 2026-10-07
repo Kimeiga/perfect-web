@@ -443,7 +443,7 @@ impl<'a> Inference<'a> {
                 continue;
             };
             let declared = &declared;
-            let Some(sig) = self.sigs.member_of(declared, &member) else {
+            let Some(sig) = types.member(declared, &member) else {
                 continue;
             };
             // The fact `R-037` claimed and did not have: this member was

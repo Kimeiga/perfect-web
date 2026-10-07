@@ -426,11 +426,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              soundness needs them: ~~a `resource` declaration's clauses~~
              (ADR-0251, `just e14-resource-clauses`: what `acquire` makes,
              the resource holds, and what `release` is given, it ends); and
-             **a member names whichever declaration registered last**
-             (`signatures::by_member`): `h.destroy()` named
-             `VendorSdk.destroy`, which releases nothing, in a module
-             importing only `Maps`, and four members are declared so today
-             (`destroy`, `is_available`, `current`, `for_store`). Before it,
+             ~~a member names whichever declaration registered last~~
+             (ADR-0254, `just e14-member-resolution`: the one the module
+             sees, or PW0628). Before it,
              found fixing `e10-lexical`: ~~a secret returned early is
              public~~ (ADR-0252, `just e14-returned-labels`). Then 0057-c, a
              map or set sorted on arrival;
