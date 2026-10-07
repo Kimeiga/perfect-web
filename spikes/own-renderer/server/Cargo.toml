@@ -25,6 +25,9 @@ pw-materialize = { path = "../../../runtime/pw-materialize" }
 pw-protocol = { path = "../../../runtime/pw-protocol" }
 pw-render = { path = "../../../runtime/pw-render" }
 pw-resource = { path = "../../../runtime/pw-resource" }
+# The feed's data in PostgreSQL, where the deployment names one
+# (`PW_FEED_DATABASE_URL`); the in-memory layer otherwise.
+postgres.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

@@ -42,6 +42,15 @@ pub(crate) trait DataLayer: Send + Sync {
         false
     }
 
+    /// **What the database it opened provides** (ADR-XXXX), which the host
+    /// compares with what the program's sources state before it serves. By
+    /// default what the host's own database gives a resource no source holds
+    /// (ADR-0207): serializable transactions, reads of the latest commit, and
+    /// no feed of its changes. An in-memory layer gives that under its lock.
+    fn provides(&self) -> Result<Provided, String> {
+        Ok(Provided::host_database())
+    }
+
     /// **Every operation it supplies**, read from the functions it builds,
     /// not from a list kept beside them.
     fn operations(&self) -> BTreeSet<String> {
@@ -61,4 +70,151 @@ pub(crate) trait Staged {
     fn rows(&self) -> Option<Vec<(String, String)>>;
     /// After the commit: what was staged is the layer's.
     fn publish(&mut self);
+
+    /// **The command's writes and what it handed the outbox, committed in
+    /// the layer's own transaction** (ADR-0208, ADR-XXXX), where the layer
+    /// keeps its own outbox: events and invalidated entries, each by its
+    /// declaration's path with the values the command computed.
+    ///
+    /// Returns what its outbox committed, read back once the transaction
+    /// committed, which the host delivers. `None` where the layer keeps no
+    /// outbox: the host's materializer commits the events with [`rows`].
+    /// An error is a commit refused, and nothing of the command is kept.
+    ///
+    /// [`rows`]: Staged::rows
+    fn commit(
+        &mut self,
+        _events: &[Handed],
+        _invalidated: &[Handed],
+    ) -> Result<Option<Outboxed>, String> {
+        Ok(None)
+    }
+}
+
+/// One thing a command handed the outbox: its declaration's path, and the
+/// values the command computed.
+pub(crate) type Handed = (String, Vec<Val>);
+
+/// **What a layer's outbox committed** (ADR-XXXX): the events, then the
+/// invalidated entries, each in the order the command handed them.
+pub(crate) type Outboxed = (Vec<Handed>, Vec<Handed>);
+
+/// **What a database provides** (ADR-0207's vocabulary, ADR-XXXX): the
+/// isolation a command's transaction gets, what a read may promise, and
+/// whether it tells what changed once committed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Provided {
+    /// `serializable`, `snapshot`, `read_committed` or `none`.
+    pub transactions: String,
+    pub reads: BTreeSet<String>,
+    pub feed: bool,
+}
+
+impl Provided {
+    /// What the host's own database gives (ADR-0005, ADR-0207).
+    pub(crate) fn host_database() -> Provided {
+        Provided {
+            transactions: "serializable".to_string(),
+            reads: BTreeSet::from(["strong".to_string()]),
+            feed: false,
+        }
+    }
+}
+
+/// **A source's clauses, as `pw build` wrote them** (`sources.json`).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub(crate) struct Declared {
+    pub name: String,
+    pub holds: Vec<String>,
+    pub transactions: String,
+    pub reads: Vec<String>,
+    pub changes: String,
+}
+
+/// How much an isolation prevents (Berenson et al., SIGMOD 1995), in the
+/// checker's order: serializable, snapshot, read committed, none.
+fn isolation(word: &str) -> u8 {
+    match word {
+        "serializable" => 3,
+        "snapshot" => 2,
+        "read_committed" => 1,
+        _ => 0,
+    }
+}
+
+/// **Does what a database provides give what a source states?**
+/// (ADR-XXXX): its transactions at least as isolated, each promise its reads
+/// make (`strong` gives every one, and every database gives `eventual`), and
+/// a feed of its changes where it states one. Each shortfall, one line.
+pub(crate) fn shortfalls(declared: &Declared, provided: &Provided) -> Vec<String> {
+    let mut out = Vec::new();
+    if isolation(&declared.transactions) > isolation(&provided.transactions) {
+        out.push(format!(
+            "`{}` states `transactions {}`, and the database's are {}",
+            declared.name, declared.transactions, provided.transactions
+        ));
+    }
+    for read in &declared.reads {
+        let given = read == "eventual"
+            || provided.reads.contains("strong")
+            || provided.reads.contains(read);
+        if !given {
+            out.push(format!(
+                "`{}` states `reads {read}`, and the database's reads give {}",
+                declared.name,
+                provided
+                    .reads
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+    }
+    if declared.changes == "feed" && !provided.feed {
+        out.push(format!(
+            "`{}` states `changes feed`, and its data layer delivers no feed of its changes",
+            declared.name
+        ));
+    }
+    out
+}
+
+/// **What a layer's database must give, and each way it falls short**
+/// (ADR-XXXX): each declared source holding a resource the layer's grants
+/// name (`database.read<Post>` names `Post`), and, for a resource no source
+/// holds, the host's own database's guarantees (ADR-0207).
+pub(crate) fn held_to(sources: &[Declared], grants: &[&str], provided: &Provided) -> Vec<String> {
+    let resources: BTreeSet<&str> = grants
+        .iter()
+        .filter_map(|g| {
+            g.strip_prefix("database.read<")
+                .or_else(|| g.strip_prefix("database.write<"))
+                .and_then(|r| r.strip_suffix('>'))
+        })
+        .collect();
+    let mut out = Vec::new();
+    for source in sources
+        .iter()
+        .filter(|s| s.holds.iter().any(|h| resources.contains(h.as_str())))
+    {
+        out.extend(shortfalls(source, provided));
+    }
+    let unheld: Vec<&str> = resources
+        .iter()
+        .copied()
+        .filter(|r| !sources.iter().any(|s| s.holds.iter().any(|h| h == r)))
+        .collect();
+    if !unheld.is_empty() {
+        let host = Provided::host_database();
+        let implied = Declared {
+            name: format!("the host's database, holding {}", unheld.join(", ")),
+            holds: unheld.iter().map(|r| r.to_string()).collect(),
+            transactions: host.transactions,
+            reads: host.reads.into_iter().collect(),
+            changes: "none".to_string(),
+        };
+        out.extend(shortfalls(&implied, provided));
+    }
+    out
 }
