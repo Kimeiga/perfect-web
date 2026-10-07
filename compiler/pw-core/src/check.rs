@@ -4197,6 +4197,37 @@ fn declared_sources(hirs: &[&Hir]) -> Vec<Source> {
     out
 }
 
+/// **A data source's clauses, as a host compares them with what its
+/// database provides** (ADR-0207's "Not claimed", ADR-XXXX): what `pw build`
+/// writes to `sources.json`. Read as the checker reads them: a clause left
+/// out guarantees nothing, so `transactions` is `none`, `reads` is
+/// `eventual` and `changes` is `none`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SourceClauses {
+    pub name: String,
+    /// What it holds, as the program's effects name it: `Post` for
+    /// `database.read<Post>`.
+    pub holds: Vec<String>,
+    pub transactions: String,
+    pub reads: Vec<String>,
+    /// `feed` or `none`.
+    pub changes: String,
+}
+
+/// Every source the program declares, as [`SourceClauses`].
+pub fn source_clauses(hirs: &[&Hir]) -> Vec<SourceClauses> {
+    declared_sources(hirs)
+        .into_iter()
+        .map(|s| SourceClauses {
+            name: s.name,
+            holds: s.holds.into_iter().map(|(h, _)| h).collect(),
+            transactions: s.transactions,
+            reads: s.reads.into_iter().collect(),
+            changes: if s.feed { "feed" } else { "none" }.to_string(),
+        })
+        .collect()
+}
+
 /// How much a transaction's isolation prevents, as a command is written
 /// against it: each level prevents what the one below does, and more
 /// (Berenson et al., SIGMOD 1995; Jepsen's consistency models).
