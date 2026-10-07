@@ -70,7 +70,9 @@ event Deleted(post: PostId)
 // the deployment: the host signs a session in through the deployment's
 // identity provider and keeps its principal, and nothing of it is any other
 // session's.
-type Viewer = Viewer { signed_in: Bool, name: String }
+// `account`: signed in to an account, which can sign out; the development
+// guest model's guest (every session its own) has none.
+type Viewer = Viewer { signed_in: Bool, account: Bool, name: String }
 
 // **What the feed's database guarantees** (ADR-0207, ADR-0246): one
 // PostgreSQL, as the host's feed layer opens it.
@@ -272,7 +274,7 @@ session page Home() {
             <h1>Home</h1>
             {#if me.signed_in}
             <p id="me">Signed in as {me.name}</p>
-            <form method="post" action="/sign-out"><button type="submit">Sign out</button></form>
+            {#if me.account}<form method="post" action="/sign-out"><button type="submit">Sign out</button></form>{/if}
             {:else}
             <p id="signed-out" role="status">Sign in to post, reply or like.</p>
             <form method="get" action="/sign-in"><button type="submit">Sign in</button></form>
