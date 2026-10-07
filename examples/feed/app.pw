@@ -61,7 +61,7 @@ type FeedError =
 event Posted(author: UserId)
 event Liked(post: PostId)
 
-// **What the feed's database guarantees** (ADR-0207, ADR-XXXX): one
+// **What the feed's database guarantees** (ADR-0207, ADR-0246): one
 // PostgreSQL, as the host's feed layer opens it.
 // - A command's writes commit in a serializable transaction: the layer sets
 //   it on each, whatever the connection's default (read committed).

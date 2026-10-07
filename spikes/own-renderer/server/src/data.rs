@@ -42,7 +42,7 @@ pub(crate) trait DataLayer: Send + Sync {
         false
     }
 
-    /// **What the database it opened provides** (ADR-XXXX), which the host
+    /// **What the database it opened provides** (ADR-0246), which the host
     /// compares with what the program's sources state before it serves. By
     /// default what the host's own database gives a resource no source holds
     /// (ADR-0207): serializable transactions, reads of the latest commit, and
@@ -72,7 +72,7 @@ pub(crate) trait Staged {
     fn publish(&mut self);
 
     /// **The command's writes and what it handed the outbox, committed in
-    /// the layer's own transaction** (ADR-0208, ADR-XXXX), where the layer
+    /// the layer's own transaction** (ADR-0208, ADR-0246), where the layer
     /// keeps its own outbox: events and invalidated entries, each by its
     /// declaration's path with the values the command computed.
     ///
@@ -95,11 +95,11 @@ pub(crate) trait Staged {
 /// values the command computed.
 pub(crate) type Handed = (String, Vec<Val>);
 
-/// **What a layer's outbox committed** (ADR-XXXX): the events, then the
+/// **What a layer's outbox committed** (ADR-0246): the events, then the
 /// invalidated entries, each in the order the command handed them.
 pub(crate) type Outboxed = (Vec<Handed>, Vec<Handed>);
 
-/// **What a database provides** (ADR-0207's vocabulary, ADR-XXXX): the
+/// **What a database provides** (ADR-0207's vocabulary, ADR-0246): the
 /// isolation a command's transaction gets, what a read may promise, and
 /// whether it tells what changed once committed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,7 +143,7 @@ fn isolation(word: &str) -> u8 {
 }
 
 /// **Does what a database provides give what a source states?**
-/// (ADR-XXXX): its transactions at least as isolated, each promise its reads
+/// (ADR-0246): its transactions at least as isolated, each promise its reads
 /// make (`strong` gives every one, and every database gives `eventual`), and
 /// a feed of its changes where it states one. Each shortfall, one line.
 pub(crate) fn shortfalls(declared: &Declared, provided: &Provided) -> Vec<String> {
@@ -181,7 +181,7 @@ pub(crate) fn shortfalls(declared: &Declared, provided: &Provided) -> Vec<String
 }
 
 /// **What a layer's database must give, and each way it falls short**
-/// (ADR-XXXX): each declared source holding a resource the layer's grants
+/// (ADR-0246): each declared source holding a resource the layer's grants
 /// name (`database.read<Post>` names `Post`), and, for a resource no source
 /// holds, the host's own database's guarantees (ADR-0207).
 pub(crate) fn held_to(sources: &[Declared], grants: &[&str], provided: &Provided) -> Vec<String> {

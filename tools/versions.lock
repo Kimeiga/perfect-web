@@ -28,7 +28,7 @@ npm_marko_vite   = 6.1.9
 npm_vite         = 8.2.0
 npm_playwright   = 1.62.1
 
-# Optional: the database `just e14-feed-postgres` runs against (ADR-XXXX), a
+# Optional: the database `just e14-feed-postgres` runs against (ADR-0246), a
 # throwaway one named by PW_FEED_DATABASE_URL. Installed 2026-10-07 with
 # `brew install postgresql@18`; the newest supported major on
 # postgresql.org/support/versioning that day.

@@ -1,4 +1,4 @@
--- The feed's data in PostgreSQL (ADR-XXXX): users, posts with their replies,
+-- The feed's data in PostgreSQL (ADR-0246): users, posts with their replies,
 -- likes, and the transactional outbox. Applied once, in order, by
 -- `feed_pg.rs`, which records each in `pw_migrations`.
 --

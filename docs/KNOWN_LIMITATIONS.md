@@ -486,12 +486,20 @@ awaited in order. What remains:
   platform, and is acted on once its writes commit. An event carrying a value
   that is not a key (a record, a list) checks, and is refused when the
   command runs. `invalidates Cart(_)`, every entry, is ruling 10's.
-- **A source's guarantees are its program's statement** (ADR-0207). What a
-  program asks of its data is held to what its `source` declarations give;
-  nothing yet compares a source's clauses with the database a deployment
-  opens. Not counted either: a command's several writes to a source without
-  transactions, which commit apart, and its reads across two sources, which
-  no transaction makes one snapshot.
+- **A source's guarantees are held to the database the feed opens**
+  (ADR-0207, ADR-0246): the host measures a PostgreSQL feed's isolation and
+  whether it may write, and refuses to serve on a shortfall. The store's
+  data, and every other layer, are held to the host's own database's
+  guarantees, not measured. Not counted either: a command's several writes
+  to a source without transactions, which commit apart, and its reads
+  across two sources, which no transaction makes one snapshot.
+- **The feed on PostgreSQL is one host's** (ADR-0246): delivery is the
+  committing host's, so a second host on the same database hears nothing
+  of the first's commits; a host's commands are serialized by its layer's
+  lock, so a serialization failure between concurrent writers is refused
+  as any refused commit, and never measured; an interaction's idempotency
+  is remembered in the host's memory, not committed with its writes; and
+  the browser suite runs on the in-memory layer.
 - **A `style` attribute's value is escaped by refusing what executes**
   (`expression(`, a script scheme in `url(`), then as an attribute. A style
   can still load a URL the value names. A `<style>` element holds text only

@@ -1,9 +1,11 @@
-# ADR-XXXX: the feed's data in PostgreSQL, held to what its source states
+# ADR-0246: the feed's data in PostgreSQL, held to what its source states
 
-Status: proposed for the integrator to number and accept, under the owner's
-delegation of 2026-10-02. It builds ADR-0207's "Not claimed": "a host does
-not yet compare a source's clauses with what its database provides".
-Date: 2026-10-07. Milestone: E14, the app layer. Branch `pg-data-layer`.
+Status: accepted under the owner's delegation of 2026-10-02; the owner
+approved its crates (`postgres` 0.19.14 and what it brings) on 2026-10-07.
+It builds ADR-0207's "Not claimed": "a host does not yet compare a source's
+clauses with what its database provides". Date: 2026-10-07. Milestone: E14,
+the app layer. Written on branch `pg-data-layer` by a parallel session, on
+the owner's direction, and integrated here.
 
 ## Context
 
@@ -166,8 +168,8 @@ The program checks unchanged. The in-memory layer gives the same.
   `md-5`, `hmac` and `sha2` among them for SCRAM authentication.
   cargo-deny: licenses, bans and sources pass;
   six duplicate crates warn (`sha2` 0.10 and 0.11 and their digests,
-  `fallible-iterator` 0.2 and 0.3). Its advisories fail only for wasmtime,
-  as on master.
+  `fallible-iterator` 0.2 and 0.3). Its advisories failed only for
+  Wasmtime, as on master then; integrated after ADR-0244, they pass.
 - A test that sets `PW_FEED_DATABASE_URL` runs in a schema of its own and
   drops it. Without one, each PostgreSQL test passes doing nothing; the
   recipe says so and records nothing.
@@ -227,3 +229,21 @@ Recorded by `just e14-feed-postgres` in
 - **`reads` measured beyond primary or not.** `synchronous_commit` and
   similar settings change durability, not what a reader sees, and are not
   read.
+
+## Integration
+
+Written on `pg-data-layer` (six commits on `745a972`) and rebased onto
+ADR-0245 without a conflict; the lockfile builds `--locked` with Wasmtime
+48.0.5 beside PostgreSQL's crates, and `just audit` passes. Here:
+
+- **Numbered**: ADR-0246, in the ADR, the code's comments, the recipe, its
+  mutation script, the migration and `tools/versions.lock`.
+- **The verification run's database job** (ADR-0245): a recipe run against
+  a database (`e14-feed-postgres`) is planned there, not in a shard, and
+  runs against PostgreSQL 18.6 in a service container, a throwaway
+  database each run. A test of the plan holds it there.
+- **kiokun's `sources.json`** was written by hand on the branch. `just
+  e10-kiokun`, run again here, writes the same bytes: it is the recorded
+  command's now.
+- **The recipe, run here** against PostgreSQL 18.6: 10 tests, the server's
+  other 150, 4 of 4 mutants killed.

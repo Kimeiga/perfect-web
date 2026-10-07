@@ -1,4 +1,4 @@
-//! **The feed on PostgreSQL** (ADR-XXXX): the feed reference app served by
+//! **The feed on PostgreSQL** (ADR-0246): the feed reference app served by
 //! the host, its data in a real database, held to what its `source` states.
 //!
 //! Each test runs against `PW_FEED_DATABASE_URL`, in a schema of its own that
@@ -139,7 +139,7 @@ fn thread_of(id: &str) -> Params {
     Params::from([("id".to_string(), id.to_string())])
 }
 
-/// **What the database provides, measured** (ADR-XXXX): a command's
+/// **What the database provides, measured** (ADR-0246): a command's
 /// transaction is serializable though the connection's default is read
 /// committed, a read is of the latest commit, and no change feed.
 #[test]
@@ -454,7 +454,7 @@ fn on_postgres_the_feed_serves_what_it_serves_in_memory() {
     assert_eq!(pages[0], pages[1]);
 }
 
-/// **A source stating a feed of its changes is refused** (ADR-XXXX's
+/// **A source stating a feed of its changes is refused** (ADR-0246's
 /// negative control): the layer delivers none, so the host does not serve,
 /// and says which clause.
 #[test]
@@ -475,7 +475,7 @@ fn on_postgres_a_stated_change_feed_the_layer_cannot_deliver_is_refused() {
 
 /// **Serializable, stated against a connection that opens read committed,
 /// is refused**, unless the layer sets it on each transaction, or the
-/// connection's default gives it (ADR-XXXX).
+/// connection's default gives it (ADR-0246).
 #[test]
 fn on_postgres_serializable_against_a_read_committed_default_is_refused() {
     let Some(url) = database() else { return };

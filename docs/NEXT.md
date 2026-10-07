@@ -400,10 +400,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
              `just e14-statements-separated`). **First of all (owner,
              relayed 2026-10-07): CI green**: ~~the Wasmtime advisories~~
              (ADR-0244); ~~the heavy verification on GitHub Actions~~
-             (ADR-0245). **Next**, its first runs read, and what Linux
-             finds in the recipes fixed; then the `pg-data-layer` branch
-             merged (the owner approved its crates, 2026-10-07); then what
-             ADR-0243 found, drafted: a
+             (ADR-0245); ~~the `pg-data-layer` branch merged~~ (ADR-0246,
+             the owner approved its crates, 2026-10-07). **Next**, the first
+             verification runs read, and what Linux finds in the recipes
+             fixed; then what ADR-0243 found, drafted: a
              clause written in a block judged by its domain, as one heading
              a declaration is (`scope bogus` in a resource's block checks).
              Further grammar and clause defects go under 0047-a below,
@@ -428,14 +428,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
              content-type limits, stored through a deployment's blob-storage
              capability (Pleris builds no storage and no CDN), and served
              safely;
-          8. ~~a real database for the feed~~: **a parallel track** (the
-             owner's, relayed 2026-10-07). A cloud agent builds Postgres
-             behind the `DataLayer` trait (ADR-0218), and the host comparing
-             a source's declared guarantees with what the database provides
-             (ADR-0207), on branch `pg-data-layer`, its ADR unnumbered. This
-             track integrates it: numbers the ADR, merges, runs the chain.
-             The trait's shape changes only with a note here, since that
-             branch builds on it;
+          8. ~~a real database for the feed~~ (ADR-0246, written on
+             `pg-data-layer` in parallel and integrated here; `just
+             e14-feed-postgres`). What it leaves (its "Not claimed"): a
+             second host on one database, a measured serialization failure
+             between concurrent writers, idempotency committed with the
+             writes, and the browser suite and the store on PostgreSQL;
         - then what ruling 0073-a still refuses (several values, a page's
           parameter, the browser's values inside a block, instances), and
           everything below;

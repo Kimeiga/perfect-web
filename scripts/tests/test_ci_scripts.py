@@ -1,8 +1,9 @@
 """The verification run's scripts (ADR-0245), each on what it decides.
 
 - `ci_plan.py` deals recipes into shards, the costliest first, the same way
-  every time, leaves out the measurements of a machine, and reaches from a
-  change to the mutation scripts it touches;
+  every time, leaves out the measurements of a machine, sends a recipe run
+  against a database to the database job, and reaches from a change to the
+  mutation scripts it touches;
 - `ci_recipes.py` takes what a recipe wrote to be the files whose bytes
   changed while it ran;
 - `ci_summary.py` fails a run where a recipe failed, a mutant survived, or a
@@ -82,6 +83,16 @@ class Plan(unittest.TestCase):
             "statements_separated_mutations.py",
             plan.touched_scripts({grammar: [(1, 1)]}, 30),
         )
+
+    def test_a_recipe_run_against_a_database_goes_to_the_database_job(self) -> None:
+        out = subprocess.run(
+            [sys.executable, str(SCRIPTS / "ci_plan.py"), "--shards", "2", "e14-feed-postgres", "e14-feed"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        self.assertEqual(out[0], 'shards=[{"index": 0, "recipes": ["e14-feed"]}]')
+        self.assertEqual(out[1], 'database=["e14-feed-postgres"]')
 
     def test_a_recipes_cost_counts_the_mutants_it_plants(self) -> None:
         body = "    python3 scripts/statements_separated_mutations.py\n"

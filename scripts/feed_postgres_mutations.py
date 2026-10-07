@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-XXXX: the feed's data in PostgreSQL, held to
+"""Mutation controls for ADR-0246: the feed's data in PostgreSQL, held to
 what its source states.
 
 Each mutant undoes one piece: the events committed in the command's own

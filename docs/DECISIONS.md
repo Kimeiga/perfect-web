@@ -2056,3 +2056,9 @@ the heavy verification runs on GitHub Actions.
   `verify` workflow runs them in parallel shards on Linux, a push the
   recipes it touches and each night all of them, and a recorded command
   fetches a run's evidence, each file naming the run.
+[ADR-0246](DECISIONS/ADR-0246-a-feed-on-postgres.md):
+the feed's data in PostgreSQL, held to what its source states.
+- A `DataLayer` on PostgreSQL beside the in-memory one: a command is one
+  serializable transaction, and its events commit in its outbox with its
+  writes. The host compares what each source states with what the database
+  it opens provides, and refuses to serve on a shortfall.

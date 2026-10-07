@@ -70,7 +70,7 @@ blake3 = "1.8.6"
 # newest, not yanked, MIT OR Apache-2.0; its API (`TempDir::with_prefix`,
 # `path`, deleting on drop) checked against docs.rs for 3.27.0.
 tempfile = "3.27.0"
-# The feed's PostgreSQL data layer (ADR-XXXX, a feed on PostgreSQL). Verified
+# The feed's PostgreSQL data layer (ADR-0246, a feed on PostgreSQL). Verified
 # on crates.io 2026-10-07: 0.19.14, the newest, not yanked, MIT OR Apache-2.0,
 # rust-version 1.85; rust-postgres's synchronous client over tokio-postgres
 # 0.7.18, pure Rust (no libpq). Its API (`Client::connect`, `NoTls`,

@@ -2985,7 +2985,7 @@ e14-feed:
      } > docs/evidence/E14/feed.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/feed.txt
 
-# ADR-XXXX: the feed's data in PostgreSQL, held to what its source states.
+# ADR-0246: the feed's data in PostgreSQL, held to what its source states.
 # Needs PW_FEED_DATABASE_URL, a throwaway database (each test uses a schema of
 # its own and drops it), e.g. postgresql://localhost/pw_feed_test; skips
 # without one, and writes no evidence.
@@ -2995,7 +2995,7 @@ e14-feed-postgres:
        exit 0; \
      fi; \
      mkdir -p docs/evidence/E14; \
-     { echo "ADR-XXXX - the feed's data in PostgreSQL, held to what its source states"; echo; \
+     { echo "ADR-0246 - the feed's data in PostgreSQL, held to what its source states"; echo; \
        echo "produced by: just e14-feed-postgres"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; \

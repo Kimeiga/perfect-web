@@ -43,6 +43,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
+      database: ${{ steps.plan.outputs.database }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -125,6 +126,49 @@ jobs:
           path: ci-out/
           retention-days: 90
 
+  # The recipes run against a database (ADR-0246): PostgreSQL as the
+  # verified image runs it, a throwaway database each run.
+  database:
+    needs: plan
+    if: needs.plan.outputs.database != '[]'
+    name: recipes on PostgreSQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: pw_feed_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PW_FEED_DATABASE_URL: postgresql://postgres:pw@localhost:5432/pw_feed_test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: verify
+          save-if: false
+      - uses: extractions/setup-just@v2
+      - name: Build
+        run: cargo build --workspace --locked
+      - name: Recipes
+        env:
+          RECIPES: ${{ join(fromJSON(needs.plan.outputs.database), ' ') }}
+        run: |
+          echo "$(lsb_release -ds) on GitHub Actions, $(uname -m), PostgreSQL 18.6" > ci-out-runner.txt
+          python3 scripts/ci_recipes.py --out ci-out $RECIPES
+          mv ci-out-runner.txt ci-out/runner.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: evidence-database
+          path: ci-out/
+          retention-days: 90
+
   browser:
     name: browser ${{ matrix.engine }}
     runs-on: ubuntu-24.04
@@ -166,16 +210,19 @@ jobs:
           retention-days: 30
 
   summary:
-    needs: [plan, recipes]
+    needs: [plan, recipes, database]
     if: always() && needs.plan.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v8
-        if: needs.plan.outputs.shards != '[]'
+        if: needs.plan.outputs.shards != '[]' || needs.plan.outputs.database != '[]'
         with:
           pattern: evidence-*
           path: artifacts
       - env:
           SHARDS_JSON: ${{ needs.plan.outputs.shards }}
-        run: python3 scripts/ci_summary.py artifacts --shards "$(python3 -c 'import json,os; print(len(json.loads(os.environ["SHARDS_JSON"])))')"
+          DATABASE_JSON: ${{ needs.plan.outputs.database }}
+        run: |
+          expected=$(python3 -c 'import json,os; print(len(json.loads(os.environ["SHARDS_JSON"])) + (1 if json.loads(os.environ["DATABASE_JSON"]) else 0))')
+          python3 scripts/ci_summary.py artifacts --shards "$expected"

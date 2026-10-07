@@ -4198,7 +4198,7 @@ fn declared_sources(hirs: &[&Hir]) -> Vec<Source> {
 }
 
 /// **A data source's clauses, as a host compares them with what its
-/// database provides** (ADR-0207's "Not claimed", ADR-XXXX): what `pw build`
+/// database provides** (ADR-0207's "Not claimed", ADR-0246): what `pw build`
 /// writes to `sources.json`. Read as the checker reads them: a clause left
 /// out guarantees nothing, so `transactions` is `none`, `reads` is
 /// `eventual` and `changes` is `none`.

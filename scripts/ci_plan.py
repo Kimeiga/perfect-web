@@ -13,8 +13,10 @@ The recipes are `just`'s own list, kept where they record evidence
 
 Each is dealt to the shard with the least work so far, the costliest first,
 by an estimate of its cost: the mutants the scripts it runs plant, each a
-build and a test run. Prints `shards=<json>` for `$GITHUB_OUTPUT`: a list of
-`{"index": i, "recipes": [...]}`, empty where nothing is to run.
+build and a test run; one that needs a database (`NEEDS_DATABASE`) goes to
+the run's database job instead. Prints, for `$GITHUB_OUTPUT`, `shards=<json>`,
+a list of `{"index": i, "recipes": [...]}`, and `database=<json>`, a list of
+recipes, each empty where nothing is to run.
 
     python3 scripts/ci_plan.py --shards 16 --all
     python3 scripts/ci_plan.py --shards 16 --changed BASE HEAD
@@ -43,6 +45,10 @@ LOCAL_ONLY = {
     "e10-load",
     "e10-memory",
 }
+
+# Recipes run against a database, which the run's database job provides
+# (ADR-0246): they are planned there and not in a shard.
+NEEDS_DATABASE = {"e14-feed-postgres"}
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
 
@@ -219,8 +225,11 @@ def main() -> int:
         print("ci_plan: say --all, --changed BASE HEAD, or the recipes", file=sys.stderr)
         return 1
     body = bodies()
-    costs = {n: cost(body.get(n, "")) for n in names}
-    print("shards=" + json.dumps(plan(names, costs, args.shards)))
+    database = sorted(n for n in names if n in NEEDS_DATABASE)
+    sharded = [n for n in names if n not in NEEDS_DATABASE]
+    costs = {n: cost(body.get(n, "")) for n in sharded}
+    print("shards=" + json.dumps(plan(sharded, costs, args.shards)))
+    print("database=" + json.dumps(database))
     return 0
 
 

@@ -14,6 +14,18 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0246, 2026-10-07: the feed's data in PostgreSQL, held to what its
+source states** (the owner's parallel track, written on `pg-data-layer` and
+integrated here). Where a deployment names a database
+(`PW_FEED_DATABASE_URL`), the feed's data layer is PostgreSQL: each command
+one serializable transaction, its events written to an outbox in the same
+transaction and delivered once it commits (ADR-0208). The feed states what
+its database guarantees (`source FeedData`), `pw build` writes it
+(`sources.json`), and the host measures the database it opens and refuses
+to serve on a shortfall. The in-memory layer stays the default. Against
+PostgreSQL 18.6 here, and on CI in a service container
+(`just e14-feed-postgres`).
+
 **ADR-0245, 2026-10-07: the heavy verification runs on GitHub Actions** (the
 owner's direction, relayed 2026-10-07). A `verify` workflow runs the
 evidence recipes in parallel shards on Linux, and the browser suite in each

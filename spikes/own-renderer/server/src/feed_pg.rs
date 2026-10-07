@@ -1,4 +1,4 @@
-//! **The feed's data in PostgreSQL** (ADR-XXXX), beside the in-memory layer
+//! **The feed's data in PostgreSQL** (ADR-0246), beside the in-memory layer
 //! (`feed.rs`), which stays the default. A deployment names a database with
 //! `PW_FEED_DATABASE_URL`; the host opens this layer on it, holds it to what
 //! the feed's `source` states, and serves the same program.
@@ -365,7 +365,7 @@ fn val_of(json: &serde_json::Value) -> Result<Val, String> {
     }
 }
 
-/// **A command's transaction** (ADR-0218, ADR-XXXX): its connection, in
+/// **A command's transaction** (ADR-0218, ADR-0246): its connection, in
 /// the transaction `begin` opened, from the call to the commit.
 pub(crate) struct Staging<'a> {
     _writes: std::sync::MutexGuard<'a, ()>,
@@ -619,7 +619,7 @@ impl crate::data::DataLayer for FeedPg {
         None
     }
 
-    /// **What the database provides, measured** (ADR-XXXX): a transaction
+    /// **What the database provides, measured** (ADR-0246): a transaction
     /// opened as a command's is, asked its isolation and whether it may
     /// write.
     /// - Serializable is `serializable`; PostgreSQL's repeatable read is

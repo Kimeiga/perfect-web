@@ -958,7 +958,7 @@ impl Server {
     }
 
     /// [`Server::from_build`], the feed's data in the layer the deployment
-    /// opened (ADR-XXXX): PostgreSQL where it names one, the in-memory layer
+    /// opened (ADR-0246): PostgreSQL where it names one, the in-memory layer
     /// otherwise. Either is held to what the program's sources state before
     /// anything is served.
     fn from_build_with(
@@ -1004,7 +1004,7 @@ impl Server {
             store.clone()
         };
         // **What the program's sources state, its database provides**
-        // (ADR-XXXX): compared here, before anything is served, as an
+        // (ADR-0246): compared here, before anything is served, as an
         // operation no layer supplies is. ADR-0207 held a program to its
         // sources' statements; this holds the statements to the database. A
         // build from before `sources.json` states none.
@@ -1501,7 +1501,7 @@ impl Server {
                 .collect::<Result<Vec<_>, String>>()?;
             // A layer that keeps its own outbox commits the writes and the
             // events in its own transaction, and what it committed is what
-            // is delivered, read back from its outbox (ADR-XXXX). Refused,
+            // is delivered, read back from its outbox (ADR-0246). Refused,
             // nothing of the command is kept, and no one is told.
             let (emitted, invalidated) = match staging.commit(&emitted, &invalidated)? {
                 Some(committed) => committed,
@@ -5280,7 +5280,7 @@ fn main() {
         .nth(2)
         .unwrap_or_else(|| format!("{dist}/build"));
     // The feed's data in PostgreSQL, where the deployment names a database
-    // (ADR-XXXX); in memory otherwise. Its URL is the environment's, never
+    // (ADR-0246); in memory otherwise. Its URL is the environment's, never
     // the repository's. `PW_FEED_TRANSACTIONS=connection` leaves a command's
     // isolation to the database's default, which the host then measures.
     let isolation = match std::env::var("PW_FEED_TRANSACTIONS").as_deref() {
@@ -10061,7 +10061,7 @@ public query Store(",
         (dir, out)
     }
 
-    /// The feed on PostgreSQL (ADR-XXXX): its tests, which skip without a
+    /// The feed on PostgreSQL (ADR-0246): its tests, which skip without a
     /// database.
     mod feed_pg;
 
