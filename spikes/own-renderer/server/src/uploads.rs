@@ -145,6 +145,54 @@ pub(crate) struct Shared {
 /// **The leases, as the feed's data layer holds them.**
 pub(crate) type Leases = Arc<Shared>;
 
+impl std::fmt::Debug for Shared {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let names: Vec<&str> = self.declared.iter().map(|d| d.name.as_str()).collect();
+        f.debug_struct("Leases").field("declared", &names).finish()
+    }
+}
+
+/// **What a deployment states of its uploads' limits**: each, where it
+/// states one, applied to every upload the program declares.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Lowered {
+    pub max_bytes: Option<u64>,
+    pub max_width: Option<u64>,
+    pub max_height: Option<u64>,
+}
+
+/// **A deployment may lower a limit and never raise one** (the integrator's
+/// ruling on Q1): the program states what an upload may be, and a host may
+/// hold a browser to less. A deployment's limit above a program's is not
+/// taken as the lesser: the host refuses to start, since a deployment that
+/// asks for more than the program allows has misread one or the other.
+pub(crate) fn lowered(mut declared: Vec<Declared>, by: &Lowered) -> Result<Vec<Declared>, String> {
+    for d in &mut declared {
+        let lower = |what: &str, ours: &mut u64, theirs: Option<u64>| -> Result<(), String> {
+            match theirs {
+                Some(0) => Err(format!("the deployment's {what} for `{}` is zero", d.name)),
+                Some(n) if n > *ours => Err(format!(
+                    "the deployment's {what} for `{}` is {n}, above the program's {ours}: a \
+                     deployment may lower an upload's limit and never raise one",
+                    d.name
+                )),
+                Some(n) => {
+                    *ours = n;
+                    Ok(())
+                }
+                None => Ok(()),
+            }
+        };
+        let (mut w, mut h) = (d.max_width as u64, d.max_height as u64);
+        let mut bytes = d.max_bytes;
+        lower("max_bytes", &mut bytes, by.max_bytes)?;
+        lower("max_width", &mut w, by.max_width)?;
+        lower("max_height", &mut h, by.max_height)?;
+        (d.max_bytes, d.max_width, d.max_height) = (bytes, w as u32, h as u32);
+    }
+    Ok(declared)
+}
+
 /// **Where a development server keeps its blobs**: `PW_BLOB_DIR` where the
 /// deployment names it, and `blobs/` beside the documents otherwise.
 pub fn blob_root(dist: &std::path::Path) -> std::path::PathBuf {
@@ -175,6 +223,23 @@ impl Uploads {
         if declared.is_empty() {
             return Ok(Uploads::default());
         }
+        let deployment = |name: &str| -> Result<Option<u64>, String> {
+            match std::env::var(name) {
+                Ok(v) if !v.is_empty() => v
+                    .parse()
+                    .map(Some)
+                    .map_err(|_| format!("{name}={v} is not a count")),
+                _ => Ok(None),
+            }
+        };
+        let declared = lowered(
+            declared,
+            &Lowered {
+                max_bytes: deployment("PW_UPLOAD_MAX_BYTES")?,
+                max_width: deployment("PW_UPLOAD_MAX_WIDTH")?,
+                max_height: deployment("PW_UPLOAD_MAX_HEIGHT")?,
+            },
+        )?;
         let staged = root.join("staged");
         match std::fs::remove_dir_all(&staged) {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
@@ -227,9 +292,7 @@ impl Uploads {
         };
         shared.declared.iter().any(|d| match method {
             "POST" => route == d.route,
-            "GET" | "HEAD" => {
-                under(route, &d.serves).is_some() || under(route, &d.route).is_some()
-            }
+            "GET" | "HEAD" => under(route, &d.serves).is_some() || under(route, &d.route).is_some(),
             _ => false,
         })
     }
@@ -379,6 +442,7 @@ impl Answer {
         self.headers.push((name, value));
     }
 
+    #[cfg(test)]
     pub(crate) fn header(&self, name: &str) -> Option<&str> {
         self.headers
             .iter()
@@ -425,7 +489,7 @@ fn reason(code: u16) -> &'static str {
 /// `bytes` in megabytes, to a tenth, as a person reads a limit.
 fn megabytes(bytes: u64) -> String {
     let tenths = bytes * 10 / 1_000_000;
-    if tenths % 10 == 0 {
+    if tenths.is_multiple_of(10) {
         format!("{} MB", tenths / 10)
     } else {
         format!("{}.{} MB", tenths / 10, tenths % 10)
@@ -433,7 +497,7 @@ fn megabytes(bytes: u64) -> String {
 }
 
 impl Shared {
-    fn answer(
+    pub(crate) fn answer(
         &self,
         method: &str,
         route: &str,
@@ -482,7 +546,10 @@ impl Shared {
         else {
             return Answer::text(411, "an upload states its length");
         };
-        let too_large = format!("The image is larger than {}.", megabytes(declared.max_bytes));
+        let too_large = format!(
+            "The image is larger than {}.",
+            megabytes(declared.max_bytes)
+        );
         // Bounded before a byte is read: a length nothing checks is an
         // allocation anyone can ask for.
         if length > declared.max_bytes + FORM_OVERHEAD {
@@ -563,7 +630,10 @@ impl Shared {
         let size = bytes.len() as u64;
         let replaced = state.leases.get(session).map_or(0, |l| l.bytes);
         if state.staged_bytes - replaced + size > STAGED_CAP {
-            return Err((503, "Too many images are waiting to be posted; try again later."));
+            return Err((
+                503,
+                "Too many images are waiting to be posted; try again later.",
+            ));
         }
         let key = self
             .staged
@@ -758,13 +828,232 @@ impl Shared {
     }
 
     /// Where a committed image is served.
+    #[cfg(test)]
     pub(crate) fn src(&self, key: &BlobKey, kind: Kind) -> String {
-        let serves = self
-            .declared
-            .first()
-            .map_or("/images", |d| d.serves.as_str());
-        format!("{serves}/{}.{}", key.hex(), kind.word())
+        format!("{}/{}.{}", self.serves(), key.hex(), kind.word())
     }
+}
+
+// ---- What the feed's data layers keep of an upload, and how. ----
+
+use pw_host::engine::{HostFn, Val};
+
+/// **An image as a post keeps it** (the feed's `Row`, and its columns on
+/// PostgreSQL): its blob's key and kind, its width and height as a browser
+/// shows it, and its author's words for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ImageRow {
+    pub key: String,
+    pub kind: Kind,
+    pub width: u32,
+    pub height: u32,
+    pub alt: String,
+}
+
+impl ImageRow {
+    /// **The program's `Image`**: where it is served, its size, its words.
+    pub(crate) fn val(&self, serves: &str) -> Val {
+        Val::Record(vec![
+            (
+                "src".into(),
+                Val::String(format!("{serves}/{}.{}", self.key, self.kind.word())),
+            ),
+            ("width".into(), Val::S64(self.width as i64)),
+            ("height".into(), Val::S64(self.height as i64)),
+            ("alt".into(), Val::String(self.alt.clone())),
+        ])
+    }
+}
+
+/// **A post's images, as the program's `images: List<Image>`**: none, or
+/// the one it carries.
+pub(crate) fn images_val(image: Option<&ImageRow>, leases: Option<&Leases>) -> Val {
+    let serves = leases.map_or("/images", |l| l.serves());
+    Val::List(image.map(|i| i.val(serves)).into_iter().collect())
+}
+
+impl Shared {
+    /// Where committed images are served.
+    pub(crate) fn serves(&self) -> &str {
+        self.declared
+            .first()
+            .map_or("/images", |d| d.serves.as_str())
+    }
+}
+
+/// **The read a page makes of its session's lease**, the program's
+/// `List<Attached>`, none or one: `feed:data/uploads#attached`.
+pub(crate) fn attached_op(leases: Option<Leases>) -> HostFn {
+    Arc::new(move |args: &[Val]| match args {
+        [Val::String(session)] => {
+            let shown = leases.as_ref().and_then(|l| l.shown(session));
+            Ok(vec![Val::List(
+                shown
+                    .map(|s| {
+                        Val::Record(vec![
+                            ("src".into(), Val::String(s.src)),
+                            ("width".into(), Val::S64(s.width as i64)),
+                            ("height".into(), Val::S64(s.height as i64)),
+                        ])
+                    })
+                    .into_iter()
+                    .collect(),
+            )])
+        }
+        other => Err(format!("uploads#attached received {other:?}")),
+    })
+}
+
+/// What a command did with a claim.
+#[derive(Debug, PartialEq, Eq)]
+enum Fate {
+    Held,
+    Committed,
+    Discarded,
+}
+
+/// **What one command's transaction holds of the leases**: each claim, and
+/// what the command did with it. Ended by [`Claims::settle`] once the
+/// transaction commits; dropped without it, every claim is given back, so a
+/// command that fails, refuses or traps leaves its session's lease as it was.
+pub(crate) struct Claims {
+    leases: Option<Leases>,
+    held: Vec<(Claimed, Fate)>,
+    settled: bool,
+}
+
+/// A command's claims, shared by its operations.
+pub(crate) type Claiming = Arc<Mutex<Claims>>;
+
+impl Claims {
+    pub(crate) fn new(leases: Option<Leases>) -> Claiming {
+        Arc::new(Mutex::new(Claims {
+            leases,
+            held: Vec::new(),
+            settled: false,
+        }))
+    }
+
+    /// **The image a claim held by this command commits**, `upload` of
+    /// `session`, marked committed with its post; none where this command
+    /// holds no such claim, or has ended it.
+    pub(crate) fn commit(&mut self, session: &str, upload: &str, alt: &str) -> Option<ImageRow> {
+        let (claimed, fate) = self
+            .held
+            .iter_mut()
+            .find(|(c, f)| c.session == session && c.id == upload && *f == Fate::Held)?;
+        *fate = Fate::Committed;
+        Some(ImageRow {
+            key: claimed.key.hex().to_string(),
+            kind: claimed.kind,
+            width: claimed.width,
+            height: claimed.height,
+            alt: alt.to_string(),
+        })
+    }
+
+    /// **The images this command commits, put in the deployment's blob
+    /// storage**: before its transaction commits, so a committed post never
+    /// names bytes the deployment does not have. An error refuses the commit.
+    pub(crate) fn keep(&self) -> Result<(), String> {
+        let Some(leases) = &self.leases else {
+            return Ok(());
+        };
+        for (claimed, fate) in &self.held {
+            if *fate == Fate::Committed {
+                leases.keep(claimed)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// **The transaction committed**: each committed or discarded claim's
+    /// lease ended, and any other given back.
+    pub(crate) fn settle(&mut self) {
+        self.settled = true;
+        let Some(leases) = self.leases.clone() else {
+            return;
+        };
+        for (claimed, fate) in self.held.drain(..) {
+            match fate {
+                Fate::Committed => leases.committed(claimed),
+                Fate::Discarded => leases.discarded(claimed),
+                Fate::Held => leases.unclaim(claimed),
+            }
+        }
+    }
+}
+
+impl Drop for Claims {
+    fn drop(&mut self) {
+        if self.settled {
+            return;
+        }
+        if let Some(leases) = self.leases.clone() {
+            for (claimed, _) in self.held.drain(..) {
+                leases.unclaim(claimed);
+            }
+        }
+    }
+}
+
+/// **A command claims its session's lease**: `feed:data/uploads#claim`,
+/// the program's `resource.acquire<Upload>`. The handle is the lease's id;
+/// none leased, or claimed by another command, is not found.
+pub(crate) fn claim_op(claims: Claiming) -> HostFn {
+    Arc::new(move |args: &[Val]| match args {
+        [Val::String(session)] => {
+            let mut claims = claims.lock().expect("claims");
+            let claimed = claims.leases.as_ref().and_then(|l| l.claim(session));
+            Ok(vec![match claimed {
+                Some(claimed) => {
+                    let id = claimed.id.clone();
+                    claims.held.push((claimed, Fate::Held));
+                    crate::feed::ok(Val::String(id))
+                }
+                None => crate::feed::not_found(),
+            }])
+        }
+        other => Err(format!("uploads#claim received {other:?}")),
+    })
+}
+
+/// **A command discards the claim it holds**: `feed:data/uploads#discard`,
+/// the program's `resource.release<Upload>`. Its lease ends when the
+/// command commits, and what it showed is the answer.
+pub(crate) fn discard_op(claims: Claiming, staged: impl Fn() + Send + Sync + 'static) -> HostFn {
+    Arc::new(move |args: &[Val]| match args {
+        [Val::String(session), Val::String(upload)] => {
+            let mut claims = claims.lock().expect("claims");
+            let serves_route = claims
+                .leases
+                .as_ref()
+                .and_then(|l| l.declared.first().map(|d| d.route.clone()));
+            let Some((claimed, fate)) = claims
+                .held
+                .iter_mut()
+                .find(|(c, f)| c.session == *session && c.id == *upload && *f == Fate::Held)
+            else {
+                return Ok(vec![crate::feed::not_found()]);
+            };
+            *fate = Fate::Discarded;
+            let shown = Val::Record(vec![
+                (
+                    "src".into(),
+                    Val::String(format!(
+                        "{}/{}",
+                        serves_route.unwrap_or_default(),
+                        claimed.id
+                    )),
+                ),
+                ("width".into(), Val::S64(claimed.width as i64)),
+                ("height".into(), Val::S64(claimed.height as i64)),
+            ]);
+            staged();
+            Ok(vec![crate::feed::ok(shown)])
+        }
+        other => Err(format!("uploads#discard received {other:?}")),
+    })
 }
 
 #[cfg(test)]
@@ -902,12 +1191,27 @@ pub(crate) mod tests {
         let json = serde_json::to_string(&vec![declared()]).unwrap();
         std::fs::write(d.path().join("uploads.json"), json).unwrap();
         let root = d.path().join("root");
-        LocalBlobs::new(root.join("staged")).unwrap().put(b"left over").unwrap();
-        let kept = LocalBlobs::new(root.join("blobs")).unwrap().put(b"a post's").unwrap();
+        LocalBlobs::new(root.join("staged"))
+            .unwrap()
+            .put(b"left over")
+            .unwrap();
+        let kept = LocalBlobs::new(root.join("blobs"))
+            .unwrap()
+            .put(b"a post's")
+            .unwrap();
         let u = Uploads::from_build(d.path(), &root).expect("built");
         assert!(u.claims("POST", "/uploads/post-image"));
-        assert_eq!(files(&root.join("staged")), 0, "no lease outlives its server");
-        assert!(root.join("blobs").join(&kept.hex()[..2]).join(kept.hex()).is_file());
+        assert_eq!(
+            files(&root.join("staged")),
+            0,
+            "no lease outlives its server"
+        );
+        assert!(
+            root.join("blobs")
+                .join(&kept.hex()[..2])
+                .join(kept.hex())
+                .is_file()
+        );
     }
 
     #[test]
@@ -933,7 +1237,11 @@ pub(crate) mod tests {
         );
         assert_eq!(mine.header("cache-control"), Some("private, no-store"));
         assert_eq!(mine.header("x-content-type-options"), Some("nosniff"));
-        assert_eq!(get(&u, &shown.src, "s-2", "").status, 404, "another's lease");
+        assert_eq!(
+            get(&u, &shown.src, "s-2", "").status,
+            404,
+            "another's lease"
+        );
         // Not served where committed images are: no post holds it.
         let key = BlobKey::of(&png(64, 48));
         let at = format!("/images/{}.png", key.hex());
@@ -956,7 +1264,10 @@ pub(crate) mod tests {
         let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(1)\"/>";
         assert_eq!(post(&u, "s-1", svg, "x.svg", "image/svg+xml").status, 415);
         // A PNG sent as a JPEG is a PNG.
-        assert_eq!(post(&u, "s-1", &png(2, 2), "x.jpg", "image/jpeg").status, 303);
+        assert_eq!(
+            post(&u, "s-1", &png(2, 2), "x.jpg", "image/jpeg").status,
+            303
+        );
         let shown = shared(&u).shown("s-1").expect("leased");
         let served = get(&u, &shown.src, "s-1", "");
         assert_eq!(served.header("content-type"), Some("image/png"));
@@ -1000,7 +1311,10 @@ pub(crate) mod tests {
         );
         assert_eq!(a.status, 413);
         assert_eq!(never.position(), 0, "nothing of the body read");
-        assert!(a.unread > 0, "and what is drained after the answer is bounded");
+        assert!(
+            a.unread > 0,
+            "and what is drained after the answer is bounded"
+        );
         assert!(a.unread <= 2 * (4096 + FORM_OVERHEAD));
     }
 
@@ -1008,11 +1322,17 @@ pub(crate) mod tests {
     fn the_dimensions_are_held() {
         let d = dir();
         let u = uploads(d.path(), declared(), LEASE);
-        assert_eq!(post(&u, "s-1", &png(640, 480), "a.png", "image/png").status, 303);
+        assert_eq!(
+            post(&u, "s-1", &png(640, 480), "a.png", "image/png").status,
+            303
+        );
         let a = post(&u, "s-2", &png(641, 480), "a.png", "image/png");
         assert_eq!(a.status, 422);
         assert!(body(&a).contains("641 by 480 pixels"));
-        assert_eq!(post(&u, "s-2", &png(640, 481), "a.png", "image/png").status, 422);
+        assert_eq!(
+            post(&u, "s-2", &png(640, 481), "a.png", "image/png").status,
+            422
+        );
         let mut bad = png(4, 4);
         bad[20] ^= 1; // the height, its CRC not
         assert_eq!(post(&u, "s-2", &bad, "a.png", "image/png").status, 422);
@@ -1039,9 +1359,10 @@ pub(crate) mod tests {
         assert_eq!(run(&ok, true), 403, "a session the browser was not given");
         let cross = ok.replace("Sec-Fetch-Site: same-origin", "Sec-Fetch-Site: cross-site");
         assert_eq!(run(&cross, false), 403);
-        let other = ok
-            .replace("Sec-Fetch-Site: same-origin\r\n", "")
-            .replace("Origin: http://127.0.0.1:3143", "Origin: http://evil.example");
+        let other = ok.replace("Sec-Fetch-Site: same-origin\r\n", "").replace(
+            "Origin: http://127.0.0.1:3143",
+            "Origin: http://evil.example",
+        );
         assert_eq!(run(&other, false), 403);
         let chunked = format!("{ok}Transfer-Encoding: chunked\r\n");
         assert_eq!(run(&chunked, false), 411);
@@ -1058,12 +1379,21 @@ pub(crate) mod tests {
             back("Host: a:1\r\nReferer: http://a:1/post/p1?x=1\r\n"),
             "/post/p1?x=1"
         );
-        assert_eq!(back("Host: a:1\r\nReferer: http://evil.example/post\r\n"), "/");
-        assert_eq!(back("Host: a:1\r\nReferer: http://a:1//evil.example/\r\n"), "/");
+        assert_eq!(
+            back("Host: a:1\r\nReferer: http://evil.example/post\r\n"),
+            "/"
+        );
+        assert_eq!(
+            back("Host: a:1\r\nReferer: http://a:1//evil.example/\r\n"),
+            "/"
+        );
         assert_eq!(back("Host: a:1\r\n"), "/");
         let page = Answer::refused(415, "<b>", "/\"><script>");
         let text = String::from_utf8(page.body).unwrap();
-        assert!(!text.contains("<b>") && !text.contains("<script>"), "{text}");
+        assert!(
+            !text.contains("<b>") && !text.contains("<script>"),
+            "{text}"
+        );
     }
 
     #[test]
@@ -1071,13 +1401,25 @@ pub(crate) mod tests {
         let d = dir();
         let u = uploads(d.path(), declared(), LEASE);
         let staged = d.path().join("staged");
-        assert_eq!(post(&u, "s-1", &png(2, 2), "a.png", "image/png").status, 303);
-        assert_eq!(post(&u, "s-1", &png(3, 3), "a.png", "image/png").status, 303);
+        assert_eq!(
+            post(&u, "s-1", &png(2, 2), "a.png", "image/png").status,
+            303
+        );
+        assert_eq!(
+            post(&u, "s-1", &png(3, 3), "a.png", "image/png").status,
+            303
+        );
         assert_eq!(files(&staged), 1, "the first blob forgotten");
         assert_eq!(shared(&u).shown("s-1").map(|s| s.width), Some(3));
         // The same bytes from two sessions are one blob, held twice.
-        assert_eq!(post(&u, "s-2", &png(3, 3), "b.png", "image/png").status, 303);
-        assert_eq!(post(&u, "s-1", &png(4, 4), "a.png", "image/png").status, 303);
+        assert_eq!(
+            post(&u, "s-2", &png(3, 3), "b.png", "image/png").status,
+            303
+        );
+        assert_eq!(
+            post(&u, "s-1", &png(4, 4), "a.png", "image/png").status,
+            303
+        );
         assert_eq!(files(&staged), 2, "s-2 still holds the 3 by 3");
     }
 
@@ -1086,12 +1428,21 @@ pub(crate) mod tests {
         let d = dir();
         let u = uploads(d.path(), declared(), Duration::ZERO);
         let s = shared(&u);
-        assert_eq!(post(&u, "s-1", &png(2, 2), "a.png", "image/png").status, 303);
+        assert_eq!(
+            post(&u, "s-1", &png(2, 2), "a.png", "image/png").status,
+            303
+        );
         let claimed = s.claim("s-1").expect("claimed before the sweep");
-        assert_eq!(post(&u, "s-2", &png(3, 3), "b.png", "image/png").status, 303);
+        assert_eq!(
+            post(&u, "s-2", &png(3, 3), "b.png", "image/png").status,
+            303
+        );
         assert!(s.shown("s-1").is_some(), "a claimed lease is not swept");
         s.unclaim(claimed);
-        assert_eq!(post(&u, "s-3", &png(4, 4), "c.png", "image/png").status, 303);
+        assert_eq!(
+            post(&u, "s-3", &png(4, 4), "c.png", "image/png").status,
+            303
+        );
         assert!(s.shown("s-1").is_none(), "swept once given back");
         assert!(s.shown("s-2").is_none());
         assert_eq!(files(&d.path().join("staged")), 1, "s-3's alone");
@@ -1103,7 +1454,10 @@ pub(crate) mod tests {
         let u = uploads(d.path(), declared(), LEASE);
         let s = shared(&u);
         assert!(s.claim("s-1").is_none(), "nothing leased");
-        assert_eq!(post(&u, "s-1", &png(64, 48), "a.png", "image/png").status, 303);
+        assert_eq!(
+            post(&u, "s-1", &png(64, 48), "a.png", "image/png").status,
+            303
+        );
         let claimed = s.claim("s-1").expect("claimed");
         assert!(s.claim("s-1").is_none(), "claimed once");
         assert_eq!(
@@ -1146,11 +1500,120 @@ pub(crate) mod tests {
         assert_eq!(get(&u, "/images/../../etc/passwd", "s", "").status, 404);
 
         // A second lease, discarded: its blob forgotten.
-        assert_eq!(post(&u, "s-1", &png(5, 5), "b.png", "image/png").status, 303);
+        assert_eq!(
+            post(&u, "s-1", &png(5, 5), "b.png", "image/png").status,
+            303
+        );
         let claimed = s.claim("s-1").expect("claimed");
         s.discarded(claimed);
         assert!(s.shown("s-1").is_none());
         assert_eq!(files(&d.path().join("staged")), 0);
-        assert_eq!(files(&d.path().join("blobs")), 1, "the committed image alone");
+        assert_eq!(
+            files(&d.path().join("blobs")),
+            1,
+            "the committed image alone"
+        );
+    }
+
+    #[test]
+    fn a_deployment_lowers_a_limit_and_never_raises_one() {
+        let lower = |by: Lowered| lowered(vec![declared()], &by);
+        let lowered_to = lower(Lowered {
+            max_bytes: Some(1000),
+            max_width: Some(320),
+            max_height: None,
+        })
+        .expect("lowered");
+        assert_eq!(
+            (
+                lowered_to[0].max_bytes,
+                lowered_to[0].max_width,
+                lowered_to[0].max_height
+            ),
+            (1000, 320, 480)
+        );
+        assert_eq!(
+            lower(Lowered::default()).expect("as declared"),
+            vec![declared()]
+        );
+        for raised in [
+            Lowered {
+                max_bytes: Some(4097),
+                ..Lowered::default()
+            },
+            Lowered {
+                max_width: Some(641),
+                ..Lowered::default()
+            },
+            Lowered {
+                max_height: Some(0),
+                ..Lowered::default()
+            },
+        ] {
+            let why = lower(raised).expect_err("refused");
+            assert!(why.contains("deployment"), "{why}");
+        }
+        // Lowered, the host holds a browser to the lower.
+        let d = dir();
+        let mut small = declared();
+        small.max_width = 63;
+        let u = uploads(d.path(), small, LEASE);
+        assert_eq!(
+            post(&u, "s-1", &png(64, 48), "a.png", "image/png").status,
+            422
+        );
+    }
+
+    /// **A command that does not commit gives its claim back**: its claims
+    /// dropped unsettled, whatever it did with them, and settled, each ended
+    /// as the command said.
+    #[test]
+    fn a_claim_no_transaction_commits_is_given_back() {
+        let d = dir();
+        let u = uploads(d.path(), declared(), LEASE);
+        let leases = u.leases().expect("declared");
+        assert_eq!(
+            post(&u, "s-1", &png(8, 8), "a.png", "image/png").status,
+            303
+        );
+        let call = |op: &HostFn, args: &[Val]| op(args).expect("runs").remove(0);
+        let id = {
+            let claims = Claims::new(Some(leases.clone()));
+            let claimed = call(&claim_op(claims.clone()), &[Val::String("s-1".into())]);
+            let Val::Result(Ok(Some(id))) = claimed else {
+                panic!("claimed: {claimed:?}")
+            };
+            let Val::String(id) = *id else { panic!() };
+            assert!(claims.lock().unwrap().commit("s-1", &id, "words").is_some());
+            assert!(leases.claim("s-1").is_none(), "held while the command runs");
+            id
+            // Dropped here, unsettled: the command failed.
+        };
+        assert!(
+            leases.shown("s-1").is_some(),
+            "the lease is the session's again"
+        );
+        let claims = Claims::new(Some(leases.clone()));
+        let again = call(&claim_op(claims.clone()), &[Val::String("s-1".into())]);
+        assert!(matches!(again, Val::Result(Ok(_))), "{again:?}");
+        // Another session's handle, or one not claimed, is not found.
+        let other = call(
+            &discard_op(claims.clone(), || {}),
+            &[Val::String("s-2".into()), Val::String(id.clone())],
+        );
+        assert!(matches!(other, Val::Result(Err(_))), "{other:?}");
+        let discarded = call(
+            &discard_op(claims.clone(), || {}),
+            &[Val::String("s-1".into()), Val::String(id.clone())],
+        );
+        assert!(matches!(discarded, Val::Result(Ok(_))), "{discarded:?}");
+        assert!(
+            claims.lock().unwrap().commit("s-1", &id, "words").is_none(),
+            "discarded, it is committed with no post"
+        );
+        claims.lock().unwrap().settle();
+        assert!(leases.shown("s-1").is_none(), "settled, the lease is ended");
+        assert_eq!(files(&d.path().join("staged")), 0);
+        assert_eq!(files(&d.path().join("blobs")), 0, "a discard keeps nothing");
     }
 }

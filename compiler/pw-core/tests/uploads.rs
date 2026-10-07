@@ -95,7 +95,14 @@ fn an_upload_that_states_its_limits_checks() {
 
 #[test]
 fn every_clause_is_stated() {
-    for head in ["route", "serves", "max_bytes", "types", "max_width", "max_height"] {
+    for head in [
+        "route",
+        "serves",
+        "max_bytes",
+        "types",
+        "max_width",
+        "max_height",
+    ] {
         let without: String = PROGRAM
             .lines()
             .filter(|l| !l.trim_start().starts_with(&format!("{head} ")))
@@ -146,15 +153,23 @@ fn its_types_are_a_closed_set() {
 #[test]
 fn its_paths_are_literal_paths() {
     for (from, to) in [
-        ("route      \"/uploads/post-image\"", "route      \"/uploads/{kind}\""),
-        ("route      \"/uploads/post-image\"", "route      \"uploads\""),
+        (
+            "route      \"/uploads/post-image\"",
+            "route      \"/uploads/{kind}\"",
+        ),
+        (
+            "route      \"/uploads/post-image\"",
+            "route      \"uploads\"",
+        ),
         ("serves     \"/images\"", "serves     \"/images/\""),
         ("serves     \"/images\"", "serves     \"/Images?x=1\""),
     ] {
         let changed = PROGRAM.replace(from, to);
         let found = uploads(&changed);
         assert!(
-            found.iter().any(|d| d.starts_with("PW5601") && d.contains("is not a literal path")),
+            found
+                .iter()
+                .any(|d| d.starts_with("PW5601") && d.contains("is not a literal path")),
             "{to}: {found:?}"
         );
     }
@@ -167,25 +182,38 @@ fn its_clauses_are_an_uploads_alone() {
         "    route     \"/about\"\n",
         "    route     \"/about\"\n    max_bytes 10\n",
     );
-    assert!(uploads(&on_page).iter().any(|d| d.starts_with("PW5105")), "{:?}", uploads(&on_page));
-    let on_upload = PROGRAM.replace("    max_height 4096\n", "    max_height 4096\n    cache      shared\n");
+    assert!(
+        uploads(&on_page).iter().any(|d| d.starts_with("PW5105")),
+        "{:?}",
+        uploads(&on_page)
+    );
+    let on_upload = PROGRAM.replace(
+        "    max_height 4096\n",
+        "    max_height 4096\n    cache      shared\n",
+    );
     assert!(uploads(&on_upload).iter().any(|d| d.starts_with("PW5105")));
 }
 
 #[test]
 fn its_paths_are_no_pages() {
-    let page_at_route = PROGRAM.replace("route     \"/about\"", "route     \"/uploads/post-image\"");
+    let page_at_route =
+        PROGRAM.replace("route     \"/about\"", "route     \"/uploads/post-image\"");
     assert_eq!(
         uploads(&page_at_route),
-        ["PW5602 `PostImage` answers `/uploads/post-image`, its route, and so does the page \
-          `About`, at `/uploads/post-image`"]
+        [
+            "PW5602 `PostImage` answers `/uploads/post-image`, its route, and so does the page \
+          `About`, at `/uploads/post-image`"
+        ]
     );
     let page_under_serves = PROGRAM.replace("route     \"/about\"", "route     \"/images/{id}\"");
     let found = uploads(&page_under_serves);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found[0].contains("what it serves"), "{found:?}");
     // A parameter in the page's route at the lease's segment.
-    let lease = PROGRAM.replace("route     \"/about\"", "route     \"/uploads/post-image/7\"");
+    let lease = PROGRAM.replace(
+        "route     \"/about\"",
+        "route     \"/uploads/post-image/7\"",
+    );
     assert!(uploads(&lease)[0].contains("its lease"));
     // The control: a page beside it, not under it.
     let beside = PROGRAM.replace("route     \"/about\"", "route     \"/images\"");
@@ -201,16 +229,22 @@ fn two_uploads_are_at_two_paths() {
     );
     let found = uploads(&second);
     assert!(
-        found.iter().any(|d| d.starts_with("PW5602 `Avatar` answers `/uploads/post-image`")),
+        found
+            .iter()
+            .any(|d| d.starts_with("PW5602 `Avatar` answers `/uploads/post-image`")),
         "{found:?}"
     );
-    let apart = second.replace("route      \"/uploads/post-image\"\n    serves     \"/avatars\"", "route      \"/uploads/avatar\"\n    serves     \"/avatars\"");
+    let apart = second.replace(
+        "route      \"/uploads/post-image\"\n    serves     \"/avatars\"",
+        "route      \"/uploads/avatar\"\n    serves     \"/avatars\"",
+    );
     assert_eq!(uploads(&apart), Vec::<String>::new());
 }
 
 #[test]
 fn a_form_that_sends_a_file_posts_it_to_an_upload() {
-    let form = "<form method=\"post\" action=\"/uploads/post-image\" enctype=\"multipart/form-data\">";
+    let form =
+        "<form method=\"post\" action=\"/uploads/post-image\" enctype=\"multipart/form-data\">";
     for (to, fault) in [
         (
             "<form method=\"post\" action=\"/about\" enctype=\"multipart/form-data\">",
@@ -233,7 +267,8 @@ fn a_form_that_sends_a_file_posts_it_to_an_upload() {
         let found = uploads(&changed);
         assert_eq!(found.len(), 1, "{to}: {found:?}");
         assert!(
-            found[0].starts_with("PW5603 a form in `Home` that sends a file") && found[0].contains(fault),
+            found[0].starts_with("PW5603 a form in `Home` that sends a file")
+                && found[0].contains(fault),
             "{to}: {found:?}"
         );
     }
@@ -281,6 +316,9 @@ fn a_build_writes_each_upload_for_its_host() {
         }]
     );
     // A link to an upload's route is no link to a page (PW5009).
-    let link = PROGRAM.replace("<h1>About</h1>", "<h1>About</h1><a href=\"/uploads/post-image\">x</a>");
+    let link = PROGRAM.replace(
+        "<h1>About</h1>",
+        "<h1>About</h1><a href=\"/uploads/post-image\">x</a>",
+    );
     assert!(reported(&link).iter().any(|d| d.starts_with("PW5009")));
 }

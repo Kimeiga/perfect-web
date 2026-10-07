@@ -316,10 +316,13 @@ fn taken(hirs: &[&Hir], unit: usize, out: &mut Vec<Diagnostic>) {
 
 /// A static attribute's value, without its quotes.
 fn static_attr<'a>(attrs: &'a [crate::hir::Attr], name: &str) -> Option<&'a str> {
-    attrs.iter().find(|a| a.name == name).and_then(|a| match &a.value {
-        AttrValue::Static(raw) => Some(raw.trim_matches('"')),
-        _ => None,
-    })
+    attrs
+        .iter()
+        .find(|a| a.name == name)
+        .and_then(|a| match &a.value {
+            AttrValue::Static(raw) => Some(raw.trim_matches('"')),
+            _ => None,
+        })
 }
 
 fn forms(hir: &Hir, uploads: &[String], out: &mut Vec<Diagnostic>) {
@@ -386,7 +389,11 @@ fn forms(hir: &Hir, uploads: &[String], out: &mut Vec<Diagnostic>) {
             out.push(diagnostic(
                 codes::FILE_FORM_POSTS_TO_NO_UPLOAD,
                 "file_form_posts_to_no_upload",
-                format!("a form in `{}` that sends a file {}", decl.name, faults.join(", ")),
+                format!(
+                    "a form in `{}` that sends a file {}",
+                    decl.name,
+                    faults.join(", ")
+                ),
                 span,
                 vec![Related {
                     span: hir.decl_span(id),

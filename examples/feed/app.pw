@@ -43,6 +43,7 @@ type Post = Post {
     text: String,
     likes: Int,
     replies: List<Post>,
+    images: List<Image>, // Track `uploads` (ADR-XXXX): none, or one.
 }
 
 // **A post as a timeline shows it** (ADR-0222): who wrote it, what it says,
@@ -55,7 +56,50 @@ type Item = Item {
     // Whether the reader wrote it (track `identity`): the timeline is
     // private, and a post its author may delete shows a Delete button.
     mine: Bool,
+    images: List<Image>, // Track `uploads` (ADR-XXXX): none, or one.
 }
+
+// --- Track `uploads` (ADR-XXXX): an image on a post. -----------------------
+
+// **An image a post carries**: where it is served, its width and height as
+// a browser shows it, so its page keeps its place before it loads
+// (ADR-0187), and its author's words for whoever cannot see it.
+type Image = Image { src: String, width: Int, height: Int, alt: String }
+
+// **An image's words for whoever cannot see it**: something, and at most
+// 1000 characters. A post's image has them, or is not posted.
+opaque type AltText = String where String.length(value) >= 1 & String.length(value) <= 1000
+
+// **A draft as an image's words, or none**, as `post_text` is a post's.
+fn alt_text(draft: String) -> Option<AltText> !{} {
+    if String.length(draft) >= 1 & String.length(draft) <= 1000 {
+        Some(AltText(draft))
+    } else {
+        None
+    }
+}
+
+// **The image the session attached, waiting for its post**: where its page
+// shows it, and its width and height. The upload itself is the host's: a
+// page never holds it.
+type Attached = Attached { src: String, width: Int, height: Int }
+
+// **An attached image, claimed by a command** (ADR-0250): an acquisition,
+// which the command commits with its post or discards, on every path.
+opaque type Upload = String
+
+// **What a post's image may be**: the host reads a form's file posted to its
+// route within these, sniffing its kind from its bytes, and serves what a
+// post commits under `/images`.
+upload PostImage
+    route      "/uploads/post-image"
+    serves     "/images"
+    max_bytes  5_000_000
+    types      png, jpeg, webp, gif
+    max_width  4096
+    max_height 4096
+
+// --- end of track `uploads`'s types. -----------------------------------------
 
 // **Who follows whom** (ADR-0257): a row a follow writes and an unfollow
 // deletes, the follower first.
@@ -133,6 +177,27 @@ fn add_reply(s: Session<SessionId>, to: PostId, text: PostText) -> Result<Post, 
 
 fn add_like(s: Session<SessionId>, post: PostId) -> Result<Post, FeedError> !{ database.write<Post> }
     host "feed:data/posts#like"
+
+// **The image the session attached** (track `uploads`): none, or the one.
+// A list, since a handler that reads it takes no `Option` apart (ADR-0033).
+fn attached(s: Session<SessionId>) -> List<Attached> !{ database.read<Attached> }
+    host "feed:data/uploads#attached"
+
+// **The session's attached image, claimed** (track `uploads`): held by the
+// command until it commits it with a post or discards it. None attached is
+// not found.
+fn claim(s: Session<SessionId>) -> Result<Upload, FeedError> !{ database.read<Attached>, resource.acquire<Upload> }
+    host "feed:data/uploads#claim"
+
+// **A post with its image** (track `uploads`): the image committed with the
+// post, in its transaction, and the claim ended.
+fn publish_image(s: Session<SessionId>, text: PostText, alt: AltText, image: Upload) -> Result<Post, FeedError> !{ database.write<Post>, resource.release<Upload> }
+    host "feed:data/posts#publish-image"
+
+// **An attached image, discarded** (track `uploads`): the claim ended, and
+// nothing posted.
+fn discard(s: Session<SessionId>, image: Upload) -> Result<Attached, FeedError> !{ database.write<Attached>, resource.release<Upload> }
+    host "feed:data/uploads#discard"
 
 // **The timeline of those the session's user follows** (ADR-0257): their
 // posts and its own, newest first, at most `limit`.
@@ -238,6 +303,20 @@ session query Relation(session: Session<SessionId>, user: UserId) -> Relation
     relation(session, user)
 }
 
+// **The image the session attached** (track `uploads`): the reader's own,
+// read again whenever its page is, since a form posts it.
+session query Attached(session: Session<SessionId>) -> List<Attached>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            session
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    attached(session)
+}
+
 public query Thread(id: PostId) -> Result<Post, FeedError>
     freshness      5.seconds
     consistency    snapshot
@@ -260,6 +339,29 @@ command post(text: PostText) -> Result<Post, FeedError>
     publish(current_session(), text)
 }
 
+// **A post with the image the session attached** (track `uploads`): the
+// image claimed, and committed with the post or the command refused. PW2005
+// holds the body to ending the claim on every path (ADR-0250).
+command post_image(text: PostText, alt: AltText) -> Result<Post, FeedError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    emits         Posted(author(current_session()))
+    invalidates   Attached(current_session())
+{
+    let image = claim(current_session())?
+    publish_image(current_session(), text, alt, image)
+}
+
+// **The attached image, removed** (track `uploads`): claimed and discarded.
+command discard_image() -> Result<Attached, FeedError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    invalidates   Attached(current_session())
+{
+    let image = claim(current_session())?
+    discard(current_session(), image)
+}
+
 // **A reply** (ADR-0231): a post, in its thread and in no timeline. The
 // thread page passes its `id`, the page's parameter, which keys the thread it
 // shows, so a reply is shown there before the server answers (ADR-0236,
@@ -278,13 +380,14 @@ command reply(to: PostId, text: PostText) -> Result<Post, FeedError>
 fn replied(thread: Post, text: PostText) -> Post !{} {
     let you = User { id: UserId("you"), handle: "@you", name: "You" }
     let id = PostId("pending-reply-{List.length(thread.replies)}")
-    let mine = Post { id: id, author: you, text: text.value, likes: 0, replies: [] }
+    let mine = Post { id: id, author: you, text: text.value, likes: 0, replies: [], images: [] }
     Post {
         id: thread.id,
         author: thread.author,
         text: thread.text,
         likes: thread.likes,
         replies: List.concat(thread.replies, [mine]),
+        images: thread.images,
     }
 }
 
@@ -293,7 +396,7 @@ fn replied(thread: Post, text: PostText) -> Post !{} {
 fn pending(feed: List<Item>, text: PostText) -> List<Item> !{} {
     let you = User { id: UserId("you"), handle: "@you", name: "You" }
     let id = PostId("pending-{List.length(feed)}")
-    List.concat([Item { id: id, author: you, text: text.value, likes: 0, mine: true }], feed)
+    List.concat([Item { id: id, author: you, text: text.value, likes: 0, mine: true, images: [] }], feed)
 }
 
 // **A count, in words** (ADR-0226): "1 reply", "3 likes". The thread
@@ -392,6 +495,7 @@ fn liked_thread(thread: Post, post: PostId) -> Post !{} {
             text: thread.text,
             likes: thread.likes + 1,
             replies: thread.replies,
+            images: thread.images,
         }
     } else {
         thread
@@ -402,7 +506,7 @@ fn liked_thread(thread: Post, post: PostId) -> Post !{} {
 // one more, in the timeline the page shows.
 fn liked(feed: List<Item>, post: PostId) -> List<Item> !{} {
     List.map(feed, (i) => if i.id == post {
-        Item { id: i.id, author: i.author, text: i.text, likes: i.likes + 1, mine: i.mine }
+        Item { id: i.id, author: i.author, text: i.text, likes: i.likes + 1, mine: i.mine, images: i.images }
     } else {
         i
     })
@@ -415,8 +519,10 @@ session page Home() {
 
     signal shown: Int = 20
     signal draft: String = ""
+    signal alt: String = "" // Track `uploads`: the attached image's words.
     let feed = query Timeline(current_session(), shown)
     let me = query Me(current_session())
+    let staged = query Attached(current_session()) // Track `uploads`.
 
     view {
         <title>Home</title>
@@ -431,14 +537,41 @@ session page Home() {
             <form method="get" action="/sign-in"><button type="submit">Sign in</button></form>
             <form method="get" action="/sign-up"><button type="submit">Sign up</button></form>
             {/if}
+            {#if me.signed_in}
+                {#each staged as a (a.src)}
+                    <figure class="attached">
+                        <img class="attached-image" src={a.src} width={a.width} height={a.height} alt="The image you attached">
+                        <figcaption>Attached, and posted with what you write next.</figcaption>
+                    </figure>
+                    <button class="remove-image" type="button" on:press={() => match discard_image() {
+                        Ok(_) => alt = "",
+                        Err(_) => alt = alt,
+                    }}>Remove image</button>
+                {/each}
+                <form id="attach" method="post" action="/uploads/post-image" enctype="multipart/form-data">
+                    <label>An image to attach <input type="file" name="image" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+                    <button type="submit">Attach</button>
+                </form>
+            {/if}
             <form on:submit|prevent={() => match post_text(draft) {
-                Some(text) => match post(text) {
-                    Ok(_) => draft = "",
-                    Err(_) => draft = draft,
+                Some(text) => if List.length(staged) > 0 {
+                    match alt_text(alt) {
+                        Some(words) => match post_image(text, words) {
+                            Ok(_) => draft = "",
+                            Err(_) => draft = draft,
+                        },
+                        None => draft = draft,
+                    }
+                } else {
+                    match post(text) {
+                        Ok(_) => draft = "",
+                        Err(_) => draft = draft,
+                    }
                 },
                 None => draft = draft,
             }}>
                 <label>What's happening? <textarea bind:value={draft}></textarea></label>
+                <label>The image, in words, for whoever cannot see it <textarea id="alt" bind:value={alt}></textarea></label>
                 <p id="left">{280 - String.length(draft)} left</p>
                 {#if String.length(draft) > 280}<p id="over" role="alert">Too long to post.</p>{/if}
                 <button type="submit" disabled={String.length(draft) == 0 | String.length(draft) > 280}>Post</button>
@@ -449,6 +582,9 @@ session page Home() {
                         <a class="author" href="/post/{p.id}">{p.author.name}</a>
                         <a class="handle" href="/user/{p.author.id}">{p.author.handle}</a>
                         <p>{p.text}</p>
+                        {#each p.images as shown_image (shown_image.src)}
+                            <img class="photo" src={shown_image.src} width={shown_image.width} height={shown_image.height} alt={shown_image.alt}>
+                        {/each}
                         <button type="button" on:press={resumable(captures = { p }) => match like(p.id) {
                             Ok(_) => draft = draft,
                             Err(_) => draft = draft,
@@ -471,6 +607,9 @@ session page Home() {
 view Replies(post: Post) {
     <article>
         <p><a href="/post/{post.id}">{post.author.name}</a></p>
+        {#each post.images as thread_image (thread_image.src)}
+            <img class="photo" src={thread_image.src} width={thread_image.width} height={thread_image.height} alt={thread_image.alt}>
+        {/each}
         <p>{post.text}</p>
         <ul>
             {#each post.replies as reply (reply.id)}
@@ -534,6 +673,9 @@ session page FollowingPage() {
                         <a class="author" href="/post/{item.id}">{item.author.name}</a>
                         <a class="handle" href="/user/{item.author.id}">{item.author.handle}</a>
                         <p>{item.text}</p>
+                        {#each item.images as followed_image (followed_image.src)}
+                            <img class="photo" src={followed_image.src} width={followed_image.width} height={followed_image.height} alt={followed_image.alt}>
+                        {/each}
                         <button type="button" on:press={resumable(captures = { item }) => match like(item.id) {
                             Ok(_) => shown = shown,
                             Err(_) => shown = shown,

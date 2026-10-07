@@ -1019,6 +1019,11 @@ impl Server {
         } else {
             store.clone()
         };
+        // TRACK SEAM (uploads, ADR-0253): the layer commits a post's image
+        // from the uploads' leases, in the post's own transaction.
+        if let Some(leases) = uploads.leases() {
+            data.uploaded_by(leases);
+        }
         // **What the program's sources state, its database provides**
         // (ADR-0246): compared here, before anything is served, as an
         // operation no layer supplies is. ADR-0207 held a program to its
@@ -10217,6 +10222,10 @@ public query Store(",
 
     /// TRACK SEAM (identity): accounts and sign-in, served.
     mod sign_in;
+
+    // TRACK SEAM (uploads, ADR-0253): an image on a post, in memory and on
+    // PostgreSQL where a database is named.
+    mod uploads;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent

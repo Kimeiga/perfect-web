@@ -150,7 +150,10 @@ mod tests {
         let path = dir.path().join(&k.hex()[..2]).join(k.hex());
         assert!(path.is_file(), "kept under its own digits");
         // Nothing but the blob in its directory: no temporary left.
-        assert_eq!(std::fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
+        assert_eq!(
+            std::fs::read_dir(path.parent().unwrap()).unwrap().count(),
+            1
+        );
         blobs.delete(&k).expect("delete");
         assert_eq!(blobs.get(&k).expect("gone"), None);
         blobs.delete(&k).expect("forgetting twice is nothing");

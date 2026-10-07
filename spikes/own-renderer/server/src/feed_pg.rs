@@ -36,6 +36,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0004_follows",
         include_str!("../migrations/feed/0004_follows.sql"),
     ),
+    // Track `uploads` (ADR-XXXX): a post's image, kept with it.
+    (
+        "0005_post_images",
+        include_str!("../migrations/feed/0005_post_images.sql"),
+    ),
 ];
 
 /// **How a command's transaction is opened.** The layer sets serializable on
@@ -123,15 +128,32 @@ struct Row {
     text: String,
     likes: i64,
     reply_to: Option<String>,
+    /// Track `uploads`: the image it carries.
+    image: Option<crate::uploads::ImageRow>,
 }
 
 /// The columns every read of a post selects, `p` the post.
 const POST_COLUMNS: &str = "p.id, p.author, u.handle, u.name, p.text, \
-     (SELECT count(*) FROM likes l WHERE l.post = p.id), p.reply_to";
+     (SELECT count(*) FROM likes l WHERE l.post = p.id), p.reply_to, \
+     p.image_key, p.image_kind, p.image_width, p.image_height, p.image_alt";
 
 fn row_of(r: &postgres::Row) -> Row {
     let handle: Option<String> = r.get(2);
     let name: Option<String> = r.get(3);
+    // Track `uploads`: all five columns, or none (`posts_image_whole`).
+    let key: Option<String> = r.get(7);
+    let kind: Option<String> = r.get(8);
+    let (width, height): (Option<i32>, Option<i32>) = (r.get(9), r.get(10));
+    let alt: Option<String> = r.get(11);
+    let image = (|| {
+        Some(crate::uploads::ImageRow {
+            key: key?,
+            kind: crate::uploads::sniff::Kind::named(&kind?)?,
+            width: u32::try_from(width?).ok()?,
+            height: u32::try_from(height?).ok()?,
+            alt: alt?,
+        })
+    })();
     Row {
         id: r.get(0),
         author: r.get(1),
@@ -139,23 +161,34 @@ fn row_of(r: &postgres::Row) -> Row {
         text: r.get(4),
         likes: r.get(5),
         reply_to: r.get(6),
+        image,
     }
 }
 
-/// A post as the program's `Post` is, `replies` inside it.
-fn post_val(row: &Row, replies: Vec<Val>) -> Val {
+/// A post as the program's `Post` is, `replies` inside it, its image served
+/// where `l` says.
+fn post_val(row: &Row, replies: Vec<Val>, l: Option<&crate::uploads::Leases>) -> Val {
     Val::Record(vec![
         ("id".into(), Val::String(row.id.clone())),
         ("author".into(), user_record(&row.author, row.known.clone())),
         ("text".into(), Val::String(row.text.clone())),
         ("likes".into(), Val::S64(row.likes)),
         ("replies".into(), Val::List(replies)),
+        (
+            "images".into(),
+            crate::uploads::images_val(row.image.as_ref(), l),
+        ),
     ])
 }
 
 /// **The timeline**: the newest `limit` posts that reply to none, each an
 /// `Item` (ADR-0222), and whether `reader` wrote it (track `identity`).
-fn timeline(c: &mut Client, limit: i64, reader: &str) -> Result<Val, postgres::Error> {
+fn timeline(
+    c: &mut Client,
+    limit: i64,
+    reader: &str,
+    l: Option<&crate::uploads::Leases>,
+) -> Result<Val, postgres::Error> {
     let rows = c.query(
         &format!(
             "SELECT {POST_COLUMNS} FROM posts p LEFT JOIN users u ON u.id = p.author \
@@ -164,13 +197,13 @@ fn timeline(c: &mut Client, limit: i64, reader: &str) -> Result<Val, postgres::E
         &[&limit.max(0)],
     )?;
     Ok(Val::List(
-        rows.iter().map(|r| item_of(row_of(r), reader)).collect(),
+        rows.iter().map(|r| item_of(row_of(r), reader, l)).collect(),
     ))
 }
 
 /// An `Item` as the timelines show it (ADR-0222), and whether `reader`
 /// wrote it (track `identity`).
-fn item_of(row: Row, reader: &str) -> Val {
+fn item_of(row: Row, reader: &str, l: Option<&crate::uploads::Leases>) -> Val {
     let mine = row.author == reader;
     Val::Record(vec![
         ("id".into(), Val::String(row.id)),
@@ -178,12 +211,21 @@ fn item_of(row: Row, reader: &str) -> Val {
         ("text".into(), Val::String(row.text)),
         ("likes".into(), Val::S64(row.likes)),
         ("mine".into(), Val::Bool(mine)),
+        (
+            "images".into(),
+            crate::uploads::images_val(row.image.as_ref(), l),
+        ),
     ])
 }
 
 /// **The timeline of those `reader` follows** (ADR-0257): its own posts and
 /// theirs that reply to none, the newest `limit`.
-fn following(c: &mut Client, reader: &str, limit: i64) -> Result<Val, postgres::Error> {
+fn following(
+    c: &mut Client,
+    reader: &str,
+    limit: i64,
+    l: Option<&crate::uploads::Leases>,
+) -> Result<Val, postgres::Error> {
     let rows = c.query(
         &format!(
             "SELECT {POST_COLUMNS} FROM posts p LEFT JOIN users u ON u.id = p.author \
@@ -195,7 +237,7 @@ fn following(c: &mut Client, reader: &str, limit: i64) -> Result<Val, postgres::
         &[&reader, &limit.max(0)],
     )?;
     Ok(Val::List(
-        rows.iter().map(|r| item_of(row_of(r), reader)).collect(),
+        rows.iter().map(|r| item_of(row_of(r), reader, l)).collect(),
     ))
 }
 
@@ -273,7 +315,7 @@ fn relation(c: &mut Client, reader: &str, user: &str) -> Result<Val, postgres::E
 
 /// **A thread**: the post and its replies, as deep as they go, read in one
 /// statement, so one snapshot.
-fn thread(c: &mut Client, id: &str) -> Result<Val, postgres::Error> {
+fn thread(c: &mut Client, id: &str, l: Option<&crate::uploads::Leases>) -> Result<Val, postgres::Error> {
     let rows = c.query(
         &format!(
             "WITH RECURSIVE t AS ( \
@@ -287,22 +329,26 @@ fn thread(c: &mut Client, id: &str) -> Result<Val, postgres::Error> {
     )?;
     let rows: Vec<Row> = rows.iter().map(row_of).collect();
     // Each post's replies, in the order they were written.
-    fn nested(rows: &[Row], row: &Row) -> Val {
+    fn nested(rows: &[Row], row: &Row, l: Option<&crate::uploads::Leases>) -> Val {
         let replies = rows
             .iter()
             .filter(|r| r.reply_to.as_deref() == Some(row.id.as_str()))
-            .map(|r| nested(rows, r))
+            .map(|r| nested(rows, r, l))
             .collect();
-        post_val(row, replies)
+        post_val(row, replies, l)
     }
     Ok(match rows.iter().find(|r| r.id == id) {
-        Some(root) => ok(nested(&rows, root)),
+        Some(root) => ok(nested(&rows, root, l)),
         None => not_found(),
     })
 }
 
 /// One post with its likes, its replies left to its thread.
-fn post_alone(c: &mut Client, id: &str) -> Result<Option<Val>, postgres::Error> {
+fn post_alone(
+    c: &mut Client,
+    id: &str,
+    l: Option<&crate::uploads::Leases>,
+) -> Result<Option<Val>, postgres::Error> {
     let row = c.query_opt(
         &format!(
             "SELECT {POST_COLUMNS} FROM posts p LEFT JOIN users u ON u.id = p.author \
@@ -310,7 +356,7 @@ fn post_alone(c: &mut Client, id: &str) -> Result<Option<Val>, postgres::Error> 
         ),
         &[&id],
     )?;
-    Ok(row.map(|r| post_val(&row_of(&r), Vec::new())))
+    Ok(row.map(|r| post_val(&row_of(&r), Vec::new(), l)))
 }
 
 /// One read, on a connection.
@@ -320,35 +366,49 @@ type Read<'r> = &'r mut dyn FnMut(&mut Client) -> Result<Val, String>;
 /// transaction.
 type Run = Arc<dyn Fn(Read<'_>) -> Result<Val, String> + Send + Sync>;
 
-/// The reads, each through `run`, a session's user its principal's.
-fn reads_through(run: Run, principals: Principals) -> crate::data::Ops {
+/// The reads, each through `run`, a session's user its principal's, a
+/// post's image served where `leases` says.
+fn reads_through(
+    run: Run,
+    principals: Principals,
+    leases: Option<crate::uploads::Leases>,
+) -> crate::data::Ops {
     let mut ops: crate::data::Ops = BTreeMap::new();
-    let (r, p) = (run.clone(), principals.clone());
+    // Track `uploads`: the image a session attached, waiting for its post.
+    ops.insert(
+        "feed:data/uploads#attached".to_string(),
+        crate::uploads::attached_op(leases.clone()),
+    );
+    let (r, p, l) = (run.clone(), principals.clone(), leases.clone());
     ops.insert(
         "feed:data/posts#timeline".to_string(),
         Arc::new(move |args: &[Val]| match args {
             [Val::String(session), Val::S64(limit)] => {
                 let (limit, reader) = (*limit, p.user_of(session));
-                Ok(vec![r(&mut |c| timeline(c, limit, &reader).map_err(pg))?])
+                Ok(vec![r(&mut |c| {
+                    timeline(c, limit, &reader, l.as_ref()).map_err(pg)
+                })?])
             }
             other => Err(format!("posts#timeline received {other:?}")),
         }),
     );
-    let r = run.clone();
+    let (r, l) = (run.clone(), leases.clone());
     ops.insert(
         "feed:data/posts#thread".to_string(),
         Arc::new(move |args: &[Val]| match args {
-            [Val::String(id)] => Ok(vec![r(&mut |c| thread(c, id).map_err(pg))?]),
+            [Val::String(id)] => Ok(vec![r(&mut |c| thread(c, id, l.as_ref()).map_err(pg))?]),
             other => Err(format!("posts#thread received {other:?}")),
         }),
     );
-    let (r, p) = (run.clone(), principals.clone());
+    let (r, p, l) = (run.clone(), principals.clone(), leases);
     ops.insert(
         "feed:data/posts#following".to_string(),
         Arc::new(move |args: &[Val]| match args {
             [Val::String(session), Val::S64(limit)] => {
                 let (reader, limit) = (p.user_of(session), *limit);
-                Ok(vec![r(&mut |c| following(c, &reader, limit).map_err(pg))?])
+                Ok(vec![r(&mut |c| {
+                    following(c, &reader, limit, l.as_ref()).map_err(pg)
+                })?])
             }
             other => Err(format!("posts#following received {other:?}")),
         }),
@@ -417,6 +477,8 @@ pub(crate) struct FeedPg {
     /// itself. A serializable transaction is what holds against any other
     /// writer of the database, and a commit it refuses keeps nothing.
     writes: Mutex<()>,
+    /// Track `uploads`: the leases a post's image is committed from.
+    uploaded: std::sync::OnceLock<crate::uploads::Leases>,
     /// Each session's principal (track `identity`): whom a session writes
     /// as. Until the server hands its own, every session is its own guest.
     principals: std::sync::RwLock<Principals>,
@@ -462,6 +524,7 @@ impl FeedPg {
             pool,
             isolation,
             writes: Mutex::new(()),
+            uploaded: std::sync::OnceLock::new(),
             principals: std::sync::RwLock::new(Principals::default()),
         })
     }
@@ -541,6 +604,9 @@ pub(crate) struct Staging<'a> {
     /// Whether its transaction committed; dropped otherwise, it rolls back.
     committed: bool,
     ops: crate::data::Ops,
+    /// Track `uploads`: the leases the command claimed, given back where it
+    /// does not commit.
+    claims: crate::uploads::Claiming,
 }
 
 impl crate::data::Staged for Staging<'_> {
@@ -597,8 +663,15 @@ impl crate::data::Staged for Staging<'_> {
         // The writes and the outbox's rows, at once or not at all. A commit
         // the database refuses (a serialization failure, a deferred
         // constraint) has rolled back, and nothing is delivered.
+        // Track `uploads`: a post's image in the deployment's blob storage
+        // before its row commits, so no committed post names bytes the
+        // deployment does not have.
+        self.claims.lock().expect("claims").keep()?;
         c.batch_execute("COMMIT").map_err(pg)?;
         self.committed = true;
+        // Track `uploads`: each lease the command committed or discarded
+        // ended, now that its transaction has.
+        self.claims.lock().expect("claims").settle();
         match delivered(c, &ids) {
             Ok(read) => Ok(Some(read)),
             // Committed, and not read back: what it handed is what
@@ -676,7 +749,12 @@ impl crate::data::DataLayer for FeedPg {
         reads_through(
             Arc::new(move |f: Read<'_>| pool.with(|c| Ok(f(c))).and_then(|r| r)),
             self.principals(),
+            self.uploaded.get().cloned(),
         )
+    }
+
+    fn uploaded_by(&self, leases: crate::uploads::Leases) {
+        let _ = self.uploaded.set(leases);
     }
 
     fn identified_by(&self, principals: Principals) {
@@ -711,7 +789,23 @@ impl crate::data::DataLayer for FeedPg {
             })
         };
         let principals = self.principals();
-        let mut ops = reads_through(run, principals.clone());
+        let leases = self.uploaded.get().cloned();
+        let mut ops = reads_through(run, principals.clone(), leases.clone());
+        // Track `uploads`: a command claims its session's attached image,
+        // commits it with a post, or discards it.
+        let claims = crate::uploads::Claims::new(leases.clone());
+        ops.insert(
+            "feed:data/uploads#claim".to_string(),
+            crate::uploads::claim_op(claims.clone()),
+        );
+        let discarded = wrote.clone();
+        ops.insert(
+            "feed:data/uploads#discard".to_string(),
+            crate::uploads::discard_op(claims.clone(), move || {
+                // A discard commits, so its lease ends with the transaction.
+                discarded.store(true, Ordering::SeqCst)
+            }),
+        );
         let mut write = |key: &str, op: Arc<InTransaction>| {
             let (conn, why, wrote) = (conn.clone(), why.clone(), wrote.clone());
             ops.insert(
@@ -727,7 +821,7 @@ impl crate::data::DataLayer for FeedPg {
                 }),
             );
         };
-        let p = principals.clone();
+        let (p, l) = (principals.clone(), leases.clone());
         write(
             "feed:data/posts#publish",
             Arc::new(move |c: &mut Client, args: &[Val]| match args {
@@ -740,7 +834,7 @@ impl crate::data::DataLayer for FeedPg {
                         )
                         .map_err(pg)?;
                     let id: String = row.get(0);
-                    let post = post_alone(c, &id)
+                    let post = post_alone(c, &id, l.as_ref())
                         .map_err(pg)?
                         .ok_or("a post just written")?;
                     Ok((ok(post), true))
@@ -748,9 +842,53 @@ impl crate::data::DataLayer for FeedPg {
                 other => Err(format!("posts#publish received {other:?}")),
             }),
         );
+        // **A post with its image** (track `uploads`): the image the
+        // command's claim holds, written with the post in its transaction, by
+        // the author `publish` writes as. A handle this command did not claim
+        // is not found.
+        let (p, l, holding) = (principals.clone(), leases.clone(), claims.clone());
+        write(
+            "feed:data/posts#publish-image",
+            Arc::new(move |c: &mut Client, args: &[Val]| match args {
+                [
+                    Val::String(session),
+                    Val::String(text),
+                    Val::String(alt),
+                    Val::String(upload),
+                ] => {
+                    let Some(image) = holding.lock().expect("claims").commit(session, upload, alt)
+                    else {
+                        return Ok((not_found(), false));
+                    };
+                    let author = author(c, &p, session)?;
+                    let row = c
+                        .query_one(
+                            "INSERT INTO posts (author, text, image_key, image_kind, \
+                                 image_width, image_height, image_alt) \
+                             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+                            &[
+                                &author,
+                                text,
+                                &image.key,
+                                &image.kind.word(),
+                                &(image.width as i32),
+                                &(image.height as i32),
+                                &image.alt,
+                            ],
+                        )
+                        .map_err(pg)?;
+                    let id: String = row.get(0);
+                    let post = post_alone(c, &id, l.as_ref())
+                        .map_err(pg)?
+                        .ok_or("a post just written")?;
+                    Ok((ok(post), true))
+                }
+                other => Err(format!("posts#publish-image received {other:?}")),
+            }),
+        );
         // **A reply** (ADR-0231): a post that replies to `to`. To a post that
         // is not there, none.
-        let p = principals.clone();
+        let (p, l) = (principals.clone(), leases.clone());
         write(
             "feed:data/posts#reply",
             Arc::new(move |c: &mut Client, args: &[Val]| match args {
@@ -771,7 +909,7 @@ impl crate::data::DataLayer for FeedPg {
                         )
                         .map_err(pg)?;
                     let id: String = row.get(0);
-                    let post = post_alone(c, &id)
+                    let post = post_alone(c, &id, l.as_ref())
                         .map_err(pg)?
                         .ok_or("a reply just written")?;
                     Ok((ok(post), true))
@@ -860,7 +998,7 @@ impl crate::data::DataLayer for FeedPg {
                 other => Err(format!("posts#delete received {other:?}")),
             }),
         );
-        let p = principals;
+        let (p, l) = (principals, leases);
         write(
             "feed:data/posts#like",
             Arc::new(move |c: &mut Client, args: &[Val]| match args {
@@ -877,7 +1015,9 @@ impl crate::data::DataLayer for FeedPg {
                         &[id, &p.user_of(session)],
                     )
                     .map_err(pg)?;
-                    let post = post_alone(c, id).map_err(pg)?.ok_or("a post just liked")?;
+                    let post = post_alone(c, id, l.as_ref())
+                        .map_err(pg)?
+                        .ok_or("a post just liked")?;
                     Ok((ok(post), true))
                 }
                 other => Err(format!("posts#like received {other:?}")),
@@ -890,6 +1030,7 @@ impl crate::data::DataLayer for FeedPg {
             wrote,
             committed: false,
             ops,
+            claims,
         })
     }
 

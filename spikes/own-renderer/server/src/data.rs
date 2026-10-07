@@ -57,6 +57,11 @@ pub(crate) trait DataLayer: Send + Sync {
     /// knows no users ignores it.
     fn identified_by(&self, _principals: crate::identity::Principals) {}
 
+    /// **The uploads it commits with what it writes** (track `uploads`):
+    /// handed once, before anything is served, to a layer whose program
+    /// declares an upload. By default a layer keeps no upload.
+    fn uploaded_by(&self, _leases: crate::uploads::Leases) {}
+
     /// **Every operation it supplies**, read from the functions it builds,
     /// not from a list kept beside them.
     fn operations(&self) -> BTreeSet<String> {

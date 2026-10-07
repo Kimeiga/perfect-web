@@ -147,7 +147,11 @@ pub(crate) fn crc32(bytes: &[u8]) -> u32 {
     for &b in bytes {
         c ^= b as u32;
         for _ in 0..8 {
-            c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+            c = if c & 1 != 0 {
+                0xEDB8_8320 ^ (c >> 1)
+            } else {
+                c >> 1
+            };
         }
     }
     c ^ 0xFFFF_FFFF
@@ -316,13 +320,15 @@ fn jpeg(b: &[u8]) -> Result<(u32, u32), &'static str> {
 /// **An Exif TIFF structure's `Orientation`** (CIPA DC-008, tag `0112`, a
 /// SHORT in IFD0), where it has one it can read. A structure it cannot read
 /// says nothing, as a browser that cannot read it shows the image unturned.
+/// A reader of an unsigned integer at an offset, in one byte order.
+type Reader = fn(&[u8], usize) -> Option<u32>;
+
 pub(crate) fn orientation(tiff: &[u8]) -> Option<u32> {
-    let (r16, r32): (fn(&[u8], usize) -> Option<u32>, fn(&[u8], usize) -> Option<u32>) =
-        match tiff.get(0..2)? {
-            b"II" => (le16, le32),
-            b"MM" => (be16, be32),
-            _ => return None,
-        };
+    let (r16, r32): (Reader, Reader) = match tiff.get(0..2)? {
+        b"II" => (le16, le32),
+        b"MM" => (be16, be32),
+        _ => return None,
+    };
     if r16(tiff, 2)? != 42 {
         return None;
     }
@@ -331,7 +337,7 @@ pub(crate) fn orientation(tiff: &[u8]) -> Option<u32> {
     for i in 0..count {
         let entry = ifd.checked_add(2 + 12 * i)?;
         if r16(tiff, entry)? == 0x0112 && r16(tiff, entry + 2)? == 3 && r32(tiff, entry + 4)? == 1 {
-            return Some(r16(tiff, entry + 8)?);
+            return r16(tiff, entry + 8);
         }
     }
     None
@@ -414,8 +420,20 @@ mod tests {
 
     fn exif(order: &[u8; 2], orientation: u16) -> Vec<u8> {
         let big = order == b"MM";
-        let u16b = |v: u16| if big { v.to_be_bytes() } else { v.to_le_bytes() };
-        let u32b = |v: u32| if big { v.to_be_bytes() } else { v.to_le_bytes() };
+        let u16b = |v: u16| {
+            if big {
+                v.to_be_bytes()
+            } else {
+                v.to_le_bytes()
+            }
+        };
+        let u32b = |v: u32| {
+            if big {
+                v.to_be_bytes()
+            } else {
+                v.to_le_bytes()
+            }
+        };
         let mut d = b"Exif\0\0".to_vec();
         d.extend(order);
         d.extend(u16b(42));
@@ -447,7 +465,10 @@ mod tests {
     #[test]
     fn a_png_is_its_ihdrs_width_and_height() {
         assert_eq!(measure(&png_head(640, 480)), measured(Kind::Png, 640, 480));
-        assert_eq!(measure(&png_head(1, 70_000)), measured(Kind::Png, 1, 70_000));
+        assert_eq!(
+            measure(&png_head(1, 70_000)),
+            measured(Kind::Png, 1, 70_000)
+        );
     }
 
     #[test]
@@ -457,7 +478,10 @@ mod tests {
         crc[17] ^= 1; // the width changed, the CRC not
         assert_eq!(
             measure(&crc),
-            Err(Unreadable::Malformed(Kind::Png, "its IHDR chunk's CRC does not match"))
+            Err(Unreadable::Malformed(
+                Kind::Png,
+                "its IHDR chunk's CRC does not match"
+            ))
         );
         assert!(measure(&ok[..30]).is_err(), "cut in its CRC");
         assert!(measure(&png_head(0, 4)).is_err(), "zero wide");
@@ -473,8 +497,14 @@ mod tests {
 
     #[test]
     fn a_gif_is_its_logical_screens_width_and_height() {
-        assert_eq!(measure(&gif_head(b"GIF89a", 300, 2)), measured(Kind::Gif, 300, 2));
-        assert_eq!(measure(&gif_head(b"GIF87a", 2, 300)), measured(Kind::Gif, 2, 300));
+        assert_eq!(
+            measure(&gif_head(b"GIF89a", 300, 2)),
+            measured(Kind::Gif, 300, 2)
+        );
+        assert_eq!(
+            measure(&gif_head(b"GIF87a", 2, 300)),
+            measured(Kind::Gif, 2, 300)
+        );
         assert!(measure(&gif_head(b"GIF89a", 0, 3)).is_err());
         assert!(measure(&gif_head(b"GIF89a", 3, 3)[..12]).is_err());
         assert_eq!(sniff(&gif_head(b"GIF88a", 3, 3)), None, "no such version");
@@ -482,14 +512,23 @@ mod tests {
 
     #[test]
     fn a_webp_is_its_first_chunks_width_and_height() {
-        assert_eq!(measure(&riff(b"VP8 ", &vp8(321, 123))), measured(Kind::Webp, 321, 123));
+        assert_eq!(
+            measure(&riff(b"VP8 ", &vp8(321, 123))),
+            measured(Kind::Webp, 321, 123)
+        );
         // The two scale bits are not the size.
         assert_eq!(
             measure(&riff(b"VP8 ", &vp8(0xC000 | 321, 0x4000 | 123))),
             measured(Kind::Webp, 321, 123)
         );
-        assert_eq!(measure(&riff(b"VP8L", &vp8l(16384, 1))), measured(Kind::Webp, 16384, 1));
-        assert_eq!(measure(&riff(b"VP8L", &vp8l(5, 7))), measured(Kind::Webp, 5, 7));
+        assert_eq!(
+            measure(&riff(b"VP8L", &vp8l(16384, 1))),
+            measured(Kind::Webp, 16384, 1)
+        );
+        assert_eq!(
+            measure(&riff(b"VP8L", &vp8l(5, 7))),
+            measured(Kind::Webp, 5, 7)
+        );
         assert_eq!(
             measure(&riff(b"VP8X", &vp8x(70_000, 3))),
             measured(Kind::Webp, 70_000, 3)
@@ -515,7 +554,10 @@ mod tests {
             "a canvas over 2³²−1"
         );
         let whole = riff(b"VP8L", &vp8l(4, 4));
-        assert!(measure(&whole[..whole.len() - 1]).is_err(), "RIFF size past its end");
+        assert!(
+            measure(&whole[..whole.len() - 1]).is_err(),
+            "RIFF size past its end"
+        );
         // `WEBPVP`, its sniffing pattern, and an unknown chunk after `VP`.
         assert!(measure(&riff(b"VP8Z", &vp8l(4, 4))).is_err());
     }
@@ -523,10 +565,16 @@ mod tests {
     #[test]
     fn a_jpeg_is_its_first_frame_headers_width_and_height() {
         let jfif = (0xE0, b"JFIF\0\x01\x01\0\0\x01\0\x01\0\0".to_vec());
-        assert_eq!(measure(&jpeg_with(&[jfif.clone()], 640, 480)), measured(Kind::Jpeg, 640, 480));
+        assert_eq!(
+            measure(&jpeg_with(std::slice::from_ref(&jfif), 640, 480)),
+            measured(Kind::Jpeg, 640, 480)
+        );
         // Fill bytes before a marker, and a progressive frame (SOF2).
         let mut filled = jpeg_with(&[jfif], 8, 6);
-        let sof_at = filled.windows(2).position(|w| w == [0xFF, 0xC0]).expect("SOF0");
+        let sof_at = filled
+            .windows(2)
+            .position(|w| w == [0xFF, 0xC0])
+            .expect("SOF0");
         filled[sof_at + 1] = 0xC2;
         filled.splice(sof_at..sof_at, [0xFF, 0xFF]);
         assert_eq!(measure(&filled), measured(Kind::Jpeg, 8, 6));
@@ -544,21 +592,30 @@ mod tests {
         // An Exif structure it cannot read says nothing.
         let mut broken = exif(b"II", 6);
         broken[8] = 41;
-        assert_eq!(measure(&jpeg_with(&[(0xE1, broken)], 40, 30)), measured(Kind::Jpeg, 40, 30));
+        assert_eq!(
+            measure(&jpeg_with(&[(0xE1, broken)], 40, 30)),
+            measured(Kind::Jpeg, 40, 30)
+        );
     }
 
     #[test]
     fn a_jpeg_without_a_frame_header_is_refused() {
         let b = jpeg_with(&[], 640, 480);
         let sof_at = b.windows(2).position(|w| w == [0xFF, 0xC0]).expect("SOF0");
-        assert!(measure(&b[..sof_at + 6]).is_err(), "cut in its frame header");
+        assert!(
+            measure(&b[..sof_at + 6]).is_err(),
+            "cut in its frame header"
+        );
         let mut sos = b.clone();
         sos[sof_at + 1] = 0xDA;
         assert!(measure(&sos).is_err(), "a scan before any frame");
         let mut dht = b.clone();
         dht[sof_at + 1] = 0xC4; // DHT is not SOFn
         assert!(measure(&dht).is_err());
-        assert!(measure(&jpeg_with(&[], 640, 0)).is_err(), "Y defined by DNL");
+        assert!(
+            measure(&jpeg_with(&[], 640, 0)).is_err(),
+            "Y defined by DNL"
+        );
         assert!(measure(&jpeg_with(&[], 0, 480)).is_err(), "X zero");
         let mut length = b;
         length[4] = 0;
@@ -569,13 +626,22 @@ mod tests {
 
     #[test]
     fn the_kind_is_the_bytes_and_nothing_else() {
-        assert_eq!(measure(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"), Err(Unreadable::Unrecognized));
-        assert_eq!(measure(b"<!DOCTYPE html><script>alert(1)</script>"), Err(Unreadable::Unrecognized));
+        assert_eq!(
+            measure(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"),
+            Err(Unreadable::Unrecognized)
+        );
+        assert_eq!(
+            measure(b"<!DOCTYPE html><script>alert(1)</script>"),
+            Err(Unreadable::Unrecognized)
+        );
         assert_eq!(measure(b""), Err(Unreadable::Unrecognized));
         // A PNG's signature with HTML after it is a PNG, and a malformed one.
         let mut polyglot = png_head(1, 1)[..8].to_vec();
         polyglot.extend(b"<html><script>alert(1)</script>");
-        assert!(matches!(measure(&polyglot), Err(Unreadable::Malformed(Kind::Png, _))));
+        assert!(matches!(
+            measure(&polyglot),
+            Err(Unreadable::Malformed(Kind::Png, _))
+        ));
     }
 
     /// **Real encoders' files** (`scripts/uploads_fixtures.py`, Pillow):

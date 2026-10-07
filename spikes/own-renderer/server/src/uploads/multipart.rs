@@ -73,7 +73,8 @@ pub fn parts<'a>(body: &'a [u8], boundary: &str) -> Result<Vec<Part<'a>>, &'stat
         }
         at += 2;
         let head_end = find(body, b"\r\n\r\n", at).ok_or("a part's headers do not end")?;
-        let head = std::str::from_utf8(&body[at..head_end]).map_err(|_| "a part's headers are not text")?;
+        let head = std::str::from_utf8(&body[at..head_end])
+            .map_err(|_| "a part's headers are not text")?;
         let name = head
             .split("\r\n")
             .find_map(|line| {
@@ -84,7 +85,8 @@ pub fn parts<'a>(body: &'a [u8], boundary: &str) -> Result<Vec<Part<'a>>, &'stat
             })
             .ok_or("a part without a form-data name")?;
         let start = head_end + 4;
-        let end = find(body, delimiter.as_bytes(), start).ok_or("a part is not closed by a delimiter")?;
+        let end =
+            find(body, delimiter.as_bytes(), start).ok_or("a part is not closed by a delimiter")?;
         out.push(Part {
             name,
             data: &body[start..end],
@@ -125,11 +127,17 @@ mod tests {
             boundary("multipart/form-data; boundary=----WebKitFormBoundaryAbC"),
             Some("----WebKitFormBoundaryAbC".into())
         );
-        assert_eq!(boundary("Multipart/Form-Data;boundary=\"a b\""), Some("a b".into()));
+        assert_eq!(
+            boundary("Multipart/Form-Data;boundary=\"a b\""),
+            Some("a b".into())
+        );
         assert_eq!(boundary("multipart/mixed; boundary=x"), None);
         assert_eq!(boundary("multipart/form-data"), None);
         assert_eq!(boundary("multipart/form-data; boundary="), None);
-        assert_eq!(boundary(&format!("multipart/form-data; boundary={}", "x".repeat(71))), None);
+        assert_eq!(
+            boundary(&format!("multipart/form-data; boundary={}", "x".repeat(71))),
+            None
+        );
         assert_eq!(boundary("multipart/form-data; boundary=a\r\nb"), None);
     }
 
@@ -163,7 +171,13 @@ mod tests {
     fn a_preamble_is_ignored_and_a_body_without_its_close_refused() {
         let body = b"preamble\r\n--b\r\nContent-Disposition: form-data; name=a\r\n\r\n1\r\n--b--";
         assert_eq!(parts(body, "b").expect("parsed")[0].data, b"1");
-        assert!(parts(b"--b\r\nContent-Disposition: form-data; name=a\r\n\r\n1", "b").is_err());
+        assert!(
+            parts(
+                b"--b\r\nContent-Disposition: form-data; name=a\r\n\r\n1",
+                "b"
+            )
+            .is_err()
+        );
         assert!(parts(b"--b\r\nContent-Type: image/png\r\n\r\n1\r\n--b--", "b").is_err());
         assert!(parts(b"nothing here", "b").is_err());
         assert!(parts(b"--bX\r\n", "b").is_err());

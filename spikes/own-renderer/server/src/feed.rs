@@ -15,6 +15,12 @@ pub(crate) const GRANTS: &[&str] = &[
     "database.read<User>",
     "database.read<Follow>",
     "database.write<Follow>",
+    // Track `uploads`: a session's attached image, read and discarded, and
+    // the claim a command holds on it from its acquisition to its release.
+    "database.read<Attached>",
+    "database.write<Attached>",
+    "resource.acquire<Upload>",
+    "resource.release<Upload>",
 ];
 
 /// One post as kept: its author by id, and what it replies to.
@@ -25,6 +31,8 @@ struct Row {
     text: String,
     likes: i64,
     reply_to: Option<String>,
+    /// Track `uploads`: the image it carries, kept with it.
+    image: Option<crate::uploads::ImageRow>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -40,6 +48,9 @@ struct State {
     written: usize,
     /// Commits, which the materializer's row for the feed counts.
     commits: usize,
+    /// Track `uploads`: the leases a post's image is committed from, where
+    /// the program declares an upload.
+    leases: Option<crate::uploads::Leases>,
 }
 
 /// What a command changes, staged until it commits.
@@ -56,6 +67,9 @@ enum Change {
     /// A signed-in author's handle and name, as their provider gave them:
     /// the user the feed shows for them.
     User(String, (String, String)),
+    /// Track `uploads`: an attached image discarded, which ends its lease
+    /// once the command commits.
+    Discard,
 }
 
 pub(crate) struct FeedData {
@@ -80,6 +94,7 @@ impl FeedData {
                 text: "Hello, feed.".into(),
                 likes: 2,
                 reply_to: None,
+                image: None,
             },
             Row {
                 id: "p2".into(),
@@ -87,6 +102,7 @@ impl FeedData {
                 text: "Hello, Ada.".into(),
                 likes: 0,
                 reply_to: Some("p1".into()),
+                image: None,
             },
             Row {
                 id: "p3".into(),
@@ -94,6 +110,7 @@ impl FeedData {
                 text: "And a reply to the reply.".into(),
                 likes: 1,
                 reply_to: Some("p2".into()),
+                image: None,
             },
         ];
         state.written = state.posts.len();
@@ -178,6 +195,10 @@ fn post_val(state: &State, row: &Row, replies: bool) -> Val {
         ("text".into(), Val::String(row.text.clone())),
         ("likes".into(), Val::S64(row.likes)),
         ("replies".into(), Val::List(inner)),
+        (
+            "images".into(),
+            crate::uploads::images_val(row.image.as_ref(), state.leases.as_ref()),
+        ),
     ])
 }
 
@@ -191,6 +212,10 @@ fn item_val(state: &State, row: &Row, reader: &str) -> Val {
         ("text".into(), Val::String(row.text.clone())),
         ("likes".into(), Val::S64(row.likes)),
         ("mine".into(), Val::Bool(row.author == reader)),
+        (
+            "images".into(),
+            crate::uploads::images_val(row.image.as_ref(), state.leases.as_ref()),
+        ),
     ])
 }
 
@@ -339,6 +364,11 @@ fn reads_of(state: Arc<State>, principals: Principals) -> crate::data::Ops {
         }),
     );
     let p = principals.clone();
+    // Track `uploads`: the image a session attached, waiting for its post.
+    ops.insert(
+        "feed:data/uploads#attached".to_string(),
+        crate::uploads::attached_op(state.leases.clone()),
+    );
     ops.insert(
         "feed:data/users#of-session".to_string(),
         Arc::new(move |args: &[Val]| match args {
@@ -379,6 +409,9 @@ pub(crate) struct Staging<'a> {
     state: std::sync::MutexGuard<'a, State>,
     staged: Arc<Mutex<Vec<Change>>>,
     ops: crate::data::Ops,
+    /// Track `uploads`: the leases the command claimed, given back where it
+    /// does not commit.
+    claims: crate::uploads::Claiming,
 }
 
 impl crate::data::Staged for Staging<'_> {
@@ -394,6 +427,17 @@ impl crate::data::Staged for Staging<'_> {
                 (self.state.commits + 1).to_string(),
             )]
         })
+    }
+
+    /// Track `uploads`: a post's image put in the deployment's blob storage
+    /// before the command commits; the host's materializer commits the rest.
+    fn commit(
+        &mut self,
+        _events: &[crate::data::Handed],
+        _invalidated: &[crate::data::Dropped],
+    ) -> Result<Option<crate::data::Outboxed>, String> {
+        self.claims.lock().expect("claims").keep()?;
+        Ok(None)
     }
 
     fn publish(&mut self) {
@@ -425,8 +469,12 @@ impl crate::data::Staged for Staging<'_> {
                 Change::Unfollow(follower, followee) => {
                     self.state.follows.remove(&(follower, followee));
                 }
+                Change::Discard => {}
             }
         }
+        // Track `uploads`: each lease the command committed or discarded
+        // ended, now that its transaction has.
+        self.claims.lock().expect("claims").settle();
     }
 }
 
@@ -490,6 +538,7 @@ impl crate::data::DataLayer for FeedData {
                         text: text.clone(),
                         likes: 0,
                         reply_to: None,
+                        image: None,
                     };
                     let answer = ok(post_val(&s, &row, false));
                     staged.push(Change::Post(row));
@@ -515,12 +564,65 @@ impl crate::data::DataLayer for FeedData {
                         text: text.clone(),
                         likes: 0,
                         reply_to: Some(to.clone()),
+                        image: None,
                     };
                     let answer = ok(post_val(&s, &row, false));
                     staged.push(Change::Post(row));
                     Ok(vec![answer])
                 }
                 other => Err(format!("posts#reply received {other:?}")),
+            }),
+        );
+        // Track `uploads`: a command claims its session's attached image,
+        // commits it with a post, or discards it.
+        let claims = crate::uploads::Claims::new(seen.leases.clone());
+        ops.insert(
+            "feed:data/uploads#claim".to_string(),
+            crate::uploads::claim_op(claims.clone()),
+        );
+        let into = staged.clone();
+        ops.insert(
+            "feed:data/uploads#discard".to_string(),
+            crate::uploads::discard_op(claims.clone(), move || {
+                into.lock().expect("staged").push(Change::Discard)
+            }),
+        );
+        // **A post with its image** (track `uploads`): the image the
+        // command's claim holds, kept with the post, by the author `publish`
+        // writes as. A handle this command did not claim is not found.
+        let (s, into, p, holding) = (
+            seen.clone(),
+            staged.clone(),
+            principals.clone(),
+            claims.clone(),
+        );
+        ops.insert(
+            "feed:data/posts#publish-image".to_string(),
+            Arc::new(move |args: &[Val]| match args {
+                [
+                    Val::String(session),
+                    Val::String(text),
+                    Val::String(alt),
+                    Val::String(upload),
+                ] => {
+                    let Some(image) = holding.lock().expect("claims").commit(session, upload, alt)
+                    else {
+                        return Ok(vec![not_found()]);
+                    };
+                    let mut staged = into.lock().expect("staged");
+                    let row = Row {
+                        id: next_id(&s, &staged),
+                        author: author(&p, session, &mut staged),
+                        text: text.clone(),
+                        likes: 0,
+                        reply_to: None,
+                        image: Some(image),
+                    };
+                    let answer = ok(post_val(&s, &row, false));
+                    staged.push(Change::Post(row));
+                    Ok(vec![answer])
+                }
+                other => Err(format!("posts#publish-image received {other:?}")),
             }),
         );
         // **A follow** (ADR-0257): once, however often; a follow again
@@ -596,7 +698,12 @@ impl crate::data::DataLayer for FeedData {
                 other => Err(format!("posts#like received {other:?}")),
             }),
         );
-        Box::new(Staging { state, staged, ops })
+        Box::new(Staging {
+            state,
+            staged,
+            ops,
+            claims,
+        })
     }
 
     fn grants(&self) -> Vec<&'static str> {
@@ -605,5 +712,9 @@ impl crate::data::DataLayer for FeedData {
 
     fn default_page(&self) -> Option<&'static str> {
         None
+    }
+
+    fn uploaded_by(&self, leases: crate::uploads::Leases) {
+        self.state.lock().expect("feed").leases = Some(leases);
     }
 }
