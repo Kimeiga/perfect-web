@@ -437,12 +437,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
              cycle is refused, PW5109, and a write reaches each of a
              chain); ~~`invalidates Cart(_)`~~ (ADR-0256, `just
              e14-every-entry`: every entry at the rest, and an entry
-             dropped in every session's partition); then a timeline built
-             from who you follow, with follow
-             and unfollow commands and a profile page with follower counts
-             (the integrator's track, ADR-0253), on queries, since a
-             materialization does not run; then materializations made real:
-             a body and a type, a generator, a page reading one, and a chain
+             dropped in every session's partition); ~~a timeline built from
+             who you follow~~ (ADR-0257, `just e14-follows`: follow and
+             unfollow, `/following`, and a user's page with follower
+             counts, on queries); then materializations made real: a body
+             and a type, a generator, a page reading one, and a chain
              rebuilt in order;
           4. **track `identity`, W1** (ADR-0253, docs/PARALLEL.md): real
              accounts and sign-in: sign-up, sign-in and sign-out,

@@ -16,7 +16,7 @@
 
 use super::*;
 use crate::data::{Dropped, Handed, Outboxed, Provided};
-use crate::feed::{not_found, ok, user_of, user_record};
+use crate::feed::{PROFILE_POSTS, not_found, ok, user_of, user_record};
 use postgres::{Client, NoTls};
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -30,6 +30,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
     (
         "0002_seed",
         include_str!("../migrations/feed/0002_seed.sql"),
+    ),
+    (
+        "0004_follows",
+        include_str!("../migrations/feed/0004_follows.sql"),
     ),
 ];
 
@@ -158,19 +162,105 @@ fn timeline(c: &mut Client, limit: i64) -> Result<Val, postgres::Error> {
         ),
         &[&limit.max(0)],
     )?;
-    Ok(Val::List(
-        rows.iter()
-            .map(|r| {
-                let row = row_of(r);
-                Val::Record(vec![
-                    ("id".into(), Val::String(row.id)),
-                    ("author".into(), user_record(&row.author, row.known)),
-                    ("text".into(), Val::String(row.text)),
-                    ("likes".into(), Val::S64(row.likes)),
-                ])
-            })
-            .collect(),
-    ))
+    Ok(Val::List(rows.iter().map(|r| item_of(row_of(r))).collect()))
+}
+
+/// An `Item` as the timelines show it (ADR-0222).
+fn item_of(row: Row) -> Val {
+    Val::Record(vec![
+        ("id".into(), Val::String(row.id)),
+        ("author".into(), user_record(&row.author, row.known)),
+        ("text".into(), Val::String(row.text)),
+        ("likes".into(), Val::S64(row.likes)),
+    ])
+}
+
+/// **The timeline of those `reader` follows** (ADR-0257): its own posts and
+/// theirs that reply to none, the newest `limit`.
+fn following(c: &mut Client, reader: &str, limit: i64) -> Result<Val, postgres::Error> {
+    let rows = c.query(
+        &format!(
+            "SELECT {POST_COLUMNS} FROM posts p LEFT JOIN users u ON u.id = p.author \
+             WHERE p.reply_to IS NULL \
+               AND (p.author = $1 \
+                    OR p.author IN (SELECT followee FROM follows WHERE follower = $1)) \
+             ORDER BY p.seq DESC LIMIT $2"
+        ),
+        &[&reader, &limit.max(0)],
+    )?;
+    Ok(Val::List(rows.iter().map(|r| item_of(row_of(r))).collect()))
+}
+
+/// Whether the feed knows `id` (ADR-0257), as `feed.rs` reads it.
+const KNOWN: &str = "EXISTS (SELECT 1 FROM users WHERE id = $1) \
+     OR EXISTS (SELECT 1 FROM posts WHERE author = $1) \
+     OR EXISTS (SELECT 1 FROM follows WHERE follower = $1 OR followee = $1)";
+
+/// **A user's page** (ADR-0257), read in one statement, so one snapshot:
+/// who they are, their counts, and their newest posts that reply to none.
+fn profile(c: &mut Client, id: &str) -> Result<Val, postgres::Error> {
+    let row = c.query_one(
+        &format!(
+            "SELECT u.handle, u.name, \
+                    (SELECT count(*) FROM follows WHERE followee = $1), \
+                    (SELECT count(*) FROM follows WHERE follower = $1), \
+                    (SELECT coalesce(json_agg(json_build_array(p.id, p.text, \
+                         (SELECT count(*) FROM likes l WHERE l.post = p.id)) \
+                         ORDER BY p.seq DESC), '[]')::text \
+                       FROM (SELECT * FROM posts WHERE author = $1 AND reply_to IS NULL \
+                             ORDER BY seq DESC LIMIT {PROFILE_POSTS}) p), \
+                    {KNOWN} \
+             FROM (SELECT 1) AS one LEFT JOIN users u ON u.id = $1"
+        ),
+        &[&id],
+    )?;
+    let known: bool = row.get(5);
+    if !known {
+        return Ok(not_found());
+    }
+    let (handle, name): (Option<String>, Option<String>) = (row.get(0), row.get(1));
+    let (followers, following): (i64, i64) = (row.get(2), row.get(3));
+    let posts: Vec<(String, String, i64)> =
+        serde_json::from_str(&row.get::<_, String>(4)).unwrap_or_default();
+    Ok(ok(Val::Record(vec![
+        ("user".into(), user_record(id, handle.zip(name))),
+        ("followers".into(), Val::S64(followers)),
+        ("following".into(), Val::S64(following)),
+        (
+            "posts".into(),
+            Val::List(
+                posts
+                    .into_iter()
+                    .map(|(id, text, likes)| {
+                        Val::Record(vec![
+                            ("id".into(), Val::String(id)),
+                            ("text".into(), Val::String(text)),
+                            ("likes".into(), Val::S64(likes)),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+    ])))
+}
+
+/// **What `reader` is to `user`** (ADR-0257), the program's `Relation`.
+fn relation(c: &mut Client, reader: &str, user: &str) -> Result<Val, postgres::Error> {
+    if reader == user {
+        return Ok(Val::Variant("yourself".into(), None));
+    }
+    let follows: bool = c
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM follows WHERE follower = $1 AND followee = $2)",
+            &[&reader, &user],
+        )?
+        .get(0);
+    let case = if follows {
+        "following"
+    } else {
+        "not-following"
+    };
+    Ok(Val::Variant(case.into(), None))
 }
 
 /// **A thread**: the post and its replies, as deep as they go, read in one
@@ -236,12 +326,42 @@ fn reads_through(run: Run) -> crate::data::Ops {
             other => Err(format!("posts#timeline received {other:?}")),
         }),
     );
-    let r = run;
+    let r = run.clone();
     ops.insert(
         "feed:data/posts#thread".to_string(),
         Arc::new(move |args: &[Val]| match args {
             [Val::String(id)] => Ok(vec![r(&mut |c| thread(c, id).map_err(pg))?]),
             other => Err(format!("posts#thread received {other:?}")),
+        }),
+    );
+    let r = run.clone();
+    ops.insert(
+        "feed:data/posts#following".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(session), Val::S64(limit)] => {
+                let (reader, limit) = (user_of(session), *limit);
+                Ok(vec![r(&mut |c| following(c, &reader, limit).map_err(pg))?])
+            }
+            other => Err(format!("posts#following received {other:?}")),
+        }),
+    );
+    let r = run.clone();
+    ops.insert(
+        "feed:data/users#profile".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(id)] => Ok(vec![r(&mut |c| profile(c, id).map_err(pg))?]),
+            other => Err(format!("users#profile received {other:?}")),
+        }),
+    );
+    let r = run;
+    ops.insert(
+        "feed:data/users#relation".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(session), Val::String(user)] => {
+                let reader = user_of(session);
+                Ok(vec![r(&mut |c| relation(c, &reader, user).map_err(pg))?])
+            }
+            other => Err(format!("users#relation received {other:?}")),
         }),
     );
     ops.insert(
@@ -605,6 +725,55 @@ impl crate::data::DataLayer for FeedPg {
                     Ok((ok(post), true))
                 }
                 other => Err(format!("posts#reply received {other:?}")),
+            }),
+        );
+        // **A follow** (ADR-0257): once, however often; one the feed does
+        // not know, or the follower itself, is not found, and nothing is
+        // written. A follow again writes what is there, and commits, so its
+        // event refreshes every page that shows it.
+        write(
+            "feed:data/users#follow",
+            Arc::new(|c: &mut Client, args: &[Val]| match args {
+                [Val::String(session), Val::String(user)] => {
+                    let follower = user_of(session);
+                    let known: bool = c
+                        .query_one(&format!("SELECT {KNOWN}"), &[user])
+                        .map_err(pg)?
+                        .get(0);
+                    if follower == *user || !known {
+                        return Ok((not_found(), false));
+                    }
+                    c.execute(
+                        "INSERT INTO follows (follower, followee) VALUES ($1, $2) \
+                         ON CONFLICT DO NOTHING",
+                        &[&follower, user],
+                    )
+                    .map_err(pg)?;
+                    Ok((ok(Val::String(user.clone())), true))
+                }
+                other => Err(format!("users#follow received {other:?}")),
+            }),
+        );
+        // **An unfollow** (ADR-0257): one not followed is no change.
+        write(
+            "feed:data/users#unfollow",
+            Arc::new(|c: &mut Client, args: &[Val]| match args {
+                [Val::String(session), Val::String(user)] => {
+                    let known: bool = c
+                        .query_one(&format!("SELECT {KNOWN}"), &[user])
+                        .map_err(pg)?
+                        .get(0);
+                    if !known {
+                        return Ok((not_found(), false));
+                    }
+                    c.execute(
+                        "DELETE FROM follows WHERE follower = $1 AND followee = $2",
+                        &[&user_of(session), user],
+                    )
+                    .map_err(pg)?;
+                    Ok((ok(Val::String(user.clone())), true))
+                }
+                other => Err(format!("users#unfollow received {other:?}")),
             }),
         );
         write(

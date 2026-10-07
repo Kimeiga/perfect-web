@@ -506,6 +506,12 @@ awaited in order. What remains:
   that is not a key (a record, a list) checks, and is refused when the
   command runs. `invalidates Cart(_)` is every entry (ADR-0256); `_` in
   a `depends_on` key is a name, and resolves to nothing.
+- **The follows timeline is a query** (ADR-0257): read on each render
+  from the posts of those followed, not a materialization fanned out on
+  write. A reader is told of its own follow by its session, and another
+  session of its user by nothing until it reads again; a user's page lists
+  their newest 20 posts. No blocks, mutes, follow requests, private
+  accounts or lists of followers.
 - **A materialization is checked, and does not run** (ADR-0255). One may
   read another, a cycle of them is refused (PW5109), and an event reaching
   one reaches what reads it. But a materialization has no body, type or

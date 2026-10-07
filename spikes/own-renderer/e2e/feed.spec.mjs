@@ -41,6 +41,29 @@ test.use({
 
 test.describe.configure({ mode: "serial" });
 
+// What the page's runtime said, beside a failure and its trace: its log,
+// its transport, how often it asked again, and the versions it holds and
+// knows. WebKit's "Load more" failed on CI with nothing of it (runs
+// 37663299969, 37681083688): the server answered the read, and the page
+// kept its twenty rows.
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const said = await page
+    .evaluate(() => ({
+      log: window.__pw?.log ?? null,
+      transport: window.__pw?.transport ?? null,
+      reconnects: window.__pw?.reconnects ?? 0,
+      reads: window.__pw?.reads ?? 0,
+      held: window.__pwHeld?.() ?? null,
+      known: window.__pwKnown?.() ?? null,
+    }))
+    .catch((e) => ({ unavailable: String(e) }));
+  await testInfo.attach("runtime", {
+    body: JSON.stringify(said, null, 2),
+    contentType: "application/json",
+  });
+});
+
 /** The home page, its handlers attached. */
 async function home(page) {
   await page.goto("/");
@@ -97,9 +120,9 @@ test("a post reaches the author's timeline and every other reader's", async ({
   // The author's own row is "You" until the server's arrives (ADR-0222):
   // waited for, not read at once. In one run of ADR-0229's, Firefox read
   // the pending row.
-  await expect(post(author, text).getByRole("link")).toHaveText(/^Guest /);
-  const name = await post(author, text).getByRole("link").innerText();
-  await expect(post(reader, text).getByRole("link")).toHaveText(name);
+  await expect(post(author, text).locator(".author")).toHaveText(/^Guest /);
+  const name = await post(author, text).locator(".author").innerText();
+  await expect(post(reader, text).locator(".author")).toHaveText(name);
   expect(await unreloaded(author)).toBe(true);
   expect(await unreloaded(reader)).toBe(true);
   await a.close();
@@ -214,11 +237,11 @@ test("a post shows before the server answers, and is the server's after", async 
   await page.getByLabel("What's happening?").fill(text);
   await page.getByRole("button", { name: "Post" }).click();
   await expect(post(page, text)).toHaveCount(1);
-  await expect(post(page, text).getByRole("link")).toHaveText("You");
+  await expect(post(page, text).locator(".author")).toHaveText("You");
   await expect(page.locator("main > ul > li").first()).toContainText(text);
   release();
   // The server's: its author named as the server names it, and one row.
-  await expect(post(page, text).getByRole("link")).toHaveText(/^Guest /);
+  await expect(post(page, text).locator(".author")).toHaveText(/^Guest /);
   await expect(post(page, text)).toHaveCount(1);
   await expect(page.getByLabel("What's happening?")).toHaveValue("");
   expect(await unreloaded(page)).toBe(true);
@@ -308,7 +331,7 @@ test("a post longer than 280 characters is not sent, and 280 emoji are", async (
   await expect(page.locator("#left")).toHaveText("0 left");
   await button.click();
   await expect(post(page, emoji)).toHaveCount(1);
-  await expect(post(page, emoji).getByRole("link")).toHaveText(/^Guest /);
+  await expect(post(page, emoji).locator(".author")).toHaveText(/^Guest /);
   expect(sent).toHaveLength(1);
 });
 
@@ -348,7 +371,7 @@ test("Load more shows the next page, and a post after it is shown over it", asyn
   await expect(rows.first()).toContainText(text);
   await expect(rows).toHaveCount(longer + 1);
   release();
-  await expect(post(page, text).getByRole("link")).toHaveText(/^Guest /);
+  await expect(post(page, text).locator(".author")).toHaveText(/^Guest /);
   expect(await unreloaded(page)).toBe(true);
 });
 
@@ -366,7 +389,7 @@ test("a reply reaches its thread and every reader of it, and no timeline", async
   await author.getByRole("button", { name: "Post" }).click();
   // The server's row, whose link is the post's address, not the pending
   // row's.
-  const link = post(author, text).getByRole("link");
+  const link = post(author, text).locator(".author");
   await expect(link).toHaveAttribute("href", /^\/post\/p\d+$/);
   const address = await link.getAttribute("href");
   for (const page of [author, reader]) {
@@ -404,7 +427,7 @@ async function newThread(page, testInfo, what) {
   const text = `${what} in ${testInfo.project.name} at ${Date.now()}`;
   await page.getByLabel("What's happening?").fill(text);
   await page.getByRole("button", { name: "Post" }).click();
-  const link = post(page, text).getByRole("link");
+  const link = post(page, text).locator(".author");
   await expect(link).toHaveAttribute("href", /^\/post\/p\d+$/);
   await page.goto(await link.getAttribute("href"));
   await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
@@ -486,4 +509,99 @@ test("a like on the thread page shows before the server answers", async ({ page 
   // And it is the server's: the thread read again says so.
   await page.reload();
   await expect(page.locator("#counts")).toHaveText("0 replies · 1 like");
+});
+
+/** A user's page, its handlers attached. */
+async function profile(page, id) {
+  await page.goto(`/user/${id}`);
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
+}
+
+/** A user's page's followers, as its counts say them. */
+async function followers(page) {
+  const said = await page.locator("#follow-counts").innerText();
+  return Number(said.match(/^(\d+) follower/)[1]);
+}
+
+test("following someone shows their posts in Following, and unfollowing takes them out", async ({ page }) => {
+  // ADR-0257: a new reader follows no one, and its timeline of those it
+  // follows has nothing of Ada's; everyone's has.
+  await page.goto("/following");
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
+  await expect(post(page, "Hello, feed.")).toHaveCount(0);
+  await profile(page, "u-ada");
+  await expect(page.locator("h1")).toHaveText("Ada");
+  await expect(page.locator("#handle")).toHaveText("@ada");
+  await page.locator("#follow").click();
+  await expect(page.locator("#unfollow")).toHaveCount(1);
+  await page.goto("/following");
+  await expect(post(page, "Hello, feed.")).toHaveCount(1);
+  await profile(page, "u-ada");
+  await page.locator("#unfollow").click();
+  await expect(page.locator("#follow")).toHaveCount(1);
+  await page.goto("/following");
+  await expect(post(page, "Hello, feed.")).toHaveCount(0);
+});
+
+test("a follow shows before the server answers, and is the server's after", async ({ page }) => {
+  await profile(page, "u-grace");
+  const before = await followers(page);
+  let release;
+  const held = new Promise((r) => (release = r));
+  await page.route("**/command/feed.app.follow", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.locator("#follow").click();
+  // Speculated: the button and the count, before the server answers.
+  await expect(page.locator("#unfollow")).toHaveCount(1);
+  expect(await followers(page)).toBe(before + 1);
+  const answered = page.waitForResponse("**/command/feed.app.follow");
+  release();
+  await answered;
+  await page.reload();
+  await expect(page.locator("#unfollow")).toHaveCount(1);
+  expect(await followers(page)).toBe(before + 1);
+  // Left as it was found, for the next test's count.
+  await page.locator("#unfollow").click();
+  await expect(page.locator("#follow")).toHaveCount(1);
+});
+
+test("a follow reaches another reader of the page without a reload", async ({ browser }) => {
+  // Two readers, each a session of its own.
+  const [one, two] = await Promise.all([browser.newContext(), browser.newContext()]);
+  const [a, b] = await Promise.all([one.newPage(), two.newPage()]);
+  await profile(a, "u-grace");
+  await profile(b, "u-grace");
+  await b.evaluate(() => {
+    window.__unreloaded = true;
+  });
+  const before = await followers(b);
+  await a.locator("#follow").click();
+  await expect(b.locator("#follow-counts")).toHaveText(new RegExp(`^${before + 1} follower`));
+  expect(await unreloaded(b)).toBe(true);
+  await a.locator("#unfollow").click();
+  await expect(b.locator("#follow-counts")).toHaveText(new RegExp(`^${before} follower`));
+  await Promise.all([one.close(), two.close()]);
+});
+
+test("your own page says it is yours", async ({ page }, testInfo) => {
+  // A guest is someone once it posts: its handle leads to its page.
+  await home(page);
+  const text = `Mine in ${testInfo.project.name} at ${Date.now()}`;
+  await page.getByLabel("What's happening?").fill(text);
+  await page.getByRole("button", { name: "Post" }).click();
+  const row = post(page, text);
+  // The server's row, by the session's guest, not the one shown before it
+  // answered, by "You".
+  await expect(row.locator(".author")).toHaveText(/^Guest /);
+  await row.locator(".handle").click();
+  await expect(page.locator("#you")).toHaveText("This is you.");
+  await expect(page.locator("#follow")).toHaveCount(0);
+  await expect(page.locator("main li").filter({ hasText: text })).toHaveCount(1);
+});
+
+test("a page of no one is not found", async ({ page }) => {
+  const missing = await page.goto("/user/u-nobody");
+  expect(missing.status()).toBe(404);
 });

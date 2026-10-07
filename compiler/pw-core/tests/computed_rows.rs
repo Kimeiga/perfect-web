@@ -212,9 +212,10 @@ fn what_a_row_does_not_compute_yet_is_refused_by_name() {
         // computes one from the row's item whole.
         (
             feed(&|s| {
-                s.replace(
+                s.replacen(
                     "<span class=\"likes\">{counted(p.likes, \"like\", \"likes\")}</span>",
                     "<Named author={p.author} />",
+                    1,
                 ) + "\nview Named(author: User) !{} {\n    <span>{String.length(author.name)}</span>\n}\n"
             }),
             "computes a value from `p.author`, a field of a row the page speculates on, and the \

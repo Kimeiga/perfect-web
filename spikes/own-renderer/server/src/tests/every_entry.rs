@@ -12,18 +12,20 @@
 use super::*;
 
 /// **The feed, and two commands liking a post**: one dropping the
-/// session's timeline at every limit, and one every session's at 20. A
-/// command that writes nothing commits nothing, its invalidations among it.
+/// session's timelines at every limit, and one every session's at 20. A
+/// command that writes nothing commits nothing, its invalidations among it,
+/// and one that writes a post reaches every reader of one (PW5106).
 pub(super) fn forgetting(app: &str) -> String {
     format!(
         "{app}\n\
          command forget(post: PostId) -> Result<Post, FeedError>\n    \
          requires      SignedIn\n    \
-         invalidates   Timeline(current_session(), _)\n{{\n    \
+         invalidates   Timeline(current_session(), _), \
+         FollowingTimeline(current_session(), _)\n{{\n    \
          add_like(current_session(), post)\n}}\n\n\
          command forget_twenty(post: PostId) -> Result<Post, FeedError>\n    \
          requires      SignedIn\n    \
-         invalidates   Timeline(_, 20)\n{{\n    \
+         invalidates   Timeline(_, 20), FollowingTimeline(_, 20)\n{{\n    \
          add_like(current_session(), post)\n}}\n"
     )
 }

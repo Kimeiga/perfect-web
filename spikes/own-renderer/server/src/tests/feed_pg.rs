@@ -20,7 +20,7 @@ fn database() -> Option<String> {
 }
 
 /// **A schema of the test's own**, dropped when the test is done with it.
-struct Schema {
+pub(super) struct Schema {
     url: String,
     name: String,
 }
@@ -51,7 +51,7 @@ impl Schema {
         c
     }
 
-    fn count(&self, query: &str) -> i64 {
+    pub(super) fn count(&self, query: &str) -> i64 {
         self.sql().query_one(query, &[]).expect(query).get(0)
     }
 }
@@ -66,9 +66,9 @@ impl Drop for Schema {
 
 /// **The feed, built and served on PostgreSQL**, its server dropped before
 /// its schema.
-struct OnPostgres {
+pub(super) struct OnPostgres {
     served: Served,
-    db: Schema,
+    pub(super) db: Schema,
 }
 
 impl std::ops::Deref for OnPostgres {
@@ -94,6 +94,11 @@ fn served_with(
         served: Served { server, _dir: dir },
         db,
     })
+}
+
+/// The feed as it is, on PostgreSQL.
+pub(super) fn served_on(url: &str, test: &str) -> OnPostgres {
+    served(url, test)
 }
 
 /// The feed as it is, on PostgreSQL.

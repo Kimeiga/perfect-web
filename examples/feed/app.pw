@@ -54,12 +54,39 @@ type Item = Item {
     likes: Int,
 }
 
+// **Who follows whom** (ADR-0257): a row a follow writes and an unfollow
+// deletes, the follower first.
+type Follow = Follow { follower: UserId, followee: UserId }
+
+// **A post as its author's page lists it** (ADR-0257): what it says and its
+// likes. Its author is the page's.
+type Authored = Authored { id: PostId, text: String, likes: Int }
+
+// **A user's page** (ADR-0257): who they are, how many follow them and how
+// many they follow, and their newest posts. Every reader's: what the reader
+// is to them is the reader's own, `Relation`.
+type Profile = Profile {
+    user: User,
+    followers: Int,
+    following: Int,
+    posts: List<Authored>,
+}
+
+// **What the reader is to a user** (ADR-0257): the user, one who follows
+// them, or one who does not.
+type Relation =
+    | Yourself
+    | Following
+    | NotFollowing
+
 type FeedError =
     | Unavailable
     | NotFound
 
 event Posted(author: UserId)
 event Liked(post: PostId)
+event Followed(follower: UserId, followee: UserId)
+event Unfollowed(follower: UserId, followee: UserId)
 
 // **What the feed's database guarantees** (ADR-0207, ADR-0246): one
 // PostgreSQL, as the host's feed layer opens it.
@@ -71,7 +98,7 @@ event Liked(post: PostId)
 // The host compares these with what the database it opens provides, and
 // does not serve on a mismatch.
 source FeedData
-    holds        Post, User
+    holds        Post, User, Follow
     transactions serializable
     reads        strong
     changes      none
@@ -94,6 +121,29 @@ fn add_reply(s: Session<SessionId>, to: PostId, text: PostText) -> Result<Post, 
 fn add_like(s: Session<SessionId>, post: PostId) -> Result<Post, FeedError> !{ database.write<Post> }
     host "feed:data/posts#like"
 
+// **The timeline of those the session's user follows** (ADR-0257): their
+// posts and its own, newest first, at most `limit`.
+fn following_timeline(s: Session<SessionId>, limit: Int) -> List<Item> !{ database.read<Post>, database.read<Follow> }
+    host "feed:data/posts#following"
+
+// **A user's page** (ADR-0257), or none for one the feed does not know.
+fn profile(id: UserId) -> Result<Profile, FeedError> !{ database.read<User>, database.read<Post>, database.read<Follow> }
+    host "feed:data/users#profile"
+
+// **What the session's user is to `user`** (ADR-0257).
+fn relation(s: Session<SessionId>, user: UserId) -> Relation !{ database.read<User>, database.read<Follow> }
+    host "feed:data/users#relation"
+
+// **The session's user follows `user`** (ADR-0257): once, whatever how
+// often; one the feed does not know, or itself, is not found.
+fn add_follow(s: Session<SessionId>, user: UserId) -> Result<UserId, FeedError> !{ database.read<User>, database.write<Follow> }
+    host "feed:data/users#follow"
+
+// **The session's user follows `user` no more** (ADR-0257): one it does not
+// follow is no change; one the feed does not know is not found.
+fn remove_follow(s: Session<SessionId>, user: UserId) -> Result<UserId, FeedError> !{ database.read<User>, database.write<Follow> }
+    host "feed:data/users#unfollow"
+
 session query Timeline(session: Session<SessionId>, limit: Int) -> List<Item>
     freshness      0.seconds
     consistency    read_your_writes
@@ -105,6 +155,52 @@ session query Timeline(session: Session<SessionId>, limit: Int) -> List<Item>
     timeout        2.seconds
 {
     timeline(session, limit)
+}
+
+// **The timeline of those you follow** (ADR-0257): their posts and your
+// own, newest first, read as the home timeline is. A follow or an unfollow
+// drops it, by its own `invalidates`.
+session query FollowingTimeline(session: Session<SessionId>, limit: Int) -> List<Item>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            session, limit
+    invalidates_on Posted(_), Liked(_)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    following_timeline(session, limit)
+}
+
+// **A user's page** (ADR-0257), every reader's: its counts change when
+// someone follows them or they follow someone, and its posts when they post
+// or one is liked.
+public query Profile(id: UserId) -> Result<Profile, FeedError>
+    freshness      5.seconds
+    consistency    snapshot
+    cache          shared
+    key            id
+    invalidates_on Followed(_, id), Unfollowed(_, id), Followed(id, _),
+                   Unfollowed(id, _), Posted(id), Liked(_)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    profile(id)
+}
+
+// **What the reader is to a user** (ADR-0257): the reader's own.
+session query Relation(session: Session<SessionId>, user: UserId) -> Relation
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            session, user
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    relation(session, user)
 }
 
 public query Thread(id: PostId) -> Result<Post, FeedError>
@@ -180,9 +276,63 @@ command like(post: PostId) -> Result<Post, FeedError>
     idempotent_by InteractionId
     emits         Liked(post)
     optimistic    Timeline(current_session(), _) as feed => liked(feed, post),
+                  FollowingTimeline(current_session(), _) as feed => liked(feed, post),
                   Thread(post) as thread => liked_thread(thread, post)
 {
     add_like(current_session(), post)
+}
+
+// **Following someone** (ADR-0257): their posts in your following timeline
+// from now on, and one more follower on their page. Shown before the server
+// answers: the button, and the count.
+command follow(user: UserId) -> Result<UserId, FeedError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    emits         Followed(author(current_session()), user)
+    invalidates   FollowingTimeline(current_session(), _), Relation(current_session(), user)
+    optimistic    Relation(current_session(), user) as now => followed(now),
+                  Profile(user) as person => counted_follower(person, 1)
+{
+    add_follow(current_session(), user)
+}
+
+// **Following someone no more** (ADR-0257).
+command unfollow(user: UserId) -> Result<UserId, FeedError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    emits         Unfollowed(author(current_session()), user)
+    invalidates   FollowingTimeline(current_session(), _), Relation(current_session(), user)
+    optimistic    Relation(current_session(), user) as now => unfollowed(now),
+                  Profile(user) as person => counted_follower(person, -1)
+{
+    remove_follow(current_session(), user)
+}
+
+// **A follow, shown before the server answers** (ADR-0257): the reader
+// follows them, unless they are the reader.
+fn followed(now: Relation) -> Relation !{} {
+    match now {
+        Yourself => Yourself,
+        _ => Following,
+    }
+}
+
+// **An unfollow, shown before the server answers** (ADR-0257).
+fn unfollowed(now: Relation) -> Relation !{} {
+    match now {
+        Yourself => Yourself,
+        _ => NotFollowing,
+    }
+}
+
+// **A page's follower count, by `by`** (ADR-0257).
+fn counted_follower(person: Profile, by: Int) -> Profile !{} {
+    Profile {
+        user: person.user,
+        followers: person.followers + by,
+        following: person.following,
+        posts: person.posts,
+    }
 }
 
 // **A like on the thread page, shown before the server answers**
@@ -224,6 +374,7 @@ session page Home() {
         <title>Home</title>
         <main>
             <h1>Home</h1>
+            <nav aria-label="Timelines"><a href="/" aria-current="page">Everyone</a> <a href="/following">Following</a></nav>
             <form on:submit|prevent={() => match post_text(draft) {
                 Some(text) => match post(text) {
                     Ok(_) => draft = "",
@@ -239,7 +390,8 @@ session page Home() {
             <ul>
                 {#each feed as p (p.id)}
                     <li>
-                        <a href="/post/{p.id}">{p.author.name}</a>
+                        <a class="author" href="/post/{p.id}">{p.author.name}</a>
+                        <a class="handle" href="/user/{p.author.id}">{p.author.handle}</a>
                         <p>{p.text}</p>
                         <button type="button" on:press={resumable(captures = { p }) => match like(p.id) {
                             Ok(_) => draft = draft,
@@ -297,6 +449,84 @@ page PostPage(id: PostId) {
                 <label>Your reply <textarea bind:value={answer}></textarea></label>
                 <button type="submit" disabled={String.length(answer) == 0 | String.length(answer) > 280}>Reply</button>
             </form>
+        </main>
+    }
+}
+
+// **The timeline of those you follow** (ADR-0257): their posts and your own.
+session page FollowingPage() {
+    route     "/following"
+    placement origin
+    cache     private
+
+    signal shown: Int = 20
+    let feed = query FollowingTimeline(current_session(), shown)
+
+    view {
+        <title>Following</title>
+        <main>
+            <h1>Following</h1>
+            <nav aria-label="Timelines"><a href="/">Everyone</a> <a href="/following" aria-current="page">Following</a></nav>
+            {#if List.length(feed) == 0}<p id="nobody">Follow someone to see their posts here.</p>{/if}
+            <ul>
+                {#each feed as item (item.id)}
+                    <li>
+                        <a class="author" href="/post/{item.id}">{item.author.name}</a>
+                        <a class="handle" href="/user/{item.author.id}">{item.author.handle}</a>
+                        <p>{item.text}</p>
+                        <button type="button" on:press={resumable(captures = { item }) => match like(item.id) {
+                            Ok(_) => shown = shown,
+                            Err(_) => shown = shown,
+                        }}>Like</button>
+                        <span class="likes">{counted(item.likes, "like", "likes")}</span>
+                    </li>
+                {/each}
+            </ul>
+            <button type="button" on:press={() => shown = shown + 20}>Load more</button>
+        </main>
+    }
+}
+
+// **A user's page** (ADR-0257): who they are, who follows them and whom they
+// follow, a Follow or an Unfollow for the reader, and their newest posts.
+session page ProfilePage(id: UserId) {
+    route        "/user/{id}"
+    not_found_on FeedError.NotFound
+    placement    origin
+    cache        private
+
+    signal pressed: Int = 0
+    let person = query Profile(id)
+    let relation = query Relation(current_session(), id)
+
+    view {
+        <title>Profile</title>
+        <main>
+            <h1>{person.user.name}</h1>
+            <p id="handle">{person.user.handle}</p>
+            <p id="follow-counts">{counted(person.followers, "follower", "followers")} · {person.following} following</p>
+            {#match relation}
+                {:Yourself}
+                    <p id="you">This is you.</p>
+                {:Following}
+                    <button id="unfollow" type="button" on:press={resumable(captures = { id }) => match unfollow(id) {
+                        Ok(_) => pressed = pressed + 1,
+                        Err(_) => pressed = pressed,
+                    }}>Unfollow</button>
+                {:NotFollowing}
+                    <button id="follow" type="button" on:press={resumable(captures = { id }) => match follow(id) {
+                        Ok(_) => pressed = pressed + 1,
+                        Err(_) => pressed = pressed,
+                    }}>Follow</button>
+            {/match}
+            <ul>
+                {#each person.posts as post (post.id)}
+                    <li>
+                        <a href="/post/{post.id}">{post.text}</a>
+                        <span class="likes">{counted(post.likes, "like", "likes")}</span>
+                    </li>
+                {/each}
+            </ul>
         </main>
     }
 }

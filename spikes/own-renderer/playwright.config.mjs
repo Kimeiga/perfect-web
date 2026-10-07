@@ -152,6 +152,13 @@ const HOSTS = process.env.PW_PERFORMANCE
   ? [MUTABLE_PORTS.performance.chromium]
   : [PORT, ...MUTATING.flatMap((suite) => Object.values(MUTABLE_PORTS[suite]))];
 
+// **The hosts keep their data in memory** (ADR-0257), whatever the caller's
+// environment says: Playwright gives a server the caller's environment with
+// its own `env` over it, and a `PW_FEED_DATABASE_URL` left there put every
+// engine's feed host on one database, and each run's posts on the last's.
+// A suite on PostgreSQL is the server's tests' (`e14-feed-postgres`).
+const IN_MEMORY = { PW_FEED_DATABASE_URL: "" };
+
 export default defineConfig({
   testDir: "./e2e",
   // The performance gate is excluded from the parallel suite and run alone by
@@ -187,7 +194,7 @@ export default defineConfig({
   webServer: [
     ...HOSTS.map((port) => ({
       command: `../../target/debug/pw-dev-server dist`,
-      env: { PORT: String(port) },
+      env: { PORT: String(port), ...IN_MEMORY },
       port,
       reuseExistingServer: !!process.env.PW_REUSE,
       timeout: 60_000,
@@ -195,7 +202,7 @@ export default defineConfig({
     ...(KEYED_BUILT && !process.env.PW_PERFORMANCE
       ? Object.values(KEYED_PORTS).map((port) => ({
           command: `../../target/debug/pw-dev-server dist-keyed`,
-          env: { PORT: String(port) },
+          env: { PORT: String(port), ...IN_MEMORY },
           port,
           reuseExistingServer: !!process.env.PW_REUSE,
           timeout: 60_000,
@@ -204,7 +211,7 @@ export default defineConfig({
     ...(FEED_BUILT && !process.env.PW_PERFORMANCE
       ? Object.values(FEED_PORTS).map((port) => ({
           command: `../../target/debug/pw-dev-server dist-feed`,
-          env: { PORT: String(port) },
+          env: { PORT: String(port), ...IN_MEMORY },
           port,
           reuseExistingServer: !!process.env.PW_REUSE,
           timeout: 60_000,

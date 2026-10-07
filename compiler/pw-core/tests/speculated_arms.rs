@@ -192,5 +192,6 @@ fn arms_are_separated_by_commas() {
         .all_decls()
         .find(|(_, d)| d.name == "like")
         .expect("the like command");
-    assert_eq!(like.optimistic_clauses().len(), 2);
+    // The timeline's, the following timeline's (ADR-0257) and the thread's.
+    assert_eq!(like.optimistic_clauses().len(), 3);
 }

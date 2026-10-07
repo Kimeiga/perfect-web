@@ -4,8 +4,10 @@ what its source states.
 
 Each mutant undoes one piece: the events committed in the command's own
 transaction, the transaction's isolation set on each, the host's refusal to
-serve a database that gives less than the program states, and a refused
-commit answered as refused. The PostgreSQL tests of each must then fail.
+serve a database that gives less than the program states, a refused commit
+answered as refused, and the follows (ADR-0257): the timeline's join, a
+follow's write, and its refusal of oneself. The PostgreSQL tests of each
+must then fail.
 
 They need a database: `PW_FEED_DATABASE_URL`, a throwaway one, which each
 test uses in a schema of its own. Without it every test passes doing
@@ -59,12 +61,30 @@ MUTANTS = [
         '        c.batch_execute("COMMIT").map_err(pg)?;\n',
         '        let _ = c.batch_execute("COMMIT");\n',
     ),
+    (
+        "on PostgreSQL, the timeline of those you follow is everyone's",
+        LAYER,
+        "                    OR p.author IN (SELECT followee FROM follows WHERE follower = $1)) \\\n",
+        "                    OR true) \\\n",
+    ),
+    (
+        "on PostgreSQL, a follow is not written",
+        LAYER,
+        '                        "INSERT INTO follows (follower, followee) VALUES ($1, $2) \\\n',
+        '                        "INSERT INTO follows (follower, followee) SELECT $1::text, $2::text WHERE false \\\n',
+    ),
+    (
+        "on PostgreSQL, a reader may follow itself",
+        LAYER,
+        "                    if follower == *user || !known {\n",
+        "                    if !known {\n",
+    ),
 ]
 
 TESTS = [
     [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
-        "tests::feed_pg::",
+        "tests::feed_pg::", "tests::follows::on_postgres",
     ],
 ]
 

@@ -2125,3 +2125,11 @@ other half, and a correction).
   refused, and a bare key's repair says how every entry is written. And an
   invalidation dropped a private entry in the committing session's
   partition alone; it drops it in every session's, and tells the others.
+[ADR-0257](DECISIONS/ADR-0257-the-follows-timeline.md):
+the follows timeline (the integrator's track, ADR-0253).
+- `follow` and `unfollow`, idempotent as Mastodon's are; the timeline of
+  those you follow, and your own posts, at `/following`; a user's page at
+  `/user/{id}`, counting who follows them and whom they follow, with a
+  Follow or Unfollow that shows before the server answers. A follow is a
+  row the feed's source holds, so PW5106 holds each command that writes one
+  to every reader of one.

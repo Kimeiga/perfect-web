@@ -41,6 +41,27 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0257, 2026-10-07: the follows timeline** (the integrator's track,
+ADR-0253; ADR-0195's ruling 10's feed). A reader follows and unfollows a
+user from their page, `/user/{id}`, which counts who follows them and whom
+they follow and lists their newest posts; the button and the count show
+before the server answers. `/following` is the timeline of those a reader
+follows, and its own posts, beside the home page, which stays everyone's.
+Both are idempotent, as Mastodon's are, and following oneself or no one is
+not found. A follow is a row the feed's source holds (`database.write<Follow>`),
+so PW5106 holds both commands to every reader of one: each drops its
+reader's following timeline at every limit, ADR-0256's `_`, and its
+relation, and tells every open page of the user by its event. In memory and
+on PostgreSQL, migration `0004_follows` (`just e14-follows`). Found on the
+way: the browser suite's hosts took `PW_FEED_DATABASE_URL` from whoever ran
+the suite, so a run with it set put every engine's feed host on one
+database, and each run's posts on the last's; three mutation runs' browser
+baselines here failed so. They keep the feed in memory now, whatever the
+environment. And a failing feed test keeps what its page's runtime said
+beside its trace, for WebKit's intermittent "Load more": its second trace
+shows the server answering the read, `{"applied":1}`, and the page keeping
+its twenty rows.
+
 **Correction, 2026-10-07: and the rest of `body_label`.** The verification
 of `5aa9430` (run 37682873614) ran `e10-privacy-by-resolution` for the first
 time since ADR-0112 recorded it on 2026-09-26, and "the body's label is read

@@ -3006,10 +3006,10 @@ e14-feed-postgres:
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; \
        echo "postgres: $(psql "$PW_FEED_DATABASE_URL" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)')"; echo; \
-       echo "== the feed on PostgreSQL (spikes/own-renderer/server/src/tests/feed_pg.rs)"; echo; \
-       cargo test --locked -p pw-dev-server -- tests::feed_pg:: 2>&1 | grep -E '^(test |test result)'; \
+       echo "== the feed on PostgreSQL (spikes/own-renderer/server/src/tests/feed_pg.rs, follows.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- tests::feed_pg:: tests::follows::on_postgres 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the in-memory layer, unchanged (the server's other tests)"; echo; \
-       cargo test --locked -p pw-dev-server -- --skip tests::feed_pg:: 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-dev-server -- --skip tests::feed_pg:: --skip tests::follows::on_postgres 2>&1 | grep -E '^test result'; \
        echo; echo "== mutation controls (scripts/feed_postgres_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/feed_postgres_mutations.py; \
      } > docs/evidence/E14/feed-postgres.txt; \
@@ -4975,3 +4975,29 @@ e14-every-entry:
        CARGO_INCREMENTAL=0 python3 scripts/every_entry_mutations.py; \
      } > docs/evidence/E14/every-entry.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/every-entry.txt
+
+# ADR-0257: the follows timeline. The server's tests (on PostgreSQL where
+# PW_FEED_DATABASE_URL names a database, and doing nothing otherwise; the
+# database job runs them in `e14-feed-postgres`), the feed in three engines,
+# and the mutation controls.
+e14-follows:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0257 - the follows timeline"; echo; \
+       echo "produced by: just e14-follows"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; \
+       echo "postgres: $([ -n "${PW_FEED_DATABASE_URL:-}" ] && (psql "$PW_FEED_DATABASE_URL" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)') || echo 'none: PW_FEED_DATABASE_URL is not set')"; echo; \
+       echo "== the server (spikes/own-renderer/server/src/tests/follows.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- tests::follows:: 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/follows_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/follows_mutations.py; \
+     } > docs/evidence/E14/follows.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/follows.txt

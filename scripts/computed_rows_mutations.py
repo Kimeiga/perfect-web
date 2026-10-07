@@ -110,6 +110,7 @@ MUTANTS = [
         "browser",
         FEED,
         "    optimistic    Timeline(current_session(), _) as feed => liked(feed, post),\n"
+        "                  FollowingTimeline(current_session(), _) as feed => liked(feed, post),\n"
         "                  Thread(post) as thread => liked_thread(thread, post)\n",
         "",
     ),

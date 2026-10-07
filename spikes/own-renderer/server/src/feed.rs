@@ -12,6 +12,8 @@ pub(crate) const GRANTS: &[&str] = &[
     "database.read<Post>",
     "database.write<Post>",
     "database.read<User>",
+    "database.read<Follow>",
+    "database.write<Follow>",
 ];
 
 /// One post as kept: its author by id, and what it replies to.
@@ -30,6 +32,8 @@ struct State {
     posts: Vec<Row>,
     /// A user's handle and name, by id.
     users: BTreeMap<String, (String, String)>,
+    /// Who follows whom (ADR-0257), the follower first.
+    follows: std::collections::BTreeSet<(String, String)>,
 }
 
 /// What a command changes, staged until it commits.
@@ -37,6 +41,10 @@ struct State {
 enum Change {
     Post(Row),
     Like(String),
+    /// The follower follows the followee (ADR-0257).
+    Follow(String, String),
+    /// The follower follows the followee no more.
+    Unfollow(String, String),
 }
 
 pub(crate) struct FeedData {
@@ -138,6 +146,60 @@ fn item_val(state: &State, row: &Row) -> Val {
     ])
 }
 
+/// **Whether the feed knows `id`** (ADR-0257): a user with a row, or one
+/// who wrote a post, follows or is followed. A session's guest is known once
+/// it has done one.
+fn known(state: &State, id: &str) -> bool {
+    state.users.contains_key(id)
+        || state.posts.iter().any(|r| r.author == id)
+        || state.follows.iter().any(|(a, b)| a == id || b == id)
+}
+
+/// **What `reader` is to `user`** (ADR-0257), the program's `Relation`.
+fn relation_val(state: &State, reader: &str, user: &str) -> Val {
+    let case = if reader == user {
+        "yourself"
+    } else if state
+        .follows
+        .contains(&(reader.to_string(), user.to_string()))
+    {
+        "following"
+    } else {
+        "not-following"
+    };
+    Val::Variant(case.into(), None)
+}
+
+/// How many of a user's posts their page lists, newest first (ADR-0257).
+pub(crate) const PROFILE_POSTS: usize = 20;
+
+/// **A user's page** (ADR-0257), the program's `Profile`: who follow them,
+/// whom they follow, and their newest posts that reply to none.
+fn profile_val(state: &State, id: &str) -> Val {
+    let followers = state.follows.iter().filter(|(_, b)| b == id).count();
+    let following = state.follows.iter().filter(|(a, _)| a == id).count();
+    let posts: Vec<Val> = state
+        .posts
+        .iter()
+        .rev()
+        .filter(|r| r.author == id && r.reply_to.is_none())
+        .take(PROFILE_POSTS)
+        .map(|r| {
+            Val::Record(vec![
+                ("id".into(), Val::String(r.id.clone())),
+                ("text".into(), Val::String(r.text.clone())),
+                ("likes".into(), Val::S64(r.likes)),
+            ])
+        })
+        .collect();
+    Val::Record(vec![
+        ("user".into(), user_val(state, id)),
+        ("followers".into(), Val::S64(followers as i64)),
+        ("following".into(), Val::S64(following as i64)),
+        ("posts".into(), Val::List(posts)),
+    ])
+}
+
 pub(crate) fn not_found() -> Val {
     Val::Result(Err(Some(Box::new(Val::Variant("not-found".into(), None)))))
 }
@@ -178,6 +240,52 @@ fn reads_of(state: Arc<State>) -> crate::data::Ops {
                 None => not_found(),
             }]),
             other => Err(format!("posts#thread received {other:?}")),
+        }),
+    );
+    // **The timeline of those a session's user follows** (ADR-0257): each an
+    // `Item`, its own posts and theirs, that reply to none.
+    let s = state.clone();
+    ops.insert(
+        "feed:data/posts#following".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(session), Val::S64(limit)] => {
+                let reader = user_of(session);
+                let shown: Vec<Val> = s
+                    .posts
+                    .iter()
+                    .rev()
+                    .filter(|r| r.reply_to.is_none())
+                    .filter(|r| {
+                        r.author == reader
+                            || s.follows.contains(&(reader.clone(), r.author.clone()))
+                    })
+                    .take((*limit).max(0) as usize)
+                    .map(|r| item_val(&s, r))
+                    .collect();
+                Ok(vec![Val::List(shown)])
+            }
+            other => Err(format!("posts#following received {other:?}")),
+        }),
+    );
+    let s = state.clone();
+    ops.insert(
+        "feed:data/users#profile".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(id)] => Ok(vec![match known(&s, id) {
+                true => ok(profile_val(&s, id)),
+                false => not_found(),
+            }]),
+            other => Err(format!("users#profile received {other:?}")),
+        }),
+    );
+    let s = state.clone();
+    ops.insert(
+        "feed:data/users#relation".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(session), Val::String(user)] => {
+                Ok(vec![relation_val(&s, &user_of(session), user)])
+            }
+            other => Err(format!("users#relation received {other:?}")),
         }),
     );
     ops.insert(
@@ -221,6 +329,12 @@ impl crate::data::Staged for Staging<'_> {
                     if let Some(row) = self.state.posts.iter_mut().find(|r| r.id == id) {
                         row.likes += 1;
                     }
+                }
+                Change::Follow(follower, followee) => {
+                    self.state.follows.insert((follower, followee));
+                }
+                Change::Unfollow(follower, followee) => {
+                    self.state.follows.remove(&(follower, followee));
                 }
             }
         }
@@ -280,6 +394,44 @@ impl crate::data::DataLayer for FeedData {
                     Ok(vec![answer])
                 }
                 other => Err(format!("posts#reply received {other:?}")),
+            }),
+        );
+        // **A follow** (ADR-0257): once, however often; a follow again
+        // writes what is there, and its event refreshes every page that
+        // shows it. One the feed does not know, or the follower itself, is
+        // not found.
+        let (s, into) = (seen.clone(), staged.clone());
+        ops.insert(
+            "feed:data/users#follow".to_string(),
+            Arc::new(move |args: &[Val]| match args {
+                [Val::String(session), Val::String(user)] => {
+                    let follower = user_of(session);
+                    if follower == *user || !known(&s, user) {
+                        return Ok(vec![not_found()]);
+                    }
+                    into.lock()
+                        .expect("staged")
+                        .push(Change::Follow(follower, user.clone()));
+                    Ok(vec![ok(Val::String(user.clone()))])
+                }
+                other => Err(format!("users#follow received {other:?}")),
+            }),
+        );
+        // **An unfollow** (ADR-0257): one not followed is no change.
+        let (s, into) = (seen.clone(), staged.clone());
+        ops.insert(
+            "feed:data/users#unfollow".to_string(),
+            Arc::new(move |args: &[Val]| match args {
+                [Val::String(session), Val::String(user)] => {
+                    if !known(&s, user) {
+                        return Ok(vec![not_found()]);
+                    }
+                    into.lock()
+                        .expect("staged")
+                        .push(Change::Unfollow(user_of(session), user.clone()));
+                    Ok(vec![ok(Val::String(user.clone()))])
+                }
+                other => Err(format!("users#unfollow received {other:?}")),
             }),
         );
         let (s, into) = (seen, staged.clone());

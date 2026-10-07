@@ -10154,6 +10154,10 @@ public query Store(",
     /// partition (ADR-0256).
     mod every_entry;
 
+    /// The follows timeline (ADR-0257): its tests, in memory and on
+    /// PostgreSQL where a database is named.
+    mod follows;
+
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
     /// to the session's document. Until ADR-0218 the host served the store
