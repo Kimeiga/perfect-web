@@ -1,0 +1,27 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: indirect invalid — a resource's `release` clause ends nothing
+//
+// A-007 with its `release` clause emptied. A `resource` declaration's clauses
+// are terms no statement reaches, and until ADR-0251 PW2005 walked none of
+// them: the handle `acquire` made was never destroyed, and nothing said so.
+
+module generality.affine_release_ends_nothing
+
+import browser.{ ElementRef, MapHandle, MapError }
+import domain.{ LatLng }
+
+import Maps
+
+resource StoreMap(container: ElementRef, center: LatLng)
+    -> Result<MapHandle, MapError>
+{
+    placement browser
+    affine
+    acquire {
+        Maps.create(container, center)
+    }
+    release(handle) {
+        ()
+    }
+}

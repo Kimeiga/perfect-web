@@ -1,0 +1,26 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: nesting — a component's `resource` statement's `release` ends nothing
+//
+// A-019 with its `release` clause emptied. The component's body holds the
+// clauses as statements, which PW2005 walked, but until ADR-0251 it asked a
+// `release` clause for nothing.
+
+module generality.affine_component_release
+
+import Maps
+import domain.{ LatLng }
+
+component LazyMap(center: LatLng) {
+    placement browser
+
+    let visible = observe intersection(self, threshold = 0.1) -> Bool
+
+    resource map when visible {
+        scope component
+        acquire { Maps.create(self, center) }
+        release(handle) { () }
+    }
+
+    view { <section aria-label="Store location" /> }
+}

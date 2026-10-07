@@ -23,6 +23,15 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0251, 2026-10-07: a resource's clauses are held to PW2005** (a
+correction, found with ADR-0250). A `resource` declaration's `acquire` and
+`release` clauses are terms no statement reaches, and PW2005 walked none of
+them; a component's `resource` statement's were walked, but its `release`
+owed nothing. A `release` that never ended its handle passed in both forms.
+Now what `acquire` makes, the resource holds, and what `release` is given it
+ends exactly once on every path, where `acquire` acquires it; an acquisition
+in another clause is refused (`just e14-resource-clauses`).
+
 **ADR-0250, 2026-10-07: `let _` discards a value, and an acquisition is
 held or refused** (the owner's ruling 0099-a, Twitter item 2, and a
 correction its probes found). `let _ = e` parses and binds nothing: a

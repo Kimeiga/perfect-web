@@ -2084,3 +2084,9 @@ a verification shard sets up only what its recipes need.
   a resource bound to `_` is PW2005. Its probes found PW2005 followed only
   `let x = acquire()`: a statement, an argument, a branch, `let h = ..?` and
   a function value's result each passed, leaking what they acquired.
+[ADR-0251](DECISIONS/ADR-0251-a-resources-clauses-are-held-to-pw2005.md):
+a resource's clauses are held to PW2005 (a correction, found with ADR-0250).
+- A `resource` declaration's `acquire` and `release` are terms no statement
+  reaches, and PW2005 walked none of them; a component's were walked, but a
+  `release` owed nothing. Now what `acquire` makes the resource holds, and
+  what `release` is given it ends exactly once on every path.

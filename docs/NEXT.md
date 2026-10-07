@@ -417,14 +417,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
              _` (0099-a)~~ (ADR-0250, `just e14-let-discard`, which found
              PW2005 following only `let x = acquire()`: an acquisition is
              held or refused now). Its tests found two more, next, since
-             soundness needs them: **a `resource` declaration's clauses**,
-             terms outside the body PW2005 walks, so an acquisition in a
-             `release` clause, or a `release` that never ends its handle,
-             passes; and **a member names whichever declaration registered
-             last** (`signatures::by_member`): `h.destroy()` named
+             soundness needs them: ~~a `resource` declaration's clauses~~
+             (ADR-0251, `just e14-resource-clauses`: what `acquire` makes,
+             the resource holds, and what `release` is given, it ends); and
+             **a member names whichever declaration registered last**
+             (`signatures::by_member`): `h.destroy()` named
              `VendorSdk.destroy`, which releases nothing, in a module
-             importing only `Maps`. Then 0057-c, a map or set sorted on
-             arrival;
+             importing only `Maps`, and four members are declared so today
+             (`destroy`, `is_available`, `current`, `for_store`). Then
+             0057-c, a map or set sorted on arrival;
           3. ADR-0195's ruling 10, materialization chains: a timeline built
              from who you follow, with follow and unfollow commands and a
              profile page with follower counts;

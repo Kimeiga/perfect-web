@@ -350,7 +350,9 @@ refused by name:
   followed, and so is `let o = Some(Database.begin())`, which no release
   takes. `use _ = ..` is refused, not read as a scope holding a value it
   never names, and so is an acquisition no name holds inside a keyword's
-  block, `unsafe.imperative { Maps.create(..) }`.
+  block, `unsafe.imperative { Maps.create(..) }`. In a clause other than
+  `acquire`, a `release`, a key, a `draw` or a transition, an acquisition
+  is refused, not followed into what reads the clause's value (ADR-0251).
 - **A function value read from a record field is not called** (ADR-0052).
   A function is a value: a lambda or a declaration's name is stored,
   returned, passed and called. But `r.check(5)` reads as a method call. A

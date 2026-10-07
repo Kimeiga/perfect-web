@@ -4876,3 +4876,23 @@ e14-let-discard:
        CARGO_INCREMENTAL=0 python3 scripts/let_discard_mutations.py; \
      } > docs/evidence/E14/let-discard.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/let-discard.txt
+
+# ADR-0251: a resource's clauses are held to PW2005: what its `acquire` makes
+# the resource holds, and what its `release` is given it ends.
+e14-resource-clauses:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0251 - a resource's clauses are held to PW2005"; echo; \
+       echo "produced by: just e14-resource-clauses"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/resource_clauses.rs)"; echo; \
+       cargo test --locked -p pw-core --test resource_clauses 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the generality witnesses (examples/generality/affine_not_consumed_once)"; echo; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       echo; echo "== the accepted corpus, A-007, A-019 and A-024 among it, checks as one program"; echo; \
+       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       echo; echo "== mutation controls (scripts/resource_clauses_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/resource_clauses_mutations.py; \
+     } > docs/evidence/E14/resource-clauses.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/resource-clauses.txt

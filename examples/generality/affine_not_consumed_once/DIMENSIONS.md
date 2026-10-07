@@ -25,9 +25,13 @@ An affine value is consumed exactly once, in the scope that acquired it.
 | deferred execution | `returned-by-a-function-value.pw` | a function value's result, which nothing follows |
 | indirect invalid | `unit-body-drops-its-value.pw` | `moved-to-the-caller.pw` declaring `()`: no caller has the value |
 | neighbour | `ended-where-made.pw` | ended where it is made, `Database.begin().commit()` |
+| indirect invalid | `release-ends-nothing.pw` | A-007 with its `release` emptied: a declaration's clauses are terms no statement reaches |
+| nesting | `component-release-ends-nothing.pw` | A-019 with its `release` emptied: a component's `resource` statement |
 
 The seven rows after the first six were added on 2026-09-25, when the check
 began counting releases on every path; each caught one was accepted before.
 The eight after them were added on 2026-10-07 (ADR-0250), when it began
 following an acquisition wherever it stands, and a body declaring `()` stopped
-giving its last value to a caller; each caught one was accepted before.
+giving its last value to a caller; each caught one was accepted before. The
+last two were added the same day (ADR-0251), when it began walking a
+resource's clauses and holding its `release` to what `acquire` made.

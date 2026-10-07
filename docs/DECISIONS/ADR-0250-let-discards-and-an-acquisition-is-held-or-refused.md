@@ -124,10 +124,13 @@ found. Date: 2026-10-07. Milestone: E14, the owner's Twitter list, item 2.
   body's": each `return` the tests wrote was the body's last statement too,
   given to the caller either way. One inside a branch holds it, and 29 of 29
   are killed.
-- **The chain runs on the push** (ADR-0245), and with it the nine scripts
-  with a mutant within thirty lines of a change, each run whole: the three
-  of PW2005, and those of command answers, function values, handler
-  failures, lexical scope, named handlers and separated statements.
+- **The chain runs on the push** (ADR-0245), and with it the eight scripts
+  with a mutant within thirty lines of a change, each run whole: two of
+  PW2005's, and those of command answers, function values, handler
+  failures, lexical scope, named handlers and separated statements. PW2005's
+  third, `affine_loops_mutations.py`, has none so near, and was run whole
+  here at `f32d114`: 3 of 3 killed. (Corrected 2026-10-07: this said nine,
+  "the three of PW2005", and the push's plan holds eight.)
 
 ## Found
 
@@ -159,5 +162,5 @@ Writing the tests found two more, each the next ADR:
   what a keyword's block gives the keyword is ruled nowhere, and is not
   guessed here.
 - **A `resource` declaration's clauses, and a member two modules declare**
-  (Found, above): the next ADRs.
+  (Found, above): the next ADRs, the first ADR-0251.
 - **A borrow**: ADR-0045's "Not claimed" stands.
