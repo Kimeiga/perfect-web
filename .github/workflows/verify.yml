@@ -86,6 +86,12 @@ jobs:
       matrix:
         shard: ${{ fromJSON(needs.plan.outputs.shards) }}
     steps:
+      # A runner's disk is about 14 GB free. What it ships and nothing here
+      # uses goes first: .NET, Android, GHC and CodeQL, some 25 GB.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -146,6 +152,12 @@ jobs:
     env:
       PW_FEED_DATABASE_URL: postgresql://postgres:pw@localhost:5432/pw_feed_test
     steps:
+      # A runner's disk is about 14 GB free. What it ships and nothing here
+      # uses goes first: .NET, Android, GHC and CodeQL, some 25 GB.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -178,6 +190,12 @@ jobs:
       matrix:
         engine: [chromium, firefox, webkit]
     steps:
+      # A runner's disk is about 14 GB free. What it ships and nothing here
+      # uses goes first: .NET, Android, GHC and CodeQL, some 25 GB.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2

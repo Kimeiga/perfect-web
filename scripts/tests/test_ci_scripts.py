@@ -5,7 +5,7 @@
   against a database to the database job, and reaches from a change to the
   mutation scripts it touches;
 - `ci_recipes.py` takes what a recipe wrote to be the files whose bytes
-  changed while it ran;
+  changed while it ran, and frees what its builds leave;
 - `ci_summary.py` fails a run where a recipe failed, a mutant survived, or a
   shard reported nothing;
 - `evidence_fetch.py` names the run after a file's `commit:` line, and
@@ -108,6 +108,30 @@ class Recipes(unittest.TestCase):
             recipes.written(before, after),
             ["docs/evidence/b.txt", "docs/evidence/c.txt"],
         )
+
+
+class Prune(unittest.TestCase):
+    def test_what_builds_leave_is_freed_and_the_newest_binary_kept(self) -> None:
+        import os
+        import time
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = pathlib.Path(tmp)
+            deps = target / "debug" / "deps"
+            deps.mkdir(parents=True)
+            (target / "debug" / "incremental" / "x").mkdir(parents=True)
+            old, new = deps / "feed-0123456789abcdef", deps / "feed-fedcba9876543210"
+            for i, binary in enumerate((old, new)):
+                binary.write_text("binary")
+                binary.chmod(0o755)
+                os.utime(binary, (time.time() + i, time.time() + i))
+            library = deps / "libpw_core-0123456789abcdef.rlib"
+            library.write_text("library")
+            (deps / "feed.a1.rcgu.o").write_text("object")
+            recipes.prune(target)
+            left = sorted(p.name for p in deps.iterdir())
+            self.assertEqual(left, sorted([library.name, new.name]))
+            self.assertFalse((target / "debug" / "incremental").exists())
 
 
 class Fetch(unittest.TestCase):

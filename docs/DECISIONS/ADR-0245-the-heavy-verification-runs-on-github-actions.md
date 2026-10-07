@@ -89,3 +89,11 @@ direction to move the heavy verification off the laptop (relayed
   `wasm32-unknown-unknown`, which the development machine had installed by
   hand; every job of the first run failed building it. The toolchain file
   names it now, so rustup installs it wherever the toolchain is.
+- **A runner's disk is about 14 GB free, and a shard ran out.** Each mutant
+  a recipe plants builds its tests again under a new hash, as on the
+  development machine (where the disk filled the same day). The second run's
+  shard 7 was stopped by the runner mid-recipe, after two that passed. Each
+  heavy job now deletes what the runner ships and nothing here uses (.NET,
+  Android, GHC, CodeQL), and a shard frees, between recipes, the object
+  files, the incremental cache and each test binary but the newest of its
+  name, and records the disk left after each.
