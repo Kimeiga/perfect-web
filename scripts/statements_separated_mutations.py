@@ -30,8 +30,8 @@ MUTANTS = [
     (
         "two statements on one line are not refused",
         GRAMMAR,
-        "            if same_line && !block && takes == Takes::Nothing {\n",
-        "            if same_line && !block && takes == Takes::Nothing && false {\n",
+        "            if same_line && !block && takes == Takes::Nothing && read && self.at_expression() {\n",
+        "            if same_line && !block && takes == Takes::Nothing && read && self.at_expression() && false {\n",
     ),
     (
         "the refusal offers no repair",
@@ -72,6 +72,18 @@ MUTANTS = [
         GRAMMAR,
         "            let block = self.at(Kind::LBrace);\n",
         "            let block = false && self.at(Kind::LBrace);\n",
+    ),
+    (
+        "a statement after one read with an error is refused as a second",
+        GRAMMAR,
+        "            read = self.errors.len() == errors;\n",
+        "            read = self.errors.len() == errors || true;\n",
+    ),
+    (
+        "a token no expression begins with is refused as a statement",
+        GRAMMAR,
+        "            if same_line && !block && takes == Takes::Nothing && read && self.at_expression() {\n",
+        "            if same_line && !block && takes == Takes::Nothing && read && (self.at_expression() || true) {\n",
     ),
     (
         "a word alone is not read",

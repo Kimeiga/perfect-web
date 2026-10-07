@@ -155,3 +155,21 @@ Milestone: E14. A correction, found with ADR-0237.
   lacks, and nothing reads the rest: no analysis, generator or runtime
   names `respects`, `intrinsic_height` or a `handler_policy`. Its own ADR,
   next.
+
+## Amended, 2026-10-07: what a parse error already says
+
+Found probing ADR-0247's `let _` and an index: after a statement the parser
+could not read, the refusal piled onto its error. `let _ = r()`, before
+0099-a, was PW0001 at `_` and then PW0030 at `_`; `g(items[0])` was PW0010,
+then PW0030 at `[` and at `)`, then PW0009. After an error, where the
+statement ended is the recovery's guess, and a second statement on its line
+is the error's, not the program's.
+
+- **No PW0030 after a statement read with an error**: the grammar counts
+  its errors across each statement, and the next is taken as separated.
+- **No PW0030 at a token no expression begins with**: the expression
+  parser refuses it (PW0009), and it is no statement.
+
+The grammar's unit test holds `g(a[0])` to PW0010 and PW0009 alone, and
+`scripts/statements_separated_mutations.py` has a mutant for each, 29 in
+all.

@@ -478,6 +478,26 @@ impl<'a> P<'a> {
             .any(|t| self.src[t.span.clone()].contains('\n'))
     }
 
+    /// **Does an expression begin here?** The tokens `expr_lhs` reads one
+    /// from; at any other it refuses (PW0009).
+    fn at_expression(&self) -> bool {
+        matches!(
+            self.cur(),
+            Kind::Int
+                | Kind::Float
+                | Kind::Str
+                | Kind::UnterminatedStr
+                | Kind::Minus
+                | Kind::Bang
+                | Kind::LParen
+                | Kind::LBracket
+                | Kind::LBrace
+                | Kind::LAngle
+                | Kind::Underscore
+                | Kind::Ident
+        )
+    }
+
     /// The word the tokens from `from` to here are, when they are one name
     /// alone (ADR-0243).
     fn one_word(&self, from: usize) -> Option<&'a str> {
@@ -1699,6 +1719,10 @@ impl<'a> P<'a> {
         // was none: the block's first.
         let mut separated = true;
         let mut takes = Takes::Nothing;
+        // Whether the statement before was read without an error. After one,
+        // where it ended is the recovery's guess, and a second statement on
+        // its line is the error's, not the program's.
+        let mut read = true;
         while !self.at(Kind::RBrace) && !self.at_eof() {
             guard += 1;
             if guard > 20_000 {
@@ -1715,7 +1739,9 @@ impl<'a> P<'a> {
             // after fails for it.
             let same_line = !separated && !self.newline_ahead();
             let block = self.at(Kind::LBrace);
-            if same_line && !block && takes == Takes::Nothing {
+            // A token no expression begins with is the expression parser's
+            // to refuse (PW0009), and not a second statement.
+            if same_line && !block && takes == Takes::Nothing && read && self.at_expression() {
                 self.error_help(
                     "PW0030",
                     "two statements on one line are separated by `;`",
@@ -1723,6 +1749,7 @@ impl<'a> P<'a> {
                 );
             }
             let before = self.pos;
+            let errors = self.errors.len();
             // A named `fn` nested in a component or view body is a
             // declaration, not an expression. `fn(` with no name is still a
             // lambda. The nested-declaration set is deliberately this small:
@@ -1755,6 +1782,7 @@ impl<'a> P<'a> {
                 _ if takes == Takes::Rest && same_line && !block => Takes::Rest,
                 _ => Takes::Nothing,
             };
+            read = self.errors.len() == errors;
             let comma = self.eat(Kind::Comma);
             let semi = self.eat(Kind::Semi);
             separated = comma || semi;
@@ -4056,6 +4084,18 @@ mod tests {
         for body in ["a; b", "a, b", "a\n    b", "R { a: 1, b: 2 }"] {
             assert!(parse_tree(&f(body)).ok(), "{body}");
         }
+        // After a statement read with an error, and at a token no expression
+        // begins with, the error is the parse's own: `g(a[0])` is an
+        // argument list left open (PW0010) and a stray `)` (PW0009), and
+        // never two statements.
+        let src = f("g(a[0])");
+        let p = parse_tree(&src);
+        let codes: Vec<_> = p.errors.iter().map(|e| e.code).collect();
+        assert!(!codes.contains(&"PW0030"), "{codes:?}");
+        assert!(
+            codes.contains(&"PW0010") && codes.contains(&"PW0009"),
+            "{codes:?}"
+        );
         // What a block's readers read as one: a `return` and its value, a
         // clause's head and the rest of its line, and a block after what
         // precedes it.
