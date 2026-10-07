@@ -66,3 +66,5 @@ See `justfile`.
 - Subagents must read the charter, `docs/ARCHITECTURE.md`, and the relevant ADRs
   before changing code.
 - Delete abandoned worktrees after integrating or rejecting them.
+- The parallel tracks, their branches, the files and diagnostic codes each
+  owns, and how a worker asks the integrator: `docs/PARALLEL.md` (ADR-0253).

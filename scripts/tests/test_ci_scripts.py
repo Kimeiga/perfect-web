@@ -111,6 +111,27 @@ class Plan(unittest.TestCase):
             plan.touched_scripts({grammar: [(1, 1)]}, 30),
         )
 
+    def test_a_recipe_in_an_imported_file_is_read_and_planned(self) -> None:
+        # ADR-0253: a track's recipes live in a file the justfile imports.
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            (root / "just").mkdir()
+            (root / "justfile").write_text(
+                "set positional-arguments\n\nimport 'just/t.just'\nimport? 'just/none.just'\n\n"
+                "e14-root:\n    cargo test -p pw-core --test names\n"
+            )
+            (root / "just/t.just").write_text(
+                "# A track's.\ne14-track:\n    python3 scripts/track_mutations.py\n"
+            )
+            self.assertEqual(plan.justfile_parts(root), ["justfile", "just/t.just"])
+            body = plan.bodies(root)
+            self.assertIn("scripts/track_mutations.py", body["e14-track"])
+            self.assertIn("--test names", body["e14-root"])
+            # A changed line of the imported file is its recipe's.
+            text = (root / "just/t.just").read_text().splitlines()
+            self.assertEqual(plan.recipes_at(text, [(3, 3)], ["e14-track"]), {"e14-track"})
+            self.assertEqual(plan.recipes_at(text, [(1, 1)], ["e14-track"]), set())
+
     def test_a_recipe_run_against_a_database_goes_to_the_database_job(self) -> None:
         out = subprocess.run(
             [sys.executable, str(SCRIPTS / "ci_plan.py"), "--shards", "2", "e14-feed-postgres", "e14-feed"],

@@ -90,6 +90,10 @@ class EvidenceGates(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="pleris gate tests ") as directory:
             root = Path(directory)
             (root / "justfile").write_text(JUSTFILE.read_text() if source is None else source)
+            # The files it imports (ADR-0253), where they are: a test's own
+            # source is the justfile changed, its imports with it.
+            if (JUSTFILE.parent / "just").is_dir():
+                shutil.copytree(JUSTFILE.parent / "just", root / "just")
             bin_dir = root / ".toolchain/prefix/bin"
             executable(bin_dir / "cargo", PRODUCER)
             executable(bin_dir / "git", "#!/usr/bin/env bash\nexit 0\n")

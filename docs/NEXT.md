@@ -432,20 +432,25 @@ E14 comes before E11-E13. Its plan, controls and task list are
              map or set sorted on arrival;
           3. ADR-0195's ruling 10, materialization chains: a timeline built
              from who you follow, with follow and unfollow commands and a
-             profile page with follower counts;
-          4. real accounts and sign-in: sign-up, sign-in and sign-out,
+             profile page with follower counts (the integrator's track,
+             ADR-0253);
+          4. **track `identity`, W1** (ADR-0253, docs/PARALLEL.md): real
+             accounts and sign-in: sign-up, sign-in and sign-out,
              per-user sessions, and a real `requires` evaluator in place of
              the development server's every session `SignedIn`. An ADR
              decides what Pleris owns and what a deployment does. Pleris is
              no identity provider (the charter): OIDC behind a deployment's
              interface, and a local provider that is plainly not production.
              Pleris never stores a password in plain text;
-          5. notifications: private, per-user live data derived from others'
-             actions, a like or a reply to your post, with an unread count;
-          6. direct messages: data private to exactly two users. The privacy
+          5. notifications (after the timeline, ADR-0253): private,
+             per-user live data derived from others' actions, a like or a
+             reply to your post, with an unread count;
+          6. direct messages (after the timeline): data private to exactly
+             two users. The privacy
              labels with two principals, and a cache that never shows one
              conversation to a third user;
-          7. image uploads on a post: a typed upload with size and
+          7. **track `uploads`, W2** (ADR-0253, docs/PARALLEL.md): image
+             uploads on a post: a typed upload with size and
              content-type limits, stored through a deployment's blob-storage
              capability (Pleris builds no storage and no CDN), and served
              safely;

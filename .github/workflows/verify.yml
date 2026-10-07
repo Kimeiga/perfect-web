@@ -14,7 +14,8 @@ name: verify
 
 on:
   push:
-    branches: [master]
+    # A track's branch too (ADR-0253, docs/PARALLEL.md), for what it changed.
+    branches: [master, "track/**"]
   schedule:
     - cron: "17 6 * * *"
   workflow_dispatch:
@@ -58,9 +59,15 @@ jobs:
         run: |
           case "$EVENT" in
             push)
+              # A track's push (ADR-0253): what the track changed since it left
+              # `master`, at every push, in at most 8 shards, so that `master`'s
+              # runs keep most of the plan's 20 jobs.
+              if [ "${GITHUB_REF_NAME#track/}" != "$GITHUB_REF_NAME" ]; then
+                base=$(git merge-base origin/master "$GITHUB_SHA")
+                python3 scripts/ci_plan.py --shards 8 --changed "$base" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
               # The chain's choice; a first push, with no commit before it, is
               # planned whole.
-              if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+              elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
                 python3 scripts/ci_plan.py --shards 16 --changed "$BEFORE" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
               else
                 python3 scripts/ci_plan.py --shards 16 --all >> "$GITHUB_OUTPUT"

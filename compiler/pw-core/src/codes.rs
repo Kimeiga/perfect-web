@@ -17,7 +17,12 @@
 //! PW00xx   lexical and syntax
 //! PW01xx+  semantic invariants
 //! PW50xx   placement, capability and unsafe boundaries
+//! PW55xx   the identity track's (ADR-0253): accounts, sign-in, `requires`
+//! PW56xx   the uploads track's (ADR-0253): typed uploads and blob storage
 //! ```
+//!
+//! A parallel track registers its codes in its own block, with its own
+//! owner, and nothing else may (docs/PARALLEL.md).
 //!
 //! Ranges are enforced by a test, not by convention.
 
@@ -82,6 +87,12 @@ pub enum Owner {
     /// ADR-0148: a streamed region. What reads a query declared `delivery
     /// streamed`, and the states a `<stream>` shows.
     Streaming,
+    /// ADR-0253: the identity track's codes, PW55xx: accounts, sign-in and
+    /// sign-out, a session's principal, and the `requires` evaluator.
+    Identity,
+    /// ADR-0253: the uploads track's codes, PW56xx: a typed upload, its
+    /// limits, a deployment's blob storage, and serving it safely.
+    Uploads,
 }
 
 impl fmt::Display for Code {
@@ -787,6 +798,9 @@ impl Owner {
     /// has to answer this question before it can register a code.
     pub fn range(self) -> &'static str {
         match self {
+            // The parallel tracks' blocks (ADR-0253), each held to its owner.
+            Owner::Identity => "PW55",
+            Owner::Uploads => "PW56",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -834,6 +848,22 @@ mod tests {
                 c.id,
                 c.owner
             );
+        }
+    }
+
+    #[test]
+    fn a_tracks_block_holds_only_its_tracks_codes() {
+        // ADR-0253: two tracks work in parallel, each registering codes in
+        // its own block. A code of any other owner there is how two of them
+        // take one number.
+        for c in ALL {
+            for (owner, block) in [(Owner::Identity, "PW55"), (Owner::Uploads, "PW56")] {
+                assert!(
+                    !c.id.starts_with(block) || c.owner == owner,
+                    "{} sits in {block}, the {owner:?} track's block",
+                    c.id
+                );
+            }
         }
     }
 

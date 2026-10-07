@@ -2096,3 +2096,9 @@ a value returned early carries its label to the caller (a correction).
   from a branch or a loop was public to the caller, and could be logged.
   Each `return` counts now, with the conditions it runs under, and each `?`
   with its own.
+[ADR-0253](DECISIONS/ADR-0253-two-tracks-are-built-in-parallel-each-in-files-of-its-own.md):
+two tracks are built in parallel, each in files of its own.
+- The owner's approval of parallel workers (charter R10). Accounts and
+  uploads each get an imported justfile, a block of diagnostic codes, and a
+  module of the development server reached at marked seams; the protocol is
+  `docs/PARALLEL.md`, and `verify` runs on a track's push.

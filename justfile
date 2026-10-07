@@ -11,6 +11,12 @@ set positional-arguments
 toolchain_bin := justfile_directory() / ".toolchain/prefix/bin"
 export PATH := toolchain_bin + ":" + env_var('PATH')
 
+# The parallel tracks' recipes (ADR-0253, docs/PARALLEL.md): each track adds
+# recipes only to its own file, and the integrator alone edits this one. An
+# imported recipe runs in this directory, under these settings.
+import 'just/identity.just'
+import 'just/uploads.just'
+
 default:
     @just --list
 

@@ -65,21 +65,55 @@ def recipes() -> list[str]:
     return out.split()
 
 
-def bodies() -> dict[str, str]:
-    """Each recipe's body in the justfile, by name."""
-    text = (ROOT / "justfile").read_text()
+IMPORT = re.compile(r"""^import\??\s+(['"])(.+?)\1""")
+
+HEADER = re.compile(r"^([a-z0-9][a-z0-9-]*)\s*(?:[^:=]*)?:(?!=)")
+
+
+def justfile_parts(root: pathlib.Path = ROOT) -> list[str]:
+    """The justfile and each file it imports (ADR-0253), each by its path
+    from the repository: a parallel track's recipes live in a file of its
+    own, which `just` reads as part of the justfile."""
+    parts = ["justfile"]
+    for line in (root / "justfile").read_text().splitlines():
+        m = IMPORT.match(line)
+        if m and (root / m.group(2)).is_file():
+            parts.append(m.group(2))
+    return parts
+
+
+def bodies(root: pathlib.Path = ROOT) -> dict[str, str]:
+    """Each recipe's body, by name, in every part of the justfile."""
     out: dict[str, str] = {}
-    name = None
-    for line in text.splitlines():
-        m = re.match(r"^([a-z0-9][a-z0-9-]*)\s*(?:[^:=]*)?:(?!=)", line)
-        if m and not line.startswith((" ", "\t")):
-            name = m.group(1)
-            out[name] = ""
-            continue
-        if name and (line.startswith((" ", "\t")) or not line.strip()):
-            out[name] += line + "\n"
-        else:
-            name = None
+    for part in justfile_parts(root):
+        name = None
+        for line in (root / part).read_text().splitlines():
+            m = HEADER.match(line)
+            if m and not line.startswith((" ", "\t")):
+                name = m.group(1)
+                out[name] = ""
+                continue
+            if name and (line.startswith((" ", "\t")) or not line.strip()):
+                out[name] += line + "\n"
+            else:
+                name = None
+    return out
+
+
+def recipes_at(text: list[str], lines: list[tuple[int, int]], names: list[str]) -> set[str]:
+    """The recipes of `names` whose own lines are among `lines`, in a part of
+    the justfile: for each, the nearest header above it."""
+    out = set()
+    for a, b in lines:
+        for line in range(a, b + 1):
+            for k in range(min(line, len(text)) - 1, -1, -1):
+                m = HEADER.match(text[k])
+                if m and not text[k].startswith((" ", "\t")):
+                    if m.group(1) in names:
+                        out.add(m.group(1))
+                    break
+                if text[k].strip() and not text[k].startswith((" ", "\t", "#")):
+                    break
     return out
 
 
@@ -174,20 +208,12 @@ def changed_recipes(base: str, head: str, near: int, names: list[str]) -> list[s
         for name in names
         if any(f"scripts/{s}" in body.get(name, "") for s in scripts)
     }
-    # A recipe whose own lines changed: written or changed in the range.
-    if "justfile" in changed:
-        text = (ROOT / "justfile").read_text().splitlines()
-        for a, b in changed["justfile"]:
-            for line in range(a, b + 1):
-                # The recipe a changed line is in: the nearest header above it.
-                for k in range(min(line, len(text)) - 1, -1, -1):
-                    m = re.match(r"^([a-z0-9][a-z0-9-]*)\s*(?:[^:=]*)?:(?!=)", text[k])
-                    if m and not text[k].startswith((" ", "\t")):
-                        if m.group(1) in names:
-                            out.add(m.group(1))
-                        break
-                    if text[k].strip() and not text[k].startswith((" ", "\t", "#")):
-                        break
+    # A recipe whose own lines changed: written or changed in the range, in
+    # any part of the justfile.
+    for part in justfile_parts():
+        if part in changed:
+            text = (ROOT / part).read_text().splitlines()
+            out |= recipes_at(text, changed[part], names)
     return sorted(out)
 
 

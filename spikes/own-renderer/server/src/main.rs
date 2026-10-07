@@ -524,7 +524,11 @@ impl Default for Estimator {
 mod data;
 mod feed;
 mod feed_pg;
+// The parallel tracks' modules (ADR-0253, docs/PARALLEL.md): each reached
+// from this file only at the seams marked `TRACK SEAM`.
+mod identity;
 mod store;
+mod uploads;
 
 struct Server {
     /// The templates the compiler emitted, deserialized once.
@@ -683,6 +687,11 @@ struct Server {
     /// Per session, the interaction keys held in `commands`, oldest first,
     /// each with the arguments it was first sent with.
     interactions: Mutex<BTreeMap<String, std::collections::VecDeque<(String, String)>>>,
+    /// **Who a request is, and what `requires` is told**: the identity
+    /// track's (ADR-0253).
+    identity: identity::Identity,
+    /// **A request whose body is a file**: the uploads track's (ADR-0253).
+    uploads: uploads::Uploads,
 }
 
 /// How many interactions' outcomes one session keeps (ADR-0121). A retry of
@@ -1162,6 +1171,8 @@ impl Server {
             calls: Arc::default(),
             commands: pw_resource::Resources::new(pw_resource::Clock::new()),
             interactions: Mutex::new(BTreeMap::new()),
+            identity: identity::Identity::default(),
+            uploads: uploads::Uploads::default(),
         }
     }
 
@@ -1331,17 +1342,10 @@ impl Server {
             host,
             &[&export.interface, &export.function],
             args,
-            |predicate, _bound| match predicate {
-                // This is a DEVELOPMENT identity model, not authentication:
-                // every session the local server issued is the signed-in demo
-                // principal. The important property here is that `requires`
-                // is evaluated explicitly and an unknown predicate cannot run.
-                "SignedIn" if !session.is_empty() => Ok(true),
-                "SignedIn" => Ok(false),
-                other => Err(format!(
-                    "the development deployment has no authorization predicate `{other}`"
-                )),
-            },
+            // TRACK SEAM (identity, ADR-0253): what `requires` is told. The
+            // important property is that each predicate is evaluated, and an
+            // unknown one cannot run.
+            |predicate, _bound| self.identity.requires(predicate, session),
         )?;
         // A type that contains itself arrives as its nodes, and a page reads
         // it nested (ADR-0194).
@@ -5354,6 +5358,16 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
     let session = session_of(&headers);
     let fresh = !headers.contains("pw-session=");
 
+    // TRACK SEAM (uploads, ADR-0253): an upload reads its own body, within
+    // its own limits, before the bound a command's body is held to.
+    let route = path.split('?').next().unwrap_or("/");
+    if server.uploads.claims(method, route) {
+        server
+            .uploads
+            .answer(route, &headers, &session, fresh, &mut reader, &mut stream);
+        return;
+    }
+
     // The body, when the request declares one. Bounded: a command's arguments
     // are a few values, and a length nothing checks is an allocation anyone
     // can ask for.
@@ -5383,7 +5397,14 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         return;
     }
 
-    let route = path.split('?').next().unwrap_or("/");
+    // TRACK SEAM (identity, ADR-0253): the identity track's routes, before
+    // any other.
+    if server
+        .identity
+        .answer(method, route, &headers, &session, fresh, &body, &mut stream)
+    {
+        return;
+    }
     let query = path.split_once('?').map(|(_, q)| q).unwrap_or("");
     // The page a path names by its route, and the parameters it gives
     // (ADR-0162).

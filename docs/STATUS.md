@@ -41,6 +41,17 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0253, 2026-10-07: two tracks are built in parallel, each in files of
+its own** (the owner's approval of parallel workers, charter R10). Accounts
+and sign-in (W1) and image uploads (W2) run beside the integrator, who keeps
+the follows timeline and alone merges, numbers ADRs and writes these
+documents. Each track has an imported justfile (`just/identity.just`,
+`just/uploads.just`), a block of codes (`PW55xx`, `PW56xx`, each held to
+its owner by a test), and a module of the development server
+(`identity.rs`, `uploads.rs`) reached from `main.rs` at lines marked
+`TRACK SEAM`; `requires` is decided there now. `verify` runs on a track's
+push, for what it changed. The protocol is `docs/PARALLEL.md`.
+
 **ADR-0252, 2026-10-07: a value returned early carries its label to the
 caller** (a correction, found holding those survivors). A body's label was
 its last statement's, joined with each `?`'s value: a `return` inside a
