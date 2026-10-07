@@ -3,9 +3,14 @@
 what it calls.
 
 Each mutant undoes one piece: following a read's own reads, joining a read's
-declared label, leaving a command's reads to it, a body's reads beyond its
-calls, PW5101 reading them, leaving a secret out, and the contract reading
-the same labels. The tests in `reads_through_calls.rs` must then fail.
+declared label, leaving a command's reads to it, PW5101 reading them,
+leaving a secret out, and the contract reading the same labels. The tests in
+`reads_through_calls.rs` must then fail.
+
+"A body reads one call deep" is retired (2026-10-07): it dropped what a
+body's reads return from `body_label`, whose one reader, the shared-cache
+rule, has joined `Reads::observed` since ADR-0128, from the same reads. It
+survived its first whole run since, and the join it undid is removed.
 
 Run from the repository root; `just e10-reads-through-calls` records the
 output. The source is restored after every mutant, whatever happens.
@@ -40,12 +45,6 @@ MUTANTS = [
         CHECK,
         "                if decl.kind == DeclKind::Command {\n",
         "                if false {\n",
-    ),
-    (
-        "a body reads one call deep",
-        CHECK,
-        "        label = label.join(&reads.through(def));\n",
-        "        let _ = def;\n",
     ),
     (
         "PW5101 reads declarations only",

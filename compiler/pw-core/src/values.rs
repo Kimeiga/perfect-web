@@ -1910,18 +1910,19 @@ impl<'a> Typer<'a> {
     /// for `emits`. Looked up in the clause's namespace, never as a term. A
     /// name of another kind, or of nothing, is the graph's (PW5100, PW5103).
     fn keyed(&self, head: &str, key: &crate::hir::ClauseKey) -> Option<&'a Signature> {
-        let (ns, kinds) = crate::policy::keyed(head)?;
-        let found = match key.name.contains('.') {
-            true => self.ws.resolve_path_in(self.at, ns, &key.name),
-            false => self.ws.resolve_in(self.at, ns, &key.name),
-        };
-        let (Resolution::Local(def) | Resolution::Imported { def, .. }) = found else {
-            return None;
-        };
-        if !self.sigs.kind_of(def).is_some_and(|k| kinds.contains(&k)) {
-            return None;
-        }
-        self.sigs.by_def(def)
+        crate::policy::keyed(head)?.iter().find_map(|(ns, kinds)| {
+            let found = match key.name.contains('.') {
+                true => self.ws.resolve_path_in(self.at, *ns, &key.name),
+                false => self.ws.resolve_in(self.at, *ns, &key.name),
+            };
+            let (Resolution::Local(def) | Resolution::Imported { def, .. }) = found else {
+                return None;
+            };
+            if !self.sigs.kind_of(def).is_some_and(|k| kinds.contains(&k)) {
+                return None;
+            }
+            self.sigs.by_def(def)
+        })
     }
 
     /// The type a policy term's binders take from its header, where it gives

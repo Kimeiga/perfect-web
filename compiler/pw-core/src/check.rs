@@ -1243,24 +1243,32 @@ fn cached_readers(
             });
         }
     }
-    // One level: `depends_on` is a materialization's alone (ADR-0092), so
-    // what a fragment reads, nothing reads through.
-    for (unit, hir) in hirs.iter().enumerate() {
-        for (id, decl) in hir.all_decls() {
-            if decl.kind != DeclKind::Materialize {
-                continue;
-            }
+    // A materialization may read another (ADR-0255, ADR-0195's ruling 10):
+    // what one reads, the one reading it reads too. Each round reads what
+    // the last made known, until none is added; the build refuses a cycle
+    // (PW5109), and a round past their number would be one.
+    let materializations: Vec<(usize, crate::hir::DeclId)> = hirs
+        .iter()
+        .enumerate()
+        .flat_map(|(unit, hir)| {
+            hir.all_decls()
+                .filter(|(_, d)| d.kind == DeclKind::Materialize)
+                .map(move |(id, _)| (unit, id))
+        })
+        .collect();
+    for _ in 0..materializations.len() {
+        let mut added = false;
+        for &(unit, id) in &materializations {
+            let hir = hirs[unit];
             let path = crate::graph::path_of(hir, id);
-            let built_from: Vec<(String, BTreeSet<String>)> = graph
+            // What it reads through what it depends on, and through its own
+            // statements: a materialize block may hold them after its
+            // policies.
+            let reads: BTreeSet<String> = graph
                 .edges
                 .iter()
                 .filter(|e| e.kind == crate::graph::EdgeKind::Reads && e.from == path)
-                .filter_map(|e| read_by.get(&e.to).cloned())
-                .collect();
-            // And what it reads itself: a materialize block may hold
-            // statements after its policies.
-            let reads: BTreeSet<String> = built_from
-                .iter()
+                .filter_map(|e| read_by.get(&e.to))
                 .flat_map(|(_, r)| r.iter().cloned())
                 .chain(
                     inference
@@ -1273,6 +1281,33 @@ fn cached_readers(
             if reads.is_empty() {
                 continue;
             }
+            let entry = read_by
+                .entry(path)
+                .or_insert_with(|| (hir.decl(id).name.clone(), BTreeSet::new()));
+            let before = entry.1.len();
+            entry.1.extend(reads);
+            added |= entry.1.len() > before;
+        }
+        if !added {
+            break;
+        }
+    }
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind != DeclKind::Materialize {
+                continue;
+            }
+            let path = crate::graph::path_of(hir, id);
+            let built_from: Vec<(String, BTreeSet<String>)> = graph
+                .edges
+                .iter()
+                .filter(|e| e.kind == crate::graph::EdgeKind::Reads && e.from == path)
+                .filter_map(|e| read_by.get(&e.to).cloned())
+                .collect();
+            // What it reads, the rounds above gathered.
+            let Some((_, reads)) = read_by.get(&path).cloned() else {
+                continue;
+            };
             out.push(Reader {
                 path,
                 name: decl.name.clone(),
@@ -7294,13 +7329,13 @@ fn given_label(sigs: &Signatures, sig: &crate::signatures::Signature) -> Option<
 /// it returns `Secret<C>`, not because it is spelled `secrets.something`
 /// (E2C, architect ruling 2026-08-06).
 ///
-/// And what each declaration the body reads returns through what it reads in
-/// turn (ADR-0118): a helper returning a cart it read with `current_session()`
-/// is the session's.
+/// What each declaration the body reads returns through what it reads in turn
+/// (ADR-0118) is `Reads::observed`'s, which the shared-cache rule joins with
+/// this (ADR-0128). Until 2026-10-07 it was joined here too, from the same
+/// reads, and changed nothing.
 fn body_label(
     body: &Body,
     sigs: &Signatures,
-    reads: &Reads,
     inference: &crate::effects::Inference<'_>,
     at: usize,
 ) -> Label {
@@ -7312,9 +7347,6 @@ fn body_label(
         if let Some(sig) = callee_signature(sigs, inference, at, body, *callee) {
             label = label.join(&sig.label);
         }
-    }
-    for def in reads_of(body, inference, at) {
-        label = label.join(&reads.through(def));
     }
     label
 }
@@ -7563,7 +7595,7 @@ fn privacy_flow(
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
     let imports = crate::labels::imported_modules(hir);
-    let label = body_label(body, sigs, reads, inference, at);
+    let label = body_label(body, sigs, inference, at);
     let def = crate::resolve::DefId {
         unit: at,
         decl: id.0,

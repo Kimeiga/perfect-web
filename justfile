@@ -4934,3 +4934,20 @@ e14-member-resolution:
        CARGO_INCREMENTAL=0 python3 scripts/member_resolution_mutations.py; \
      } > docs/evidence/E14/member-resolution.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/member-resolution.txt
+
+# ADR-0255 (ADR-0195's ruling 10): a materialization may read another, the
+# build refuses a cycle (PW5109), and invalidation propagates transitively.
+e14-materialization-chains:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0255 - a materialization may read another"; echo; \
+       echo "produced by: just e14-materialization-chains"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/materialization_chains.rs)"; echo; \
+       cargo test --locked -p pw-core --test materialization_chains 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the runtime's reads (runtime/pw-materialize/tests/reads.rs)"; echo; \
+       cargo test --locked -p pw-materialize --test reads 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/materialization_chains_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/materialization_chains_mutations.py; \
+     } > docs/evidence/E14/materialization-chains.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/materialization-chains.txt

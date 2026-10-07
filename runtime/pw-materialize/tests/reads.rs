@@ -195,3 +195,41 @@ fn a_node_read_twice_is_followed_at_each_key() {
         [pair("1", "2")]
     );
 }
+
+#[test]
+fn an_event_reaches_what_reads_a_materialization_it_reaches() {
+    // ADR-0255, ADR-0195's ruling 10: a materialization may read another,
+    // and invalidation propagates transitively. `MenuStrip` reads
+    // `MenuFragment`, which listens: store 47's strip is stale with store
+    // 47's fragment, and store 48's is not.
+    let g = Graph::from_json(
+        r#"{
+      "nodes": [
+        { "path": "Events.MenuChanged", "name": "MenuChanged", "node": "event", "params": ["store"] },
+        { "path": "store.MenuFragment", "name": "MenuFragment", "node": "materialization",
+          "partition": "public", "params": ["id"] },
+        { "path": "store.MenuStrip", "name": "MenuStrip", "node": "materialization",
+          "partition": "public", "params": ["id"] }
+      ],
+      "edges": [
+        { "from": "store.MenuFragment", "to": "Events.MenuChanged",
+          "kind": "invalidated_by", "key": ["id"] },
+        { "from": "store.MenuStrip", "to": "store.MenuFragment", "kind": "reads", "key": ["id"] }
+      ],
+      "dangling": []
+    }"#,
+    )
+    .expect("the graph parses");
+    let keys = [
+        entry("store.MenuStrip", "47"),
+        entry("store.MenuStrip", "48"),
+        entry("store.MenuFragment", "47"),
+    ];
+    assert_eq!(
+        invalidated_in(&g, &keys, Event::new("Events.MenuChanged", &["47"])),
+        [
+            entry("store.MenuStrip", "47"),
+            entry("store.MenuFragment", "47")
+        ]
+    );
+}

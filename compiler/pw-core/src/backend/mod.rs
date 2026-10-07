@@ -140,17 +140,20 @@ pub fn invalidated_query(
     key: &crate::hir::ClauseKey,
 ) -> Option<crate::resolve::DefId> {
     use crate::resolve::Resolution;
-    let (ns, kinds) = crate::policy::keyed("invalidates")?;
-    let found = match key.name.contains('.') {
-        true => ws.resolve_path_in(unit, ns, &key.name),
-        false => ws.resolve_in(unit, ns, &key.name),
-    };
-    let (Resolution::Local(def) | Resolution::Imported { def, .. }) = found else {
-        return None;
-    };
-    sigs.kind_of(def)
-        .is_some_and(|k| kinds.contains(&k))
-        .then_some(def)
+    crate::policy::keyed("invalidates")?
+        .iter()
+        .find_map(|(ns, kinds)| {
+            let found = match key.name.contains('.') {
+                true => ws.resolve_path_in(unit, *ns, &key.name),
+                false => ws.resolve_in(unit, *ns, &key.name),
+            };
+            let (Resolution::Local(def) | Resolution::Imported { def, .. }) = found else {
+                return None;
+            };
+            sigs.kind_of(def)
+                .is_some_and(|k| kinds.contains(&k))
+                .then_some(def)
+        })
 }
 
 /// **The platform's invalidations** (ADR-0209): each query a command

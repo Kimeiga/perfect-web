@@ -47,8 +47,8 @@ MUTANTS = [
     (
         "a key's name is looked up as a term",
         VALUES,
-        "            false => self.ws.resolve_in(self.at, ns, &key.name),",
-        "            false => self.ws.resolve_in(self.at, crate::resolve::Namespace::Term, &key.name),",
+        "                false => self.ws.resolve_in(self.at, *ns, &key.name),",
+        "                false => self.ws.resolve_in(self.at, crate::resolve::Namespace::Term, &key.name),",
     ),
     (
         "a key of another kind is related",
@@ -59,8 +59,8 @@ MUTANTS = [
     (
         "an `emits` clause names no kind of declaration",
         POLICY,
-        "        Domain::EventRef | Domain::Listener => Some((Namespace::Event, &[K::Event])),",
-        "        Domain::EventRef | Domain::Listener => Some((Namespace::Event, &[])),",
+        "    const EVENT: &[(Namespace, &[K])] = &[(Namespace::Event, &[K::Event])];",
+        "    const EVENT: &[(Namespace, &[K])] = &[(Namespace::Event, &[])];",
     ),
     (
         "an event has no signature",

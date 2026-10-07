@@ -432,10 +432,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
              found fixing `e10-lexical`: ~~a secret returned early is
              public~~ (ADR-0252, `just e14-returned-labels`). Then 0057-c, a
              map or set sorted on arrival;
-          3. ADR-0195's ruling 10, materialization chains: a timeline built
-             from who you follow, with follow and unfollow commands and a
-             profile page with follower counts (the integrator's track,
-             ADR-0253);
+          3. ADR-0195's ruling 10: ~~materialization chains~~ (ADR-0255,
+             `just e14-materialization-chains`: one may read another, a
+             cycle is refused, PW5109, and a write reaches each of a
+             chain); then a timeline built from who you follow, with follow
+             and unfollow commands and a profile page with follower counts
+             (the integrator's track, ADR-0253), on queries, since a
+             materialization does not run; then materializations made real:
+             a body and a type, a generator, a page reading one, and a chain
+             rebuilt in order;
           4. **track `identity`, W1** (ADR-0253, docs/PARALLEL.md): real
              accounts and sign-in: sign-up, sign-in and sign-out,
              per-user sessions, and a real `requires` evaluator in place of

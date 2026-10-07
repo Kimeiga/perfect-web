@@ -31,10 +31,14 @@ MUTANTS = [
     (
         "a fragment's own reads are not its",
         CHECK,
+        "                .filter_map(|e| read_by.get(&e.to))\n"
+        "                .flat_map(|(_, r)| r.iter().cloned())\n"
         "                .chain(\n"
         "                    inference\n"
         "                        .effective_effects(unit, hir, id)\n"
         "                        .iter()\n",
+        "                .filter_map(|e| read_by.get(&e.to))\n"
+        "                .flat_map(|(_, r)| r.iter().cloned())\n"
         "                .chain(\n"
         "                    Vec::<String>::new()\n"
         "                        .iter()\n",

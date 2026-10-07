@@ -620,8 +620,9 @@ codes! {
     // naming nothing, checked until 2026-09-26.
     LISTENER_KEY = "PW5104" / listener_key / 1, ResourceGraph,
         "a listener's argument is one of its declaration's parameters, or `_`";
-    CLAUSE_NAMES_ANOTHER_KIND = "PW5103" / clause_names_another_kind / 1, ResourceGraph,
-        "a clause names a declaration of its kind: a resource to read or invalidate, an event to emit or listen for";
+    // Revision 2 (ADR-0255, ruling 10): a materialization may read another.
+    CLAUSE_NAMES_ANOTHER_KIND = "PW5103" / clause_names_another_kind / 2, ResourceGraph,
+        "a clause names a declaration of its kind: a resource or a materialization to read, a resource to invalidate, an event to emit or listen for";
     // ADR-0101: `add_to_cart` without `invalidates` or `emits` checked until
     // 2026-09-26, and the cart it wrote stayed as it was on every page.
     WRITE_NOT_INVALIDATED = "PW5106" / write_not_invalidated / 1, ResourceGraph,
@@ -634,6 +635,10 @@ codes! {
     // checked, and the page kept the function's answer as an entry.
     READ_NAMES_ANOTHER_KIND = "PW5108" / read_names_another_kind / 1, ResourceGraph,
         "a `query` reads a query or a resource, and a `subscription` a subscription";
+    // ADR-0255 (ADR-0195's ruling 10): a materialization may read another,
+    // and the build refuses a cycle.
+    MATERIALIZATION_CYCLE = "PW5109" / materialization_cycle / 1, ResourceGraph,
+        "a materialization depends on nothing that depends on it";
 
     // --- what a capability names (PW52xx, E8) -----------------------------
     //

@@ -41,6 +41,27 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0255, 2026-10-07: a materialization may read another** (ADR-0195's
+ruling 10, its compiler half). `depends_on` looked names up among
+resources, so one naming a materialization was refused, PW5103; it names a
+resource or a materialization now, and its arguments are checked. A cycle
+is refused, PW5109, once, by its first member; a shared materialization
+reading a private one is PW5101; and what one reads, the one reading it
+reads too, so a write reaches each of a chain (PW5106), and the key audit
+counts what a materialization read separates. Found on the way: a clause
+naming a function or a view, no node of the graph, made an edge to nothing,
+and no check said so; it is refused (PW5103). The runtime already followed
+reads, and a test holds it for a chain. A materialization still has no
+body or generator; that is queued (`just e14-materialization-chains`).
+
+**Correction, 2026-10-07: a mutant equivalent since ADR-0128.** ADR-0255's
+run of `reads_through_calls_mutations.py` whole, its first since ADR-0118
+recorded it on 2026-10-02, found "a body reads one call deep" surviving. It
+dropped what a body's reads give from `body_label`, whose one reader, the
+shared-cache rule (PW5004), has also joined `Reads::observed` since
+ADR-0128: what the same reads give, through the same fixed point. The join
+it undid is removed, and the mutant retired.
+
 **ADR-0254, 2026-10-07: a member names the declaration its module sees** (a
 correction, found with ADR-0250). The member table kept one declaration per
 receiver and name, and a second replaced the first: `h.destroy()` was

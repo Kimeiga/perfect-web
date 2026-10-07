@@ -36,7 +36,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::hir::{Decl, DeclKind, Hir};
+use std::collections::BTreeMap;
+
+use crate::hir::{Decl, DeclKind, Hir, Span};
 
 /// A dimension a materialization's cache key varies by (charter §14 M6 task 1).
 ///
@@ -522,16 +524,22 @@ impl Graph {
             if e.from != path || e.kind != EdgeKind::Reads {
                 continue;
             }
-            let Some(Node {
-                kind: NodeKind::Resource { key, .. },
-                name: dep,
-                params,
-                ..
-            }) = self.node(&e.to)
-            else {
+            let Some(read) = self.node(&e.to) else {
                 continue;
             };
-            for component in key {
+            let (dep, params) = (&read.name, &read.params);
+            let key: Vec<String> = match &read.kind {
+                NodeKind::Resource { key, .. } => key.clone(),
+                // A materialization read (ADR-0255, ruling 10): its entries are
+                // separated by its parameters and by what it varies by.
+                NodeKind::Materialization { varies_by: by, .. } => params
+                    .iter()
+                    .cloned()
+                    .chain(by.iter().map(|d| d.keyword().to_string()))
+                    .collect(),
+                _ => continue,
+            };
+            for component in &key {
                 // Supplied positionally: `Menu(id)` gives the resource's first
                 // parameter, so a key component naming that parameter is
                 // covered by the fragment's own logical key.
@@ -539,7 +547,7 @@ impl Graph {
                     .iter()
                     .position(|p| p == component)
                     .is_some_and(|i| i < e.key.len());
-                let varied = varies_by.iter().any(|d| d.keyword() == component.as_str());
+                let varied = varies_by.iter().any(|d| d.keyword() == component);
                 if !supplied && !varied {
                     gaps.push(KeyGap {
                         resource: dep.clone(),
@@ -849,17 +857,45 @@ pub fn check(
             let Some(p) = decl.policy(policy) else {
                 continue;
             };
-            let wanted = if wants_resource {
-                "a resource"
-            } else {
-                "an event"
+            let wanted = match (wants_resource, policy) {
+                (true, "depends_on") => "a resource or a materialization",
+                (true, _) => "a resource",
+                _ => "an event",
             };
             for e in g.edges.iter().filter(|e| e.from == path && e.kind == kind) {
+                // A name that is a declaration and no node of the graph: a
+                // function, or a view. Until ADR-0255 the clause was taken as
+                // it was, and `depends_on someFn(id)` checked.
                 let Some(node) = g.node(&e.to) else {
+                    let name = &e.to;
+                    out.push(Diagnostic {
+                        code: codes::CLAUSE_NAMES_ANOTHER_KIND.id,
+                        invariant: codes::CLAUSE_NAMES_ANOTHER_KIND.invariant,
+                        reason: "clause_names_no_node",
+                        detector: Detector::ResourceGraph,
+                        severity: Severity::Error,
+                        message: format!("`{}` {what} `{name}`, which is not {wanted}", decl.name),
+                        primary_span: p.span.clone(),
+                        related: vec![Related {
+                            span: at.clone(),
+                            label: format!("`{}` is the node with the edge", decl.name),
+                        }],
+                        explanation: Some(format!(
+                            "`{policy}` names {wanted}: a node of the dependency graph, \
+                             which invalidation runs through. `{name}` is a declaration of \
+                             another kind, and an edge to it would carry nothing."
+                        )),
+                        repairs: vec![Repair {
+                            description: format!("name {wanted} here"),
+                            replacement: None,
+                        }],
+                    });
                     continue;
                 };
                 let is = match &node.kind {
                     NodeKind::Resource { .. } if wants_resource => continue,
+                    // A materialization may read another (ADR-0255, ruling 10).
+                    NodeKind::Materialization { .. } if policy == "depends_on" => continue,
                     NodeKind::Event if !wants_resource => continue,
                     NodeKind::Resource { .. } => "a resource",
                     NodeKind::Event => "an event",
@@ -884,8 +920,8 @@ pub fn check(
                     }],
                     explanation: Some(format!(
                         "`{policy}` names {wanted}. A command invalidates a resource's \
-                         entries and emits events; a resource or a materialization \
-                         depends on resources and listens for events. The graph looked \
+                         entries and emits events; a materialization depends on resources \
+                         and materializations, and listens for events. The graph looked \
                          `{}` up wherever a name might be until 2026-09-26, and drew \
                          the edge to whatever it found.",
                         node.name
@@ -896,6 +932,57 @@ pub fn check(
                     }],
                 });
             }
+        }
+
+        // 1c. A materialization that depends on itself (ADR-0255, ADR-0195's
+        // ruling 10, PW5109). Reported once a cycle, by its first member.
+        if matches!(
+            g.node(&path).map(|n| &n.kind),
+            Some(NodeKind::Materialization { .. })
+        ) && let Some(cycle) = cycle_through(g, &path)
+            && cycle.iter().all(|m| m.as_str() >= path.as_str())
+        {
+            let named =
+                |m: &String| format!("`{}`", g.node(m).map_or(m.as_str(), |n| n.name.as_str()));
+            let through: Vec<String> = cycle[1..].iter().map(named).collect();
+            let message = match through.as_slice() {
+                [] => format!("`{}` depends on itself", decl.name),
+                [one] => format!("`{}` depends on itself, through {one}", decl.name),
+                [rest @ .., last] => format!(
+                    "`{}` depends on itself, through {} and {last}",
+                    decl.name,
+                    rest.join(", ")
+                ),
+            };
+            out.push(Diagnostic {
+                code: codes::MATERIALIZATION_CYCLE.id,
+                invariant: codes::MATERIALIZATION_CYCLE.invariant,
+                reason: "materialization_depends_on_itself",
+                detector: Detector::ResourceGraph,
+                severity: Severity::Error,
+                message,
+                primary_span: decl
+                    .policy("depends_on")
+                    .map(|p| p.span.clone())
+                    .unwrap_or_else(|| at.clone()),
+                related: vec![Related {
+                    span: at.clone(),
+                    label: format!("`{}` is rebuilt from what it reads", decl.name),
+                }],
+                explanation: Some(
+                    "A materialization is rebuilt from what it reads, once what it reads \
+                     is rebuilt (ADR-0195's ruling 10). Around a cycle nothing is first: \
+                     each would wait for the other, or be rebuilt from the other's stale \
+                     entry."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "let one of them read the resources the other reads, and \
+                                  not the other"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
         }
 
         // 2 and 3 are about materializations whose entry is SHARED.
@@ -923,6 +1010,24 @@ pub fn check(
         // and the fragment still wrong.
         for e in &g.edges {
             if e.from != path || e.kind != EdgeKind::Reads {
+                continue;
+            }
+            // A materialization it reads (ADR-0255, ruling 10): shared only
+            // where it is `partition public`, which holds of what that one
+            // reads in turn, since the build refuses a cycle.
+            if let Some(Node {
+                kind: NodeKind::Materialization { partition: dp, .. },
+                name: dep,
+                ..
+            }) = g.node(&e.to)
+                && dp.as_deref().map(str::trim) != Some("public")
+            {
+                out.push(shared_reads_restricted(
+                    decl,
+                    dep,
+                    "is not materialized `partition public`",
+                    &at,
+                ));
                 continue;
             }
             let Some(Node {
@@ -953,39 +1058,90 @@ pub fn check(
                     .map(|v| format!("is declared `{v}`"))
                     .unwrap_or_else(|| "is cached `private`".to_string()),
             };
-            out.push(Diagnostic {
-                code: codes::PRIVATE_IN_SHARED_MATERIALIZATION.id,
-                invariant: codes::PRIVATE_IN_SHARED_MATERIALIZATION.invariant,
-                reason: "restricted_dependency_of_shared_fragment",
-                detector: Detector::ResourceGraph,
-                severity: Severity::Error,
-                message: format!(
-                    "`{}` is materialized into a shared entry and depends on `{dep}`, which {why}",
-                    decl.name
-                ),
-                primary_span: decl
-                    .policy("depends_on")
-                    .map(|p| p.span.clone())
-                    .unwrap_or_else(|| at.clone()),
-                related: vec![Related {
-                    span: at.clone(),
-                    label: "`partition public` makes one entry serve every reader".to_string(),
-                }],
-                explanation: Some(format!(
-                    "A shared materialization is computed for whoever asks first and served \
-                     to everyone after. `{dep}` {why}, so the first reader's data would be \
-                     written into storage the rest of them read. Charter §14 M6 gate item 4 \
-                     states this as a property of the STORAGE; it is decided here, where the \
-                     dependency is written."
-                )),
-                repairs: vec![Repair {
-                    description: format!(
-                        "materialize `{}` with `partition private`, or drop the dependency on `{dep}` and read it per reader",
-                        decl.name
-                    ),
-                    replacement: None,
-                }],
-            });
+            out.push(shared_reads_restricted(decl, dep, &why, &at));
         }
     }
+}
+
+/// **A shared materialization depends on `dep`, which `why`** (PW5101).
+fn shared_reads_restricted(decl: &Decl, dep: &str, why: &str, at: &Span) -> Diagnostic {
+    Diagnostic {
+        code: codes::PRIVATE_IN_SHARED_MATERIALIZATION.id,
+        invariant: codes::PRIVATE_IN_SHARED_MATERIALIZATION.invariant,
+        reason: "restricted_dependency_of_shared_fragment",
+        detector: Detector::ResourceGraph,
+        severity: Severity::Error,
+        message: format!(
+            "`{}` is materialized into a shared entry and depends on `{dep}`, which {why}",
+            decl.name
+        ),
+        primary_span: decl
+            .policy("depends_on")
+            .map(|p| p.span.clone())
+            .unwrap_or_else(|| at.clone()),
+        related: vec![Related {
+            span: at.clone(),
+            label: "`partition public` makes one entry serve every reader".to_string(),
+        }],
+        explanation: Some(format!(
+            "A shared materialization is computed for whoever asks first and served \
+             to everyone after. `{dep}` {why}, so the first reader's data would be \
+             written into storage the rest of them read. Charter §14 M6 gate item 4 \
+             states this as a property of the STORAGE; it is decided here, where the \
+             dependency is written."
+        )),
+        repairs: vec![Repair {
+            description: format!(
+                "materialize `{}` with `partition private`, or drop the dependency on `{dep}` and read it per reader",
+                decl.name
+            ),
+            replacement: None,
+        }],
+    }
+}
+
+/// **A materialization that depends on itself** (ADR-0255, ADR-0195's ruling
+/// 10, PW5109): the cycle through `path`, as the paths of its members from
+/// `path` back to it, where the reads from `path` reach `path` again.
+fn cycle_through(g: &Graph, path: &str) -> Option<Vec<String>> {
+    let reads = |from: &str| -> Vec<String> {
+        g.edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::Reads && e.from == from)
+            .filter(|e| {
+                g.node(&e.to)
+                    .is_some_and(|n| matches!(n.kind, NodeKind::Materialization { .. }))
+            })
+            .map(|e| e.to.clone())
+            .collect()
+    };
+    // Breadth first, each node once, keeping how it was reached: the
+    // shortest way back is the cycle a reader can follow.
+    let mut came_from: BTreeMap<String, String> = BTreeMap::new();
+    let mut queue: std::collections::VecDeque<String> = reads(path).into_iter().collect();
+    for next in &queue {
+        came_from.insert(next.clone(), path.to_string());
+    }
+    while let Some(cur) = queue.pop_front() {
+        if cur == path {
+            let mut cycle = vec![path.to_string()];
+            let mut at = came_from.get(path).cloned();
+            while let Some(p) = at {
+                if p == path {
+                    break;
+                }
+                cycle.push(p.clone());
+                at = came_from.get(&p).cloned();
+            }
+            cycle[1..].reverse();
+            return Some(cycle);
+        }
+        for next in reads(&cur) {
+            if !came_from.contains_key(&next) {
+                came_from.insert(next.clone(), cur.clone());
+                queue.push_back(next);
+            }
+        }
+    }
+    None
 }

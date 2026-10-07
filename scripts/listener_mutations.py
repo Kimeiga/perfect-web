@@ -34,8 +34,8 @@ MUTANTS = [
     (
         "a listener names no event",
         POLICY,
-        "        Domain::EventRef | Domain::Listener => Some((Namespace::Event, &[K::Event])),",
-        "        Domain::EventRef => Some((Namespace::Event, &[K::Event])),",
+        "        Domain::EventRef | Domain::Listener => Some(EVENT),",
+        "        Domain::EventRef => Some(EVENT),",
     ),
     (
         "the listener rule does not run",

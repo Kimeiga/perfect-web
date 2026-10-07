@@ -2109,3 +2109,10 @@ a member names the declaration its module sees (a correction).
   imports only `Maps`. Of several, a member is now the one the module
   declares or imports, or that is declared beside its type; a module that
   sees several or none is refused, PW0628.
+[ADR-0255](DECISIONS/ADR-0255-a-materialization-may-read-another.md):
+a materialization may read another (ADR-0195's ruling 10, its compiler half).
+- `depends_on` names a resource or a materialization, whose arguments are
+  checked; a cycle is refused (PW5109), a shared one reading a private one
+  is PW5101, and a write reaches each materialization of a chain. A clause
+  naming a function or a view, no node of the graph, was taken as it was,
+  and is refused (PW5103).

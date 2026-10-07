@@ -418,12 +418,25 @@ pub fn carries_terms(head: &str) -> bool {
 /// the namespace its names are looked up in, and the kinds of declaration
 /// it may name. `invalidates Cart(current_session())` names a resource, and
 /// `emits CartChanged(current_session())` an event. Each key is a term.
-pub fn keyed(head: &str) -> Option<(crate::resolve::Namespace, &'static [crate::hir::DeclKind])> {
+///
+/// `depends_on` names a resource, or a materialization (ADR-0255, ADR-0195's
+/// ruling 10), which is looked up in the namespace views share.
+pub fn keyed(
+    head: &str,
+) -> Option<&'static [(crate::resolve::Namespace, &'static [crate::hir::DeclKind])]> {
     use crate::hir::DeclKind as K;
     use crate::resolve::Namespace;
+    const RESOURCES: &[K] = &[K::Query, K::Subscription, K::Resource];
+    const READ: &[(Namespace, &[K])] = &[
+        (Namespace::Term, RESOURCES),
+        (Namespace::Ui, &[K::Materialize]),
+    ];
+    const RESOURCE: &[(Namespace, &[K])] = &[(Namespace::Term, RESOURCES)];
+    const EVENT: &[(Namespace, &[K])] = &[(Namespace::Event, &[K::Event])];
     match domain_of(head)? {
-        Domain::ResourceRef => Some((Namespace::Term, &[K::Query, K::Subscription, K::Resource])),
-        Domain::EventRef | Domain::Listener => Some((Namespace::Event, &[K::Event])),
+        Domain::ResourceRef if head == "depends_on" => Some(READ),
+        Domain::ResourceRef => Some(RESOURCE),
+        Domain::EventRef | Domain::Listener => Some(EVENT),
         _ => None,
     }
 }
