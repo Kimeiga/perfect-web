@@ -170,7 +170,15 @@ export default defineConfig({
   ],
   fullyParallel: true,
   reporter: [["list"]],
-  use: { baseURL: `http://127.0.0.1:${PORT}`, trace: "off" },
+  // A test that fails on CI keeps its trace, the network's frames among it,
+  // in the browser job's `test-results` artifact: a failure seen once and not
+  // here (WebKit's "Load more", run 37663299969) left only a page snapshot.
+  // Not a retry: a test that fails once is a finding, and not to be run again
+  // until it passes.
+  use: {
+    baseURL: `http://127.0.0.1:${PORT}`,
+    trace: process.env.CI ? "retain-on-failure" : "off",
+  },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },

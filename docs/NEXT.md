@@ -410,7 +410,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
              a region itself"~~, which timed out in run 37651362024: the
              runtime records a region that settles after it starts, Chrome
              150 can fill one first, and the test waited for a record; it
-             now reads which happened, and holds the record to it; and
+             now reads which happened, and holds the record to it;
+             `feed.spec.mjs`'s "Load more shows the next page" in WebKit,
+             which in run 37663299969 still showed 20 rows five seconds after
+             the press, and here, in 20 runs, never stopped at 20; a failing
+             test on CI keeps its trace now, for the next time; and
              ~~`e10-recursion`'s "a record or variant is passed flat"~~,
              equivalent since ADR-0059 and retired (STATUS, 2026-10-07).
              Further grammar and clause defects go under 0047-a below,
