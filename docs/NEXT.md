@@ -406,10 +406,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
              e14-block-clauses`); ~~a shard sets up only what its recipes
              need~~ (ADR-0249). What Linux has found in the recipes: the
              toolchain's missing target and a runner's disk (both fixed,
-             ADR-0245), and `stream.spec.mjs`'s "Chrome 150 and later fills
-             a region itself", which passed in run 37646762298 and timed out
-             in 37651362024 waiting for `__pw.settled`, the region filled: a
-             race in the runtime's record or in the test, to find.
+             ADR-0245), and ~~`stream.spec.mjs`'s "Chrome 150 and later fills
+             a region itself"~~, which timed out in run 37651362024: the
+             runtime records a region that settles after it starts, Chrome
+             150 can fill one first, and the test waited for a record; it
+             now reads which happened, and holds the record to it.
              Further grammar and clause defects go under 0047-a below,
              unless the feed, the next Twitter item or soundness needs one;
           2. ~~map keys (0057-a)~~ (ADR-0248, `just e14-map-keys`) and ~~`let

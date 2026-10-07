@@ -146,11 +146,30 @@ test("Chrome 150 and later fills a region itself, with JavaScript off", async ({
   await expect(page.locator("#pending")).toHaveCount(0);
   await expect(page.locator("template")).toHaveCount(0);
   await context.close();
-  // And with it on, the browser filled it, not the runtime.
+  // And with it on, the browser filled it, not the runtime. The runtime
+  // records a region that settles after it starts, and one the browser
+  // filled first is in no record: which comes first is the runner's speed
+  // against the recommender's 300 ms. Until 2026-10-07 this waited for a
+  // record, and timed out on a runner slow to start the runtime (run
+  // 37651362024). A region still pending once the runtime has started is one
+  // it saw pending, so the browser's fill is recorded; one already filled is
+  // in no record, and nothing may say the runtime filled it.
   const live = await chrome.newContext({ baseURL });
   const scripted = await live.newPage();
-  await scripted.goto(PAGE);
-  await scripted.waitForFunction(() => window.__pw?.settled?.length === 1);
-  expect(await scripted.evaluate(() => window.__pw.settled)).toEqual([{ part: 3, by: "browser" }]);
+  await scripted.goto(PAGE, { waitUntil: "commit" });
+  await scripted.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
+  const pendingOnceStarted = await scripted.evaluate(() => !!document.querySelector("#pending"));
+  await scripted.waitForLoadState("load");
+  await expect(scripted.locator("#picks li")).toHaveCount(2);
+  await expect(scripted.locator("template")).toHaveCount(0);
+  const settled = await scripted.evaluate(() => window.__pw.settled);
+  if (pendingOnceStarted) {
+    expect(settled).toEqual([{ part: 3, by: "browser" }]);
+  } else {
+    expect(settled.filter((s) => s.by !== "browser")).toEqual([]);
+  }
+  // Either way, what the region holds works.
+  await scripted.locator("#picks button").nth(1).click();
+  await expect(scripted.locator("#picked")).toHaveText("Cold Brew");
   await chrome.close();
 });
