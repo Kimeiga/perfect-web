@@ -4739,3 +4739,22 @@ e14-transition-values:
        CARGO_INCREMENTAL=0 python3 scripts/transition_values_mutations.py; \
      } > docs/evidence/E14/transition-values.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/transition-values.txt
+
+# ADR-0242: an `{#each}`'s head is read once, by the grammar. The checker's
+# tests, the parser's, the readers', and the mutation controls.
+e14-each-heads:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0242 - an each head is read once, by the grammar"; echo; \
+       echo "produced by: just e14-each-heads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/each_heads.rs)"; echo; \
+       cargo test --locked -p pw-core --test each_heads 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the parser (compiler/pw-syntax/src/grammar.rs)"; echo; \
+       cargo test --locked -p pw-syntax --lib -- an_each_head_is_its_list 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the readers (every_name_resolves, lexical_scope, each_typing, marko_adapter, template_blocks, keyed, nested_lists)"; echo; \
+       cargo test --locked -p pw-core --test every_name_resolves --test lexical_scope --test each_typing --test marko_adapter --test template_blocks --test keyed --test nested_lists 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/each_heads_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/each_heads_mutations.py; \
+     } > docs/evidence/E14/each-heads.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/each-heads.txt

@@ -634,7 +634,7 @@ impl Walk<'_> {
             }
             Node::Interpolation(e) => self.expr(e),
             Node::Block {
-                directive,
+                each,
                 children,
                 subject,
                 ..
@@ -643,7 +643,9 @@ impl Walk<'_> {
                     self.expr(s);
                 }
                 let mut scope = BTreeSet::new();
-                if let Some((collection, binding)) = each(&directive) {
+                if let Some((collection, binding)) =
+                    each.as_ref().map(|e| (e.list.clone(), e.binder.clone()))
+                {
                     // A list written as a path starts with a name. A computed
                     // one, `same(xs)`, is not a name: until 2026-09-26 it was
                     // reported as one that does not resolve, and the build now
@@ -697,14 +699,6 @@ impl Walk<'_> {
             Node::Text(_) => {}
         }
     }
-}
-
-/// `{#each xs as x (x.id)}` -> `("xs", "x")`.
-fn each(directive: &str) -> Option<(String, String)> {
-    let inner = directive.strip_prefix("{#each")?.strip_suffix('}')?.trim();
-    let (collection, rest) = inner.split_once(" as ")?;
-    let binding = rest.split(['(', ' ']).next()?.trim();
-    (!binding.is_empty()).then(|| (collection.trim().to_string(), binding.to_string()))
 }
 
 /// `x = e` where `x` is not `let mut` (PW0611, ADR-0051).

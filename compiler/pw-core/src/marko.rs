@@ -417,6 +417,7 @@ fn emit_node(
         Node::Block {
             directive,
             children,
+            each,
             ..
         } => {
             // A branch marker inside the loop is not modelled (ADR-0042).
@@ -430,7 +431,7 @@ fn emit_node(
                     marker.trim_matches(|c| c == '{' || c == '}').trim()
                 ));
             }
-            let each = parse_each(directive).ok_or_else(|| {
+            let each = each.as_ref().map(Each::of).ok_or_else(|| {
                 format!(
                     "the `{}` directive is not modelled yet",
                     directive.trim_matches(|c| c == '{' || c == '}').trim()
@@ -525,20 +526,15 @@ struct Each {
     key: Option<String>,
 }
 
-fn parse_each(directive: &str) -> Option<Each> {
-    let inner = directive.trim().strip_prefix("{#")?.strip_suffix('}')?;
-    let rest = inner.trim().strip_prefix("each")?.trim();
-    let (source, rest) = rest.split_once(" as ")?;
-    let rest = rest.trim();
-    let (binding, key) = match rest.split_once('(') {
-        Some((b, k)) => (b.trim(), Some(k.trim_end_matches(')').trim().to_string())),
-        None => (rest, None),
-    };
-    Some(Each {
-        source: source.trim().to_string(),
-        binding: binding.trim().to_string(),
-        key,
-    })
+impl Each {
+    /// The head the grammar read (ADR-0242).
+    fn of(each: &crate::hir::EachHead) -> Each {
+        Each {
+            source: each.list.clone(),
+            binding: each.binder.clone(),
+            key: each.key.clone(),
+        }
+    }
 }
 
 /// `<stream query={Q(x)}>` with `<placeholder>`, `<ready as={v}>` and

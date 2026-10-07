@@ -153,6 +153,10 @@ codes! {
     // rules wrote for a stale session read too. Neither was registered.
     FOR_NEEDS_IN = "PW0018" / for_needs_in / 1, Syntax,
         "a `for` loop names what it iterates after `in`";
+    // ADR-0242: an `{#each}`'s head was split at ` as ` in five places, and
+    // one with no `as` was read as a list with no name each row binds.
+    EACH_HEAD = "PW0019" / each_head / 1, Syntax,
+        "an `{#each}` names its list, and after `as` the name each row binds";
     NO_PROGRESS = "PW0099" / no_progress / 1, Syntax, "the parser made no progress";
 
     // --- name resolution (PW002x) -----------------------------------------

@@ -14,6 +14,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0242, 2026-10-07: an `{#each}`'s head is read once, by the grammar**
+(a correction, found with ADR-0237). The head was kept as text, and five
+places split it at ` as ` and `(`. So `{#each xs ys as x (x)}` and an
+unclosed key checked, `{#each xs}` was refused for what it lacked downstream
+and never for its missing `as`, and PW5011 took any `(` in the directive for
+a key. The grammar parses the head now, padded to its place: a missing `as`
+is PW0019, what stands before `as` or the key is one error and the rest is
+read on, and every reader reads the head's parts
+(`just e14-each-heads`).
+
 **ADR-0241, 2026-10-07: an optimistic transition's value is the value
 typer's** (a correction, found with ADR-0240). PW0331 read the transition's
 type through the older typer, which has no answer for a literal, and no

@@ -2859,6 +2859,94 @@ pub fn parse_transition_clause(src: &str) -> Parse {
     }
 }
 
+/// **Parse an `{#each}`'s head, standalone** (ADR-0242).
+///
+/// ```text
+/// menu as item (item.id)
+/// └list┘   └name┘ └─key──┘
+/// ```
+///
+/// The list, `as` and the name each row binds, and the key that tells the
+/// rows apart, in parentheses, where one is written. It was split at ` as `
+/// and `(` in five places, each its own reading: `{#each xs ys as x (x)}`
+/// checked, its list `xs ys`, and an unclosed key went unnoticed.
+pub fn parse_each_head(src: &str) -> Parse {
+    let mut p = P::standalone(src, "the end of the `{#each}`".to_string());
+    p.b.start(K::SourceFile);
+    p.b.start(K::EachHead);
+    // The list. Above `as`'s power, as an optimistic clause's target is, so
+    // the cast rule does not read the name as a type.
+    if p.at_eof() {
+        let found = p.found();
+        p.error(
+            "PW0019",
+            format!("expected a list, `as` and a name for each row, found {found}"),
+        );
+    } else {
+        p.expr(10);
+        if !p.at_kw("as") {
+            // What stands between the list and `as` is one error, and the
+            // head is read on from `as`, so the name each row binds is
+            // bound: `{#each xs ys as x}` is one mistake, not a second for
+            // every `x` the rows read.
+            let (start, found) = (p.cur_span().start, p.found());
+            let mut end = start;
+            p.start(K::ErrorExpr);
+            while !p.at_eof() && !p.at_kw("as") {
+                end = p.cur_span().end;
+                p.bump();
+            }
+            p.finish();
+            p.errors.push(SyntaxError {
+                code: "PW0019",
+                message: format!("expected `as` and a name for each row, found {found}"),
+                span: start..end,
+                help: None,
+            });
+        }
+        if p.at_kw("as") {
+            p.bump();
+            if p.name("a name for each row") {
+                // And what stands between the name and the key, an index
+                // or a second name: one error, and the key read on, so a
+                // keyed list is not refused for a key it has.
+                if !p.at_eof() && !p.at(Kind::LParen) {
+                    let start = p.cur_span().start;
+                    let mut end = start;
+                    p.start(K::ErrorExpr);
+                    while !p.at_eof() && !p.at(Kind::LParen) {
+                        end = p.cur_span().end;
+                        p.bump();
+                    }
+                    p.finish();
+                    p.errors.push(SyntaxError {
+                        code: "PW0016",
+                        message: "an `{#each}` is its list, `as` a name for each row, and a key \
+                                  in parentheses"
+                            .to_string(),
+                        span: start..end,
+                        help: None,
+                    });
+                }
+                if p.eat(Kind::LParen) {
+                    p.expr(0);
+                    p.expect(Kind::RParen, "to close the key");
+                }
+            }
+        }
+    }
+    p.rest_unread(
+        "an `{#each}` is its list, `as` a name for each row, and a key in parentheses",
+        None,
+    );
+    p.b.finish_node();
+    p.b.finish_node();
+    Parse {
+        green: SyntaxNode::new_root(p.b.finish()),
+        errors: p.errors,
+    }
+}
+
 /// **Parse one expression, standalone.**
 ///
 /// The same expression grammar `parse_tree` uses — there is one parser
@@ -3825,6 +3913,43 @@ mod tests {
             let p = parse_tree(src);
             assert_eq!(tree_text(&p.green), src, "not lossless: {src:?}");
         }
+    }
+
+    #[test]
+    fn an_each_head_is_its_list_its_name_and_its_key() {
+        // ADR-0242.
+        let src = "menu.items as item (item.id)";
+        let p = parse_each_head(src);
+        assert_lossless(src, &p);
+        assert!(p.ok(), "{:?}", p.errors);
+        assert_eq!(first_text(&p, K::Name).as_deref(), Some("item"));
+        assert_eq!(texts(&p, K::FieldExpr), ["menu.items", "item.id"]);
+        // No key is a head too.
+        assert!(parse_each_head("xs as x").ok());
+        // Two words for a list: `as` was expected, the one error, and the
+        // name after it read.
+        let src = "xs ys as x (x)";
+        let p = parse_each_head(src);
+        assert_lossless(src, &p);
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(p.errors[0].code, "PW0019");
+        assert_eq!(&src[p.errors[0].span.clone()], "ys");
+        assert_eq!(first_text(&p, K::Name).as_deref(), Some("x"));
+        // An unclosed key.
+        let p = parse_each_head("xs as x (x");
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(
+            p.errors[0].message,
+            "expected `)` to close the key, found the end of the `{#each}`"
+        );
+        // A second name, or an index, stands between the name and the key:
+        // the one error, and the key read.
+        let src = "xs as x, i (x)";
+        let p = parse_each_head(src);
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(p.errors[0].code, "PW0016");
+        assert_eq!(&src[p.errors[0].span.clone()], ", i");
+        assert_eq!(texts(&p, K::NameExpr).last().map(String::as_str), Some("x"));
     }
 
     #[test]

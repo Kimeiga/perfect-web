@@ -2030,3 +2030,9 @@ an optimistic transition's value is the value typer's (a correction).
   answer for a literal, so `optimistic Thing(x) as t => "no"` over an `Int`
   checked. The value typer relates each transition to its target's value
   now, and the older reading is retired: one fact, one detector.
+[ADR-0242](DECISIONS/ADR-0242-an-each-head-is-read-once.md):
+an `{#each}`'s head is read once, by the grammar (a correction).
+- Five places split the directive at ` as ` and `(`: `{#each xs ys as x
+  (x)}` and an unclosed key checked, and PW5011 took any `(` for a key. The
+  grammar parses the head now, a missing `as` is PW0019, and every reader
+  reads its parts.

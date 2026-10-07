@@ -7849,10 +7849,13 @@ fn loop_keys(hir: &Hir, id: crate::hir::DeclId, decl: &Decl, out: &mut Vec<Diagn
         }
     }
     for n in body.walk_markup(&roots) {
-        let Node::Block { directive, .. } = body.node(n) else {
+        let Node::Block {
+            each: Some(each), ..
+        } = body.node(n)
+        else {
             continue;
         };
-        let Some((binding, _, Some(key))) = crate::template_ir::each_parts(directive) else {
+        let (binding, Some(key), Some(key_span)) = (&each.binder, &each.key, &each.key_span) else {
             continue;
         };
         let head = key.split('.').next().unwrap_or_default().trim();
@@ -7868,7 +7871,8 @@ fn loop_keys(hir: &Hir, id: crate::hir::DeclId, decl: &Decl, out: &mut Vec<Diagn
             message: format!(
                 "a loop's key is `{binding}` or a field read from it, and this is `{key}`"
             ),
-            primary_span: body.node_span(n),
+            // The key, where it is written (ADR-0242).
+            primary_span: key_span.clone(),
             related: vec![Related {
                 span: hir.decl_span(id),
                 label: format!("`{}` renders this", decl.name),
@@ -8069,6 +8073,7 @@ fn template_blocks(
             children,
             subject,
             close,
+            ..
         } = body.node(n)
         else {
             continue;
@@ -8561,9 +8566,12 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
     for &id in &order {
         match body.node(id) {
             // A list without a key cannot preserve identity across a reorder.
-            Node::Block { directive, .. } => {
-                let d = directive.trim();
-                if !d.starts_with("{#each") || d.contains('(') {
+            // By the head's key (ADR-0242): a `(` anywhere in the directive
+            // was a key, so a list computed by a call needed none.
+            Node::Block {
+                each: Some(each), ..
+            } => {
+                if each.key.is_some() {
                     continue;
                 }
                 out.push(Diagnostic {

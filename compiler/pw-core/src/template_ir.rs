@@ -2641,7 +2641,13 @@ fn lower_block_at(
             at: d.to_string(),
         })
     };
-    if let Some((binding, collection, key)) = parse_each(d) {
+    // Its head, as the grammar read it (ADR-0242).
+    let each = match body.node(node) {
+        Node::Block { each, .. } => each.as_ref(),
+        _ => None,
+    };
+    if let Some(each) = each {
+        let (binding, collection, key) = (each.binder.clone(), each.list.clone(), each.key.clone());
         let written = collection.split('.').map(str::trim).all(|s| {
             s.starts_with(|c: char| c.is_alphabetic() || c == '_')
                 && s.chars().all(|c| c.is_alphanumeric() || c == '_')
@@ -2755,24 +2761,6 @@ fn lower_block_at(
         reason: format!("the block directive `{d}` has no template-IR representation"),
         at: d.to_string(),
     }));
-}
-
-/// `{#each items as item (item.id)}` -> `("item", "items", Some("item.id"))`.
-fn parse_each(d: &str) -> Option<(String, String, Option<String>)> {
-    each_parts(d)
-}
-
-/// `{#each items as item (item.id)}` -> `("item", "items", Some("item.id"))`:
-/// the directive's parts as written.
-pub(crate) fn each_parts(d: &str) -> Option<(String, String, Option<String>)> {
-    let inner = d.trim().strip_prefix("{#each")?.strip_suffix('}')?.trim();
-    let (collection, rest) = inner.split_once(" as ")?;
-    let rest = rest.trim();
-    let (binding, key) = match rest.split_once('(') {
-        Some((b, k)) => (b.trim(), Some(k.trim_end_matches(')').trim().to_string())),
-        None => (rest, None),
-    };
-    Some((binding.to_string(), collection.trim().to_string(), key))
 }
 
 /// `href="/stores/{id}"`: static text and value paths, each value escaped for

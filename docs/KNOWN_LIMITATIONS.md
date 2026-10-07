@@ -14,9 +14,9 @@ Those historical statements must not override current source or test results.
 **What the parser does not read yet** (found with ADR-0237, which made
 lowering report what it parses):
 
-- **An `{#each}`'s head is read by splitting its text**, in five places
-  (`resolve.rs`, `template_ir.rs`, `infer.rs`, `names.rs`, `marko.rs`), and
-  never parsed: `{#each xs ys as x (x)}` checks.
+- **An `{#each}`'s list and key are read as written** (ADR-0242): parsed by
+  the grammar, and not lowered into the body's arena, so a computed list is
+  not typed, and a key's names are not resolved as terms.
 - **Two expressions on one line of a block are two statements**:
   `fn f(a: Int, b: Int) -> Int !{} { a b }` checks, and is `b`.
 

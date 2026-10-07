@@ -519,7 +519,7 @@ impl Walk<'_> {
                 Node::Interpolation(e) => self.expr(*e, scope),
                 Node::Text(_) => {}
                 Node::Block {
-                    directive,
+                    each,
                     children,
                     subject: own,
                     ..
@@ -528,7 +528,9 @@ impl Walk<'_> {
                         self.expr(*s, scope);
                     }
                     let inner = scope.len();
-                    if let Some((name, collection)) = crate::infer::each_binding(directive) {
+                    if let Some((name, collection)) =
+                        each.as_ref().map(|e| (e.binder.clone(), e.list.clone()))
+                    {
                         let head = collection
                             .split(['.', '('])
                             .next()

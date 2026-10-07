@@ -724,22 +724,6 @@ pub fn element_of_type(ty: &ResolvedType) -> Option<&ResolvedType> {
     }
 }
 
-/// `{#each menu as item (item.id)}` gives `("item", "menu")`.
-///
-/// Read from the directive's text because that is where the parser leaves it —
-/// a markup block keeps its directive verbatim. The shape is fixed by the
-/// grammar, so this is reading a known form rather than guessing at one.
-pub(crate) fn each_binding(directive: &str) -> Option<(String, String)> {
-    let d = directive.trim();
-    let inner = d.strip_prefix("{#each")?.strip_suffix('}')?;
-    let (collection, rest) = inner.trim().split_once(" as ")?;
-    let binding = rest
-        .trim()
-        .split(|c: char| c == '(' || c.is_whitespace())
-        .find(|s| !s.is_empty())?;
-    Some((binding.to_string(), collection.trim().to_string()))
-}
-
 pub fn path_of(body: &Body, id: ExprId) -> String {
     match body.expr(id) {
         Expr::Name(n) => n.clone(),

@@ -3426,10 +3426,13 @@ impl<'a> Typer<'a> {
             // The key is read from the element, through fields it has, and is
             // written as text (ADR-0074). A key read from another name is
             // PW5021's.
-            let crate::hir::Node::Block { directive, .. } = self.body.node(node) else {
+            let crate::hir::Node::Block {
+                each: Some(each), ..
+            } = self.body.node(node)
+            else {
                 continue;
             };
-            let Some((binding, _, Some(key))) = crate::template_ir::each_parts(directive) else {
+            let (binding, Some(key)) = (&each.binder, &each.key) else {
                 continue;
             };
             let segments: Vec<&str> = key.split('.').map(str::trim).collect();

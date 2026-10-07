@@ -741,21 +741,14 @@ pub fn local_bindings_from(body: &crate::hir::Body, root: crate::hir::ExprId) ->
                         out.extend(arm.bindings.iter().cloned());
                         continue;
                     }
-                    let Node::Block { directive, .. } = body.node(n) else {
+                    // Its head's name, as the grammar read it (ADR-0242).
+                    let Node::Block {
+                        each: Some(each), ..
+                    } = body.node(n)
+                    else {
                         continue;
                     };
-                    let Some(rest) = directive.split(" as ").nth(1) else {
-                        continue;
-                    };
-                    let name = rest
-                        .trim()
-                        .split(['(', '}', ' '])
-                        .next()
-                        .unwrap_or("")
-                        .trim();
-                    if !name.is_empty() {
-                        out.insert(name.to_string());
-                    }
+                    out.insert(each.binder.clone());
                 }
             }
             // A body-level statement introduces its modifier words as names:
@@ -802,6 +795,21 @@ mod tests {
 
     const DOMAIN: &str =
         "module domain\n\ntype Store = Store { name: String }\ntype Hidden = Hidden { x: Int }\n";
+
+    #[test]
+    fn an_each_rows_name_is_a_local_binding() {
+        // Read from the head the grammar parsed (ADR-0242), not split from
+        // the directive's text: what a call's path through the row is
+        // resolved against where no lexical scope says.
+        let src = "module m\n\nview V(xs: List<Int>) {\n    <ul>\n        {#each xs as row (row)}\n            <li>{row}</li>\n        {/each}\n    </ul>\n}\n";
+        let h = hirs(&[src]);
+        let (_, v) = h[0]
+            .all_decls()
+            .find(|(_, d)| d.name == "V")
+            .expect("the view");
+        let names = local_bindings(h[0].body(v.body.expect("a body")));
+        assert!(names.contains("row"), "{names:?}");
+    }
 
     #[test]
     fn an_imported_name_resolves_and_an_unimported_one_does_not() {

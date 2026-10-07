@@ -184,6 +184,9 @@ pub enum SyntaxKind {
     /// command speculating on several entries writes an arm for each,
     /// separated by commas.
     TransitionArm,
+    /// An `{#each}`'s head (ADR-0242): the list, the `Name` each row binds,
+    /// and the key in parentheses where one is written, in that order.
+    EachHead,
 
     // ---- markup ---------------------------------------------------------- 400..
     // A template region is a tree, not a token soup: E3 lowers it to a
@@ -409,6 +412,7 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         TemplateRegion,
         Interpolation,
         TransitionArm,
+        EachHead,
         WildcardPat,
         BindingPat,
         CtorPat,

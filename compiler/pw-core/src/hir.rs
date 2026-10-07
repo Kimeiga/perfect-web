@@ -1148,8 +1148,12 @@ pub enum Node {
         children: Vec<NodeId>,
         /// `c` in `{#if c}`, `e` in `{#match e}`: a real expression, so the
         /// value relations and the privacy walks see it. `None` for `{#each}`,
-        /// whose directive is read as written.
+        /// whose head is `each`.
         subject: Option<ExprId>,
+        /// An `{#each}`'s head, parsed once by the grammar (ADR-0242). `None`
+        /// for any other block, or a head that did not parse, whose error is
+        /// reported.
+        each: Option<EachHead>,
         /// The closing marker as written, `{/if}`; empty when the block was
         /// never closed.
         close: String,
@@ -1164,6 +1168,23 @@ pub enum Node {
         /// `{:Some(x)}`, `{:None}`, `{:Shape.Rect(w, h)}`: a `{#match}` arm.
         arm: Option<TemplateArm>,
     },
+}
+
+/// **An `{#each}`'s head** (ADR-0242): `menu as item (item.id)`, parsed once
+/// by the grammar. Each part as written and where, since what reads one reads
+/// it as text: the template IR the list and the key as paths, Marko writes
+/// them, and the names check reads the list's first name. Five places split
+/// the directive's text at ` as ` and `(` until then.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EachHead {
+    pub list: String,
+    pub list_span: Span,
+    /// The name each row binds.
+    pub binder: String,
+    pub binder_span: Span,
+    /// What tells the rows apart, where it is written.
+    pub key: Option<String>,
+    pub key_span: Option<Span>,
 }
 
 /// **A `{#match}` arm's marker** (ADR-0042, ADR-0061): the case it takes,

@@ -303,6 +303,52 @@ impl Lowerer<'_> {
         self.expression_at(b, inner, span_of(node).start + lead + prefix.len(), what)
     }
 
+    /// **An `{#each}`'s head** (ADR-0242), parsed once by the grammar and
+    /// padded to its place, so its parts' spans and its errors are the
+    /// file's. `None` for another block, or a head with no list and name.
+    fn each_head(&mut self, node: &SyntaxNode) -> Option<crate::hir::EachHead> {
+        let raw = text(self.src, node);
+        let lead = raw.len() - raw.trim_start().len();
+        let rest = raw.trim_start().strip_prefix("{#each")?;
+        if !(rest.starts_with(char::is_whitespace) || rest.starts_with('}')) {
+            return None;
+        }
+        let inner = rest.trim_end().strip_suffix('}')?;
+        let at = span_of(node).start + lead + "{#each".len();
+        let mut padded = String::with_capacity(at + inner.len());
+        padded.push_str(&" ".repeat(at));
+        padded.push_str(inner);
+
+        let parsed = pw_syntax::parse_each_head(&padded);
+        self.read_errors(&parsed, 0);
+        // A head whose list and name were read is the block's, its errors
+        // reported: the rows' names are bound, and one mistake is one error.
+        let head = parsed.green.children().find(|c| c.kind() == K::EachHead)?;
+        // By where each is, around the name: what a recovery skipped is an
+        // error node, and neither the list nor the key.
+        let read = |c: &SyntaxNode| is_expr(c.kind()) && c.kind() != K::ErrorExpr;
+        let name = head.children().find(|c| c.kind() == K::Name)?;
+        let list = head
+            .children()
+            .take_while(|c| c.kind() != K::Name)
+            .find(read)?;
+        let key = head
+            .children()
+            .skip_while(|c| c.kind() != K::Name)
+            .skip(1)
+            .find(read);
+        let written =
+            |n: &SyntaxNode| pw_syntax::collapse_policy_whitespace(text(&padded, n).trim());
+        Some(crate::hir::EachHead {
+            list: written(&list),
+            list_span: span_of(&list),
+            binder: written(&name),
+            binder_span: span_of(&name),
+            key: key.as_ref().map(written),
+            key_span: key.as_ref().map(span_of),
+        })
+    }
+
     /// `{:else}`, `{:else if c}`, `{:Some(x)}`: a block's branch marker, kept
     /// at its place (ADR-0042).
     fn branch(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> NodeId {
@@ -1572,6 +1618,7 @@ impl Lowerer<'_> {
                 let subject = open.as_ref().and_then(|o| {
                     self.marker_expression(b, o, &["{#if", "{#match"], "a block's subject")
                 });
+                let each = open.as_ref().and_then(|o| self.each_head(o));
                 let mut children = Vec::new();
                 for c in node.children().filter(|c| is_markup(c.kind())) {
                     if Some(&c) == open.as_ref() || Some(&c) == close.as_ref() {
@@ -1587,6 +1634,7 @@ impl Lowerer<'_> {
                         directive,
                         children,
                         subject,
+                        each,
                         close: close.map(|c| text(self.src, &c)).unwrap_or_default(),
                     },
                     span,
@@ -1606,6 +1654,7 @@ impl Lowerer<'_> {
                             directive: raw,
                             children: vec![],
                             subject: None,
+                            each: None,
                             close: String::new(),
                         },
                         span,
