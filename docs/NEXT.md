@@ -391,8 +391,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
              thread page~~ (ADR-0238, `just e14-speculated-arms`). Writing it
              found that lowering dropped its parses' errors: ~~what lowering
              parses, it reports~~ (ADR-0237, `just e14-read-whole`). Then the
-             findings beside it, first: the registry's gaps (PW0101 and PW0102, one
-             number with two meanings); a clause read once, the graph reading
+             findings beside it, first: ~~the registry's gaps~~ (ADR-0239,
+             `just e14-registered-codes`); a clause read once, the graph reading
              the keys lowering made, an interface's keys resolved too; an
              `{#each}`'s head lowered by the grammar, once, for the five
              places that split its text; two statements on one line;

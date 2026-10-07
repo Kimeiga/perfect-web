@@ -106,13 +106,12 @@ fn a_session_query_in_a_shared_cache_is_refused_however_it_is_spelled() {
         &session_query("freshness 0.seconds\ncache Shared"),
         &["PW0335 `cache Shared`: `Shared` is not one of"],
     );
-    // Two detectors report this one, as `pw check` prints them.
+    // One error, PW5001: the declaration rule that wrote PW0100 for the
+    // same clause is retired (ADR-0239). Two detectors reported it, under two
+    // numbers, until then.
     says(
         &session_query("freshness 0.seconds\ncache shared"),
-        &[
-            "PW0100 cannot materialize `Mine` in a shared public cache",
-            "PW5001 `Mine` is Session<SessionId> and declares a shared cache",
-        ],
+        &["PW5001 `Mine` is Session<SessionId> and declares a shared cache"],
     );
 }
 
@@ -123,6 +122,20 @@ fn a_duration_is_a_count_and_a_unit() {
         &["PW0335 `timeout 30.secondz`: `30.secondz` is not a duration"],
     );
     says(&query("timeout thirty"), &["PW0335 `timeout thirty`"]);
+    // `freshness` is the duration domain's one head since `timeout` became a
+    // budget (ADR-0109), and nothing held a freshness that is no duration:
+    // its control survived, found by ADR-0239's run of them.
+    let fresh = |value: &str| {
+        format!(
+            "module t\n\npublic query Box(id: Int) -> Int !{{}}\n    freshness {value}\n{{\n    id\n}}\n"
+        )
+    };
+    says(
+        &fresh("30.secondz"),
+        &["PW0335 `freshness 30.secondz`: `30.secondz` is not a duration"],
+    );
+    says(&fresh("thirty"), &["PW0335 `freshness thirty`"]);
+    clean(&fresh("30.seconds"));
     clean(&query("timeout 1.hours"));
     clean(&query("timeout 500.milliseconds"));
 }

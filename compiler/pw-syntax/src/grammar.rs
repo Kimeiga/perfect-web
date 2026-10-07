@@ -2006,7 +2006,7 @@ impl<'a> P<'a> {
         if self.at_kw("in") {
             self.bump();
         } else {
-            self.error("PW0102", "expected `in` after the loop binding");
+            self.error("PW0018", "expected `in` after the loop binding");
         }
         self.expr(0);
         if self.at(Kind::LBrace) {

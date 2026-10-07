@@ -2010,3 +2010,10 @@ a command speculates on several entries, a page on those it shows.
   speculates on the arms whose targets it shows; one whose resource it does
   not show is not the page's. The feed's thread page shows a like before the
   server answers, in three engines.
+[ADR-0239](DECISIONS/ADR-0239-every-code-the-compiler-writes-is-registered.md):
+every code the compiler writes is registered, once (a correction).
+- The declaration rules wrote PW0101 and PW0102 unregistered, and the parser
+  PW0102 for a `for` with no `in`: one number, two meanings. A reader's
+  value in a shared cache was two errors, PW0100 and PW5001. The registry's
+  tests now read what the compiler writes, both ways, as rustc's `tidy`
+  does.

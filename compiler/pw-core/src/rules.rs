@@ -219,31 +219,10 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
     let label = privacy_label(visibility);
     let name_span: Span = decl.name_span.clone();
 
-    // --- PW0100: a non-Public value in a shared cache -----------------------
-    // The charter §16.3 worked example, now on real files.
-    if let Some(cache) = policy(policies, "cache")
-        && cache.value.trim() == "shared"
-        && matches!(visibility, "session" | "private")
-    {
-        out.push(
-            err(
-                "PW0100",
-                "a shared cache may contain only Public values",
-                format!("cannot materialize `{name}` in a shared public cache"),
-                cache.span.clone(),
-            )
-            .related(
-                name_span.clone(),
-                format!("`{name}` is declared here, so its result is labeled `{label}`"),
-            )
-            .explain(format!(
-                "a shared cache may contain only `Public` values; this {noun}'s result is `{label}`"
-            ))
-            .repair(
-                "change this to `cache private`, or move the value into a private streamed slot",
-            ),
-        );
-    }
+    // A reader's value in a shared cache is the label algebra's (PW5001),
+    // which reads what the declaration observes as well as its keyword. This
+    // rule wrote PW0100 for the same clause until ADR-0239: one mistake, two
+    // errors under two numbers.
 
     // --- PW0101: read_your_writes on a public read --------------------------
     if let Some(c) = policy(policies, "consistency")
@@ -719,33 +698,6 @@ mod tests {
     }
 
     #[test]
-    fn session_query_in_a_shared_cache_is_rejected_with_both_spans() {
-        let src = "module cart\nsession query Cart(s: SessionId) -> Cart\n    cache shared\n{\n    Carts.current(s)\n}\n";
-        let f = findings(src);
-        let pw0100 = f.iter().find(|f| f.code == "PW0100").expect("PW0100");
-        assert!(
-            !pw0100.related.is_empty(),
-            "charter §16.3 requires an origin span"
-        );
-        assert!(
-            pw0100
-                .explanation
-                .as_ref()
-                .unwrap()
-                .contains("Session<SessionId>")
-        );
-        assert!(pw0100.repairs[0].description.contains("cache private"));
-        // The spans must point at real text.
-        assert_eq!(&src[pw0100.primary_span.clone()], "cache shared");
-    }
-
-    #[test]
-    fn a_public_shared_cache_is_accepted() {
-        let src = "module s\npublic query Store(id: StoreId) -> Store\n    freshness 30.seconds\n    cache shared\n{\n    Stores.get(id)\n}\n";
-        assert!(!codes(src).contains(&"PW0100"));
-    }
-
-    #[test]
     fn read_your_writes_on_a_public_query_is_rejected() {
         let src = "module s\npublic query Store(id: StoreId) -> Store\n    consistency read_your_writes\n{\n    0\n}\n";
         assert!(codes(src).contains(&"PW0101"));
@@ -850,7 +802,7 @@ mod tests {
     fn an_effect_the_placement_cannot_grant_is_rejected() {
         let src = "module e\nview Receipt(o: OrderId) !{ secret<Payments> }\n    placement edge\n{\n    0\n}\n";
         let f = findings(src);
-        let e = f.iter().find(|f| f.code == "PW5005").expect("PW0323");
+        let e = f.iter().find(|f| f.code == "PW5005").expect("PW5005");
         assert!(e.message.contains("secret"), "{}", e.message);
         assert!(
             !e.related.is_empty(),

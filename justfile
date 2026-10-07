@@ -4682,3 +4682,23 @@ e14-speculated-arms:
        CARGO_INCREMENTAL=0 python3 scripts/speculated_arms_mutations.py; \
      } > docs/evidence/E14/speculated-arms.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/speculated-arms.txt
+
+# ADR-0239: every code the compiler writes is registered, once. The
+# registry's tests, the checker's, the corpus, and the mutation controls.
+e14-registered-codes:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0239 - every code the compiler writes is registered, once"; echo; \
+       echo "produced by: just e14-registered-codes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the registry (compiler/pw-core/src/codes.rs)"; echo; \
+       cargo test --locked -p pw-core --lib codes:: 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the checker (compiler/pw-core/tests/registered_codes.rs)"; echo; \
+       cargo test --locked -p pw-core --test registered_codes 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus (corpus-check, checking_source.rs)"; echo; \
+       cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
+       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/registered_codes_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/registered_codes_mutations.py; \
+     } > docs/evidence/E14/registered-codes.txt
+    @grep -E "^test result|corpus-check|mutants killed" docs/evidence/E14/registered-codes.txt

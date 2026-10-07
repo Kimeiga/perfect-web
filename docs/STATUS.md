@@ -14,6 +14,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0239, 2026-10-07: every code the compiler writes is registered,
+once** (a correction, found with ADR-0237). The declaration rules wrote
+PW0101 and PW0102, which the registry did not have, so their diagnostics had
+no symbol; the parser wrote PW0102 too, for a `for` with no `in`. A reader's
+value in a shared cache was two errors under two numbers: the declaration
+rule's PW0100, an alias, and the label algebra's PW5001. PW0101 and PW0102
+are registered, the parser's is PW0018, and the declaration rule is retired
+for PW5001. The registry's tests read the compiler's own source both ways
+now, as rustc's `tidy` does (`just e14-registered-codes`).
+
 **ADR-0238, 2026-10-07: a command speculates on several entries, a page on
 those it shows** (the rest of the owner's first Twitter gap). A command's
 `optimistic` clause named one entry, and a page that called the command

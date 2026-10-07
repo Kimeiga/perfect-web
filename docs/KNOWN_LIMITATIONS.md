@@ -25,8 +25,6 @@ lowering report what it parses):
 - **An interface's clause keys are not resolved**: a declaration with no body
   has no arena for their terms. `invalidates_on Changed(nosuch)` on a `query`
   with no body checks.
-- **The registry does not have every code emitted.** The declaration rules
-  emit PW0101 and PW0102, and the parser's `for` without `in` is PW0102 too.
 
 **E9-V1..V6 are met** (2026-09-24, ADR-0031). What the value relations do not
 decide is Undecided, counted by `pw audit-values`, and never reported as

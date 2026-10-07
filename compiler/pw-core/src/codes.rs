@@ -149,6 +149,10 @@ codes! {
         "a clause's value, a string's hole and a block marker's expression are read whole, and nothing follows what their grammar reads";
     OPTIMISTIC_CLAUSE = "PW0017" / optimistic_clause / 1, Syntax,
         "an optimistic clause names an entry, binds its value with `as`, and gives its transition after `=>`";
+    // ADR-0239: the parser wrote PW0102 for this, a number the declaration
+    // rules wrote for a stale session read too. Neither was registered.
+    FOR_NEEDS_IN = "PW0018" / for_needs_in / 1, Syntax,
+        "a `for` loop names what it iterates after `in`";
     NO_PROGRESS = "PW0099" / no_progress / 1, Syntax, "the parser made no progress";
 
     // --- name resolution (PW002x) -----------------------------------------
@@ -184,6 +188,12 @@ codes! {
         "a call names a function, a data operation, or a type it builds";
 
     // --- declaration rules (PW01xx-PW03xx) --------------------------------
+    // ADR-0239: the declaration rules wrote these and the registry did not
+    // have them, so a diagnostic carrying either had no symbol.
+    READ_YOUR_WRITES_NEEDS_A_SESSION = "PW0101" / read_your_writes_needs_a_session / 1, DeclarationRules,
+        "read-your-writes requires a session-scoped read";
+    SESSION_STATE_IS_FRESH = "PW0102" / session_state_is_fresh / 1, DeclarationRules,
+        "session-owned state may not be served stale";
     RETRY_NOT_IDEMPOTENT = "PW0312" / retry_not_idempotent / 1, DeclarationRules,
         "a command that retries must be idempotent";
     // ADR-0154: a browser's request can be delivered twice, whatever the
@@ -924,34 +934,14 @@ mod tests {
     /// description of a different rule.
     #[test]
     fn every_registered_code_is_one_a_checker_can_emit() {
-        // The whole compiler: `pw-syntax` emits the PW00xx codes, `pw-core`
-        // the rest. Scanning one crate would call the other's codes dead.
-        let compiler = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .canonicalize()
-            .expect("compiler/");
-        let mut sources = String::new();
-        let mut stack = vec![compiler];
-        while let Some(dir) = stack.pop() {
-            for e in std::fs::read_dir(&dir).expect("src") {
-                let p = e.expect("entry").path();
-                if p.is_dir() {
-                    stack.push(p);
-                    continue;
-                }
-                if p.file_name().is_some_and(|n| n == "codes.rs") {
-                    continue;
-                }
-                if p.extension().is_some_and(|x| x == "rs") {
-                    sources.push_str(&std::fs::read_to_string(&p).expect("read"));
-                }
-            }
-        }
+        // The compiler's own source, its tests left out (ADR-0239): a code
+        // only a test names is one no checker emits.
+        let sources: String = written().into_iter().map(|(_, src)| src).collect();
         let mut dead = Vec::new();
         for c in ALL {
             // Either by constant (`codes::UNDECLARED_EFFECT.id`) or by the
             // literal, which `rules.rs` still uses.
-            if !sources.contains(c.id) && !sources.contains(c.konst) {
+            if !sources.contains(&format!("\"{}\"", c.id)) && !sources.contains(c.konst) {
                 dead.push(format!("{} ({})", c.id, c.invariant));
             }
         }
@@ -961,6 +951,84 @@ mod tests {
              nothing enforces:\n  {}",
             dead.join("\n  ")
         );
+    }
+
+    /// **Every code a checker writes is registered** (ADR-0239), the other
+    /// half of rustc's `tidy` check on its error codes. The declaration
+    /// rules wrote PW0101 and PW0102 unregistered, and the parser PW0102 for
+    /// a `for` with no `in`: one number, two meanings, and neither had a
+    /// symbol. Nothing compared what is written with what is registered.
+    #[test]
+    fn every_code_a_checker_writes_is_registered() {
+        let mut written_codes = Vec::new();
+        for (file, src) in written() {
+            for (at, _) in src.match_indices("\"PW") {
+                let Some(code) = src.get(at + 1..at + 7) else {
+                    continue;
+                };
+                if code[2..].bytes().all(|b| b.is_ascii_digit()) && src[at + 7..].starts_with('"') {
+                    let line = src[..at].lines().count();
+                    written_codes.push((code.to_string(), format!("{file}:{line}")));
+                }
+            }
+        }
+        assert!(
+            written_codes.len() > 20,
+            "the compiler was read: {written_codes:?}"
+        );
+        let unregistered: Vec<&(String, String)> = written_codes
+            .iter()
+            .filter(|(code, _)| lookup(code).is_none())
+            .collect();
+        assert!(
+            unregistered.is_empty(),
+            "written and not registered: {unregistered:?}"
+        );
+    }
+
+    /// The source of each crate that writes codes, by file, without its tests
+    /// or the registry. A file's tests are at its end, behind `#[cfg(test)]`,
+    /// and are cut there; the aliases are numbers the corpus wrote.
+    fn written() -> Vec<(String, String)> {
+        let compiler = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .canonicalize()
+            .expect("compiler/");
+        let mut out = Vec::new();
+        let mut stack: Vec<std::path::PathBuf> = ["pw-syntax/src", "pw-core/src", "pw-cli/src"]
+            .iter()
+            .map(|d| compiler.join(d))
+            .collect();
+        while let Some(dir) = stack.pop() {
+            for e in std::fs::read_dir(&dir).expect("src") {
+                let p = e.expect("entry").path();
+                if p.is_dir() {
+                    stack.push(p);
+                    continue;
+                }
+                if p.file_name().is_some_and(|n| n == "codes.rs")
+                    || p.extension().is_none_or(|x| x != "rs")
+                {
+                    continue;
+                }
+                let src = std::fs::read_to_string(&p).expect("read");
+                for (i, _) in src.match_indices("#[cfg(test)]") {
+                    let next = src[i..].lines().nth(1).unwrap_or("").trim();
+                    assert!(
+                        next.starts_with("mod ") || next.starts_with("pub mod "),
+                        "{}: `#[cfg(test)]` before `{next}`, which is no test module",
+                        p.display()
+                    );
+                }
+                let own = src.split("#[cfg(test)]").next().unwrap_or("");
+                let own = own
+                    .split("pub const DEPRECATED_ALIASES")
+                    .next()
+                    .unwrap_or("");
+                out.push((p.display().to_string(), own.to_string()));
+            }
+        }
+        out
     }
 
     /// A retired number must never come back as something else.
