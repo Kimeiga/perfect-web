@@ -128,7 +128,7 @@ test-compile:
 # table plus the accepted neighbours that stop the checker collapsing into
 # "any build difference means reload".
 resume-matrix:
-    @cargo test --quiet -p pw-resume 2>&1 | grep -E 'test result' | sed -n '1,3p'
+    @cargo test --quiet -p pw-resume 2>&1 | grep -E 'test result|^---- ' | sed -n '1,3p'
     @echo "  6 fuzz targets, 22000 generated cases, 0 violations"
     @echo "  Structured generation seeded from the matrix — NOT coverage-guided:"
     @echo "  no instrumentation, no corpus evolution, no branch guidance. It"
@@ -141,7 +141,7 @@ resume-matrix:
 # contract — declarations with no implementation here — is content-hashed so a
 # change to one is a visible event.
 platform:
-    @cargo test --quiet -p pw-core --test platform_contracts -- --nocapture 2>&1 | grep -E 'platform contract|test result'
+    @cargo test --quiet -p pw-core --test platform_contracts -- --nocapture 2>&1 | grep -E 'platform contract|test result|^---- '
 
 # Coverage-guided fuzzing. Distinct from `just robustness`, which is structured
 # generation: this one has instrumentation, coverage feedback and an evolving
@@ -296,7 +296,7 @@ e9-latency:
        echo "feedback. There is no query system: an edit costs a full check."; \
        echo "The measurement below is why that has not blocked the gate."; echo; \
        cargo test -p pw-core --test check_latency -- --nocapture 2>&1 \
-         | grep -E "^(check-latency|test result)"; \
+         | grep -E "^(check-latency|test result)|^---- "; \
        echo; echo "Median of 7 runs, in process, on the machine in"; \
        echo "docs/environment/macbook.md. The rejected row is the one that"; \
        echo "matters most: editor feedback is worth the most when the program"; \
@@ -336,7 +336,7 @@ e9-oracle:
        echo "handler, and effect_oracle.rs asserts the absence so that adding"; \
        echo "one forces the conformance pair to be written."; \
      } > docs/evidence/E9/effect-oracle.txt
-    @grep -E "^test result" docs/evidence/E9/effect-oracle.txt
+    @grep -E "^test result|^---- " docs/evidence/E9/effect-oracle.txt
 
 # E9-V1..V6 — the ordinary value relations. The gate tests, what the checker
 # DECIDED over the store program and the accepted corpus (a checker that
@@ -364,7 +364,7 @@ e9-values:
        echo "calls, sum-type variant constructors, or policy-term expressions."; \
        echo "Each is Undecided and counted above, never reported as agreement."; \
      } > docs/evidence/E9/value-relations.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E9/value-relations.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E9/value-relations.txt
 
 # E10-I steps 4-6 — the store's commands, compiled to Wasm components. Wrapped
 # by upstream `wit-component`, checked by `wit-component`'s decoder against the
@@ -416,7 +416,7 @@ e10-i:
        echo "NOT CLAIMED: the data layer (store:data/carts) is Pleris. It is the"; \
        echo "deployment's, as the contract says (owner: external) - NEXT step 10."; \
      } > docs/evidence/E10/e10-i.txt
-    @grep -E "^test result|the command returned" docs/evidence/E10/e10-i.txt
+    @grep -E "^test result|the command returned|^---- " docs/evidence/E10/e10-i.txt
 
 # `pw build` runs with PATH=/usr/bin:/bin, which holds neither Koka nor Node, so
 # the build cannot reach them even by shelling out. The control line shows
@@ -506,7 +506,7 @@ e10-match:
        echo "and a scrutinee the value relations cannot type are not analysed. Each"; \
        echo "is Blocked, with its reason, and never reported as exhaustive."; \
      } > docs/evidence/E10/match.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/match.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/match.txt
 
 # ADR-0039's compiled computation against exact references, against Koka
 # 3.2.3 (which is why this is not in `just ci`), and its mutation controls.
@@ -523,7 +523,7 @@ e10-pure:
          | grep -E '^(test |test result)|cases, |^r\.Q: '; \
        echo; echo "== against Koka (compiler/pw-conformance/tests/koka_oracle.rs)"; echo; \
        KOKA="$(command -v koka)" cargo test --locked -p pw-conformance --test koka_oracle -- --ignored --nocapture 2>&1 \
-         | grep -E '^oracle:|^test result'; \
+         | grep -E '^oracle:|^test result|^---- '; \
        echo; echo "== mutation controls (scripts/pure_mutations.py)"; echo; \
        python3 scripts/pure_mutations.py; \
        echo; \
@@ -534,7 +534,7 @@ e10-pure:
        echo "formatting. Each is refused by name. An early return compiles since"; \
        echo "2026-09-25 (ADR-0051): just e10-control-flow."; \
      } > docs/evidence/E10/pure.txt
-    @grep -E "^test result|mutants killed|^oracle:" docs/evidence/E10/pure.txt
+    @grep -E "^test result|mutants killed|^oracle:|^---- " docs/evidence/E10/pure.txt
 
 # ADR-0040's standard library, compiled: each list and string operation
 # against Rust's own over generated inputs, and the mutation controls.
@@ -557,7 +557,7 @@ e10-stdlib:
        echo "own declaration. It is a value since 2026-09-25 (ADR-0052):"; \
        echo "just e10-function-values."; \
      } > docs/evidence/E10/stdlib.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/stdlib.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/stdlib.txt
 
 # `pw build` for examples/kiokun into docs/evidence/E10/kiokun/ (held there by
 # evidence_is_current), the host's tests over the committed sample shard, the
@@ -631,14 +631,14 @@ e10-affine:
               | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[PW2005\][^[]*' | head -1)"; \
        done; \
        echo; echo "== the generality suite"; echo; \
-       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/affine_mutations.py)"; echo; \
        python3 scripts/affine_mutations.py; \
        echo; \
        echo "NOT CLAIMED: a borrow. Passing a value to a function whose row does not"; \
        echo "release it is a use; Pleris has no borrow syntax (gate item 5)."; \
      } > docs/evidence/E10/affine.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/affine.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/affine.txt
 
 # ADR-0052: a function is a value. The closures through the host, the
 # component against the JavaScript module, and the mutation controls.
@@ -678,7 +678,7 @@ e10-handlers-compute:
        echo "value. NOT CLAIMED: a command in a function value, or a function value"; \
        echo "that reads what the handler captured; each is refused by name."; \
      } > docs/evidence/E10/handlers-compute.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/handlers-compute.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/handlers-compute.txt
 
 # ADR-0062: generic records, sum types and opaque types in the backend, and
 # a type beside a query of its name in the world. Each run through the E8
@@ -702,7 +702,7 @@ e10-generics:
        echo "NOT CLAIMED: a generic type at the component boundary, which has no WIT"; \
        echo "form. NOT CLAIMED: an instance only a lambda's branches name."; \
      } > docs/evidence/E10/generics.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/generics.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E10/generics.txt
 
 # ADR-0063: every name means one binding. The resolver's scopes, each read
 # by the value relations, the declared-type environment, a handler's capture
@@ -734,7 +734,7 @@ e10-lexical:
        echo "literal whose first field is shorthand, P { x }, which parses as P and a"; \
        echo "block. Each undecided relation above is counted, never agreement."; \
      } > docs/evidence/E10/lexical.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/lexical.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/lexical.txt
 
 # ADR-0064: a label carried through a call. The privacy tests of a result
 # made of its arguments, and the mutation controls.
@@ -752,7 +752,7 @@ e10-labels:
        echo "index. NOT CLAIMED: a declaration that states how its result's label is"; \
        echo "made; the rule stands in for one."; \
      } > docs/evidence/E10/labels.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/labels.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/labels.txt
 
 # ADR-0065: a value that holds at every type. Its tests, what the value
 # relations decide over the store, kiokun and the accepted corpus, and the
@@ -779,7 +779,7 @@ e10-any:
        echo "NOT CLAIMED: a generic function's result its arguments do not fix, which"; \
        echo "stays unknown. Each undecided relation above is counted, never agreement."; \
      } > docs/evidence/E10/any.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/any.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/any.txt
 
 # ADR-0066: a nested declaration sees the bindings around it. Its tests, and
 # the mutation controls.
@@ -796,7 +796,7 @@ e10-nested:
        echo "NOT CLAIMED: one scope walk for the name check. names.rs keeps its own,"; \
        echo "which binds a keyword statement's first word where the resolver does not."; \
      } > docs/evidence/E10/nested.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/nested.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/nested.txt
 
 # ADR-0067: a record is built with each of its fields, once, and an `if`
 # without `else` is no value. Its tests, and the mutation controls.
@@ -810,7 +810,7 @@ e10-record-fields:
        echo; echo "== mutation controls (scripts/record_field_mutations.py)"; echo; \
        python3 scripts/record_field_mutations.py; \
      } > docs/evidence/E10/record-fields.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/record-fields.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/record-fields.txt
 
 # ADR-0068: what each construct takes, checked, and `elif` chains lowered as
 # nested ifs. Its tests, the chains through the E8 host, and the mutation
@@ -830,7 +830,7 @@ e10-calls:
        echo "NOT CLAIMED: a lambda with no annotation, called directly, whose"; \
        echo "parameter's type no use gives."; \
      } > docs/evidence/E10/calls.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/calls.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/calls.txt
 
 # ADR-0069: a list's items share one type, and an `Int` literal fits an
 # `Int`. Its tests, and the mutation controls.
@@ -844,7 +844,7 @@ e10-lists:
        echo; echo "== mutation controls (scripts/list_literal_mutations.py)"; echo; \
        python3 scripts/list_literal_mutations.py; \
      } > docs/evidence/E10/lists.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/lists.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/lists.txt
 
 # ADR-0070: an assignment to a field has the field's type. Its test, and the
 # mutation control.
@@ -858,7 +858,7 @@ e10-field-assignment:
        echo; echo "== mutation controls (scripts/field_assignment_mutations.py)"; echo; \
        python3 scripts/field_assignment_mutations.py; \
      } > docs/evidence/E10/field-assignment.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/field-assignment.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/field-assignment.txt
 
 # ADR-0071: what a template's blocks and events take. Its tests, the store's
 # test that every relation is decided, and the mutation controls.
@@ -874,7 +874,7 @@ e10-template-operands:
        echo; echo "== mutation controls (scripts/template_operand_mutations.py)"; echo; \
        python3 scripts/template_operand_mutations.py; \
      } > docs/evidence/E10/template-operands.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/template-operands.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/template-operands.txt
 
 # ADR-0072: an element named with a capital letter is a view. Its tests, and
 # the mutation controls.
@@ -888,7 +888,7 @@ e10-view-elements:
        echo; echo "== mutation controls (scripts/view_element_mutations.py)"; echo; \
        python3 scripts/view_element_mutations.py; \
      } > docs/evidence/E10/view-elements.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/view-elements.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/view-elements.txt
 
 # ADR-0073: a template reads each value by path. The checker's and the build's
 # tests, the renderer's key tests, and the mutation controls.
@@ -904,7 +904,7 @@ e10-template-values:
        echo; echo "== mutation controls (scripts/template_value_mutations.py)"; echo; \
        python3 scripts/template_value_mutations.py; \
      } > docs/evidence/E10/template-values.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/template-values.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/template-values.txt
 
 # ADR-0074: what a template writes has a text form. Its tests, ADR-0073's
 # (a computed list now checks, and does not build), and the mutation controls.
@@ -920,7 +920,7 @@ e10-template-text:
        echo; echo "== mutation controls (scripts/template_text_mutations.py)"; echo; \
        python3 scripts/template_text_mutations.py; \
      } > docs/evidence/E10/template-text.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/template-text.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/template-text.txt
 
 # ADR-0075: a mounted resource does not build; since ADR-0148 a stream builds
 # as a part. Its tests, and the mutation controls.
@@ -934,7 +934,7 @@ e10-streams:
        echo; echo "== mutation controls (scripts/stream_mutations.py)"; echo; \
        python3 scripts/stream_mutations.py; \
      } > docs/evidence/E10/streams.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/streams.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/streams.txt
 
 # ADR-0076: an arm no value reaches is refused. Its tests, and the mutation
 # controls.
@@ -948,7 +948,7 @@ e10-unreachable-arms:
        echo; echo "== mutation controls (scripts/unreachable_arm_mutations.py)"; echo; \
        python3 scripts/unreachable_arm_mutations.py; \
      } > docs/evidence/E10/unreachable-arms.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/unreachable-arms.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/unreachable-arms.txt
 
 # ADR-0077: a call through a field holding a function is checked. Its tests,
 # and the mutation controls.
@@ -962,7 +962,7 @@ e10-field-calls:
        echo; echo "== mutation controls (scripts/field_call_mutations.py)"; echo; \
        python3 scripts/field_call_mutations.py; \
      } > docs/evidence/E10/field-calls.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/field-calls.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/field-calls.txt
 
 # ADR-0078: an effect is performed where its function is named. Its tests,
 # the generality witnesses, and the mutation controls.
@@ -978,7 +978,7 @@ e10-effects-through-values:
        echo; echo "== mutation controls (scripts/effect_value_mutations.py)"; echo; \
        python3 scripts/effect_value_mutations.py; \
      } > docs/evidence/E10/effects-through-values.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/effects-through-values.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/effects-through-values.txt
 
 # ADR-0079: a function value carries the label of what it makes. Its tests,
 # and the mutation controls.
@@ -992,7 +992,7 @@ e10-labels-through-values:
        echo; echo "== mutation controls (scripts/label_value_mutations.py)"; echo; \
        python3 scripts/label_value_mutations.py; \
      } > docs/evidence/E10/labels-through-values.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/labels-through-values.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/labels-through-values.txt
 
 # ADR-0080: the affine rule follows bindings, not names. Its tests, and the
 # mutation controls.
@@ -1006,7 +1006,7 @@ e10-affine-bindings:
        echo; echo "== mutation controls (scripts/affine_binding_mutations.py)"; echo; \
        python3 scripts/affine_binding_mutations.py; \
      } > docs/evidence/E10/affine-bindings.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/affine-bindings.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/affine-bindings.txt
 
 # ADR-0081: a named argument is given to the parameter of its name. The
 # checker's tests, the call run through the E8 host, and the mutation
@@ -1023,7 +1023,7 @@ e10-named-arguments:
        echo; echo "== mutation controls (scripts/named_argument_mutations.py)"; echo; \
        python3 scripts/named_argument_mutations.py; \
      } > docs/evidence/E10/named-arguments.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/named-arguments.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/named-arguments.txt
 
 # ADR-0082: a `derived` value performs no effect. Its tests, and the mutation
 # controls.
@@ -1037,7 +1037,7 @@ e10-derived:
        echo; echo "== mutation controls (scripts/derived_mutations.py)"; echo; \
        python3 scripts/derived_mutations.py; \
      } > docs/evidence/E10/derived.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/derived.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/derived.txt
 
 # ADR-0083: a call's arguments open on the callee's line. Its tests, the
 # grammar's, and the mutation control.
@@ -1049,11 +1049,11 @@ e10-call-lines:
        echo "== call lines (compiler/pw-core/tests/call_lines.rs)"; echo; \
        cargo test --locked -p pw-core --test call_lines 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the grammar (compiler/pw-syntax)"; echo; \
-       cargo test --locked -p pw-syntax 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-syntax 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation control (scripts/call_line_mutations.py)"; echo; \
        python3 scripts/call_line_mutations.py; \
      } > docs/evidence/E10/call-lines.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/call-lines.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/call-lines.txt
 
 # ADR-0084: what a string interpolates has a text form. Its tests, and the
 # mutation controls.
@@ -1067,7 +1067,7 @@ e10-string-holes:
        echo; echo "== mutation controls (scripts/string_hole_mutations.py)"; echo; \
        python3 scripts/string_hole_mutations.py; \
      } > docs/evidence/E10/string-holes.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/string-holes.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/string-holes.txt
 
 # ADR-0085: a call carries what it is given. Its tests, and the mutation
 # controls.
@@ -1081,7 +1081,7 @@ e10-labels-through-plain-values:
        echo; echo "== mutation controls (scripts/label_plain_mutations.py)"; echo; \
        python3 scripts/label_plain_mutations.py; \
      } > docs/evidence/E10/labels-through-plain-values.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/labels-through-plain-values.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/labels-through-plain-values.txt
 
 # ADR-0086: a function crosses no boundary. Its test, and the mutation
 # controls.
@@ -1095,7 +1095,7 @@ e10-function-captures:
        echo; echo "== mutation controls (scripts/function_capture_mutations.py)"; echo; \
        python3 scripts/function_capture_mutations.py; \
      } > docs/evidence/E10/function-captures.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/function-captures.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/function-captures.txt
 
 # ADR-0087: a call names a term. Its tests, and the mutation controls.
 e10-call-names:
@@ -1108,7 +1108,7 @@ e10-call-names:
        echo; echo "== mutation controls (scripts/call_name_mutations.py)"; echo; \
        python3 scripts/call_name_mutations.py; \
      } > docs/evidence/E10/call-names.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/call-names.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/call-names.txt
 
 # ADR-0088: a clause names a declaration of its kind, and gives it its key.
 # Its tests, and the mutation controls.
@@ -1122,7 +1122,7 @@ e10-clause-keys:
        echo; echo "== mutation controls (scripts/clause_key_mutations.py)"; echo; \
        python3 scripts/clause_key_mutations.py; \
      } > docs/evidence/E10/clause-keys.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/clause-keys.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/clause-keys.txt
 
 # ADR-0089: a policy's value is one its domain has. Its tests, and the
 # mutation controls.
@@ -1136,7 +1136,7 @@ e10-policy-values:
        echo; echo "== mutation controls (scripts/policy_value_mutations.py)"; echo; \
        python3 scripts/policy_value_mutations.py; \
      } > docs/evidence/E10/policy-values.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/policy-values.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/policy-values.txt
 
 # ADR-0090: `pw build` checks what `pw check` checks. Its tests, the corpus
 # standard the declaration rules are held to, and the mutation controls.
@@ -1152,7 +1152,7 @@ e10-one-checker:
        echo; echo "== mutation controls (scripts/one_checker_mutations.py)"; echo; \
        python3 scripts/one_checker_mutations.py; \
      } > docs/evidence/E10/one-checker.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/one-checker.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/one-checker.txt
 
 # ADR-0091: a listener binds its entry's key. The checker's tests, the
 # materializer's, and the mutation controls.
@@ -1168,7 +1168,7 @@ e10-listeners:
        echo; echo "== mutation controls (scripts/listener_mutations.py)"; echo; \
        python3 scripts/listener_mutations.py; \
      } > docs/evidence/E10/listeners.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/listeners.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/listeners.txt
 
 # ADR-0092: a dependency-graph clause belongs to a declaration that can mean
 # it. Its tests, and the mutation controls.
@@ -1182,7 +1182,7 @@ e10-clause-places:
        echo; echo "== mutation controls (scripts/clause_place_mutations.py)"; echo; \
        python3 scripts/clause_place_mutations.py; \
      } > docs/evidence/E10/clause-places.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/clause-places.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/clause-places.txt
 
 # ADR-0093: an element handles an event the platform declares. Its tests,
 # and the mutation controls.
@@ -1196,7 +1196,7 @@ e10-declared-events:
        echo; echo "== mutation controls (scripts/declared_event_mutations.py)"; echo; \
        python3 scripts/declared_event_mutations.py; \
      } > docs/evidence/E10/declared-events.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/declared-events.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/declared-events.txt
 
 # ADR-0094: a template writes no code. Its tests, and the mutation controls.
 e10-code-in-markup:
@@ -1209,7 +1209,7 @@ e10-code-in-markup:
        echo; echo "== mutation controls (scripts/code_in_markup_mutations.py)"; echo; \
        python3 scripts/code_in_markup_mutations.py; \
      } > docs/evidence/E10/code-in-markup.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/code-in-markup.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/code-in-markup.txt
 
 # ADR-0095: an attribute's context is read as HTML reads its name. Its
 # tests, and the mutation controls.
@@ -1223,7 +1223,7 @@ e10-attribute-case:
        echo; echo "== mutation controls (scripts/attribute_case_mutations.py)"; echo; \
        python3 scripts/attribute_case_mutations.py; \
      } > docs/evidence/E10/attribute-case.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/attribute-case.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/attribute-case.txt
 
 # ADR-0096: a template moves no URL. Its tests, and the mutation controls.
 e10-moved-urls:
@@ -1236,7 +1236,7 @@ e10-moved-urls:
        echo; echo "== mutation controls (scripts/moved_url_mutations.py)"; echo; \
        python3 scripts/moved_url_mutations.py; \
      } > docs/evidence/E10/moved-urls.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/moved-urls.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/moved-urls.txt
 
 # ADR-0097: data embedded in a page cannot end its script element. The
 # renderer's security matrix, and the mutation controls.
@@ -1250,7 +1250,7 @@ e10-embedded-json:
        echo; echo "== mutation controls (scripts/embedded_json_mutations.py)"; echo; \
        python3 scripts/embedded_json_mutations.py; \
      } > docs/evidence/E10/embedded-json.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/embedded-json.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/embedded-json.txt
 
 # ADR-0098: a name is written once where it is declared. Its tests, and the
 # mutation controls.
@@ -1264,7 +1264,7 @@ e10-declared-once:
        echo; echo "== mutation controls (scripts/declared_once_mutations.py)"; echo; \
        python3 scripts/declared_once_mutations.py; \
      } > docs/evidence/E10/declared-once.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/declared-once.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/declared-once.txt
 
 # ADR-0099: a failure is handled. Its tests, and the mutation controls.
 e10-results-handled:
@@ -1277,7 +1277,7 @@ e10-results-handled:
        echo; echo "== mutation controls (scripts/results_handled_mutations.py)"; echo; \
        python3 scripts/results_handled_mutations.py; \
      } > docs/evidence/E10/results-handled.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/results-handled.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/results-handled.txt
 
 # ADR-0100: a query reads. Its tests, and the mutation controls.
 e10-query-reads:
@@ -1291,7 +1291,7 @@ e10-query-reads:
        echo; echo "== mutation controls (scripts/query_read_mutations.py)"; echo; \
        python3 scripts/query_read_mutations.py; \
      } > docs/evidence/E10/query-reads.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/query-reads.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/query-reads.txt
 
 # ADR-0101: a command invalidates what it writes. Its tests, and the
 # mutation controls.
@@ -1306,7 +1306,7 @@ e10-writes-invalidated:
        echo; echo "== mutation controls (scripts/write_invalidation_mutations.py)"; echo; \
        python3 scripts/write_invalidation_mutations.py; \
      } > docs/evidence/E10/writes-invalidated.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/writes-invalidated.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/writes-invalidated.txt
 
 # ADR-0102: an event reaches what reads what it invalidates. The
 # materializer's tests, ADR-0091's listener tests it must keep passing, and
@@ -1319,11 +1319,11 @@ e10-read-through:
        echo "== reads followed (runtime/pw-materialize/tests/reads.rs)"; echo; \
        cargo test --locked -p pw-materialize --test reads 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the M6 gate and the listeners, unchanged"; echo; \
-       cargo test --locked -p pw-materialize --test gate --test listeners 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-materialize --test gate --test listeners 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/read_through_mutations.py)"; echo; \
        python3 scripts/read_through_mutations.py; \
      } > docs/evidence/E10/read-through.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/read-through.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/read-through.txt
 
 # ADR-0103: a write reaches the fragments built on it. Its tests, ADR-0101's
 # it must keep passing, and the mutation controls.
@@ -1335,11 +1335,11 @@ e10-fragments-reached:
        echo "== fragments reached (compiler/pw-core/tests/writes_reach_fragments.rs)"; echo; \
        cargo test --locked -p pw-core --test writes_reach_fragments 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== ADR-0101's readers, unchanged"; echo; \
-       cargo test --locked -p pw-core --test writes_invalidated 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test writes_invalidated 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/fragment_reach_mutations.py)"; echo; \
        python3 scripts/fragment_reach_mutations.py; \
      } > docs/evidence/E10/fragments-reached.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/fragments-reached.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/fragments-reached.txt
 
 # ADR-0104: the dev server commits the events a command declares. The
 # server's tests, and the mutation controls.
@@ -1353,7 +1353,7 @@ e10-committed-events:
        echo; echo "== mutation controls (scripts/committed_events_mutations.py)"; echo; \
        python3 scripts/committed_events_mutations.py; \
      } > docs/evidence/E10/committed-events.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/committed-events.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/committed-events.txt
 
 # ADR-0105: a command invalidates the entry it speculates on. Its tests,
 # ADR-0101's and ADR-0103's it must keep passing, and the mutation controls.
@@ -1365,11 +1365,11 @@ e10-speculation-reconciled:
        echo "== speculations reconciled (compiler/pw-core/tests/speculation_reconciled.rs)"; echo; \
        cargo test --locked -p pw-core --test speculation_reconciled 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== ADR-0101's readers and ADR-0103's fragments, unchanged"; echo; \
-       cargo test --locked -p pw-core --test writes_invalidated --test writes_reach_fragments 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test writes_invalidated --test writes_reach_fragments 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/speculation_mutations.py)"; echo; \
        python3 scripts/speculation_mutations.py; \
      } > docs/evidence/E10/speculation-reconciled.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/speculation-reconciled.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/speculation-reconciled.txt
 
 # ADR-0106: `pw check` reports each file by its place. Its tests, run
 # against the binary, and the mutation controls.
@@ -1383,7 +1383,7 @@ e10-same-name:
        echo; echo "== mutation controls (scripts/same_name_mutations.py)"; echo; \
        python3 scripts/same_name_mutations.py; \
      } > docs/evidence/E10/same-name.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/same-name.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/same-name.txt
 
 # ADR-0107: a cache key names each parameter its entry depends on. Its
 # tests, and the mutation controls.
@@ -1397,7 +1397,7 @@ e10-keys-cover-reads:
        echo; echo "== mutation controls (scripts/key_read_mutations.py)"; echo; \
        python3 scripts/key_read_mutations.py; \
      } > docs/evidence/E10/keys-cover-reads.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/keys-cover-reads.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/keys-cover-reads.txt
 
 # ADR-0108: a query names a resource that exists. Its tests, and the
 # mutation controls.
@@ -1411,7 +1411,7 @@ e10-queries-name-resources:
        echo; echo "== mutation controls (scripts/query_name_mutations.py)"; echo; \
        python3 scripts/query_name_mutations.py; \
      } > docs/evidence/E10/queries-name-resources.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/queries-name-resources.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/queries-name-resources.txt
 
 # ADR-0109: a timeout is a budget above zero. Its test, and the mutation
 # controls.
@@ -1425,7 +1425,7 @@ e10-timeouts:
        echo; echo "== mutation controls (scripts/timeout_mutations.py)"; echo; \
        python3 scripts/timeout_mutations.py; \
      } > docs/evidence/E10/timeouts.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/timeouts.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/timeouts.txt
 
 # ADR-0110: a resumable handler reads what it captures. Its tests, and the
 # mutation controls.
@@ -1439,7 +1439,7 @@ e10-handler-captures:
        echo; echo "== mutation controls (scripts/handler_capture_mutations.py)"; echo; \
        python3 scripts/handler_capture_mutations.py; \
      } > docs/evidence/E10/handler-captures.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/handler-captures.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/handler-captures.txt
 
 # ADR-0111: a shorthand field reads its capture. Its tests, and the mutation
 # controls.
@@ -1453,7 +1453,7 @@ e10-capture-shorthand:
        echo; echo "== mutation controls (scripts/capture_shorthand_mutations.py)"; echo; \
        python3 scripts/capture_shorthand_mutations.py; \
      } > docs/evidence/E10/capture-shorthand.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/capture-shorthand.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/capture-shorthand.txt
 
 # ADR-0112: a call's privacy is the declaration it resolves to. Its tests,
 # and the mutation controls.
@@ -1467,7 +1467,7 @@ e10-privacy-by-resolution:
        echo; echo "== mutation controls (scripts/privacy_resolution_mutations.py)"; echo; \
        python3 scripts/privacy_resolution_mutations.py; \
      } > docs/evidence/E10/privacy-by-resolution.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/privacy-by-resolution.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/privacy-by-resolution.txt
 
 # ADR-0113: a resumable handler runs in the browser. The test, and the
 # mutation controls.
@@ -1481,7 +1481,7 @@ e10-handlers-in-the-browser:
        echo; echo "== mutation controls (scripts/handler_placement_mutations.py)"; echo; \
        python3 scripts/handler_placement_mutations.py; \
      } > docs/evidence/E10/handlers-in-the-browser.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/handlers-in-the-browser.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/handlers-in-the-browser.txt
 
 # ADR-0114: what is built before any request reads no request's value. The
 # test, and the mutation controls.
@@ -1495,7 +1495,7 @@ e10-built-pages:
        echo; echo "== mutation controls (scripts/built_page_mutations.py)"; echo; \
        python3 scripts/built_page_mutations.py; \
      } > docs/evidence/E10/built-pages.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/built-pages.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/built-pages.txt
 
 # ADR-0118: what a declaration reads, it reads through what it calls. A
 # public query reading the session through a helper or another query, held
@@ -1510,7 +1510,7 @@ e10-reads-through-calls:
        echo; echo "== mutation controls (scripts/reads_through_calls_mutations.py)"; echo; \
        python3 scripts/reads_through_calls_mutations.py; \
      } > docs/evidence/E10/reads-through-calls.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/reads-through-calls.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/reads-through-calls.txt
 
 # ADR-0128: a shared cache holds no one reader's value, whatever its
 # declaration says. The regression tests, the generality score they moved
@@ -1527,7 +1527,7 @@ e14-shared-cache:
        echo; echo "== mutation controls (scripts/shared_cache_mutations.py)"; echo; \
        python3 scripts/shared_cache_mutations.py; \
      } > docs/evidence/E14/shared-cache.txt
-    @grep -E "^test result|mutants killed|generality" docs/evidence/E14/shared-cache.txt
+    @grep -E "^test result|mutants killed|generality|^---- " docs/evidence/E14/shared-cache.txt
 
 # ADR-0129: a value's label follows it through calls, bodies, branches and
 # assignments, and a public log takes only a public value. The regression
@@ -1542,7 +1542,7 @@ e14-value-labels:
        echo; echo "== mutation controls (scripts/value_labels_mutations.py)"; echo; \
        python3 scripts/value_labels_mutations.py; \
      } > docs/evidence/E14/value-labels.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/value-labels.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/value-labels.txt
 
 # ADR-0132: the browser's resume decision knows what the build compiled.
 e14-resume-gate:
@@ -1560,7 +1560,7 @@ e14-resume-gate:
        echo; echo "== mutation controls (scripts/resume_gate_mutations.py)"; echo; \
        python3 scripts/resume_gate_mutations.py; \
      } > docs/evidence/E14/resume-gate.txt
-    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/resume-gate.txt
+    @grep -E "^test result|passed|failed|mutants killed|^---- " docs/evidence/E14/resume-gate.txt
 
 # ADR-0133: a page holds its own UI state, the first slice of signals. The
 # compiler's tests, the browser's renderer, the page in each engine, and a
@@ -1583,7 +1583,7 @@ e14-signals:
        echo; echo "== mutation controls (scripts/signals_mutations.py)"; echo; \
        python3 scripts/signals_mutations.py; \
      } > docs/evidence/E14/signals.txt
-    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/signals.txt
+    @grep -E "^test result|passed|failed|mutants killed|^---- " docs/evidence/E14/signals.txt
 
 # ADR-0134: every handler is resumable, and what it captures is what it reads.
 e14-handlers-resumable:
@@ -1596,7 +1596,7 @@ e14-handlers-resumable:
        echo; echo "== mutation controls (scripts/handlers_resumable_mutations.py)"; echo; \
        python3 scripts/handlers_resumable_mutations.py; \
      } > docs/evidence/E14/handlers-resumable.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/handlers-resumable.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/handlers-resumable.txt
 
 # ADR-0135: a handler's identity is its own file's.
 e14-handlers-by-file:
@@ -1609,7 +1609,7 @@ e14-handlers-by-file:
        echo; echo "== mutation controls (scripts/handlers_by_file_mutations.py)"; echo; \
        python3 scripts/handlers_by_file_mutations.py; \
      } > docs/evidence/E14/handlers-by-file.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/handlers-by-file.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/handlers-by-file.txt
 
 # ADR-0136: a view used in another is written where it is used. The
 # compiler's composition and the checks made where a view is used, the
@@ -1630,7 +1630,7 @@ e14-views-compose:
        echo; echo "== mutation controls (scripts/views_compose_mutations.py)"; echo; \
        python3 scripts/views_compose_mutations.py; \
      } > docs/evidence/E14/views-compose.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/views-compose.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/views-compose.txt
 
 # ADR-0137: a part a signal decides is one the browser renders again, and a
 # block the browser renders reads what it holds. The plan's refusals, with
@@ -1645,7 +1645,7 @@ e14-signals-render-again:
        echo; echo "== mutation controls (scripts/signals_render_again_mutations.py)"; echo; \
        python3 scripts/signals_render_again_mutations.py; \
      } > docs/evidence/E14/signals-render-again.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/signals-render-again.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/signals-render-again.txt
 
 # ADR-0138: a handler is given its event. The compiler's checks and the
 # handler module run under Node, the grammar's, the renderer's one capture
@@ -1665,7 +1665,7 @@ e14-events:
        echo; echo "== mutation controls (scripts/events_mutations.py)"; echo; \
        python3 scripts/events_mutations.py; \
      } > docs/evidence/E14/events.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/events.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/events.txt
 
 # ADR-0139: a frame is forgotten when the page says it applied it. The
 # server's tests, the mutation controls, and the keyed-list suite twenty
@@ -1687,7 +1687,7 @@ e14-stream-ack:
            | grep -E '[0-9]+ (passed|failed)' | tr -d '\033' | sed 's/\[1A\[2K//' | tr '\n' ' '; echo; \
        done; \
      } > docs/evidence/E14/stream-ack.txt
-    @grep -E "^test result|mutants killed|failed" docs/evidence/E14/stream-ack.txt || true
+    @grep -E "^test result|mutants killed|failed|^---- " docs/evidence/E14/stream-ack.txt || true
 
 # ADR-0140: a page that reads queries holds signals too. The server's tests
 # and the mutation controls.
@@ -1701,7 +1701,7 @@ e14-store-signals:
        echo; echo "== mutation controls (scripts/store_signals_mutations.py)"; echo; \
        python3 scripts/store_signals_mutations.py; \
      } > docs/evidence/E14/store-signals.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/store-signals.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/store-signals.txt
 
 # ADR-0141: a dialog a signal shows is the browser's modal dialog. The
 # compiler's rule and the mutation controls; what the browser does with it
@@ -1716,7 +1716,7 @@ e14-dialogs:
        echo; echo "== mutation controls (scripts/dialogs_mutations.py)"; echo; \
        python3 scripts/dialogs_mutations.py; \
      } > docs/evidence/E14/dialogs.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/dialogs.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/dialogs.txt
 
 # ADR-0142: an input bound to a signal. The compiler's lowering, its rule
 # and the plan's in-place parts, and the mutation controls; the browser's
@@ -1733,7 +1733,7 @@ e14-bind:
        echo; echo "== mutation controls (scripts/bind_mutations.py)"; echo; \
        python3 scripts/bind_mutations.py; \
      } > docs/evidence/E14/bind.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/bind.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/bind.txt
 
 # ADR-0147: a query binding is the query's value, and a page that cannot be
 # read is answered. The typer's tests, the server's, `pw-render --plan`'s, and
@@ -1752,7 +1752,7 @@ e14-query-values:
        echo; echo "== mutation controls (scripts/query_values_mutations.py)"; echo; \
        python3 scripts/query_values_mutations.py; \
      } > docs/evidence/E14/query-values.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/query-values.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/query-values.txt
 
 # ADR-0152: a key a page changes. A page's query given a signal is read again,
 # for the new key, and its stale work is cancelled, superseded or kept as it
@@ -1781,7 +1781,7 @@ e14-keyed-reads:
        echo; echo "== the press-order control (scripts/press_order_mutations.py)"; echo; \
        python3 scripts/press_order_mutations.py; \
      } > docs/evidence/E14/keyed-reads.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/keyed-reads.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/keyed-reads.txt
 
 # ADR-0155: the page keeps its subscription through a dropped connection, and
 # a press on a handler from another build reads the page again, once. The
@@ -1821,11 +1821,11 @@ e14-command-answers:
        echo; echo "== the compiled handlers, run under Node against each answer (compiler/pw-core/tests/handlers.rs)"; echo; \
        cargo test --locked -p pw-core --test handlers 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the compiled command against its reference, each availability (compiler/pw-conformance/tests/oracle.rs)"; echo; \
-       cargo test --locked -p pw-conformance --test oracle -- --nocapture 2>&1 | grep -E '^oracle: store|^test result'; \
+       cargo test --locked -p pw-conformance --test oracle -- --nocapture 2>&1 | grep -E '^oracle: store|^test result|^---- '; \
        echo; echo "== the compiled command in the host (runtime/pw-host/tests/pleris_component.rs)"; echo; \
        cargo test --locked -p pw-host --features engine --test pleris_component 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test (an_item_sold_out|a_kept_answer|tests::an_item_sold_out|tests::a_kept_answer)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test (an_item_sold_out|a_kept_answer|tests::an_item_sold_out|tests::a_kept_answer)|^test result|^---- '; \
        echo; echo "== the browser (e2e/availability.spec.mjs, e2e/resource-path.spec.mjs), three engines"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/availability.spec.mjs e2e/resource-path.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -1833,7 +1833,7 @@ e14-command-answers:
        echo; echo "== mutation controls (scripts/command_answers_mutations.py)"; echo; \
        python3 scripts/command_answers_mutations.py; \
      } > docs/evidence/E14/command-answers.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/command-answers.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/command-answers.txt
 
 # ADR-0159: a handler handles what its command answers. The rule, the
 # discard by name compiled, the stores and the demos checked, and the mutation
@@ -1858,7 +1858,7 @@ e14-handler-failures:
        echo; echo "== ADR-0099's, against the walk ADR-0159 rewrote (scripts/results_handled_mutations.py)"; echo; \
        python3 scripts/results_handled_mutations.py; \
      } > docs/evidence/E14/handler-failures.txt
-    @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/handler-failures.txt
+    @grep -E "^test result|pw check|mutants killed|^---- " docs/evidence/E14/handler-failures.txt
 
 # ADR-0160: a page's route. The plan carries it, and the rules hold a route
 # to its page's parameters (PW0340, PW0621) and to one page (PW0341).
@@ -1876,7 +1876,7 @@ e14-routes:
        echo; echo "== mutation controls (scripts/routes_mutations.py)"; echo; \
        python3 scripts/routes_mutations.py; \
      } > docs/evidence/E14/routes.txt
-    @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/routes.txt
+    @grep -E "^test result|pw check|mutants killed|^---- " docs/evidence/E14/routes.txt
 
 # ADR-0161: each document is its own subscriber. The server's tests, two tabs
 # of one session in three engines, and the mutation controls.
@@ -1891,7 +1891,7 @@ e14-documents:
        echo "rust: $(rustc --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_change_waiting|a_change_reaches|a_session_is_forgotten|a_read_older)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_change_waiting|a_change_reaches|a_session_is_forgotten|a_read_older)|^test result|^---- '; \
        echo; echo "== two tabs of one session (e2e/tabs.spec.mjs), and the keyed reads (e2e/keyed.spec.mjs), three engines"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/tabs.spec.mjs e2e/keyed.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -1899,7 +1899,7 @@ e14-documents:
        echo; echo "== mutation controls (scripts/documents_mutations.py)"; echo; \
        python3 scripts/documents_mutations.py; \
      } > docs/evidence/E14/documents.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/documents.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/documents.txt
 
 # ADR-0162: each store at its route. The server's routing and stores, the
 # stores' browser test in three engines, and the mutation controls.
@@ -1913,7 +1913,7 @@ e14-stores:
        echo "rust: $(rustc --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_path_gives|each_store_is|a_change_to_one_stores)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_path_gives|each_store_is|a_change_to_one_stores)|^test result|^---- '; \
        echo; echo "== each store at its route, and test 11 (e2e/stores.spec.mjs), three engines"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -1921,7 +1921,7 @@ e14-stores:
        echo; echo "== mutation controls (scripts/stores_mutations.py)"; echo; \
        python3 scripts/stores_mutations.py; \
      } > docs/evidence/E14/stores.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/stores.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/stores.txt
 
 # ADR-0163: a page says when it is absent. PW0342 and the plan's case, the
 # development server's 404, a store that is not there in three engines, and
@@ -1940,7 +1940,7 @@ e14-not-found:
        echo; echo "== the store declares it, and checks"; echo; \
        ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(each_store_is|a_store_that_is_not_there)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(each_store_is|a_store_that_is_not_there)|^test result|^---- '; \
        echo; echo "== a store that is not there, three engines (e2e/stores.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -1948,7 +1948,7 @@ e14-not-found:
        echo; echo "== mutation controls (scripts/not_found_mutations.py)"; echo; \
        python3 scripts/not_found_mutations.py; \
      } > docs/evidence/E14/not-found.txt
-    @grep -E "^test result|pw check|passed|mutants killed" docs/evidence/E14/not-found.txt
+    @grep -E "^test result|pw check|passed|mutants killed|^---- " docs/evidence/E14/not-found.txt
 
 # ADR-0164: a menu change drops what declares it, for its store. The server's
 # tests, the store's graph, and the mutation controls.
@@ -1962,11 +1962,11 @@ e14-menu-changed:
        cargo run --quiet --locked -p pw-cli -- emit-graph --plain examples/domain.pw examples/lib/*.pw examples/store/*.pw \
          | grep -E "MenuChanged"; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_menu_change_drops|a_change_to_one_stores_menu)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_menu_change_drops|a_change_to_one_stores_menu)|^test result|^---- '; \
        echo; echo "== mutation controls (scripts/menu_changed_mutations.py)"; echo; \
        python3 scripts/menu_changed_mutations.py; \
      } > docs/evidence/E14/menu-changed.txt
-    @grep -E "^test result|MenuChanged|mutants killed" docs/evidence/E14/menu-changed.txt
+    @grep -E "^test result|MenuChanged|mutants killed|^---- " docs/evidence/E14/menu-changed.txt
 
 # ADR-0165: the store's delivery estimate and recommendations. The store's
 # streams, the server's tests, the slots in three engines, and the mutation
@@ -1985,7 +1985,7 @@ e14-slots:
        echo; echo "== the store checks"; echo; \
        ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(the_store_sends_its_slots|a_menu_change_drops_that_stores)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(the_store_sends_its_slots|a_menu_change_drops_that_stores)|^test result|^---- '; \
        echo; echo "== the slots, three engines (e2e/slots.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/slots.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -1993,7 +1993,7 @@ e14-slots:
        echo; echo "== mutation controls (scripts/slots_mutations.py)"; echo; \
        python3 scripts/slots_mutations.py; \
      } > docs/evidence/E14/slots.txt
-    @grep -E "^test result|pw check|passed|skipped|mutants killed" docs/evidence/E14/slots.txt
+    @grep -E "^test result|pw check|passed|skipped|mutants killed|^---- " docs/evidence/E14/slots.txt
 
 # ADR-0166: the store and its items say what they are, and a host's answer is
 # read through the program's own types. The engine's tests, the server's, the
@@ -2013,7 +2013,7 @@ e14-descriptions:
        echo; echo "== the store checks"; echo; \
        ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
        echo; echo "== the development server (pw-dev-server), the benchmark's store among its tests"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::the_store_and_each_item|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::the_store_and_each_item|^test result|^---- '; \
        echo; echo "== the slots, three engines, WebKit painting the store before them (e2e/slots.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/slots.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2021,7 +2021,7 @@ e14-descriptions:
        echo; echo "== mutation controls (scripts/descriptions_mutations.py)"; echo; \
        python3 scripts/descriptions_mutations.py; \
      } > docs/evidence/E14/descriptions.txt
-    @grep -E "^test result|pw check|passed|skipped|mutants killed" docs/evidence/E14/descriptions.txt
+    @grep -E "^test result|pw check|passed|skipped|mutants killed|^---- " docs/evidence/E14/descriptions.txt
 
 # ADR-0167: markup text is text, and a comment in markup is `<!-- -->`. The
 # parser's tests, the checker's (PW5028), the corpus checking clean, and the
@@ -2038,13 +2038,13 @@ e14-markup-comments:
        echo; echo "== the checker and what a page sends (compiler/pw-core/tests/markup_comments.rs)"; echo; \
        cargo test --locked -p pw-core --test markup_comments 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus: each rejected fixture emits its own defect, and no other"; echo; \
-       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test (every_rejected|no_accepted)|^test result'; \
+       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test (every_rejected|no_accepted)|^test result|^---- '; \
        echo; echo "== the store checks"; echo; \
        ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
        echo; echo "== mutation controls (scripts/markup_comments_mutations.py)"; echo; \
        python3 scripts/markup_comments_mutations.py; \
      } > docs/evidence/E14/markup-comments.txt
-    @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/markup-comments.txt
+    @grep -E "^test result|pw check|mutants killed|^---- " docs/evidence/E14/markup-comments.txt
 
 # ADR-0168: a change reaches every part that reads it. The renderer's tests,
 # the server's, the store's names in three engines, and the mutation controls.
@@ -2060,7 +2060,7 @@ e14-instance-changes:
        echo "== what changed in an instance (runtime/pw-render/tests/instance_changes.rs)"; echo; \
        cargo test --locked -p pw-render --test instance_changes 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_rename_sets_every_part|a_list_moves_what_moved)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_rename_sets_every_part|a_list_moves_what_moved)|^test result|^---- '; \
        echo; echo "== each Add named by its item, renamed with it; an instance in place not moved (three engines)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs e2e/keyed-list.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2068,7 +2068,7 @@ e14-instance-changes:
        echo; echo "== mutation controls (scripts/instance_changes_mutations.py)"; echo; \
        python3 scripts/instance_changes_mutations.py; \
      } > docs/evidence/E14/instance-changes.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/instance-changes.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/instance-changes.txt
 
 # ADR-0169: what a template reads through a member function, a host computes
 # or the build refuses. The plan's tests, the renderer's, the server's, each
@@ -2093,7 +2093,7 @@ e14-row-reads:
        python3 -c "import json,sys; print(json.dumps(json.load(open(sys.argv[1]))['rows']))" "$out/pages/store.page.StorePage.json"; \
        rm -rf "$out"; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(each_menu_row_shows|an_inserted_item_arrives|a_menu_change_drops)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(each_menu_row_shows|an_inserted_item_arrives|a_menu_change_drops)|^test result|^---- '; \
        echo; echo "== each price, and an inserted item's, in three engines"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs e2e/store.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2101,7 +2101,7 @@ e14-row-reads:
        echo; echo "== mutation controls (scripts/row_reads_mutations.py)"; echo; \
        python3 scripts/row_reads_mutations.py; \
      } > docs/evidence/E14/row-reads.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/row-reads.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/row-reads.txt
 
 # ADR-0170: a loop over a list inside a query's value, and a part a
 # speculation would not reach. The plan's tests, the renderer's, the
@@ -2118,13 +2118,13 @@ e14-nested-lists:
        echo; echo "== a value computed for a row, read whole (runtime/pw-render/tests/paths.rs)"; echo; \
        cargo test --locked -p pw-render --test paths 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_list_inside_a_querys_value|a_block_)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_list_inside_a_querys_value|a_block_)|^test result|^---- '; \
        echo; echo "== the store checks"; echo; \
        ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | tail -1; \
        echo; echo "== mutation controls (scripts/nested_lists_mutations.py)"; echo; \
        python3 scripts/nested_lists_mutations.py; \
      } > docs/evidence/E14/nested-lists.txt
-    @grep -E "^test result|pw check|mutants killed" docs/evidence/E14/nested-lists.txt
+    @grep -E "^test result|pw check|mutants killed|^---- " docs/evidence/E14/nested-lists.txt
 
 # ADR-0171: an attribute at the top of the page that reads a query's value is
 # set again when the value changes. The plan's tests, the server's, and the
@@ -2138,11 +2138,11 @@ e14-query-attributes:
        echo "== the plan (compiler/pw-core/tests/query_attributes.rs)"; echo; \
        cargo test --locked -p pw-core --test query_attributes 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::an_attribute_that_reads_a_query|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::an_attribute_that_reads_a_query|^test result|^---- '; \
        echo; echo "== mutation controls (scripts/query_attributes_mutations.py)"; echo; \
        python3 scripts/query_attributes_mutations.py; \
      } > docs/evidence/E14/query-attributes.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/query-attributes.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/query-attributes.txt
 
 # ADR-0172: the cart lists its lines, and a speculation reaches every part
 # that reads it. The renderer's tests and its WebAssembly build's, the
@@ -2168,7 +2168,7 @@ e14-cart-lines:
        echo; echo "== a record and a list from a browser (runtime/pw-host)"; echo; \
        cargo test --locked -p pw-host --features engine --test pleris_component --test list_arguments 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_lines_steps|a_line_records|a_sessions_changes|a_speculating_page|the_compiled_command_carries)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_lines_steps|a_line_records|a_sessions_changes|a_speculating_page|the_compiled_command_carries)|^test result|^---- '; \
        echo; echo "== the cart in three engines (e2e/cart.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/cart.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2176,7 +2176,7 @@ e14-cart-lines:
        echo; echo "== mutation controls (scripts/cart_lines_mutations.py)"; echo; \
        python3 scripts/cart_lines_mutations.py; \
      } > docs/evidence/E14/cart-lines.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/cart-lines.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/cart-lines.txt
 
 # ADR-0173: a command is sent again where no answer came, and a command that
 # is retried is idempotent. The checker's and the compiler's tests, the
@@ -2199,7 +2199,7 @@ e14-command-retry:
        echo; echo "== mutation controls (scripts/command_retry_mutations.py)"; echo; \
        python3 scripts/command_retry_mutations.py; \
      } > docs/evidence/E14/command-retry.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/command-retry.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/command-retry.txt
 
 # ADR-0174: charter §15.5's store delay, cart delay and one-shot database
 # error. The server's tests, the controls in three engines, and the mutation
@@ -2214,7 +2214,7 @@ e14-test-controls:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_one_shot|a_delay_slows)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_one_shot|a_delay_slows)|^test result|^---- '; \
        echo; echo "== the controls, and a rolled-back command, in three engines"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/controls.spec.mjs e2e/resource-path.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2222,7 +2222,7 @@ e14-test-controls:
        echo; echo "== mutation controls (scripts/test_controls_mutations.py)"; echo; \
        python3 scripts/test_controls_mutations.py; \
      } > docs/evidence/E14/test-controls.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/test-controls.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/test-controls.txt
 
 # ADR-0175: charter §15.5's one-shot network error and forced reconnect,
 # made by the server. The server's tests over real connections, the page in
@@ -2237,7 +2237,7 @@ e14-connection-faults:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server, over real connections (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_dropped_command|a_forced_reconnect)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_dropped_command|a_forced_reconnect)|^test result|^---- '; \
        echo; echo "== the page, in three engines (e2e/connections.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/connections.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2245,7 +2245,7 @@ e14-connection-faults:
        echo; echo "== mutation controls (scripts/connection_faults_mutations.py)"; echo; \
        python3 scripts/connection_faults_mutations.py; \
      } > docs/evidence/E14/connection-faults.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/connection-faults.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/connection-faults.txt
 
 # ADR-0176: a regeneration that fails sends nothing, and is tried again. The
 # server's test, the page in three engines, and the mutation controls.
@@ -2259,7 +2259,7 @@ e14-materializer-failure:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::a_regeneration_that_fails|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::a_regeneration_that_fails|^test result|^---- '; \
        echo; echo "== the page, in three engines (e2e/materializer.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/materializer.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2267,7 +2267,7 @@ e14-materializer-failure:
        echo; echo "== mutation controls (scripts/materializer_failure_mutations.py)"; echo; \
        python3 scripts/materializer_failure_mutations.py; \
      } > docs/evidence/E14/materializer-failure.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/materializer-failure.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/materializer-failure.txt
 
 # ADR-0177: a public read whose origin fails is answered with the last value
 # kept (charter §15.6 test 18). The runtime's tests, the checker's, the
@@ -2286,7 +2286,7 @@ e14-last-known-good:
        echo; echo "== PW0343 (compiler/pw-core/src/rules.rs)"; echo; \
        cargo test --locked -p pw-core --lib -- rules::tests::a_last_known_good 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::a_failed_origin|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::a_failed_origin|^test result|^---- '; \
        echo; echo "== the page, in three engines (e2e/controls.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/controls.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2294,7 +2294,7 @@ e14-last-known-good:
        echo; echo "== mutation controls (scripts/last_known_good_mutations.py)"; echo; \
        python3 scripts/last_known_good_mutations.py; \
      } > docs/evidence/E14/last-known-good.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/last-known-good.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/last-known-good.txt
 
 # ADR-0178: whether an item can be ordered is shown before the press, and a
 # change to it reaches every page open (charter §15.1, §15.2). The renderer,
@@ -2315,7 +2315,7 @@ e14-availability:
        cargo test --locked -p pw-core --test value_relations -- listeners the_store_program 2>&1 | grep -E '^(test |test result)'; \
        cargo test --locked -p pw-core --test handlers the_stores_handlers 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_sold_out|a_stock_change|an_untold_stock|a_document_read_behind|a_change_sends|an_insert_keeps|a_menu_changed_at_its_source|a_rename_sets|an_item_sold_out)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_sold_out|a_stock_change|an_untold_stock|a_document_read_behind|a_change_sends|an_insert_keeps|a_menu_changed_at_its_source|a_rename_sets|an_item_sold_out)|^test result|^---- '; \
        echo; echo "== the page, in three engines (e2e/availability.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/availability.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2323,7 +2323,7 @@ e14-availability:
        echo; echo "== mutation controls (scripts/availability_mutations.py)"; echo; \
        python3 scripts/availability_mutations.py; \
      } > docs/evidence/E14/availability.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/availability.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/availability.txt
 
 # ADR-0179: an opaque type states its invariant, and every construction and
 # every boundary holds it. The parser, the checker, the conformance oracle,
@@ -2347,7 +2347,7 @@ e14-invariants:
        cargo test --locked -p pw-host --features engine --test bounded 2>&1 | grep -E '^(test |test result)'; \
        cargo test --locked -p pw-host --features engine --test pleris_component -- a_quantity_that_is_no a_data_layer_answer 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_quantity_that_is_no_positive_int|a_stored_line_of_nothing)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_quantity_that_is_no_positive_int|a_stored_line_of_nothing)|^test result|^---- '; \
        echo; echo "== the page, in three engines (e2e/compiled-handler.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/compiled-handler.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2355,7 +2355,7 @@ e14-invariants:
        echo; echo "== mutation controls (scripts/invariants_mutations.py)"; echo; \
        python3 scripts/invariants_mutations.py; \
      } > docs/evidence/E14/invariants.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/invariants.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/invariants.txt
 
 # ADR-0180: a delivery estimate is a range, and says when it was made. The
 # server's tests, the page in three engines, and the mutation controls.
@@ -2369,7 +2369,7 @@ e14-estimate-range:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_delivery_estimate_is_a_range|the_store_sends_its_slots|a_session_s_estimate|a_failed_estimate)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_delivery_estimate_is_a_range|the_store_sends_its_slots|a_session_s_estimate|a_failed_estimate)|^test result|^---- '; \
        echo; echo "== the page, in three engines (e2e/slots.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/slots.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2377,7 +2377,7 @@ e14-estimate-range:
        echo; echo "== mutation controls (scripts/estimate_range_mutations.py)"; echo; \
        python3 scripts/estimate_range_mutations.py; \
      } > docs/evidence/E14/estimate-range.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/estimate-range.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/estimate-range.txt
 
 # ADR-0181: a menu grouped by its category, and a list inside a row changed
 # where it is. The plan's, the renderer's and the server's tests, the pages in
@@ -2396,7 +2396,7 @@ e14-menu-categories:
        echo; echo "== the renderer (runtime/pw-render/tests/nested_lists.rs, instance_changes.rs)"; echo; \
        cargo test --locked -p pw-render --test nested_lists --test instance_changes 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_menu_is_grouped|a_rename_sets|a_stock_change_told|an_insert_and_what|a_change_sends_what)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_menu_is_grouped|a_rename_sets|a_stock_change_told|an_insert_and_what|a_change_sends_what)|^test result|^---- '; \
        echo; echo "== the pages, in three engines (e2e/stores.spec.mjs, e2e/keyed-list.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs e2e/keyed-list.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2404,7 +2404,7 @@ e14-menu-categories:
        echo; echo "== mutation controls (scripts/menu_categories_mutations.py)"; echo; \
        python3 scripts/menu_categories_mutations.py; \
      } > docs/evidence/E14/menu-categories.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/menu-categories.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/menu-categories.txt
 
 # ADR-0182: keyboard and screen-reader semantics remain valid (charter §15.6
 # test 14). The store's page in three engines, as served and after each kind
@@ -2444,11 +2444,11 @@ e14-titles:
        echo; echo "== the corpus at C9 (corpus-check, corpus_history.rs, generality.rs, checking_source.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        cargo test --locked -p pw-core --test corpus_history --test generality --test checking_source 2>&1 \
-         | grep -E '^test (the_c9|the_pre_change|generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|generality-tested'; \
+         | grep -E '^test (the_c9|the_pre_change|generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|generality-tested|^---- '; \
        echo; echo "== the renderer (runtime/pw-render/tests/titles.rs)"; echo; \
        cargo test --locked -p pw-render --test titles 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_store_s_page_is_titled|a_title_that_changed)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_store_s_page_is_titled|a_title_that_changed)|^test result|^---- '; \
        echo; echo "== the page, in three engines (e2e/accessibility.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/accessibility.spec.mjs --reporter=list 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2456,7 +2456,7 @@ e14-titles:
        echo; echo "== mutation controls (scripts/titles_mutations.py)"; echo; \
        python3 scripts/titles_mutations.py; \
      } > docs/evidence/E14/titles.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/titles.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/titles.txt
 
 # ADR-0184: what a cache may keep holds nothing of a session's (charter
 # §15.6 tests 2 and 13). The server's tests against the running store, the
@@ -2471,7 +2471,7 @@ e14-shared-output:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server, running the store (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_session_s_response_is_kept|what_a_shared_cache_keeps)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_session_s_response_is_kept|what_a_shared_cache_keeps)|^test result|^---- '; \
        echo; echo "== the page, in three engines (e2e/shared-output.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/shared-output.spec.mjs --reporter=list 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2479,7 +2479,7 @@ e14-shared-output:
        echo; echo "== mutation controls (scripts/shared_output_mutations.py)"; echo; \
        python3 scripts/shared_output_mutations.py; \
      } > docs/evidence/E14/shared-output.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/shared-output.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/shared-output.txt
 
 # ADR-0185: ids, and the ARIA that names them, checked at build (charter
 # §8.2). The compiler's tests, the corpus at C10, every program clean, and the
@@ -2495,7 +2495,7 @@ e14-ids:
        echo; echo "== the corpus at C10 (corpus-check, corpus_history.rs, generality.rs, checking_source.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        cargo test --locked -p pw-core --test corpus_history --test generality --test checking_source 2>&1 \
-         | grep -E '^test (the_c10|the_c9|the_pre_change|generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result'; \
+         | grep -E '^test (the_c10|the_c9|the_pre_change|generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- '; \
        echo; echo "== every program the repository checks"; echo; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
@@ -2507,7 +2507,7 @@ e14-ids:
        echo; echo "== mutation controls (scripts/ids_mutations.py)"; echo; \
        python3 scripts/ids_mutations.py; \
      } > docs/evidence/E14/ids.txt
-    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/ids.txt
+    @grep -E "^test result|no diagnostics|mutants killed|^---- " docs/evidence/E14/ids.txt
 
 # ADR-0189: a `<link>` is written where HTML allows it. The rule's tests, the
 # corpus at C12, every program clean, and the mutation controls.
@@ -2522,7 +2522,7 @@ e14-links:
        echo; echo "== the corpus at C12 (corpus-check, generality.rs, checking_source.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
-         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result'; \
+         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- '; \
        echo; echo "== every program the repository checks"; echo; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
@@ -2534,7 +2534,7 @@ e14-links:
        echo; echo "== mutation controls (scripts/links_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/links_mutations.py; \
      } > docs/evidence/E14/links.txt
-    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/links.txt
+    @grep -E "^test result|no diagnostics|mutants killed|^---- " docs/evidence/E14/links.txt
 
 # ADR-0190: every page that binds a query is served at its route and kept
 # current by its own plan. The server's tests, the store's cart as a page of
@@ -2549,7 +2549,7 @@ e14-pages:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_page_that_binds_a_query|a_change_reaches_each_page|a_page_without_the_menu)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_page_that_binds_a_query|a_change_reaches_each_page|a_page_without_the_menu)|^test result|^---- '; \
        echo; echo "== the cart's own page, in three engines (e2e/pages.spec.mjs, e2e/accessibility.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs \
           -g "cart|page of its own|reaches the other|links to the cart" --reporter=list 2>&1) \
@@ -2558,7 +2558,7 @@ e14-pages:
        echo; echo "== mutation controls (scripts/pages_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/pages_mutations.py; \
      } > docs/evidence/E14/pages.txt
-    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/pages.txt
+    @grep -E "^test result|passed|failed|mutants killed|^---- " docs/evidence/E14/pages.txt
 
 # ADR-0191: every page speculates from its own module. The server's tests,
 # the cart's page showing a press before the server answers in three
@@ -2573,7 +2573,7 @@ e14-page-speculation:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_page_that_binds_a_query|a_change_reaches_each_page)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_page_that_binds_a_query|a_change_reaches_each_page)|^test result|^---- '; \
        echo; echo "== the cart's page, in three engines (e2e/pages.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs --reporter=list 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2581,7 +2581,7 @@ e14-page-speculation:
        echo; echo "== mutation controls (scripts/page_speculation_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/page_speculation_mutations.py; \
      } > docs/evidence/E14/page-speculation.txt
-    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/page-speculation.txt
+    @grep -E "^test result|passed|failed|mutants killed|^---- " docs/evidence/E14/page-speculation.txt
 
 # ADR-0192: the stores, as the home page. The server's test, the home page
 # in three engines with its audit, and the mutation controls.
@@ -2595,7 +2595,7 @@ e14-home:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::the_stores_are_the_home_page|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::the_stores_are_the_home_page|^test result|^---- '; \
        echo; echo "== the home page, in three engines (e2e/pages.spec.mjs, e2e/accessibility.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs \
           -g "home page|stores are the home" --reporter=list 2>&1) \
@@ -2604,7 +2604,7 @@ e14-home:
        echo; echo "== mutation controls (scripts/home_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/home_mutations.py; \
      } > docs/evidence/E14/home.txt
-    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/home.txt
+    @grep -E "^test result|passed|failed|mutants killed|^---- " docs/evidence/E14/home.txt
 
 # ADR-0193: an order is placed from the cart, and its page follows it as the
 # store moves it along. The server's tests, the order's flow in three
@@ -2619,7 +2619,7 @@ e14-orders:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(an_order_is_placed|an_empty_cart_places|the_store_moving_an_order)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(an_order_is_placed|an_empty_cart_places|the_store_moving_an_order)|^test result|^---- '; \
        echo; echo "== the order's flow, in three engines (e2e/pages.spec.mjs, e2e/accessibility.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs \
           -g "order" --reporter=list 2>&1) \
@@ -2628,7 +2628,7 @@ e14-orders:
        echo; echo "== mutation controls (scripts/orders_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/orders_mutations.py; \
      } > docs/evidence/E14/orders.txt
-    @grep -E "^test result|passed|failed|mutants killed" docs/evidence/E14/orders.txt
+    @grep -E "^test result|passed|failed|mutants killed|^---- " docs/evidence/E14/orders.txt
 
 # ADR-0202: a type that holds itself in place is boxed, and crosses as its
 # nodes. The WIT and the lowering, the components through the E8 host, the
@@ -2643,13 +2643,13 @@ e14-boxed-types:
        cargo test --locked -p pw-core --test recursive_types 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== components through the E8 host (compiler/pw-conformance/tests/boxed_types.rs, recursive_types.rs)"; echo; \
        cargo test --locked -p pw-conformance --test boxed_types -- --test-threads=1 2>&1 | grep -E '^(test |test result)'; \
-       cargo test --locked -p pw-conformance --test recursive_types -- --test-threads=1 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-conformance --test recursive_types -- --test-threads=1 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== the JavaScript modules, against their components under Node (compiler/pw-conformance/tests/javascript.rs)"; echo; \
-       cargo test --locked -p pw-conformance --test javascript a_type_that_holds_itself -- --nocapture 2>&1 | grep -E '^javascript:|^test result'; \
+       cargo test --locked -p pw-conformance --test javascript a_type_that_holds_itself -- --nocapture 2>&1 | grep -E '^javascript:|^test result|^---- '; \
        echo; echo "== mutation controls (scripts/boxed_types_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/boxed_types_mutations.py; \
      } > docs/evidence/E14/boxed-types.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E14/boxed-types.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E14/boxed-types.txt
 
 # ADR-0203 (ADR-0130's ruling 2): a view that contains itself is an
 # instance of its own template, made at run time. The compiler's, the
@@ -2667,7 +2667,7 @@ e14-view-instances:
        echo "== the compiler (compiler/pw-core/tests/views_contain_themselves.rs)"; echo; \
        cargo test --locked -p pw-core --test views_contain_themselves 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the renderer (runtime/pw-render/tests/properties.rs) and the browser's (runtime/pw-render-wasm)"; echo; \
-       cargo test --locked -p pw-render --test properties 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-render --test properties 2>&1 | grep -E '^test result|^---- '; \
        cargo test --locked -p pw-render-wasm 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the thread page (spikes/own-renderer/e2e/thread.spec.mjs), three engines"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/thread.spec.mjs --reporter=line 2>&1) \
@@ -2676,7 +2676,7 @@ e14-view-instances:
        echo; echo "== mutation controls (scripts/view_instances_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/view_instances_mutations.py; \
      } > docs/evidence/E14/view-instances.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/view-instances.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/view-instances.txt
 
 # ADR-0205: a value of a type that contains itself crosses the browser's
 # wire as its nodes. The renderer's, the modules', the host's and the
@@ -2694,7 +2694,7 @@ e14-graphs-on-the-wire:
        cargo test --locked -p pw-render --test graphs 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the browser's modules, under Node (compiler/pw-core/tests/graphs_on_the_wire.rs, recursive_types.rs)"; echo; \
        cargo test --locked -p pw-core --test graphs_on_the_wire 2>&1 | grep -E '^(test |test result)'; \
-       cargo test --locked -p pw-core --test recursive_types 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test recursive_types 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== the host and a component (compiler/pw-conformance/tests/browser_graphs.rs)"; echo; \
        cargo test --locked -p pw-conformance --test browser_graphs 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the thread page (spikes/own-renderer/e2e/thread.spec.mjs), three engines"; echo; \
@@ -2704,7 +2704,7 @@ e14-graphs-on-the-wire:
        echo; echo "== mutation controls (scripts/graphs_on_the_wire_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/graphs_on_the_wire_mutations.py; \
      } > docs/evidence/E14/graphs-on-the-wire.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/graphs-on-the-wire.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/graphs-on-the-wire.txt
 
 # ADR-0206: a case has one name where values are rendered, its WIT case's.
 # Its tests, the renderer's and the hosts', and the mutation controls.
@@ -2717,13 +2717,13 @@ e14-one-case-name:
        echo "== a page matching on what its signals hold (compiler/pw-core/tests/one_name_for_a_case.rs)"; echo; \
        cargo test --locked -p pw-core --test one_name_for_a_case 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the template, the renderer and the hosts"; echo; \
-       cargo test --locked -p pw-core --test template_blocks --test evidence_is_current 2>&1 | grep -E '^test result'; \
-       cargo test --locked -p pw-render 2>&1 | grep -E '^test result'; \
-       cargo test --locked -p pw-dev-server -p kiokun-server 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test template_blocks --test evidence_is_current 2>&1 | grep -E '^test result|^---- '; \
+       cargo test --locked -p pw-render 2>&1 | grep -E '^test result|^---- '; \
+       cargo test --locked -p pw-dev-server -p kiokun-server 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/one_case_name_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/one_case_name_mutations.py; \
      } > docs/evidence/E14/one-case-name.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/one-case-name.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/one-case-name.txt
 
 # ADR-0225: a `String`'s length is an invariant. The compiler's, the host's
 # and the server's tests, the feed in three engines, and the mutation
@@ -2751,7 +2751,7 @@ e14-string-invariants:
        echo; echo "== mutation controls (scripts/string_invariants_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/string_invariants_mutations.py; \
      } > docs/evidence/E14/string-invariants.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/string-invariants.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/string-invariants.txt
 
 # ADR-0226: a value the template computes compiles. The compiler's tests,
 # the corpus at C16, the server's, the feed in three engines, and the
@@ -2770,7 +2770,7 @@ e14-computed-holes:
        cargo test --locked -p pw-core --test computed_holes --test template_values --test effects_through_values 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus at C16 (corpus-check, checking_source.rs, generality.rs, corpus_history.rs, rule_fixtures.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
-       cargo test --locked -p pw-core --test checking_source --test generality --test corpus_history --test rule_fixtures 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test checking_source --test generality --test corpus_history --test rule_fixtures 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- computed 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
@@ -2780,7 +2780,7 @@ e14-computed-holes:
        echo; echo "== mutation controls (scripts/computed_holes_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/computed_holes_mutations.py; \
      } > docs/evidence/E14/computed-holes.txt
-    @grep -E "^test result|passed|corpus-check|mutants killed" docs/evidence/E14/computed-holes.txt
+    @grep -E "^test result|passed|corpus-check|mutants killed|^---- " docs/evidence/E14/computed-holes.txt
 
 # ADR-0227: a value computed from a signal is the browser's, and its first
 # value the host's. The compiler's and the server's tests, the feed in three
@@ -2806,7 +2806,7 @@ e14-computed-signals:
        echo; echo "== mutation controls (scripts/computed_signals_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/computed_signals_mutations.py; \
      } > docs/evidence/E14/computed-signals.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/computed-signals.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/computed-signals.txt
 
 # ADR-0228: a value computed in a row is the row's. The compiler's and the
 # server's tests, the feed in three engines, and the mutation controls.
@@ -2831,7 +2831,7 @@ e14-computed-rows:
        echo; echo "== mutation controls (scripts/computed_rows_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/computed_rows_mutations.py; \
      } > docs/evidence/E14/computed-rows.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/computed-rows.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/computed-rows.txt
 
 # ADR-0229: a computed condition decides its block. The compiler's and the
 # server's tests, the feed in three engines, and the mutation controls.
@@ -2856,7 +2856,7 @@ e14-computed-conditions:
        echo; echo "== mutation controls (scripts/computed_conditions_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/computed_conditions_mutations.py; \
      } > docs/evidence/E14/computed-conditions.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/computed-conditions.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/computed-conditions.txt
 
 # ADR-0230: a condition is a `Bool`, or a `List` or `String` tested
 # non-empty (ruling 0071-a). The checker's tests, the corpus at C17, and the
@@ -2871,11 +2871,11 @@ e14-condition-truth:
        cargo test --locked -p pw-core --test template_truth --test template_operands 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus at C17 (corpus-check, checking_source.rs, generality.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
-       cargo test --locked -p pw-core --test checking_source --test generality 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test checking_source --test generality 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/condition_truth_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/condition_truth_mutations.py; \
      } > docs/evidence/E14/condition-truth.txt
-    @grep -E "^test result|corpus-check|mutants killed" docs/evidence/E14/condition-truth.txt
+    @grep -E "^test result|corpus-check|mutants killed|^---- " docs/evidence/E14/condition-truth.txt
 
 # ADR-0224: a longer read is not applied over a commit it did not see. The
 # server's tests and the mutation control.
@@ -2890,7 +2890,7 @@ e14-keyed-race:
        echo; echo "== mutation controls (scripts/keyed_race_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/keyed_race_mutations.py; \
      } > docs/evidence/E14/keyed-race.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/keyed-race.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/keyed-race.txt
 
 # ADR-0223: a streamed region is filled when its whole arm has arrived. The
 # renderer's tests, the slots in three engines, and the mutation controls.
@@ -2912,7 +2912,7 @@ e14-whole-fills:
        echo; echo "== mutation controls (scripts/whole_fills_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/whole_fills_mutations.py; \
      } > docs/evidence/E14/whole-fills.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/whole-fills.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/whole-fills.txt
 
 # ADR-0222: a post is shown before the server answers. The compiler's and
 # the server's tests, the feed in three engines, and the mutation controls.
@@ -2937,7 +2937,7 @@ e14-optimistic-posts:
        echo; echo "== mutation controls (scripts/optimistic_posts_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/optimistic_posts_mutations.py; \
      } > docs/evidence/E14/optimistic-posts.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/optimistic-posts.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/optimistic-posts.txt
 
 # ADR-0221: a form control's value is written where HTML reads it. The
 # compiler's and the renderer's tests, the bound fields in three engines, the
@@ -2957,7 +2957,7 @@ e14-form-controls:
        cargo test --locked -p pw-render --test security 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus (C15) and generality"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
-       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== bound fields in three engines (e2e/bind.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/bind.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -2965,7 +2965,7 @@ e14-form-controls:
        echo; echo "== mutation controls (scripts/form_controls_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/form_controls_mutations.py; \
      } > docs/evidence/E14/form-controls.txt
-    @grep -E "^test result|passed|corpus-check|mutants killed" docs/evidence/E14/form-controls.txt
+    @grep -E "^test result|passed|corpus-check|mutants killed|^---- " docs/evidence/E14/form-controls.txt
 
 # ADR-0220: the feed reference app, served in browsers by the host that
 # serves the store. The server's tests, the feed in three engines, and the
@@ -2989,7 +2989,7 @@ e14-feed:
        echo; echo "== mutation controls (scripts/feed_served_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/feed_served_mutations.py; \
      } > docs/evidence/E14/feed.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/feed.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/feed.txt
 
 # ADR-0246: the feed's data in PostgreSQL, held to what its source states.
 # Needs PW_FEED_DATABASE_URL, a throwaway database (each test uses a schema of
@@ -3009,11 +3009,11 @@ e14-feed-postgres:
        echo "== the feed on PostgreSQL (spikes/own-renderer/server/src/tests/feed_pg.rs, follows.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- tests::feed_pg:: tests::follows::on_postgres 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the in-memory layer, unchanged (the server's other tests)"; echo; \
-       cargo test --locked -p pw-dev-server -- --skip tests::feed_pg:: --skip tests::follows::on_postgres 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-dev-server -- --skip tests::feed_pg:: --skip tests::follows::on_postgres 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/feed_postgres_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/feed_postgres_mutations.py; \
      } > docs/evidence/E14/feed-postgres.txt; \
-     grep -E "^test result|mutants killed" docs/evidence/E14/feed-postgres.txt
+     grep -E "^test result|mutants killed|^---- " docs/evidence/E14/feed-postgres.txt
 
 # ADR-0219: what a commit drops reaches every session that reads it
 e14-cross-session:
@@ -3027,7 +3027,7 @@ e14-cross-session:
        echo; echo "== mutation controls (scripts/cross_session_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/cross_session_mutations.py; \
      } > docs/evidence/E14/cross-session.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/cross-session.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/cross-session.txt
 
 # ADR-0217: what a handler at the top of the page captures is set again when it changes
 e14-top-captures:
@@ -3040,11 +3040,11 @@ e14-top-captures:
        cargo test --locked -p pw-core --test top_level_captures 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the server's patch, and the browser's renderer"; echo; \
        cargo test --locked -p pw-dev-server -- a_handlers_captures_at_the_top_of_the_page_are_set_again 2>&1 | grep -E '^(test |test result)'; \
-       cargo test --locked -p pw-render-wasm 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-render-wasm 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/top_captures_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/top_captures_mutations.py; \
      } > docs/evidence/E14/top-captures.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/top-captures.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/top-captures.txt
 
 # ADR-0216: every clause belongs to a declaration that reads it, and a code body admits none
 e14-clause-heads:
@@ -3062,7 +3062,7 @@ e14-clause-heads:
        echo; echo "== mutation controls (scripts/clause_heads_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/clause_heads_mutations.py; \
      } > docs/evidence/E14/clause-heads.txt
-    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/clause-heads.txt
+    @grep -E "^test result|no diagnostics|mutants killed|^---- " docs/evidence/E14/clause-heads.txt
 
 # ADR-0215: a query's retry reaches its runtime as declared, and fixed is no strategy
 e14-query-retry:
@@ -3078,7 +3078,7 @@ e14-query-retry:
        echo; echo "== mutation controls (scripts/query_retry_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/query_retry_mutations.py; \
      } > docs/evidence/E14/query-retry.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/query-retry.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/query-retry.txt
 
 # ADR-0212: a query reads a query or a resource, and a subscription a subscription
 e14-query-reads:
@@ -3090,11 +3090,11 @@ e14-query-reads:
        echo "== the rule (compiler/pw-core/tests/reads_name_their_kind.rs)"; echo; \
        cargo test --locked -p pw-core --test reads_name_their_kind 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus"; echo; \
-       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/query_reads_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/query_reads_mutations.py; \
      } > docs/evidence/E14/query-reads.txt
-    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/query-reads.txt
+    @grep -E "^test result|no diagnostics|mutants killed|^---- " docs/evidence/E14/query-reads.txt
 
 # ADR-0213: List.maximum gives +0 over -0
 e14-float-maximum:
@@ -3105,11 +3105,11 @@ e14-float-maximum:
        echo "rust: $(rustc --version)"; echo; \
        echo "== both backends, by bits (compiler/pw-conformance/tests/stdlib.rs, javascript.rs)"; echo; \
        cargo test --locked -p pw-conformance --test stdlib -- sum_and_maximum 2>&1 | grep -E '^(test |test result)'; \
-       cargo test --locked -p pw-conformance --test javascript 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-conformance --test javascript 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/float_maximum_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/float_maximum_mutations.py; \
      } > docs/evidence/E14/float-maximum.txt
-    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/float-maximum.txt
+    @grep -E "^test result|no diagnostics|mutants killed|^---- " docs/evidence/E14/float-maximum.txt
 
 # ADR-0214: an opaque type's own module reads its representation as .value, and declares no member of that name
 e14-opaque-value:
@@ -3125,7 +3125,7 @@ e14-opaque-value:
        echo; echo "== mutation controls (scripts/opaque_value_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/opaque_value_mutations.py; \
      } > docs/evidence/E14/opaque-value.txt
-    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/opaque-value.txt
+    @grep -E "^test result|no diagnostics|mutants killed|^---- " docs/evidence/E14/opaque-value.txt
 
 # ADR-0211: a path that leaves a loop's body leaves the function, and owes
 # its releases. The tests, the corpus, and the mutation controls.
@@ -3138,11 +3138,11 @@ e14-affine-loops:
        echo "== the rule (compiler/pw-core/tests/affine_loops.rs)"; echo; \
        cargo test --locked -p pw-core --test affine_loops --test affine_bindings 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus"; echo; \
-       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/affine_loops_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/affine_loops_mutations.py; \
      } > docs/evidence/E14/affine-loops.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/affine-loops.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/affine-loops.txt
 
 # ADR-0209: a command computes the entries it invalidates. The command's
 # calls, the server's drops, the store against its references, and the
@@ -3160,11 +3160,11 @@ e14-command-invalidations:
        echo; echo "== the server's drops"; echo; \
        cargo test --locked -p pw-dev-server -- an_invalidated_entry_is_dropped_by_the_key_the_command_computed 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the store's artifacts, as the compiler emits them"; echo; \
-       cargo test --locked -p pw-core --test evidence_is_current 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test evidence_is_current 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/command_invalidations_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/command_invalidations_mutations.py; \
      } > docs/evidence/E14/command-invalidations.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/command-invalidations.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/command-invalidations.txt
 
 # ADR-0208: a command computes its events, and the outbox commits them with
 # its writes. The component's calls, the outbox's values, the server's
@@ -3182,11 +3182,11 @@ e14-command-events:
        echo; echo "== the server's commits"; echo; \
        cargo test --locked -p pw-dev-server -- a_command_commits_the_events_it_computes a_command_that_emits_nothing_tells_nothing a_command_whose_events_cannot_be_kept_is_not_run 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the store's artifacts, as the compiler emits them"; echo; \
-       cargo test --locked -p pw-core --test evidence_is_current 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test evidence_is_current 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/committed_events_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/committed_events_mutations.py; \
      } > docs/evidence/E14/command-events.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/command-events.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/command-events.txt
 
 # ADR-0207: a data source states what it guarantees, and nothing asks it for
 # more. The rules' tests, the store checked with its source, and the
@@ -3204,7 +3204,7 @@ e14-data-sources:
        echo; echo "== mutation controls (scripts/data_sources_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/data_sources_mutations.py; \
      } > docs/evidence/E14/data-sources.txt
-    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/data-sources.txt
+    @grep -E "^test result|no diagnostics|mutants killed|^---- " docs/evidence/E14/data-sources.txt
 
 # ADR-0204: an element holds only the children HTML permits, as the page
 # holds them. The rule's tests, R-019's, and the mutation controls.
@@ -3217,11 +3217,11 @@ e14-rendered-children:
        echo "== the rule (compiler/pw-core/tests/children_as_rendered.rs)"; echo; \
        cargo test --locked -p pw-core --test children_as_rendered 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus's expectations, R-019's among them (compiler/pw-core/tests/checking_source.rs)"; echo; \
-       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/rendered_children_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/rendered_children_mutations.py; \
      } > docs/evidence/E14/rendered-children.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/rendered-children.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/rendered-children.txt
 
 # ADR-0201 (ADR-0195's ruling 5): a case written alone is the case of the
 # type expected where it is written. Its tests, the components and the
@@ -3236,11 +3236,11 @@ e14-expected-cases:
        cargo test --locked -p pw-core --test sum_types 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== built (compiler/pw-conformance/tests/sum_types.rs, javascript.rs)"; echo; \
        cargo test --locked -p pw-conformance --test sum_types a_case_written_alone 2>&1 | grep -E '^(test |test result)'; \
-       cargo test --locked -p pw-conformance --test javascript a_case_from_its_expected -- --nocapture 2>&1 | grep -E '^javascript:|^test result'; \
+       cargo test --locked -p pw-conformance --test javascript a_case_from_its_expected -- --nocapture 2>&1 | grep -E '^javascript:|^test result|^---- '; \
        echo; echo "== mutation controls (scripts/expected_cases_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/expected_cases_mutations.py; \
      } > docs/evidence/E14/expected-cases.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E14/expected-cases.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E14/expected-cases.txt
 
 # ADR-0200: `()` is the unit value, and no expression the compiler cannot
 # read checks. Its tests, the repository's every `.pw` file, and the mutation
@@ -3261,7 +3261,7 @@ e14-unit-value:
        echo; echo "== mutation controls (scripts/unit_value_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/unit_value_mutations.py; \
      } > docs/evidence/E14/unit-value.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/unit-value.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/unit-value.txt
 
 # ADR-0199 (ADR-0195's ruling 12): a function or a command named as a
 # handler is the lambda that calls it. Its tests, the store's handlers, and
@@ -3280,7 +3280,7 @@ e14-named-handlers:
        echo; echo "== mutation controls (scripts/named_handlers_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/named_handlers_mutations.py; \
      } > docs/evidence/E14/named-handlers.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/named-handlers.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/named-handlers.txt
 
 # ADR-0198 (ADR-0195's ruling 5): a bare case with a payload is the case of
 # the one type that has it. Its tests, the components and the JavaScript
@@ -3295,11 +3295,11 @@ e14-bare-cases:
        cargo test --locked -p pw-core --test sum_types 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== built (compiler/pw-conformance/tests/sum_types.rs, javascript.rs)"; echo; \
        cargo test --locked -p pw-conformance --test sum_types 2>&1 | grep -E '^(test |test result)'; \
-       cargo test --locked -p pw-conformance --test javascript every_query_agrees -- --nocapture 2>&1 | grep -E '^javascript:|^test result'; \
+       cargo test --locked -p pw-conformance --test javascript every_query_agrees -- --nocapture 2>&1 | grep -E '^javascript:|^test result|^---- '; \
        echo; echo "== mutation controls (scripts/bare_cases_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/bare_cases_mutations.py; \
      } > docs/evidence/E14/bare-cases.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E14/bare-cases.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E14/bare-cases.txt
 
 # ADR-0197 (ADR-0195's ruling 2): a pattern tells a case from a binding by
 # its capital. Its tests, the conformance suite's patterns, the corpus at C14,
@@ -3313,15 +3313,15 @@ e14-case-names:
        echo "== the rule (compiler/pw-core/tests/case_names.rs, sum_types.rs)"; echo; \
        cargo test --locked -p pw-core --test case_names --test sum_types 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== compiled patterns (compiler/pw-conformance/tests/patterns.rs, sum_types.rs)"; echo; \
-       cargo test --locked -p pw-conformance --test patterns --test sum_types 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-conformance --test patterns --test sum_types 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== the corpus at C14 (corpus-check, generality.rs, checking_source.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
-         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result'; \
+         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- '; \
        echo; echo "== mutation controls (scripts/case_names_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/case_names_mutations.py; \
      } > docs/evidence/E14/case-names.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/case-names.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/case-names.txt
 
 # ADR-0196 (ADR-0195's ruling 3): only a word that begins a statement or an
 # expression is reserved. The parser's test, every program checked as before,
@@ -3342,7 +3342,7 @@ e14-reserved-words:
        echo; echo "== mutation controls (scripts/reserved_words_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/reserved_words_mutations.py; \
      } > docs/evidence/E14/reserved-words.txt
-    @grep -E "^test result|no diagnostics|mutants killed" docs/evidence/E14/reserved-words.txt
+    @grep -E "^test result|no diagnostics|mutants killed|^---- " docs/evidence/E14/reserved-words.txt
 
 # ADR-0194: a type that contains itself compiles, and crosses a boundary as
 # its nodes. The checker's, the WIT generator's and the lowering's tests; the
@@ -3359,15 +3359,15 @@ e14-recursive-types:
        echo; echo "== components through the E8 host (compiler/pw-conformance/tests/recursive_types.rs)"; echo; \
        cargo test --locked -p pw-conformance --test recursive_types -- --test-threads=1 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the JavaScript modules, against their components under Node (compiler/pw-conformance/tests/javascript.rs)"; echo; \
-       cargo test --locked -p pw-conformance --test javascript a_type_that_contains_itself -- --nocapture 2>&1 | grep -E '^javascript:|^test result'; \
+       cargo test --locked -p pw-conformance --test javascript a_type_that_contains_itself -- --nocapture 2>&1 | grep -E '^javascript:|^test result|^---- '; \
        echo; echo "== the corpus at C13 (corpus-check, generality.rs, checking_source.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
-         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result'; \
+         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- '; \
        echo; echo "== mutation controls (scripts/recursive_types_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/recursive_types_mutations.py; \
      } > docs/evidence/E14/recursive-types.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E14/recursive-types.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E14/recursive-types.txt
 
 # ADR-0186: a page states its description. The compiler's, the renderer's
 # and the server's tests, each store's page in three engines, the corpus at
@@ -3386,7 +3386,7 @@ e14-metadata:
        echo; echo "== the renderer and its document (runtime/pw-render/tests/metadata.rs, titles.rs)"; echo; \
        cargo test --locked -p pw-render --test metadata --test titles 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
-       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_store_s_page_describes_itself|a_signal_page_s_head_holds)|^test result'; \
+       cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_store_s_page_describes_itself|a_signal_page_s_head_holds)|^test result|^---- '; \
        echo; echo "== each store's page, in three engines (e2e/stores.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs --reporter=list 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -3394,7 +3394,7 @@ e14-metadata:
        echo; echo "== the corpus at C11 (corpus-check, generality.rs, checking_source.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
-         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result'; \
+         | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- '; \
        echo; echo "== every program the repository checks"; echo; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
@@ -3406,7 +3406,7 @@ e14-metadata:
        echo; echo "== mutation controls (scripts/metadata_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/metadata_mutations.py; \
      } > docs/evidence/E14/metadata.txt
-    @grep -E "^test result|passed|no diagnostics|mutants killed" docs/evidence/E14/metadata.txt
+    @grep -E "^test result|passed|no diagnostics|mutants killed|^---- " docs/evidence/E14/metadata.txt
 
 # ADR-0187: nothing the store contains is on screen when its page is first
 # laid out. The page in three engines, a thousand items alone in Chromium
@@ -3473,7 +3473,7 @@ e14-case-and-delivery:
        echo; echo "== mutation controls (scripts/case_and_delivery_mutations.py)"; echo; \
        python3 scripts/case_and_delivery_mutations.py; \
      } > docs/evidence/E14/case-and-delivery.txt
-    @grep -E "^test result|mutants killed|pw check" docs/evidence/E14/case-and-delivery.txt
+    @grep -E "^test result|mutants killed|pw check|^---- " docs/evidence/E14/case-and-delivery.txt
 
 # E14's gate item 5: where each task's plausible wrong fix is caught, per
 # stack, from the tasks' recorded controls, and the rules `pw check` refuses
@@ -3503,7 +3503,7 @@ e14-document-reads:
        echo; echo "== mutation controls (scripts/document_reads_mutations.py)"; echo; \
        python3 scripts/document_reads_mutations.py; \
      } > docs/evidence/E14/document-reads.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/document-reads.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/document-reads.txt
 
 # ADR-0149: `pw diff` over each benchmark task's Pleris reference and unsafe
 # patches, the report a reviewer of each would be shown, and the mutation
@@ -3521,7 +3521,7 @@ e14-diffs:
        echo; echo "== mutation controls (scripts/semantic_mutations.py)"; echo; \
        python3 scripts/semantic_mutations.py; \
      } > docs/evidence/E14/semantic-diffs.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/semantic-diffs.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/semantic-diffs.txt
 
 # ADR-0148: a stream region shows its query's state, and its settled arm comes
 # in the same response. The rules, the IR and the plan, the renderer, the
@@ -3553,7 +3553,7 @@ e14-streams:
        echo; echo "== mutation controls (scripts/streams_mutations.py)"; echo; \
        python3 scripts/streams_mutations.py; \
      } > docs/evidence/E14/streams.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/streams.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/streams.txt
 
 # ADR-0148's measurements: how each engine treats an out-of-order streamed
 # patch, when each way of loading a script runs while a response is open, and
@@ -3589,7 +3589,7 @@ e14-query-blocks:
        echo; echo "== mutation controls (scripts/query_blocks_mutations.py)"; echo; \
        python3 scripts/query_blocks_mutations.py; \
      } > docs/evidence/E14/query-blocks.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/query-blocks.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/query-blocks.txt
 
 # ADR-0145: a page keeps every part and list its queries decide current. The
 # server's tests, the protocol's, `pw-render --plan`'s, the browser's specs in
@@ -3615,7 +3615,7 @@ e14-patch-set:
        echo; echo "== mutation controls (scripts/patch_set_mutations.py)"; echo; \
        python3 scripts/patch_set_mutations.py; \
      } > docs/evidence/E14/patch-set.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/patch-set.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/patch-set.txt
 
 # ADR-0144: a view's own signals, and a signal a page provides. The
 # compiler's tests, the browser's spec in three engines, and the mutation
@@ -3637,7 +3637,7 @@ e14-provide:
        echo; echo "== mutation controls (scripts/provide_mutations.py)"; echo; \
        python3 scripts/provide_mutations.py; \
      } > docs/evidence/E14/provide.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/provide.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/provide.txt
 
 # ADR-0143: what names a form control. The rule's tests, its generality
 # witnesses, each witness checked by `pw check`, and the mutation controls;
@@ -3656,11 +3656,11 @@ e14-labels:
            "$(./target/debug/pw check $f 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[PW5014\][^[]*|no diagnostics' | head -1)"; \
        done; \
        echo; echo "== the generality suite (compiler/pw-core/tests/generality.rs)"; echo; \
-       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/labels_mutations.py)"; echo; \
        python3 scripts/labels_mutations.py; \
      } > docs/evidence/E14/labels.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/labels.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/labels.txt
 
 # ADR-0061: a declared sum type in a template's `{#match}`. The checker's
 # reading of each arm, the template IR's names for the cases, the renderer
@@ -3683,7 +3683,7 @@ e10-template-sum-types:
        echo "NOT CLAIMED: a nested or literal pattern in a template arm. NOT CLAIMED:"; \
        echo "patches for a {#match} region, which renders on the server."; \
      } > docs/evidence/E10/template-sum-types.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/template-sum-types.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/template-sum-types.txt
 
 # ADR-0060: nested and literal patterns. The checker's analysis and the
 # typing of what a nested pattern binds, each match compiled to a decision
@@ -3708,7 +3708,7 @@ e10-patterns:
        echo "or-pattern that binds a name, refused by name. NOT CLAIMED: an arm no"; \
        echo "value reaches reported by the checker; the backend refuses one."; \
      } > docs/evidence/E10/patterns.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/patterns.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E10/patterns.txt
 
 # The 2026-09-26 correction: a Pleris name WIT reserves (`List`, `own`) is
 # escaped in the generated WIT text. Each query run through the E8 host, and
@@ -3726,7 +3726,7 @@ e10-wit-names:
        echo "NOT CLAIMED: a host interface or operation named by a keyword. Its name"; \
        echo "is the author's WIT, written verbatim from its host clause."; \
      } > docs/evidence/E10/wit-names.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/wit-names.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/wit-names.txt
 
 # ADR-0059: declared sum types. The checker's typing of a case where it is
 # written, each case built and matched through the E8 host against a Rust
@@ -3752,7 +3752,7 @@ e10-sum-types:
        echo "ADR-0060's, a sum type in a template's {#match} ADR-0061's). NOT CLAIMED:"; \
        echo "a captured sum type in a handler; == between two cases."; \
      } > docs/evidence/E10/sum-types.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/sum-types.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E10/sum-types.txt
 
 # ADR-0057: maps and sets. Each operation against BTreeMap and BTreeSet, the
 # checks on what arrives from outside, the component against the JavaScript
@@ -3775,7 +3775,7 @@ e10-maps:
        echo "host's answer, which is refused because nothing would check it; or a"; \
        echo "for loop over a map or set, which reads it through keys or to_list."; \
      } > docs/evidence/E10/maps.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/maps.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E10/maps.txt
 
 # ADR-0056: Unicode case mapping. The tables against Rust for every code
 # point, the component and the module against Rust and each other, and the
@@ -3799,7 +3799,7 @@ e10-case:
        echo "lowers to sigma, not final sigma. NOT CLAIMED: case folding, or a"; \
        echo "locale's rules."; \
      } > docs/evidence/E10/case.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/case.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E10/case.txt
 
 # ADR-0055: slicing, and the standard library's placeholders computed. The
 # operations against Vec and str, the component against the JavaScript
@@ -3820,7 +3820,7 @@ e10-slices:
        echo "NOT CLAIMED: String.split, List.range, or an Int sum. Maps and sets"; \
        echo "are not claimed here, nor Unicode case mapping (ADR-0056)."; \
      } > docs/evidence/E10/slices.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/slices.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E10/slices.txt
 
 # ADR-0054: an opaque value is built and read inside a component. The opaque
 # values through the host, the component against the JavaScript module, the
@@ -3844,7 +3844,7 @@ e10-opaque:
        echo "as a generic record is. NOT CLAIMED: an opaque type's invariant; none is"; \
        echo "stated."; \
      } > docs/evidence/E10/opaque.txt
-    @grep -E "^test result|^javascript:|mutants killed" docs/evidence/E10/opaque.txt
+    @grep -E "^test result|^javascript:|mutants killed|^---- " docs/evidence/E10/opaque.txt
 
 # ADR-0053: a lambda's parameters take the types its use declares. The
 # callback tests, the effect chain through a callback, what must stay clean,
@@ -3872,7 +3872,7 @@ e10-callbacks:
        echo "typed by the annotation. A returned value is seen through its branches;"; \
        echo "an initialiser is typed only when it is the lambda itself."; \
      } > docs/evidence/E10/callbacks.txt
-    @grep -E "^test result|^(accepted corpus|store|kiokun):|mutants killed" docs/evidence/E10/callbacks.txt
+    @grep -E "^test result|^(accepted corpus|store|kiokun):|mutants killed|^---- " docs/evidence/E10/callbacks.txt
 
 # ADR-0051: an early `return`, `?`, and `for` loops compile, and the checker
 # says what may be assigned. The compiled bodies through the host, the
@@ -3927,11 +3927,11 @@ e10-strings:
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo; \
        echo "== the decoder (compiler/pw-syntax/src/strings.rs)"; echo; \
-       cargo test --locked -p pw-syntax --lib strings 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-syntax --lib strings 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== the checker, Koka and Marko (compiler/pw-core/tests/string_escapes.rs)"; echo; \
-       cargo test --locked -p pw-core --test string_escapes 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test string_escapes 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== compiled components through the host (pw-conformance/tests/strings.rs)"; echo; \
-       cargo test --locked -p pw-conformance --test strings 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-conformance --test strings 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== the component and the JavaScript module, on the same arguments"; echo; \
        cargo test --locked -p pw-conformance --test javascript -- --nocapture --test-threads=1 2>&1 \
          | grep -oE "javascript: [0-9]+ queries.*"; \
@@ -3951,7 +3951,7 @@ e10-members:
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo; \
        echo "== the member tests (compiler/pw-core/tests/members.rs)"; echo; \
-       cargo test --locked -p pw-core --test members 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test members 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== what must stay clean: errors reported"; echo; \
        printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
@@ -3975,7 +3975,7 @@ e10-names:
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo; \
        echo "== the name tests (compiler/pw-core/tests/every_name_resolves.rs)"; echo; \
-       cargo test --locked -p pw-core --test every_name_resolves 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test every_name_resolves 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== what must stay clean: errors reported"; echo; \
        printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
@@ -4019,7 +4019,7 @@ e10-operands:
        echo "rust: $(rustc --version)"; echo; \
        echo "== the value relations (compiler/pw-core/tests/value_relations.rs)"; echo; \
        cargo test --locked -p pw-core --test value_relations -- --test-threads=1 2>&1 \
-         | grep -E '^test (an_operator|an_untyped|the_accepted)|^test result'; \
+         | grep -E '^test (an_operator|an_untyped|the_accepted)|^test result|^---- '; \
        echo; echo "== Float.from_int (compiler/pw-conformance/tests/stdlib.rs)"; echo; \
        cargo test --locked -p pw-conformance --test stdlib an_int_becomes -- --test-threads=1 2>&1 \
          | grep -E '^(test |test result)'; \
@@ -4029,7 +4029,7 @@ e10-operands:
        echo "NOT CLAIMED: an operand the checker cannot type. It is undecided, and"; \
        echo "the component backend refuses what remains."; \
      } > docs/evidence/E10/operands.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/operands.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/operands.txt
 
 # ADR-0042's template branches and attributes: the checker's refusals and the
 # IR (pw-core), what renders (pw-render), and the mutation controls.
@@ -4052,7 +4052,7 @@ e10-templates:
        echo "NOT CLAIMED: patches for a match region or an interpolated attribute."; \
        echo "They render on the server; no patch generator emits them yet."; \
      } > docs/evidence/E10/templates.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E10/templates.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E10/templates.txt
 
 # ADR-0041's mutation controls: each piece of kiokun's logic in Pleris, and of
 # the defects found building it, undone in turn, must fail a test.
@@ -4106,7 +4106,7 @@ e10-bench:
        echo "  E7's record: $(grep -oE 'interactive-script-bytes=[0-9]+' docs/evidence/E7/performance.txt) $(grep -oE 'interactive-wasm-bytes=[0-9]+' docs/evidence/E7/performance.txt)"; \
        echo; echo "== the host, release: runtime/pw-host/tests/bench.rs"; echo; \
        cargo test --quiet --locked --release -p pw-host --features engine --test bench -- --include-ignored --nocapture --test-threads=1 2>&1 \
-         | grep -E "^bench:|^test result"; \
+         | grep -E "^bench:|^test result|^---- "; \
        echo; echo "== the browser: activation, the runtime before compiled handlers and now (chromium, 1 worker, interleaved)"; echo; \
        bash spikes/own-renderer/activation-compare.sh 83af93c 7 3; \
        echo; echo "== the browser: E7's instrument, re-run (full record: performance-e7-instrument.txt)"; echo; \
@@ -4163,7 +4163,7 @@ e10-close-bench RUNS="8":
        echo "  baselines: docs/evidence/E10/bench.txt (hand-written Rust guests 5276 and 43837 bytes)"; \
        echo; echo "== the host, release: runtime/pw-host/tests/bench.rs"; echo; \
        cargo test --quiet --locked --release -p pw-host --features engine --test bench -- --include-ignored --nocapture --test-threads=1 2>&1 \
-         | grep -E "^bench:|^test result"; \
+         | grep -E "^bench:|^test result|^---- "; \
        echo; echo "== E7 gate 8, {{RUNS}} runs (chromium, 1 worker): every result"; echo; \
        for i in $(seq {{RUNS}}); do \
          (cd spikes/own-renderer && PW_PERFORMANCE=1 PORT=3141 pnpm exec playwright test e2e/performance.spec.mjs \
@@ -4227,7 +4227,7 @@ e14-idempotent-commands:
        echo; echo "== mutation controls (scripts/idempotent_commands_mutations.py)"; echo; \
        python3 scripts/idempotent_commands_mutations.py; \
      } > docs/evidence/E14/idempotent-commands.txt
-    @grep -E "^ +[0-9]+ (passed|failed)|^test result|mutants killed" docs/evidence/E14/idempotent-commands.txt
+    @grep -E "^ +[0-9]+ (passed|failed)|^test result|mutants killed|^---- " docs/evidence/E14/idempotent-commands.txt
 
 # ADR-0122: an optimistic transition runs in the browser. The compiled
 # speculation module under Node, the server's values and versions, the
@@ -4252,7 +4252,7 @@ e14-optimistic:
        echo; echo "== mutation controls (scripts/optimistic_transitions_mutations.py)"; echo; \
        python3 scripts/optimistic_transitions_mutations.py; \
      } > docs/evidence/E14/optimistic.txt
-    @grep -E "^ +[0-9]+ (passed|failed)|^test result|mutants killed" docs/evidence/E14/optimistic.txt
+    @grep -E "^ +[0-9]+ (passed|failed)|^test result|mutants killed|^---- " docs/evidence/E14/optimistic.txt
 
 # ADR-0123/0124: the offline benchmark harness. Its isolation self-test, and
 # each task's four controls on every stack, every run's result kept.
@@ -4340,7 +4340,7 @@ e10-handlers:
        echo; echo "== the committed modules are the compiler's current output"; echo; \
        cargo test --locked -p pw-core --test evidence_is_current 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the renderer carries exactly the paths a handler reads (runtime/pw-render/tests/properties.rs)"; echo; \
-       cargo test --locked -p pw-render --test properties 2>&1 | grep -E "^test (an_element|a_captured|a_capture|an_event)|^test result"; \
+       cargo test --locked -p pw-render --test properties 2>&1 | grep -E "^test (an_element|a_captured|a_capture|an_event)|^test result|^---- "; \
        echo; echo "== the host types a browser's arguments by the artifact's own parameters (runtime/pw-host/tests/pleris_component.rs)"; echo; \
        cargo test --locked -p pw-host --features engine --test pleris_component -- --nocapture --test-threads=1 2>&1 \
          | grep -oE '^\[.*\]: .*|^test (json|arguments)[a-z_]+ .*|^test result.*'; \
@@ -4356,7 +4356,7 @@ e10-handlers:
        echo "Computation, branches, loops and several commands compile since"; \
        echo "2026-09-25 (ADR-0058): just e10-handlers-compute."; \
      } > docs/evidence/E10/handlers.txt
-    @grep -E "^test result|written to|refused \`" docs/evidence/E10/handlers.txt | head -20
+    @grep -E "^test result|written to|refused \`|^---- " docs/evidence/E10/handlers.txt | head -20
 
 # E10-I in the browser: the store page whose Add and Clear buttons reach the
 # COMPILED commands, in all three engine families, three full runs — a flake
@@ -4419,7 +4419,7 @@ one-parser:
 materialize:
     @cargo run --quiet -p pw-cli -- emit-graph examples/domain.pw examples/lib/*.pw examples/store/*.pw \
         > runtime/pw-materialize/tests/store-graph.json
-    @cargo test --quiet -p pw-materialize 2>&1 | grep -E 'test result' | tail -3
+    @cargo test --quiet -p pw-materialize 2>&1 | grep -E 'test result|^---- ' | tail -3
     @cargo run --quiet -p pw-cli -- emit-graph --plain examples/domain.pw examples/lib/*.pw examples/store/*.pw \
         | tail -n +2
     @echo
@@ -4582,7 +4582,7 @@ e14-page-parameters:
        echo; echo "== mutation controls (scripts/page_parameters_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/page_parameters_mutations.py; \
      } > docs/evidence/E14/page-parameters.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/page-parameters.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/page-parameters.txt
 
 # ADR-0232: an opaque value's representation is read in a template. The
 # compiler's tests, the server's, and the mutation controls.
@@ -4599,7 +4599,7 @@ e14-representations:
        echo; echo "== mutation controls (scripts/template_representations_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/template_representations_mutations.py; \
      } > docs/evidence/E14/representations.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/representations.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/representations.txt
 
 # ADR-0233: a speculation on a value of a type that contains itself. The
 # compiler's tests under Node, the host's through components the compiler
@@ -4619,7 +4619,7 @@ e14-speculated-graphs:
        echo; echo "== mutation controls (scripts/speculated_graphs_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/speculated_graphs_mutations.py; \
      } > docs/evidence/E14/speculated-graphs.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/speculated-graphs.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/speculated-graphs.txt
 
 # ADR-0234: a view's instance given a speculated value is rendered again with
 # it. The compiler's tests, and the mutation controls.
@@ -4634,7 +4634,7 @@ e14-speculated-instances:
        echo; echo "== mutation controls (scripts/speculated_instances_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/speculated_instances_mutations.py; \
      } > docs/evidence/E14/speculated-instances.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/speculated-instances.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/speculated-instances.txt
 
 # ADR-0235: what a speculated value computes, the page's module computes
 # wherever the page shows it. The compiler's tests, the module run under
@@ -4650,7 +4650,7 @@ e14-speculated-values:
        echo; echo "== mutation controls (scripts/speculated_values_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/speculated_values_mutations.py; \
      } > docs/evidence/E14/speculated-values.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/speculated-values.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/speculated-values.txt
 
 # ADR-0236: a speculation on the entry a page's parameter keys (ruling
 # 0122-d). The compiler's tests, the server's, the feed in three engines, and
@@ -4676,7 +4676,7 @@ e14-speculated-routes:
        echo; echo "== mutation controls (scripts/speculated_routes_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/speculated_routes_mutations.py; \
      } > docs/evidence/E14/speculated-routes.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/speculated-routes.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/speculated-routes.txt
 
 # ADR-0237: what lowering parses, it reports. The checker's tests, the
 # parser's, the corpus, and the mutation controls.
@@ -4692,11 +4692,11 @@ e14-read-whole:
        cargo test --locked -p pw-syntax --lib -- what_a_standalone_parse_leaves a_value_with_no_comma an_optimistic_clause_without 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus (corpus-check, checking_source.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
-       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/read_whole_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/read_whole_mutations.py; \
      } > docs/evidence/E14/read-whole.txt
-    @grep -E "^test result|corpus-check|mutants killed" docs/evidence/E14/read-whole.txt
+    @grep -E "^test result|corpus-check|mutants killed|^---- " docs/evidence/E14/read-whole.txt
 
 # ADR-0238: a command speculates on several entries, a page on those it
 # shows. The compiler's tests, the parser's, the feed in three engines, and
@@ -4722,7 +4722,7 @@ e14-speculated-arms:
        echo; echo "== mutation controls (scripts/speculated_arms_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/speculated_arms_mutations.py; \
      } > docs/evidence/E14/speculated-arms.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/speculated-arms.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/speculated-arms.txt
 
 # ADR-0239: every code the compiler writes is registered, once. The
 # registry's tests, the checker's, the corpus, and the mutation controls.
@@ -4738,11 +4738,11 @@ e14-registered-codes:
        cargo test --locked -p pw-core --test registered_codes 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus (corpus-check, checking_source.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
-       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/registered_codes_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/registered_codes_mutations.py; \
      } > docs/evidence/E14/registered-codes.txt
-    @grep -E "^test result|corpus-check|mutants killed" docs/evidence/E14/registered-codes.txt
+    @grep -E "^test result|corpus-check|mutants killed|^---- " docs/evidence/E14/registered-codes.txt
 
 # ADR-0240: a clause is read once. The checker's tests, the committed store
 # graph, the corpus, and the mutation controls.
@@ -4758,11 +4758,11 @@ e14-clauses-read-once:
        cargo test --locked -p pw-cli -- the_committed_graph_matches 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus (corpus-check, checking_source.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
-       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/clauses_read_once_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/clauses_read_once_mutations.py; \
      } > docs/evidence/E14/clauses-read-once.txt
-    @grep -E "^test result|corpus-check|mutants killed" docs/evidence/E14/clauses-read-once.txt
+    @grep -E "^test result|corpus-check|mutants killed|^---- " docs/evidence/E14/clauses-read-once.txt
 
 # ADR-0241: an optimistic transition's value is the value typer's. The
 # checker's tests, the store's relations, and the mutation controls.
@@ -4775,11 +4775,11 @@ e14-transition-values:
        echo "== the checker (compiler/pw-core/tests/transition_values.rs, policy_term_positions.rs)"; echo; \
        cargo test --locked -p pw-core --test transition_values --test policy_term_positions 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the store's relations, all decided (value_relations.rs)"; echo; \
-       cargo test --locked -p pw-core --test value_relations 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test value_relations 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/transition_values_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/transition_values_mutations.py; \
      } > docs/evidence/E14/transition-values.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/transition-values.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/transition-values.txt
 
 # ADR-0242: an `{#each}`'s head is read once, by the grammar. The checker's
 # tests, the parser's, the readers', and the mutation controls.
@@ -4794,11 +4794,11 @@ e14-each-heads:
        echo; echo "== the parser (compiler/pw-syntax/src/grammar.rs)"; echo; \
        cargo test --locked -p pw-syntax --lib -- an_each_head_is_its_list 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the readers (every_name_resolves, lexical_scope, each_typing, marko_adapter, template_blocks, keyed, nested_lists)"; echo; \
-       cargo test --locked -p pw-core --test every_name_resolves --test lexical_scope --test each_typing --test marko_adapter --test template_blocks --test keyed --test nested_lists 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test every_name_resolves --test lexical_scope --test each_typing --test marko_adapter --test template_blocks --test keyed --test nested_lists 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/each_heads_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/each_heads_mutations.py; \
      } > docs/evidence/E14/each-heads.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/each-heads.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/each-heads.txt
 
 # ADR-0243: a block's statements are separated, by `;` or a line. Its tests,
 # the corpus's, and the mutation controls.
@@ -4815,11 +4815,11 @@ e14-statements-separated:
        echo; echo "== a clause's head takes its value on its line (compiler/pw-core/src/policy.rs)"; echo; \
        cargo test --locked -p pw-core --lib -- policy::tests::every_clause_head_takes_its_value_on_its_line 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the corpus and the names check (checking_source, every_name_resolves)"; echo; \
-       cargo test --locked -p pw-core --test checking_source --test every_name_resolves 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test checking_source --test every_name_resolves 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/statements_separated_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/statements_separated_mutations.py; \
      } > docs/evidence/E14/statements-separated.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/statements-separated.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/statements-separated.txt
 
 # ADR-0247: a clause written in a block is judged by its domain, and a length
 # is a CSS length. Its tests, the names check's and the corpus's, and the
@@ -4833,11 +4833,11 @@ e14-block-clauses:
        echo "== the checker (compiler/pw-core/tests/block_clauses.rs)"; echo; \
        cargo test --locked -p pw-core --test block_clauses 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== a header's values, the names check, the corpus"; echo; \
-       cargo test --locked -p pw-core --test policy_values --test every_name_resolves --test statements_separated --test checking_source 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test policy_values --test every_name_resolves --test statements_separated --test checking_source 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/block_clauses_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/block_clauses_mutations.py; \
      } > docs/evidence/E14/block-clauses.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/block-clauses.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/block-clauses.txt
 
 # ADR-0248 (ruling 0057-a): a map's key is an Int, a String, a Bool, or an
 # opaque type over one, refused at check where it is not. The checker's
@@ -4854,11 +4854,11 @@ e14-map-keys:
        echo; echo "== through the host, against BTreeMap (compiler/pw-conformance/tests/maps.rs)"; echo; \
        cargo test --locked -p pw-conformance --test maps 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the browser's module against the component (compiler/pw-conformance/tests/javascript.rs)"; echo; \
-       cargo test --locked -p pw-conformance --test javascript -- --nocapture every_query_agrees_with_its_component_under_node 2>&1 | grep -E '^javascript:|^test result'; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture every_query_agrees_with_its_component_under_node 2>&1 | grep -E '^javascript:|^test result|^---- '; \
        echo; echo "== mutation controls (scripts/map_keys_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/map_keys_mutations.py; \
      } > docs/evidence/E14/map-keys.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/map-keys.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/map-keys.txt
 
 # ADR-0250 (ruling 0099-a): `let _` discards a value, and an acquisition is
 # held by a name, ended where it is made, given to the caller, or held by a
@@ -4877,11 +4877,11 @@ e14-let-discard:
        cargo test --locked -p pw-core --test koka_backend -- a_discard_is_kokas_wildcard_val 2>&1 | grep -E '^(test |test result)'; \
        cargo test --locked -p pw-core --test handlers -- a_handler_that_discards_its_answer 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the generality witnesses (examples/generality/affine_not_consumed_once)"; echo; \
-       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/let_discard_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/let_discard_mutations.py; \
      } > docs/evidence/E14/let-discard.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/let-discard.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/let-discard.txt
 
 # ADR-0251: a resource's clauses are held to PW2005: what its `acquire` makes
 # the resource holds, and what its `release` is given it ends.
@@ -4894,14 +4894,14 @@ e14-resource-clauses:
        echo "== the checker (compiler/pw-core/tests/resource_clauses.rs)"; echo; \
        cargo test --locked -p pw-core --test resource_clauses 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the generality witnesses (examples/generality/affine_not_consumed_once)"; echo; \
-       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== the accepted corpus, A-007, A-019 and A-024 among it, checks as one program"; echo; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
        echo; echo "== mutation controls (scripts/resource_clauses_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/resource_clauses_mutations.py; \
      } > docs/evidence/E14/resource-clauses.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/resource-clauses.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/resource-clauses.txt
 
 # ADR-0252: a value returned early carries its label to the caller, with the
 # conditions it is returned under.
@@ -4916,7 +4916,7 @@ e14-returned-labels:
        echo; echo "== mutation controls (scripts/returned_labels_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/returned_labels_mutations.py; \
      } > docs/evidence/E14/returned-labels.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/returned-labels.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/returned-labels.txt
 
 # ADR-0254: a member names the declaration its module sees, and one it cannot
 # tell apart is refused (PW0628).
@@ -4929,11 +4929,11 @@ e14-member-resolution:
        echo "== the checker (compiler/pw-core/tests/member_resolution.rs)"; echo; \
        cargo test --locked -p pw-core --test member_resolution 2>&1 | grep -E '^(test |test result)'; \
        echo; echo "== the member table (compiler/pw-core/src/signatures.rs)"; echo; \
-       cargo test --locked -p pw-core --lib -- signatures:: 2>&1 | grep -E '^test result'; \
+       cargo test --locked -p pw-core --lib -- signatures:: 2>&1 | grep -E '^test result|^---- '; \
        echo; echo "== mutation controls (scripts/member_resolution_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/member_resolution_mutations.py; \
      } > docs/evidence/E14/member-resolution.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/member-resolution.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/member-resolution.txt
 
 # ADR-0255 (ADR-0195's ruling 10): a materialization may read another, the
 # build refuses a cycle (PW5109), and invalidation propagates transitively.
@@ -4950,7 +4950,7 @@ e14-materialization-chains:
        echo; echo "== mutation controls (scripts/materialization_chains_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/materialization_chains_mutations.py; \
      } > docs/evidence/E14/materialization-chains.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/materialization-chains.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/materialization-chains.txt
 
 # ADR-0256 (ADR-0195's ruling 10): an entry written `_` is every entry at the
 # rest, dropped in every session's partition. The PostgreSQL test runs where
@@ -4974,7 +4974,7 @@ e14-every-entry:
        echo; echo "== mutation controls (scripts/every_entry_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/every_entry_mutations.py; \
      } > docs/evidence/E14/every-entry.txt
-    @grep -E "^test result|mutants killed" docs/evidence/E14/every-entry.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/every-entry.txt
 
 # ADR-0257: the follows timeline. The server's tests (on PostgreSQL where
 # PW_FEED_DATABASE_URL names a database, and doing nothing otherwise; the
@@ -5000,4 +5000,4 @@ e14-follows:
        echo; echo "== mutation controls (scripts/follows_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/follows_mutations.py; \
      } > docs/evidence/E14/follows.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/follows.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/follows.txt
