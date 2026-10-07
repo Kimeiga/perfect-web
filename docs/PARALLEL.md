@@ -32,6 +32,8 @@ Notifications and direct messages wait until the follows timeline lands.
 | diagnostic codes | `PW55xx`, `Owner::Identity` | `PW56xx`, `Owner::Uploads` |
 | the development server | `spikes/own-renderer/server/src/identity.rs` | `spikes/own-renderer/server/src/uploads.rs` |
 | new files | anything new under a directory or name the track's own: `identity`, `accounts`, `sign_in` | `uploads`, `blob` |
+| browser hosts | `PORT+70..72`, `IDENTITY_PORTS` | `PORT+80..82` |
+| PostgreSQL migrations | `0003` | the next free after `0004`, the follows timeline's |
 
 - **Recipes**: the root `justfile` imports each track's file, whose recipes
   run in the repository's root under the root's settings and `PATH`. An
@@ -103,3 +105,33 @@ the integrator's to answer:
 - **A value's privacy label follows it** (ADR-0129, ADR-0252): through
   calls, branches, assignments and early returns; a session's principal and
   anything read with it are private to it.
+
+## The integrator's rulings
+
+Each a decision for a track, with its date; a track's ADR records it too.
+
+- **2026-10-07, identity (W1's plan).** Pleris owns the relying party:
+  state, nonce, PKCE S256, the callback, the session it opens, its cookies,
+  CSRF and the `requires` evaluator; a deployment owns the provider behind
+  an `IdentityProvider` interface. A development provider refuses to start
+  unless the deployment says development and its origin is loopback.
+  - `Guest`, every session its own guest principal, stays the default and is
+    named and development-only like the rest; a deployment opts the feed
+    into accounts. Flipping the feed's default is the integrator's ruling
+    once the track merges.
+  - A `requires` refusal is answered as its own case, 403 with
+    `{"committed":false,"refused":"<predicate>"}`, never as a declared
+    error. The runtime is unchanged: a page hides what its viewer cannot
+    do, and a stale tab gets the runtime's failure (to queue in NEXT).
+  - No compiler change: the host resolves the principal from the session.
+    A typed principal in the language is a language ADR, the integrator's.
+  - `DataLayer::identified_by`, defaulted, is the one change to the trait.
+  - Session cookies are `HttpOnly`, and `Secure` off loopback; a session
+    id is 128 random bits from the OS.
+  - CSRF, in `Identity::answer` for every unsafe request, in both
+    providers: Go 1.25's `CrossOriginProtection` (`Sec-Fetch-Site`, then
+    `Origin` against `Host`).
+  - A new crate is the owner's to approve, in the track's own session; its
+    version is checked against its primary source and `just ci`'s
+    advisories gate stays green. A crate already in `Cargo.lock` is taken
+    at the lock's newest version.
