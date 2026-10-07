@@ -521,6 +521,8 @@ impl Default for Estimator {
     }
 }
 
+// TRACK SEAM (uploads, ADR-0253): a deployment's blob storage.
+mod blob;
 mod data;
 mod feed;
 mod feed_pg;
@@ -1004,6 +1006,9 @@ impl Server {
         // where the program has it. A program without one has none.
         // **The data layer the program's contracts import** (ADR-0218): the
         // feed's where they import `feed:…`, the store's otherwise.
+        // TRACK SEAM (uploads, ADR-0253): the uploads the program declares
+        // (`uploads.json`), their blobs where the deployment keeps them.
+        let uploads = uploads::Uploads::from_build(&build, &uploads::blob_root(&dist))?;
         let store = Arc::new(store::StoreData::new());
         let data: Arc<dyn data::DataLayer> = if contracts
             .iter()
@@ -1041,7 +1046,7 @@ impl Server {
             .cloned()
             .unwrap_or(serde_json::Value::Null);
         let topology = topology_for(&data.grants());
-        let server = Server::with_layer(
+        let mut server = Server::with_layer(
             dist,
             topology,
             Built {
@@ -1056,6 +1061,7 @@ impl Server {
             store,
             data,
         );
+        server.uploads = uploads; // TRACK SEAM (uploads, ADR-0253)
         // **What the program imports, its data layer supplies** (ADR-0218):
         // refused here, as uncompiled handlers are, rather than when a press
         // first reaches the operation.
@@ -5454,9 +5460,15 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
     // its own limits, before the bound a command's body is held to.
     let route = path.split('?').next().unwrap_or("/");
     if server.uploads.claims(method, route) {
-        server
-            .uploads
-            .answer(route, &headers, &session, fresh, &mut reader, &mut stream);
+        server.uploads.answer(
+            method,
+            route,
+            &headers,
+            &session,
+            fresh,
+            &mut reader,
+            &mut stream,
+        );
         return;
     }
 

@@ -1,0 +1,70 @@
+[
+  {
+    "file": "six-by-four.png",
+    "kind": "png",
+    "sha256": "049b8c349186000d75e7a9d0715c8b56deb5356a4ec8ef6f7c701a95d027ba69",
+    "width": 6,
+    "height": 4
+  },
+  {
+    "file": "eight-by-five.jpeg",
+    "kind": "jpeg",
+    "sha256": "5504fec21ae6464d552ab67e5a05b4d77284c25995d31aa3d207c5efcf85a8b0",
+    "width": 8,
+    "height": 5
+  },
+  {
+    "file": "nine-by-seven-progressive.jpeg",
+    "kind": "jpeg",
+    "sha256": "01b5899d0c8ad3413006dbd90d1f4623caee1d35f51b18c3c6dae03855be0af4",
+    "width": 9,
+    "height": 7
+  },
+  {
+    "file": "turned-five-by-eight.jpeg",
+    "kind": "jpeg",
+    "sha256": "b0b45cdfe3d39939dd790abfee86899d4eccea3629fefcef190c103e8200acc0",
+    "width": 5,
+    "height": 8
+  },
+  {
+    "file": "ten-by-six-lossy.webp",
+    "kind": "webp",
+    "sha256": "1005473d242c1ce16cba115f17ae3885197a425d7dad799ca491a84c6f0e3db7",
+    "width": 10,
+    "height": 6
+  },
+  {
+    "file": "seven-by-three-lossless.webp",
+    "kind": "webp",
+    "sha256": "93b9259fa2d937dd1901f34d6c54dbba1b4d1f9036ce364a5ca3bfc47a4b1259",
+    "width": 7,
+    "height": 3
+  },
+  {
+    "file": "twelve-by-nine-alpha.webp",
+    "kind": "webp",
+    "sha256": "96779e0800e3a621388e89c9a674a51fb283126bb3b388d9b90563db955c2a50",
+    "width": 12,
+    "height": 9
+  },
+  {
+    "file": "five-by-nine.gif",
+    "kind": "gif",
+    "sha256": "f760a9e327ca3f7c682c14ece14736f318473903025cbb8da1cf2feeffc0ac11",
+    "width": 5,
+    "height": 9
+  },
+  {
+    "file": "too-wide.png",
+    "kind": "png",
+    "sha256": "861b54a4d5619f347050b11277b9ad78f45d08cbb2733a20e17449b5c2231157",
+    "width": 4097,
+    "height": 1
+  },
+  {
+    "file": "not-an-image.png",
+    "kind": null,
+    "sha256": "671c85c518430828e0f9ffbd2054612bab2398124472d0d957f9a6d9978a4023"
+  }
+]
