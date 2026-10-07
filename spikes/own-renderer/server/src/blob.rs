@@ -45,6 +45,42 @@ pub trait BlobStore: Send + Sync {
     fn get(&self, key: &BlobKey) -> io::Result<Option<Vec<u8>>>;
     /// Forget the bytes at `key`; forgetting what is not kept is nothing.
     fn delete(&self, key: &BlobKey) -> io::Result<()>;
+    /// How many blobs it keeps: what a deployment measures it by, and what a
+    /// test counts to see one forgotten.
+    fn count(&self) -> io::Result<usize>;
+}
+
+/// **Blobs in memory**: where an upload's bytes wait for their post. A lease
+/// is the server's, and none outlives it, so neither do its bytes; nor can
+/// two servers of one build, each with its own leases, forget each other's.
+#[derive(Default)]
+pub struct MemoryBlobs {
+    kept: std::sync::Mutex<std::collections::BTreeMap<BlobKey, Vec<u8>>>,
+}
+
+impl BlobStore for MemoryBlobs {
+    fn put(&self, bytes: &[u8]) -> io::Result<BlobKey> {
+        let key = BlobKey::of(bytes);
+        self.kept
+            .lock()
+            .expect("blobs")
+            .entry(key.clone())
+            .or_insert_with(|| bytes.to_vec());
+        Ok(key)
+    }
+
+    fn get(&self, key: &BlobKey) -> io::Result<Option<Vec<u8>>> {
+        Ok(self.kept.lock().expect("blobs").get(key).cloned())
+    }
+
+    fn delete(&self, key: &BlobKey) -> io::Result<()> {
+        self.kept.lock().expect("blobs").remove(key);
+        Ok(())
+    }
+
+    fn count(&self) -> io::Result<usize> {
+        Ok(self.kept.lock().expect("blobs").len())
+    }
 }
 
 /// **A directory of blobs, for development and tests**: each at
@@ -108,6 +144,22 @@ impl BlobStore for LocalBlobs {
             _ => Ok(()),
         }
     }
+
+    /// Each file under a key's directory, a temporary one being written
+    /// aside.
+    fn count(&self) -> io::Result<usize> {
+        let mut n = 0;
+        for dir in std::fs::read_dir(&self.root)? {
+            let dir = dir?.path();
+            if dir.is_dir() {
+                for f in std::fs::read_dir(dir)? {
+                    let named = f?.file_name();
+                    n += usize::from(!named.to_string_lossy().starts_with('.'));
+                }
+            }
+        }
+        Ok(n)
+    }
 }
 
 #[cfg(test)]
@@ -154,9 +206,25 @@ mod tests {
             std::fs::read_dir(path.parent().unwrap()).unwrap().count(),
             1
         );
+        assert_eq!(blobs.count().expect("count"), 1);
         blobs.delete(&k).expect("delete");
         assert_eq!(blobs.get(&k).expect("gone"), None);
         blobs.delete(&k).expect("forgetting twice is nothing");
+        assert_eq!(blobs.count().expect("count"), 0);
+    }
+
+    #[test]
+    fn a_blob_in_memory_is_kept_by_its_key_once_and_forgotten() {
+        let blobs = MemoryBlobs::default();
+        let k = blobs.put(b"one").expect("put");
+        assert_eq!(blobs.put(b"one").expect("again"), k);
+        assert_eq!(blobs.get(&k).expect("get"), Some(b"one".to_vec()));
+        assert_eq!(blobs.count().expect("count"), 1);
+        blobs.delete(&k).expect("delete");
+        assert_eq!(
+            (blobs.get(&k).expect("gone"), blobs.count().unwrap()),
+            (None, 0)
+        );
     }
 
     #[test]

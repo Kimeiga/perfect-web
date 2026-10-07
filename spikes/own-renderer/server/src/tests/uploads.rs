@@ -84,9 +84,11 @@ fn post_image(s: &Server, session: &str, text: &str, alt: &str, interaction: &st
     .expect("runs")
 }
 
-/// How many blobs a directory under the server's blob root holds.
+/// How many blobs the server's leases hold (`staged`), or its posts
+/// committed to the deployment's blob storage.
 fn blobs(s: &Server, which: &str) -> usize {
-    crate::uploads::tests::files(&crate::uploads::blob_root(&s.dist).join(which))
+    let (staged, committed) = s.uploads.leases().expect("declared").counted();
+    if which == "staged" { staged } else { committed }
 }
 
 /// **An image attached is posted with its post, and served from the

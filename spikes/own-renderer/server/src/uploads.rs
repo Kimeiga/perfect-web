@@ -35,7 +35,7 @@
 pub(crate) mod multipart;
 pub(crate) mod sniff;
 
-use crate::blob::{BlobKey, BlobStore, LocalBlobs};
+use crate::blob::{BlobKey, BlobStore, LocalBlobs, MemoryBlobs};
 use sniff::{Kind, Measured, Unreadable};
 use std::collections::BTreeMap;
 use std::io::{BufRead, Read, Write};
@@ -75,9 +75,10 @@ const FORM_OVERHEAD: u64 = 16 * 1024;
 /// How long a lease is kept unclaimed.
 const LEASE: Duration = Duration::from_secs(60 * 60);
 
-/// What every session's leases may hold together, so that sessions, which
-/// cost nothing to make, cannot fill the disk between two sweeps.
-const STAGED_CAP: u64 = 256 * 1024 * 1024;
+/// What every session's leases may hold together, in the server's memory, so
+/// that sessions, which cost nothing to make, cannot fill it between two
+/// sweeps.
+const STAGED_CAP: u64 = 128 * 1024 * 1024;
 
 /// How long a sender may take between two reads of its body.
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
@@ -134,7 +135,7 @@ struct State {
 /// with a post in the post's own transaction.
 pub(crate) struct Shared {
     declared: Vec<Declared>,
-    /// Where a lease's bytes wait: this server's, emptied at its start.
+    /// Where a lease's bytes wait: this server's memory.
     staged: Box<dyn BlobStore>,
     /// **The deployment's blob storage**: what a committed post shows.
     blobs: Box<dyn BlobStore>,
@@ -210,9 +211,9 @@ pub struct Uploads {
 }
 
 impl Uploads {
-    /// **The uploads a build declares** (`uploads.json`): their blobs kept
-    /// under `root`, the deployment's in `root/blobs` and the leases' in
-    /// `root/staged`, which starts empty, since no lease outlives the server
+    /// **The uploads a build declares** (`uploads.json`): what posts commit
+    /// kept in the directory `root`, the development server's blob storage,
+    /// and what leases hold in memory, since no lease outlives the server
     /// that made it. A build that declares none has none, and claims nothing.
     pub fn from_build(build: &std::path::Path, root: &std::path::Path) -> Result<Uploads, String> {
         let declared: Vec<Declared> = match std::fs::read_to_string(build.join("uploads.json")) {
@@ -240,20 +241,11 @@ impl Uploads {
                 max_height: deployment("PW_UPLOAD_MAX_HEIGHT")?,
             },
         )?;
-        let staged = root.join("staged");
-        match std::fs::remove_dir_all(&staged) {
-            Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-                return Err(format!("{}: {e}", staged.display()));
-            }
-            _ => {}
-        }
-        let open = |dir: std::path::PathBuf| {
-            LocalBlobs::new(&dir).map_err(|e| format!("{}: {e}", dir.display()))
-        };
+        let blobs = LocalBlobs::new(root).map_err(|e| format!("{}: {e}", root.display()))?;
         Ok(Uploads::with(
             declared,
-            Box::new(open(staged)?),
-            Box::new(open(root.join("blobs"))?),
+            Box::new(MemoryBlobs::default()),
+            Box::new(blobs),
             LEASE,
         ))
     }
@@ -829,6 +821,15 @@ impl Shared {
         }
     }
 
+    /// How many blobs its leases hold, and how many its posts committed.
+    #[cfg(test)]
+    pub(crate) fn counted(&self) -> (usize, usize) {
+        (
+            self.staged.count().expect("staged"),
+            self.blobs.count().expect("blobs"),
+        )
+    }
+
     /// Where a committed image is served.
     #[cfg(test)]
     pub(crate) fn src(&self, key: &BlobKey, kind: Kind) -> String {
@@ -1193,27 +1194,21 @@ pub(crate) mod tests {
         let json = serde_json::to_string(&vec![declared()]).unwrap();
         std::fs::write(d.path().join("uploads.json"), json).unwrap();
         let root = d.path().join("root");
-        LocalBlobs::new(root.join("staged"))
-            .unwrap()
-            .put(b"left over")
-            .unwrap();
-        let kept = LocalBlobs::new(root.join("blobs"))
-            .unwrap()
-            .put(b"a post's")
-            .unwrap();
+        let kept = LocalBlobs::new(&root).unwrap().put(b"a post's").unwrap();
         let u = Uploads::from_build(d.path(), &root).expect("built");
         assert!(u.claims("POST", "/uploads/post-image"));
+        let leases = u.leases().expect("declared");
         assert_eq!(
-            files(&root.join("staged")),
+            leases.staged.count().unwrap(),
             0,
             "no lease outlives its server"
         );
-        assert!(
-            root.join("blobs")
-                .join(&kept.hex()[..2])
-                .join(kept.hex())
-                .is_file()
+        assert_eq!(
+            leases.blobs.count().unwrap(),
+            1,
+            "what a post committed stays"
         );
+        assert_eq!(leases.blobs.get(&kept).unwrap(), Some(b"a post's".to_vec()));
     }
 
     #[test]
