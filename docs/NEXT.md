@@ -399,11 +399,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
              e14-each-heads`); ~~two statements on one line~~ (ADR-0243,
              `just e14-statements-separated`). **First of all (owner,
              relayed 2026-10-07): CI green**: ~~the Wasmtime advisories~~
-             (ADR-0244). **Next**, the heavy verification on GitHub
-             Actions, the mutation scripts and the browser suites as
-             parallel jobs, each recipe's output an artifact a recorded
-             command fetches into `docs/evidence/` (the owner's direction,
-             relayed 2026-10-07). Then what ADR-0243 found, drafted: a
+             (ADR-0244); ~~the heavy verification on GitHub Actions~~
+             (ADR-0245). **Next**, its first runs read, and what Linux
+             finds in the recipes fixed; then the `pg-data-layer` branch
+             merged (the owner approved its crates, 2026-10-07); then what
+             ADR-0243 found, drafted: a
              clause written in a block judged by its domain, as one heading
              a declaration is (`scope bogus` in a resource's block checks).
              Further grammar and clause defects go under 0047-a below,

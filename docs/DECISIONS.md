@@ -2050,3 +2050,9 @@ Wasmtime 48.0.5, and a host that enables only what it runs (a correction).
   advisories. Every pin is 48.0.5; the host's engines turn off GC,
   exceptions and the component model's async, each with when to revisit it;
   the Node audit behind it is fixed or accepted with its reason.
+[ADR-0245](DECISIONS/ADR-0245-the-heavy-verification-runs-on-github-actions.md):
+the heavy verification runs on GitHub Actions.
+- The chain and the mutation controls ran serially on one machine. A
+  `verify` workflow runs them in parallel shards on Linux, a push the
+  recipes it touches and each night all of them, and a recorded command
+  fetches a run's evidence, each file naming the run.

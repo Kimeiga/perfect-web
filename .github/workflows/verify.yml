@@ -1,0 +1,181 @@
+# Heavy verification, off the laptop (ADR-0245).
+#
+# Evidence recipes — the tests, the mutation controls, the browser specs each
+# one runs — sharded across parallel jobs, and the whole browser suite in
+# each engine. A push runs the recipes its commits touch (the chain's
+# choice, `scripts/ci_plan.py --changed`); the nightly run, every one. A
+# recipe's output is an artifact; `just evidence-fetch <run>` copies a run's
+# evidence into docs/evidence/, each file naming the run that produced it.
+#
+# Linux, where the laptop is macOS: charter §13.5 asks for Linux CI, and a
+# recipe that only passes on one of them is a finding. Measurements of the
+# machine (`scripts/ci_plan.py`'s LOCAL_ONLY) stay on the development machine.
+name: verify
+
+on:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      recipes:
+        description: "Recipes to run, space-separated; empty runs every one"
+        required: false
+        default: ""
+      shards:
+        description: "Shards"
+        required: false
+        default: "16"
+
+# No concurrency group: a run's plan is its own push's commits, so a later
+# run does not cover an earlier one, and none is cancelled for it.
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: "0"
+  # Debug info is most of a debug build's size, and nothing here debugs.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: extractions/setup-just@v2
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          RECIPES: ${{ inputs.recipes }}
+          SHARDS: ${{ inputs.shards || '16' }}
+        run: |
+          case "$EVENT" in
+            push)
+              # The chain's choice; a first push, with no commit before it, is
+              # planned whole.
+              if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+                python3 scripts/ci_plan.py --shards 16 --changed "$BEFORE" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+              else
+                python3 scripts/ci_plan.py --shards 48 --all >> "$GITHUB_OUTPUT"
+              fi ;;
+            schedule)
+              python3 scripts/ci_plan.py --shards 48 --all >> "$GITHUB_OUTPUT" ;;
+            *)
+              if [ -n "$RECIPES" ]; then
+                python3 scripts/ci_plan.py --shards "$SHARDS" $RECIPES >> "$GITHUB_OUTPUT"
+              else
+                python3 scripts/ci_plan.py --shards "$SHARDS" --all >> "$GITHUB_OUTPUT"
+              fi ;;
+          esac
+
+  recipes:
+    needs: plan
+    if: needs.plan.outputs.shards != '[]'
+    name: recipes ${{ matrix.shard.index }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: verify
+          # One shard saves the cache, so sixteen do not race to write it.
+          save-if: ${{ matrix.shard.index == 0 }}
+      - uses: extractions/setup-just@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # Koka and the Wasmtime CLI, each verified against its pinned SHA-256,
+      # and the Node workspace.
+      - name: Bootstrap pinned toolchain
+        run: just bootstrap
+      - name: Browsers
+        working-directory: spikes/own-renderer
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Build
+        run: |
+          cargo build --workspace --locked
+          BUILD_ONLY=1 bash spikes/own-renderer/run.sh
+          bash spikes/own-renderer/keyed-store.sh
+          bash spikes/own-renderer/feed.sh
+      - name: Recipes
+        env:
+          RECIPES: ${{ join(matrix.shard.recipes, ' ') }}
+        run: |
+          echo "$(lsb_release -ds) on GitHub Actions, $(uname -m)" > ci-out-runner.txt
+          python3 scripts/ci_recipes.py --out ci-out $RECIPES
+          mv ci-out-runner.txt ci-out/runner.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: evidence-${{ matrix.shard.index }}
+          path: ci-out/
+          retention-days: 90
+
+  browser:
+    name: browser ${{ matrix.engine }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: verify
+          save-if: false
+      - uses: extractions/setup-just@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: just bootstrap
+      - working-directory: spikes/own-renderer
+        run: pnpm exec playwright install --with-deps ${{ matrix.engine }}
+      - name: Build
+        run: |
+          cargo build --locked -p pw-cli -p pw-dev-server -p kiokun-server
+          BUILD_ONLY=1 bash spikes/own-renderer/run.sh
+          bash spikes/own-renderer/keyed-store.sh
+          bash spikes/own-renderer/feed.sh
+      - name: Suite
+        working-directory: spikes/own-renderer
+        run: pnpm exec playwright test --project=${{ matrix.engine }} --reporter=line
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-${{ matrix.engine }}
+          path: spikes/own-renderer/test-results/
+          retention-days: 30
+
+  summary:
+    needs: [plan, recipes]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v8
+        if: needs.plan.outputs.shards != '[]'
+        with:
+          pattern: evidence-*
+          path: artifacts
+      - env:
+          SHARDS_JSON: ${{ needs.plan.outputs.shards }}
+        run: python3 scripts/ci_summary.py artifacts --shards "$(python3 -c 'import json,os; print(len(json.loads(os.environ["SHARDS_JSON"])))')"

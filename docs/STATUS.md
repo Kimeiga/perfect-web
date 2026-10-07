@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0245, 2026-10-07: the heavy verification runs on GitHub Actions** (the
+owner's direction, relayed 2026-10-07). A `verify` workflow runs the
+evidence recipes in parallel shards on Linux, and the browser suite in each
+engine: a push, the recipes its commits touch, the chain's choice; each
+night, all 208. Each recipe's output and evidence is an artifact, and `just
+evidence-fetch <run>`, the recorded command, copies a run's evidence into
+`docs/evidence/`, each file naming the run. The laptop keeps the fast check
+before a commit.
+
 **ADR-0244, 2026-10-07: Wasmtime 48.0.5, and a host that enables only what
 it runs** (a correction). Master's CI had been red since 2026-10-05 on its
 "licenses and advisories" job: three RustSec advisories against Wasmtime

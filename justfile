@@ -73,7 +73,18 @@ audit:
 # Verify real recipe exit statuses with isolated, deterministic failing producers.
 # This tests the harness, not the compiler or the browser.
 evidence-gates:
-    @python3 -m unittest discover -s scripts/tests -p 'test_evidence_gates.py' -v
+    @python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+
+# ADR-0245: a verification run's evidence, fetched into docs/evidence/. The
+# run is a GitHub Actions run of `verify`, by its id; each file it fetches
+# names the run after its `commit:` line.
+evidence-fetch run *flags:
+    python3 scripts/evidence_fetch.py {{run}} {{flags}}
+
+# ADR-0245: what a verification run would run, planned here: `--all`,
+# `--changed BASE HEAD`, or recipes by name.
+verify-plan *args:
+    python3 scripts/ci_plan.py {{args}}
 
 test: test-unit test-compile
 
