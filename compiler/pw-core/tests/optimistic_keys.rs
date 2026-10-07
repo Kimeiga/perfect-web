@@ -107,8 +107,18 @@ fn a_key_left_unnamed_is_a_targets_alone() {
         found.iter().any(|d| d == "PW0021 `_` does not resolve"),
         "{found:#?}"
     );
-    // Inside a key, as a call's argument, likewise.
-    let nested = |s: &str| s.replace("Timeline(current_session(), _)", "Timeline(author(_), _)");
+    // Inside a key, as a call's argument, likewise. The post's target alone:
+    // `Timeline(current_session(), _)` is also `like`'s arm, and inside
+    // `FollowingTimeline(..)` (ADR-0257), which a replacement of every one
+    // rewrote too.
+    let target = |s: &str, key: &str| {
+        assert_eq!(s.matches(TARGET).count(), 1, "the post's target, once");
+        s.replace(
+            TARGET,
+            &TARGET.replace("Timeline(current_session(), _)", key),
+        )
+    };
+    let nested = |s: &str| target(s, "Timeline(author(_), _)");
     let found = reported(&nested);
     assert!(
         found.iter().any(|d| d == "PW0021 `_` does not resolve"),
@@ -116,12 +126,7 @@ fn a_key_left_unnamed_is_a_targets_alone() {
     );
     // A key the page does not show the entry by is still no match: the
     // speculation would be shown on no binding.
-    let unmatched = |s: &str| {
-        s.replace(
-            "Timeline(current_session(), _)",
-            "Timeline(current_session(), 3)",
-        )
-    };
+    let unmatched = |s: &str| target(s, "Timeline(current_session(), 3)");
     assert_eq!(reported(&unmatched), Vec::<String>::new());
     let refusals = build(&unmatched).refusals();
     assert!(

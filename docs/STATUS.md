@@ -41,6 +41,21 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**Correction, 2026-10-07: two tests edited the feed where they did not mean
+to.** CI's verification of `4fde2cb` (run 37700255338) found
+`e14-every-entry`'s "a private drop is told to no other session" surviving.
+Its test made "the first shared cache keyed by `id`" private, meaning the
+thread's; ADR-0257 declared `Profile`, the same text, before `Thread`, so
+the test made the profile private, the thread stayed shared, and the mutant
+had nothing to fail. It is anchored on the thread's own declaration now, and
+kills it. An audit of every anchor the tests write in the feed found one
+more: `optimistic_keys.rs` rewrote `like`'s arm and the following
+timeline's clauses with the post's target; it rewrites the post's alone.
+And a recipe that kept a test run's results alone, or a few tests by name,
+names a failing test now, by its `---- name stdout ----` header:
+`e14-not-found`'s did not, on CI, when one test of 189 failed (found by
+W1).
+
 **ADR-0258, 2026-10-07: accounts and sign-in** (track `identity`, W1, the
 first track merged under ADR-0253; the owner confirmed argon2 0.6.0 before
 it). Pleris is the relying party: a sign-in's state, nonce and PKCE S256,

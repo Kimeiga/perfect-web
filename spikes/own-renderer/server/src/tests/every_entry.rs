@@ -121,18 +121,19 @@ fn a_wildcard_may_stand_first() {
 }
 
 /// **The feed, its thread cached per reader**: a private query keyed by
-/// something other than the session.
+/// something other than the session. Anchored on the thread's own
+/// declaration: until 2026-10-07 this made the first shared cache keyed by
+/// `id` private, which the follows timeline made the profile's (ADR-0257),
+/// and the thread stayed shared.
 fn private_threads(app: &str) -> String {
-    let private = app.replacen(
-        "    cache          shared\n    key            id\n",
-        "    cache          private\n    key            id\n",
-        1,
-    );
-    assert_ne!(
-        private, app,
-        "the thread's cache is where the test expects it"
-    );
-    private
+    let shared = "public query Thread(id: PostId) -> Result<Post, FeedError>\n    \
+                  freshness      5.seconds\n    consistency    snapshot\n    \
+                  cache          shared\n";
+    assert_eq!(app.matches(shared).count(), 1, "the thread's cache, once");
+    app.replace(
+        shared,
+        &shared.replace("cache          shared", "cache          private"),
+    )
 }
 
 #[test]
