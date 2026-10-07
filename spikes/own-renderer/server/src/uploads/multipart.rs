@@ -9,14 +9,17 @@
 //!   delimiter is CRLF, `--` and the boundary; the first may begin the body,
 //!   after a preamble that is ignored, and the last is followed by `--`.
 //! - Each part has a `Content-Disposition: form-data` header with a `name`
-//!   (RFC 7578 §4.2). Its `filename` and its `Content-Type` are the
-//!   sender's to choose, so neither is read: what the bytes are is sniffed
-//!   from them, and what the file is called is never used.
+//!   (RFC 7578 §4.2). A part that is a file's content has a `filename` too,
+//!   which a browser always sends for a file input, empty where none was
+//!   chosen (HTML's "constructing the entry list"): that it has one is read,
+//!   and its value never is. Its `Content-Type` is the sender's to choose,
+//!   so it is not read: what the bytes are is sniffed from them.
 
-/// One part: its field's name, and its bytes.
+/// One part: its field's name, whether it is a file's, and its bytes.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Part<'a> {
     pub name: String,
+    pub file: bool,
     pub data: &'a [u8],
 }
 
@@ -75,7 +78,7 @@ pub fn parts<'a>(body: &'a [u8], boundary: &str) -> Result<Vec<Part<'a>>, &'stat
         let head_end = find(body, b"\r\n\r\n", at).ok_or("a part's headers do not end")?;
         let head = std::str::from_utf8(&body[at..head_end])
             .map_err(|_| "a part's headers are not text")?;
-        let name = head
+        let (name, file) = head
             .split("\r\n")
             .find_map(|line| {
                 let (k, v) = line.split_once(':')?;
@@ -89,20 +92,28 @@ pub fn parts<'a>(body: &'a [u8], boundary: &str) -> Result<Vec<Part<'a>>, &'stat
             find(body, delimiter.as_bytes(), start).ok_or("a part is not closed by a delimiter")?;
         out.push(Part {
             name,
+            file,
             data: &body[start..end],
         });
         at = end + delimiter.len();
     }
 }
 
-/// The `name` of a `form-data` disposition: a quoted string, as browsers
-/// write it (HTML's "multipart/form-data encoding algorithm").
-fn field_name(disposition: &str) -> Option<String> {
+/// The `name` of a `form-data` disposition, a quoted string as browsers
+/// write it (HTML's "multipart/form-data encoding algorithm"), and whether
+/// it names a file.
+fn field_name(disposition: &str) -> Option<(String, bool)> {
     let mut params = disposition.split(';');
     if !params.next()?.trim().eq_ignore_ascii_case("form-data") {
         return None;
     }
-    params.find_map(|p| {
+    let file = disposition.split(';').skip(1).any(|p| {
+        p.split_once('=').is_some_and(|(k, _)| {
+            let k = k.trim();
+            k.eq_ignore_ascii_case("filename") || k.eq_ignore_ascii_case("filename*")
+        })
+    });
+    let name = params.find_map(|p| {
         let (k, v) = p.split_once('=')?;
         if !k.trim().eq_ignore_ascii_case("name") {
             return None;
@@ -114,7 +125,8 @@ fn field_name(disposition: &str) -> Option<String> {
                 .unwrap_or(v)
                 .to_string(),
         )
-    })
+    })?;
+    Some((name, file))
 }
 
 #[cfg(test)]
@@ -157,12 +169,34 @@ mod tests {
             vec![
                 Part {
                     name: "image".into(),
+                    file: true,
                     data: b"\x89PNG\r\n--Xy-not-it"
                 },
                 Part {
                     name: "note".into(),
+                    file: false,
                     data: b"hi"
                 },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_part_is_a_files_by_its_filename_whatever_it_is_called() {
+        let body = b"--b\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"\"\r\n\r\n\
+            1\r\n--b\r\nContent-Disposition: form-data; name=\"image\"\r\n\r\n2\r\n--b\r\n\
+            Content-Disposition: form-data; name=x; FILENAME*=UTF-8''a\r\n\r\n3\r\n--b--";
+        let files: Vec<(String, bool)> = parts(body, "b")
+            .expect("parsed")
+            .into_iter()
+            .map(|p| (p.name, p.file))
+            .collect();
+        assert_eq!(
+            files,
+            [
+                ("photo".into(), true),
+                ("image".into(), false),
+                ("x".into(), true)
             ]
         );
     }

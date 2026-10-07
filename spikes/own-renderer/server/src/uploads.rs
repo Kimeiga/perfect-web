@@ -570,9 +570,11 @@ impl Shared {
                 return Answer::refused(400, &format!("The form is malformed: {why}."), &back);
             }
         };
-        let files: Vec<&multipart::Part> = parts.iter().filter(|p| p.name == "image").collect();
+        // The one part that is a file's, whatever its field is named: PW5603
+        // holds a form to one file input.
+        let files: Vec<&multipart::Part> = parts.iter().filter(|p| p.file).collect();
         let [file] = files[..] else {
-            return Answer::refused(400, "The form sends one image, as `image`.", &back);
+            return Answer::refused(400, "The form sends one image at a time.", &back);
         };
         let bytes = file.data;
         if bytes.is_empty() {
