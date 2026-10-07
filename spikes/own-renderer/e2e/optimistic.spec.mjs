@@ -36,7 +36,11 @@ test("the count moves before the server answers", async ({ page }) => {
   await expect.poll(hold.count).toBe(1);
   await expect(page.locator("#cart-count")).toHaveText("1");
 
+  // Answered before the page is read again: a reload while the request is
+  // in flight may cancel it.
+  const answered = page.waitForResponse("**/command/store.page.add_to_cart");
   hold.release();
+  await answered;
   await expect(page.locator("#cart-count")).toHaveText("1");
   // And the server agrees, read from a fresh document.
   await page.unroute("**/command/store.page.add_to_cart");

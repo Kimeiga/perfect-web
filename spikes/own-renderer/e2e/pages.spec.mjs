@@ -81,7 +81,12 @@ test("a press on the cart's page is shown before the server answers", async ({ p
   await page.getByRole("button", { name: "Increase quantity of Espresso" }).click();
   await expect.poll(() => held.length).toBe(1);
   await expect(page.locator("#cart-count")).toHaveText("2");
+  // Answered before the page is read again: a reload while the request is
+  // in flight may cancel it, as WebKit did here under load (ADR-0238's like
+  // waits the same way).
+  const answered = page.waitForResponse("**/command/store.page.increase_in_cart");
   held.splice(0).forEach((resolve) => resolve());
+  await answered;
   await expect(page.locator("#cart-count")).toHaveText("2");
   await page.unroute("**/command/store.page.increase_in_cart");
   // And the server agrees, read from a fresh document.
