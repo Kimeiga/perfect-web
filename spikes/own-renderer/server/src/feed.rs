@@ -7,6 +7,13 @@
 
 use super::*;
 
+/// **What a node grants the feed's data**, wherever it is kept.
+pub(crate) const GRANTS: &[&str] = &[
+    "database.read<Post>",
+    "database.write<Post>",
+    "database.read<User>",
+];
+
 /// One post as kept: its author by id, and what it replies to.
 #[derive(Debug, Clone)]
 struct Row {
@@ -74,15 +81,20 @@ impl FeedData {
 }
 
 /// The user a session posts as: one of its own, named for it.
-fn user_of(session: &str) -> String {
+pub(crate) fn user_of(session: &str) -> String {
     format!("u-{session}")
 }
 
 fn user_val(state: &State, id: &str) -> Val {
-    // A session's own user, which signed up as no one: a guest named for its
-    // session, the same to every reader. Until ADR-0220 it was "You" to
-    // every reader.
-    let (handle, name) = state.users.get(id).cloned().unwrap_or_else(|| {
+    user_record(id, state.users.get(id).cloned())
+}
+
+/// **A user as the program's `User` is**: its handle and name where it has
+/// them. A session's own user, which signed up as no one, is a guest named
+/// for its session, the same to every reader. Until ADR-0220 it was "You" to
+/// every reader.
+pub(crate) fn user_record(id: &str, known: Option<(String, String)>) -> Val {
+    let (handle, name) = known.unwrap_or_else(|| {
         let session = id.strip_prefix("u-").unwrap_or(id);
         (format!("@{session}"), format!("Guest {session}"))
     });
@@ -126,11 +138,11 @@ fn item_val(state: &State, row: &Row) -> Val {
     ])
 }
 
-fn not_found() -> Val {
+pub(crate) fn not_found() -> Val {
     Val::Result(Err(Some(Box::new(Val::Variant("not-found".into(), None)))))
 }
 
-fn ok(v: Val) -> Val {
+pub(crate) fn ok(v: Val) -> Val {
     Val::Result(Ok(Some(Box::new(v))))
 }
 
@@ -290,11 +302,7 @@ impl crate::data::DataLayer for FeedData {
     }
 
     fn grants(&self) -> Vec<&'static str> {
-        vec![
-            "database.read<Post>",
-            "database.write<Post>",
-            "database.read<User>",
-        ]
+        GRANTS.to_vec()
     }
 
     fn default_page(&self) -> Option<&'static str> {

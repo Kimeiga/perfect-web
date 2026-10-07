@@ -523,6 +523,7 @@ impl Default for Estimator {
 
 mod data;
 mod feed;
+mod feed_pg;
 mod store;
 
 struct Server {
@@ -951,7 +952,20 @@ impl Server {
     /// build directory. Until 2026-10-02 the commands and contracts came from
     /// `docs/evidence/` and the graph was compiled into this binary, so a
     /// program changed and rebuilt kept running its old commands.
+    #[cfg(test)]
     fn from_build(dist: std::path::PathBuf, build: std::path::PathBuf) -> Result<Server, String> {
+        Server::from_build_with(dist, build, None)
+    }
+
+    /// [`Server::from_build`], the feed's data in the layer the deployment
+    /// opened (ADR-XXXX): PostgreSQL where it names one, the in-memory layer
+    /// otherwise. Either is held to what the program's sources state before
+    /// anything is served.
+    fn from_build_with(
+        dist: std::path::PathBuf,
+        build: std::path::PathBuf,
+        feed: Option<Arc<dyn data::DataLayer>>,
+    ) -> Result<Server, String> {
         let read = |rel: &str| {
             std::fs::read_to_string(build.join(rel))
                 .map_err(|e| format!("{}: {e}", build.join(rel).display()))
@@ -985,10 +999,30 @@ impl Server {
             .flat_map(|c| &c.imports)
             .any(|i| i.interface.starts_with("feed:"))
         {
-            Arc::new(feed::FeedData::new())
+            feed.unwrap_or_else(|| Arc::new(feed::FeedData::new()))
         } else {
             store.clone()
         };
+        // **What the program's sources state, its database provides**
+        // (ADR-XXXX): compared here, before anything is served, as an
+        // operation no layer supplies is. ADR-0207 held a program to its
+        // sources' statements; this holds the statements to the database. A
+        // build from before `sources.json` states none.
+        let declared: Vec<data::Declared> =
+            match std::fs::read_to_string(build.join("sources.json")) {
+                Ok(text) => {
+                    serde_json::from_str(&text).map_err(|e| format!("sources.json: {e}"))?
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+                Err(e) => return Err(format!("sources.json: {e}")),
+            };
+        let short = data::held_to(&declared, &data.grants(), &data.provides()?);
+        if !short.is_empty() {
+            return Err(format!(
+                "the data layer's database does not give what the program states: {}",
+                short.join("; ")
+            ));
+        }
         // The page a document with none recorded is, where the layer has one.
         let plan = data
             .default_page()
@@ -1465,14 +1499,24 @@ impl Server {
                 .iter()
                 .map(|(event, values)| outboxed(event, values))
                 .collect::<Result<Vec<_>, String>>()?;
-            // The state the data layer staged and the outbox's events, in one
-            // transaction (ADR-0019, ADR-0208).
-            self.materializer.command(|tx| {
-                for (key, value) in &rows {
-                    Materializer::set_state(tx, key, value);
+            // A layer that keeps its own outbox commits the writes and the
+            // events in its own transaction, and what it committed is what
+            // is delivered, read back from its outbox (ADR-XXXX). Refused,
+            // nothing of the command is kept, and no one is told.
+            let (emitted, invalidated) = match staging.commit(&emitted, &invalidated)? {
+                Some(committed) => committed,
+                None => {
+                    // The state the data layer staged and the outbox's
+                    // events, in one transaction (ADR-0019, ADR-0208).
+                    self.materializer.command(|tx| {
+                        for (key, value) in &rows {
+                            Materializer::set_state(tx, key, value);
+                        }
+                        Ok::<_, String>(events)
+                    })?;
+                    (emitted, invalidated)
                 }
-                Ok::<_, String>(events)
-            })?;
+            };
             // What was staged is the data layer's from now on.
             staging.publish();
             // What the cart's values include from now on, by the interaction
@@ -5235,7 +5279,25 @@ fn main() {
     let build = std::env::args()
         .nth(2)
         .unwrap_or_else(|| format!("{dist}/build"));
-    let server = match Server::from_build(dist.into(), build.into()) {
+    // The feed's data in PostgreSQL, where the deployment names a database
+    // (ADR-XXXX); in memory otherwise. Its URL is the environment's, never
+    // the repository's. `PW_FEED_TRANSACTIONS=connection` leaves a command's
+    // isolation to the database's default, which the host then measures.
+    let isolation = match std::env::var("PW_FEED_TRANSACTIONS").as_deref() {
+        Ok("connection") => feed_pg::Isolation::ConnectionDefault,
+        _ => feed_pg::Isolation::Serializable,
+    };
+    let feed = match std::env::var("PW_FEED_DATABASE_URL") {
+        Ok(url) if !url.is_empty() => match feed_pg::FeedPg::open_with(&url, None, isolation) {
+            Ok(layer) => Some(Arc::new(layer) as Arc<dyn data::DataLayer>),
+            Err(e) => {
+                eprintln!("pw dev server: PW_FEED_DATABASE_URL: {e}");
+                std::process::exit(1);
+            }
+        },
+        _ => None,
+    };
+    let server = match Server::from_build_with(dist.into(), build.into(), feed) {
         Ok(s) => Arc::new(s),
         Err(e) => {
             eprintln!("pw dev server: {e}\nrun spikes/own-renderer/run.sh, which runs `pw build`");
@@ -9956,6 +10018,16 @@ public query Store(",
 
     /// [`served_feed`], its `app.pw` changed by `change`.
     fn served_feed_with(change: fn(&str) -> String) -> Served {
+        let (dir, out) = built_feed_with(change);
+        Served {
+            server: Server::from_build(out.clone(), out).expect("served"),
+            _dir: dir,
+        }
+    }
+
+    /// The feed, its `app.pw` changed by `change`, built as `pw build` builds
+    /// it and not yet served: its directory, and the build in it.
+    fn built_feed_with(change: fn(&str) -> String) -> (tempfile::TempDir, std::path::PathBuf) {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
         let dir = tempfile::TempDir::with_prefix("pw-feed-").expect("a temporary directory");
         let mut units = Vec::new();
@@ -9986,11 +10058,12 @@ public query Store(",
         assert!(build.refusals().is_empty(), "{:?}", build.refusals());
         let out = dir.path().join("build");
         build.write(&out).expect("the build is written");
-        Served {
-            server: Server::from_build(out.clone(), out).expect("served"),
-            _dir: dir,
-        }
+        (dir, out)
     }
+
+    /// The feed on PostgreSQL (ADR-XXXX): its tests, which skip without a
+    /// database.
+    mod feed_pg;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
