@@ -4896,3 +4896,18 @@ e14-resource-clauses:
        CARGO_INCREMENTAL=0 python3 scripts/resource_clauses_mutations.py; \
      } > docs/evidence/E14/resource-clauses.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/resource-clauses.txt
+
+# ADR-0252: a value returned early carries its label to the caller, with the
+# conditions it is returned under.
+e14-returned-labels:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0252 - a value returned early carries its label to the caller"; echo; \
+       echo "produced by: just e14-returned-labels"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/returned_labels.rs)"; echo; \
+       cargo test --locked -p pw-core --test returned_labels 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/returned_labels_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/returned_labels_mutations.py; \
+     } > docs/evidence/E14/returned-labels.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/returned-labels.txt

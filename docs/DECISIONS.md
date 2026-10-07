@@ -2090,3 +2090,9 @@ a resource's clauses are held to PW2005 (a correction, found with ADR-0250).
   reaches, and PW2005 walked none of them; a component's were walked, but a
   `release` owed nothing. Now what `acquire` makes the resource holds, and
   what `release` is given it ends exactly once on every path.
+[ADR-0252](DECISIONS/ADR-0252-a-value-returned-early-carries-its-label.md):
+a value returned early carries its label to the caller (a correction).
+- A body's label was its last statement's and its `?`s': a secret returned
+  from a branch or a loop was public to the caller, and could be logged.
+  Each `return` counts now, with the conditions it runs under, and each `?`
+  with its own.

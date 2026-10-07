@@ -427,11 +427,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              `VendorSdk.destroy`, which releases nothing, in a module
              importing only `Maps`, and four members are declared so today
              (`destroy`, `is_available`, `current`, `for_store`). Before it,
-             found fixing `e10-lexical`: **a secret returned early is
-             public**: a body's label is its last statement's, with each
-             `?`'s value, and a `return` in a branch or a loop is in neither,
-             so `log.public(g())` passes where `g` returns `token()` early.
-             Then 0057-c, a map or set sorted on arrival;
+             found fixing `e10-lexical`: ~~a secret returned early is
+             public~~ (ADR-0252, `just e14-returned-labels`). Then 0057-c, a
+             map or set sorted on arrival;
           3. ADR-0195's ruling 10, materialization chains: a timeline built
              from who you follow, with follow and unfollow commands and a
              profile page with follower counts;

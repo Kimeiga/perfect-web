@@ -438,17 +438,33 @@ impl<'a> Labels<'a> {
         me
     }
 
-    /// **The label of what a body makes** (ADR-0129): its value, and the
-    /// failure each `?` in it may return early. What calling its declaration
-    /// carries.
+    /// **The label of what a body makes** (ADR-0129): its value, the
+    /// failure each `?` in it may return early, and what each `return` in it
+    /// gives back, the `return`s of a function value aside (ADR-0252). Each
+    /// early return joins the conditions it runs under: which value comes
+    /// back is decided there. What calling its declaration carries. Until
+    /// ADR-0252 a `return` inside a branch or a loop was left out, and a
+    /// helper returning a secret early was public to its callers.
     pub fn value_of_body(&self, body: &Body) -> Label {
-        body.walk()
+        let mut early = Vec::new();
+        returns(body, body.root, &mut early);
+        let tried = body
+            .walk()
             .into_iter()
             .filter_map(|id| match body.expr(id) {
-                Expr::Try { value } => Some(self.label(body, *value)),
+                Expr::Try { value } => Some((id, *value)),
                 _ => None,
+            });
+        early
+            .into_iter()
+            .chain(tried)
+            .fold(self.label(body, body.root), |acc, (at, value)| {
+                let l = acc.join(&self.label(body, value));
+                match self.condition(at) {
+                    Some((c, _)) => l.join(c),
+                    None => l,
+                }
             })
-            .fold(self.label(body, body.root), |acc, l| acc.join(&l))
     }
 
     /// The conditions `id` runs under, and the first that contributed.
@@ -861,6 +877,26 @@ impl<'a> Labels<'a> {
 
             _ => Label::public(),
         }
+    }
+}
+
+/// Each `return e` under `id`, outside a function value, whose `return`
+/// leaves the function value and not the body (ADR-0252): the `return`,
+/// and `e`.
+fn returns(body: &Body, id: ExprId, out: &mut Vec<(ExprId, ExprId)>) {
+    match body.expr(id) {
+        Expr::Lambda { .. } => return,
+        Expr::Block { stmts } => {
+            for w in stmts.windows(2) {
+                if matches!(body.expr(w[0]), Expr::Name(n) if n == "return") {
+                    out.push((w[0], w[1]));
+                }
+            }
+        }
+        _ => {}
+    }
+    for c in body.children(id) {
+        returns(body, c, out);
     }
 }
 

@@ -41,10 +41,13 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
-**Found the same day, next: a secret returned early is public.** A body's
-label is its last statement's, joined with each `?`'s value: a `return`
-inside a branch or a loop is in neither. `fn g() -> String { if c { return
-token() } "none" }` is public to its callers, and `log.public(g())` passes.
+**ADR-0252, 2026-10-07: a value returned early carries its label to the
+caller** (a correction, found holding those survivors). A body's label was
+its last statement's, joined with each `?`'s value: a `return` inside a
+branch or a loop was in neither, so `fn g() -> String { if c { return
+token() } "none" }` was public to its callers, and `log.public(g())`
+passed a secret. Each `return` counts now, with the conditions it runs
+under, as does each `?` (`just e14-returned-labels`).
 
 **ADR-0251, 2026-10-07: a resource's clauses are held to PW2005** (a
 correction, found with ADR-0250). A `resource` declaration's `acquire` and
