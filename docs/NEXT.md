@@ -410,7 +410,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              a region itself"~~, which timed out in run 37651362024: the
              runtime records a region that settles after it starts, Chrome
              150 can fill one first, and the test waited for a record; it
-             now reads which happened, and holds the record to it.
+             now reads which happened, and holds the record to it; and
+             ~~`e10-recursion`'s "a record or variant is passed flat"~~,
+             equivalent since ADR-0059 and retired (STATUS, 2026-10-07).
              Further grammar and clause defects go under 0047-a below,
              unless the feed, the next Twitter item or soundness needs one;
           2. ~~map keys (0057-a)~~ (ADR-0248, `just e14-map-keys`) and ~~`let
@@ -424,8 +426,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
              (`signatures::by_member`): `h.destroy()` named
              `VendorSdk.destroy`, which releases nothing, in a module
              importing only `Maps`, and four members are declared so today
-             (`destroy`, `is_available`, `current`, `for_store`). Then
-             0057-c, a map or set sorted on arrival;
+             (`destroy`, `is_available`, `current`, `for_store`). Before it,
+             found fixing `e10-lexical`: **a secret returned early is
+             public**: a body's label is its last statement's, with each
+             `?`'s value, and a `return` in a branch or a loop is in neither,
+             so `log.public(g())` passes where `g` returns `token()` early.
+             Then 0057-c, a map or set sorted on arrival;
           3. ADR-0195's ruling 10, materialization chains: a timeline built
              from who you follow, with follow and unfollow commands and a
              profile page with follower counts;
@@ -476,11 +482,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
             Maps.create(..)` then `match r`, are refused though an arm ends
             the handle: what an arm binds is not followed, and `let h =
             Maps.create(..)?` is the form that is;
-          - **`lexical_mutations.py`'s two label survivors** (ADR-0242), "a
-            `for` loop's name carries no label" and "a lambda's parameters
-            carry no label": older than ADR-0242, killed at `d569e18`; with
-            either mutant the programs their tests write are refused all the
-            same, and what holds each is not yet accounted for;
+          - ~~**`lexical_mutations.py`'s two label survivors**~~
+            (ADR-0242), "a `for` loop's name carries no label" and "a
+            lambda's parameters carry no label": each test held a value
+            secret by its type, and two that log a `String` secret by its
+            label alone hold them (2026-10-07, STATUS);
         - housekeeping: 0032-a's field made required, 0049-a's wording,
           kiokun's NOTICE, an inlining budget, KNOWN_LIMITATIONS cleaned.
 

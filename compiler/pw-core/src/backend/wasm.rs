@@ -1714,9 +1714,11 @@ struct ClosureCode {
 /// **How a function compiled beside the export passes one value**
 /// (ADR-0050): a primitive, a string or a list as its flat values; anything
 /// else, a record or a variant, as a pointer to its canonical layout in the
-/// region. A record or variant built in the body already lives there, and
-/// this encoder writes a variant's joined flat slots but does not read them
-/// back from memory.
+/// region, where one built in the body already lives. A choice, not a
+/// necessity: until ADR-0059 this encoder could not read a variant's joined
+/// flat slots back from memory, and passing one flat failed; `load_variant`
+/// reads them, and either way computes the same (found 2026-10-07, when the
+/// mutant passing them flat survived).
 #[derive(Clone)]
 enum Passed {
     Flat(Vec<ValType>),

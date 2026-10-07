@@ -23,6 +23,29 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**Correction, 2026-10-07: a mutant survived at 07f8a2c.** The first
+verification run of `e10-recursion` on Linux (run 37646762298) recorded 6
+of 7, and so does this host: "a record or variant is passed flat" survives.
+It was killed when written (ADR-0050), because the encoder could not read a
+variant's flat values back from memory; ADR-0059's `load_variant` can, and a
+record or a variant passed flat to a callee computes what one passed by
+pointer does. The tests pass 18 such values, and agree with the browser's
+module either way. The mutant is retired as equivalent, and the encoder's
+comment says the pointer is a choice. The same run's other failure,
+`e10-lexical`'s two label survivors (ADR-0242's finding), had two causes.
+Every test of a loop's or a lambda's name held a `Secret<Payments>`, secret
+by its type; and a log in a loop over secrets, or in a lambda given them, is
+refused without the name's label too, for running where a secret decides it
+(ADR-0129). The label is what makes the diagnostic name the value logged,
+"cannot log a `Secret<Payments>` value", where without it the log is refused
+"where a `Secret<Payments>` value decides it". Two tests now log a `String`
+a helper read a secret into, and hold the diagnostic to the value.
+
+**Found the same day, next: a secret returned early is public.** A body's
+label is its last statement's, joined with each `?`'s value: a `return`
+inside a branch or a loop is in neither. `fn g() -> String { if c { return
+token() } "none" }` is public to its callers, and `log.public(g())` passes.
+
 **ADR-0251, 2026-10-07: a resource's clauses are held to PW2005** (a
 correction, found with ADR-0250). A `resource` declaration's `acquire` and
 `release` clauses are terms no statement reaches, and PW2005 walked none of

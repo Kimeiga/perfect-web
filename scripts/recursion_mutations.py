@@ -5,6 +5,13 @@ Each mutant undoes one piece of how a recursive or generic callee is
 compiled beside its export, or how the two encoders call it, and the
 recursion tests must then fail.
 
+"A record or variant is passed flat" was retired on 2026-10-07: since
+ADR-0059 the encoder reads a variant's flat values back from memory
+(`load_variant`), so a record or a variant passed flat computes what one
+passed by pointer does. The tests pass 18 such values to callees, whose
+components agree with the browser's module either way; the pointer is a
+choice, and no fault.
+
 Run from the repository root; `just e10-recursion` records the output. The
 source is restored after every mutant, whatever happens.
 """
@@ -60,12 +67,6 @@ MUTANTS = [
                 args.first().is_some_and(|a| instantiate(sigs, a, t, subst))
             }""",
         """            (Builtin::List, Type::List(_)) | (Builtin::Option, Type::Option(_)) => true,""",
-    ),
-    (
-        "a record or variant is passed flat",
-        WASM,
-        "        Some(f) if !compound => Passed::Flat(core_types(&f)),",
-        "        Some(f) => Passed::Flat(core_types(&f)),",
     ),
     (
         "a callee's result is left on the stack",

@@ -205,6 +205,47 @@ fn a_secret_logged_through_a_lambdas_parameter_is_refused() {
     none(&wrong.replace("[secrets.payments()]", "[\"a\", \"b\"]"));
 }
 
+/// A helper that reads a secret into a `String`: what it makes is secret by
+/// its label (ADR-0129), and its type says nothing.
+const TOKEN: &str =
+    "fn token() -> String !{ secret.read } {\n    let k = secrets.payments()\n    \"{k}\"\n}\n\n";
+
+/// [`logs`], with [`TOKEN`] before `f`.
+fn logs_token(body: &str) -> String {
+    logs(body).replace("fn f()", &format!("{TOKEN}fn f()"))
+}
+
+/// What logging a secret value says, where the value is the secret: an
+/// explicit flow, and not only a log that runs where a secret decides it.
+const LOGS_THE_SECRET: &str =
+    "PW5006 cannot log a `Secret<Payments>` value at privacy level `Public`";
+
+#[test]
+fn a_secret_string_logged_through_a_for_loops_name_is_refused() {
+    // Each `t` is a `String`, so only its binding's label says it is the
+    // secret: the label the loop gives its name, its iterable's. Without it
+    // the log is still refused, for running where a secret decides it ("where
+    // a `Secret<Payments>` value decides it"), and the diagnostic names no
+    // value. Until 2026-10-07 every test of this held a `Secret<Payments>`,
+    // secret by its type, and a loop's name with no label passed them all.
+    let wrong = logs_token(
+        "    let tokens = [token()]\n    for t in tokens {\n        log.public(\"with {t}\")\n    }",
+    );
+    assert_eq!(one(&wrong, "PW5006"), LOGS_THE_SECRET);
+    none(&wrong.replace("[token()]", "[\"a\", \"b\"]"));
+}
+
+#[test]
+fn a_secret_string_logged_through_a_lambdas_parameter_is_refused() {
+    // The lambda's `t`, a `String`, is secret by the label its parameter
+    // takes from what the call gives it.
+    let wrong = logs_token(
+        "    let tokens = [token()]\n    List.map(tokens, t => log.public(\"with {t}\"))",
+    );
+    assert_eq!(one(&wrong, "PW5006"), LOGS_THE_SECRET);
+    none(&wrong.replace("[token()]", "[\"a\", \"b\"]"));
+}
+
 #[test]
 fn a_name_bound_twice_carries_each_bindings_label() {
     // The public `t` is logged, and the secret one is not.
