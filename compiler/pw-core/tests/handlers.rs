@@ -795,6 +795,24 @@ fn a_refused_command_stops_the_handler_before_the_next() {
     assert_eq!(out["trap"], "refused");
 }
 
+/// **A handler that discards its command's answer with `_` sends it**
+/// (ADR-0250, ruling 0099-a): `let _ = ..` binds nothing, and the backend
+/// still computes what it is given. Named for its call, as the discard by
+/// name is.
+#[test]
+fn a_handler_that_discards_its_answer_with_underscore_sends_it() {
+    let m = compiled("{ let _ = Buy(item.id, Qty(2)) }");
+    assert!(
+        m.source.contains("export const name = \"Buy\";"),
+        "{}",
+        m.source
+    );
+    assert_eq!(
+        sent(&run(&m, ITEM)),
+        &serde_json::json!([["shop.ui.Buy", ["a", 2]]])
+    );
+}
+
 /// **A handler that discards its command's answer by name compiles**
 /// (ADR-0159): `let _ignored = ..`, ADR-0099's discard, as its last
 /// statement. The block is the unit value. Until 2026-10-03 the backend

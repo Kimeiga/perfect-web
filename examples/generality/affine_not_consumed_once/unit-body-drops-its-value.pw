@@ -1,0 +1,20 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: indirect invalid — the body's value, where the body gives none
+//
+// `moved-to-the-caller.pw` declaring `()`. A body that declares `()` ends in
+// a statement, whose value nothing reads (`values::returns`), so `tx` reaches
+// no caller. Until ADR-0250 the body's last value counted as moved whatever
+// the declaration answered.
+
+module generality.affine_unit_body
+
+import Database
+import domain.{ DatabaseTransaction }
+
+fn open() -> ()
+    !{ database.transaction, resource.acquire<DatabaseTransaction> }
+{
+    let tx = Database.begin()
+    tx
+}

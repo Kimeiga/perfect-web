@@ -218,7 +218,9 @@ Scarce or correctness-sensitive handles are affine: `DatabaseTransaction`,
 `SecretHandle`, `LockGuard`, `FileUpload`.
 
 A transaction must end exactly once, in commit or rollback; a resource must not
-escape its scope.
+escape its scope. An acquisition is held by a name, ended where it is made,
+given to the caller, or held by a resource's `acquire` clause; anywhere else,
+`let _ = Database.begin()` among them, it is refused (ADR-0250).
 
 **Specified** — A-007, R-011, R-012. **Open** — the Koka spike did not attempt
 linearity; charter §14 M1 task 7 warns explicitly against claiming Koka proves

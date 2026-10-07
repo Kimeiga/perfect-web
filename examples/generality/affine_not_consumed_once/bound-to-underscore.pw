@@ -1,0 +1,27 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: direct invalid — bound to `_`, which nothing can release
+//
+// Ruling 0099-a (ADR-0210, ADR-0250): `let _ = e` discards `e`, and an
+// affine resource discarded so is refused as never consumed. Rust's `let _ =
+// mutex.lock()` drops the guard at once, which its `let_underscore_lock`
+// lint denies; here the transaction would simply stay open.
+
+module generality.affine_discarded
+
+import Carts
+import Database
+import context.{ current_session }
+// The accepted corpus's `Cart` reads what this command writes, and listens
+// for this event (ADR-0101).
+import Events.{ CartChanged }
+import domain.{ CartError }
+
+command clear_cart() -> Result<(), CartError>
+    requires SignedIn
+    emits CartChanged(current_session())
+{
+    let _ = Database.begin()
+    let _cleared = Carts.clear(current_session())
+    Ok(())
+}

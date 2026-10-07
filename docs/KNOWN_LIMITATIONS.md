@@ -341,6 +341,16 @@ refused by name:
   on every path. There is no way to say "this function reads the value and
   hands it back"; a `use` block releases its value and is the scoped form. A
   release inside a loop is refused even when the loop would run once.
+- **An acquisition is followed from a name** (ADR-0250). One is held by a
+  binding, `let x = ..`, `use x = ..` or `let h = Maps.create(..)?`; ended
+  where it is made; given to a caller, by a declaration that answers one;
+  or held by a resource's `acquire` clause. Anywhere else it is refused,
+  even where it would be ended: `match Maps.create(..) { Ok(h) =>
+  Maps.destroy(h), .. }` is refused, since what an arm binds is not
+  followed, and so is `let o = Some(Database.begin())`, which no release
+  takes. `use _ = ..` is refused, not read as a scope holding a value it
+  never names, and so is an acquisition no name holds inside a keyword's
+  block, `unsafe.imperative { Maps.create(..) }`.
 - **A function value read from a record field is not called** (ADR-0052).
   A function is a value: a lambda or a declaration's name is stored,
   returned, passed and called. But `r.check(5)` reads as a method call. A

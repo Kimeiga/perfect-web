@@ -412,8 +412,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
              race in the runtime's record or in the test, to find.
              Further grammar and clause defects go under 0047-a below,
              unless the feed, the next Twitter item or soundness needs one;
-          2. ~~map keys (0057-a)~~ (ADR-0248, `just e14-map-keys`) and `let
-             _` (0099-a); then 0057-c, a map or set sorted on arrival;
+          2. ~~map keys (0057-a)~~ (ADR-0248, `just e14-map-keys`) and ~~`let
+             _` (0099-a)~~ (ADR-0250, `just e14-let-discard`, which found
+             PW2005 following only `let x = acquire()`: an acquisition is
+             held or refused now). Its tests found two more, next, since
+             soundness needs them: **a `resource` declaration's clauses**,
+             terms outside the body PW2005 walks, so an acquisition in a
+             `release` clause, or a `release` that never ends its handle,
+             passes; and **a member names whichever declaration registered
+             last** (`signatures::by_member`): `h.destroy()` named
+             `VendorSdk.destroy`, which releases nothing, in a module
+             importing only `Maps`. Then 0057-c, a map or set sorted on
+             arrival;
           3. ADR-0195's ruling 10, materialization chains: a timeline built
              from who you follow, with follow and unfollow commands and a
              profile page with follower counts;
@@ -446,9 +456,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - with the app layer: computed holes (0073-a: the host's part done,
           ADR-0226, and the browser's, ADR-0227, rows, ADR-0228, conditions,
           ADR-0229; the rest later), then ~~0071-a~~ (ADR-0230);
-          route-keyed speculation (0122-d); map keys (0057-a, 0057-c); `let
-          _`, `while`, 0052-a, 0055-b, 0061-a, 0049-b; cheaper instantiation
-          (0046-a);
+          route-keyed speculation (0122-d); map keys (0057-a, 0057-c); ~~`let
+          _`~~ (ADR-0250), `while`, 0052-a, 0055-b, 0061-a, 0049-b; cheaper
+          instantiation (0046-a);
         - after it: 0060-a, 0078-a, 0056-a, 0047-a's parser split, and
           what waits for it, found on the way:
           - **clauses nothing reads** (ADR-0243): `respects`,
@@ -459,6 +469,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
             is refused as two statements in a block, and as what an
             argument list or a hole reads elsewhere; read as an index and
             refused by name, `List.get(items, 0)`, it would say what it is;
+          - **a resource matched where it is made** (ADR-0250): `match
+            Maps.create(..) { Ok(h) => Maps.destroy(h), .. }`, and `let r =
+            Maps.create(..)` then `match r`, are refused though an arm ends
+            the handle: what an arm binds is not followed, and `let h =
+            Maps.create(..)?` is the form that is;
           - **`lexical_mutations.py`'s two label survivors** (ADR-0242), "a
             `for` loop's name carries no label" and "a lambda's parameters
             carry no label": older than ADR-0242, killed at `d569e18`; with

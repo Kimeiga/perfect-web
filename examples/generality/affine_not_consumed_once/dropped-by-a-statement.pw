@@ -1,0 +1,27 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: indirect invalid — no binding holds it: a statement's value
+//
+// The transaction is opened by a statement, and the statement's value is
+// dropped. Until ADR-0250 the check followed only a binding whose value was
+// the acquiring call, so an acquisition that no binding held was never
+// looked at.
+
+module generality.affine_dropped
+
+import Carts
+import Database
+import context.{ current_session }
+// The accepted corpus's `Cart` reads what this command writes, and listens
+// for this event (ADR-0101).
+import Events.{ CartChanged }
+import domain.{ CartError }
+
+command clear_cart() -> Result<(), CartError>
+    requires SignedIn
+    emits CartChanged(current_session())
+{
+    Database.begin()
+    let _cleared = Carts.clear(current_session())
+    Ok(())
+}

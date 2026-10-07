@@ -17,6 +17,17 @@ An affine value is consumed exactly once, in the scope that acquired it.
 | indirect invalid | `parameter-not-released.pw` | a declaration that promises to release its parameter, and does not on one path |
 | neighbour | `parameter-released.pw` | the same helper, ending it once on each path |
 | neighbour | `moved-to-the-caller.pw` | the value is the body's result, which moves it to the caller |
+| direct invalid | `bound-to-underscore.pw` | `let _ = ..`, ruling 0099-a's discard, which nothing can release |
+| indirect invalid | `dropped-by-a-statement.pw` | no binding holds it: a statement's value, dropped |
+| helper extraction | `given-to-a-helper.pw` | given to a function whose row does not release it |
+| equivalent syntax | `held-behind-try.pw` | `let h = Maps.create(..)?`: a `Result` carries the handle |
+| neighbour | `held-behind-try-and-destroyed.pw` | the same handle, destroyed |
+| deferred execution | `returned-by-a-function-value.pw` | a function value's result, which nothing follows |
+| indirect invalid | `unit-body-drops-its-value.pw` | `moved-to-the-caller.pw` declaring `()`: no caller has the value |
+| neighbour | `ended-where-made.pw` | ended where it is made, `Database.begin().commit()` |
 
 The seven rows after the first six were added on 2026-09-25, when the check
 began counting releases on every path; each caught one was accepted before.
+The eight after them were added on 2026-10-07 (ADR-0250), when it began
+following an acquisition wherever it stands, and a body declaring `()` stopped
+giving its last value to a caller; each caught one was accepted before.

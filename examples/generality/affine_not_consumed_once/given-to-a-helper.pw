@@ -1,0 +1,30 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: helper extraction — given to a function that does not end it
+//
+// `audit` takes the transaction and its row releases nothing, so the
+// transaction is still open when it returns, and nothing holds it after.
+// Until ADR-0250 an acquisition passed straight to a call was not followed.
+
+module generality.affine_given
+
+import Carts
+import Database
+import context.{ current_session }
+// The accepted corpus's `Cart` reads what this command writes, and listens
+// for this event (ADR-0101).
+import Events.{ CartChanged }
+import domain.{ CartError, DatabaseTransaction }
+
+fn audit(tx: DatabaseTransaction) -> () !{} {
+    ()
+}
+
+command clear_cart() -> Result<(), CartError>
+    requires SignedIn
+    emits CartChanged(current_session())
+{
+    audit(Database.begin())
+    let _cleared = Carts.clear(current_session())
+    Ok(())
+}

@@ -199,6 +199,16 @@ fn the_corpus_reports_honestly_how_little_of_it_lowers() {
 }
 
 #[test]
+fn a_discard_is_kokas_wildcard_val() {
+    // ADR-0250: `let _ = e` is `val _ = e`. Koka 3.2.3's local `val` takes a
+    // pattern, `decl : VAL apattern '=' blockexpr`, and `_` is one
+    // (`doc/spec/grammar/parser.y`).
+    let out = generate("module m\n\nfn f(a: Int) -> Int !{} {\n    let _ = a + 1\n    a\n}\n");
+    assert!(out.skipped.is_empty(), "{:?}", out.skipped);
+    assert!(out.source.contains("val _ = "), "{}", out.source);
+}
+
+#[test]
 fn a_negated_name_is_kokas_negation() {
     // `-a` is not Koka's negation after `(`: it reads as the start of an
     // operator section, and Koka refused `(-a + b)` the first time a negated

@@ -297,6 +297,9 @@ fn lower_expr(b: &Body, id: ExprId) -> Result<String, &'static str> {
                     Expr::Let { pat, init, .. } => {
                         let name = match pat.map(|p| b.pat(p)) {
                             Some(Pattern::Bind { name, .. }) => value_name(name),
+                            // `let _ = e` (ADR-0250): Koka 3.2.3's local
+                            // `val` takes a pattern, and `_` is one.
+                            Some(Pattern::Wild) => "_".to_string(),
                             _ => return Err("a destructuring binding"),
                         };
                         let Some(init) = init else {

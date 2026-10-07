@@ -120,8 +120,7 @@ fn results_are_handled(
                  nothing with it: a failure the handler does not take apart goes \
                  unshown, and the press looks as though it worked (ADR-0159). That is \
                  its last value, a value it returns, and the failure a `?` returns.",
-                "take it apart with `match` and show its failure, or discard it by \
-                 name, `let _ignored = ..`",
+                "take it apart with `match` and show its failure, or discard it, `let _ = ..`",
             ),
             Fate::FailureToTheRuntime => (
                 "handler_failure_dropped",
@@ -129,8 +128,7 @@ fn results_are_handled(
                 "A handler's `?` returns its failure to the runtime that called the \
                  handler, which does nothing with it: the failure goes unshown, and the \
                  press looks as though it worked (ADR-0159).",
-                "take it apart with `match` and show its failure, or discard it by \
-                 name, `let _ignored = ..`",
+                "take it apart with `match` and show its failure, or discard it, `let _ = ..`",
             ),
             _ => (
                 "result_dropped",
@@ -138,8 +136,7 @@ fn results_are_handled(
                 "A `Result` carries a failure, and a value nothing uses handles neither \
                  of its cases: the program goes on as though it had succeeded. Until \
                  2026-09-26 a statement's `Result` was dropped without a word.",
-                "pass the failure on with `?`, handle it with `match`, or discard it \
-                 by name, `let _ignored = ..`",
+                "pass the failure on with `?`, handle it with `match`, or discard it, `let _ = ..`",
             ),
         };
         out.push(Diagnostic {

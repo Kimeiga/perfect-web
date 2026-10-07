@@ -1880,7 +1880,19 @@ impl<'a> P<'a> {
 
     fn keyword_stmt(&mut self) {
         self.start(K::LetStmt);
+        let keyword = self.cur_text().to_string();
         self.bump(); // the keyword
+        // **`use _ = ..`** (ADR-0250): `_` is `let`'s discard. A `use` names
+        // what it holds until its block ends; this read as `use`, then a
+        // second statement `_ = ..`, and was PW0030.
+        if keyword == "use" && self.at(Kind::Underscore) {
+            self.error_help(
+                "PW0001",
+                "`use` binds a name, and `_` binds nothing",
+                "name what it holds, `use handle = ..`: its block ends it when the block ends",
+            );
+            self.bump();
+        }
         // A qualified keyword: `unsafe.imperative`, `unsafe.lifecycle`.
         while self.at(Kind::Dot) && self.nth_is(1, Kind::Ident) {
             self.bump();
@@ -2047,9 +2059,27 @@ impl<'a> P<'a> {
     fn let_stmt(&mut self) {
         self.start(K::LetStmt);
         self.bump(); // let
-        self.eat_kw("mut");
+        let mutable = self.eat_kw("mut");
         self.not_a_statement_keyword("a binding");
-        self.name("a binding name");
+        // **`let _ = e`: an explicit discard** (ADR-0250, ruling 0099-a):
+        // the value is computed and bound to nothing. It was "expected a
+        // binding name", and a program discarded by naming a binding it
+        // never read, `let _ignored = e`.
+        if self.at(Kind::Underscore) {
+            // `let mut _`: nothing is bound to change. Rust refuses it too.
+            if mutable {
+                self.error_help(
+                    "PW0001",
+                    "`let mut` binds a name to change, and `_` binds nothing",
+                    "discard the value with `let _ = ..`, or name it: `let mut x = ..`",
+                );
+            }
+            self.start(K::WildcardPat);
+            self.bump();
+            self.finish();
+        } else {
+            self.name("a binding name");
+        }
         if self.eat(Kind::Colon) {
             self.type_ref();
         }
@@ -4051,6 +4081,49 @@ mod tests {
         assert_eq!(p.errors[0].code, "PW0016");
         assert_eq!(&src[p.errors[0].span.clone()], ", i");
         assert_eq!(texts(&p, K::NameExpr).last().map(String::as_str), Some("x"));
+    }
+
+    #[test]
+    fn a_let_may_discard_its_value() {
+        // ADR-0250: `let _ = e` binds nothing, and parses.
+        let src = "module m\nfn f() -> Int !{} {\n    let _ = g()\n    let _: Int = 1\n    0\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        assert_eq!(texts(&p, K::WildcardPat), vec!["_", "_"]);
+        // The control: a name is a name.
+        let named = parse_ok("module m\nfn f() -> Int !{} {\n    let x = g()\n    x\n}\n");
+        assert!(texts(&named, K::WildcardPat).is_empty());
+    }
+
+    #[test]
+    fn a_discard_is_neither_mutable_nor_a_use() {
+        // ADR-0250: `let mut _` binds nothing to change, and `use _` nothing
+        // to hold; each is one error, where it is written.
+        for (src, at, says) in [
+            (
+                "module m\nfn f() -> Int !{} {\n    let mut _ = 1\n    0\n}\n",
+                "_",
+                "`let mut` binds a name to change, and `_` binds nothing",
+            ),
+            (
+                "module m\nfn f() -> Int !{} {\n    use _ = g()\n    0\n}\n",
+                "_",
+                "`use` binds a name, and `_` binds nothing",
+            ),
+        ] {
+            let p = parse_tree(src);
+            assert_lossless(src, &p);
+            assert_eq!(
+                p.errors
+                    .iter()
+                    .map(|e| (e.code, &src[e.span.clone()], e.message.as_str()))
+                    .collect::<Vec<_>>(),
+                vec![("PW0001", at, says)],
+                "{src}"
+            );
+        }
+        // The controls: a name for each.
+        parse_ok("module m\nfn f() -> Int !{} {\n    let mut x = 1\n    use h = g()\n    x\n}\n");
     }
 
     #[test]

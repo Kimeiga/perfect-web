@@ -24,7 +24,9 @@
 //! - a parameter's or `let`'s written annotation;
 //! - `self` inside a UI declaration, which is that declaration's element;
 //! - a call's return type, from the callee's signature;
-//! - a field access, from the signature of the member on the base's type.
+//! - a field access, from the signature of the member on the base's type;
+//! - what `e?` takes out of `e`'s `Result` or `Option`, a block's last
+//!   statement, and branches or arms that agree (ADR-0250).
 //!
 //! That chain is what makes `self.style.set_padding(4.px)` resolvable:
 //! `self` is an `ElementRef`, `.style` is a member of `ElementRef` returning
@@ -655,6 +657,34 @@ impl<'a> Types<'a> {
                     return Some(ResolvedType::answered(result));
                 }
                 Some(result.clone())
+            }
+            // **`e?`, a block, and branches** (ADR-0250): what `e`'s `Result`
+            // or `Option` holds; the last statement's value; and the
+            // branches' or arms' type, where each says the same. Until
+            // ADR-0250 `let h = Maps.create(..)?` held a value of no type,
+            // and `h.destroy()` named no member.
+            Expr::Try { value } => {
+                let t = self.of(body, *value)?;
+                match t.as_builtin() {
+                    Some(Builtin::Result | Builtin::Option) => t.args().first().cloned(),
+                    _ => None,
+                }
+            }
+            Expr::Block { stmts } => self.of(body, *stmts.last()?),
+            Expr::If {
+                then, els: Some(e), ..
+            } => {
+                let t = self.of(body, *then)?;
+                self.of(body, *e)
+                    .is_some_and(|u| u.same_as(&t))
+                    .then_some(t)
+            }
+            Expr::Match { arms, .. } => {
+                let (first, rest) = arms.split_first()?;
+                let t = self.of(body, first.body)?;
+                rest.iter()
+                    .all(|a| self.of(body, a.body).is_some_and(|u| u.same_as(&t)))
+                    .then_some(t)
             }
             _ => None,
         }

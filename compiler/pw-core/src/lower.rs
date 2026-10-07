@@ -1321,6 +1321,12 @@ impl Lowerer<'_> {
                     span_of(&n),
                 )
             });
+            // `let _ = e`, an explicit discard (ADR-0250).
+            let pat = pat.or_else(|| {
+                node.children()
+                    .find(|c| c.kind() == K::WildcardPat)
+                    .map(|w| b.pat(Pattern::Wild, span_of(&w)))
+            });
             let ty = node
                 .children()
                 .find(|c| c.kind() == K::TypeRef)

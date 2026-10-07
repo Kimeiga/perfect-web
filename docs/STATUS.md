@@ -23,6 +23,18 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0250, 2026-10-07: `let _` discards a value, and an acquisition is
+held or refused** (the owner's ruling 0099-a, Twitter item 2, and a
+correction its probes found). `let _ = e` parses and binds nothing: a
+`Result` so discarded is handled, and a resource bound to `_` is refused as
+never consumed. PW2005 followed only `let x = acquire()` and `use x = ..`;
+an acquisition dropped by a statement, given to a call that does not end
+it, in an `if` statement's branch, held with `?`, or returned by a function
+value passed unread, and a body declaring `()` gave its caller a
+transaction it never had. Each is held by a name, ended where it is made,
+given to a caller, or held by a resource's `acquire` clause now, or refused
+(`just e14-let-discard`).
+
 **ADR-0248, 2026-10-07: a map's key is an `Int`, a `String`, a `Bool`, or
 an opaque type over one** (the owner's ruling 0057-a, Twitter item 2). A
 `Map<Float, Int>` checked and only `pw build` refused it, and a

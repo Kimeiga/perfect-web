@@ -4853,3 +4853,26 @@ e14-map-keys:
        CARGO_INCREMENTAL=0 python3 scripts/map_keys_mutations.py; \
      } > docs/evidence/E14/map-keys.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/map-keys.txt
+
+# ADR-0250 (ruling 0099-a): `let _` discards a value, and an acquisition is
+# held by a name, ended where it is made, given to the caller, or held by a
+# resource's `acquire` clause, or refused.
+e14-let-discard:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0250 - let _ discards a value, and an acquisition is held or refused"; echo; \
+       echo "produced by: just e14-let-discard"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the parser (compiler/pw-syntax/src/grammar.rs)"; echo; \
+       cargo test --locked -p pw-syntax --lib -- a_let_may_discard_its_value a_discard_is_neither_mutable_nor_a_use 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the checker (compiler/pw-core/tests/let_discard.rs)"; echo; \
+       cargo test --locked -p pw-core --test let_discard 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the Koka translation, and a handler (koka_backend.rs, handlers.rs)"; echo; \
+       cargo test --locked -p pw-core --test koka_backend -- a_discard_is_kokas_wildcard_val 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-core --test handlers -- a_handler_that_discards_its_answer 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the generality witnesses (examples/generality/affine_not_consumed_once)"; echo; \
+       cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/let_discard_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/let_discard_mutations.py; \
+     } > docs/evidence/E14/let-discard.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/let-discard.txt

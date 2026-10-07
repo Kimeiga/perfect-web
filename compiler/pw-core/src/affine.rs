@@ -30,6 +30,18 @@
 //! release came before each `return`, so a value never released, one live
 //! across a `?`, and one released twice all passed.
 //!
+//! # Held, or refused
+//!
+//! What is followed is a name: `let tx = Database.begin()`, `use handle =
+//! ..`, or `let h = Maps.create(..)?`. An acquisition's value is held by
+//! such a binding, ended where it is made (`Database.begin().commit()`),
+//! given to the caller as the declaration's value, or held by a resource's
+//! `acquire` clause, which its `release` clause ends. Anywhere else nothing
+//! follows it, and it is refused: bound to `_`, dropped by a statement,
+//! given to a call that does not release it, kept in another value, or
+//! returned by a function value (ADR-0250). Until ADR-0250 only the first
+//! binding was followed, and an acquisition anywhere else passed unread.
+//!
 //! # Bindings, not names
 //!
 //! A use of the value is a name whose binding is the acquisition's
@@ -40,7 +52,7 @@
 //! that declaration where it is called; a value given to any other function
 //! value may be released there, which nothing can count, and is refused.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::codes;
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
@@ -84,7 +96,11 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         }
         let at = hir.decl_span(id);
         let types = crate::infer::Types::of_decl(sigs, hir, id, body);
-        let mut owned = acquisitions(body, sigs, &types);
+        let gives = gives_its_value(hir, sigs, id, decl);
+        let (mut owned, unheld) = acquisitions(body, sigs, &types, gives);
+        for u in unheld {
+            report_unheld(sigs, decl, u, &at, out);
+        }
         owned.extend(released_parameters(hir, sigs, id, decl, body));
         for a in owned {
             let (releases, given) = releases_of(body, sigs, &types, &a);
@@ -95,7 +111,7 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
             } else if a.scoped {
                 // A `use` block releases its value when it ends.
                 continue;
-            } else if let Some(fault) = fault_of(body, &types, &a, &releases) {
+            } else if let Some(fault) = fault_of(body, &types, &a, &releases, gives) {
                 report_unconsumed(hir, sigs, decl, &a, fault, &at, out);
             }
         }
@@ -145,57 +161,316 @@ fn released_parameters(
         .collect()
 }
 
-/// Bindings whose initialiser declares `resource.acquire<T>`.
+/// **Every call whose row declares `resource.acquire<T>`, and what holds
+/// its value** (ADR-0250): the bindings that name one, each once, to be
+/// followed; and the acquisitions nothing holds.
 fn acquisitions<'a>(
     body: &Body,
     sigs: &'a Signatures,
-    types: &crate::infer::Types<'a>,
-) -> Vec<Acquired> {
-    let mut out = Vec::new();
+    types: &Types<'a>,
+    gives: bool,
+) -> (Vec<Acquired>, Vec<Unheld>) {
+    let parents: BTreeMap<ExprId, ExprId> = body
+        .walk()
+        .into_iter()
+        .flat_map(|p| body.children(p).into_iter().map(move |c| (c, p)))
+        .collect();
+    let (mut owned, mut unheld) = (Vec::<Acquired>::new(), Vec::new());
     for id in body.walk() {
-        let (binder, name, init, scoped) = match body.expr(id) {
-            Expr::Let {
-                pat: Some(pat),
-                init: Some(init),
-                ..
-            } => match body.pat(*pat) {
-                crate::hir::Pattern::Bind { name, .. } => {
-                    (Binder::Pattern(*pat), name.clone(), *init, false)
+        let Expr::Call { callee, .. } = body.expr(id) else {
+            continue;
+        };
+        let Some(sig) = signature_of(sigs, types, body, *callee) else {
+            continue;
+        };
+        let Some(ty) = sig
+            .effects
+            .iter()
+            .find_map(|e| type_argument(e, "resource.acquire"))
+        else {
+            continue;
+        };
+        let walk = Holding {
+            body,
+            sigs,
+            types,
+            parents: &parents,
+            ty: &ty,
+            gives,
+        };
+        match walk.holder(id) {
+            Holder::Binding {
+                binder,
+                name,
+                at,
+                scoped,
+            } => {
+                // `let tx = if c { Database.begin() } else { .. }`: two
+                // acquisitions, one binding to follow.
+                if !owned.iter().any(|a| a.binder == binder) {
+                    owned.push(Acquired {
+                        binder,
+                        name,
+                        ty,
+                        span: body.expr_span(at),
+                        scoped,
+                        parameter: false,
+                    });
                 }
-                _ => continue,
-            },
-            // `use handle = Maps.create(..)` — the scoped form.
-            Expr::Keyword {
-                keyword,
-                modifiers,
-                args,
-                ..
-            } if keyword == "use" => match (modifiers.first(), args.first()) {
-                (Some(name), Some(init)) => (Binder::Use(id), name.clone(), *init, true),
-                _ => continue,
-            },
-            _ => continue,
-        };
-        let Expr::Call { callee, .. } = body.expr(init) else {
-            continue;
-        };
-        let Some(ty) = signature_of(sigs, types, body, *callee).and_then(|s| {
-            s.effects
-                .iter()
-                .find_map(|e| type_argument(e, "resource.acquire"))
-        }) else {
-            continue;
-        };
-        out.push(Acquired {
-            binder,
-            name,
-            ty,
-            span: body.expr_span(id),
-            scoped,
-            parameter: false,
-        });
+            }
+            Holder::Kept => {}
+            Holder::Nothing(dropped) => unheld.push(Unheld {
+                ty,
+                span: body.expr_span(id),
+                dropped,
+                carried: carried(sig),
+            }),
+        }
     }
-    out
+    (owned, unheld)
+}
+
+/// **Does the declaration give its body's value to a caller** (ADR-0250)?
+/// A function, a query, a command or a task does, unless it declares `()`:
+/// such a body ends in a statement, whose value nothing reads (`values`,
+/// `returns`). A value given to the caller is the caller's to end, since
+/// the row that acquired it, which PW0400 has the declaration state, is now
+/// the declaration's own. Until ADR-0250 a body declaring `()` gave its
+/// last value to the caller too, and a transaction it ended in passed.
+fn gives_its_value(hir: &Hir, sigs: &Signatures, id: crate::hir::DeclId, decl: &Decl) -> bool {
+    use crate::hir::DeclKind;
+    if !matches!(
+        decl.kind,
+        DeclKind::Fn | DeclKind::Query | DeclKind::Command | DeclKind::Task
+    ) {
+        return false;
+    }
+    let path = match hir.module_of(id) {
+        Some(m) => format!("{m}.{}", decl.name),
+        None => decl.name.clone(),
+    };
+    sigs.by_path(&path)
+        .and_then(|s| s.returns.as_ref())
+        .and_then(|r| r.resolved())
+        .is_some_and(|r| r.as_primitive() != Some(crate::resolved::Primitive::Unit))
+}
+
+/// Does the call answer a `Result` or an `Option` that carries what it
+/// acquires, `Maps.create(..)`, so that a name holds it with `?`?
+fn carried(sig: &crate::signatures::Signature) -> bool {
+    use crate::resolved::Builtin;
+    sig.returns
+        .as_ref()
+        .and_then(|r| r.resolved())
+        .map(crate::values::Ty::of)
+        .is_some_and(|t| {
+            matches!(
+                t,
+                crate::values::Ty::Builtin(Builtin::Result | Builtin::Option, _)
+            )
+        })
+}
+
+/// What holds an acquired value (ADR-0250).
+enum Holder {
+    /// `let x = ..` or `use x = ..`: a binding, which `fault_of` follows.
+    Binding {
+        binder: Binder,
+        name: String,
+        /// The binding statement.
+        at: ExprId,
+        scoped: bool,
+    },
+    /// Ended where it is made, given to the caller, or held by a resource's
+    /// `acquire` clause.
+    Kept,
+    /// Nothing does.
+    Nothing(Dropped),
+}
+
+/// Where an acquisition nothing holds goes, and the span that says so.
+enum Dropped {
+    /// `let _ = ..`, ruling 0099-a: Rust's `let _ = mutex.lock()`, which
+    /// drops at once, refused rather than guessed at.
+    Discarded(Span),
+    /// A statement's value, which nothing reads: the statement.
+    Statement(Span),
+    /// Given to a call that does not release it: the call, and its callee.
+    Taken(Span, String),
+    /// Matched where it is made: what the arms bind is not followed.
+    Matched(Span),
+    /// A function value's result, which nothing follows.
+    Returned(Span),
+    /// Kept in another value, or read for a field: that value.
+    Contained(Span),
+}
+
+/// An acquisition nothing holds.
+struct Unheld {
+    ty: String,
+    /// The acquiring call.
+    span: Span,
+    dropped: Dropped,
+    carried: bool,
+}
+
+/// The walk from an acquiring call up to what holds its value.
+struct Holding<'a, 'b> {
+    body: &'b Body,
+    sigs: &'a Signatures,
+    types: &'b Types<'a>,
+    parents: &'b BTreeMap<ExprId, ExprId>,
+    /// What the call acquires.
+    ty: &'b str,
+    gives: bool,
+}
+
+impl Holding<'_, '_> {
+    /// The value's holder: up through what passes a value on, a block's last
+    /// statement, a branch, an arm, a `?`, `Ok(..)` and `Some(..)`, to what
+    /// keeps or drops it.
+    fn holder(&self, call: ExprId) -> Holder {
+        let body = self.body;
+        let mut at = call;
+        loop {
+            let Some(&p) = self.parents.get(&at) else {
+                // The body's value.
+                return self.given(at);
+            };
+            match body.expr(p) {
+                Expr::Block { stmts } => {
+                    let i = stmts.iter().position(|s| *s == at).unwrap_or(0);
+                    let before = i.checked_sub(1).map(|j| body.expr(stmts[j]));
+                    // `acquire { .. }`: the resource holds the value, and its
+                    // `release` clause ends it.
+                    if matches!(before, Some(Expr::Name(n)) if n == "acquire")
+                        && matches!(body.expr(at), Expr::Block { .. })
+                    {
+                        return Holder::Kept;
+                    }
+                    // `return e`: the value of the function the `return` is
+                    // in.
+                    if matches!(before, Some(Expr::Name(n)) if n == "return") {
+                        return match self.enclosing_lambda(p) {
+                            Some(l) => Holder::Nothing(Dropped::Returned(body.expr_span(l))),
+                            None => self.given(at),
+                        };
+                    }
+                    if i + 1 < stmts.len() {
+                        return Holder::Nothing(Dropped::Statement(body.expr_span(at)));
+                    }
+                }
+                Expr::If { cond, .. } if *cond != at => {}
+                Expr::Match { scrutinee, .. } if *scrutinee == at => {
+                    return Holder::Nothing(Dropped::Matched(body.expr_span(p)));
+                }
+                Expr::Match { .. } | Expr::Try { .. } => {}
+                Expr::Call { .. } if wraps(body, self.types, p) == Some(at) => {}
+                Expr::Let { pat, .. } => {
+                    return match pat.map(|q| (q, body.pat(q))) {
+                        Some((q, crate::hir::Pattern::Bind { name, .. })) => Holder::Binding {
+                            binder: Binder::Pattern(q),
+                            name: name.clone(),
+                            at: p,
+                            scoped: false,
+                        },
+                        Some((_, crate::hir::Pattern::Wild)) => {
+                            Holder::Nothing(Dropped::Discarded(body.expr_span(p)))
+                        }
+                        _ => Holder::Nothing(Dropped::Contained(body.expr_span(p))),
+                    };
+                }
+                // `use handle = Maps.create(..)`, the scoped form.
+                Expr::Keyword {
+                    keyword,
+                    modifiers,
+                    args,
+                    ..
+                } if keyword == "use" && args.first() == Some(&at) => {
+                    return match modifiers.first() {
+                        Some(name) => Holder::Binding {
+                            binder: Binder::Use(p),
+                            name: name.clone(),
+                            at: p,
+                            scoped: true,
+                        },
+                        None => Holder::Nothing(Dropped::Contained(body.expr_span(p))),
+                    };
+                }
+                Expr::Lambda { .. } => {
+                    return Holder::Nothing(Dropped::Returned(body.expr_span(p)));
+                }
+                Expr::For { .. } => {
+                    return Holder::Nothing(Dropped::Statement(body.expr_span(at)));
+                }
+                // `Database.begin().commit()`: the receiver of a call.
+                Expr::Field { base, .. } if *base == at => {
+                    return match self.parents.get(&p).map(|c| (*c, body.expr(*c))) {
+                        Some((c, Expr::Call { callee, .. })) if *callee == p => self.taken(c, p),
+                        _ => Holder::Nothing(Dropped::Contained(body.expr_span(p))),
+                    };
+                }
+                // `Database.commit(Database.begin())`: an argument.
+                Expr::Call { callee, .. } if *callee != at => return self.taken(p, *callee),
+                _ => return Holder::Nothing(Dropped::Contained(body.expr_span(p))),
+            }
+            at = p;
+        }
+    }
+
+    /// The value `at` holds, given to the declaration's caller.
+    fn given(&self, at: ExprId) -> Holder {
+        if self.gives {
+            Holder::Kept
+        } else {
+            Holder::Nothing(Dropped::Statement(self.body.expr_span(at)))
+        }
+    }
+
+    /// Given to `call`: ended there if its callee releases what was
+    /// acquired; otherwise taken by a callee that does not end it, or kept
+    /// in the value a case makes.
+    fn taken(&self, call: ExprId, callee: ExprId) -> Holder {
+        let span = self.body.expr_span(call);
+        match signature_of(self.sigs, self.types, self.body, callee) {
+            Some(sig)
+                if sig
+                    .effects
+                    .iter()
+                    .any(|e| type_argument(e, "resource.release").as_deref() == Some(self.ty)) =>
+            {
+                Holder::Kept
+            }
+            Some(_) => Holder::Nothing(Dropped::Taken(span, path_of(self.body, callee))),
+            None if function_value(self.body, self.types, callee) => {
+                Holder::Nothing(Dropped::Taken(span, path_of(self.body, callee)))
+            }
+            None => Holder::Nothing(Dropped::Contained(span)),
+        }
+    }
+
+    /// The function value `id` is in, if any: a `return` there leaves it.
+    fn enclosing_lambda(&self, mut id: ExprId) -> Option<ExprId> {
+        loop {
+            if matches!(self.body.expr(id), Expr::Lambda { .. }) {
+                return Some(id);
+            }
+            id = *self.parents.get(&id)?;
+        }
+    }
+}
+
+/// `Ok(x)`, `Err(e)`, `Some(x)`: the language's own cases, which hold what
+/// they are given. The argument.
+fn wraps(body: &Body, types: &Types<'_>, e: ExprId) -> Option<ExprId> {
+    let Expr::Call { callee, args } = body.expr(e) else {
+        return None;
+    };
+    let (Expr::Name(n), [arg]) = (body.expr(*callee), args.as_slice()) else {
+        return None;
+    };
+    (matches!(n.as_str(), "Ok" | "Err" | "Some") && types.lexical().binder(*callee).is_none())
+        .then_some(arg.value)
 }
 
 /// Does `e` mean the value `a` holds: a name whose binding is `a`'s
@@ -353,12 +628,10 @@ impl Paths<'_> {
         while i < stmts.len() && !flow.through.is_empty() {
             let s = stmts[i];
             // `return e` is two statements: the value, then the exit. Nothing
-            // after it on this path runs.
+            // after it on this path runs. The value is the body's, moved to
+            // the caller where it is the value named (`tails`).
             if matches!(self.body.expr(s), Expr::Name(n) if n == "return") {
                 let value = match stmts.get(i + 1) {
-                    Some(e) if means(self.body, self.types, *e, self.acquired) => {
-                        Flow::releasing(1)
-                    }
                     Some(e) => self.expr(*e),
                     None => Flow::identity(),
                 };
@@ -450,28 +723,65 @@ impl Paths<'_> {
     }
 }
 
-/// The expressions whose value is the body's.
-fn tails(body: &Body, id: ExprId, out: &mut BTreeSet<ExprId>) {
+/// **The expressions whose value is the body's**, given to the caller: its
+/// last statement's, and each `return`'s that is the body's own and not a
+/// function value's; through blocks, branches, arms, and `Ok(..)` and
+/// `Some(..)`, which hold what they are given. None where the declaration
+/// gives its caller nothing (ADR-0250): until then a body declaring `()`
+/// moved a transaction it ended in to a caller that never had it.
+fn tails(body: &Body, types: &Types<'_>, gives: bool) -> BTreeSet<ExprId> {
+    let mut out = BTreeSet::new();
+    if gives {
+        value_of(body, types, body.root, &mut out);
+        returned(body, types, body.root, &mut out);
+    }
+    out
+}
+
+/// The expressions whose value is `id`'s.
+fn value_of(body: &Body, types: &Types<'_>, id: ExprId, out: &mut BTreeSet<ExprId>) {
     match body.expr(id) {
         Expr::Block { stmts } => {
             if let Some(last) = stmts.last() {
-                tails(body, *last, out);
+                value_of(body, types, *last, out);
             }
         }
         Expr::If {
             then, els: Some(e), ..
         } => {
-            tails(body, *then, out);
-            tails(body, *e, out);
+            value_of(body, types, *then, out);
+            value_of(body, types, *e, out);
         }
         Expr::Match { arms, .. } => {
             for a in arms {
-                tails(body, a.body, out);
+                value_of(body, types, a.body, out);
             }
         }
         _ => {
             out.insert(id);
+            if let Some(held) = wraps(body, types, id) {
+                value_of(body, types, held, out);
+            }
         }
+    }
+}
+
+/// Each `return e` under `id`, outside a function value: `e`'s value is the
+/// body's.
+fn returned(body: &Body, types: &Types<'_>, id: ExprId, out: &mut BTreeSet<ExprId>) {
+    match body.expr(id) {
+        Expr::Lambda { .. } => return,
+        Expr::Block { stmts } => {
+            for w in stmts.windows(2) {
+                if matches!(body.expr(w[0]), Expr::Name(n) if n == "return") {
+                    value_of(body, types, w[1], out);
+                }
+            }
+        }
+        _ => {}
+    }
+    for c in body.children(id) {
+        returned(body, types, c, out);
     }
 }
 
@@ -491,15 +801,19 @@ enum Fault {
 
 /// The scope `a` is acquired in: the statements after its binding, in the
 /// block that holds it, or the whole body for a parameter.
-fn fault_of(body: &Body, types: &Types<'_>, a: &Acquired, releases: &[Span]) -> Option<Fault> {
-    let mut tail = BTreeSet::new();
-    tails(body, body.root, &mut tail);
+fn fault_of(
+    body: &Body,
+    types: &Types<'_>,
+    a: &Acquired,
+    releases: &[Span],
+    gives: bool,
+) -> Option<Fault> {
     let paths = Paths {
         body,
         types,
         acquired: a,
         releases,
-        tails: tail,
+        tails: tails(body, types, gives),
     };
     let (flow, end) = if a.parameter {
         (paths.expr(body.root), body.expr_span(body.root))
@@ -710,7 +1024,98 @@ fn report_unconsumed(
     let _ = hir;
 }
 
-/// Every function the program declares as releasing this resource type.
+/// **An acquisition nothing holds** (ADR-0250): it can never be ended.
+fn report_unheld(sigs: &Signatures, decl: &Decl, u: Unheld, at: &Span, out: &mut Vec<Diagnostic>) {
+    let ways = release_functions(sigs, &u.ty);
+    let ways = if ways.is_empty() {
+        "a function that releases it".to_string()
+    } else {
+        ways.iter()
+            .map(|w| format!("`{w}`"))
+            .collect::<Vec<_>>()
+            .join(" or ")
+    };
+    let ty = &u.ty;
+    let (reason, message, site, label) = match u.dropped {
+        Dropped::Discarded(span) => (
+            "affine_value_discarded",
+            format!("affine resource `{ty}` is bound to `_`, and nothing can release it"),
+            span,
+            "`_` binds nothing".to_string(),
+        ),
+        Dropped::Statement(span) => (
+            "affine_value_dropped",
+            format!("affine resource `{ty}` is acquired, and its statement drops it"),
+            span,
+            "nothing reads this statement's value".to_string(),
+        ),
+        Dropped::Taken(span, to) => (
+            "affine_value_taken",
+            format!("affine resource `{ty}` is given to `{to}`, which does not release it"),
+            span,
+            format!("`{to}` takes it, and nothing ends it after"),
+        ),
+        Dropped::Matched(span) => (
+            "affine_value_matched",
+            format!(
+                "affine resource `{ty}` is matched where it is acquired, and what the arms bind \
+                 is not followed"
+            ),
+            span,
+            "nothing follows a value an arm binds".to_string(),
+        ),
+        Dropped::Returned(span) => (
+            "affine_value_returned_by_a_function_value",
+            format!(
+                "affine resource `{ty}` is returned by a function value, which nothing follows"
+            ),
+            span,
+            "what calls this function value is not followed".to_string(),
+        ),
+        Dropped::Contained(span) => (
+            "affine_value_contained",
+            format!("affine resource `{ty}` is kept in a value that nothing follows"),
+            span,
+            "nothing follows this value".to_string(),
+        ),
+    };
+    let repair = if u.carried {
+        format!("bind it to a name with `?`, `let x = ..?`, and end it with {ways}")
+    } else {
+        format!("bind it to a name, and end it with {ways}")
+    };
+    out.push(Diagnostic {
+        code: codes::AFFINE_NOT_CONSUMED_ONCE.id,
+        invariant: codes::AFFINE_NOT_CONSUMED_ONCE.invariant,
+        reason,
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message,
+        primary_span: u.span,
+        related: vec![
+            Related { span: site, label },
+            Related {
+                span: at.clone(),
+                label: format!("`{}` must end it exactly once on every path", decl.name),
+            },
+        ],
+        explanation: Some(format!(
+            "A {ty} must end exactly once, with {ways}. What ends it is followed from \
+             a name: a binding, `let x = ..` or `use x = ..`, to where it is released. \
+             An acquisition no name holds, and that is neither ended where it is made \
+             nor given to the caller, can never be ended."
+        )),
+        repairs: vec![Repair {
+            description: repair,
+            replacement: None,
+        }],
+    });
+}
+
+/// Every function the program declares as releasing this resource type and
+/// taking one, as `released_parameters` reads a row. A declaration whose row
+/// releases one only because its body calls `commit` is not a way to end
+/// another's: until ADR-0250 the repair named the function being checked.
 fn release_functions(sigs: &Signatures, ty: &str) -> Vec<String> {
     let mut out: Vec<String> = sigs
         .iter()
@@ -718,6 +1123,11 @@ fn release_functions(sigs: &Signatures, ty: &str) -> Vec<String> {
             s.effects
                 .iter()
                 .any(|e| type_argument(e, "resource.release").as_deref() == Some(ty))
+                && s.params.iter().any(|p| {
+                    p.as_ref()
+                        .and_then(|r| r.resolved())
+                        .is_some_and(|t| t.written_source() == ty)
+                })
         })
         .map(|(path, _)| path.rsplit('.').next().unwrap_or(path).to_string())
         .collect();

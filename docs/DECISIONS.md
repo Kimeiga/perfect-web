@@ -2078,3 +2078,9 @@ a verification shard sets up only what its recipes need.
 - Setup was most of a shard's time. Recipes of a kind share shards, only
   browser recipes' shards install browsers and only build readers' build,
   the disk is freed in the background, and a run is at most 16 shards.
+[ADR-0250](DECISIONS/ADR-0250-let-discards-and-an-acquisition-is-held-or-refused.md):
+`let _` discards a value, and an acquisition is held or refused.
+- The owner's ruling 0099-a. `let _ = e` binds nothing, and satisfies PW0618;
+  a resource bound to `_` is PW2005. Its probes found PW2005 followed only
+  `let x = acquire()`: a statement, an argument, a branch, `let h = ..?` and
+  a function value's result each passed, leaking what they acquired.

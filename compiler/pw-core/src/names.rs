@@ -849,26 +849,43 @@ fn unseparated(head: Span, second: Span, src: &str) -> Diagnostic {
 }
 
 fn diagnostic(hir: &Hir, id: DeclId, decl: &Decl, span: Span, name: &str) -> Diagnostic {
+    // **`_` is read** (ADR-0250): it binds nothing, in a pattern or a `let`,
+    // so nothing can be bound before this use to give it a value.
+    let (message, explanation, repair) = if name == "_" {
+        (
+            "`_` binds nothing, and is no value".to_string(),
+            "`_` takes a value and drops it, in a pattern or a `let`: nothing is \
+             bound, and there is no value here to read."
+                .to_string(),
+            "bind the value to a name, `let x = ..`, and read `x`".to_string(),
+        )
+    } else {
+        (
+            format!("`{name}` does not resolve"),
+            format!(
+                "Nothing in scope here is called `{name}`: no parameter, no `let` or \
+                 pattern before this use, no declaration of this module, and no \
+                 import. A name must come from lexical scope, the module, or an \
+                 explicit import."
+            ),
+            format!("bind `{name}` before this use, declare it, or import it"),
+        )
+    };
     Diagnostic {
         code: crate::codes::UNRESOLVED_NAME.id,
         invariant: crate::codes::UNRESOLVED_NAME.invariant,
         reason: "unresolved_name",
         detector: Detector::DeclarationRule,
         severity: Severity::Error,
-        message: format!("`{name}` does not resolve"),
+        message,
         primary_span: span,
         related: vec![Related {
             span: hir.decl_span(id),
             label: format!("used inside `{}`", decl.name),
         }],
-        explanation: Some(format!(
-            "Nothing in scope here is called `{name}`: no parameter, no `let` or \
-             pattern before this use, no declaration of this module, and no \
-             import. A name must come from lexical scope, the module, or an \
-             explicit import."
-        )),
+        explanation: Some(explanation),
         repairs: vec![Repair {
-            description: format!("bind `{name}` before this use, declare it, or import it"),
+            description: repair,
             replacement: None,
         }],
     }

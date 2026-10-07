@@ -1,0 +1,21 @@
+// @status: GENERAL
+// @invariant: affine_not_consumed_once
+// @dimension: equivalent syntax — a `Result` carries the handle, taken out by `?`
+//
+// `Maps.create` answers a `Result`, and `?` takes the handle out of it: the
+// natural way to hold it. Until ADR-0250 a binding was followed only where
+// its value was the acquiring call itself, so this handle, never destroyed,
+// passed.
+
+module generality.affine_behind_try
+
+import Maps
+import browser.{ ElementRef, MapHandle, MapError }
+import domain.{ LatLng }
+
+fn show(container: ElementRef, center: LatLng) -> Result<(), MapError>
+    !{ dom.mutate, layout.measure, resource.acquire<MapHandle> }
+{
+    let handle = Maps.create(container, center)?
+    Ok(())
+}

@@ -1,0 +1,19 @@
+// @status: NEIGHBOUR
+// @invariant: affine_not_consumed_once
+// @dimension: valid neighbour — ended where it is made
+//
+// No binding holds the transaction, and none needs to: it is committed
+// where it is opened. An acquisition is held by a name, ended where it is
+// made, given to the caller, or held by a resource's `acquire` clause
+// (ADR-0250).
+
+module generality.affine_ended_where_made
+
+import Database
+import domain.{ CartError, DatabaseTransaction }
+
+fn touch() -> Result<(), CartError>
+    !{ database.transaction, resource.acquire<DatabaseTransaction>, resource.release<DatabaseTransaction> }
+{
+    Database.begin().commit()
+}

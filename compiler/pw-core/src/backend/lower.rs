@@ -1801,8 +1801,8 @@ impl<'a> Lower<'a> {
                     }
                     if let Expr::Let { pat, init, ty } = body.expr(*s) {
                         // A block ending in a binding is the unit value
-                        // (ADR-0159): `{ let _ignored = .. }` discards by
-                        // name, as ADR-0099 has it, and a handler may end so.
+                        // (ADR-0159): `{ let _ = .. }` discards, as ruling
+                        // 0099-a has it (ADR-0250), and a handler may end so.
                         // Where a value of another type is wanted, it cannot
                         // be given.
                         if tail && !matches!(expected, None | Some(Type::Unit)) {
