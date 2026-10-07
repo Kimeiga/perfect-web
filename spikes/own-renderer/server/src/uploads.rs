@@ -419,7 +419,7 @@ pub(crate) struct Answer {
 
 /// What every answer this module gives carries: the type it states is the
 /// type, and a document it serves runs nothing.
-const GUARDED: [(&str, &str); 2] = [
+const GUARDED: &[(&str, &str)] = &[
     ("x-content-type-options", "nosniff"),
     ("content-security-policy", "default-src 'none'; sandbox"),
 ];
