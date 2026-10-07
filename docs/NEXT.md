@@ -388,8 +388,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
           2026-10-07), each its own ADR as the feed hits it:
           1. ~~route-keyed speculation (0122-d): an optimistic reply~~
              (ADR-0236, `just e14-speculated-routes`); next a like on the
-             thread page, where `like`'s clause on the timeline, which the
-             page does not show, refuses it;
+             thread page (ADR-0238), where `like`'s clause on the timeline,
+             which the page does not show, refuses it. Writing it found that
+             lowering dropped its parses' errors: ~~what lowering parses, it
+             reports~~ (ADR-0237, `just e14-read-whole`). Then the findings
+             beside it, first: the registry's gaps (PW0101 and PW0102, one
+             number with two meanings); a clause read once, the graph reading
+             the keys lowering made, an interface's keys resolved too; an
+             `{#each}`'s head lowered by the grammar, once, for the five
+             places that split its text; two statements on one line;
           2. map keys (0057-a) and `let _` (0099-a);
           3. ADR-0195's ruling 10, materialization chains: a timeline built
              from who you follow, with follow and unfollow commands and a

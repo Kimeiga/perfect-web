@@ -1194,6 +1194,11 @@ pub struct Hir {
     pub modules: Arena<Module>,
     pub decls: Arena<Decl>,
     pub bodies: Arena<Body>,
+    /// **What lowering parsed and could not read** (ADR-0237): the errors of
+    /// its standalone parses, of what the declaration grammar keeps as text —
+    /// a clause's value, a string's hole, a block marker's expression — each
+    /// span in the file. The checker reports them as it does the file's.
+    pub syntax: Vec<pw_syntax::SyntaxError>,
 }
 
 impl Hir {

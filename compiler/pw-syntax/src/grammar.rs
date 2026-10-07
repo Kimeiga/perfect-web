@@ -329,6 +329,10 @@ struct P<'a> {
     /// A checkpoint taken before a visibility keyword, so the declaration that
     /// follows can re-parent it (see [`P::start`]).
     pending_vis: Option<rowan::Checkpoint>,
+    /// What the end of the text is, when it is not the file's (ADR-0237): a
+    /// standalone parse reads a hole or a clause's value, which ends in the
+    /// middle of its file.
+    end: String,
 }
 
 impl<'a> P<'a> {
@@ -341,6 +345,32 @@ impl<'a> P<'a> {
             errors: Vec::new(),
             fuel: 0,
             pending_vis: None,
+            end: "end of file".to_string(),
+        }
+    }
+
+    /// A standalone parse of text whose end is `end` (ADR-0237).
+    fn standalone(src: &'a str, end: String) -> Self {
+        Self {
+            end,
+            ..Self::new(src)
+        }
+    }
+
+    /// Where the last significant token read ends.
+    fn read_to(&self) -> usize {
+        self.toks[..self.pos]
+            .iter()
+            .rev()
+            .find(|t| !t.kind.is_trivia())
+            .map_or(0, |t| t.span.end)
+    }
+
+    /// The current token, as an error names what it found.
+    fn found(&self) -> String {
+        match self.cur() {
+            Kind::Eof => self.end.clone(),
+            k => k.describe().to_string(),
         }
     }
 
@@ -513,13 +543,81 @@ impl<'a> P<'a> {
         });
     }
 
+    /// **What a standalone parse leaves unread** (ADR-0237): one error over
+    /// the whole rest, kept in the tree as an `ErrorExpr` so the parse stays
+    /// lossless. It was an error per token, which no one saw: lowering
+    /// dropped every error a standalone parse made.
+    fn rest_unread(&mut self, message: &str, help: Option<&str>) {
+        if self.at_eof() {
+            return;
+        }
+        let start = self.cur_span().start;
+        let mut end = start;
+        self.start(K::ErrorExpr);
+        while !self.at_eof() {
+            end = self.cur_span().end;
+            self.bump();
+        }
+        self.finish();
+        self.errors.push(SyntaxError {
+            code: "PW0016",
+            message: message.to_string(),
+            span: start..end,
+            help: help.map(str::to_string),
+        });
+    }
+
+    /// **Items separated by commas, each read by `item`** (ADR-0237), as
+    /// rustc reads a sequence (`parse_seq_to_before_tokens`):
+    /// - an item with no comma before it is read, and the missing comma is
+    ///   the error, with its repair. What the list holds is what was meant;
+    /// - one that does not parse there is no item: its own errors are
+    ///   dropped, and the missing comma is the error, over all that is left.
+    fn comma_separated(&mut self, item: impl Fn(&mut Self), message: &str, repair: &str) {
+        let mut first = true;
+        while !self.at_eof() {
+            let missing = !first && !self.eat(Kind::Comma);
+            if self.at_eof() {
+                break;
+            }
+            let (before, start, errors) = (self.pos, self.cur_span().start, self.errors.len());
+            item(self);
+            if self.pos == before {
+                break;
+            }
+            if missing {
+                let read = self.errors.len() == errors;
+                self.errors.truncate(errors);
+                if !read {
+                    self.start(K::ErrorExpr);
+                    while !self.at_eof() {
+                        self.bump();
+                    }
+                    self.finish();
+                }
+                let end = self.read_to();
+                self.errors.push(SyntaxError {
+                    code: "PW0016",
+                    message: message.to_string(),
+                    span: start..end,
+                    help: read.then(|| repair.to_string()),
+                });
+                if !read {
+                    break;
+                }
+            }
+            first = false;
+        }
+        self.rest_unread(message, None);
+    }
+
     /// Consume `k` or report a diagnostic and keep going. Recovery is
     /// deliberate: a missing closer should not truncate the rest of the file.
     fn expect(&mut self, k: Kind, ctx: &str) -> bool {
         if self.eat(k) {
             return true;
         }
-        let found = self.cur().describe();
+        let found = self.found();
         let want = k.describe();
         self.error("PW0001", format!("expected {want} {ctx}, found {found}"));
         false
@@ -532,7 +630,7 @@ impl<'a> P<'a> {
             self.finish();
             true
         } else {
-            let found = self.cur().describe();
+            let found = self.found();
             self.error("PW0001", format!("expected {what}, found {found}"));
             false
         }
@@ -541,7 +639,7 @@ impl<'a> P<'a> {
     /// A dotted path consumed as one `Name` node: `store.pricing`, `database.read`.
     fn dotted_name(&mut self, what: &str) -> bool {
         if !self.at(Kind::Ident) {
-            let found = self.cur().describe();
+            let found = self.found();
             self.error("PW0001", format!("expected {what}, found {found}"));
             return false;
         }
@@ -606,7 +704,7 @@ impl<'a> P<'a> {
             return true;
         }
         if !self.at(Kind::Ident) {
-            let found = self.cur().describe();
+            let found = self.found();
             self.error("PW0001", format!("expected a type, found {found}"));
             return false;
         }
@@ -1014,7 +1112,7 @@ impl<'a> P<'a> {
             }
             _ => {
                 self.start(K::ErrorExpr);
-                let found = self.cur().describe();
+                let found = self.found();
                 self.error("PW0009", format!("expected an expression, found {found}"));
                 self.bump();
                 self.finish();
@@ -2027,7 +2125,7 @@ impl<'a> P<'a> {
             }
             _ => {
                 self.start(K::WildcardPat);
-                let found = self.cur().describe();
+                let found = self.found();
                 self.error("PW0011", format!("expected a pattern, found {found}"));
                 self.bump();
                 self.finish();
@@ -2637,7 +2735,7 @@ impl<'a> P<'a> {
             let before = self.pos;
             if !self.decl() {
                 self.start(K::ErrorDecl);
-                let found = self.cur().describe();
+                let found = self.found();
                 self.error_help(
                     "PW0007",
                     format!("expected a declaration, found {found}"),
@@ -2673,15 +2771,10 @@ pub fn parse_tree(src: &str) -> Parse {
 /// This is for legacy HIR slots which retain source text, not for reparsing an
 /// already resolved or serialized semantic type. Extra tokens are an error.
 pub fn parse_type(src: &str) -> Parse {
-    let mut p = P::new(src);
+    let mut p = P::standalone(src, "the end of the type".to_string());
     p.b.start(K::SourceFile);
     p.type_ref();
-    while !p.at_eof() {
-        p.start(K::ErrorExpr);
-        p.error("PW0103", "a type annotation is one type");
-        p.bump();
-        p.finish();
-    }
+    p.rest_unread("a type annotation is one type", None);
     p.b.finish_node();
     Parse {
         green: SyntaxNode::new_root(p.b.finish()),
@@ -2709,7 +2802,7 @@ pub fn parse_type(src: &str) -> Parse {
 /// Which policy heads take this shape is `pw_core::policy`'s answer. This is
 /// the grammar; the table lives where the rest of the policy vocabulary does.
 pub fn parse_transition_clause(src: &str) -> Parse {
-    let mut p = P::new(src);
+    let mut p = P::standalone(src, "the end of the clause".to_string());
     p.b.start(K::SourceFile);
     p.b.start(K::TransitionClause);
     if !p.at_eof() {
@@ -2721,28 +2814,23 @@ pub fn parse_transition_clause(src: &str) -> Parse {
             p.name("a name for the resource's current value");
         } else {
             p.error(
-                "PW0104",
+                "PW0017",
                 "expected `as <name>` — an optimistic clause binds the \
                  resource's current value",
             );
         }
-        if p.eat(Kind::FatArrow) {
+        // The transition is read without its arrow too, so the arrow is the
+        // one error (ADR-0237). After the arrow, a transition is expected,
+        // and its absence is the error.
+        let arrow = p.eat(Kind::FatArrow);
+        if !arrow {
+            p.error("PW0017", "expected `=>` and a transition expression");
+        }
+        if arrow || !p.at_eof() {
             p.expr(0);
-        } else {
-            p.error("PW0105", "expected `=>` and a transition expression");
         }
     }
-    while !p.at_eof() {
-        p.fuel += 1;
-        if p.fuel > 200_000 {
-            p.error("PW0099", "parser made no progress");
-            break;
-        }
-        p.start(K::ErrorExpr);
-        p.error("PW0103", "an optimistic clause is one transition");
-        p.bump();
-        p.finish();
-    }
+    p.rest_unread("an optimistic clause is one transition", None);
     p.b.finish_node();
     p.b.finish_node();
     Parse {
@@ -2757,37 +2845,25 @@ pub fn parse_transition_clause(src: &str) -> Parse {
 /// (E6F), and a second reader of Pleris expressions is exactly what that
 /// milestone existed to remove.
 ///
-/// Written for policy values whose domain is executable code:
-/// `optimistic cart.add(item, quantity)` is a term, and the declaration-level
-/// policy grammar keeps a policy's value as TEXT. Until 2026-08-10 nothing had
-/// ever parsed those, so two real client-side calls naming something that does
-/// not exist had never been examined.
+/// Written for an expression the declaration grammar keeps as text: a
+/// string's hole, `{a}` in `"sum {a}"`, and the expression a block marker
+/// carries, `c` in `{#if c}` (ADR-0237). `what` names it, for the error
+/// reporting what follows the expression: "a hole is one expression".
 ///
 /// The returned tree is rooted at `K::SourceFile` with the expression as its
 /// only child, so every consumer that walks a tree works unchanged. Spans are
-/// relative to `src` and the caller offsets them — see
-/// `pw_core::lower`'s policy-term lowering.
-pub fn parse_expr(src: &str) -> Parse {
-    let mut p = P::new(src);
+/// relative to `src`; a caller that pads `src` to the expression's place in
+/// its file gets spans in that file.
+pub fn parse_expr(src: &str, what: &str) -> Parse {
+    let mut p = P::standalone(src, format!("the end of {what}"));
     p.b.start(K::SourceFile);
     if !p.at_eof() {
         p.expr(0);
     }
-    while !p.at_eof() {
-        p.fuel += 1;
-        if p.fuel > 200_000 {
-            p.error("PW0099", "parser made no progress");
-            break;
-        }
-        // Anything after the first expression is a second value in a position
-        // that takes one. Reported rather than dropped: a policy whose value
-        // is `a b` means something the compiler does not understand, and
-        // silence would make it mean nothing at all.
-        p.start(K::ErrorExpr);
-        p.error("PW0103", "a policy value is one expression");
-        p.bump();
-        p.finish();
-    }
+    // Anything after the first expression is a second value in a position
+    // that takes one. Reported rather than dropped: `"sum {a b}"` rendered
+    // `a`, and `{#if flag other}` was decided by `flag`, until ADR-0237.
+    p.rest_unread(&format!("{what} is one expression"), None);
     p.b.finish_node();
     Parse {
         green: SyntaxNode::new_root(p.b.finish()),
@@ -2803,26 +2879,13 @@ pub fn parse_expr(src: &str) -> Parse {
 /// each one must be — a name, or a name applied to its key — is the policy's
 /// question, not the grammar's.
 pub fn parse_expr_list(src: &str) -> Parse {
-    let mut p = P::new(src);
+    let mut p = P::standalone(src, "the end of the clause".to_string());
     p.b.start(K::SourceFile);
-    while !p.at_eof() {
-        let before = p.pos;
-        p.expr(0);
-        if !p.eat(Kind::Comma) || p.pos == before {
-            break;
-        }
-    }
-    while !p.at_eof() {
-        p.fuel += 1;
-        if p.fuel > 200_000 {
-            p.error("PW0099", "parser made no progress");
-            break;
-        }
-        p.start(K::ErrorExpr);
-        p.error("PW0103", "a clause's values are separated by commas");
-        p.bump();
-        p.finish();
-    }
+    p.comma_separated(
+        |p| p.expr(0),
+        "a clause's values are separated by commas",
+        "write a comma before this value",
+    );
     p.b.finish_node();
     Parse {
         green: SyntaxNode::new_root(p.b.finish()),
@@ -3749,5 +3812,79 @@ mod tests {
         // docs/RISK_QUEUE.md negative control.
         assert!(parse_tree("module m\n").ok());
         assert!(!parse_tree("module m\n$$$\n").ok());
+    }
+
+    #[test]
+    fn what_a_standalone_parse_leaves_is_one_error_over_it() {
+        // ADR-0237: it was an error per token, and no one saw any.
+        let src = "a b c";
+        let p = parse_expr(src, "a hole");
+        assert_lossless(src, &p);
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(p.errors[0].code, "PW0016");
+        assert_eq!(p.errors[0].message, "a hole is one expression");
+        assert_eq!(&src[p.errors[0].span.clone()], "b c");
+        // The control.
+        assert!(parse_expr("a.b", "a hole").ok());
+        // Its end is the hole's, not the file's.
+        let p = parse_expr("a ==", "a hole");
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(
+            p.errors[0].message,
+            "expected an expression, found the end of a hole"
+        );
+    }
+
+    #[test]
+    fn a_value_with_no_comma_before_it_is_reported_and_read() {
+        // ADR-0237, as rustc reads an omitted separator: two values, and one
+        // error over the second.
+        let src = "Liked(id) Posted(_)";
+        let p = parse_expr_list(src);
+        assert_lossless(src, &p);
+        assert_eq!(texts(&p, K::CallExpr), ["Liked(id)", "Posted(_)"]);
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(p.errors[0].code, "PW0016");
+        assert_eq!(&src[p.errors[0].span.clone()], "Posted(_)");
+        // The control.
+        assert!(parse_expr_list("Liked(id), Posted(_)").ok());
+        // What is not a value after a comma is that value's error alone.
+        let p = parse_expr_list("Liked(id), )");
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(p.errors[0].code, "PW0009");
+        // What is not a value where a comma is missing is no value: the
+        // comma is the error, over all that is left, as rustc reports it.
+        let src = "Liked(id) ; ;";
+        let p = parse_expr_list(src);
+        assert_lossless(src, &p);
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(p.errors[0].code, "PW0016");
+        assert_eq!(&src[p.errors[0].span.clone()], "; ;");
+        assert_eq!(p.errors[0].help, None);
+    }
+
+    #[test]
+    fn an_optimistic_clause_without_its_arrow_reads_its_transition() {
+        // ADR-0237: the arrow is the one error, and the transition is read.
+        let src = "Cart(s) as cart add(cart)";
+        let p = parse_transition_clause(src);
+        assert_lossless(src, &p);
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(p.errors[0].code, "PW0017");
+        assert_eq!(texts(&p, K::CallExpr), ["Cart(s)", "add(cart)"]);
+        // After the arrow, its absence is the error.
+        let p = parse_transition_clause("Cart(s) as cart =>");
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(
+            p.errors[0].message,
+            "expected an expression, found the end of the clause"
+        );
+        // Text after the transition is the rest's error.
+        let src = "Cart(s) as cart => add(cart) more";
+        let p = parse_transition_clause(src);
+        assert_lossless(src, &p);
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(p.errors[0].code, "PW0016");
+        assert_eq!(&src[p.errors[0].span.clone()], "more");
     }
 }

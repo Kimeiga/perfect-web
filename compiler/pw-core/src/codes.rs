@@ -139,6 +139,16 @@ codes! {
     // parser's error says what is wrong; none did. `()` checked as an `Int`.
     UNREAD = "PW0015" / unread / 1, Syntax,
         "every expression and pattern in a file that parses is one the compiler reads";
+    // ADR-0237: what the declaration grammar keeps as text and lowering
+    // parses, a clause's value, a string's hole and a block marker's
+    // expression. Its errors were dropped, so `invalidates Cart(s) Order(s)`
+    // invalidated no order, and `{#if flag other}` was decided by `flag`.
+    // The grammar emitted them as PW0103 to PW0105, numbers in the semantic
+    // range no one registered, since no one saw them.
+    READ_WHOLE = "PW0016" / read_whole / 1, Syntax,
+        "a clause's value, a string's hole and a block marker's expression are read whole, and nothing follows what their grammar reads";
+    OPTIMISTIC_CLAUSE = "PW0017" / optimistic_clause / 1, Syntax,
+        "an optimistic clause names an entry, binds its value with `as`, and gives its transition after `=>`";
     NO_PROGRESS = "PW0099" / no_progress / 1, Syntax, "the parser made no progress";
 
     // --- name resolution (PW002x) -----------------------------------------

@@ -169,20 +169,42 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
     }
 }
 
-/// The first expression node inside a synthetic wrapper's function body.
-fn first_expr(root: &SyntaxNode) -> Option<SyntaxNode> {
-    root.descendants()
-        .find(|n| n.kind() == K::BlockExpr)?
-        .children()
-        .find(|c| is_expr(c.kind()))
-}
-
-/// The shortest synthetic program that puts an expression in expression
-/// position. Padded to the hole's own offset so every span the sub-parse
-/// produces already points into the real file.
-const HOLE_PREFIX: &str = "module h\nfn h()->(){";
-
 impl Lowerer<'_> {
+    /// **An interface's clauses, parsed for what they do not read**
+    /// (ADR-0237). A declaration with no body has no arena for its clauses'
+    /// terms, and lowering makes none, so they were never parsed at all. Their
+    /// parses' errors are reported all the same. That an interface's keys are
+    /// not resolved is a limitation of its own.
+    fn clause_syntax(&mut self, policies: &[Policy]) {
+        for p in policies {
+            let parse: fn(&str) -> pw_syntax::Parse = if crate::policy::keyed(&p.name).is_some() {
+                pw_syntax::parse_expr_list
+            } else if crate::policy::domain_of(&p.name) == Some(crate::policy::Domain::Transition) {
+                pw_syntax::parse_transition_clause
+            } else {
+                continue;
+            };
+            let (value, offset) = self.written_value(p);
+            if !value.is_empty() {
+                let parsed = parse(&value);
+                self.read_errors(&parsed, offset);
+            }
+        }
+    }
+
+    /// **A standalone parse's errors, each moved to its place in the file**
+    /// (ADR-0237). Until then they were dropped, and what such a parse could
+    /// not read was simply not there: `invalidates Cart(s) Order(s)`
+    /// invalidated no order.
+    fn read_errors(&mut self, parsed: &pw_syntax::Parse, offset: usize) {
+        self.hir
+            .syntax
+            .extend(parsed.errors.iter().map(|e| pw_syntax::SyntaxError {
+                span: (e.span.start + offset)..(e.span.end + offset),
+                ..e.clone()
+            }));
+    }
+
     /// The `{expr}` holes in a string literal, lowered with the REAL grammar.
     ///
     /// The alternative — a small parser for what may appear in a hole — is the
@@ -190,10 +212,9 @@ impl Lowerer<'_> {
     /// and it fails the same way: the two grammars disagree about something and
     /// the checker quietly analyses a different program from the one that runs.
     ///
-    /// So the hole is handed to `pw_syntax::parse` inside a synthetic wrapper
-    /// whose prefix is space-padded to exactly the hole's offset in the real
-    /// source. Every span that comes back is therefore already correct, with no
-    /// arithmetic to get wrong.
+    /// So the hole is handed to `pw_syntax::parse_expr`, space-padded to
+    /// exactly the hole's offset in the real source. Every span that comes
+    /// back is therefore already correct, with no arithmetic to get wrong.
     fn interpolations(&mut self, b: &mut BodyBuilder, text: &str, at: usize) -> Vec<ExprId> {
         let mut out = Vec::new();
         let mut rest = text;
@@ -201,7 +222,7 @@ impl Lowerer<'_> {
         while let Some(open) = rest.find('{') {
             let after = &rest[open + 1..];
             let Some(close) = after.find('}') else { break };
-            if let Some(id) = self.expression_at(b, &after[..close], base + open + 1) {
+            if let Some(id) = self.expression_at(b, &after[..close], base + open + 1, "a hole") {
                 out.push(id);
             }
             base = base + open + 1 + close + 1;
@@ -211,36 +232,47 @@ impl Lowerer<'_> {
     }
 
     /// One expression written at `at` in the real file: a string's hole, or
-    /// the subject a block marker carries (`c` in `{#if c}`). Lowered with the
-    /// real grammar, like every other expression.
-    fn expression_at(&mut self, b: &mut BodyBuilder, hole: &str, at: usize) -> Option<ExprId> {
-        if hole.trim().is_empty() || at < HOLE_PREFIX.len() {
+    /// the expression a block marker carries (`c` in `{#if c}`). Lowered with
+    /// the real grammar, like every other expression, and read whole (ADR-0237):
+    /// what follows the expression is an error, which `what` names. It was a
+    /// statement after it, in a synthetic function's body, and dropped.
+    fn expression_at(
+        &mut self,
+        b: &mut BodyBuilder,
+        hole: &str,
+        at: usize,
+        what: &str,
+    ) -> Option<ExprId> {
+        if hole.trim().is_empty() {
             return None;
         }
-        let pad = at - HOLE_PREFIX.len();
-        let mut synthetic = String::with_capacity(at + hole.len() + 1);
-        synthetic.push_str(HOLE_PREFIX);
-        synthetic.push_str(&" ".repeat(pad));
-        synthetic.push_str(hole);
-        synthetic.push('}');
+        let mut padded = String::with_capacity(at + hole.len());
+        padded.push_str(&" ".repeat(at));
+        padded.push_str(hole);
 
-        let parsed = pw_syntax::parse_tree(&synthetic);
+        let parsed = pw_syntax::parse_expr(&padded, what);
+        self.read_errors(&parsed, 0);
         let mut sub = Lowerer {
             hir: std::mem::take(&mut self.hir),
-            src: &synthetic,
+            src: &padded,
         };
-        let id = first_expr(&parsed.green).map(|e| sub.expr(b, &e));
+        let id = parsed
+            .green
+            .children()
+            .find(|c| is_expr(c.kind()))
+            .map(|e| sub.expr(b, &e));
         self.hir = sub.hir;
         id
     }
 
     /// The expression a block marker carries after one of `prefixes`: `c` in
-    /// `{#if c}` or `{:else if c}`, `e` in `{#match e}`.
+    /// `{#if c}` or `{:else if c}`, `e` in `{#match e}`. `what` names it.
     fn marker_expression(
         &mut self,
         b: &mut BodyBuilder,
         node: &SyntaxNode,
         prefixes: &[&str],
+        what: &str,
     ) -> Option<ExprId> {
         let raw = text(self.src, node);
         let lead = raw.len() - raw.trim_start().len();
@@ -250,14 +282,14 @@ impl Lowerer<'_> {
                 .is_some_and(|r| r.starts_with(char::is_whitespace))
         })?;
         let inner = t[prefix.len()..].trim_end().strip_suffix('}')?;
-        self.expression_at(b, inner, span_of(node).start + lead + prefix.len())
+        self.expression_at(b, inner, span_of(node).start + lead + prefix.len(), what)
     }
 
     /// `{:else}`, `{:else if c}`, `{:Some(x)}`: a block's branch marker, kept
     /// at its place (ADR-0042).
     fn branch(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> NodeId {
         let marker = text(self.src, node);
-        let condition = self.marker_expression(b, node, &["{:else if"]);
+        let condition = self.marker_expression(b, node, &["{:else if"], "a branch's condition");
         let inner = marker
             .trim()
             .trim_start_matches("{:")
@@ -345,6 +377,9 @@ impl Lowerer<'_> {
             Some(b) => self.body(id, &b, &mut policies),
             None => (None, Vec::new()),
         };
+        if body.is_none() {
+            self.clause_syntax(&policies);
+        }
         // Internal invariant, not a claim about the program: `id` was
         // returned by `alloc` four lines up and arenas do not shrink. No `.pw`
         // source can make this absent.
@@ -667,6 +702,7 @@ impl Lowerer<'_> {
                 continue;
             }
             let parsed = pw_syntax::parse_transition_clause(&value);
+            self.read_errors(&parsed, offset);
             let Some(clause) = parsed
                 .green
                 .children()
@@ -756,6 +792,7 @@ impl Lowerer<'_> {
             return;
         }
         let parsed = pw_syntax::parse_expr_list(&value);
+        self.read_errors(&parsed, offset);
         let items: Vec<SyntaxNode> = parsed
             .green
             .children()
@@ -845,7 +882,8 @@ impl Lowerer<'_> {
                             let mut parts = Vec::new();
                             for p in &pieces {
                                 if let pw_syntax::strings::Piece::Hole { source, at } = p
-                                    && let Some(id) = self.expression_at(b, source, span.start + at)
+                                    && let Some(id) =
+                                        self.expression_at(b, source, span.start + at, "a hole")
                                 {
                                     parts.push(id);
                                 }
@@ -1484,9 +1522,9 @@ impl Lowerer<'_> {
                     .filter(|c| Some(c) != open.as_ref())
                     .filter(|c| text(self.src, c).trim_start().starts_with("{/"));
                 let directive = open.as_ref().map(|i| text(self.src, i)).unwrap_or_default();
-                let subject = open
-                    .as_ref()
-                    .and_then(|o| self.marker_expression(b, o, &["{#if", "{#match"]));
+                let subject = open.as_ref().and_then(|o| {
+                    self.marker_expression(b, o, &["{#if", "{#match"], "a block's subject")
+                });
                 let mut children = Vec::new();
                 for c in node.children().filter(|c| is_markup(c.kind())) {
                     if Some(&c) == open.as_ref() || Some(&c) == close.as_ref() {

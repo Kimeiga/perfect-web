@@ -1996,3 +1996,10 @@ a speculation on the entry a page's parameter keys (ruling 0122-d).
   unchanged. A speculated entry is named by the page's parameters its key reads.
   The feed's thread page shows a reply before the server answers, in three
   engines.
+[ADR-0237](DECISIONS/ADR-0237-what-lowering-parses-it-reports.md):
+what lowering parses, it reports (a correction).
+- A clause's value, a string's hole and a block marker's expression are parsed
+  by lowering, and every error those parses made was dropped:
+  `invalidates Cart(s) Order(s)` invalidated no order, and `{#if flag other}`
+  was decided by `flag`. They are reported now, at their place, as PW0016 and
+  PW0017; a missing comma or arrow is reported and read past, as rustc does.

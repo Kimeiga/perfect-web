@@ -5130,8 +5130,11 @@ fn check_unit_with(
     types: &std::collections::BTreeSet<String>,
     unit: &Unit,
 ) -> Vec<Diagnostic> {
-    // What the compiler cannot read, first (ADR-0200).
-    let mut out = unread(&unit.hir, &unit.src);
+    // What the compiler cannot read, first: what lowering parsed and could
+    // not read (ADR-0237), then what it read and has no meaning for
+    // (ADR-0200).
+    let mut out: Vec<Diagnostic> = unit.hir.syntax.iter().cloned().map(syntax_error).collect();
+    out.extend(unread(&unit.hir, &unit.src));
 
     // Placement is inherited: a `fn` inside a `component placement browser`
     // runs in the browser too. Checking each declaration in isolation misses
@@ -6208,8 +6211,17 @@ pub(crate) fn syntax_error(e: pw_syntax::SyntaxError) -> Diagnostic {
         message: e.message,
         primary_span: e.span,
         related: Vec::new(),
-        explanation: e.help,
-        repairs: Vec::new(),
+        explanation: None,
+        // The parser's help says what to write, as a repair does, and is
+        // rendered as `pw check` renders a file's parse errors' (ADR-0237).
+        repairs: e
+            .help
+            .map(|description| Repair {
+                description,
+                replacement: None,
+            })
+            .into_iter()
+            .collect(),
     }
 }
 
@@ -6221,7 +6233,16 @@ pub(crate) fn syntax_error(e: pw_syntax::SyntaxError) -> Diagnostic {
 /// and the backend's `Checked::of` keep out or refuse one that does not), so
 /// an error node here is text the parser accepted and nothing reported.
 /// `()` was one until ADR-0200, and `fn f() -> Int !{} { () }` checked.
+///
+/// Except where lowering parses text itself (ADR-0237): `{#if flag ==}` is an
+/// error node, and the parse's own error, reported, says what is wrong. Such
+/// a node is that error, and is not reported twice.
 fn unread(hir: &Hir, src: &str) -> Vec<Diagnostic> {
+    let reported = |span: &hir::Span| {
+        hir.syntax
+            .iter()
+            .any(|e| span.start <= e.span.start && e.span.start <= span.end)
+    };
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {
         let Some(b) = decl.body else { continue };
@@ -6235,7 +6256,7 @@ fn unread(hir: &Hir, src: &str) -> Vec<Diagnostic> {
             .iter()
             .filter(|(_, p, _)| matches!(p, HPat::Error))
             .map(|(_, _, span)| ("a pattern", span.clone()));
-        for (what, span) in exprs.chain(patterns) {
+        for (what, span) in exprs.chain(patterns).filter(|(_, span)| !reported(span)) {
             let text = src.get(span.clone()).unwrap_or_default().trim();
             out.push(Diagnostic {
                 code: crate::codes::UNREAD.id,

@@ -14,6 +14,23 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0237, 2026-10-07: what lowering parses, it reports** (a correction,
+found writing ADR-0238). The grammar keeps a clause's value, a string's hole
+and a block marker's expression as text, and lowering parsed each and dropped
+the parse's errors. So `invalidates Cart(s) Order(s)` checked and invalidated
+no order, `"sum {a b}"` rendered `a`, and `{#if flag other}` was decided by
+`flag`. Each is refused now at its place, as PW0016 `read_whole` or PW0017
+`optimistic_clause`, codes registered in the syntax range. A missing comma or
+arrow is reported and read past, as rustc reads an omitted separator. An
+`{#each}`'s head, read by splitting its text in five places, and two
+statements on one line are their own ADRs (`just e14-read-whole`).
+
+**ADR-0210's urgent defect 3 is not one** (verified 2026-10-07; it was
+marked unverified). A page's handler calling a command whose body is `todo`
+is refused at build: "`feed.app.Home` depends on `feed.app.like`, whose body
+is a placeholder (`todo`)". `pw check` passes it: a placeholder is refused
+once a build depends on it (ADR-0034).
+
 **ADR-0236, 2026-10-07: a speculation on the entry a page's parameter keys**
 (ruling 0122-d, the first of the owner's Twitter gaps). A target keyed by a
 command's parameter, `optimistic Thread(to)`, matched no page: the thread page

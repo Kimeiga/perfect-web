@@ -4636,3 +4636,23 @@ e14-speculated-routes:
        CARGO_INCREMENTAL=0 python3 scripts/speculated_routes_mutations.py; \
      } > docs/evidence/E14/speculated-routes.txt
     @grep -E "^test result|passed|mutants killed" docs/evidence/E14/speculated-routes.txt
+
+# ADR-0237: what lowering parses, it reports. The checker's tests, the
+# parser's, the corpus, and the mutation controls.
+e14-read-whole:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0237 - what lowering parses, it reports"; echo; \
+       echo "produced by: just e14-read-whole"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/read_whole.rs)"; echo; \
+       cargo test --locked -p pw-core --test read_whole 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the parser (compiler/pw-syntax/src/grammar.rs)"; echo; \
+       cargo test --locked -p pw-syntax --lib -- what_a_standalone_parse_leaves a_value_with_no_comma an_optimistic_clause_without 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the corpus (corpus-check, checking_source.rs)"; echo; \
+       cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
+       cargo test --locked -p pw-core --test checking_source 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/read_whole_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/read_whole_mutations.py; \
+     } > docs/evidence/E14/read-whole.txt
+    @grep -E "^test result|corpus-check|mutants killed" docs/evidence/E14/read-whole.txt

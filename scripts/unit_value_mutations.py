@@ -62,8 +62,8 @@ MUTANTS = [
     (
         "an expression the compiler cannot read checks",
         CHECK,
-        "    let mut out = unread(&unit.hir, &unit.src);\n",
-        "    let mut out = unread(&unit.hir, &unit.src);\n    out.retain(|d| d.code != crate::codes::UNREAD.id);\n",
+        "    out.extend(unread(&unit.hir, &unit.src));\n",
+        "    out.extend(unread(&unit.hir, &unit.src));\n    out.retain(|d| d.code != crate::codes::UNREAD.id);\n",
     ),
     (
         "a block left open takes its element's close tag",

@@ -11,6 +11,23 @@ Those historical statements must not override current source or test results.
 
 ## Value checking and generated execution
 
+**What the parser does not read yet** (found with ADR-0237, which made
+lowering report what it parses):
+
+- **An `{#each}`'s head is read by splitting its text**, in five places
+  (`resolve.rs`, `template_ir.rs`, `infer.rs`, `names.rs`, `marko.rs`), and
+  never parsed: `{#each xs ys as x (x)}` checks.
+- **Two expressions on one line of a block are two statements**:
+  `fn f(a: Int, b: Int) -> Int !{} { a b }` checks, and is `b`.
+- **The resource graph reads a clause's text, not the keys lowering made**:
+  it splits the value at its commas, so a comma inside a key's string splits
+  the key.
+- **An interface's clause keys are not resolved**: a declaration with no body
+  has no arena for their terms. `invalidates_on Changed(nosuch)` on a `query`
+  with no body checks.
+- **The registry does not have every code emitted.** The declaration rules
+  emit PW0101 and PW0102, and the parser's `for` without `in` is PW0102 too.
+
 **E9-V1..V6 are met** (2026-09-24, ADR-0031). What the value relations do not
 decide is Undecided, counted by `pw audit-values`, and never reported as
 agreement:
