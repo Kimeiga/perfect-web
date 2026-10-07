@@ -111,15 +111,16 @@ pub(crate) fn user_of(session: &str) -> String {
 }
 
 /// **Who `session` reads as** (track `identity`, ADR-XXXX), the program's
-/// `Viewer`: signed in or not, its user, and its name.
+/// `Viewer`: signed in or not, to an account or as the guest model's guest,
+/// and its name.
 pub(crate) fn viewer_val(principal: Option<Principal>) -> Val {
-    let (signed_in, id, name) = match principal {
-        Some(p) => (true, p.user, p.name),
-        None => (false, String::new(), String::new()),
+    let (signed_in, account, name) = match principal {
+        Some(p) => (true, !p.is_guest(), p.name),
+        None => (false, false, String::new()),
     };
     Val::Record(vec![
         ("signed-in".into(), Val::Bool(signed_in)),
-        ("id".into(), Val::String(id)),
+        ("account".into(), Val::Bool(account)),
         ("name".into(), Val::String(name)),
     ])
 }

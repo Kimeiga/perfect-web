@@ -649,6 +649,20 @@ fn two_users_pages_never_share_private_parts() {
     }
 }
 
+/// **The guest model's reader is its session's guest**, the development
+/// model the server held before the track: signed in, named for the
+/// session, posting as it, and with no account to sign out of.
+#[test]
+fn the_guest_models_reader_is_its_sessions_guest() {
+    let s = served_feed();
+    let html = home(&s, "s-guest");
+    assert!(html.contains("Signed in as Guest s-guest"), "{html}");
+    assert!(!html.contains("action=\"/sign-out\""), "{html}");
+    assert!(!html.contains("Sign in to post"), "{html}");
+    let answer = command(&s, "feed.app.post", "s-guest", "i-1", "[\"As a guest\"]");
+    assert!(answer.contains("\"committed\":true"), "{answer}");
+}
+
 /// **A principal is the deployment's, not the request's**: a session no
 /// sign-in opened is no one in the accounts model, whatever it calls itself,
 /// and a guest only in the guest model.
