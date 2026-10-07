@@ -10127,6 +10127,9 @@ public query Store(",
     /// database.
     mod feed_pg;
 
+    /// TRACK SEAM (identity): accounts and sign-in, served.
+    mod sign_in;
+
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
     /// to the session's document. Until ADR-0218 the host served the store

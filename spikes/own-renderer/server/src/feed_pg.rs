@@ -16,7 +16,8 @@
 
 use super::*;
 use crate::data::{Handed, Outboxed, Provided};
-use crate::feed::{not_found, ok, user_of, user_record};
+use crate::feed::{not_found, ok, profile_of, user_of, user_record, viewer_val};
+use crate::identity::Principals;
 use postgres::{Client, NoTls};
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -149,8 +150,8 @@ fn post_val(row: &Row, replies: Vec<Val>) -> Val {
 }
 
 /// **The timeline**: the newest `limit` posts that reply to none, each an
-/// `Item` (ADR-0222).
-fn timeline(c: &mut Client, limit: i64) -> Result<Val, postgres::Error> {
+/// `Item` (ADR-0222), and whether `reader` wrote it (track `identity`).
+fn timeline(c: &mut Client, limit: i64, reader: &str) -> Result<Val, postgres::Error> {
     let rows = c.query(
         &format!(
             "SELECT {POST_COLUMNS} FROM posts p LEFT JOIN users u ON u.id = p.author \
@@ -167,6 +168,7 @@ fn timeline(c: &mut Client, limit: i64) -> Result<Val, postgres::Error> {
                     ("author".into(), user_record(&row.author, row.known)),
                     ("text".into(), Val::String(row.text)),
                     ("likes".into(), Val::S64(row.likes)),
+                    ("mine".into(), Val::Bool(row.author == reader)),
                 ])
             })
             .collect(),
@@ -222,16 +224,16 @@ type Read<'r> = &'r mut dyn FnMut(&mut Client) -> Result<Val, String>;
 /// transaction.
 type Run = Arc<dyn Fn(Read<'_>) -> Result<Val, String> + Send + Sync>;
 
-/// The reads, each through `run`.
-fn reads_through(run: Run) -> crate::data::Ops {
+/// The reads, each through `run`, a session's user its principal's.
+fn reads_through(run: Run, principals: Principals) -> crate::data::Ops {
     let mut ops: crate::data::Ops = BTreeMap::new();
-    let r = run.clone();
+    let (r, p) = (run.clone(), principals.clone());
     ops.insert(
         "feed:data/posts#timeline".to_string(),
         Arc::new(move |args: &[Val]| match args {
-            [Val::String(_), Val::S64(limit)] => {
-                let limit = *limit;
-                Ok(vec![r(&mut |c| timeline(c, limit).map_err(pg))?])
+            [Val::String(session), Val::S64(limit)] => {
+                let (limit, reader) = (*limit, p.user_of(session));
+                Ok(vec![r(&mut |c| timeline(c, limit, &reader).map_err(pg))?])
             }
             other => Err(format!("posts#timeline received {other:?}")),
         }),
@@ -244,14 +246,40 @@ fn reads_through(run: Run) -> crate::data::Ops {
             other => Err(format!("posts#thread received {other:?}")),
         }),
     );
+    let p = principals.clone();
     ops.insert(
         "feed:data/users#of-session".to_string(),
         Arc::new(move |args: &[Val]| match args {
-            [Val::String(session)] => Ok(vec![Val::String(user_of(session))]),
+            [Val::String(session)] => Ok(vec![Val::String(p.user_of(session))]),
             other => Err(format!("users#of-session received {other:?}")),
         }),
     );
+    ops.insert(
+        "feed:data/users#viewer".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(session)] => Ok(vec![viewer_val(principals.of(session))]),
+            other => Err(format!("users#viewer received {other:?}")),
+        }),
+    );
     ops
+}
+
+/// **The author `session` writes as** (track `identity`): its principal's
+/// user, and a signed-in one's handle and name written with what they
+/// write, as their provider last gave them.
+fn author(c: &mut Client, principals: &Principals, session: &str) -> Result<String, String> {
+    let Some(p) = principals.of(session) else {
+        return Ok(user_of(session));
+    };
+    if let Some((handle, name)) = profile_of(&p) {
+        c.execute(
+            "INSERT INTO users (id, handle, name) VALUES ($1, $2, $3) \
+             ON CONFLICT (id) DO UPDATE SET handle = EXCLUDED.handle, name = EXCLUDED.name",
+            &[&p.user, &handle, &name],
+        )
+        .map_err(pg)?;
+    }
+    Ok(p.user)
 }
 
 /// **The feed's data in one PostgreSQL database.**
@@ -263,9 +291,16 @@ pub(crate) struct FeedPg {
     /// itself. A serializable transaction is what holds against any other
     /// writer of the database, and a commit it refuses keeps nothing.
     writes: Mutex<()>,
+    /// Each session's principal (track `identity`): whom a session writes
+    /// as. Until the server hands its own, every session is its own guest.
+    principals: std::sync::RwLock<Principals>,
 }
 
 impl FeedPg {
+    fn principals(&self) -> Principals {
+        self.principals.read().expect("principals").clone()
+    }
+
     /// **The layer on `url`**, its tables in `schema` (created if missing)
     /// or in the connection's own search path, migrated, and a command's
     /// transaction serializable.
@@ -301,6 +336,7 @@ impl FeedPg {
             pool,
             isolation,
             writes: Mutex::new(()),
+            principals: std::sync::RwLock::new(Principals::default()),
         })
     }
 }
@@ -483,9 +519,14 @@ type InTransaction =
 impl crate::data::DataLayer for FeedPg {
     fn reads(&self, _session: &str, _stopped: Option<Stopped>) -> crate::data::Ops {
         let pool = self.pool.clone();
-        reads_through(Arc::new(move |f: Read<'_>| {
-            pool.with(|c| Ok(f(c))).and_then(|r| r)
-        }))
+        reads_through(
+            Arc::new(move |f: Read<'_>| pool.with(|c| Ok(f(c))).and_then(|r| r)),
+            self.principals(),
+        )
+    }
+
+    fn identified_by(&self, principals: Principals) {
+        *self.principals.write().expect("principals") = principals;
     }
 
     fn begin<'a>(&'a self, _session: &str) -> Box<dyn crate::data::Staged + 'a> {
@@ -515,7 +556,8 @@ impl crate::data::DataLayer for FeedPg {
                 }
             })
         };
-        let mut ops = reads_through(run);
+        let principals = self.principals();
+        let mut ops = reads_through(run, principals.clone());
         let mut write = |key: &str, op: Arc<InTransaction>| {
             let (conn, why, wrote) = (conn.clone(), why.clone(), wrote.clone());
             ops.insert(
@@ -531,14 +573,16 @@ impl crate::data::DataLayer for FeedPg {
                 }),
             );
         };
+        let p = principals.clone();
         write(
             "feed:data/posts#publish",
-            Arc::new(|c: &mut Client, args: &[Val]| match args {
+            Arc::new(move |c: &mut Client, args: &[Val]| match args {
                 [Val::String(session), Val::String(text)] => {
+                    let author = author(c, &p, session)?;
                     let row = c
                         .query_one(
                             "INSERT INTO posts (author, text) VALUES ($1, $2) RETURNING id",
-                            &[&user_of(session), text],
+                            &[&author, text],
                         )
                         .map_err(pg)?;
                     let id: String = row.get(0);
@@ -552,9 +596,10 @@ impl crate::data::DataLayer for FeedPg {
         );
         // **A reply** (ADR-0231): a post that replies to `to`. To a post that
         // is not there, none.
+        let p = principals.clone();
         write(
             "feed:data/posts#reply",
-            Arc::new(|c: &mut Client, args: &[Val]| match args {
+            Arc::new(move |c: &mut Client, args: &[Val]| match args {
                 [Val::String(session), Val::String(to), Val::String(text)] => {
                     let there = c
                         .query_opt("SELECT 1 FROM posts WHERE id = $1", &[to])
@@ -563,11 +608,12 @@ impl crate::data::DataLayer for FeedPg {
                     if !there {
                         return Ok((not_found(), false));
                     }
+                    let author = author(c, &p, session)?;
                     let row = c
                         .query_one(
                             "INSERT INTO posts (author, text, reply_to) VALUES ($1, $2, $3) \
                              RETURNING id",
-                            &[&user_of(session), text, to],
+                            &[&author, text, to],
                         )
                         .map_err(pg)?;
                     let id: String = row.get(0);
@@ -579,9 +625,40 @@ impl crate::data::DataLayer for FeedPg {
                 other => Err(format!("posts#reply received {other:?}")),
             }),
         );
+        // **A post deleted** (track `identity`): it, every reply under it,
+        // and their likes, in one statement, so one snapshot. Who may is
+        // `requires OwnsPost(post)`'s, evaluated in this transaction before
+        // the command runs.
+        write(
+            "feed:data/posts#delete",
+            Arc::new(|c: &mut Client, args: &[Val]| match args {
+                [Val::String(_), Val::String(id)] => {
+                    let gone: i64 = c
+                        .query_one(
+                            "WITH RECURSIVE t AS ( \
+                                 SELECT id FROM posts WHERE id = $1 \
+                                 UNION ALL \
+                                 SELECT p.id FROM posts p JOIN t ON p.reply_to = t.id), \
+                             unliked AS (DELETE FROM likes WHERE post IN (SELECT id FROM t)), \
+                             deleted AS (DELETE FROM posts WHERE id IN (SELECT id FROM t) \
+                                 RETURNING id) \
+                             SELECT count(*) FROM deleted",
+                            &[id],
+                        )
+                        .map_err(pg)?
+                        .get(0);
+                    if gone == 0 {
+                        return Ok((not_found(), false));
+                    }
+                    Ok((ok(Val::String(id.clone())), true))
+                }
+                other => Err(format!("posts#delete received {other:?}")),
+            }),
+        );
+        let p = principals;
         write(
             "feed:data/posts#like",
-            Arc::new(|c: &mut Client, args: &[Val]| match args {
+            Arc::new(move |c: &mut Client, args: &[Val]| match args {
                 [Val::String(session), Val::String(id)] => {
                     let there = c
                         .query_opt("SELECT 1 FROM posts WHERE id = $1", &[id])
@@ -592,7 +669,7 @@ impl crate::data::DataLayer for FeedPg {
                     }
                     c.execute(
                         "INSERT INTO likes (post, liker) VALUES ($1, $2)",
-                        &[id, &user_of(session)],
+                        &[id, &p.user_of(session)],
                     )
                     .map_err(pg)?;
                     let post = post_alone(c, id).map_err(pg)?.ok_or("a post just liked")?;

@@ -250,6 +250,10 @@ impl Principal {
             issuer: "guest".to_string(),
         }
     }
+
+    pub fn is_guest(&self) -> bool {
+        self.issuer == "guest"
+    }
 }
 
 #[derive(Debug, Default)]
@@ -278,6 +282,14 @@ impl Principals {
         (!self.0.accounts.load(Ordering::SeqCst)).then(|| Principal::guest(session))
     }
 
+    /// The user `session` acts as: its principal's, or its guest's, who can
+    /// write nothing where `requires SignedIn` is held.
+    pub fn user_of(&self, session: &str) -> String {
+        self.of(session)
+            .map(|p| p.user)
+            .unwrap_or_else(|| format!("u-{session}"))
+    }
+
     fn open(&self, session: &str, principal: Principal) {
         self.0
             .sessions
@@ -292,6 +304,12 @@ impl Principals {
 
     fn set_accounts(&self, on: bool) {
         self.0.accounts.store(on, Ordering::SeqCst);
+    }
+
+    /// How many sessions are signed in.
+    #[cfg(test)]
+    pub fn signed_in(&self) -> usize {
+        self.0.sessions.read().expect("principals").len()
     }
 }
 

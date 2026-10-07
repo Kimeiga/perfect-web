@@ -52,6 +52,9 @@ type Item = Item {
     author: User,
     text: String,
     likes: Int,
+    // Whether the reader wrote it (track `identity`): the timeline is
+    // private, and a post its author may delete shows a Delete button.
+    mine: Bool,
 }
 
 type FeedError =
@@ -60,6 +63,14 @@ type FeedError =
 
 event Posted(author: UserId)
 event Liked(post: PostId)
+event Deleted(post: PostId)
+
+// **Who reads the page** (track `identity`, ADR-XXXX): whether the session
+// is signed in, and the name its provider gave. Who a session is belongs to
+// the deployment: the host signs a session in through the deployment's
+// identity provider and keeps its principal, and nothing of it is any other
+// session's.
+type Viewer = Viewer { signed_in: Bool, name: String }
 
 // **What the feed's database guarantees** (ADR-0207, ADR-0246): one
 // PostgreSQL, as the host's feed layer opens it.
@@ -94,12 +105,34 @@ fn add_reply(s: Session<SessionId>, to: PostId, text: PostText) -> Result<Post, 
 fn add_like(s: Session<SessionId>, post: PostId) -> Result<Post, FeedError> !{ database.write<Post> }
     host "feed:data/posts#like"
 
+fn remove(s: Session<SessionId>, post: PostId) -> Result<PostId, FeedError> !{ database.write<Post> }
+    host "feed:data/posts#delete"
+
+// Who the session is, which the platform's session capability reads: a
+// principal is the session's, as its id is.
+fn viewer(s: Session<SessionId>) -> Viewer !{ session.read }
+    host "feed:data/users#viewer"
+
+// **The session's reader** (track `identity`): private to it. Signing in or
+// out gives the browser a new session, so its pages ask again.
+session query Me(session: Session<SessionId>) -> Viewer
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            session
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    viewer(session)
+}
+
 session query Timeline(session: Session<SessionId>, limit: Int) -> List<Item>
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
     key            session, limit
-    invalidates_on Posted(_), Liked(_)
+    invalidates_on Posted(_), Liked(_), Deleted(_)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
@@ -112,7 +145,7 @@ public query Thread(id: PostId) -> Result<Post, FeedError>
     consistency    snapshot
     cache          shared
     key            id
-    invalidates_on Liked(id), Posted(_)
+    invalidates_on Liked(id), Posted(_), Deleted(_)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
@@ -162,7 +195,7 @@ fn replied(thread: Post, text: PostText) -> Post !{} {
 fn pending(feed: List<Item>, text: PostText) -> List<Item> !{} {
     let you = User { id: UserId("you"), handle: "@you", name: "You" }
     let id = PostId("pending-{List.length(feed)}")
-    List.concat([Item { id: id, author: you, text: text.value, likes: 0 }], feed)
+    List.concat([Item { id: id, author: you, text: text.value, likes: 0, mine: true }], feed)
 }
 
 // **A count, in words** (ADR-0226): "1 reply", "3 likes". The thread
@@ -185,6 +218,18 @@ command like(post: PostId) -> Result<Post, FeedError>
     add_like(current_session(), post)
 }
 
+// **A post deleted by its author** (track `identity`, ADR-0115):
+// `OwnsPost(post)` is the deployment's predicate over the command's
+// parameter, evaluated before the body runs, so another reader's post is
+// refused and nothing of it runs. It and its replies go.
+command delete(post: PostId) -> Result<PostId, FeedError>
+    requires      SignedIn, OwnsPost(post)
+    idempotent_by InteractionId
+    emits         Deleted(post)
+{
+    remove(current_session(), post)
+}
+
 // **A like on the thread page, shown before the server answers**
 // (ADR-0238): the thread's count one more, where the thread is the post.
 fn liked_thread(thread: Post, post: PostId) -> Post !{} {
@@ -205,7 +250,7 @@ fn liked_thread(thread: Post, post: PostId) -> Post !{} {
 // one more, in the timeline the page shows.
 fn liked(feed: List<Item>, post: PostId) -> List<Item> !{} {
     List.map(feed, (i) => if i.id == post {
-        Item { id: i.id, author: i.author, text: i.text, likes: i.likes + 1 }
+        Item { id: i.id, author: i.author, text: i.text, likes: i.likes + 1, mine: i.mine }
     } else {
         i
     })
@@ -219,11 +264,20 @@ session page Home() {
     signal shown: Int = 20
     signal draft: String = ""
     let feed = query Timeline(current_session(), shown)
+    let me = query Me(current_session())
 
     view {
         <title>Home</title>
         <main>
             <h1>Home</h1>
+            {#if me.signed_in}
+            <p id="me">Signed in as {me.name}</p>
+            <form method="post" action="/sign-out"><button type="submit">Sign out</button></form>
+            {:else}
+            <p id="signed-out" role="status">Sign in to post, reply or like.</p>
+            <form method="get" action="/sign-in"><button type="submit">Sign in</button></form>
+            <form method="get" action="/sign-up"><button type="submit">Sign up</button></form>
+            {/if}
             <form on:submit|prevent={() => match post_text(draft) {
                 Some(text) => match post(text) {
                     Ok(_) => draft = "",
@@ -246,6 +300,10 @@ session page Home() {
                             Err(_) => draft = draft,
                         }}>Like</button>
                         <span class="likes">{counted(p.likes, "like", "likes")}</span>
+                        {#if p.mine}<button type="button" class="delete" on:press={resumable(captures = { p }) => match delete(p.id) {
+                            Ok(_) => draft = draft,
+                            Err(_) => draft = draft,
+                        }}>Delete</button>{/if}
                     </li>
                 {/each}
             </ul>
