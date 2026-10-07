@@ -81,3 +81,11 @@ direction to move the heavy verification off the laptop (relayed
   after reading the run.
 - **A push's plan covers its own commits.** A run is not cancelled for a
   later push, and the nightly run covers every recipe.
+
+## Found by the first run, 2026-10-07
+
+- **`rust-toolchain.toml` named one of the two WebAssembly targets the build
+  uses.** `run.sh` builds the browser's WebAssembly for
+  `wasm32-unknown-unknown`, which the development machine had installed by
+  hand; every job of the first run failed building it. The toolchain file
+  names it now, so rustup installs it wherever the toolchain is.
