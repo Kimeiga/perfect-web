@@ -14,9 +14,13 @@ The recipes are `just`'s own list, kept where they record evidence
 Each is dealt to the shard with the least work so far, the costliest first,
 by an estimate of its cost: the mutants the scripts it runs plant, each a
 build and a test run; one that needs a database (`NEEDS_DATABASE`) goes to
-the run's database job instead. Prints, for `$GITHUB_OUTPUT`, `shards=<json>`,
-a list of `{"index": i, "recipes": [...]}`, and `database=<json>`, a list of
-recipes, each empty where nothing is to run.
+the run's database job instead. A recipe that drives a browser, or reads
+what the build makes (the servers, `pw`), shares its shards with its kind
+(ADR-0249): only those shards install the browsers and build, most of a
+shard's setup, and the others do neither. Prints, for `$GITHUB_OUTPUT`,
+`shards=<json>`, a list of `{"index": i, "recipes": [...], "browsers": b,
+"build": b}`, and `database=<json>`, a list of recipes, each empty where
+nothing is to run.
 
     python3 scripts/ci_plan.py --shards 16 --all
     python3 scripts/ci_plan.py --shards 16 --changed BASE HEAD
@@ -187,18 +191,57 @@ def changed_recipes(base: str, head: str, near: int, names: list[str]) -> list[s
     return sorted(out)
 
 
-def plan(names: list[str], costs: dict[str, int], shards: int) -> list[dict]:
+def deal(names: list[str], costs: dict[str, int], shards: int) -> list[list[str]]:
     """Deal `names` into `shards`, the costliest first, each to the least
-    loaded shard; ties to the lower index, so a plan is the same every time."""
+    loaded shard; ties to the lower index, so a deal is the same every
+    time."""
     loads = [0] * shards
     dealt: list[list[str]] = [[] for _ in range(shards)]
     for name in sorted(names, key=lambda n: (-costs.get(n, 1), n)):
         i = min(range(shards), key=lambda k: (loads[k], k))
         loads[i] += costs.get(name, 1)
         dealt[i].append(name)
-    return [
-        {"index": i, "recipes": sorted(r)} for i, r in enumerate(dealt) if r
-    ]
+    return [sorted(r) for r in dealt if r]
+
+
+def needs(body: str) -> tuple[bool, bool]:
+    """What a recipe's shard must set up (ADR-0249): browsers, for one that
+    runs Playwright; the build, for one that runs it, or reads what it
+    makes: the servers, the store's pages, `pw` itself."""
+    browsers = "playwright" in body
+    build = browsers or bool(re.search(r"run\.sh|feed\.sh|keyed-store\.sh|target/debug/", body))
+    return browsers, build
+
+
+def plan(
+    names: list[str],
+    costs: dict[str, int],
+    shards: int,
+    need: dict[str, tuple[bool, bool]] | None = None,
+) -> list[dict]:
+    """Deal `names` into at most `shards`, each kind of recipe (browsers and
+    a build, a build alone, neither) into shards of its own, as many as its
+    share of the work, at least one where it has a recipe."""
+    need = need or {}
+    kinds: dict[tuple[bool, bool], list[str]] = {}
+    for n in names:
+        kinds.setdefault(need.get(n, (False, False)), []).append(n)
+    total = sum(costs.get(n, 1) for n in names) or 1
+    order = sorted(kinds, reverse=True)
+    share = {
+        k: min(len(kinds[k]), max(1, round(shards * sum(costs.get(n, 1) for n in kinds[k]) / total)))
+        for k in order
+    }
+    # More shards than there are: the largest share gives one back, until
+    # they fit.
+    while sum(share.values()) > max(shards, len(order)):
+        k = max(order, key=lambda k: (share[k], k))
+        share[k] -= 1
+    out = []
+    for k in order:
+        for recipes in deal(kinds[k], costs, share[k]):
+            out.append({"index": len(out), "recipes": recipes, "browsers": k[0], "build": k[1]})
+    return out
 
 
 def main() -> int:
@@ -228,7 +271,8 @@ def main() -> int:
     database = sorted(n for n in names if n in NEEDS_DATABASE)
     sharded = [n for n in names if n not in NEEDS_DATABASE]
     costs = {n: cost(body.get(n, "")) for n in sharded}
-    print("shards=" + json.dumps(plan(sharded, costs, args.shards)))
+    need = {n: needs(body.get(n, "")) for n in sharded}
+    print("shards=" + json.dumps(plan(sharded, costs, args.shards, need)))
     print("database=" + json.dumps(database))
     return 0
 

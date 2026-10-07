@@ -38,17 +38,44 @@ fetch = load("evidence_fetch")
 class Plan(unittest.TestCase):
     def test_the_costliest_go_first_each_to_the_least_loaded_shard(self) -> None:
         costs = {"a": 10, "b": 6, "c": 5, "d": 1}
-        shards = plan.plan(list(costs), costs, 2)
+        self.assertEqual(plan.deal(list(costs), costs, 2), [["a", "d"], ["b", "c"]])
         self.assertEqual(
-            shards,
-            [{"index": 0, "recipes": ["a", "d"]}, {"index": 1, "recipes": ["b", "c"]}],
+            plan.plan(list(costs), costs, 2),
+            [
+                {"index": 0, "recipes": ["a", "d"], "browsers": False, "build": False},
+                {"index": 1, "recipes": ["b", "c"], "browsers": False, "build": False},
+            ],
         )
+
+    def test_a_kind_of_recipe_shares_its_shards_with_its_kind(self) -> None:
+        # ADR-0249: only a shard with a recipe that drives a browser installs
+        # one, and only one with a recipe that reads the build builds.
+        costs = {"p1": 6, "p2": 6, "b1": 4, "x1": 8, "x2": 8, "x3": 8}
+        need = {"p1": (True, True), "p2": (True, True), "b1": (False, True)}
+        shards = plan.plan(list(costs), costs, 4, need)
+        self.assertEqual(
+            [(s["recipes"], s["browsers"], s["build"]) for s in shards],
+            [
+                (["p1", "p2"], True, True),
+                (["b1"], False, True),
+                (["x1", "x3"], False, False),
+                (["x2"], False, False),
+            ],
+        )
+        self.assertEqual([s["index"] for s in shards], [0, 1, 2, 3])
+
+    def test_what_a_recipe_needs_is_read_from_its_lines(self) -> None:
+        self.assertEqual(plan.needs("    pnpm exec playwright test e2e/feed.spec.mjs\n"), (True, True))
+        self.assertEqual(plan.needs("    ./target/debug/pw check a.pw\n"), (False, True))
+        self.assertEqual(plan.needs("    BUILD_ONLY=1 bash spikes/own-renderer/run.sh\n"), (False, True))
+        self.assertEqual(plan.needs("    cargo test -p pw-core --test names\n"), (False, False))
 
     def test_a_plan_is_the_same_every_time(self) -> None:
         costs = {f"e14-r{i}": i % 4 + 1 for i in range(40)}
         names = list(costs)
         first = plan.plan(names, costs, 16)
         self.assertEqual(first, plan.plan(list(reversed(names)), costs, 16))
+        self.assertLessEqual(len(first), 16)
         dealt = sorted(r for s in first for r in s["recipes"])
         self.assertEqual(dealt, sorted(names))
 
@@ -91,7 +118,10 @@ class Plan(unittest.TestCase):
             text=True,
             check=True,
         ).stdout.splitlines()
-        self.assertEqual(out[0], 'shards=[{"index": 0, "recipes": ["e14-feed"]}]')
+        self.assertEqual(
+            out[0],
+            'shards=[{"index": 0, "recipes": ["e14-feed"], "browsers": true, "build": true}]',
+        )
         self.assertEqual(out[1], 'database=["e14-feed-postgres"]')
 
     def test_a_recipes_cost_counts_the_mutants_it_plants(self) -> None:

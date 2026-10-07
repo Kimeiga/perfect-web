@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0249, 2026-10-07: a verification shard sets up only what its recipes
+need** (the owner's approval, relayed 2026-10-07). A shard spent more than
+half its time setting up: shard 3 at `c1738ec` freed the disk for 84 s,
+installed browsers for 54 s and built for 131 s, then ran its recipes for
+233 s. Recipes of a kind now share shards: only those that drive a browser
+install one, only those that read the build build, the disk is freed in the
+background, and every run fits the Free plan's 20 jobs at once. Playwright
+advises against caching its browsers, so they are not cached.
+
 **ADR-0248, 2026-10-07: a map's key is an `Int`, a `String`, a `Bool`, or
 an opaque type over one** (the owner's ruling 0057-a, Twitter item 2). A
 `Map<Float, Int>` checked and only `pw build` refused it, and a

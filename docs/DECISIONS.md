@@ -2073,3 +2073,8 @@ refused at check where it is not.
 - The owner's ruling 0057-a. `Bool` and opaque keys compile in the
   component and the browser's module; another key is PW0627 where it is
   written or a call instantiates it, not first at build.
+[ADR-0249](DECISIONS/ADR-0249-a-verification-shard-sets-up-only-what-its-recipes-need.md):
+a verification shard sets up only what its recipes need.
+- Setup was most of a shard's time. Recipes of a kind share shards, only
+  browser recipes' shards install browsers and only build readers' build,
+  the disk is freed in the background, and a run is at most 16 shards.

@@ -403,7 +403,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
              (ADR-0245); ~~the `pg-data-layer` branch merged~~ (ADR-0246,
              the owner approved its crates, 2026-10-07); ~~a clause written
              in a block judged by its domain~~ (ADR-0247, `just
-             e14-block-clauses`). What Linux has found in the recipes: the
+             e14-block-clauses`); ~~a shard sets up only what its recipes
+             need~~ (ADR-0249). What Linux has found in the recipes: the
              toolchain's missing target and a runner's disk (both fixed,
              ADR-0245), and `stream.spec.mjs`'s "Chrome 150 and later fills
              a region itself", which passed in run 37646762298 and timed out
