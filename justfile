@@ -4656,3 +4656,29 @@ e14-read-whole:
        CARGO_INCREMENTAL=0 python3 scripts/read_whole_mutations.py; \
      } > docs/evidence/E14/read-whole.txt
     @grep -E "^test result|corpus-check|mutants killed" docs/evidence/E14/read-whole.txt
+
+# ADR-0238: a command speculates on several entries, a page on those it
+# shows. The compiler's tests, the parser's, the feed in three engines, and
+# the mutation controls.
+e14-speculated-arms:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0238 - a command speculates on several entries, a page on those it shows"; echo; \
+       echo "produced by: just e14-speculated-arms"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the build (compiler/pw-core/tests/speculated_arms.rs)"; echo; \
+       cargo test --locked -p pw-core --test speculated_arms 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the parser (compiler/pw-syntax/src/grammar.rs)"; echo; \
+       cargo test --locked -p pw-syntax --lib -- an_optimistic_clause_has_an_arm_for_each_entry 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/speculated_arms_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/speculated_arms_mutations.py; \
+     } > docs/evidence/E14/speculated-arms.txt
+    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/speculated-arms.txt

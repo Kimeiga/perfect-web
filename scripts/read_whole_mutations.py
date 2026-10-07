@@ -115,14 +115,18 @@ MUTANTS = [
     (
         "a transition without its arrow is not read",
         GRAMMAR,
-        "        if arrow || !p.at_eof() {\n",
-        "        if arrow {\n",
+        "        if !self.at_eof() && !self.at(Kind::Comma) {\n"
+        "            self.expr(0);\n",
+        "        if arrow && !self.at_eof() && !self.at(Kind::Comma) {\n"
+        "            self.expr(0);\n",
     ),
     (
         "an arrow with no transition after it is no error",
         GRAMMAR,
-        "        if arrow || !p.at_eof() {\n",
-        "        if !p.at_eof() {\n",
+        "        } else if arrow {\n"
+        "            let found = self.found();\n",
+        "        } else if false {\n"
+        "            let found = self.found();\n",
     ),
     (
         "a standalone parse's end is the file's",

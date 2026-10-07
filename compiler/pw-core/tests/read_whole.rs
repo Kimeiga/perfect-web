@@ -198,7 +198,11 @@ fn an_optimistic_clause_is_read_whole() {
     );
     assert_eq!(
         found(&app),
-        one("PW0016", "an optimistic clause is one transition", "text")
+        one(
+            "PW0016",
+            "an optimistic clause's arms are separated by commas",
+            "text"
+        )
     );
 
     // No name for the entry's value: the clause's own code, at its place.

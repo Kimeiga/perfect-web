@@ -787,8 +787,10 @@ type that contains itself is speculated on as its nodes (ADR-0233), and a
 view's instance given one is rendered again with it (ADR-0234). A target keyed
 by a command's parameter matches a page's binding keyed by the page's parameter
 its handlers pass unchanged (ADR-0236); one passed through a name the handler
-binds, or from a composed view, is refused by name. A clause whose target a page
-does not show refuses the page, so the thread page has no like button yet.
+binds, or from a composed view, is refused by name. An arm whose target's
+resource a page does not show is not the page's, and the page waits for the
+server on it (ADR-0238); one whose resource it shows under another key
+refuses the page.
 
 **A commit reaches another session's open page by the query it reads, not
 by its key** (ADR-0219). A like drops one post's `Thread`, and every open

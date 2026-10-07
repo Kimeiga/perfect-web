@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-0228: a value computed in a row is the row's.
+"""Mutation controls for ADR-0238: a command speculates on several entries,
+a page on those it shows.
 
-Each mutant undoes one piece: the path a row's value is named by, from the
-innermost loop's item; the host's row read, its function and its path; the
-speculation module's value for each row and for a part, and what it refuses;
-and what the feed's rows and likes found: a field of a value charged a
-same-named function's effects, and an opaque value that did not compare. The
-feed's like shown before the server answers must fail too.
+Each mutant undoes one piece: the arms parsed as nodes of their own, each
+lowered, each transition paired with its own target and its name typed as
+that target's value; an arm whose target a page does not show left to the
+server, and a page that shows none given no module; and the feed's like on
+the thread page.
 
-The compiler's and the server's tests must fail for a mutant of the compiler
-("cargo"). A mutant of the feed must fail `e2e/feed.spec.mjs` in three
-engines, against a build of the mutated source ("browser").
+The compiler's tests must fail for each ("cargo"); the feed's, in three
+engines, for the feed's ("browser").
 
-Run from the repository root; `just e14-computed-rows` records the output.
+Run from the repository root; `just e14-speculated-arms` records the output.
 The source is restored after every mutant, whatever happens.
 """
 
@@ -24,113 +23,89 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-TEMPLATE = ROOT / "compiler/pw-core/src/template_ir.rs"
-VALUES = ROOT / "compiler/pw-core/src/page_values.rs"
 SPECULATION = ROOT / "compiler/pw-core/src/backend/speculation.rs"
-EFFECTS = ROOT / "compiler/pw-core/src/effects.rs"
-LOWER = ROOT / "compiler/pw-core/src/backend/lower.rs"
+LOWER = ROOT / "compiler/pw-core/src/lower.rs"
+HIR = ROOT / "compiler/pw-core/src/hir.rs"
+VALUES = ROOT / "compiler/pw-core/src/values.rs"
+GRAMMAR = ROOT / "compiler/pw-syntax/src/grammar.rs"
 FEED = ROOT / "examples/feed/app.pw"
 
 # (what is undone, suite, file, anchor, replacement)
 MUTANTS = [
     (
-        "a row's value is named by no item",
+        "an arm whose target the page does not show refuses the page",
         "cargo",
-        TEMPLATE,
-        "            Some(item)\n                if !inputs.is_empty()\n",
-        "            Some(item)\n                if false && !inputs.is_empty()\n",
-    ),
-    (
-        "a row's value is named by the outermost loop's item",
-        "cargo",
-        TEMPLATE,
-        "        match self.loops.last() {\n",
-        "        match self.loops.first() {\n",
-    ),
-    (
-        "a row's read does not run the function",
-        "cargo",
-        VALUES,
-        "        row.steps.push(Step::Derived(component_id));\n",
+        SPECULATION,
+        "                if !bindings.iter().any(|b| b.resource == resource) {\n"
+        "                    continue;\n"
+        "                }\n",
         "",
     ),
     (
-        "a row's value is set at its input's path",
+        "a page that speculates on nothing has a module",
         "cargo",
-        VALUES,
-        "        row.path = path.to_string();\n",
+        SPECULATION,
+        "            if let Encoding::Encoded(m) = &module\n"
+        "                && m.commands.is_empty()\n"
+        "            {\n"
+        "                continue;\n"
+        "            }\n",
         "",
     ),
     (
-        "a speculated row's value is not computed",
+        "the arms are no nodes of their own",
         "cargo",
-        SPECULATION,
-        "                computed.push((rest.to_string(), functions.len() - 1));\n",
-        "",
+        GRAMMAR,
+        "        self.start(K::TransitionArm);\n",
+        "        self.start(K::ErrorExpr);\n",
     ),
     (
-        "a speculated row's value from a field of its item is built",
+        "an arm with no transition after its arrow takes the comma after it",
         "cargo",
-        SPECULATION,
-        "                if read != binding {\n",
-        "                if false && read != binding {\n",
+        GRAMMAR,
+        "        if !self.at_eof() && !self.at(Kind::Comma) {\n",
+        "        if !self.at_eof() {\n",
     ),
     (
-        "a part computed from a speculated value is not computed again",
-        "cargo",
-        SPECULATION,
-        "            reads.push((read.clone(), hole.part.0, functions.len() - 1));\n",
-        "",
-    ),
-    (
-        "an attribute computed from a speculated value is built",
-        "cargo",
-        SPECULATION,
-        # Re-anchored by ADR-0235: a block's subject from the value whole is
-        # computed too, and an attribute's alone is refused by name.
-        '            if speculates(root) && (what == "an attribute\'s value" || read != root) {\n',
-        "            if speculates(root) && read != root {\n",
-    ),
-    (
-        "a field of a value is a function of the same name",
-        "cargo",
-        EFFECTS,
-        "                    if matches!(body.expr(head), Expr::Name(_))\n",
-        "                    if false && matches!(body.expr(head), Expr::Name(_))\n",
-    ),
-    (
-        "an opaque value does not compare as its representation",
+        "only a clause's first arm is lowered",
         "cargo",
         LOWER,
-        "            (Type::Nominal(def, instance), true) if rt.as_ref() == Some(&lt) => {\n",
-        "            (Type::Nominal(def, instance), true) if false && rt.as_ref() == Some(&lt) => {\n",
+        "                .filter(|c| c.kind() == K::TransitionArm)\n",
+        "                .filter(|c| c.kind() == K::TransitionArm)\n"
+        "                .take(1)\n",
     ),
     (
-        "a like is not shown before the server answers",
+        "each transition is paired with the clause's first target",
+        "cargo",
+        HIR,
+        "                        if let Some(t) = target.take() {\n",
+        "                        if let Some(t) = p.roots.first().filter(|_| target.take().is_some()) {\n",
+    ),
+    (
+        "an arm's name is the clause's last target's value",
+        "cargo",
+        VALUES,
+        "                    .take_while(|r| !std::ptr::eq(*r, root))\n",
+        "                    .take_while(|_| true)\n",
+    ),
+    (
+        "the feed's like on the thread page is not speculated",
         "browser",
         FEED,
         "    optimistic    Timeline(current_session(), _) as feed => liked(feed, post),\n"
         "                  Thread(post) as thread => liked_thread(thread, post)\n",
-        "",
-    ),
-    (
-        "a like shown before the server answers counts nothing",
-        "browser",
-        FEED,
-        "        Item { id: i.id, author: i.author, text: i.text, likes: i.likes + 1 }\n",
-        "        Item { id: i.id, author: i.author, text: i.text, likes: i.likes }\n",
+        "    optimistic    Timeline(current_session(), _) as feed => liked(feed, post)\n",
     ),
 ]
 
 CARGO = [
     [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
-        "--test", "computed_rows", "--test", "computed_holes", "--test", "computed_signals",
-        "--test", "effects_through_values", "--test", "optimistic_keys",
+        "--test", "speculated_arms",
     ],
     [
-        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
-        "each_rows_and_sent", "compares_as_its_representation",
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-syntax", "--lib", "--",
+        "an_optimistic_clause_has_an_arm_for_each_entry",
     ],
 ]
 

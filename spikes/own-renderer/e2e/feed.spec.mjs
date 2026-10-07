@@ -26,7 +26,10 @@
 //     the thread page's form passes the page's parameter (ADR-0231);
 //   - a reply shows before the server answers, its count and the thread's
 //     "No replies yet." with it, and is the server's after; one whose request
-//     fails is taken back (ADR-0236, ruling 0122-d).
+//     fails is taken back (ADR-0236, ruling 0122-d);
+//   - a like on the thread page shows before the server answers, though
+//     `like` speculates on the timeline too, which the page does not show
+//     (ADR-0238).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -460,4 +463,27 @@ test("a reply whose request fails is taken back", async ({ page }, testInfo) => 
   await expect(page.locator("#quiet")).toHaveText("No replies yet.");
   await expect(field).toHaveValue(reply);
   expect(await unreloaded(page)).toBe(true);
+});
+
+test("a like on the thread page shows before the server answers", async ({ page }, testInfo) => {
+  // ADR-0238: `like`'s arm on the timeline is the home page's; its arm on
+  // `Thread(post)` is the thread page's, whose button passes `id`.
+  await newThread(page, testInfo, "A liked thread");
+  let release;
+  const held = new Promise((r) => (release = r));
+  await page.route("**/command/feed.app.like", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.locator("#like").click();
+  await expect(page.locator("#counts")).toHaveText("0 replies · 1 like");
+  // Answered before the page is read again: a reload while the request is
+  // in flight may cancel it, as WebKit once did here.
+  const answered = page.waitForResponse("**/command/feed.app.like");
+  release();
+  await answered;
+  await expect(page.locator("#counts")).toHaveText("0 replies · 1 like");
+  // And it is the server's: the thread read again says so.
+  await page.reload();
+  await expect(page.locator("#counts")).toHaveText("0 replies · 1 like");
 });

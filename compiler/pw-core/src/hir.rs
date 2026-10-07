@@ -629,20 +629,24 @@ impl Decl {
     /// computations; every rule about them needs both, and pairing them here
     /// keeps a caller from matching them up by position.
     pub fn optimistic_clauses(&self) -> Vec<(&Policy, &TermRoot, &TermRoot)> {
-        self.policies
-            .iter()
-            .filter_map(|p| {
-                let target = p
-                    .roots
-                    .iter()
-                    .find(|r| r.context == ExecutionContext::TargetSelection)?;
-                let transition = p
-                    .roots
-                    .iter()
-                    .find(|r| r.context == ExecutionContext::OptimisticTransition)?;
-                Some((p, target, transition))
-            })
-            .collect()
+        // Each arm's target and the transition after it (ADR-0238): a clause
+        // may speculate on several entries.
+        let mut out = Vec::new();
+        for p in &self.policies {
+            let mut target = None;
+            for r in &p.roots {
+                match r.context {
+                    ExecutionContext::TargetSelection => target = Some(r),
+                    ExecutionContext::OptimisticTransition => {
+                        if let Some(t) = target.take() {
+                            out.push((p, t, r));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        out
     }
 }
 

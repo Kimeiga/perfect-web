@@ -387,12 +387,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - **then the Twitter gaps, in the owner's order** (relayed
           2026-10-07), each its own ADR as the feed hits it:
           1. ~~route-keyed speculation (0122-d): an optimistic reply~~
-             (ADR-0236, `just e14-speculated-routes`); next a like on the
-             thread page (ADR-0238), where `like`'s clause on the timeline,
-             which the page does not show, refuses it. Writing it found that
-             lowering dropped its parses' errors: ~~what lowering parses, it
-             reports~~ (ADR-0237, `just e14-read-whole`). Then the findings
-             beside it, first: the registry's gaps (PW0101 and PW0102, one
+             (ADR-0236, `just e14-speculated-routes`); ~~a like on the
+             thread page~~ (ADR-0238, `just e14-speculated-arms`). Writing it
+             found that lowering dropped its parses' errors: ~~what lowering
+             parses, it reports~~ (ADR-0237, `just e14-read-whole`). Then the
+             findings beside it, first: the registry's gaps (PW0101 and PW0102, one
              number with two meanings); a clause read once, the graph reading
              the keys lowering made, an interface's keys resolved too; an
              `{#each}`'s head lowered by the grammar, once, for the five

@@ -2003,3 +2003,10 @@ what lowering parses, it reports (a correction).
   `invalidates Cart(s) Order(s)` invalidated no order, and `{#if flag other}`
   was decided by `flag`. They are reported now, at their place, as PW0016 and
   PW0017; a missing comma or arrow is reported and read past, as rustc does.
+[ADR-0238](DECISIONS/ADR-0238-a-command-speculates-on-several-entries.md):
+a command speculates on several entries, a page on those it shows.
+- An `optimistic` clause has an arm for each entry it changes, separated by
+  commas, each arm's transition typed against its own entry. A page
+  speculates on the arms whose targets it shows; one whose resource it does
+  not show is not the page's. The feed's thread page shows a like before the
+  server answers, in three engines.

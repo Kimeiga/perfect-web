@@ -69,7 +69,8 @@ const PASSED: &str = "Some(text) => match reply(id, text) {";
 #[test]
 fn the_thread_page_speculates_on_the_thread_its_parameter_keys() {
     let s = thread_page(&feed(&|s| s.to_string())).unwrap_or_else(|e| panic!("{e}"));
-    assert_eq!(s.commands, ["feed.app.reply"]);
+    // And `like`, on the same thread, since ADR-0238.
+    assert_eq!(s.commands, ["feed.app.like", "feed.app.reply"]);
     let [binding] = s.bindings.as_slice() else {
         panic!("{:?}", s.bindings);
     };

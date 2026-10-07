@@ -164,9 +164,26 @@ command like(post: PostId) -> Result<Post, FeedError>
     requires      SignedIn
     idempotent_by InteractionId
     emits         Liked(post)
-    optimistic    Timeline(current_session(), _) as feed => liked(feed, post)
+    optimistic    Timeline(current_session(), _) as feed => liked(feed, post),
+                  Thread(post) as thread => liked_thread(thread, post)
 {
     add_like(current_session(), post)
+}
+
+// **A like on the thread page, shown before the server answers**
+// (ADR-0238): the thread's count one more, where the thread is the post.
+fn liked_thread(thread: Post, post: PostId) -> Post !{} {
+    if thread.id == post {
+        Post {
+            id: thread.id,
+            author: thread.author,
+            text: thread.text,
+            likes: thread.likes + 1,
+            replies: thread.replies,
+        }
+    } else {
+        thread
+    }
 }
 
 // **A like shown before the server answers** (ADR-0228): the post's count
@@ -250,6 +267,10 @@ page PostPage(id: PostId) {
         <main>
             <Replies post={thread} />
             <p id="counts">{counted(List.length(thread.replies), "reply", "replies")} · {counted(thread.likes, "like", "likes")}</p>
+            <button id="like" type="button" on:press={resumable(captures = { id }) => match like(id) {
+                Ok(_) => answer = answer,
+                Err(_) => answer = answer,
+            }}>Like</button>
             {#if List.length(thread.replies) == 0}<p id="quiet">No replies yet.</p>{/if}
             <form on:submit|prevent={resumable(captures = { id }) => match post_text(answer) {
                 Some(text) => match reply(id, text) {

@@ -14,6 +14,16 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0238, 2026-10-07: a command speculates on several entries, a page on
+those it shows** (the rest of the owner's first Twitter gap). A command's
+`optimistic` clause named one entry, and a page that called the command
+without showing it was refused, so the thread page had no Like button. A
+clause has an arm for each entry now, each typed against its own: `like`
+speculates on the timeline and on the thread. A page speculates on the arms
+whose targets it shows, and waits for the server on the rest. The thread
+page shows a like before the server answers, in three engines
+(`just e14-speculated-arms`).
+
 **ADR-0237, 2026-10-07: what lowering parses, it reports** (a correction,
 found writing ADR-0238). The grammar keeps a clause's value, a string's hole
 and a block marker's expression as text, and lowering parsed each and dropped

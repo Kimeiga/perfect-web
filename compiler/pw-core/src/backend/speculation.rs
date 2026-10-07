@@ -299,9 +299,17 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
                 continue;
             }
             let page = template_path(hir, id);
+            let module = page_module(&cx, unit, id, &page, &speculating);
+            // A page that shows none of its commands' targets speculates on
+            // nothing (ADR-0238): no module.
+            if let Encoding::Encoded(m) = &module
+                && m.commands.is_empty()
+            {
+                continue;
+            }
             out.push(Compiled {
                 page: page.clone(),
-                module: page_module(&cx, unit, id, &page, &speculating),
+                module,
             });
         }
     }
@@ -636,6 +644,15 @@ fn page_module(
                     })
             });
             let Some(shown) = shown else {
+                // **An arm whose target the page does not show** (ADR-0238):
+                // not the page's to speculate. The clause's other arms may
+                // be, and a page that shows none of its targets waits for the
+                // server, as one that calls a command with no clause does.
+                // One that shows the resource under another key is refused:
+                // the speculation would change an entry it does not show.
+                if !bindings.iter().any(|b| b.resource == resource) {
+                    continue;
+                }
                 return Encoding::Unsupported {
                     construct: "a speculation on an entry the page does not show by the same key",
                     reason: format!(

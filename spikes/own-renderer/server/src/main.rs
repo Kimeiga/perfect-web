@@ -10557,8 +10557,9 @@ public query Store(",
     /// again when a like makes the thread a new value.
     #[test]
     fn an_attributes_computed_value_is_the_hosts_and_set_again() {
-        // With no reply speculated on the thread: an attribute computed from
-        // a speculated value is refused (ADR-0235), and this is the host's.
+        // With nothing speculated on the thread, neither a reply nor a like
+        // (ADR-0238): an attribute computed from a speculated value is
+        // refused (ADR-0235), and this is the host's.
         let s = served_feed_with(|app| {
             app.replace(
                 "<p id=\"counts\">",
@@ -10568,6 +10569,10 @@ public query Store(",
             .replace(
                 "    optimistic    Thread(to) as thread => replied(thread, text)\n",
                 "",
+            )
+            .replace(
+                "liked(feed, post),\n                  Thread(post) as thread => liked_thread(thread, post)\n",
+                "liked(feed, post)\n",
             )
         });
         let thread = |id: &str| Params::from([("id".to_string(), id.to_string())]);

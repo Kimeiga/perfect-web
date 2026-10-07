@@ -132,8 +132,10 @@ pub enum SyntaxKind {
     /// `Cart(current_session()) as cart => cart.add(item, quantity)` — the
     /// value of an `optimistic` clause.
     ///
-    /// Three children in order: the resource ENTRY being speculatively
-    /// updated, the `Name` binding its current value, and the transition.
+    /// Its arms, a `TransitionArm` for each entry, separated by commas
+    /// (ADR-0238). Each has three children in order: the resource ENTRY being
+    /// speculatively updated, the `Name` binding its current value, and the
+    /// transition.
     /// Architect ruling, 2026-08-11: an optimistic clause identifies a resource
     /// entry and binds its current value; its body is an ordinary Pleris
     /// transition expression. A bare lambda said what transformation to
@@ -177,6 +179,11 @@ pub enum SyntaxKind {
     TemplateRegion,
     /// A `{ expr }` interpolation inside a template region.
     Interpolation,
+    /// One arm of a `TransitionClause` (ADR-0238): the entry, the `Name`
+    /// binding its current value, and the transition, in that order. A
+    /// command speculating on several entries writes an arm for each,
+    /// separated by commas.
+    TransitionArm,
 
     // ---- markup ---------------------------------------------------------- 400..
     // A template region is a tree, not a token soup: E3 lowers it to a
@@ -401,6 +408,7 @@ pub const ALL_KINDS: &[SyntaxKind] = {
         ErrorExpr,
         TemplateRegion,
         Interpolation,
+        TransitionArm,
         WildcardPat,
         BindingPat,
         CtorPat,

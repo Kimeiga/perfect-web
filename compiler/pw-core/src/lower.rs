@@ -710,13 +710,24 @@ impl Lowerer<'_> {
             else {
                 continue;
             };
-            let exprs: Vec<SyntaxNode> = clause.children().filter(|c| is_expr(c.kind())).collect();
-            let (Some(target_node), Some(body_node)) = (exprs.first(), exprs.get(1)) else {
+            // Each arm its target, its name and its transition, in order
+            // (ADR-0238). An arm missing one is its parse's error, reported,
+            // and lowers to nothing.
+            let arms: Vec<(SyntaxNode, SyntaxNode, SyntaxNode)> = clause
+                .children()
+                .filter(|c| c.kind() == K::TransitionArm)
+                .filter_map(|arm| {
+                    let name = arm.children().find(|c| c.kind() == K::Name)?;
+                    let target = arm.children().find(|c| is_expr(c.kind()))?;
+                    let body = arm.children().filter(|c| is_expr(c.kind())).nth(1)?;
+                    (target.text_range().end() <= name.text_range().start()
+                        && name.text_range().end() <= body.text_range().start())
+                    .then_some((target, name, body))
+                })
+                .collect();
+            if arms.is_empty() {
                 continue;
-            };
-            let Some(name_node) = clause.children().find(|c| c.kind() == K::Name) else {
-                continue;
-            };
+            }
 
             // Lowered by a `Lowerer` over the VALUE's text, because `span_of`
             // reads a node's range and the sub-parse's ranges start at zero.
@@ -728,8 +739,10 @@ impl Lowerer<'_> {
                 hir: std::mem::take(&mut self.hir),
                 src: &value,
             };
-            let target = sub.expr(b, target_node);
-            let body = sub.expr(b, body_node);
+            let lowered: Vec<(ExprId, SyntaxNode, ExprId)> = arms
+                .iter()
+                .map(|(target, name, body)| (sub.expr(b, target), name.clone(), sub.expr(b, body)))
+                .collect();
             self.hir = std::mem::take(&mut sub.hir);
             b.exprs.shift_spans_from(before.0, offset);
             b.pats.shift_spans_from(before.1, offset);
@@ -742,20 +755,26 @@ impl Lowerer<'_> {
             // transformation are different computations with different
             // contexts. The target may read invocation state to name the entry;
             // the transformation may not perform anything at all.
-            let bs = span_of(&name_node);
-            let binder = text(&value, &name_node).trim().to_string();
-            p.roots = vec![
-                crate::hir::TermRoot {
-                    context: crate::hir::ExecutionContext::TargetSelection,
-                    binders: Vec::new(),
-                    root: target,
-                },
-                crate::hir::TermRoot {
-                    context: crate::hir::ExecutionContext::OptimisticTransition,
-                    binders: vec![(binder, (bs.start + offset)..(bs.end + offset))],
-                    root: body,
-                },
-            ];
+            // Each arm two roots, its target's and then its transition's.
+            p.roots = lowered
+                .into_iter()
+                .flat_map(|(target, name_node, body)| {
+                    let bs = span_of(&name_node);
+                    let binder = text(&value, &name_node).trim().to_string();
+                    [
+                        crate::hir::TermRoot {
+                            context: crate::hir::ExecutionContext::TargetSelection,
+                            binders: Vec::new(),
+                            root: target,
+                        },
+                        crate::hir::TermRoot {
+                            context: crate::hir::ExecutionContext::OptimisticTransition,
+                            binders: vec![(binder, (bs.start + offset)..(bs.end + offset))],
+                            root: body,
+                        },
+                    ]
+                })
+                .collect();
         }
     }
 

@@ -1819,10 +1819,13 @@ impl<'a> Typer<'a> {
         let mut out = Vec::new();
         for (i, (policy, root)) in self.decl.term_roots().enumerate() {
             let bound = match root.context {
+                // Its own arm's target (ADR-0238): the one before it.
                 Cx::OptimisticTransition => policy
                     .roots
                     .iter()
-                    .find(|r| r.context == Cx::TargetSelection)
+                    .take_while(|r| !std::ptr::eq(*r, root))
+                    .filter(|r| r.context == Cx::TargetSelection)
+                    .last()
                     .map(|t| success(self.of(t.root)))
                     .unwrap_or(Ty::Unknown),
                 Cx::Release => own_result.clone().map(success).unwrap_or(Ty::Unknown),

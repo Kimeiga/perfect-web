@@ -543,6 +543,40 @@ impl<'a> P<'a> {
         });
     }
 
+    /// **One arm of an optimistic clause** (ADR-0238): the entry, a name for
+    /// its current value, and its transition.
+    fn transition_arm(&mut self) {
+        self.start(K::TransitionArm);
+        // The resource entry. Above `as`'s power so the cast rule is not
+        // reached; see `P::expr`.
+        self.expr(10);
+        if self.at_kw("as") {
+            self.bump();
+            self.name("a name for the resource's current value");
+        } else {
+            self.error(
+                "PW0017",
+                "expected `as <name>` — an optimistic clause binds the \
+                 resource's current value",
+            );
+        }
+        // The transition is read without its arrow too, so the arrow is the
+        // one error (ADR-0237). After the arrow, a transition is expected,
+        // and its absence is the error; the comma after it stays the next
+        // arm's.
+        let arrow = self.eat(Kind::FatArrow);
+        if !arrow {
+            self.error("PW0017", "expected `=>` and a transition expression");
+        }
+        if !self.at_eof() && !self.at(Kind::Comma) {
+            self.expr(0);
+        } else if arrow {
+            let found = self.found();
+            self.error("PW0009", format!("expected an expression, found {found}"));
+        }
+        self.finish();
+    }
+
     /// **What a standalone parse leaves unread** (ADR-0237): one error over
     /// the whole rest, kept in the tree as an `ErrorExpr` so the parse stays
     /// lossless. It was an error per token, which no one saw: lowering
@@ -2799,38 +2833,24 @@ pub fn parse_type(src: &str) -> Parse {
 /// operator does not absorb the binder — `Cart(..) as cart` is a resource
 /// binding, not a cast to a type called `cart`.
 ///
+/// A clause is arms of this shape, one for each entry the command speculates
+/// on, separated by commas (ADR-0238).
+///
 /// Which policy heads take this shape is `pw_core::policy`'s answer. This is
 /// the grammar; the table lives where the rest of the policy vocabulary does.
 pub fn parse_transition_clause(src: &str) -> Parse {
     let mut p = P::standalone(src, "the end of the clause".to_string());
     p.b.start(K::SourceFile);
     p.b.start(K::TransitionClause);
-    if !p.at_eof() {
-        // The resource entry. Above `as`'s power so the cast rule is not
-        // reached; see `P::expr`.
-        p.expr(10);
-        if p.at_kw("as") {
-            p.bump();
-            p.name("a name for the resource's current value");
-        } else {
-            p.error(
-                "PW0017",
-                "expected `as <name>` — an optimistic clause binds the \
-                 resource's current value",
-            );
-        }
-        // The transition is read without its arrow too, so the arrow is the
-        // one error (ADR-0237). After the arrow, a transition is expected,
-        // and its absence is the error.
-        let arrow = p.eat(Kind::FatArrow);
-        if !arrow {
-            p.error("PW0017", "expected `=>` and a transition expression");
-        }
-        if arrow || !p.at_eof() {
-            p.expr(0);
-        }
-    }
-    p.rest_unread("an optimistic clause is one transition", None);
+    // **Each entry the command speculates on, an arm of its own** (ADR-0238):
+    // `Timeline(..) as feed => liked(feed, post), Thread(post) as thread =>
+    // liked_thread(thread, post)`, separated by commas as a clause's values
+    // are (ADR-0237).
+    p.comma_separated(
+        |p| p.transition_arm(),
+        "an optimistic clause's arms are separated by commas",
+        "write a comma before this arm",
+    );
     p.b.finish_node();
     p.b.finish_node();
     Parse {
@@ -3861,6 +3881,40 @@ mod tests {
         assert_eq!(p.errors[0].code, "PW0016");
         assert_eq!(&src[p.errors[0].span.clone()], "; ;");
         assert_eq!(p.errors[0].help, None);
+    }
+
+    #[test]
+    fn an_optimistic_clause_has_an_arm_for_each_entry() {
+        // ADR-0238: arms separated by commas, each a node of its own.
+        let src =
+            "Timeline(s, _) as feed => liked(feed, p), Thread(p) as thread => again(thread, p)";
+        let p = parse_transition_clause(src);
+        assert_lossless(src, &p);
+        assert!(p.ok(), "{:?}", p.errors);
+        assert_eq!(
+            texts(&p, K::TransitionArm),
+            [
+                "Timeline(s, _) as feed => liked(feed, p)",
+                "Thread(p) as thread => again(thread, p)"
+            ]
+        );
+        // Without the comma: the comma is the one error, and the arm is read.
+        let src =
+            "Timeline(s, _) as feed => liked(feed, p) Thread(p) as thread => again(thread, p)";
+        let p = parse_transition_clause(src);
+        assert_lossless(src, &p);
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(p.errors[0].code, "PW0016");
+        assert_eq!(
+            &src[p.errors[0].span.clone()],
+            "Thread(p) as thread => again(thread, p)"
+        );
+        assert_eq!(texts(&p, K::TransitionArm).len(), 2);
+        // An arm with no transition after its arrow keeps the comma after it.
+        let p = parse_transition_clause("A(s) as a =>, B(s) as b => g(b)");
+        assert_eq!(p.errors.len(), 1, "{:?}", p.errors);
+        assert_eq!(p.errors[0].message, "expected an expression, found `,`");
+        assert_eq!(texts(&p, K::TransitionArm).len(), 2);
     }
 
     #[test]
