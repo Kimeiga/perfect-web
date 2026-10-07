@@ -186,6 +186,12 @@ fn a_clause_word_alone_is_a_name() {
     // spelled like one is an ordinary use.
     let src = "module m\n\nfn f() -> Int !{} {\n    let x = 1\n    scope\n    x\n}\n";
     assert_eq!(unresolved(src), ["scope"]);
+    // In a body that admits clauses too. A function's admits none since
+    // ADR-0216, so the case above no longer asked this rule anything, and its
+    // mutant survived until ADR-0241's run of these controls.
+    let src =
+        "module m\n\ncomponent C() {\n    let x = 1\n    scope\n    x\n\n    view { <p /> }\n}\n";
+    assert_eq!(unresolved(src), ["scope"]);
 }
 
 #[test]

@@ -14,6 +14,14 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0241, 2026-10-07: an optimistic transition's value is the value
+typer's** (a correction, found with ADR-0240). PW0331 read the transition's
+type through the older typer, which has no answer for a literal, and no
+answer was no violation: `optimistic Thing(x) as t => "no"`, where `Thing`
+holds an `Int`, checked. The value typer, which types every expression,
+relates each transition to its own target's value now, as PW0331; the older
+comparison is retired (`just e14-transition-values`).
+
 **ADR-0240, 2026-10-07: a clause is read once** (a correction, found with
 ADR-0237). The resource graph split a key clause's text at its commas while
 lowering read it with the grammar. A parenthesis inside a key's string ended

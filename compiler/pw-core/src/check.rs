@@ -168,7 +168,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // with its own effect row, and its context permits none.
         named_roots_respect_their_context(&inference, i, &u.hir, per_unit);
         derived_values_are_pure(&inference, &sigs, i, &u.hir, per_unit);
-        optimistic_transitions_agree_with_their_target(&sigs, &workspace, &hirs, i, per_unit);
+        optimistic_targets_are_resource_entries(&sigs, &workspace, &hirs, i, per_unit);
     }
 
     // Declaration name → its privacy label, across every unit. A `page` in one
@@ -4676,7 +4676,8 @@ fn derived_values_are_pure(
     }
 }
 
-/// **The transition produces the value type of the resource it targets.**
+/// **An optimistic clause's target is a resource's entry** (PW0331): a
+/// resource this file can see, applied to a key.
 ///
 /// Architect ruling, 2026-08-11, treating this as blocking before codegen:
 ///
@@ -4698,9 +4699,11 @@ fn derived_values_are_pure(
 ///
 /// So `optimistic_transitions_are_pure` infers from `t.body` alone, and this
 /// function does not look at the target's effects at all. It asks the target
-/// one question — which resource, and what is its value type — and then asks
-/// the transition whether it produces that.
-fn optimistic_transitions_agree_with_their_target(
+/// one question: which resource. The transition's result, against the
+/// resource's value, is the value typer's (`values.rs`, ADR-0241). It types
+/// every expression, where the reading this function made had no answer for
+/// a literal, and `=> "no"` checked over an entry holding an `Int`.
+fn optimistic_targets_are_resource_entries(
     sigs: &Signatures,
     workspace: &crate::resolve::Workspace,
     hirs: &[&Hir],
@@ -4713,7 +4716,7 @@ fn optimistic_transitions_agree_with_their_target(
             continue;
         };
         let body = hir.body(body_id);
-        for (policy, target, transition) in decl.optimistic_clauses() {
+        for (policy, target, _) in decl.optimistic_clauses() {
             // The target names a resource. `Cart(current_session())` — the
             // callee, not the argument.
             let Expr::Call { callee, .. } = body.expr(target.root) else {
@@ -4727,7 +4730,7 @@ fn optimistic_transitions_agree_with_their_target(
                 continue;
             };
             let path = path_of(body, *callee);
-            let Some(value_ty) = resource_value_type(sigs, workspace, hirs, unit, &path) else {
+            if resource_value_type(sigs, workspace, hirs, unit, &path).is_none() {
                 out.push(target_is_not_a_resource_entry(
                     decl,
                     body,
@@ -4735,66 +4738,7 @@ fn optimistic_transitions_agree_with_their_target(
                     policy,
                     &format!("`{path}` is not a resource this file can see"),
                 ));
-                continue;
-            };
-
-            // The binder IS the target's value type; the transition must
-            // produce it. Seeded rather than inferred — nothing in the body
-            // says what `cart` is, because the clause's header does.
-            let mut types = crate::infer::Types::of_decl(sigs, hir, decl_id_of(hir, decl), body);
-            // Each binder by where it is bound: its term's place among the
-            // declaration's (ADR-0063).
-            let term = decl
-                .term_roots()
-                .position(|(_, r)| std::ptr::eq(r, transition));
-            for j in 0..transition.binders.len() {
-                if let Some(i) = term {
-                    types = types.with_binding(crate::lexical::Binder::Term(i, j), &value_ty);
-                }
             }
-            let Some(produced) = types.of(body, transition.root) else {
-                // No answer is not a violation. `docs/RISK_QUEUE.md`: an
-                // analysis that could not run must not be read as a proof, and
-                // it must not be read as a refutation either.
-                continue;
-            };
-            if produced.same_as(&value_ty) {
-                continue;
-            }
-            out.push(Diagnostic {
-                code: crate::codes::OPTIMISTIC_TARGET_MISMATCH.id,
-                invariant: crate::codes::OPTIMISTIC_TARGET_MISMATCH.invariant,
-                reason: "optimistic_transition_type_mismatch",
-                detector: Detector::DeclarationRule,
-                severity: Severity::Error,
-                message: format!(
-                    "`{}`'s optimistic transition produces `{produced}`, but it targets a \
-                     resource whose value is `{value_ty}`",
-                    decl.name
-                ),
-                primary_span: body.expr_span(transition.root),
-                related: vec![Related {
-                    span: body.expr_span(target.root),
-                    label: format!("this resource holds `{value_ty}`"),
-                }],
-                explanation: Some(format!(
-                    "An optimistic transition replaces the value the client is displaying, and \
-                     the platform abandons it by restoring the value it held. Both are \
-                     `{value_ty}`. A transition producing `{produced}` would put something else \
-                     in that entry, and there would be nothing meaningful to restore."
-                )),
-                repairs: vec![Repair {
-                    description: format!(
-                        "produce a `{value_ty}` from `{}`",
-                        transition
-                            .binders
-                            .first()
-                            .map(|(n, _)| n.as_str())
-                            .unwrap_or("the bound value")
-                    ),
-                    replacement: None,
-                }],
-            });
         }
     }
 }

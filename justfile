@@ -4722,3 +4722,20 @@ e14-clauses-read-once:
        CARGO_INCREMENTAL=0 python3 scripts/clauses_read_once_mutations.py; \
      } > docs/evidence/E14/clauses-read-once.txt
     @grep -E "^test result|corpus-check|mutants killed" docs/evidence/E14/clauses-read-once.txt
+
+# ADR-0241: an optimistic transition's value is the value typer's. The
+# checker's tests, the store's relations, and the mutation controls.
+e14-transition-values:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0241 - an optimistic transition's value is the value typer's"; echo; \
+       echo "produced by: just e14-transition-values"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/transition_values.rs, policy_term_positions.rs)"; echo; \
+       cargo test --locked -p pw-core --test transition_values --test policy_term_positions 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the store's relations, all decided (value_relations.rs)"; echo; \
+       cargo test --locked -p pw-core --test value_relations 2>&1 | grep -E '^test result'; \
+       echo; echo "== mutation controls (scripts/transition_values_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/transition_values_mutations.py; \
+     } > docs/evidence/E14/transition-values.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/transition-values.txt

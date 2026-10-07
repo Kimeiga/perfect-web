@@ -2024,3 +2024,9 @@ a clause is read once (a correction).
   had no edge to `Other`, which nothing declares. The graph reads the keys
   now. An interface's clause terms are lowered into an arena of their own,
   and every rule that reads a term reads them.
+[ADR-0241](DECISIONS/ADR-0241-a-transitions-value-is-the-value-typers.md):
+an optimistic transition's value is the value typer's (a correction).
+- PW0331 read a transition's type through the older typer, which has no
+  answer for a literal, so `optimistic Thing(x) as t => "no"` over an `Int`
+  checked. The value typer relates each transition to its target's value
+  now, and the older reading is retired: one fact, one detector.

@@ -94,12 +94,12 @@ MUTANTS = [
         "        // **Every root, asked its own context's question.**",
     ),
     (
-        "an interface's transition need not produce its target's value",
+        "an interface's transition's target need not be a resource's entry",
         CHECK,
         ANY_BODY + "        let body = hir.body(body_id);\n"
-        "        for (policy, target, transition) in decl.optimistic_clauses() {\n",
+        "        for (policy, target, _) in decl.optimistic_clauses() {\n",
         ITS_BODY + "        let body = hir.body(body_id);\n"
-        "        for (policy, target, transition) in decl.optimistic_clauses() {\n",
+        "        for (policy, target, _) in decl.optimistic_clauses() {\n",
     ),
     (
         "an interface's term may bind a name twice",

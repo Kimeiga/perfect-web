@@ -422,6 +422,9 @@ pub enum RelationKind {
     /// invariant the type states, as far as the build can bound it (PW0622,
     /// ADR-0179).
     Invariant,
+    /// `optimistic Thing(x) as t => e`: a transition's value, against the
+    /// value of the entry it replaces (PW0331, ADR-0241).
+    Transition,
 }
 
 /// A fields relation's expectation for a field its type does not declare.
@@ -1766,6 +1769,34 @@ impl<'a> Typer<'a> {
     fn term_relations(&self, out: &mut Vec<ValueRelation>) {
         for (_, root) in self.decl.term_roots() {
             self.relations_from(root.root, out);
+        }
+        // **A transition produces its target's value** (ADR-0241): the entry
+        // it replaces holds one, and the platform restores it. This typer
+        // types every expression. PW0331 read the transition through the
+        // older one, which has no answer for a literal, so `=> "no"` checked
+        // over an entry holding an `Int`.
+        for (_, target, transition) in self.decl.optimistic_clauses() {
+            let expected = match self.of(target.root) {
+                Ty::Builtin(Builtin::Result, mut args) if args.len() == 2 => args.swap_remove(0),
+                other => other,
+            };
+            let boundary = (
+                self.body.expr_span(target.root),
+                format!("this resource holds `{}`", self.display(&expected)),
+            );
+            // Its target, the name the repair says to produce it from.
+            let binder = transition
+                .binders
+                .first()
+                .map_or_else(|| "the bound value".to_string(), |(n, _)| format!("`{n}`"));
+            out.push(self.relate_types(
+                RelationKind::Transition,
+                expected,
+                self.of(transition.root),
+                binder,
+                self.body.expr_span(transition.root),
+                boundary,
+            ));
         }
         for policy in &self.decl.policies {
             for key in &policy.keys {
@@ -4252,6 +4283,38 @@ impl<'a> Typer<'a> {
         }
     }
 
+    /// **Two types related where the expected one is inferred**, not
+    /// declared: a transition's value against its target's (ADR-0241).
+    fn relate_types(
+        &self,
+        kind: RelationKind,
+        expected: Ty,
+        actual: Ty,
+        target: String,
+        span: Span,
+        boundary: (Span, String),
+    ) -> ValueRelation {
+        let mut s = Subst::default();
+        let outcome = match unify(&mut s, &expected, &actual) {
+            Verdict::Agree => Outcome::Agree,
+            Verdict::Undecided => Outcome::Undecided(Undecided::Unknown),
+            Verdict::Disagree => Outcome::Disagree {
+                expected: self.display(&expected),
+                actual: self.display(&actual),
+            },
+        };
+        ValueRelation {
+            declaration: self.decl.name.clone(),
+            kind,
+            span,
+            target,
+            index: None,
+            outcome,
+            declared_at: None,
+            boundary,
+        }
+    }
+
     /// **Every expression whose value the body returns.** The tail, seen
     /// through blocks and the branches of an `if`/`match`, and each `return`.
     ///
@@ -4854,6 +4917,29 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
             )
             .repair(format!(
                 "produce a `{expected}` here, or change the declared result"
+            )),
+            RelationKind::Transition => Diagnostic::error(
+                crate::codes::OPTIMISTIC_TARGET_MISMATCH.id,
+                crate::codes::OPTIMISTIC_TARGET_MISMATCH.invariant,
+                Detector::Signature,
+                format!(
+                    "`{}`'s optimistic transition produces `{actual}`, but it targets a \
+                     resource whose value is `{expected}`",
+                    r.declaration
+                ),
+                r.span.clone(),
+            )
+            .reason("optimistic_transition_type_mismatch")
+            .explain(format!(
+                "An optimistic transition replaces the value the client is displaying, and \
+                 the platform abandons it by restoring the value it held. Both are \
+                 `{expected}`. A transition producing `{actual}` would put something else in \
+                 that entry, and there would be nothing meaningful to restore."
+            ))
+            .repair(format!(
+                "produce {} `{expected}` from {}",
+                article(expected),
+                r.target
             )),
             RelationKind::Binding => Diagnostic::error(
                 crate::codes::BINDING_TYPE.id,

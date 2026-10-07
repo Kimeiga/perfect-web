@@ -214,6 +214,11 @@ fn an_interfaces_terms_are_checked_as_any_declarations() {
         codes("emits Changed(x)\n    optimistic Thing(x) as t => seen(t)"),
         ["PW0330"]
     );
+    // A target is a resource's entry.
+    assert_eq!(
+        codes("emits Changed(x)\n    optimistic label(x) as t => t"),
+        ["PW0331"]
+    );
     // A transition produces its target's value.
     assert_eq!(
         codes("emits Changed(x)\n    optimistic Thing(x) as t => label(t)"),
