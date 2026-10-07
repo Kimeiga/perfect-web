@@ -422,31 +422,44 @@ impl crate::data::Staged for Staging<'_> {
         // constraint) has rolled back, and nothing is delivered.
         c.batch_execute("COMMIT").map_err(pg)?;
         self.committed = true;
-        // What the outbox committed, read back and consumed: what is
-        // delivered is what was committed, and nothing else.
-        let rows = c
-            .query(
-                "DELETE FROM outbox WHERE id = ANY($1) RETURNING id, kind, name, args::text",
-                &[&ids],
-            )
-            .map_err(pg)?;
-        let mut read: Vec<(i64, String, String, String)> = rows
-            .iter()
-            .map(|r| (r.get(0), r.get(1), r.get(2), r.get(3)))
-            .collect();
-        read.sort();
-        let (mut emitted, mut dropped) = (Vec::new(), Vec::new());
-        for (_, kind, name, args) in read {
-            let values: Vec<serde_json::Value> =
-                serde_json::from_str(&args).map_err(|e| format!("the outbox's `{name}`: {e}"))?;
-            let values = values.iter().map(val_of).collect::<Result<Vec<_>, _>>()?;
-            match kind.as_str() {
-                "event" => emitted.push((name, values)),
-                _ => dropped.push((name, values)),
+        match delivered(c, &ids) {
+            Ok(read) => Ok(Some(read)),
+            // Committed, and not read back: what it handed is what
+            // committed. Its rows stay, consumed when a host next opens the
+            // database; the command is not answered as refused.
+            Err(why) => {
+                eprintln!("pw dev server: the feed's outbox was not read back: {why}");
+                Ok(Some((events.to_vec(), invalidated.to_vec())))
             }
         }
-        Ok(Some((emitted, dropped)))
     }
+}
+
+/// **What the outbox committed, read back and consumed**: what is delivered
+/// is what was committed, and nothing else.
+fn delivered(c: &mut Client, ids: &[i64]) -> Result<Outboxed, String> {
+    let rows = c
+        .query(
+            "DELETE FROM outbox WHERE id = ANY($1) RETURNING id, kind, name, args::text",
+            &[&ids],
+        )
+        .map_err(pg)?;
+    let mut read: Vec<(i64, String, String, String)> = rows
+        .iter()
+        .map(|r| (r.get(0), r.get(1), r.get(2), r.get(3)))
+        .collect();
+    read.sort();
+    let (mut emitted, mut dropped) = (Vec::new(), Vec::new());
+    for (_, kind, name, args) in read {
+        let values: Vec<serde_json::Value> =
+            serde_json::from_str(&args).map_err(|e| format!("the outbox's `{name}`: {e}"))?;
+        let values = values.iter().map(val_of).collect::<Result<Vec<_>, _>>()?;
+        match kind.as_str() {
+            "event" => emitted.push((name, values)),
+            _ => dropped.push((name, values)),
+        }
+    }
+    Ok((emitted, dropped))
 }
 
 impl Drop for Staging<'_> {
@@ -608,31 +621,29 @@ impl crate::data::DataLayer for FeedPg {
 
     /// **What the database provides, measured** (ADR-XXXX): a transaction
     /// opened as a command's is, asked its isolation and whether it may
-    /// write, and the server asked whether it is a standby.
+    /// write.
     /// - Serializable is `serializable`; PostgreSQL's repeatable read is
     ///   snapshot isolation, `snapshot`; read committed is `read_committed`.
-    /// - A primary's statement reads the latest commit, `strong`. A standby's
-    ///   reads a snapshot that may lag, `snapshot` and `eventual`.
+    /// - A transaction that may write is on the primary, whose statements
+    ///   read the latest commit: `strong`. A hot standby's are read only
+    ///   and refuse serializable, so the layer opens on none.
     /// - It delivers no feed of its changes: the program's events are its
     ///   outbox's.
     fn provides(&self) -> Result<Provided, String> {
         let mut c = self.pool.take()?;
-        let measured = (|| {
-            begin_command(&mut c, self.isolation)?;
+        let measured = begin_command(&mut c, self.isolation).and_then(|()| {
             let row = c.query_one(
                 "SELECT current_setting('transaction_isolation'), \
-                        current_setting('transaction_read_only'), \
-                        pg_is_in_recovery()",
+                        current_setting('transaction_read_only')",
                 &[],
             );
+            // Whatever the query did, the transaction ends here.
             c.batch_execute("ROLLBACK")?;
             row
-        })()
-        .map_err(pg);
+        });
         self.pool.give(c);
-        let row = measured?;
-        let (isolation, read_only, standby): (String, String, bool) =
-            (row.get(0), row.get(1), row.get(2));
+        let row = measured.map_err(pg)?;
+        let (isolation, read_only): (String, String) = (row.get(0), row.get(1));
         if read_only == "on" {
             return Err(
                 "the feed's database opens a command's transaction read only: no write commits"
@@ -644,14 +655,9 @@ impl crate::data::DataLayer for FeedPg {
             "repeatable read" => "snapshot",
             _ => "read_committed",
         };
-        let reads: BTreeSet<String> = if standby {
-            ["snapshot", "eventual"].map(String::from).into()
-        } else {
-            ["strong"].map(String::from).into()
-        };
         Ok(Provided {
             transactions: transactions.to_string(),
-            reads,
+            reads: BTreeSet::from(["strong".to_string()]),
             feed: false,
         })
     }
