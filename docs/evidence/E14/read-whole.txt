@@ -1,0 +1,54 @@
+ADR-0237 - what lowering parses, it reports
+
+produced by: just e14-read-whole
+commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the checker (compiler/pw-core/tests/read_whole.rs)
+
+test an_interfaces_clause_is_read_whole ... ok
+test a_standalone_parses_error_is_reported_once_and_names_its_end ... ok
+test a_hole_is_one_expression ... ok
+test a_block_markers_expression_is_one_expression ... ok
+test an_optimistic_clause_is_read_whole ... ok
+test a_clauses_values_are_separated_by_commas ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.67s
+
+== the parser (compiler/pw-syntax/src/grammar.rs)
+
+test grammar::tests::what_a_standalone_parse_leaves_is_one_error_over_it ... ok
+test grammar::tests::a_value_with_no_comma_before_it_is_reported_and_read ... ok
+test grammar::tests::an_optimistic_clause_without_its_arrow_reads_its_transition ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 80 filtered out; finished in 0.00s
+
+== the corpus (corpus-check, checking_source.rs)
+
+accepted: 32 files
+accepted: 32/32 charter §16 categories covered
+rejected: 59 files
+rejected: 59/59 charter §16 categories covered
+corpus-check: OK
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.11s
+
+== mutation controls (scripts/read_whole_mutations.py)
+
+baseline: 9 passed, 0 failed
+an optimistic clause's errors are dropped: KILLED (1 of 9 tests fail)
+a key clause's errors are dropped: KILLED (1 of 9 tests fail)
+a hole's and a marker's errors are dropped: KILLED (3 of 9 tests fail)
+an interface's clauses are not parsed: KILLED (1 of 9 tests fail)
+an error is left at its place in the clause, not the file: KILLED (3 of 9 tests fail)
+the checker does not report what lowering parsed: KILLED (6 of 9 tests fail)
+what follows one expression is read without an error: KILLED (3 of 9 tests fail)
+a hole is not read whole: KILLED (3 of 9 tests fail)
+a value with no comma before it ends the clause: KILLED (2 of 9 tests fail)
+a value with no comma before it is not reported: KILLED (5 of 9 tests fail)
+what is not a value where a comma is missing keeps its own errors: KILLED (4 of 9 tests fail)
+what is not a value where a comma is missing is read as one: KILLED (1 of 9 tests fail)
+a transition without its arrow is not read: KILLED (1 of 9 tests fail)
+an arrow with no transition after it is no error: KILLED (2 of 9 tests fail)
+a standalone parse's end is the file's: KILLED (4 of 9 tests fail)
+an error node a reported parse error left is reported again: KILLED (1 of 9 tests fail)
+the parser's help is no repair: KILLED (1 of 9 tests fail)
+the code is not registered: KILLED (5 of 9 tests fail)
+18 of 18 mutants killed

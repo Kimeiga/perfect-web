@@ -1,12 +1,12 @@
 ADR-0047 - every name resolves, in lexical scope
 
 produced by: just e10-names
-commit: e68873926fd01b82298d49c9142ea8d83d38938f
+commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the name tests (compiler/pw-core/tests/every_name_resolves.rs)
 
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
 
 == what must stay clean: errors reported
 
@@ -31,13 +31,10 @@ a `{#match}` arm's binding reaches the arms after it: KILLED (1 of 20 tests fail
 a stream part's `as` is read as a use: KILLED (1 of 20 tests fail)
 a receiver is not read: KILLED (1 of 20 tests fail)
 a module path used as a value is not read: KILLED (1 of 20 tests fail)
-a clause needs no value or block: KILLED (1 of 20 tests fail)
+a clause needs no value or block: SURVIVED
 `release(h)` does not bind `h` in its block: KILLED (1 of 20 tests fail)
 a nested declaration does not see its parent's parameters: KILLED (1 of 20 tests fail)
 a spawn form's words are uses: KILLED (1 of 20 tests fail)
 `derived` is a bare name again: KILLED (1 of 20 tests fail)
 a statement's named argument is an assignment again: KILLED (1 of 20 tests fail)
-20 of 20 mutants killed
-
-NOT CLAIMED: that derived is pure, or that a clause's words are in its
-domain. Both are left to the analyses that read them.
+19 of 20 mutants killed

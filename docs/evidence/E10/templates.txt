@@ -1,7 +1,7 @@
 ADR-0042 - template branches and interpolated attributes
 
 produced by: just e10-templates
-commit: 4310769be543b572da4cad5644b55f101cb803d1
+commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the checker and the IR (compiler/pw-core/tests/template_blocks.rs)
@@ -18,7 +18,7 @@ test an_unclosed_block_is_refused ... ok
 test else_if_nests_a_conditional_in_the_otherwise_branch ... ok
 test else_is_the_other_branch_not_more_of_the_first ... ok
 test match_takes_an_option_apart_with_its_payload_bound ... ok
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.48s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.43s
 
 == the renderer (runtime/pw-render/tests/branches.rs)
 

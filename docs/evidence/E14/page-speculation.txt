@@ -1,7 +1,7 @@
 ADR-0191 - every page speculates from its own module
 
 produced by: just e14-page-speculation
-commit: 4f19028f435808bf5fb7760cb9db9630f6d7ff6c
+commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -9,27 +9,40 @@ playwright: Version 1.58.0
 == the development server (pw-dev-server)
 
 test tests::a_change_reaches_each_page_that_reads_it_by_its_own_plan ... ok
+test tests::a_page_that_binds_a_query_is_rendered_with_its_parameters ... ok
 test tests::a_page_that_binds_a_query_is_served_at_its_route ... ok
-test result: ok. 113 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.13s
+test result: ok. 150 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 56.25s
 
 == the cart's page, in three engines (e2e/pages.spec.mjs)
 
-  ✓   2 [chromium] › e2e/pages.spec.mjs:17:1 › the cart is a page of its own, at its route (496ms)
-  ✓   4 [chromium] › e2e/pages.spec.mjs:53:1 › the store's page links to the cart's (1.9s)
-  ✓   5 [chromium] › e2e/pages.spec.mjs:92:1 › a press the server refuses is restored on the cart's page (2.0s)
+  ✓   5 [chromium] › e2e/pages.spec.mjs:17:1 › the cart is a page of its own, at its route (504ms)
+  ✓   6 [chromium] › e2e/pages.spec.mjs:104:1 › the stores are the home page, each a link to its own (574ms)
+  ✓   3 [chromium] › e2e/pages.spec.mjs:53:1 › the store's page links to the cart's (1.7s)
+  ✓   7 [chromium] › e2e/pages.spec.mjs:118:1 › the home page counts the session's cart as it changes (1.2s)
+  ✓   4 [chromium] › e2e/pages.spec.mjs:92:1 › a press the server refuses is restored on the cart's page (2.0s)
+  ✓   9 [chromium] › e2e/pages.spec.mjs:158:1 › an empty cart places no order, and says so (292ms)
+  ✓   2 [chromium] › e2e/pages.spec.mjs:71:1 › a press on the cart's page is shown before the server answers (2.0s)
   ✓   1 [chromium] › e2e/pages.spec.mjs:25:1 › a change made on either page reaches the other, open beside it (2.0s)
-  ✓   6 [chromium] › e2e/pages.spec.mjs:71:1 › a press on the cart's page is shown before the server answers (2.0s)
-  ✓   3 [firefox] › e2e/pages.spec.mjs:17:1 › the cart is a page of its own, at its route (2.6s)
-  ✓   7 [firefox] › e2e/pages.spec.mjs:25:1 › a change made on either page reaches the other, open beside it (3.0s)
-  ✓  10 [webkit] › e2e/pages.spec.mjs:17:1 › the cart is a page of its own, at its route (1.5s)
-  ✓  13 [webkit] › e2e/pages.spec.mjs:71:1 › a press on the cart's page is shown before the server answers (1.5s)
-  ✓  12 [webkit] › e2e/pages.spec.mjs:25:1 › a change made on either page reaches the other, open beside it (2.2s)
-  ✓  11 [firefox] › e2e/pages.spec.mjs:53:1 › the store's page links to the cart's (3.0s)
-  ✓   9 [firefox] › e2e/pages.spec.mjs:71:1 › a press on the cart's page is shown before the server answers (3.8s)
-  ✓  14 [webkit] › e2e/pages.spec.mjs:92:1 › a press the server refuses is restored on the cart's page (1.0s)
-  ✓   8 [firefox] › e2e/pages.spec.mjs:92:1 › a press the server refuses is restored on the cart's page (2.4s)
-  ✓  15 [webkit] › e2e/pages.spec.mjs:53:1 › the store's page links to the cart's (937ms)
-  15 passed (30.3s)
+  ✓   8 [chromium] › e2e/pages.spec.mjs:128:1 › an order is placed from the cart, and its page follows it as the store moves it along (1.7s)
+  ✓  10 [firefox] › e2e/pages.spec.mjs:17:1 › the cart is a page of its own, at its route (1.2s)
+  ✓  15 [firefox] › e2e/pages.spec.mjs:104:1 › the stores are the home page, each a link to its own (1.6s)
+  ✓  16 [firefox] › e2e/pages.spec.mjs:118:1 › the home page counts the session's cart as it changes (1.5s)
+  ✓  11 [firefox] › e2e/pages.spec.mjs:25:1 › a change made on either page reaches the other, open beside it (2.4s)
+  ✓  18 [firefox] › e2e/pages.spec.mjs:158:1 › an empty cart places no order, and says so (636ms)
+  ✓  12 [firefox] › e2e/pages.spec.mjs:71:1 › a press on the cart's page is shown before the server answers (2.4s)
+  ✓  14 [firefox] › e2e/pages.spec.mjs:92:1 › a press the server refuses is restored on the cart's page (2.2s)
+  ✓  13 [firefox] › e2e/pages.spec.mjs:53:1 › the store's page links to the cart's (1.5s)
+  ✓  17 [firefox] › e2e/pages.spec.mjs:128:1 › an order is placed from the cart, and its page follows it as the store moves it along (2.5s)
+  ✓  19 [webkit] › e2e/pages.spec.mjs:17:1 › the cart is a page of its own, at its route (1.3s)
+  ✓  21 [webkit] › e2e/pages.spec.mjs:53:1 › the store's page links to the cart's (1.3s)
+  ✓  20 [webkit] › e2e/pages.spec.mjs:25:1 › a change made on either page reaches the other, open beside it (2.2s)
+  ✓  24 [webkit] › e2e/pages.spec.mjs:118:1 › the home page counts the session's cart as it changes (970ms)
+  ✓  23 [webkit] › e2e/pages.spec.mjs:92:1 › a press the server refuses is restored on the cart's page (1.4s)
+  ✓  22 [webkit] › e2e/pages.spec.mjs:71:1 › a press on the cart's page is shown before the server answers (1.6s)
+  ✓  27 [webkit] › e2e/pages.spec.mjs:158:1 › an empty cart places no order, and says so (456ms)
+  ✓  26 [webkit] › e2e/pages.spec.mjs:104:1 › the stores are the home page, each a link to its own (696ms)
+  ✓  25 [webkit] › e2e/pages.spec.mjs:128:1 › an order is placed from the cart, and its page follows it as the store moves it along (1.3s)
+  27 passed (38.7s)
 
 == mutation controls (scripts/page_speculation_mutations.py)
 

@@ -1,7 +1,7 @@
 ADR-0231 - a page's parameter is rendered on every page
 
 produced by: just e14-page-parameters
-commit: c7f999bd5223ae9cc476cade7698b647ec95d1ee
+commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -16,25 +16,25 @@ test a_computed_attribute_is_a_value_the_host_sets ... ok
 test a_value_the_template_computes_is_lifted_and_planned ... ok
 test a_view_that_contains_itself_computes_nothing_yet_and_a_speculated_value_is_computed ... ok
 test what_a_host_does_not_compute_is_refused_by_name ... ok
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.02s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.97s
 test a_parameter_is_read_where_a_value_is_and_set_again_nowhere ... ok
 test what_reads_a_parameter_where_a_host_does_not_render_is_refused_by_name ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.15s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.98s
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
-test tests::a_reply_is_its_threads_to_every_reader_and_no_timelines ... ok
 test tests::a_row_a_change_renders_reads_the_pages_parameters ... ok
+test tests::a_reply_is_its_threads_to_every_reader_and_no_timelines ... ok
 test tests::a_page_that_binds_a_query_is_rendered_with_its_parameters ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 143 filtered out; finished in 1.78s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 147 filtered out; finished in 1.55s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  36 passed (37.7s)
+  45 passed (35.7s)
 
 == mutation controls (scripts/page_parameters_mutations.py)
 
-baseline (browser): 36 passed, 0 failed
+baseline (browser): 45 passed, 0 failed
 baseline (cargo): 13 passed, 0 failed
 a page that binds a query is rendered without its parameters [cargo]: KILLED (3 of 13 tests fail)
 a block a host renders again is rendered without the page's parameters [cargo]: KILLED (1 of 13 tests fail)

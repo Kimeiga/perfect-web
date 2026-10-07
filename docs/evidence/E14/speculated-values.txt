@@ -1,0 +1,22 @@
+ADR-0235 - what a speculated value computes, the page's module computes
+
+produced by: just e14-speculated-values
+commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+
+== the module (compiler/pw-core/tests/speculated_values.rs)
+
+test a_subject_and_a_value_in_its_block_are_the_modules ... ok
+test a_value_no_region_renders_is_refused_by_name ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+== mutation controls (scripts/speculated_values_mutations.py)
+
+baseline (cargo): 2 passed, 0 failed
+a block's subject computed from a speculated value is refused [cargo]: KILLED (2 of 2 tests fail)
+a block whose subject is computed from a speculated value is no region [cargo]: KILLED (2 of 2 tests fail)
+a value the module computes is not one its region holds [cargo]: KILLED (2 of 2 tests fail)
+a value inside a block no region renders is skipped [cargo]: KILLED (1 of 2 tests fail)
+the module exports nothing it computes [cargo]: KILLED (1 of 2 tests fail)
+5 of 5 mutants killed
