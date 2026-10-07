@@ -5423,6 +5423,10 @@ fn main() {
         server.identity.describe(),
         deployment.origin
     );
+    // TRACK SEAM (uploads, ADR-0253): what it holds a browser's file to.
+    if let Some(uploads) = server.uploads.describe() {
+        println!("pw dev server uploads: {uploads}");
+    }
 
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };

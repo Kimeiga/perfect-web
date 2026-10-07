@@ -270,6 +270,34 @@ impl Uploads {
     }
 
     /// The leases, for the data layer that commits them with a post.
+    /// **What a server says of its uploads as it starts**: each one's route
+    /// and limits, as the deployment holds a browser to them, and how many
+    /// blobs its storage keeps.
+    pub fn describe(&self) -> Option<String> {
+        let shared = self.shared.as_ref()?;
+        let each: Vec<String> = shared
+            .declared
+            .iter()
+            .map(|d| {
+                format!(
+                    "{} at {} (at most {} bytes, {} by {}, {}), served at {}",
+                    d.name,
+                    d.route,
+                    d.max_bytes,
+                    d.max_width,
+                    d.max_height,
+                    d.types.join(", "),
+                    d.serves
+                )
+            })
+            .collect();
+        let kept = shared.blobs.count().map_or_else(
+            |e| format!("its blob storage unreadable: {e}"),
+            |n| format!("{n} blob(s) kept"),
+        );
+        Some(format!("{}; {kept}", each.join("; ")))
+    }
+
     pub(crate) fn leases(&self) -> Option<Leases> {
         self.shared.clone()
     }
