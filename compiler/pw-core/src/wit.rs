@@ -846,29 +846,45 @@ pub fn package(
             }) else {
                 continue;
             };
-            let id = crate::backend::invalidation_binding(&sig.path);
-            if !wanted.contains(&id.qualified()) {
-                continue;
+            // Each of its functions a command calls, by the positions its
+            // key leaves to every value (ADR-0256): it takes the rest.
+            let shapes: Vec<(String, Vec<usize>)> = wanted
+                .iter()
+                .filter_map(|w| {
+                    let (interface, name) = w.split_once('#')?;
+                    (interface == crate::backend::INVALIDATIONS_INTERFACE).then_some(())?;
+                    let every = crate::backend::invalidation_shape(&sig.path, name)?;
+                    Some((name.to_string(), every))
+                })
+                .collect();
+            for (name, every) in shapes {
+                let id = crate::backend::invalidation_binding(&sig.path, &every);
+                let Some((pkg, iface)) = id.interface.split_once('/') else {
+                    continue;
+                };
+                let taking = Interface {
+                    params: sig
+                        .params
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| !every.contains(i))
+                        .map(|(_, p)| p.clone())
+                        .collect(),
+                    returns: None,
+                };
+                let (text, used) = wit_func(&name, &taking, &types)?;
+                host_uses.extend(used.iter().cloned());
+                let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
+                    name: pkg.to_string(),
+                    interfaces: BTreeMap::new(),
+                });
+                let slot = entry
+                    .interfaces
+                    .entry(iface.to_string())
+                    .or_insert_with(|| (BTreeSet::new(), Vec::new()));
+                slot.0.extend(used);
+                slot.1.push(text);
             }
-            let Some((pkg, iface)) = id.interface.split_once('/') else {
-                continue;
-            };
-            let taking = Interface {
-                params: sig.params.clone(),
-                returns: None,
-            };
-            let (text, used) = wit_func(&id.name, &taking, &types)?;
-            host_uses.extend(used.iter().cloned());
-            let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
-                name: pkg.to_string(),
-                interfaces: BTreeMap::new(),
-            });
-            let slot = entry
-                .interfaces
-                .entry(iface.to_string())
-                .or_insert_with(|| (BTreeSet::new(), Vec::new()));
-            slot.0.extend(used);
-            slot.1.push(text);
         }
     }
     for h in hosts.values_mut() {

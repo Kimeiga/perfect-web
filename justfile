@@ -4951,3 +4951,27 @@ e14-materialization-chains:
        CARGO_INCREMENTAL=0 python3 scripts/materialization_chains_mutations.py; \
      } > docs/evidence/E14/materialization-chains.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/materialization-chains.txt
+
+# ADR-0256 (ADR-0195's ruling 10): an entry written `_` is every entry at the
+# rest, dropped in every session's partition. The PostgreSQL test runs where
+# PW_FEED_DATABASE_URL names a database, and passes doing nothing otherwise:
+# the database job runs it in `e14-feed-postgres`.
+e14-every-entry:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0256 - an entry written with a wildcard is every entry at the rest"; echo; \
+       echo "produced by: just e14-every-entry"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "postgres: $([ -n "${PW_FEED_DATABASE_URL:-}" ] && (psql "$PW_FEED_DATABASE_URL" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)') || echo 'none: PW_FEED_DATABASE_URL is not set')"; echo; \
+       echo "== the checker (compiler/pw-core/tests/every_entry.rs)"; echo; \
+       cargo test --locked -p pw-core --test every_entry 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the compiled command (compiler/pw-conformance/tests/invalidations.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test invalidations 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the host (spikes/own-renderer/server/src/tests/every_entry.rs, feed_pg.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- every_entry on_postgres_an_entry_written_with_a_wildcard 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the cache (runtime/pw-resource/tests/concurrency_regressions.rs)"; echo; \
+       cargo test --locked -p pw-resource --test concurrency_regressions -- every_entry_named 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/every_entry_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/every_entry_mutations.py; \
+     } > docs/evidence/E14/every-entry.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/every-entry.txt

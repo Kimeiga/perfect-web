@@ -435,7 +435,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           3. ADR-0195's ruling 10: ~~materialization chains~~ (ADR-0255,
              `just e14-materialization-chains`: one may read another, a
              cycle is refused, PW5109, and a write reaches each of a
-             chain); then a timeline built from who you follow, with follow
+             chain); ~~`invalidates Cart(_)`~~ (ADR-0256, `just
+             e14-every-entry`: every entry at the rest, and an entry
+             dropped in every session's partition); then a timeline built
+             from who you follow, with follow
              and unfollow commands and a profile page with follower counts
              (the integrator's track, ADR-0253), on queries, since a
              materialization does not run; then materializations made real:

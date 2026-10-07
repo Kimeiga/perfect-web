@@ -310,6 +310,12 @@ pub struct Import {
     /// command's writes commit.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invalidates: Option<String>,
+    /// **The positions this import leaves to every value** (ADR-0256): an
+    /// `invalidates` key's `_`, `[1]` for `Timeline(current_session(), _)`.
+    /// The host is given the value at each other position, in order, and
+    /// drops every entry at them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub every: Vec<usize>,
 }
 
 /// **One place a value from outside must hold an invariant** (ADR-0179):
@@ -978,6 +984,7 @@ fn host_calls(
                 .unwrap_or_default(),
             event: (decl.kind == crate::hir::DeclKind::Event).then(|| signature.path.clone()),
             invalidates: None,
+            every: Vec::new(),
         });
     }
     // **And the invalidations' function for each entry it invalidates**
@@ -990,15 +997,20 @@ fn host_calls(
         let Some(signature) = sigs.by_def(def) else {
             continue;
         };
+        // A position written `_` is every value there (ADR-0256): the
+        // function takes the rest.
+        let every = crate::backend::every_position(body, key, &signature.names);
         let Some(params) = signature
             .params
             .iter()
-            .map(|p| sigs.stable_type(p.as_ref()?.resolved()?))
+            .enumerate()
+            .filter(|(i, _)| !every.contains(i))
+            .map(|(_, p)| sigs.stable_type(p.as_ref()?.resolved()?))
             .collect::<Option<Vec<_>>>()
         else {
             continue;
         };
-        let import = crate::backend::invalidation_binding(&signature.path);
+        let import = crate::backend::invalidation_binding(&signature.path, &every);
         if !seen.insert((import.interface.clone(), import.name.clone())) {
             continue;
         }
@@ -1017,6 +1029,7 @@ fn host_calls(
             bounded: Vec::new(),
             event: None,
             invalidates: Some(signature.path.clone()),
+            every,
         });
     }
     out
@@ -1105,6 +1118,7 @@ fn component_calls(
                 bounded: Vec::new(),
                 event: None,
                 invalidates: None,
+                every: Vec::new(),
             });
         }
     }

@@ -2,10 +2,15 @@
 """Mutation controls for ADR-0112: a call's privacy is the declaration it
 resolves to.
 
-Each mutant undoes one piece: resolving a callee as the unit sees it, the
-body's label reading that resolution, a sink's level reading it, and PW5004
-staying silent where PW5001 refuses the value. The tests in
-`privacy_by_resolution.rs` must then fail.
+Each mutant undoes one piece: resolving a callee as the unit sees it, a
+sink's level reading that resolution, and PW5004 staying silent where PW5001
+refuses the value. The tests in `privacy_by_resolution.rs` must then fail.
+
+"The body's label is read by spelling" is retired (2026-10-07): the label it
+undid, `body_label`, was joined in one rule with `Reads::observed`, which
+since ADR-0128 reads the same calls through the same resolution. Its first
+run since 2026-09-26, on CI at 5aa9430, found it surviving, and `body_label`
+is removed.
 
 Run from the repository root; `just e10-privacy-by-resolution` records the
 output. The source is restored after every mutant, whatever happens.
@@ -30,12 +35,6 @@ MUTANTS = [
         "        .or_else(|| sigs.by_path(&path))\n",
         "    let _ = (inference, at);\n"
         "    sigs.by_path(&path)\n",
-    ),
-    (
-        "the body's label is read by spelling",
-        CHECK,
-        "        if let Some(sig) = callee_signature(sigs, inference, at, body, *callee) {",
-        "        if let Some(sig) = sigs.by_path(&path_of(body, *callee)) {",
     ),
     (
         "a sink is read by spelling",

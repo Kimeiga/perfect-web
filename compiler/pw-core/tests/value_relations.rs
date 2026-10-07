@@ -271,16 +271,28 @@ fn v1_a_listeners_wildcard_is_decided_and_its_parameters_are_checked() {
     assert!(matches!(bad[1], Outcome::Disagree { .. }), "{bad:?}");
     assert_eq!(codes(&src("Changed(_, id)")), ["PW0605"]);
     assert!(codes(&src("Changed(id, _)")).is_empty());
-    // Where a key is evaluated, `_` names nothing (PW0021) and decides
-    // nothing: only a listener binds.
-    let evaluated = "module l\n\ntype C = C { n: Int }\ntype E = | Bad\n\n\
-                     query Current(k: Int) -> Result<C, E> { todo }\n\n\
-                     command add(k: Int) -> Result<C, E>\n    invalidates Current(_)\n{\n    todo\n}\n";
+    // Where a key is evaluated, `_` decides nothing: only a listener binds.
+    // In an `invalidates` key it is every entry at the rest (ADR-0256), and
+    // in an `emits` key no value, refused (PW0021).
+    let evaluated = |clause: &str| {
+        format!(
+            "module l\n\ntype C = C {{ n: Int }}\ntype E = | Bad\n\nevent Moved(k: Int)\n\n\
+             query Current(k: Int) -> Result<C, E> {{ todo }}\n\n\
+             command add(k: Int) -> Result<C, E>\n    {clause}\n{{\n    todo\n}}\n"
+        )
+    };
+    let every = evaluated("invalidates Current(_)");
     assert_eq!(
-        outcomes_of(evaluated, "Current"),
+        outcomes_of(&every, "Current"),
         [Outcome::Undecided(pw_core::values::Undecided::Unknown)]
     );
-    assert_eq!(codes(evaluated), ["PW0021"]);
+    assert!(codes(&every).is_empty(), "{:?}", messages(&every));
+    let none = evaluated("emits Moved(_)");
+    assert_eq!(
+        outcomes_of(&none, "Moved"),
+        [Outcome::Undecided(pw_core::values::Undecided::Unknown)]
+    );
+    assert_eq!(codes(&none), ["PW0021"]);
 }
 
 // --- V2: generic calls ------------------------------------------------------------

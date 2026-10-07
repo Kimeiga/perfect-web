@@ -178,6 +178,7 @@ fn a_hand_written_rust_guest_through_the_host() {
                 Import {
                     event: None,
                     invalidates: None,
+                    every: Vec::new(),
                     interface: interface.into(),
                     name: name.into(),
                     capability: "store.read".into(),

@@ -229,6 +229,7 @@ fn an_edge_whose_ends_share_no_node_is_necessarily_remote() {
         imports: vec![pw_host::Import {
             event: None,
             invalidates: None,
+            every: Vec::new(),
             interface: "pw:app/app.Store".into(),
             name: "Store".into(),
             capability: String::new(),
@@ -308,6 +309,7 @@ fn placement_and_transferability_are_independent_and_only_one_pair_fails() {
         imports: vec![pw_host::Import {
             event: None,
             invalidates: None,
+            every: Vec::new(),
             interface: format!("pw:app/{target}"),
             name: "Store".into(),
             capability: String::new(),
@@ -437,6 +439,7 @@ fn an_undetermined_signature_does_not_refuse_a_deployment() {
         imports: vec![pw_host::Import {
             event: None,
             invalidates: None,
+            every: Vec::new(),
             interface: "pw:app/app.Store".into(),
             name: "Store".into(),
             capability: String::new(),
@@ -545,6 +548,7 @@ fn a_necessarily_remote_edge_that_owes_a_principal_is_not_a_finished_plan() {
         imports: vec![pw_host::Import {
             event: None,
             invalidates: None,
+            every: Vec::new(),
             interface: "pw:app/app.Basket".into(),
             name: "Basket".into(),
             capability: String::new(),
@@ -620,6 +624,7 @@ fn widget_for() -> ComponentContract {
         imports: vec![pw_host::Import {
             event: None,
             invalidates: None,
+            every: Vec::new(),
             interface: "pw:app/app.Basket".into(),
             name: "Basket".into(),
             capability: String::new(),

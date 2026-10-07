@@ -657,6 +657,21 @@ fn unresolved_uses(
             // the speculation reaches the entry the page shows, whatever its
             // key there (ADR-0222, ruling 0105-a).
             let wildcards = target_wildcards(body, root);
+            // An `invalidates` key's argument written `_` is every value at
+            // its position (ADR-0256, ADR-0195's ruling 10). An `emits` key's
+            // is no value: an event is given one at each parameter.
+            if every_value(body, root.root) {
+                match root.context {
+                    crate::hir::ExecutionContext::Invalidated => continue,
+                    crate::hir::ExecutionContext::Emitted => {
+                        out.push(emitted_no_value(
+                            hirs, workspace, unit, hir, decl, body, root.root,
+                        ));
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
             // A module a path starts with, `Carts` in `Carts.with_line(..)`,
             // is no term: the path is the qualified call's, below. Until
             // ADR-0226 an import's name was in scope here, which is what let
@@ -4969,6 +4984,133 @@ pub(crate) fn target_wildcards(body: &Body, root: &crate::hir::TermRoot) -> Vec<
         .collect()
 }
 
+/// **Whether `e` is written `_`** (ADR-0256): an `invalidates` key's
+/// argument so is every value at its position. Anywhere else `_` is a name,
+/// and resolves to nothing.
+pub(crate) fn every_value(body: &Body, e: ExprId) -> bool {
+    matches!(body.expr(e), Expr::Name(n) if n == "_")
+}
+
+/// **An `emits` key's argument written `_`** (ADR-0256): no value, where a
+/// listener matches the event by each it carries.
+fn emitted_no_value(
+    hirs: &[&Hir],
+    workspace: &crate::resolve::Workspace,
+    unit: usize,
+    hir: &Hir,
+    decl: &Decl,
+    body: &Body,
+    e: ExprId,
+) -> Diagnostic {
+    // The key it is an argument of, and the parameter it is given at: by its
+    // name where it is named, and otherwise in order.
+    let found = decl
+        .policies
+        .iter()
+        .filter(|p| p.name == "emits")
+        .flat_map(|p| &p.keys)
+        .find_map(|key| {
+            let mut next = 0;
+            for a in &key.args {
+                let at = match &a.name {
+                    Some(name) => Err(name.clone()),
+                    None => {
+                        next += 1;
+                        Ok(next - 1)
+                    }
+                };
+                if a.value == e {
+                    return Some((key, at));
+                }
+            }
+            None
+        });
+    let (event, param) = match found {
+        Some((key, at)) => {
+            let param = match at {
+                Err(name) => Some(name),
+                Ok(i) => crate::backend::emitted_event(workspace, unit, key)
+                    .and_then(|def| crate::resolve::declaration(hirs, def))
+                    .and_then(|event| event.params.get(i))
+                    .map(|p| p.name.clone()),
+            };
+            (key.name.clone(), param)
+        }
+        None => (String::new(), None),
+    };
+    let at = param.map(|p| format!(" at `{p}`")).unwrap_or_default();
+    Diagnostic {
+        code: crate::codes::UNRESOLVED_NAME.id,
+        invariant: crate::codes::UNRESOLVED_NAME.invariant,
+        reason: "emitted_event_given_no_value",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!("`emits {event}` is given no value{at}: `_` is none"),
+        primary_span: body.expr_span(e),
+        related: vec![Related {
+            span: hir.decl_span(decl_id_of(hir, decl)),
+            label: format!("written in `emits` on `{}`", decl.name),
+        }],
+        explanation: Some(
+            "A listener matches an event by the values it carries, so `emits` gives it \
+             one at each of its parameters, as the command computes it. `_` is a value \
+             nowhere: in a listener it matches any, and in an `invalidates` key it is \
+             every entry at the rest (ADR-0256)."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "give the event the value it carries here".to_string(),
+            replacement: None,
+        }],
+    }
+}
+
+/// **A bare entry names none** (ADR-0256, ADR-0195's ruling 10): `invalidates
+/// Cart` passes no argument, and is refused as a call passing none is
+/// (PW0604). Its repair says how every entry is written: `Cart(_)`.
+fn every_entry_repair(
+    hir: &Hir,
+    sigs: &Signatures,
+    ws: &crate::resolve::Workspace,
+    at: usize,
+    found: &mut [Diagnostic],
+) {
+    for (_, decl) in hir.all_decls() {
+        for key in decl
+            .policies
+            .iter()
+            .filter(|p| p.name == "invalidates")
+            .flat_map(|p| &p.keys)
+            .filter(|k| k.args.is_empty())
+        {
+            let Some(sig) =
+                crate::backend::invalidated_query(ws, sigs, at, key).and_then(|d| sigs.by_def(d))
+            else {
+                continue;
+            };
+            if sig.params.is_empty() {
+                continue;
+            }
+            let every = format!("{}({})", key.name, vec!["_"; sig.params.len()].join(", "));
+            for d in found
+                .iter_mut()
+                .filter(|d| d.code == crate::codes::CALL_ARITY.id && d.primary_span == key.span)
+            {
+                d.repairs.insert(
+                    0,
+                    Repair {
+                        description: format!(
+                            "write `{every}` to drop every entry, or the key of the one the \
+                             command changes"
+                        ),
+                        replacement: None,
+                    },
+                );
+            }
+        }
+    }
+}
+
 /// A name inside an `optimistic` or `rollback` term that nothing binds.
 fn unresolved_in_policy_term(
     hir: &Hir,
@@ -5268,10 +5410,10 @@ fn check_unit_with(
     // argument types, constructed fields, declared results, annotated
     // bindings, and written types that resolve to nothing. The diagnostics
     // are a projection of `values::relations`, which an audit can query.
-    out.extend(crate::values::diagnostics(
-        &crate::values::relations(&unit.hir, sigs, ws, at),
-        at,
-    ));
+    let mut values =
+        crate::values::diagnostics(&crate::values::relations(&unit.hir, sigs, ws, at), at);
+    every_entry_repair(&unit.hir, sigs, ws, at, &mut values);
+    out.extend(values);
 
     for (id, decl) in unit.hir.all_decls() {
         privacy_and_placement(
@@ -7322,35 +7464,6 @@ fn given_label(sigs: &Signatures, sig: &crate::signatures::Signature) -> Option<
     first.map(|name| (label, name))
 }
 
-/// Every restriction a body picks up by calling something.
-///
-/// Reads the callee's **declared return label** from its signature. There is no
-/// table of accessor names here any more: a function carries a secret because
-/// it returns `Secret<C>`, not because it is spelled `secrets.something`
-/// (E2C, architect ruling 2026-08-06).
-///
-/// What each declaration the body reads returns through what it reads in turn
-/// (ADR-0118) is `Reads::observed`'s, which the shared-cache rule joins with
-/// this (ADR-0128). Until 2026-10-07 it was joined here too, from the same
-/// reads, and changed nothing.
-fn body_label(
-    body: &Body,
-    sigs: &Signatures,
-    inference: &crate::effects::Inference<'_>,
-    at: usize,
-) -> Label {
-    let mut label = Label::public();
-    for id in body.walk() {
-        let Expr::Call { callee, .. } = body.expr(id) else {
-            continue;
-        };
-        if let Some(sig) = callee_signature(sigs, inference, at, body, *callee) {
-            label = label.join(&sig.label);
-        }
-    }
-    label
-}
-
 /// **The signature a call names, as the unit sees it** (ADR-0112).
 ///
 /// Resolved through the unit's own declarations and imports first, then by
@@ -7595,7 +7708,6 @@ fn privacy_flow(
     let Some(body_id) = decl.body else { return };
     let body = hir.body(body_id);
     let imports = crate::labels::imported_modules(hir);
-    let label = body_label(body, sigs, inference, at);
     let def = crate::resolve::DefId {
         unit: at,
         decl: id.0,
@@ -7679,7 +7791,11 @@ fn privacy_flow(
     let shared = decl
         .policy("cache")
         .is_some_and(|c| c.value.trim() == "shared");
-    if !shared || (label.is_public() && reads.observed(def).is_public()) {
+    // What the body reads through each call it makes, its result's label
+    // among it, is `Reads::observed`'s (ADR-0118, ADR-0128). Until
+    // 2026-10-07 a second derivation of it from the body's calls was joined
+    // here too, and changed nothing.
+    if !shared || reads.observed(def).is_public() {
         return;
     }
     // One defect, one diagnostic (ADR-0112). A value PW5001 already refuses
@@ -7687,10 +7803,7 @@ fn privacy_flow(
     // is left is a tenant's value: the one partition a shared cache can carry
     // by its key (ADR-0128).
     let (read, _) = reads_label_with_source(hir, declared_labels, inference, at, decl);
-    let label = label_of(decl)
-        .join(&read)
-        .join(&reads.observed(def))
-        .join(&label);
+    let label = label_of(decl).join(&read).join(&reads.observed(def));
     if !label.safe_in_shared_cache() {
         return;
     }

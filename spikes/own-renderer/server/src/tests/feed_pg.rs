@@ -505,3 +505,36 @@ fn on_postgres_serializable_against_a_read_committed_default_is_refused() {
     })
     .expect("serializable on each transaction");
 }
+
+/// **An entry written `_` goes through the outbox as `null`** (ADR-0256):
+/// committed with the command's writes, read back as every value at its
+/// position, and dropped as in memory: each session's timeline at 20.
+#[test]
+fn on_postgres_an_entry_written_with_a_wildcard_is_every_entry() {
+    use super::every_entry::{forgetting, keep, kept, timeline_at};
+    let Some(url) = database() else { return };
+    let s = served_with(&url, "every", forgetting, |schema| {
+        FeedPg::open(&url, Some(schema))
+    })
+    .expect("served on PostgreSQL");
+    let keys = [
+        timeline_at("a", 20),
+        timeline_at("a", 40),
+        timeline_at("b", 20),
+    ];
+    keep(&s, &keys);
+    let answered = s
+        .command_answered(
+            "feed.app.forget_twenty",
+            "a",
+            &[Val::String("p1".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+    assert!(answered.committed, "{:?}", answered.result);
+    assert_eq!(
+        kept(&s, &keys),
+        [timeline_at("a", 40)],
+        "each session's timeline at 20 was dropped"
+    );
+}

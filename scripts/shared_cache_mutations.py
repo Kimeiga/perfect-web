@@ -50,8 +50,8 @@ MUTANTS = [
     (
         "PW5004 does not read what the declaration observes",
         CHECK,
-        "        .join(&reads.observed(def))\n        .join(&label);\n",
-        "        .join(&label);\n",
+        "    let label = label_of(decl).join(&read).join(&reads.observed(def));\n",
+        "    let label = label_of(decl).join(&read);\n",
     ),
 ]
 

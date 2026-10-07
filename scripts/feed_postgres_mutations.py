@@ -30,14 +30,14 @@ MUTANTS = [
     (
         "the events commit outside the command's transaction",
         LAYER,
-        "                let row = c\n"
-        "                    .query_one(\n"
-        '                        "INSERT INTO outbox',
-        "                let row = self\n"
-        "                    .pool\n"
-        "                    .take()?\n"
-        "                    .query_one(\n"
-        '                        "INSERT INTO outbox',
+        "            let row = c\n"
+        "                .query_one(\n"
+        '                    "INSERT INTO outbox',
+        "            let row = self\n"
+        "                .pool\n"
+        "                .take()?\n"
+        "                .query_one(\n"
+        '                    "INSERT INTO outbox',
     ),
     (
         "a command's transaction is the connection's default",

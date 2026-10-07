@@ -30,16 +30,15 @@ MUTANTS = [
     (
         "a session's own entry reaches the others",
         SERVER,
-        '                    (!k.starts_with("session=")).then(|| resource.to_string())\n',
-        "                    Some(resource.to_string())\n",
+        "            (!entry_is_private(&policy) || !pinned).then(|| resource.to_string())\n",
+        "            Some(resource.to_string())\n",
     ),
     (
         "a whole query's drop reaches no one",
         SERVER,
-        "                    self.queries.invalidate(resource);\n"
-        "                    Some(resource.to_string())\n",
-        "                    self.queries.invalidate(resource);\n"
-        "                    None\n",
+        "            (!entry_is_private(&policy) || !pinned).then(|| resource.to_string())\n",
+        "            (args.iter().any(Option::is_some) && (!entry_is_private(&policy) || !pinned))\n"
+        "                .then(|| resource.to_string())\n",
     ),
     (
         "every open page is read again",

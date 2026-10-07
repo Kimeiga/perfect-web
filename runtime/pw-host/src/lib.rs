@@ -125,6 +125,11 @@ pub struct Import {
     /// **The query whose entry this import drops** (ADR-0209), by its path.
     #[serde(default)]
     pub invalidates: Option<String>,
+    /// **The positions it leaves to every value** (ADR-0256), by parameter:
+    /// it is given the value at each other position. Mirrored by field
+    /// name, ADR-0018.
+    #[serde(default)]
+    pub every: Vec<usize>,
 }
 
 /// **One place a value from outside must hold an invariant** (ADR-0179), as

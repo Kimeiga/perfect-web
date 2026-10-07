@@ -38,14 +38,14 @@ MUTANTS = [
     (
         "an invalidated entry is not dropped",
         SERVER,
-        "            reached.extend(drop_key(query, Some(values.clone())));\n",
+        "            reached.extend(drop_entries(query, values));\n",
         "            let _ = (query, values);\n",
     ),
     (
         "an invalidated entry drops every entry of its query",
         SERVER,
-        "            reached.extend(drop_key(query, Some(values.clone())));\n",
-        "            reached.extend(drop_key(query, None));\n",
+        "            reached.extend(drop_entries(query, values));\n",
+        "            reached.extend(drop_entries(query, &vec![None; values.len()]));\n",
     ),
 ]
 

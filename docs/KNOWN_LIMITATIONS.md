@@ -504,7 +504,8 @@ awaited in order. What remains:
   (ADR-0208, ADR-0209). Each goes from the command's component to the
   platform, and is acted on once its writes commit. An event carrying a value
   that is not a key (a record, a list) checks, and is refused when the
-  command runs. `invalidates Cart(_)`, every entry, is ruling 10's.
+  command runs. `invalidates Cart(_)` is every entry (ADR-0256); `_` in
+  a `depends_on` key is a name, and resolves to nothing.
 - **A materialization is checked, and does not run** (ADR-0255). One may
   read another, a cycle of them is refused (PW5109), and an event reaching
   one reaches what reads it. But a materialization has no body, type or

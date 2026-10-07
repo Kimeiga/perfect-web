@@ -41,6 +41,31 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**Correction, 2026-10-07: and the rest of `body_label`.** The verification
+of `5aa9430` (run 37682873614) ran `e10-privacy-by-resolution` for the first
+time since ADR-0112 recorded it on 2026-09-26, and "the body's label is read
+by spelling" survived. The label it undid, `body_label`'s, was joined in the
+shared-cache rule with `Reads::observed`, which since ADR-0128 reads the
+same calls, resolved the same way; a call only `body_label` resolved names
+nothing the workspace resolves, and is refused (PW0021). `body_label` is
+removed, and the mutant retired.
+
+**ADR-0256, 2026-10-07: an entry written `_` is every entry at the rest**
+(ADR-0195's ruling 10, its other half). An `invalidates` key's `_` was a
+name that resolved to nothing, so a command could drop one entry of a query
+and no more. Now `invalidates Timeline(current_session(), _)` drops the
+session's timeline at every limit: the command computes the values it
+gives and calls the platform's function that takes them,
+`feed-app-timeline-EVERY-1`, and the host drops the entries at them,
+whatever the rest. An event's unbound position is the same, where it
+dropped the whole query. `_` in `emits` is refused by the parameter it
+leaves out, and a bare key's repair says how every entry is written.
+Found on the way: an invalidation dropped a private entry in the committing
+session's partition alone, so a private query keyed by anything but the
+session kept every other reader's copy, untold. It drops it in every
+session's, and tells another session unless a key pins the entry to the
+committing one (`just e14-every-entry`).
+
 **ADR-0255, 2026-10-07: a materialization may read another** (ADR-0195's
 ruling 10, its compiler half). `depends_on` looked names up among
 resources, so one naming a materialization was refused, PW5103; it names a

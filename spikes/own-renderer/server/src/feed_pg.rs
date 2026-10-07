@@ -15,7 +15,7 @@
 //! [`DataLayer::begin`]: crate::data::DataLayer::begin
 
 use super::*;
-use crate::data::{Handed, Outboxed, Provided};
+use crate::data::{Dropped, Handed, Outboxed, Provided};
 use crate::feed::{not_found, ok, user_of, user_record};
 use postgres::{Client, NoTls};
 use std::collections::BTreeSet;
@@ -337,16 +337,18 @@ fn migrate(c: &mut Client) -> Result<(), String> {
 }
 
 /// **A value the outbox keeps**, as the command computed it (ADR-0208): a
-/// `String`, an `Int` or a `Bool`, which key an entry. Anything else keys
-/// none and is refused, as the host's own outbox refuses it.
-fn json_of(name: &str, values: &[Val]) -> Result<String, String> {
+/// `String`, an `Int` or a `Bool`, which key an entry, and an invalidated
+/// entry's `_`, every value at its position, as `null` (ADR-0256). Anything
+/// else keys none and is refused, as the host's own outbox refuses it.
+fn json_of(name: &str, values: &[Option<Val>]) -> Result<String, String> {
     let values = values
         .iter()
         .map(|v| match v {
-            Val::String(s) => Ok(serde_json::Value::String(s.clone())),
-            Val::S64(n) => Ok(serde_json::Value::from(*n)),
-            Val::Bool(b) => Ok(serde_json::Value::Bool(*b)),
-            other => Err(format!("`{name}` carries {other:?}, which keys no entry")),
+            None => Ok(serde_json::Value::Null),
+            Some(Val::String(s)) => Ok(serde_json::Value::String(s.clone())),
+            Some(Val::S64(n)) => Ok(serde_json::Value::from(*n)),
+            Some(Val::Bool(b)) => Ok(serde_json::Value::Bool(*b)),
+            Some(other) => Err(format!("`{name}` carries {other:?}, which keys no entry")),
         })
         .collect::<Result<Vec<_>, String>>()?;
     Ok(serde_json::Value::Array(values).to_string())
@@ -396,26 +398,39 @@ impl crate::data::Staged for Staging<'_> {
     fn commit(
         &mut self,
         events: &[Handed],
-        invalidated: &[Handed],
+        invalidated: &[Dropped],
     ) -> Result<Option<Outboxed>, String> {
         let mut conn = self.conn.lock().expect("the command's connection");
         let c = conn
             .as_mut()
             .ok_or("the command's transaction did not open")?;
-        // What the command handed the outbox, in its transaction.
+        // What the command handed the outbox, in its transaction: an
+        // invalidated entry's `_` as `null` (ADR-0256).
+        let handed = events
+            .iter()
+            .map(|(name, values)| {
+                (
+                    "event",
+                    name,
+                    values.iter().cloned().map(Some).collect::<Vec<_>>(),
+                )
+            })
+            .chain(
+                invalidated
+                    .iter()
+                    .map(|(name, values)| ("invalidation", name, values.clone())),
+            );
         let mut ids: Vec<i64> = Vec::new();
-        for (kind, handed) in [("event", events), ("invalidation", invalidated)] {
-            for (name, values) in handed {
-                let args = json_of(name, values)?;
-                let row = c
-                    .query_one(
-                        "INSERT INTO outbox (kind, name, args) VALUES ($1, $2, $3::text::jsonb) \
-                         RETURNING id",
-                        &[&kind, name, &args],
-                    )
-                    .map_err(pg)?;
-                ids.push(row.get(0));
-            }
+        for (kind, name, values) in handed {
+            let args = json_of(name, &values)?;
+            let row = c
+                .query_one(
+                    "INSERT INTO outbox (kind, name, args) VALUES ($1, $2, $3::text::jsonb) \
+                     RETURNING id",
+                    &[&kind, name, &args],
+                )
+                .map_err(pg)?;
+            ids.push(row.get(0));
         }
         // The writes and the outbox's rows, at once or not at all. A commit
         // the database refuses (a serialization failure, a deferred
@@ -453,10 +468,23 @@ fn delivered(c: &mut Client, ids: &[i64]) -> Result<Outboxed, String> {
     for (_, kind, name, args) in read {
         let values: Vec<serde_json::Value> =
             serde_json::from_str(&args).map_err(|e| format!("the outbox's `{name}`: {e}"))?;
-        let values = values.iter().map(val_of).collect::<Result<Vec<_>, _>>()?;
         match kind.as_str() {
-            "event" => emitted.push((name, values)),
-            _ => dropped.push((name, values)),
+            "event" => {
+                let values = values.iter().map(val_of).collect::<Result<Vec<_>, _>>()?;
+                emitted.push((name, values));
+            }
+            // An invalidated entry's `null` is every value at its position
+            // (ADR-0256).
+            _ => {
+                let values = values
+                    .iter()
+                    .map(|v| match v {
+                        serde_json::Value::Null => Ok(None),
+                        v => val_of(v).map(Some),
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                dropped.push((name, values));
+            }
         }
     }
     Ok((emitted, dropped))

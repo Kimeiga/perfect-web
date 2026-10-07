@@ -85,7 +85,7 @@ pub(crate) trait Staged {
     fn commit(
         &mut self,
         _events: &[Handed],
-        _invalidated: &[Handed],
+        _invalidated: &[Dropped],
     ) -> Result<Option<Outboxed>, String> {
         Ok(None)
     }
@@ -95,9 +95,14 @@ pub(crate) trait Staged {
 /// values the command computed.
 pub(crate) type Handed = (String, Vec<Val>);
 
+/// **An entry a command drops** (ADR-0209, ADR-0256): its query's path, and
+/// the value at each of its parameters, `None` where the command wrote `_`,
+/// every value there.
+pub(crate) type Dropped = (String, Vec<Option<Val>>);
+
 /// **What a layer's outbox committed** (ADR-0246): the events, then the
 /// invalidated entries, each in the order the command handed them.
-pub(crate) type Outboxed = (Vec<Handed>, Vec<Handed>);
+pub(crate) type Outboxed = (Vec<Handed>, Vec<Dropped>);
 
 /// **What a database provides** (ADR-0207's vocabulary, ADR-0246): the
 /// isolation a command's transaction gets, what a read may promise, and

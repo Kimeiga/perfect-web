@@ -161,12 +161,69 @@ pub fn invalidated_query(
 /// query's whole path, since two modules' queries may share a name.
 pub const INVALIDATIONS_INTERFACE: &str = "pw:host/invalidations";
 
-/// The invalidations' function for the query `path` (ADR-0209).
-pub fn invalidation_binding(path: &str) -> ir::ImportId {
+/// The invalidations' function for the query `path` (ADR-0209), given the
+/// value at each of its parameters but those `every` lists, which its key
+/// writes `_` (ADR-0256): `feed-app-timeline-EVERY-1` takes a session, and
+/// drops its entries at every limit. A WIT name's later words may be
+/// uppercase, and `wit::ident` writes none, so no query's own name is
+/// another's shape.
+pub fn invalidation_binding(path: &str, every: &[usize]) -> ir::ImportId {
+    let mut name = crate::wit::ident(path);
+    if !every.is_empty() {
+        name.push_str("-EVERY");
+        for i in every {
+            name.push_str(&format!("-{i}"));
+        }
+    }
     ir::ImportId {
         interface: INVALIDATIONS_INTERFACE.to_string(),
-        name: crate::wit::ident(path),
+        name,
     }
+}
+
+/// **The positions an invalidations' function of `path` leaves to every
+/// value**, where `name` is one of its (ADR-0256): none for
+/// `feed-app-timeline`, the second for `feed-app-timeline-EVERY-1`, and no
+/// answer for another query's.
+pub fn invalidation_shape(path: &str, name: &str) -> Option<Vec<usize>> {
+    let rest = name.strip_prefix(&crate::wit::ident(path))?;
+    if rest.is_empty() {
+        return Some(Vec::new());
+    }
+    rest.strip_prefix("-EVERY-")?
+        .split('-')
+        .map(|i| i.parse().ok())
+        .collect()
+}
+
+/// **The positions an `invalidates` key leaves to every value** (ADR-0256,
+/// ADR-0195's ruling 10): each argument written `_`, at its parameter, by
+/// its name where it is named and otherwise in order, `names` the query's
+/// parameters.
+pub fn every_position(
+    body: &crate::hir::Body,
+    key: &crate::hir::ClauseKey,
+    names: &[String],
+) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut next = 0;
+    for a in &key.args {
+        let at = match &a.name {
+            Some(name) => names.iter().position(|n| n == name),
+            None => {
+                next += 1;
+                Some(next - 1)
+            }
+        };
+        if let Some(i) = at
+            && crate::check::every_value(body, a.value)
+        {
+            out.push(i);
+        }
+    }
+    out.sort_unstable();
+    out.dedup();
+    out
 }
 
 /// **Is this declaration an operation the compiler supplies, and which?**

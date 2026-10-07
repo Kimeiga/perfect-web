@@ -1256,13 +1256,25 @@ impl Server {
                         .push((event.clone(), values.to_vec()));
                     Ok(Vec::new())
                 }),
-                (None, Some(query)) => Arc::new(move |values: &[Val]| {
-                    into.lock()
-                        .expect("staged entries")
-                        .invalidated
-                        .push((query.clone(), values.to_vec()));
-                    Ok(Vec::new())
-                }),
+                (None, Some(query)) => {
+                    // The value at each position, but those its key leaves
+                    // to every value, `_`, which it is not given (ADR-0256).
+                    let every = import.every.clone();
+                    Arc::new(move |values: &[Val]| {
+                        let mut given = values.iter();
+                        let at: Vec<Option<Val>> = (0..values.len() + every.len())
+                            .map(|i| match every.contains(&i) {
+                                true => None,
+                                false => given.next().cloned(),
+                            })
+                            .collect();
+                        into.lock()
+                            .expect("staged entries")
+                            .invalidated
+                            .push((query.clone(), at));
+                        Ok(Vec::new())
+                    })
+                }
                 (None, None) => continue,
             };
             host.insert(import.key(), f);
@@ -1943,16 +1955,25 @@ impl Server {
 
     /// **Drop what a commit made stale** (ADR-0127): each entry a command
     /// invalidated, as it computed its key (ADR-0209), and each entry an
-    /// emitted event reaches through a query's `invalidates_on`. An event that
-    /// leaves a key unbound (`_`, ADR-0091) drops every entry of that query.
+    /// emitted event reaches through a query's `invalidates_on`. A position
+    /// a command writes `_`, or an event leaves unbound (ADR-0091), is every
+    /// value there: the entries at the values given are dropped, whatever
+    /// the rest (ADR-0256). Until ADR-0256 an event leaving one unbound
+    /// dropped every entry of the query.
+    ///
+    /// **In every session's partition** (ADR-0256): a private entry is one
+    /// session's copy, and what changed is every session's to read again.
+    /// Until ADR-0256 the committing session's alone was dropped, and
+    /// another's copy of a private query keyed by something else stayed.
     ///
     /// Returns **what it dropped that another session may hold** (ADR-0219):
-    /// each query dropped whole, or by a key its sessions share. An entry
-    /// keyed by the session is that session's alone.
+    /// a shared query's entries, or a private query's that no key position
+    /// pins to this session. Until ADR-0256 a private query's drop was told
+    /// to no other session unless it was whole.
     fn invalidate_queries(
         &self,
         session: &str,
-        invalidated: &[(String, Vec<Val>)],
+        invalidated: &[crate::data::Dropped],
         events: &[(String, Vec<Val>)],
     ) -> Vec<String> {
         // A query's policy, which keys its entries: read by a `let`, or by a
@@ -1974,27 +1995,23 @@ impl Server {
                 .map(|b| b["policy"].clone())
         };
         // Each drop says whether another session may hold what it dropped:
-        // not when the entry is keyed by this session (`entry_key`).
-        let drop_key = |resource: &str, args: Option<Vec<Val>>| -> Option<String> {
+        // a shared entry, or a private one no key position pins to this
+        // session, by its id. An entry keyed by the session is its alone.
+        let drop_entries = |resource: &str, args: &[Option<Val>]| -> Option<String> {
             // No binding reads it, so nothing of it is kept.
             let policy = policy_of(resource)?;
-            match args.and_then(|a| entry_key(session, &policy, &a)) {
-                Some(k) => {
-                    self.queries
-                        .invalidate_key(&pw_resource::Key::new(resource, &k));
-                    (!k.starts_with("session=")).then(|| resource.to_string())
-                }
-                None => {
-                    self.queries.invalidate(resource);
-                    Some(resource.to_string())
-                }
-            }
+            self.queries
+                .invalidate_where(resource, |key| names_entry(&policy, args, key));
+            let pinned = key_positions(&policy)
+                .iter()
+                .any(|i| matches!(args.get(*i), Some(Some(Val::String(s))) if s == session));
+            (!entry_is_private(&policy) || !pinned).then(|| resource.to_string())
         };
         let mut reached = Vec::new();
         // Until ADR-0209 the server read each key's text, `current_session()`
         // or else the whole query.
         for (query, values) in invalidated {
-            reached.extend(drop_key(query, Some(values.clone())));
+            reached.extend(drop_entries(query, values));
         }
         for (event, values) in events {
             for e in &self.graph.edges {
@@ -2020,7 +2037,7 @@ impl Server {
                         args[p] = Some(v.clone());
                     }
                 }
-                reached.extend(drop_key(&e.from, args.into_iter().collect()));
+                reached.extend(drop_entries(&e.from, &args));
             }
         }
         reached.sort();
@@ -4367,7 +4384,7 @@ impl Server {
 #[derive(Default)]
 struct Staged {
     events: Vec<(String, Vec<Val>)>,
-    invalidated: Vec<(String, Vec<Val>)>,
+    invalidated: Vec<crate::data::Dropped>,
 }
 
 type StagedEvents = Arc<Mutex<Staged>>;
@@ -4715,7 +4732,7 @@ fn runtime_manifest(resource: &str, policy: &serde_json::Value) -> pw_resource::
 /// argument the key names was not given.
 fn entry_key(session: &str, policy: &serde_json::Value, args: &[Val]) -> Option<String> {
     let mut parts = Vec::new();
-    if policy["cache"] == "private" || policy["privacy"] != "public" {
+    if entry_is_private(policy) {
         parts.push(format!("session={session}"));
     }
     for i in policy["key"].as_array().into_iter().flatten() {
@@ -4723,6 +4740,53 @@ fn entry_key(session: &str, policy: &serde_json::Value, args: &[Val]) -> Option<
         parts.push(val_to_json(v).to_string());
     }
     Some(parts.join("\u{1f}"))
+}
+
+/// **Whether each of a query's entries is one session's**, as `entry_key`
+/// keys it: a private cache, or a value that is not public.
+fn entry_is_private(policy: &serde_json::Value) -> bool {
+    policy["cache"] == "private" || policy["privacy"] != "public"
+}
+
+/// The parameters a query's entries are keyed by, by position.
+fn key_positions(policy: &serde_json::Value) -> Vec<usize> {
+    policy["key"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|i| i.as_u64())
+        .map(|i| i as usize)
+        .collect()
+}
+
+/// **Whether the entry kept at `key` is one `args` names** (ADR-0256): the
+/// value at each of its query's key positions where `args` gives one,
+/// whatever the rest, in any session's partition. `args` is the value at
+/// each parameter, `None` where a command wrote `_` or an event leaves it
+/// unbound.
+fn names_entry(policy: &serde_json::Value, args: &[Option<Val>], key: &str) -> bool {
+    let mut parts: Vec<&str> = match key.is_empty() {
+        true => Vec::new(),
+        false => key.split('\u{1f}').collect(),
+    };
+    if entry_is_private(policy) {
+        match parts.first() {
+            Some(p) if p.starts_with("session=") => {
+                parts.remove(0);
+            }
+            _ => return false,
+        }
+    }
+    let positions = key_positions(policy);
+    parts.len() == positions.len()
+        && positions
+            .iter()
+            .zip(&parts)
+            .all(|(i, part)| match args.get(*i) {
+                Some(Some(v)) => serde_json::from_str::<serde_json::Value>(part)
+                    .is_ok_and(|p| p == val_to_json(v)),
+                _ => true,
+            })
 }
 
 /// **A key's value, as a component is given it** (ADR-0152): a `String`, an
@@ -10086,6 +10150,10 @@ public query Store(",
     /// database.
     mod feed_pg;
 
+    /// An entry written `_` is every entry at the rest, in every session's
+    /// partition (ADR-0256).
+    mod every_entry;
+
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
     /// to the session's document. Until ADR-0218 the host served the store
@@ -12204,7 +12272,7 @@ public query Store(",
             "a",
             &[(
                 "store.page.Menu".to_string(),
-                vec![Val::String(STORE_ID.into())],
+                vec![Some(Val::String(STORE_ID.into()))],
             )],
             &[],
         );

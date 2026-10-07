@@ -886,6 +886,46 @@ impl<V: Clone> Resources<V> {
         }
     }
 
+    /// **Drop every entry of `resource` whose key `names`** (ADR-0256), as
+    /// [`Resources::invalidate_key`] drops one: a flight for one ends
+    /// invalidated. Answers what it dropped, a flight's key among them, by
+    /// key.
+    pub fn invalidate_where(
+        &self,
+        resource: &str,
+        mut names: impl FnMut(&str) -> bool,
+    ) -> Vec<Key> {
+        let mut st = self.state.lock().expect("state");
+        let mut dropped: Vec<Key> = st
+            .cache
+            .keys()
+            .filter(|k| k.resource == resource && names(&k.key))
+            .cloned()
+            .collect();
+        for key in &dropped {
+            st.cache.remove(key);
+        }
+        let flights: Vec<_> = st
+            .in_flight
+            .iter()
+            .filter(|(k, _)| k.resource == resource && names(&k.key))
+            .map(|(k, f)| (k.clone(), f.clone()))
+            .collect();
+        for (key, flight) in flights {
+            let _ = Self::finish_locked(
+                &mut st,
+                &key,
+                &flight,
+                Err(QueryError::Stopped(StopReason::Invalidated)),
+            );
+            if !dropped.contains(&key) {
+                dropped.push(key);
+            }
+        }
+        dropped.sort_by(|a, b| a.key.cmp(&b.key));
+        dropped
+    }
+
     pub fn invalidate(&self, resource: &str) {
         let mut st = self.state.lock().expect("state");
         st.cache.retain(|key, _| key.resource != resource);

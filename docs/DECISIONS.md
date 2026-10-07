@@ -2116,3 +2116,12 @@ a materialization may read another (ADR-0195's ruling 10, its compiler half).
   is PW5101, and a write reaches each materialization of a chain. A clause
   naming a function or a view, no node of the graph, was taken as it was,
   and is refused (PW5103).
+[ADR-0256](DECISIONS/ADR-0256-an-entry-written-with-a-wildcard-is-every-entry-at-the-rest.md):
+an entry written `_` is every entry at the rest (ADR-0195's ruling 10, its
+other half, and a correction).
+- `invalidates Timeline(current_session(), _)` drops the session's
+  timeline at every limit: the command computes the values it gives, and
+  the host drops the entries at them, whatever the rest. `_` in `emits` is
+  refused, and a bare key's repair says how every entry is written. And an
+  invalidation dropped a private entry in the committing session's
+  partition alone; it drops it in every session's, and tells the others.

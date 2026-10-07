@@ -683,3 +683,30 @@ fn a_cache_of_any_value_hands_the_fetch_its_value() {
     assert!(Arc::ptr_eq(&first, &made) && Arc::ptr_eq(&again, &made));
     assert_eq!(rt.public_cache_contents().len(), 1);
 }
+
+/// **Every entry a predicate names is dropped, and no other** (ADR-0256): an
+/// invalidation names the entries at the values it gives, in every
+/// session's partition, and the host drops them by one call.
+#[test]
+fn every_entry_named_is_dropped_and_no_other() {
+    let rt = Resources::new(Clock::new());
+    let cached = Manifest::new("q").freshness(10_000);
+    for k in ["a|1", "a|2", "b|1"] {
+        assert_eq!(
+            rt.fetch(&cached, &Key::new("q", k), |_| Ok(k.into())),
+            Fetched::Fresh(k.into())
+        );
+    }
+    let dropped = rt.invalidate_where("q", |key| key.starts_with("a|"));
+    assert_eq!(dropped, [Key::new("q", "a|1"), Key::new("q", "a|2")]);
+    assert_eq!(
+        rt.fetch(&cached, &Key::new("q", "b|1"), |_| panic!("still cached")),
+        Fetched::FromCache("b|1".into()),
+        "the entry it does not name is kept"
+    );
+    assert_eq!(
+        rt.fetch(&cached, &Key::new("q", "a|1"), |_| Ok("again".into())),
+        Fetched::Fresh("again".into()),
+        "a named entry is read again"
+    );
+}

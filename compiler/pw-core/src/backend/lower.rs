@@ -228,33 +228,46 @@ fn host_imports(cx: &Context<'_>, p: &Program) -> Vec<CallableImport> {
                     | crate::hir::DeclKind::Subscription
                     | crate::hir::DeclKind::Resource
             );
-            let import = crate::backend::invalidation_binding(&signature.path);
-            if !invalidable || !wanted.contains(&import) {
+            if !invalidable {
                 continue;
             }
-            let params: Option<Vec<Type>> = signature
-                .params
+            // Each of its functions the code calls, by the positions its key
+            // leaves to every value (ADR-0256): the rest are its parameters.
+            let shapes: Vec<(ImportId, Vec<usize>)> = wanted
                 .iter()
-                .map(
-                    |p| match ty_resolved(cx.sigs, p.as_ref()?.resolved()?, &decl.name_span) {
-                        Lowering::Lowered(t) => Some(t),
-                        _ => None,
-                    },
-                )
+                .filter(|w| w.interface == crate::backend::INVALIDATIONS_INTERFACE)
+                .filter_map(|w| {
+                    let every = crate::backend::invalidation_shape(&signature.path, &w.name)?;
+                    Some((w.clone(), every))
+                })
                 .collect();
-            let Some(params) = params else {
-                continue;
-            };
-            out.push(CallableImport {
-                id: import,
-                callee: def,
-                binding: crate::backend::ir::ImportBinding::PlatformHost,
-                signature: crate::backend::ir::BackendSignature {
-                    params,
-                    result: Type::Unit,
-                },
-                required_capabilities: outbox.iter().cloned().map(CapabilityId).collect(),
-            });
+            for (import, every) in shapes {
+                let params: Option<Vec<Type>> = signature
+                    .params
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| !every.contains(i))
+                    .map(|(_, p)| {
+                        match ty_resolved(cx.sigs, p.as_ref()?.resolved()?, &decl.name_span) {
+                            Lowering::Lowered(t) => Some(t),
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                let Some(params) = params else {
+                    continue;
+                };
+                out.push(CallableImport {
+                    id: import,
+                    callee: def,
+                    binding: crate::backend::ir::ImportBinding::PlatformHost,
+                    signature: crate::backend::ir::BackendSignature {
+                        params,
+                        result: Type::Unit,
+                    },
+                    required_capabilities: outbox.iter().cloned().map(CapabilityId).collect(),
+                });
+            }
         }
     }
     out.sort_by(|a, b| a.id.cmp(&b.id));
@@ -1593,13 +1606,6 @@ impl<'a> Lower<'a> {
         ) else {
             return blocked(format!("`{}` has no resolved signature", key.name));
         };
-        let import = match clause {
-            "emits" => match crate::backend::host_binding(decl) {
-                Some(import) => import,
-                None => return blocked(format!("`{}` is not the outbox's", key.name)),
-            },
-            _ => crate::backend::invalidation_binding(&sig.path),
-        };
         // Each value at its parameter: by its name where it is named, and
         // otherwise in order, as the checker related them (ADR-0088).
         let mut given: Vec<Option<ExprId>> = vec![None; sig.params.len()];
@@ -1619,8 +1625,29 @@ impl<'a> Lower<'a> {
                 }
             }
         }
+        // A position written `_` is every value there (ADR-0256): the
+        // function takes the rest, and the host drops every entry at them.
+        let every: Vec<usize> = match clause {
+            "invalidates" => given
+                .iter()
+                .enumerate()
+                .filter(|(_, e)| e.is_some_and(|e| crate::check::every_value(body, e)))
+                .map(|(i, _)| i)
+                .collect(),
+            _ => Vec::new(),
+        };
+        let import = match clause {
+            "emits" => match crate::backend::host_binding(decl) {
+                Some(import) => import,
+                None => return blocked(format!("`{}` is not the outbox's", key.name)),
+            },
+            _ => crate::backend::invalidation_binding(&sig.path, &every),
+        };
         let mut args = Vec::new();
-        for (slot, declared) in given.into_iter().zip(&sig.params) {
+        for (i, (slot, declared)) in given.into_iter().zip(&sig.params).enumerate() {
+            if every.contains(&i) {
+                continue;
+            }
             let (Some(expr), Some(declared)) = (slot, declared.as_ref()) else {
                 return blocked(format!(
                     "`{}` is not given every value it carries",
