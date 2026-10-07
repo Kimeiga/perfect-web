@@ -19,10 +19,11 @@ charter+ADR reading (`AGENTS.md`); small merges; full gate tests").
 
 | track | branch | worker |
 |---|---|---|
-| accounts and sign-in: a `requires` evaluator, sign-up, sign-in and sign-out, per-user sessions, an OIDC-style deployment interface with a local provider that is plainly not production | `track/identity` | W1, a local session |
-| image uploads on a post: a typed upload with size and content-type limits, a deployment's blob-storage capability, served safely | `track/uploads` | W2, a cloud session |
+| accounts and sign-in: a `requires` evaluator, sign-up, sign-in and sign-out, per-user sessions, an OIDC-style deployment interface with a local provider that is plainly not production | `track/identity` | W1, a local session; merged 2026-10-07 (ADR-0258) |
+| image uploads on a post: a typed upload with size and content-type limits, a deployment's blob-storage capability, served safely | `track/uploads` | W2, a local agent of the session that runs W1 |
 
-Notifications and direct messages wait until the follows timeline lands.
+The follows timeline landed on 2026-10-07 (ADR-0257); notifications and
+direct messages come next, the integrator's.
 
 ## What each track owns
 
@@ -135,3 +136,20 @@ Each a decision for a track, with its date; a track's ADR records it too.
     version is checked against its primary source and `just ci`'s
     advisories gate stays green. A crate already in `Cargo.lock` is taken
     at the lock's newest version.
+- **2026-10-07, uploads (W2's four questions).**
+  - Limits are the program's: an `upload` declaration, parsed and checked
+    like `source` and written by `pw build` to `uploads.json`, its limits
+    literals, its `types` a closed set, its `route` no page's (PW56xx). A
+    deployment may lower a limit, never raise one.
+  - A staged upload is an affine handle, claimed and published or discarded
+    in the command's body, so PW2005 holds every path; the development
+    origin grants `resource.acquire<Upload>` and `resource.release<Upload>`.
+  - A post's image is the post's own data: a field of `feed.rs`'s row and
+    columns of `feed_pg.rs`'s posts (migration 0005), written in the post's
+    transaction. No decorating layer; blobs are the uploads module's.
+  - `image: Option<Image>` on `Post` and `Item`, with a required alt text;
+    the timeline shows images.
+- **2026-10-07, at identity's merge (ADR-0258).** A typed principal, the
+  host's routes in the route table and a refusal shown by the runtime are
+  queued (NEXT); the database job sets up browsers and the build for a
+  recipe that needs them, and `e14-identity` runs there.

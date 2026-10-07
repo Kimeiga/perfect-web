@@ -1,4 +1,4 @@
-//! **Accounts and sign-in, served** (track `identity`, ADR-XXXX): the
+//! **Accounts and sign-in, served** (track `identity`, ADR-0258): the
 //! relying party's flow over HTTP against a provider of the test's own, the
 //! session it rotates and forgets, `requires SignedIn` and `OwnsPost(post)`
 //! held on the feed, a command from another origin refused, and two users'
@@ -407,7 +407,7 @@ fn a_signed_out_reader_reads_and_cannot_post() {
     assert!(replied.contains("\"refused\":\"SignedIn\""), "{replied}");
 }
 
-/// **What a signed-in user writes is theirs** (ADR-XXXX): a post and a reply
+/// **What a signed-in user writes is theirs** (ADR-0258): a post and a reply
 /// name their author as their provider named them, to every reader, and the
 /// reader's own page says who is signed in.
 #[test]

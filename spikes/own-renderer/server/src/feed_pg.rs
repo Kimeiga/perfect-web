@@ -164,9 +164,7 @@ fn timeline(c: &mut Client, limit: i64, reader: &str) -> Result<Val, postgres::E
         &[&limit.max(0)],
     )?;
     Ok(Val::List(
-        rows.iter()
-            .map(|r| item_of(row_of(r), reader))
-            .collect(),
+        rows.iter().map(|r| item_of(row_of(r), reader)).collect(),
     ))
 }
 
@@ -197,9 +195,7 @@ fn following(c: &mut Client, reader: &str, limit: i64) -> Result<Val, postgres::
         &[&reader, &limit.max(0)],
     )?;
     Ok(Val::List(
-        rows.iter()
-            .map(|r| item_of(row_of(r), reader))
-            .collect(),
+        rows.iter().map(|r| item_of(row_of(r), reader)).collect(),
     ))
 }
 

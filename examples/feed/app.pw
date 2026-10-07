@@ -92,7 +92,7 @@ event Followed(follower: UserId, followee: UserId)
 event Unfollowed(follower: UserId, followee: UserId)
 event Deleted(post: PostId)
 
-// **Who reads the page** (track `identity`, ADR-XXXX): whether the session
+// **Who reads the page** (track `identity`, ADR-0258): whether the session
 // is signed in, and the name its provider gave. Who a session is belongs to
 // the deployment: the host signs a session in through the deployment's
 // identity provider and keeps its principal, and nothing of it is any other

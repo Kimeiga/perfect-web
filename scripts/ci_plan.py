@@ -51,8 +51,9 @@ LOCAL_ONLY = {
 }
 
 # Recipes run against a database, which the run's database job provides
-# (ADR-0246): they are planned there and not in a shard.
-NEEDS_DATABASE = {"e14-feed-postgres"}
+# (ADR-0246): they are planned there and not in a shard. The job sets up
+# what a shard would for them (ADR-0258): `e14-identity` drives browsers.
+NEEDS_DATABASE = {"e14-feed-postgres", "e14-identity"}
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
 
@@ -300,6 +301,10 @@ def main() -> int:
     need = {n: needs(body.get(n, "")) for n in sharded}
     print("shards=" + json.dumps(plan(sharded, costs, args.shards, need)))
     print("database=" + json.dumps(database))
+    # What the database job sets up, as a shard does: its recipes' needs.
+    setup = [needs(body.get(n, "")) for n in database]
+    print("database_browsers=" + json.dumps(any(b for b, _ in setup)))
+    print("database_build=" + json.dumps(any(b for _, b in setup)))
     return 0
 
 

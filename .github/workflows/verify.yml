@@ -45,6 +45,8 @@ jobs:
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
       database: ${{ steps.plan.outputs.database }}
+      database_browsers: ${{ steps.plan.outputs.database_browsers }}
+      database_build: ${{ steps.plan.outputs.database_build }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -182,10 +184,32 @@ jobs:
           shared-key: verify
           save-if: false
       - uses: extractions/setup-just@v2
+      # What a shard sets up for its recipes, set up here for these
+      # (ADR-0249): the Node workspace, the browsers for a recipe that
+      # drives one, and the pages and servers for one that reads them.
+      - uses: pnpm/action-setup@v4
+        if: needs.plan.outputs.database_build == 'true'
+      - uses: actions/setup-node@v5
+        if: needs.plan.outputs.database_build == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Bootstrap pinned toolchain
+        if: needs.plan.outputs.database_build == 'true'
+        run: just bootstrap
+      - name: Browsers
+        if: needs.plan.outputs.database_browsers == 'true'
+        working-directory: spikes/own-renderer
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
       - name: Build
         run: |
           for _ in $(seq 150); do [ -e /tmp/disk-freed ] && break; sleep 2; done
           cargo build --workspace --locked
+          if [ "${{ needs.plan.outputs.database_build }}" = "true" ]; then
+            BUILD_ONLY=1 bash spikes/own-renderer/run.sh
+            bash spikes/own-renderer/keyed-store.sh
+            bash spikes/own-renderer/feed.sh
+          fi
       - name: Recipes
         env:
           RECIPES: ${{ join(fromJSON(needs.plan.outputs.database), ' ') }}

@@ -2133,3 +2133,14 @@ the follows timeline (the integrator's track, ADR-0253).
   Follow or Unfollow that shows before the server answers. A follow is a
   row the feed's source holds, so PW5106 holds each command that writes one
   to every reader of one.
+[ADR-0258](DECISIONS/ADR-0258-accounts-and-sign-in-pleris-is-the-relying-party.md):
+accounts and sign-in, Pleris the relying party and the provider the
+deployment's (track `identity`, W1; merged by the integrator).
+- The relying party is Pleris's: state, nonce, PKCE S256, the callback, a
+  session rotated at sign-in and sign-out, `HttpOnly` cookies, a same-origin
+  check on every request that changes something, and `requires` evaluated
+  (`SignedIn`, `OwnsPost(post)`), a refusal answered 403 with its
+  predicate. The provider is the deployment's; a development one, with
+  Argon2id passwords, starts only in development on loopback. The feed's
+  posts, replies and likes are their principal's, and its author may delete
+  a post.

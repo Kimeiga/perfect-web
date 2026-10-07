@@ -1,4 +1,4 @@
-// Track `identity` (ADR-XXXX): accounts and sign-in on the feed, in three
+// Track `identity` (ADR-0258): accounts and sign-in on the feed, in three
 // engines. The feed is served on hosts of its own (IDENTITY_PORTS), one per
 // engine, its sessions signed in through the development identity provider
 // (`PW_IDENTITY=dev-accounts`), which this server serves at /dev-idp as a
@@ -101,13 +101,13 @@ test("a post is its author's, and theirs alone to delete", async ({ browser }, t
   const text = `By ${name} at ${Date.now()}`;
   await author.getByLabel("What's happening?").fill(text);
   await author.getByRole("button", { name: "Post" }).click();
-  await expect(post(author, text).getByRole("link")).toHaveText(name);
+  await expect(post(author, text).locator(".author")).toHaveText(name);
   await expect(post(author, text).getByRole("button", { name: "Delete" })).toHaveCount(1);
 
   // Another reader, signed out, then signed in as someone else: the post
   // is named for its author, and has no Delete for them.
   await home(reader);
-  await expect(post(reader, text).getByRole("link")).toHaveText(name);
+  await expect(post(reader, text).locator(".author")).toHaveText(name);
   await expect(post(reader, text).getByRole("button", { name: "Delete" })).toHaveCount(0);
   await signUp(reader, handle(testInfo, "grace"), `Grace ${testInfo.project.name}`);
   await expect(post(reader, text)).toHaveCount(1);

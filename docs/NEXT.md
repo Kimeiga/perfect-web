@@ -443,14 +443,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
              counts, on queries); then materializations made real: a body
              and a type, a generator, a page reading one, and a chain
              rebuilt in order;
-          4. **track `identity`, W1** (ADR-0253, docs/PARALLEL.md): real
-             accounts and sign-in: sign-up, sign-in and sign-out,
-             per-user sessions, and a real `requires` evaluator in place of
-             the development server's every session `SignedIn`. An ADR
-             decides what Pleris owns and what a deployment does. Pleris is
-             no identity provider (the charter): OIDC behind a deployment's
-             interface, and a local provider that is plainly not production.
-             Pleris never stores a password in plain text;
+          4. ~~**track `identity`, W1**~~ (ADR-0258, `just e14-identity`:
+             accounts and sign-in, Pleris the relying party and the
+             provider the deployment's). What it leaves, in order: a
+             typed principal, `context.current_user()` answered by the
+             host from the session's principal, which notifications need
+             first (its first question); the routes a deployment's identity
+             serves in the route table, so a form to `/sign-in` is checked
+             (its second); a refusal shown by the runtime, a stale tab's
+             command refused 403 with its predicate;
           5. notifications (after the timeline, ADR-0253): private,
              per-user live data derived from others' actions, a like or a
              reply to your post, with an unread count;
@@ -481,6 +482,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
           instantiation (0046-a);
         - after it: 0060-a, 0078-a, 0056-a, 0047-a's parser split, and
           what waits for it, found on the way:
+          - **an export's parameters past the flat limit** (found by the
+            uploads track, W2): a timeline row's derived value takes its
+            whole item as its export's parameters, and an `Item` that
+            flattens past the Canonical ABI's MAX_FLAT_PARAMS (16) is refused
+            (`an export whose parameters exceed the flat limit`); they are
+            to be passed indirectly, as the Canonical ABI says, so a row's
+            record may grow. W2 carries a post's images as a list meanwhile;
+          - **a host binding's shape, checked where it is written** (found
+            by W2): `host "feed:uploads#claim"`, with no interface, broke
+            WIT generation for every component, by an error naming no
+            source line; a binding not `package:ns/interface#name` is to
+            be refused at check, with its span;
           - **clauses nothing reads** (ADR-0243): `respects`,
             `intrinsic_height` and a `handler_policy`'s clauses are read by
             no analysis, generator or runtime (the rolling deployment a

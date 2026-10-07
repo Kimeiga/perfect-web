@@ -5,7 +5,7 @@
 # `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and is planned by the
 # verification run like any other (scripts/ci_plan.py reads this file too).
 
-# Track `identity` (ADR-XXXX): accounts and sign-in on the feed. The server's
+# Track `identity` (ADR-0258): accounts and sign-in on the feed. The server's
 # tests of the identity, the development provider and the feed's accounts
 # (on PostgreSQL too where PW_FEED_DATABASE_URL names a throwaway database;
 # skipped otherwise), the flows in three engines (e2e/identity.spec.mjs,
@@ -15,7 +15,7 @@ e14-identity:
     @bash spikes/own-renderer/feed.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - accounts and sign-in: Pleris the relying party, the provider the deployment's"; echo; \
+    @{ echo "ADR-0258 - accounts and sign-in: Pleris the relying party, the provider the deployment's"; echo; \
        echo "produced by: just e14-identity"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \

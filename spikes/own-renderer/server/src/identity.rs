@@ -1,12 +1,12 @@
 //! **Who a request is, and what `requires` is told** (track `identity`,
-//! `docs/PARALLEL.md`, ADR-0253, ADR-XXXX).
+//! `docs/PARALLEL.md`, ADR-0253, ADR-0258).
 //!
 //! The identity track owns this module: sign-up, sign-in and sign-out, a
 //! session's principal, the session cookie, the check that a command comes
 //! from the page's own origin, and the `requires` evaluator. `main.rs` reaches
 //! it only at lines marked `TRACK SEAM (identity)`.
 //!
-//! **What Pleris owns, and what a deployment owns** (ADR-XXXX). Pleris is not
+//! **What Pleris owns, and what a deployment owns** (ADR-0258). Pleris is not
 //! an identity provider (the charter). It owns the relying party's half of an
 //! OpenID Connect authorization code flow with PKCE: the `state`, the
 //! `nonce` and the code verifier, the callback and its checks, the session it
@@ -226,7 +226,7 @@ pub(crate) fn now_secs() -> u64 {
 // Principals
 // ---------------------------------------------------------------------------
 
-/// **Who a session is** (ADR-XXXX): the user a provider vouched for. Its
+/// **Who a session is** (ADR-0258): the user a provider vouched for. Its
 /// `user` is the program's `UserId`: the provider's `sub`, "locally unique
 /// and never reassigned identifier within the Issuer" (OpenID Connect Core
 /// §2), or a guest's.
@@ -333,7 +333,7 @@ pub struct Claims {
     pub name: Option<String>,
 }
 
-/// **An OpenID provider, as a deployment supplies it** (ADR-XXXX): the
+/// **An OpenID provider, as a deployment supplies it** (ADR-0258): the
 /// authorization code flow with PKCE (OpenID Connect Core §3.1, RFC 7636).
 pub trait Provider: Send + Sync {
     /// The issuer identifier, which an ID token's `iss` must equal exactly.

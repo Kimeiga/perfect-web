@@ -506,6 +506,14 @@ awaited in order. What remains:
   that is not a key (a record, a list) checks, and is refused when the
   command runs. `invalidates Cart(_)` is every entry (ADR-0256); `_` in
   a `depends_on` key is a name, and resolves to nothing.
+- **Accounts are a development provider's, and sessions are in memory**
+  (ADR-0258). No production provider adapter: no OIDC discovery, no JWKS, no
+  ID token signature verification; `identity::Provider` is the seam. One
+  issuer; no account linking, email, recovery or sign-in rate limits.
+  Sessions do not outlive the process, expire, or get listed and revoked. A
+  stale tab's command refused with 403 shows the runtime's generic failure.
+  The program reads who its reader is through a data layer op, not a typed
+  principal (`context.current_user()` is not answered yet).
 - **The follows timeline is a query** (ADR-0257): read on each render
   from the posts of those followed, not a materialization fanned out on
   write. A reader is told of its own follow by its session, and another

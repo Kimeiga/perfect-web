@@ -1,4 +1,4 @@
-//! **A development identity provider** (track `identity`, ADR-XXXX): accounts
+//! **A development identity provider** (track `identity`, ADR-0258): accounts
 //! kept in memory, served by this server at `/dev-idp/authorize` as a
 //! deployment's OpenID provider would be at its own origin. It implements
 //! [`Provider`], the interface a deployment supplies, and it is **not
@@ -509,7 +509,7 @@ mod tests {
         parse_form(location.split_once('?').expect("a query").1)["code"].clone()
     }
 
-    /// **The development provider is not production** (ADR-XXXX): it refuses
+    /// **The development provider is not production** (ADR-0258): it refuses
     /// a production deployment and an origin that is not this machine's, and
     /// every page it serves says so first.
     #[test]

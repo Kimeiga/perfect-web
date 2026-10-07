@@ -28,9 +28,9 @@ pw-resource = { path = "../../../runtime/pw-resource" }
 # The feed's data in PostgreSQL, where the deployment names one
 # (`PW_FEED_DATABASE_URL`); the in-memory layer otherwise.
 postgres.workspace = true
-# The identity track (ADR-XXXX): the development provider's password hashes.
+# The identity track (ADR-0258): the development provider's password hashes.
 argon2.workspace = true
-# The identity track (ADR-XXXX): PKCE's S256, and session ids, states and
+# The identity track (ADR-0258): PKCE's S256, and session ids, states and
 # codes from the operating system's random source.
 base64.workspace = true
 getrandom.workspace = true

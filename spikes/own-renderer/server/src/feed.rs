@@ -51,7 +51,7 @@ enum Change {
     Follow(String, String),
     /// The follower follows the followee no more.
     Unfollow(String, String),
-    /// A post and every reply under it (track `identity`, ADR-XXXX).
+    /// A post and every reply under it (track `identity`, ADR-0258).
     Delete(String),
     /// A signed-in author's handle and name, as their provider gave them:
     /// the user the feed shows for them.
@@ -110,7 +110,7 @@ pub(crate) fn user_of(session: &str) -> String {
     format!("u-{session}")
 }
 
-/// **Who `session` reads as** (track `identity`, ADR-XXXX), the program's
+/// **Who `session` reads as** (track `identity`, ADR-0258), the program's
 /// `Viewer`: signed in or not, to an account or as the guest model's guest,
 /// and its name.
 pub(crate) fn viewer_val(principal: Option<Principal>) -> Val {
@@ -561,7 +561,7 @@ impl crate::data::DataLayer for FeedData {
                 other => Err(format!("users#unfollow received {other:?}")),
             }),
         );
-        // **A post deleted** (track `identity`, ADR-XXXX): it and every reply
+        // **A post deleted** (track `identity`, ADR-0258): it and every reply
         // under it. Who may is `requires OwnsPost(post)`'s, evaluated before
         // the command runs; a post that is not there is not found.
         let (s, into) = (seen.clone(), staged.clone());

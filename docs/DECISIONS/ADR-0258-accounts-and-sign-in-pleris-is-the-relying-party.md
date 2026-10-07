@@ -1,6 +1,7 @@
-# ADR-XXXX: accounts and sign-in, Pleris the relying party and the provider the deployment's
+# ADR-0258: accounts and sign-in, Pleris the relying party and the provider the deployment's
 
-Status: proposed by track `identity` (W1, `track/identity`), under the
+Status: accepted at its merge, 2026-10-07, under the owner's delegation of
+2026-10-02; proposed by track `identity` (W1, `track/identity`), under the
 integrator's rulings of 2026-10-07 (docs/PARALLEL.md, "The integrator's
 rulings"). Date: 2026-10-07. Milestone: E14, the owner's Twitter list, item
 4 (NEXT 22's fourth).
@@ -171,7 +172,8 @@ both identity models. No token: the runtime is unchanged.
 - **argon2 0.6.0** (RustCrypto, 2026-08-27): the newest on crates.io, not
   yanked, MIT OR Apache-2.0, rust-version 1.85, checked 2026-10-07 on
   crates.io, on docs.rs for 0.6.0 and in its source. **The owner approved
-  its download on 2026-10-07.** Argon2id v19 at the crate's defaults, which
+  its download on 2026-10-07**, and confirmed it in the integrator's session
+  before the merge. Argon2id v19 at the crate's defaults, which
   are OWASP's minimum (`Params::DEFAULT_M_COST = 19 * 1024`, `T = 2`,
   `P = 1`), PHC strings through password-hash 0.6
   (`PasswordHasher::hash_password`, `phc::PasswordHash::new`,
@@ -245,6 +247,14 @@ Recorded by `just e14-identity` in `docs/evidence/E14/identity.txt`:
 - **The whole server's tests**, 189 (PostgreSQL's included, against 18.6
   locally), and `just ci`.
 
+**At the merge** (the integrator's, onto ADR-0257): the whole workspace,
+2275 tests, PostgreSQL's among them; the feed's and identity's browser
+suites in three engines, 69; and, run whole, `identity_mutations.py`
+(16), `follows_mutations.py` (12), `feed_postgres_mutations.py` (7),
+`computed_rows_mutations.py` (12) and `speculated_arms_mutations.py` (8):
+every mutant killed. The rows' second link, a handle to its user's page,
+made two of the identity suite's locators the author's `.author`.
+
 ## Not claimed
 
 - **A production provider adapter**: no OIDC discovery, no JWKS, no ID
@@ -280,6 +290,30 @@ Recorded by `just e14-identity` in `docs/evidence/E14/identity.txt`:
    database job installs browsers, so its PostgreSQL tests run on CI.
 4. **Two compiler tests** (`read_whole.rs`, `clauses_read_once.rs`) pin the
    thread's listeners as written in app.pw; they now count `Deleted`.
+
+## The integrator's answers
+
+2026-10-07, at the merge.
+
+1. **A typed principal: yes, as `context.current_user()`**, which the
+   platform declares and no host has answered (its body is `User("")`).
+   It becomes a `host` operation the host answers from the session's
+   principal, `User<UserId>`, labelled the user's. A program can then key a
+   query by the reader's user, and an event naming a user reaches each of
+   their sessions; `identified_by` stays until the feed reads its user that
+   way. Notifications need it first: a reader's are keyed by the user. A
+   language ADR, the integrator's, with notifications (queued in NEXT).
+2. **The host's routes in the route table: yes**, so a form or link to
+   `/sign-in` is checked as a page's is (PW5009); the platform states the
+   routes a deployment's identity serves. Queued in NEXT.
+3. **The database job installs the browsers and builds when a recipe it
+   runs drives one**, as a shard does (ADR-0249): `ci_plan.py` says so for
+   the database job too, and `e14-identity` is planned there, so its
+   PostgreSQL tests run on CI. Done at this merge.
+4. **The two compiler tests** count `Deleted` rightly.
+
+And from "Not claimed": **a refusal shown by the runtime**, a stale tab's
+command refused with 403 and its predicate, is queued in NEXT.
 
 ## Report
 

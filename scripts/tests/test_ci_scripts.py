@@ -144,6 +144,23 @@ class Plan(unittest.TestCase):
             'shards=[{"index": 0, "recipes": ["e14-feed"], "browsers": true, "build": true}]',
         )
         self.assertEqual(out[1], 'database=["e14-feed-postgres"]')
+        # It sets up nothing more than its recipes need (ADR-0258):
+        # `e14-feed-postgres` drives no browser and reads no page built.
+        self.assertEqual(out[2], "database_browsers=false")
+        self.assertEqual(out[3], "database_build=false")
+
+    def test_the_database_job_sets_up_what_its_recipes_need(self) -> None:
+        # `e14-identity` drives three browsers against its PostgreSQL tests'
+        # database (ADR-0258): the job installs them, as a shard would.
+        out = subprocess.run(
+            [sys.executable, str(SCRIPTS / "ci_plan.py"), "--shards", "2", "e14-identity"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        self.assertEqual(out[1], 'database=["e14-identity"]')
+        self.assertEqual(out[2], "database_browsers=true")
+        self.assertEqual(out[3], "database_build=true")
 
     def test_a_recipes_cost_counts_the_mutants_it_plants(self) -> None:
         body = "    python3 scripts/statements_separated_mutations.py\n"

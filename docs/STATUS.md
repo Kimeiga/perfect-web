@@ -41,6 +41,25 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0258, 2026-10-07: accounts and sign-in** (track `identity`, W1, the
+first track merged under ADR-0253; the owner confirmed argon2 0.6.0 before
+it). Pleris is the relying party: a sign-in's state, nonce and PKCE S256,
+its callback, a session rotated at sign-in and sign-out, `HttpOnly` session
+cookies, `Secure` off loopback, a same-origin check on every request that
+changes something (Go 1.25's `CrossOriginProtection`), and `requires`
+evaluated: `SignedIn`, and `OwnsPost(post)` read in the command's own
+transaction, a refusal answered 403 with its predicate. The provider is the
+deployment's, behind `identity::Provider`; a development provider, its
+passwords Argon2id, starts only where the deployment says development on
+loopback. The guest model stays the development server's default. The
+feed's posts, replies and likes are their principal's, and an author may
+delete a post. Merged onto the follows timeline, whose reads and writes ask
+the session's principal now, and whose rows offer Delete on the reader's
+own. Its recorded evidence is from `b38d10d`, before the rebase; the
+merge's verification records `e14-identity` again, on the database job,
+which now sets up browsers and the build for a recipe that needs them
+(the integrator's answer to its third question).
+
 **ADR-0257, 2026-10-07: the follows timeline** (the integrator's track,
 ADR-0253; ADR-0195's ruling 10's feed). A reader follows and unfollows a
 user from their page, `/user/{id}`, which counts who follows them and whom

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for the identity track (ADR-XXXX): accounts and sign-in.
+"""Mutation controls for the identity track (ADR-0258): accounts and sign-in.
 
 Each mutant undoes one guarantee the track claims: a command from another
 origin refused (CSRF), the session rotated at sign-in and forgotten at

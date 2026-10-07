@@ -52,7 +52,7 @@ pub(crate) trait DataLayer: Send + Sync {
     }
 
     /// **Each session's principal, as the identity keeps it** (track
-    /// `identity`, ADR-XXXX): handed to the layer once, when the server is
+    /// `identity`, ADR-0258): handed to the layer once, when the server is
     /// built, so that it maps a session to the user it acts as. A layer that
     /// knows no users ignores it.
     fn identified_by(&self, _principals: crate::identity::Principals) {}

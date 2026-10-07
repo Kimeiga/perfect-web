@@ -93,7 +93,7 @@ export const KEYED_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 5
 // server, built into `dist-feed` by `feed.sh`. One per engine, because a
 // post is every reader's. Served only when it is built.
 export const FEED_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 60 + i]));
-// The identity track's hosts (ADR-XXXX): the feed's build again, its
+// The identity track's hosts (ADR-0258): the feed's build again, its
 // sessions signed in through the development identity provider
 // (`PW_IDENTITY=dev-accounts`). One per engine, because an account and a post
 // are every reader's on a host. Served only when the feed is built.
@@ -227,7 +227,7 @@ export default defineConfig({
     ...(FEED_BUILT && !process.env.PW_PERFORMANCE
       ? Object.values(IDENTITY_PORTS).map((port) => ({
           command: `../../target/debug/pw-dev-server dist-feed`,
-          env: { PORT: String(port), PW_IDENTITY: "dev-accounts" },
+          env: { PORT: String(port), PW_IDENTITY: "dev-accounts", ...IN_MEMORY },
           port,
           reuseExistingServer: !!process.env.PW_REUSE,
           timeout: 60_000,
