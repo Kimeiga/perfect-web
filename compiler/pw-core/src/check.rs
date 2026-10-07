@@ -217,6 +217,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // parameters, and one route is one page's.
             out.extend(crate::routes::parameters_agree(&u.hir, i, &sigs));
             out.extend(crate::routes::declared_twice(&hirs, i));
+            // Track `uploads` (ADR-XXXX): an upload's clauses, its paths, and
+            // the forms that post a file.
+            out.extend(crate::uploads::check(&hirs, i));
             // ADR-0163: a page says when its address names nothing.
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
@@ -1078,6 +1081,10 @@ fn policy_value(
                 )
             ),
             ValueFault::Flag => format!("`{head}` takes no value"),
+            ValueFault::Count => format!(
+                "`{value}` is not a count: a whole number greater than zero, as digits, \
+                 `5_000_000`"
+            ),
             ValueFault::Operator(name, ops) => {
                 format!(
                     "`{name}` is none of `{}`'s operators: {}",
@@ -2310,6 +2317,7 @@ fn described(kind: DeclKind) -> &'static str {
         DeclKind::Task => "a task",
         DeclKind::Event => "an event",
         DeclKind::Source => "a data source",
+        DeclKind::Upload => "an upload",
         DeclKind::Effect => "an effect",
         DeclKind::Prelude => "a prelude",
         DeclKind::Fn => "a function",

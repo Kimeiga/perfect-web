@@ -20,6 +20,11 @@ pub fn table(hirs: &[&Hir]) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     for hir in hirs {
         for (_, decl) in hir.all_decls() {
+            // An upload's route is where a form posts, not a page a link
+            // reaches (track `uploads`).
+            if decl.kind == crate::hir::DeclKind::Upload {
+                continue;
+            }
             out.extend(declared_route(hir, decl));
         }
     }

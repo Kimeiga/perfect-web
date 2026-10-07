@@ -69,6 +69,8 @@ pub mod signatures;
 pub mod streams;
 pub mod template_ir;
 pub mod types;
+// Track `uploads` (ADR-XXXX): a file a form posts, and its limits.
+pub mod uploads;
 pub mod values;
 pub mod wit;
 

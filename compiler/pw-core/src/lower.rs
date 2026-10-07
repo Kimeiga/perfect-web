@@ -158,6 +158,7 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
                 "materialize" => DeclKind::Materialize,
                 "event" => DeclKind::Event,
                 "source" => DeclKind::Source,
+                "upload" => DeclKind::Upload,
                 "task" => DeclKind::Task,
                 _ => {
                     let _ = src;

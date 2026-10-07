@@ -52,6 +52,9 @@ pub struct Build {
     /// **What each data source states it guarantees** (ADR-0207), which a
     /// host compares with what the database it opens provides (ADR-0246).
     pub sources: Vec<crate::check::SourceClauses>,
+    /// Track `uploads` (ADR-XXXX): each upload the program declares, which
+    /// a host holds a browser's file to.
+    pub uploads: Vec<crate::uploads::UploadClauses>,
 }
 
 impl Build {
@@ -68,6 +71,8 @@ impl Build {
     /// DIR/app.wit                   the worlds the components implement
     /// DIR/pages/<page>.json         what each page shows (ADR-0125)
     /// DIR/graph.json                what a materializer consumes (ADR-0123)
+    /// DIR/uploads.json              each upload's route and limits, which a
+    ///                               host holds a browser's file to
     /// DIR/sources.json              what each data source guarantees, which
     ///                               a host holds its database to (ADR-0246)
     /// DIR/speculations/<page>.*     each page's speculations (ADR-0122)
@@ -157,6 +162,10 @@ impl Build {
         // database provides before it serves (ADR-0246).
         let sources = serde_json::to_string_pretty(&self.sources).map_err(|e| e.to_string())?;
         write("sources.json", format!("{sources}\n").as_bytes())?;
+        // Each upload's route and limits (track `uploads`), which a host
+        // holds a browser's file to before it keeps a byte.
+        let uploads = serde_json::to_string_pretty(&self.uploads).map_err(|e| e.to_string())?;
+        write("uploads.json", format!("{uploads}\n").as_bytes())?;
         for s in &self.speculations {
             if let crate::backend::wasm::Encoding::Encoded(m) = &s.module {
                 let manifest = serde_json::json!({
@@ -365,6 +374,7 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
         computed,
         pages,
         sources: crate::check::source_clauses(&hirs),
+        uploads: crate::uploads::upload_clauses(&hirs),
     })
 }
 

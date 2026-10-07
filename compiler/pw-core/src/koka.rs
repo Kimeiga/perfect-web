@@ -92,6 +92,8 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
         DeclKind::Event => Err("an event declaration — no body to check"),
         // ADR-0207: a statement of what a database guarantees.
         DeclKind::Source => Err("a data source — what a database guarantees, no body"),
+        // Track `uploads`: what a form may post, and its limits.
+        DeclKind::Upload => Err("an upload — a file's limits, no body"),
 
         DeclKind::Type => {
             // A record: `type CartLine = CartLine { item_id: .., .. }`.

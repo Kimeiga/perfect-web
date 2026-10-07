@@ -727,6 +727,18 @@ codes! {
         "a `<stream>` shows each state its query can be in, and no other";
     STREAMED_WITHOUT_TIMEOUT = "PW5402" / streamed_without_timeout / 1, Streaming,
         "a query declared `delivery streamed` declares how long it may take";
+
+    // --- the uploads track (PW56xx, ADR-0253; track `uploads`, ADR-XXXX) ----
+    //
+    // An `upload` declaration states where a form posts a file, where what is
+    // committed is served, and its limits, each a literal the host holds a
+    // browser to: the program states its invariants, as `PostText`'s 280 is.
+    UPLOAD_MALFORMED = "PW5601" / upload_malformed / 1, Uploads,
+        "an upload states its route, where it is served, and each of its limits, once and as literals";
+    UPLOAD_ROUTE_TAKEN = "PW5602" / upload_route_taken / 1, Uploads,
+        "an upload's paths are its own: no page's, and no other upload's";
+    FILE_FORM_POSTS_TO_NO_UPLOAD = "PW5603" / file_form_posts_to_no_upload / 1, Uploads,
+        "a form that sends a file posts it, as multipart/form-data, to an upload the program declares";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must

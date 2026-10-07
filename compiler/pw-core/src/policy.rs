@@ -149,6 +149,10 @@ pub enum Domain {
     /// A declaration this program defines, named for attribution:
     /// `attributes_forced_layout_to VendorMap`.
     DeclRef,
+    /// **A whole number greater than zero, as digits** (track `uploads`):
+    /// `max_bytes 5_000_000`, `max_width 4096`. A literal, so a limit is
+    /// what the program states and nothing computes it.
+    Count,
 }
 
 /// One policy operator, with the semantic kind of each argument.
@@ -257,6 +261,10 @@ const IDENTITY_OPS: &[Op] = &[Op {
     args: &[Arg::Dimension(IDENTITY_DIMENSIONS)],
 }];
 
+/// **The kinds an upload may be** (track `uploads`): each one a server
+/// sniffs from a file's magic number and measures from its header.
+pub const UPLOAD_TYPES: &[&str] = &["png", "jpeg", "webp", "gif"];
+
 /// The domain of every policy head the parser recognises.
 ///
 /// Exhaustive by test: `every_policy_keyword_has_a_domain` fails closed when
@@ -341,6 +349,12 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "transactions" => Domain::Word(&["serializable", "snapshot", "read_committed", "none"]),
         "reads" => Domain::Words(&["strong", "snapshot", "read_your_writes", "eventual"]),
         "changes" => Domain::Word(&["none", "feed"]),
+        // An upload's (track `uploads`, ADR-XXXX): where its committed files
+        // are served, its limits, and its kinds, a closed set each sniffed
+        // from a file's bytes.
+        "serves" => Domain::Str,
+        "max_bytes" | "max_width" | "max_height" => Domain::Count,
+        "types" => Domain::Words(UPLOAD_TYPES),
         "captures" => Domain::Word(&["serializable_only"]),
         "on_version_mismatch" => Domain::Word(&["safe_refetch", "refuse"]),
         "load" => Domain::Word(&["on_first_interaction", "eager"]),
@@ -470,6 +484,7 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         K::Event,
         K::Effect,
         K::Source,
+        K::Upload,
         K::Prelude,
         K::Task,
         K::Type,
@@ -545,7 +560,9 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         // A resource's life.
         "acquire" | "release" | "affine" => (&[K::Resource], "a resource"),
         // A page's.
-        "route" | "revision" => (&[K::Page], "a page"),
+        "revision" => (&[K::Page], "a page"),
+        // A page's address, or where a form posts an upload (track `uploads`).
+        "route" => (&[K::Page, K::Upload], "a page or an upload"),
         "privacy" => (&[K::Page, K::Other], "a page or a replicated value"),
         // An effect's.
         "capability" | "impact" => (&[K::Effect], "an effect"),
@@ -554,6 +571,10 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         "host" => (&[K::Fn, K::Effect], "a function"),
         // A data source's (ADR-0207).
         "holds" | "transactions" | "reads" | "changes" => (&[K::Source], "a data source"),
+        // An upload's (track `uploads`, ADR-XXXX).
+        "serves" | "max_bytes" | "types" | "max_width" | "max_height" => {
+            (&[K::Upload], "an upload")
+        }
         // A painter's, a replicated value's, a handler policy's: forms the
         // grammar keeps as `Other`.
         "draw" | "inputs" | "isolated" => (&[K::Other], "a painter"),
@@ -762,6 +783,19 @@ fn predicate_name(name: &str) -> bool {
     !name.is_empty() && name.split('.').all(segment)
 }
 
+/// **A count as written**: digits, `_` between them, greater than zero and
+/// within `u64` (track `uploads`): `5_000_000`.
+pub fn count(value: &str) -> Option<u64> {
+    let v = value.trim();
+    let ok = v.starts_with(|c: char| c.is_ascii_digit())
+        && v.ends_with(|c: char| c.is_ascii_digit())
+        && !v.contains("__")
+        && v.chars().all(|c| c.is_ascii_digit() || c == '_');
+    ok.then(|| v.replace('_', "").parse::<u64>().ok())
+        .flatten()
+        .filter(|n| *n > 0)
+}
+
 /// **What is wrong with a policy's value, by its domain** (ADR-0089).
 ///
 /// Architect ruling, 2026-08-07, on an unknown policy head: "Pleris may
@@ -783,6 +817,8 @@ pub enum ValueFault {
     World(String),
     /// A flag written with a value.
     Flag,
+    /// Not a whole number greater than zero, as digits (track `uploads`).
+    Count,
     /// No operator of that name, where these are the domain's.
     Operator(String, Vec<&'static str>),
     /// An operator's arguments opened and never closed.
@@ -830,6 +866,7 @@ pub fn value_fault(head: &str, value: &str) -> Option<ValueFault> {
             .find(|w| !crate::placement::ALL_WORLDS.iter().any(|x| x.name() == *w))
             .map(|w| ValueFault::World(w.to_string())),
         Domain::Flag => (!value.is_empty()).then_some(ValueFault::Flag),
+        Domain::Count => count(value).is_none().then_some(ValueFault::Count),
         Domain::Operator(ops, words) => {
             if words.contains(&value) {
                 return None;
