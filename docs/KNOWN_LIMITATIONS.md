@@ -189,8 +189,9 @@ refused by name:
     inside a block a signal decides;
   - one in an arm from the names it binds, or in a view that contains
     itself;
-  - an attribute or a block's subject from a speculated value, or a
-    speculated row's value from a field of its item;
+  - an attribute from a speculated value, or a speculated row's value from
+    a field of its item (a block's subject from one is the module's since
+    ADR-0235);
   - a hole in an attribute's text.
 
   A directive other than `on:` (`style:width={w}`) does not build either

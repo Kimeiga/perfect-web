@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0235, 2026-10-07: what a speculated value computes, the page's module
+computes** (ruling 0073-a, and a gap beside it). A block's subject computed
+from a value a page speculates on was refused, and a value computed from one
+inside a block was skipped: a count inside a block another query decides kept
+the server's beside one a press changed, and nothing refused it. A block
+whose subject is computed from the value is a region now, its subject and the
+values inside it the module's; one no region renders is refused by name
+(`just e14-speculated-values`).
+
 **ADR-0234, 2026-10-06: a view's instance given a speculated value is
 rendered again with it** (found building the thread page's optimistic reply).
 A view that contains itself, given a value a page speculates on, was no region

@@ -210,17 +210,6 @@ fn what_a_condition_does_not_compute_yet_is_refused_by_name() {
             "is a block whose subject the browser computes, and whose arms hold a view's \
              signals, which the browser starts again by its arm (ruling 0073-a)",
         ),
-        // A subject computed from a value the page speculates on.
-        (
-            feed(&|s| {
-                s.replace(
-                    "            <h1>Home</h1>\n",
-                    "            <h1>Home</h1>\n            {#if List.length(feed) > 3}<p>busy</p>{/if}\n",
-                )
-            }),
-            "computes a block's subject from `feed`, which the page speculates on, and the \
-             browser computes a text part from the value whole, between tags (ruling 0073-a)",
-        ),
     ] {
         assert_eq!(reported(&files), Vec::<String>::new(), "{why}");
         match build(&files) {

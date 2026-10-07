@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-0228: a value computed in a row is the row's.
+"""Mutation controls for ADR-0235: what a speculated value computes, the
+page's module computes wherever the page shows it.
 
-Each mutant undoes one piece: the path a row's value is named by, from the
-innermost loop's item; the host's row read, its function and its path; the
-speculation module's value for each row and for a part, and what it refuses;
-and what the feed's rows and likes found: a field of a value charged a
-same-named function's effects, and an opaque value that did not compare. The
-feed's like shown before the server answers must fail too.
+Each mutant undoes one piece: a block's subject computed from a speculated
+value whole compiled; its block a region; a value the module computes held
+by its region; one inside a block no region renders refused by name; and the
+module exporting what it computes.
 
-The compiler's and the server's tests must fail for a mutant of the compiler
-("cargo"). A mutant of the feed must fail `e2e/feed.spec.mjs` in three
-engines, against a build of the mutated source ("browser").
+The compiler's tests must fail for each ("cargo"), the module run under Node.
 
-Run from the repository root; `just e14-computed-rows` records the output.
-The source is restored after every mutant, whatever happens.
+Run from the repository root; `just e14-speculated-values` records the
+output. The source is restored after every mutant, whatever happens.
 """
 
 import os
@@ -24,112 +21,55 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-TEMPLATE = ROOT / "compiler/pw-core/src/template_ir.rs"
-VALUES = ROOT / "compiler/pw-core/src/page_values.rs"
 SPECULATION = ROOT / "compiler/pw-core/src/backend/speculation.rs"
-EFFECTS = ROOT / "compiler/pw-core/src/effects.rs"
-LOWER = ROOT / "compiler/pw-core/src/backend/lower.rs"
-FEED = ROOT / "examples/feed/app.pw"
 
 # (what is undone, suite, file, anchor, replacement)
 MUTANTS = [
     (
-        "a row's value is named by no item",
-        "cargo",
-        TEMPLATE,
-        "            Some(item)\n                if !inputs.is_empty()\n",
-        "            Some(item)\n                if false && !inputs.is_empty()\n",
-    ),
-    (
-        "a row's value is named by the outermost loop's item",
-        "cargo",
-        TEMPLATE,
-        "        match self.loops.last() {\n",
-        "        match self.loops.first() {\n",
-    ),
-    (
-        "a row's read does not run the function",
-        "cargo",
-        VALUES,
-        "        row.steps.push(Step::Derived(component_id));\n",
-        "",
-    ),
-    (
-        "a row's value is set at its input's path",
-        "cargo",
-        VALUES,
-        "        row.path = path.to_string();\n",
-        "",
-    ),
-    (
-        "a speculated row's value is not computed",
+        "a block's subject computed from a speculated value is refused",
         "cargo",
         SPECULATION,
-        "                computed.push((rest.to_string(), functions.len() - 1));\n",
-        "",
+        "            if speculates(root) && (what == \"an attribute's value\" || read != root) {\n",
+        "            if speculates(root) && (what != \"a value\" || read != root) {\n",
     ),
     (
-        "a speculated row's value from a field of its item is built",
+        "a block whose subject is computed from a speculated value is no region",
         "cargo",
         SPECULATION,
-        "                if read != binding {\n",
-        "                if false && read != binding {\n",
+        "        if let Some(binding) = whole.get(&read.path) {\n",
+        "        if let Some(binding) = whole.get(&read.path).filter(|_| false) {\n",
     ),
     (
-        "a part computed from a speculated value is not computed again",
+        "a value the module computes is not one its region holds",
         "cargo",
         SPECULATION,
-        "            reads.push((read.clone(), hole.part.0, functions.len() - 1));\n",
-        "",
+        "            if !held(root) && !computes(&path) {\n",
+        "            if !held(root) {\n",
     ),
     (
-        "an attribute computed from a speculated value is built",
+        "a value inside a block no region renders is skipped",
         "cargo",
         SPECULATION,
-        # Re-anchored by ADR-0235: a block's subject from the value whole is
-        # computed too, and an attribute's alone is refused by name.
-        '            if speculates(root) && (what == "an attribute\'s value" || read != root) {\n',
-        "            if speculates(root) && read != root {\n",
+        "        if !own && !in_a_region(part) {\n",
+        "        if !own && !in_a_region(part) && false {\n",
     ),
     (
-        "a field of a value is a function of the same name",
+        "the module exports nothing it computes",
         "cargo",
-        EFFECTS,
-        "                    if matches!(body.expr(head), Expr::Name(_))\n",
-        "                    if false && matches!(body.expr(head), Expr::Name(_))\n",
-    ),
-    (
-        "an opaque value does not compare as its representation",
-        "cargo",
-        LOWER,
-        "            (Type::Nominal(def, instance), true) if rt.as_ref() == Some(&lt) => {\n",
-        "            (Type::Nominal(def, instance), true) if false && rt.as_ref() == Some(&lt) => {\n",
-    ),
-    (
-        "a like is not shown before the server answers",
-        "browser",
-        FEED,
-        "    optimistic    Timeline(current_session(), _) as feed => liked(feed, post)\n",
-        "",
-    ),
-    (
-        "a like shown before the server answers counts nothing",
-        "browser",
-        FEED,
-        "        Item { id: i.id, author: i.author, text: i.text, likes: i.likes + 1 }\n",
-        "        Item { id: i.id, author: i.author, text: i.text, likes: i.likes }\n",
+        SPECULATION,
+        "        let mine: Vec<String> = in_regions\n"
+        "            .iter()\n"
+        "            .filter(|(b, ..)| b == name)\n",
+        "        let mine: Vec<String> = in_regions\n"
+        "            .iter()\n"
+        "            .filter(|_| false)\n",
     ),
 ]
 
 CARGO = [
     [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
-        "--test", "computed_rows", "--test", "computed_holes", "--test", "computed_signals",
-        "--test", "effects_through_values", "--test", "optimistic_keys",
-    ],
-    [
-        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
-        "each_rows_and_sent", "compares_as_its_representation",
+        "--test", "speculated_values",
     ],
 ]
 

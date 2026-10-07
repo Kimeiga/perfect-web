@@ -613,9 +613,11 @@ fn page_module(
 
     // **A value computed from a speculated one** (ADR-0228) is computed
     // here, as the browser renders the speculation: a text part's from the
-    // value whole, below, and a row's from its item whole, with its row. An
-    // attribute's, or one from a field of the value, would show the server's
-    // beside a list that shows the speculation: refused, by name.
+    // value whole, below, and a row's from its item whole, with its row; a
+    // block's subject, and a value inside a region, from the value whole
+    // (ADR-0235). An attribute's, or one from a field of the value, would
+    // show the server's beside a list that shows the speculation: refused,
+    // by name.
     let computed = lowered
         .holes
         .iter()
@@ -630,18 +632,36 @@ fn page_module(
     for (part, inputs, what) in computed {
         for (name, read) in inputs {
             let root = read.split('.').next().unwrap_or_default();
-            if speculates(root) && (what != "a value" || read != root) {
+            if speculates(root) && (what == "an attribute's value" || read != root) {
                 return Encoding::Unsupported {
                     construct: "a value computed from a speculated one",
                     reason: format!(
                         "part {part} of `{page}` computes {what} from `{name}`, which the page \
-                         speculates on, and the browser computes a text part from the value \
-                         whole, between tags (ruling 0073-a)"
+                         speculates on, and the browser computes a text part or a block's \
+                         subject from the value whole (ruling 0073-a)"
                     ),
                 };
             }
         }
     }
+
+    // Each value computed from a speculated value whole, by the path the
+    // template reads it, and the binding it is computed from (ADR-0235).
+    let whole: BTreeMap<String, String> = lowered
+        .holes
+        .iter()
+        .filter_map(|h| Some((h.path.clone(), h.inputs.as_deref()?)))
+        .chain(
+            lowered
+                .reads
+                .iter()
+                .filter_map(|r| Some((r.path.clone(), r.inputs.as_deref()?))),
+        )
+        .filter_map(|(path, inputs)| match inputs {
+            [(_, read)] if speculates(read) => Some((path, read.clone())),
+            _ => None,
+        })
+        .collect();
 
     // **What the browser renders again with a speculation** (ADR-0172):
     // each attribute, block and loop at the top of the page that reads a
@@ -703,6 +723,24 @@ fn page_module(
             kind,
         });
     }
+    // **A block whose subject is computed from a speculated value** whole
+    // (ADR-0235), at the top of the page: a region, rendered again as one
+    // the value decides by its path is, its subject computed by the module.
+    for read in &lowered.reads {
+        if read.kind != crate::template_ir::ReadKind::Subject
+            || read.nested
+            || regions.iter().any(|r| r.part == read.part.0)
+        {
+            continue;
+        }
+        if let Some(binding) = whole.get(&read.path) {
+            regions.push(Region {
+                binding: binding.clone(),
+                part: read.part.0,
+                kind: RegionKind::Block,
+            });
+        }
+    }
     // **A view's instance given a speculated value** (ADR-0234), at the top
     // of the page: rendered again with it, as a block a speculated value
     // decides is, by the view's template the document carries, as the
@@ -743,6 +781,9 @@ fn page_module(
         };
         let held =
             |root: &str| root == region.binding || bound.contains(root) || signals.contains(root);
+        // And a value the module computes from the region's binding whole
+        // (ADR-0235), by its whole path.
+        let computes = |path: &str| whole.get(path) == Some(&region.binding);
         let paths = lowered
             .holes
             .iter()
@@ -761,7 +802,7 @@ fn page_module(
             );
         for (part, path) in paths {
             let root = path.split('.').next().unwrap_or_default();
-            if !held(root) {
+            if !held(root) && !computes(&path) {
                 return Encoding::Unsupported {
                     construct: "a value a speculated region reads that the browser does not hold",
                     reason: format!(
@@ -834,6 +875,75 @@ fn page_module(
                 ),
             };
         }
+    }
+    // **What a region computes from a speculated value whole** (ADR-0235):
+    // compiled here, and given to the renderer with the region's values, a
+    // block's subject and each value inside one. One inside a block no region
+    // renders is refused, as a value read there is (ADR-0172). Until
+    // 2026-10-06 one was skipped: a count inside a block a query's value
+    // decides kept the server's beside one a speculation changed.
+    let mut in_regions: Vec<(String, String, usize)> = Vec::new();
+    let reads_computed = lowered
+        .holes
+        .iter()
+        .filter_map(|h| {
+            Some((
+                h.part.0,
+                &h.path,
+                h.nested,
+                h.origin,
+                h.expr,
+                h.inputs.as_deref()?,
+            ))
+        })
+        .chain(lowered.reads.iter().filter_map(|r| {
+            let crate::template_ir::ReadAt::Expr(e) = r.at else {
+                return None;
+            };
+            Some((
+                r.part.0,
+                &r.path,
+                r.nested,
+                r.origin,
+                e,
+                r.inputs.as_deref()?,
+            ))
+        }));
+    for (part, path, nested, (at, decl), expr, inputs) in reads_computed {
+        let [(name, read)] = inputs else {
+            continue;
+        };
+        let Some((_, _, _, value)) = speculated.iter().find(|(n, ..)| n == read) else {
+            continue;
+        };
+        let own = regions.iter().any(|r| r.part == part);
+        // A text part at the top of the page is set in place (ADR-0228).
+        if !nested && !own {
+            continue;
+        }
+        if !own && !in_a_region(part) {
+            return Encoding::Unsupported {
+                construct: "a speculated value read where this module does not render it again",
+                reason: format!(
+                    "part {part} of `{page}` computes a value from `{name}` inside a block, \
+                     which a speculation would not reach"
+                ),
+            };
+        }
+        let Some(written) = cx.hirs[at].decl(decl).body.map(|b| cx.hirs[at].body(b)) else {
+            continue;
+        };
+        let f = lowered!(lower::pure_expr(
+            cx,
+            at,
+            decl,
+            expr,
+            &[(name.clone(), value.clone())],
+            &format!("{page}#part{part}"),
+            written.expr_span(expr),
+        ));
+        functions.push(f);
+        in_regions.push((read.clone(), path.clone(), functions.len() - 1));
     }
     // And a view given one there (ADR-0234), whose instance nothing would
     // render again.
@@ -1149,6 +1259,17 @@ fn page_module(
             .iter()
             .filter(|(b, ..)| b == name)
             .map(|(_, part, f)| format!("{}: f{f}", json(&part.to_string())))
+            .collect();
+        source.push_str(&format!("  {}: {{ {} }},\n", json(name), mine.join(", ")));
+    }
+    // Each value a region computes (ADR-0235), by the path the template
+    // reads it: the browser gives it to the renderer with the region's values.
+    source.push_str("};\n\nexport const computed = {\n");
+    for (name, ..) in &speculated {
+        let mine: Vec<String> = in_regions
+            .iter()
+            .filter(|(b, ..)| b == name)
+            .map(|(_, path, f)| format!("{}: f{f}", json(path)))
             .collect();
         source.push_str(&format!("  {}: {{ {} }},\n", json(name), mine.join(", ")));
     }

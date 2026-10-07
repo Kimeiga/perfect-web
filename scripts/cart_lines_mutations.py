@@ -77,12 +77,13 @@ MUTANTS = [
         "core",
         SPECULATION,
         # Re-anchored by ADR-0234, whose instance check reads the same way.
+        # And by ADR-0235: a value the module computes is held too.
         "        for (part, path) in paths {\n"
         "            let root = path.split('.').next().unwrap_or_default();\n"
-        "            if !held(root) {\n",
+        "            if !held(root) && !computes(&path) {\n",
         "        for (part, path) in paths {\n"
         "            let root = path.split('.').next().unwrap_or_default();\n"
-        "            if false && !held(root) {\n",
+        "            if false && !held(root) && !computes(&path) {\n",
     ),
     (
         "a region's handler capture of what the browser does not hold is not refused",

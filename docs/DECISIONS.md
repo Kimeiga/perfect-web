@@ -1981,3 +1981,11 @@ building the thread page's optimistic reply).
   thread as the server rendered it. Its instance is a region now, rendered as
   a block is; one given what the browser does not hold, or nested where no
   region renders it, is refused by name.
+[ADR-0235](DECISIONS/ADR-0235-what-a-speculated-value-computes-the-module-computes.md):
+what a speculated value computes, the page's module computes (ruling 0073-a,
+and a gap beside it).
+- A block whose subject is computed from a speculated value is a region now,
+  its subject and each value computed inside it the module's, given to the
+  renderer with the value. A value computed from one inside a block no region
+  renders was skipped, leaving the server's beside the speculation's; it is
+  refused by name.

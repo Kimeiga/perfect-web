@@ -4594,3 +4594,19 @@ e14-speculated-instances:
        CARGO_INCREMENTAL=0 python3 scripts/speculated_instances_mutations.py; \
      } > docs/evidence/E14/speculated-instances.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/speculated-instances.txt
+
+# ADR-0235: what a speculated value computes, the page's module computes
+# wherever the page shows it. The compiler's tests, the module run under
+# Node, and the mutation controls.
+e14-speculated-values:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0235 - what a speculated value computes, the page's module computes"; echo; \
+       echo "produced by: just e14-speculated-values"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== the module (compiler/pw-core/tests/speculated_values.rs)"; echo; \
+       cargo test --locked -p pw-core --test speculated_values 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/speculated_values_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/speculated_values_mutations.py; \
+     } > docs/evidence/E14/speculated-values.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/speculated-values.txt

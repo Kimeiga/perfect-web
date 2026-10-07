@@ -382,13 +382,40 @@ E14 comes before E11-E13. Its plan, controls and task list are
           `just e14-representations`); ~~speculation on a value of a type
           that contains itself~~ (ADR-0233, `just e14-speculated-graphs`);
           ~~a speculated view's instance rendered again~~ (ADR-0234, `just
-          e14-speculated-instances`); next a block's subject computed from a
-          speculated value (0073-a), then 0122-d's route-keyed speculation,
-          for an optimistic reply and a like on the thread page; then 0057-a, 0099-a and ADR-0195's
-          ruling 10,
-          materialization chains; and what ruling 0073-a still refuses
-          (several values, a page's parameter, the browser's values inside a
-          block, instances);
+          e14-speculated-instances`); ~~a block's subject computed from a
+          speculated value~~ (ADR-0235, `just e14-speculated-values`);
+        - **then the Twitter gaps, in the owner's order** (relayed
+          2026-10-07), each its own ADR as the feed hits it:
+          1. route-keyed speculation (0122-d): an optimistic reply, and a
+             like on the thread page;
+          2. map keys (0057-a) and `let _` (0099-a);
+          3. ADR-0195's ruling 10, materialization chains: a timeline built
+             from who you follow, with follow and unfollow commands and a
+             profile page with follower counts;
+          4. real accounts and sign-in: sign-up, sign-in and sign-out,
+             per-user sessions, and a real `requires` evaluator in place of
+             the development server's every session `SignedIn`. An ADR
+             decides what Pleris owns and what a deployment does. Pleris is
+             no identity provider (the charter): OIDC behind a deployment's
+             interface, and a local provider that is plainly not production.
+             Pleris never stores a password in plain text;
+          5. notifications: private, per-user live data derived from others'
+             actions, a like or a reply to your post, with an unread count;
+          6. direct messages: data private to exactly two users. The privacy
+             labels with two principals, and a cache that never shows one
+             conversation to a third user;
+          7. image uploads on a post: a typed upload with size and
+             content-type limits, stored through a deployment's blob-storage
+             capability (Pleris builds no storage and no CDN), and served
+             safely;
+          8. a real database for the feed: Postgres or similar behind the
+             `DataLayer` trait, the host comparing a source's declared
+             guarantees with what the database provides (item 21's last
+             step). Versions and APIs verified against primary sources; a
+             crate or a server to download is the owner's to approve;
+        - then what ruling 0073-a still refuses (several values, a page's
+          parameter, the browser's values inside a block, instances), and
+          everything below;
         - then 0101-a to 0101-d, 0105-a, 0100-a, and the rest below;
         - with the app layer: computed holes (0073-a: the host's part done,
           ADR-0226, and the browser's, ADR-0227, rows, ADR-0228, conditions,

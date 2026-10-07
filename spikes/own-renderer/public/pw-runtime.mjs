@@ -809,8 +809,14 @@ function rowOf(region, item) {
 }
 
 /** What a region is rendered with: the value, and the page's signals. */
-function regionValues(binding, value) {
-  return `{${[[binding, value], ...signals]
+function regionValues(module, binding, value) {
+  // And each value the region computes from it (ADR-0235): a block's
+  // subject, and a value inside one, by the path the template reads.
+  const computed = Object.entries(module.computed?.[binding] ?? {}).map(([path, f]) => [
+    path,
+    f(value),
+  ]);
+  return `{${[[binding, value], ...computed, ...signals]
     .map(([k, v]) => `${JSON.stringify(k)}:${wire(v)}`)
     .join(",")}}`;
 }
@@ -997,7 +1003,7 @@ const shownBlocks = new Map();
 function showRegions(module, binding, value, held) {
   const regions = module.regions?.[binding] ?? [];
   if (regions.length === 0 || !wasm) return;
-  const values = regionValues(binding, value);
+  const values = regionValues(module, binding, value);
   for (const region of regions) {
     const template = JSON.stringify(parts.regions?.[region.part]);
     if (region.kind === "list") {
@@ -1084,7 +1090,7 @@ function revertLists() {
   for (const [binding] of speculated) {
     const state = current(speculationLoaded, binding);
     if (!state || state.value === undefined) continue;
-    const values = regionValues(binding, state.value);
+    const values = regionValues(speculationLoaded, binding, state.value);
     for (const region of speculationLoaded.regions?.[binding] ?? []) {
       if (region.kind === "list" && shownLists.has(region.part)) {
         showList(region, listAt(state.value, region.collection), values, state.value, false);

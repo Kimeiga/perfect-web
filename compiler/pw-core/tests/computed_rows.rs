@@ -229,7 +229,8 @@ fn what_a_row_does_not_compute_yet_is_refused_by_name() {
                 )
             }),
             "computes an attribute's value from `feed`, which the page speculates on, and the \
-             browser computes a text part from the value whole, between tags (ruling 0073-a)",
+             browser computes a text part or a block's subject from the value whole (ruling \
+             0073-a)",
         ),
     ] {
         assert_eq!(reported(&files), Vec::<String>::new());
