@@ -77,6 +77,15 @@ tempfile = "3.27.0"
 # `build_transaction().isolation_level(..).start()`, `Transaction::commit`)
 # checked against docs.rs for 0.19.14 and the crate's source.
 postgres = "=0.19.14"
+# The identity track's development provider (track `identity`, ADR-XXXX):
+# argon2 0.6.0 (RustCrypto, 2026-08-27), the newest on crates.io and not
+# yanked, MIT OR Apache-2.0, rust-version 1.85; checked 2026-10-07, and its
+# download approved by the owner that day. Argon2id v19 at the crate's
+# defaults (19 MiB, two iterations, one lane), its hashes PHC strings
+# (`PasswordHasher::hash_password`, `phc::PasswordHash::new`,
+# `PasswordVerifier::verify_password`, checked on docs.rs for 0.6.0 and in
+# the crate's source). A password is kept only as its hash.
+argon2 = "=0.6.0"
 
 [profile.release]
 lto = "thin"
