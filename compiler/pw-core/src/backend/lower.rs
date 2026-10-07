@@ -833,6 +833,25 @@ pub fn hole(cx: &Context<'_>, d: &crate::page_values::Derived) -> Lowering<Funct
     )
 }
 
+/// **A map's key** (ADR-0248, ruling 0057-a): an `Int`, a `String`, a
+/// `Bool`, or an opaque type over one, which crosses and compares as its
+/// representation (ADR-0033 §4).
+fn ordered_key(sigs: &Signatures, t: &Type) -> bool {
+    match t {
+        Type::Int | Type::Str | Type::Bool => true,
+        Type::Nominal(def, _) => sigs
+            .type_decl(*def)
+            .and_then(|d| d.representation.as_ref())
+            .is_some_and(|r| {
+                matches!(
+                    ty_resolution(sigs, r, &Span::default()),
+                    Lowering::Lowered(Type::Int | Type::Str | Type::Bool)
+                )
+            }),
+        _ => false,
+    }
+}
+
 /// A declared type, as the backend's [`Type`] (ADR-0122).
 pub(crate) fn backend_type(cx: &Context<'_>, ty: &ResolvedType, span: &Span) -> Lowering<Type> {
     ty_resolved(cx.sigs, ty, span)
@@ -1489,17 +1508,19 @@ fn ty_resolved_with(
             },
             Builtin::Option => arg(0).map(|a| Type::Option(Box::new(a))),
             Builtin::List => arg(0).map(|a| Type::List(Box::new(a))),
-            // A map's key and a set's element are ordered: an `Int` or a
-            // `String` (ADR-0057, ruling needed).
+            // A map's key and a set's element are ordered: an `Int`, a
+            // `String`, a `Bool`, or an opaque type over one (ADR-0057,
+            // ADR-0248). The checker refuses another where it is written
+            // (PW0627); this is the backend's own guard.
             Builtin::Map | Builtin::Set => {
                 let key = match arg(0) {
-                    Lowering::Lowered(k @ (Type::Int | Type::Str)) => k,
+                    Lowering::Lowered(k) if ordered_key(sigs, &k) => k,
                     Lowering::Lowered(other) => {
                         return Lowering::Unsupported {
-                            construct: "a map or set keyed by a type other than Int or String",
+                            construct: "a map or set keyed by a type other than Int, String or Bool",
                             span: span.clone(),
                             reason: format!(
-                                "a {other:?} key has no order the backends share (ADR-0057)"
+                                "a {other:?} key has no order the backends share (ADR-0248)"
                             ),
                         };
                     }
@@ -2805,14 +2826,14 @@ impl<'a> Lower<'a> {
             (I::MapKeys, [Some(Type::Map(k, _))]) => Type::List(k.clone()),
             (I::MapValues, [Some(Type::Map(_, v))]) => Type::List(v.clone()),
             (I::MapFromLists, [Some(Type::List(k)), Some(Type::List(v))])
-                if matches!(**k, Type::Int | Type::Str) =>
+                if ordered_key(self.cx.sigs, k) =>
             {
                 Type::Map(k.clone(), v.clone())
             }
             (I::MapCheck, [Some(m @ Type::Map(..))]) | (I::SetCheck, [Some(m @ Type::Set(..))]) => {
                 m.clone()
             }
-            (I::SetFromList, [Some(Type::List(t))]) if matches!(**t, Type::Int | Type::Str) => {
+            (I::SetFromList, [Some(Type::List(t))]) if ordered_key(self.cx.sigs, t) => {
                 Type::Set(t.clone())
             }
             (I::SetContains, [Some(Type::Set(t)), Some(x)]) if **t == *x => Type::Bool,

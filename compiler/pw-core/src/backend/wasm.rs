@@ -4125,7 +4125,8 @@ impl Enc<'_> {
 
     /// **The order of two keys** (ADR-0057), each its flat values: -1, 0 or
     /// 1, in a fresh `i32`. An `Int` by value; a `String` by its bytes,
-    /// which is code point order.
+    /// which is code point order; a `Bool`, `false` before `true` (ADR-0248).
+    /// An opaque type's alias is its representation's.
     fn key_order(&mut self, key: WitType, x: &[u32], y: &[u32]) -> Encoding<u32> {
         use wasm_encoder::Instruction as I;
         let out = self.locals.fresh(ValType::I32);
@@ -4137,6 +4138,16 @@ impl Enc<'_> {
                 I::LocalGet(x[0]),
                 I::LocalGet(y[0]),
                 I::I64LtS,
+                I::I32Sub,
+                I::LocalSet(out),
+            ]),
+            WitType::Bool => self.ops.extend([
+                I::LocalGet(x[0]),
+                I::LocalGet(y[0]),
+                I::I32GtU,
+                I::LocalGet(x[0]),
+                I::LocalGet(y[0]),
+                I::I32LtU,
                 I::I32Sub,
                 I::LocalSet(out),
             ]),
@@ -4152,7 +4163,7 @@ impl Enc<'_> {
                 ]);
             }
             other => refuse!(
-                "a map or set keyed by a type other than Int or String",
+                "a map or set keyed by a type other than Int, String or Bool",
                 "`{}` orders keys of {other:?}",
                 self.export
             ),

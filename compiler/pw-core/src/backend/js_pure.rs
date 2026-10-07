@@ -810,9 +810,12 @@ const HELPERS: &[(&str, &[&str], &str)] = &[
     (
         "key_order",
         &["compare"],
-        "// The order of two keys (ADR-0057): an Int by value, a String by code\n\
-         // point, as the component orders them.\n\
-         function key_order(a, b) {\n  return typeof a === \"bigint\" ? (a < b ? -1 : a > b ? 1 : 0) : compare(a, b);\n}",
+        "// The order of two keys (ADR-0057, ADR-0248): an Int by value, a\n\
+         // String by code point, false before true, as the component orders\n\
+         // them.\n\
+         function key_order(a, b) {\n  \
+         if (typeof a === \"boolean\") return a === b ? 0 : a ? 1 : -1;\n  \
+         return typeof a === \"bigint\" ? (a < b ? -1 : a > b ? 1 : 0) : compare(a, b);\n}",
     ),
     (
         "place",

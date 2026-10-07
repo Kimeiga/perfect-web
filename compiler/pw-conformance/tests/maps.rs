@@ -72,6 +72,22 @@ public query Changed(s: Set<Int>, x: Int) -> List<Int> {
 public query Member(s: Set<String>, x: String) -> Bool { Set.contains(s, x) }
 
 public query Count(s: Set<String>) -> Int { Set.size(s) }
+
+opaque type Sku = String
+opaque type Seat = Int
+opaque type Flag = Bool
+
+public query Switched(m: Map<Bool, Int>, k: Bool, v: Int) -> Map<Bool, Int> { Map.insert(m, k, v) }
+
+public query Switch(m: Map<Bool, Int>, k: Bool) -> Option<Int> { Map.get(m, k) }
+
+public query Flags(xs: List<Bool>) -> Set<Bool> { Set.from_list(xs) }
+
+public query Stocked(m: Map<Sku, Int>, k: Sku, v: Int) -> Map<Sku, Int> { Map.insert(m, k, v) }
+
+public query Seats(xs: List<Seat>) -> Set<Seat> { Set.from_list(xs) }
+
+public query Flagged(xs: List<Flag>) -> Set<Flag> { Set.from_list(xs) }
 ";
 
 struct Rng(u64);
@@ -369,4 +385,102 @@ fn a_map_a_host_answers_is_checked_when_it_arrives() {
     );
     let unordered = answer(vec![("c", 3), ("b", 2), ("a", 1)]);
     assert!(r.call(&unordered, &args).is_err());
+}
+
+fn bool_map(m: &BTreeMap<bool, i64>) -> Val {
+    Val::List(
+        m.iter()
+            .map(|(k, v)| Val::Tuple(vec![Val::Bool(*k), Val::S64(*v)]))
+            .collect(),
+    )
+}
+
+/// **A map keyed by a `Bool`, or by an opaque type over one, an `Int` or a
+/// `String`** (ADR-0248, ruling 0057-a): ordered as its representation,
+/// `false` before `true`, as Rust's `bool` is, and an opaque type crossing
+/// as its representation.
+#[test]
+fn a_map_keyed_by_a_bool_or_an_opaque_type_answers_as_a_btreemap_does() {
+    let (switched, switch, flags) = (
+        compiled("m.Switched"),
+        compiled("m.Switch"),
+        compiled("m.Flags"),
+    );
+    let (stocked, seats, flagged) = (
+        compiled("m.Stocked"),
+        compiled("m.Seats"),
+        compiled("m.Flagged"),
+    );
+    let mut rng = Rng(0xb001);
+    for _ in 0..CASES {
+        let m: BTreeMap<bool, i64> = (0..rng.below(3))
+            .map(|_| (rng.below(2) == 1, rng.int()))
+            .collect();
+        let (k, v) = (rng.below(2) == 1, rng.int());
+        let mut with = m.clone();
+        with.insert(k, v);
+        assert_eq!(
+            call(&switched, &[bool_map(&m), Val::Bool(k), Val::S64(v)]),
+            Ok(bool_map(&with)),
+            "insert {m:?}, {k}, {v}"
+        );
+        assert_eq!(
+            call(&switch, &[bool_map(&m), Val::Bool(k)]),
+            Ok(some(m.get(&k).map(|v| Val::S64(*v)))),
+            "get {m:?}, {k}"
+        );
+        let xs: Vec<bool> = (0..rng.below(5)).map(|_| rng.below(2) == 1).collect();
+        let set: BTreeSet<bool> = xs.iter().copied().collect();
+        let want = Val::List(set.iter().map(|b| Val::Bool(*b)).collect());
+        let given = Val::List(xs.iter().map(|b| Val::Bool(*b)).collect());
+        assert_eq!(
+            call(&flags, std::slice::from_ref(&given)),
+            Ok(want.clone()),
+            "{xs:?}"
+        );
+        assert_eq!(call(&flagged, &[given]), Ok(want), "opaque {xs:?}");
+
+        let s: BTreeMap<String, i64> = (0..rng.below(6)).map(|_| (rng.text(), rng.int())).collect();
+        let (sk, sv) = (rng.text(), rng.int());
+        let mut stock = s.clone();
+        stock.insert(sk.clone(), sv);
+        assert_eq!(
+            call(&stocked, &[string_map(&s), text(&sk), Val::S64(sv)]),
+            Ok(string_map(&stock)),
+            "opaque insert {s:?}, {sk:?}"
+        );
+        let ns: Vec<i64> = (0..rng.below(8)).map(|_| rng.int()).collect();
+        let distinct: BTreeSet<i64> = ns.iter().copied().collect();
+        assert_eq!(
+            call(
+                &seats,
+                &[Val::List(ns.iter().map(|n| Val::S64(*n)).collect())]
+            ),
+            Ok(int_set(&distinct)),
+            "opaque from_list {ns:?}"
+        );
+    }
+    // Out of order on arrival: `true` before `false`, and a key twice.
+    let entry = |k: bool| Val::Tuple(vec![Val::Bool(k), Val::S64(1)]);
+    assert!(
+        call(
+            &switch,
+            &[Val::List(vec![entry(true), entry(false)]), Val::Bool(true)]
+        )
+        .is_err()
+    );
+    assert!(
+        call(
+            &switch,
+            &[Val::List(vec![entry(false), entry(false)]), Val::Bool(true)]
+        )
+        .is_err()
+    );
+    assert_eq!(
+        call(
+            &switch,
+            &[Val::List(vec![entry(false), entry(true)]), Val::Bool(true)]
+        ),
+        Ok(some(Some(Val::S64(1))))
+    );
 }

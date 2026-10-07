@@ -425,6 +425,86 @@ pub enum RelationKind {
     /// `optimistic Thing(x) as t => e`: a transition's value, against the
     /// value of the entry it replaces (PW0331, ADR-0241).
     Transition,
+    /// `Map<K, V>`, `Set<K>`: the key, against the types that have an order
+    /// every backend shares (PW0627, ADR-0248).
+    MapKey,
+}
+
+/// What a map's key may be, for a message (ADR-0248).
+const MAP_KEYS: &str = "an `Int`, a `String`, a `Bool`, or an opaque type over one";
+
+/// **Is `key` a map's key** (ADR-0248, ruling 0057-a): an `Int`, a `String`,
+/// a `Bool`, or an opaque type over one, each ordered as its representation:
+/// an `Int` by value, a `String` by code point, `false` before `true`.
+/// `None` where it is not known: a type parameter's, which each
+/// instantiation is held to, or what the program does not say.
+fn map_key(sigs: &Signatures, key: &Ty) -> Option<bool> {
+    let ordered = |t: &Ty| {
+        matches!(
+            t,
+            Ty::Primitive(Primitive::Int | Primitive::Str | Primitive::Bool)
+        )
+    };
+    match key {
+        Ty::Nominal(def, _) => Some(
+            sigs.type_decl(*def)
+                .and_then(|d| d.representation.as_ref())
+                .is_some_and(|r| matches!(r, TypeResolution::Resolved(t) if ordered(&Ty::of(t)))),
+        ),
+        Ty::Primitive(_) | Ty::Builtin(..) => Some(ordered(key)),
+        Ty::Parameter { .. } | Ty::Var(_) | Ty::Unknown | Ty::Any => None,
+    }
+}
+
+/// The key of each map and set in `ty`, outermost first, that is no map's
+/// key.
+fn unordered_keys(sigs: &Signatures, ty: &Ty, out: &mut Vec<Ty>) {
+    if let Ty::Builtin(Builtin::Map | Builtin::Set, args) = ty
+        && let Some(key) = args.first()
+        && map_key(sigs, key) == Some(false)
+    {
+        out.push(key.clone());
+    }
+    if let Ty::Builtin(_, args) | Ty::Nominal(_, args) = ty {
+        for a in args {
+            unordered_keys(sigs, a, out);
+        }
+    }
+}
+
+/// Does `t` hold a map or a set keyed by a type parameter, which a call
+/// instantiates?
+fn keyed_by_a_parameter(t: &ResolvedType) -> bool {
+    matches!(t.as_builtin(), Some(Builtin::Map | Builtin::Set))
+        && t.args()
+            .first()
+            .is_some_and(|k| k.type_parameter().is_some())
+        || t.args().iter().any(keyed_by_a_parameter)
+}
+
+/// A type as a diagnostic shows it where no body's typer is at hand
+/// (ADR-0248): a written annotation's.
+fn shown(sigs: &Signatures, t: &Ty) -> String {
+    let args = |a: &[Ty]| {
+        a.iter()
+            .map(|t| shown(sigs, t))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    match t {
+        Ty::Primitive(p) => p.name().to_string(),
+        Ty::Builtin(b, a) => format!("{}<{}>", b.name(), args(a)),
+        Ty::Nominal(d, a) => {
+            let base = sigs.path_of(*d).unwrap_or("?").to_string();
+            match a.is_empty() {
+                true => base,
+                false => format!("{base}<{}>", args(a)),
+            }
+        }
+        Ty::Parameter { index, .. } => format!("type parameter {index}"),
+        Ty::Var(_) | Ty::Unknown => "?".to_string(),
+        Ty::Any => "_".to_string(),
+    }
 }
 
 /// A fields relation's expectation for a field its type does not declare.
@@ -2111,8 +2191,41 @@ impl<'a> Typer<'a> {
         let Some(target) = target else {
             return unknown;
         };
+        // **A map or set a call builds, keyed by what it instantiates**
+        // (ADR-0248): `Set.from_list([1.5])` is a `Set<Float>`, which no
+        // annotation wrote.
+        let instantiates = match &target {
+            Target::Callable(sig) | Target::Member(sig, _) => sig.returns.as_ref().is_some_and(
+                |r| matches!(r, TypeResolution::Resolved(t) if keyed_by_a_parameter(t)),
+            ),
+            _ => false,
+        };
+        let path = match &target {
+            Target::Callable(sig) | Target::Member(sig, _) => sig.path.clone(),
+            _ => String::new(),
+        };
         let piped = self.piped.get(&id).copied();
-        self.apply(self.body.expr_span(id), callee_span, piped, target, args)
+        let mut solved = self.apply(self.body.expr_span(id), callee_span, piped, target, args);
+        if instantiates {
+            let mut keys = Vec::new();
+            unordered_keys(self.sigs, &solved.result, &mut keys);
+            for key in keys {
+                solved.relations.push(ValueRelation {
+                    declaration: self.decl.name.clone(),
+                    kind: RelationKind::MapKey,
+                    span: self.body.expr_span(id),
+                    target: format!("`{path}`'s result"),
+                    index: None,
+                    outcome: Outcome::Disagree {
+                        expected: MAP_KEYS.to_string(),
+                        actual: self.display(&key),
+                    },
+                    declared_at: None,
+                    boundary: (self.body.expr_span(id), format!("the call to `{path}`")),
+                });
+            }
+        }
+        solved
     }
 
     /// **Relate what a call supplies to what its target declares:** how many
@@ -4727,6 +4840,30 @@ fn annotations(
     let module = hir.module_of(id);
     let mut check = |written: &crate::hir::DeclaredType, span: Span, what: String| {
         let r = sigs.resolve_type(module, decl, written, span.clone());
+        // **A written map's key** (ADR-0248): refused here, where it is
+        // written, and not first where the backend builds it.
+        if let TypeResolution::Resolved(t) = &r {
+            let mut keys = Vec::new();
+            unordered_keys(sigs, &Ty::of(t), &mut keys);
+            for key in keys {
+                out.push(ValueRelation {
+                    declaration: decl.name.clone(),
+                    kind: RelationKind::MapKey,
+                    span: span.clone(),
+                    target: what.clone(),
+                    index: None,
+                    outcome: Outcome::Disagree {
+                        expected: MAP_KEYS.to_string(),
+                        actual: shown(sigs, &key),
+                    },
+                    declared_at: None,
+                    boundary: (
+                        decl.name_span.clone(),
+                        format!("in the declaration of `{}`", decl.name),
+                    ),
+                });
+            }
+        }
         out.push(ValueRelation {
             declaration: decl.name.clone(),
             kind: RelationKind::Annotation,
@@ -4921,6 +5058,24 @@ pub fn diagnostics(relations: &[ValueRelation], at: UnitId) -> Vec<Diagnostic> {
             .repair(format!(
                 "produce a `{expected}` here, or change the declared result"
             )),
+            RelationKind::MapKey => Diagnostic::error(
+                crate::codes::MAP_KEY.id,
+                crate::codes::MAP_KEY.invariant,
+                Detector::Signature,
+                format!(
+                    "{} keys a map or a set by `{actual}`, and a key is {expected}",
+                    r.target
+                ),
+                r.span.clone(),
+            )
+            .reason("map_key_has_no_order")
+            .explain(
+                "a map keeps its entries, and a set its elements, in the order of their keys, \
+                 the same in the component and the browser: an `Int` by value, a `String` by \
+                 code point, `false` before `true`, and an opaque type over one as its \
+                 representation. Any other type has no order they share",
+            )
+            .repair(format!("key it by {expected}")),
             RelationKind::Transition => Diagnostic::error(
                 crate::codes::OPTIMISTIC_TARGET_MISMATCH.id,
                 crate::codes::OPTIMISTIC_TARGET_MISMATCH.invariant,

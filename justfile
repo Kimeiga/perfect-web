@@ -4832,3 +4832,24 @@ e14-block-clauses:
        CARGO_INCREMENTAL=0 python3 scripts/block_clauses_mutations.py; \
      } > docs/evidence/E14/block-clauses.txt
     @grep -E "^test result|mutants killed" docs/evidence/E14/block-clauses.txt
+
+# ADR-0248 (ruling 0057-a): a map's key is an Int, a String, a Bool, or an
+# opaque type over one, refused at check where it is not. The checker's
+# tests, the host's against BTreeMap, the browser's module against the
+# component, and the mutation controls. Needs `node`.
+e14-map-keys:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0248 - a map's key is ordered, and refused at check where it is not"; echo; \
+       echo "produced by: just e14-map-keys"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/map_keys.rs)"; echo; \
+       cargo test --locked -p pw-core --test map_keys 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== through the host, against BTreeMap (compiler/pw-conformance/tests/maps.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test maps 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the browser's module against the component (compiler/pw-conformance/tests/javascript.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- --nocapture every_query_agrees_with_its_component_under_node 2>&1 | grep -E '^javascript:|^test result'; \
+       echo; echo "== mutation controls (scripts/map_keys_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/map_keys_mutations.py; \
+     } > docs/evidence/E14/map-keys.txt
+    @grep -E "^test result|mutants killed" docs/evidence/E14/map-keys.txt

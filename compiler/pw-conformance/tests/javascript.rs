@@ -291,6 +291,16 @@ public query Only(xs: List<Int>, ys: List<Int>) -> List<Int> {
 
 public query Given(m: Map<String, Int>) -> Int { Map.size(m) }
 
+// ADR-0248: a `Bool` key, `false` before `true`, and an opaque type's,
+// ordered as its representation, in both.
+public query Flags(xs: List<Bool>) -> List<Bool> { Set.to_list(Set.from_list(xs)) }
+
+public query Toggled(m: Map<Bool, Int>, k: Bool) -> List<Int> { Map.values(Map.insert(m, k, 1)) }
+
+public query TagScores(tags: List<Tag>, ns: List<Int>) -> List<Int> { Map.values(Map.from_lists(tags, ns)) }
+
+public query DistinctCounts(cs: List<Count>) -> Int { Set.size(Set.from_list(cs)) }
+
 // Keyed by a text's length, so keys repeat, and the last of each is kept.
 public query LastOf(words: List<Word>) -> List<Int> {
     List.map(Map.values(Map.from_lists(List.map(words, w => String.length(w.text)), words)), w => w.score)

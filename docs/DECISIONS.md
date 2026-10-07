@@ -2067,3 +2067,9 @@ a clause written in a block is judged by its domain (a correction).
 - PW0335 judged only a policy heading a declaration; `scope bogus` in a
   resource's block checked. The names check returns the clauses it reads,
   the same table judges each, and a length is a CSS length.
+[ADR-0248](DECISIONS/ADR-0248-a-maps-key-is-ordered-and-refused-at-check.md):
+a map's key is an `Int`, a `String`, a `Bool`, or an opaque type over one,
+refused at check where it is not.
+- The owner's ruling 0057-a. `Bool` and opaque keys compile in the
+  component and the browser's module; another key is PW0627 where it is
+  written or a call instantiates it, not first at build.

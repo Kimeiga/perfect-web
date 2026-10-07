@@ -431,6 +431,10 @@ codes! {
     // representation.
     REPRESENTATION_SHADOWED = "PW0626" / representation_shadowed / 1, Types,
         "an opaque type's own module reads its representation as `.value`, so it declares no member of that name";
+    // ADR-0248 (ruling 0057-a): a `Map<Float, V>` checked, and was refused
+    // only when the backend built it.
+    MAP_KEY = "PW0627" / map_key / 1, Types,
+        "a map's key and a set's element are an `Int`, a `String`, a `Bool`, or an opaque type over one";
 
     // --- structured concurrency (PW20xx) ----------------------------------
     HANDLE_ESCAPES = "PW2001" / handle_escapes / 1, ScopeGraph,

@@ -401,13 +401,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
              relayed 2026-10-07): CI green**: ~~the Wasmtime advisories~~
              (ADR-0244); ~~the heavy verification on GitHub Actions~~
              (ADR-0245); ~~the `pg-data-layer` branch merged~~ (ADR-0246,
-             the owner approved its crates, 2026-10-07). **Next**, the first
-             verification runs read, and what Linux finds in the recipes
-             fixed; ~~a clause written in a block judged by its domain~~
-             (ADR-0247, `just e14-block-clauses`).
+             the owner approved its crates, 2026-10-07); ~~a clause written
+             in a block judged by its domain~~ (ADR-0247, `just
+             e14-block-clauses`). What Linux has found in the recipes: the
+             toolchain's missing target and a runner's disk (both fixed,
+             ADR-0245), and `stream.spec.mjs`'s "Chrome 150 and later fills
+             a region itself", which passed in run 37646762298 and timed out
+             in 37651362024 waiting for `__pw.settled`, the region filled: a
+             race in the runtime's record or in the test, to find.
              Further grammar and clause defects go under 0047-a below,
              unless the feed, the next Twitter item or soundness needs one;
-          2. map keys (0057-a) and `let _` (0099-a);
+          2. ~~map keys (0057-a)~~ (ADR-0248, `just e14-map-keys`) and `let
+             _` (0099-a); then 0057-c, a map or set sorted on arrival;
           3. ADR-0195's ruling 10, materialization chains: a timeline built
              from who you follow, with follow and unfollow commands and a
              profile page with follower counts;

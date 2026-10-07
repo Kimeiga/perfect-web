@@ -14,6 +14,15 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**ADR-0248, 2026-10-07: a map's key is an `Int`, a `String`, a `Bool`, or
+an opaque type over one** (the owner's ruling 0057-a, Twitter item 2). A
+`Map<Float, Int>` checked and only `pw build` refused it, and a
+`Map<ProductId, V>` could not be written. `Bool` keys (`false` before
+`true`) and opaque types over an ordered type are keys now, in the
+component and the browser's module alike, and another key is refused at
+check (PW0627), where it is written or where a call instantiates it
+(`just e14-map-keys`).
+
 **ADR-0247, 2026-10-07: a clause written in a block is judged by its
 domain** (a correction, found with ADR-0243). PW0335 judged a policy only
 where it headed a declaration; a block's clauses were judged by nothing:
