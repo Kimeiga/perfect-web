@@ -358,7 +358,11 @@ test("a post longer than 280 characters is not sent, and 280 emoji are", async (
   // A submit that comes another way meets the page's own check,
   // `post_text`, which finds no post's text: nothing is sent, and the draft
   // is kept to shorten.
-  await page.locator("form").evaluate((form) => form.requestSubmit());
+  // The post form, beside the attach form (track `uploads`).
+  await page
+    .locator("form")
+    .filter({ has: draft })
+    .evaluate((form) => form.requestSubmit());
   await expect(draft).toHaveValue("x".repeat(281));
   // 280 emoji are 280 code points, as `String.length` counts them, though
   // 560 UTF-16 units: none left, sent, and posted. Its row says the press
