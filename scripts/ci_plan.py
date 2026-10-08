@@ -55,7 +55,13 @@ LOCAL_ONLY = {
 # beside a PostgreSQL of its own (ADR-0278), set up as any shard is for its
 # recipe (ADR-0258): `e14-identity` and `e14-uploads` (ADR-0260) drive
 # browsers.
-NEEDS_DATABASE = {"e14-feed-postgres", "e14-identity", "e14-uploads", "e14-notifications"}
+NEEDS_DATABASE = {
+    "e14-feed-postgres",
+    "e14-identity",
+    "e14-uploads",
+    "e14-notifications",
+    "e14-messages",
+}
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
 
