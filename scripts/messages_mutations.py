@@ -282,7 +282,7 @@ def run_tests(group):
                 return False, 0, 0
             continue
         if cmd is PLAYWRIGHT:
-            env = {**os.environ, "PORT": os.environ.get("PW_MESSAGES_PORT", "6300")}
+            env = {**os.environ, "PORT": os.environ.get("PW_MESSAGES_PORT", "7141")}
             r = subprocess.run(
                 cmd, cwd=ROOT / "spikes/own-renderer", capture_output=True, text=True, env=env
             )
