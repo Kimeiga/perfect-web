@@ -15,9 +15,39 @@ use crate::codes;
 use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::hir::{AttrValue, Expr, Hir, Node};
 
-/// Every route the program declares.
-pub fn table(hirs: &[&Hir]) -> BTreeSet<String> {
-    let mut out = BTreeSet::new();
+/// **The relying party's routes** (ADR-0258, ADR-0265): Pleris's own, which
+/// every deployment's host serves beside the program's pages, whatever its
+/// provider. The development server's identity answers exactly these, and a
+/// test there holds it to this list.
+pub const RELYING_PARTY: &[(&str, &str)] = &[
+    ("GET", "/sign-in"),
+    ("GET", "/sign-up"),
+    ("GET", "/sign-in/callback"),
+    ("POST", "/sign-out"),
+];
+
+/// **What a request may reach** (ADR-0265): each page's route, which a link
+/// is checked against, and every route a request may reach with the method
+/// it answers: a page's, a GET; the relying party's; and each upload's, its
+/// route a POST, and a lease shown under it and what it serves, GETs.
+#[derive(Debug, Default, Clone)]
+pub struct Table {
+    pub pages: BTreeSet<String>,
+    pub answered: BTreeSet<(&'static str, String)>,
+}
+
+impl Table {
+    /// Does a route answering `method`, in capitals, match `target`?
+    fn answers(&self, method: &str, target: &str) -> bool {
+        self.answered
+            .iter()
+            .any(|(m, r)| *m == method && matches(r, target))
+    }
+}
+
+/// Every route the program declares, and what each answers.
+pub fn table(hirs: &[&Hir]) -> Table {
+    let mut pages = BTreeSet::new();
     for hir in hirs {
         for (_, decl) in hir.all_decls() {
             // An upload's route is where a form posts, not a page a link
@@ -25,10 +55,18 @@ pub fn table(hirs: &[&Hir]) -> BTreeSet<String> {
             if decl.kind == crate::hir::DeclKind::Upload {
                 continue;
             }
-            out.extend(declared_route(hir, decl));
+            pages.extend(declared_route(hir, decl));
         }
     }
-    out
+    let mut answered: BTreeSet<(&'static str, String)> =
+        pages.iter().map(|r| ("GET", r.clone())).collect();
+    answered.extend(RELYING_PARTY.iter().map(|(m, r)| (*m, r.to_string())));
+    for u in crate::uploads::upload_clauses(hirs) {
+        answered.insert(("POST", u.route.clone()));
+        answered.insert(("GET", format!("{}/{{lease}}", u.route)));
+        answered.insert(("GET", format!("{}/{{key}}", u.serves)));
+    }
+    Table { pages, answered }
 }
 
 /// **The route a declaration declares**, as written: `/stores/{id}`. What
@@ -67,10 +105,12 @@ pub(crate) fn declared_route(hir: &Hir, decl: &crate::hir::Decl) -> Option<Strin
     None
 }
 
-pub fn check(hir: &Hir, table: &BTreeSet<String>, out: &mut Vec<Diagnostic>) {
-    // With no declared routes there is nothing to check against, and reporting
-    // every link would be reporting that the feature is unused.
-    if table.is_empty() {
+pub fn check(hir: &Hir, table: &Table, out: &mut Vec<Diagnostic>) {
+    // With no declared pages there is nothing to check against: a program
+    // that declares none is a fragment of one, whose links reach pages it does
+    // not declare, and reporting every link would be reporting that the
+    // feature is unused.
+    if table.pages.is_empty() {
         return;
     }
 
@@ -85,9 +125,19 @@ pub fn check(hir: &Hir, table: &BTreeSet<String>, out: &mut Vec<Diagnostic>) {
             }
         }
         for n in body.walk_markup(&roots) {
-            let Node::Element { tag, attrs, .. } = body.node(n) else {
+            let Node::Element {
+                tag,
+                attrs,
+                children,
+                ..
+            } = body.node(n)
+            else {
                 continue;
             };
+            if tag == "form" {
+                form(body, decl, at.clone(), attrs, children, table, out);
+                continue;
+            }
             if tag != "a" {
                 continue;
             }
@@ -106,7 +156,9 @@ pub fn check(hir: &Hir, table: &BTreeSet<String>, out: &mut Vec<Diagnostic>) {
                     AttrValue::None => continue,
                 };
                 let target = raw.trim_matches('"');
-                if !is_internal(target) || table.iter().any(|r| matches(r, target)) {
+                // A link is a GET: a page, or a route the platform or an
+                // upload answers so (ADR-0265).
+                if !is_internal(target) || table.answers("GET", target) {
                     continue;
                 }
                 out.push(Diagnostic {
@@ -127,6 +179,7 @@ pub fn check(hir: &Hir, table: &BTreeSet<String>, out: &mut Vec<Diagnostic>) {
                          broken at the moment it is written rather than the moment \
                          somebody clicks it.",
                         table
+                            .pages
                             .iter()
                             .map(|r| format!("`{r}`"))
                             .collect::<Vec<_>>()
@@ -149,6 +202,98 @@ pub fn check(hir: &Hir, table: &BTreeSet<String>, out: &mut Vec<Diagnostic>) {
 /// and segments, each a word or a `{parameter}`; it names each of the page's
 /// parameters once and nothing else, so the address gives every one; and
 /// each is text, what a segment carries (PW0340, PW0621).
+/// **A form goes where something answers it** (ADR-0265): its `action`, an
+/// internal route, answers its `method`, `get` where it states none. A
+/// form that sends a file, states an `enctype` or posts to an upload's route
+/// is PW5603's (track `uploads`), and one with no `action` submits to its
+/// own page or its handler. Until ADR-0265 no form but a file's was checked,
+/// and a link to `/sign-in` was PW5009's, its route the host's.
+fn form(
+    body: &crate::hir::Body,
+    decl: &crate::hir::Decl,
+    at: crate::hir::Span,
+    attrs: &[crate::hir::Attr],
+    children: &[crate::hir::NodeId],
+    table: &Table,
+    out: &mut Vec<Diagnostic>,
+) {
+    let value = |name: &str| {
+        attrs
+            .iter()
+            .find(|a| a.name == name)
+            .and_then(|a| match &a.value {
+                AttrValue::Static(raw) => Some((raw.trim_matches('"').to_string(), a.span.clone())),
+                AttrValue::Expr(e) => match body.expr(*e) {
+                    Expr::Interpolated { text, .. } => {
+                        Some((text.trim_matches('"').to_string(), a.span.clone()))
+                    }
+                    _ => None,
+                },
+                AttrValue::None => None,
+            })
+    };
+    let Some((target, span)) = value("action") else {
+        return;
+    };
+    let sends_file = body.walk_markup(children).into_iter().any(|c| {
+        matches!(body.node(c), Node::Element { tag, attrs, .. }
+            if tag == "input"
+                && attrs.iter().any(|a| a.name == "type"
+                    && matches!(&a.value, AttrValue::Static(t) if t.trim_matches('"') == "file")))
+    });
+    let to_upload = table
+        .answered
+        .iter()
+        .any(|(m, r)| *m == "POST" && r == &target)
+        && !RELYING_PARTY.iter().any(|(_, r)| *r == target);
+    if sends_file || value("enctype").is_some() || to_upload || !is_internal(&target) {
+        return;
+    }
+    let method = value("method").map_or_else(|| "GET".to_string(), |(m, _)| m.to_ascii_uppercase());
+    if table.answers(&method, &target) {
+        return;
+    }
+    let answering: Vec<String> = table
+        .answered
+        .iter()
+        .filter(|(_, r)| matches(r, &target))
+        .map(|(m, _)| format!("`{m}`"))
+        .collect();
+    out.push(Diagnostic {
+        code: codes::FORM_ANSWERED_BY_NOTHING.id,
+        invariant: codes::FORM_ANSWERED_BY_NOTHING.invariant,
+        reason: "form_answered_by_nothing",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: match answering.is_empty() {
+            true => format!("a form sends `{method} {target}`, and nothing answers `{target}`"),
+            false => format!(
+                "a form sends `{method} {target}`, and `{target}` answers {} alone",
+                answering.join(", ")
+            ),
+        },
+        primary_span: span,
+        related: vec![Related {
+            span: at,
+            label: format!("`{}` renders the form", decl.name),
+        }],
+        explanation: Some(
+            "A form's `action` is a request the browser sends with the form's \
+             `method`, `get` where it states none: a page answers a `get`, the \
+             relying party its own routes (`/sign-in`, `/sign-up` and the callback \
+             a `get`, `/sign-out` a `post`), and an upload a `post` of a file. A \
+             form sent where nothing answers it fails as it is submitted, and so \
+             does one whose handler would have prevented it, on a page whose \
+             runtime has not loaded."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: "send the form where something answers its method".to_string(),
+            replacement: None,
+        }],
+    });
+}
+
 pub fn parameters_agree(
     hir: &Hir,
     unit: usize,

@@ -464,12 +464,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
              typed principal, `context.current_user()` answered by the
              host from the session's principal, which notifications need
              first (its first question; built by W3 under the integrator's
-             rulings, docs/PARALLEL.md); the routes a deployment serves in
-             the route table, its identity's and its uploads', and every
-             form's `action` and `method` checked against them and the
-             program's pages and commands as PW5009 checks a link (its
-             second, and ADR-0260's fourth); a refusal shown by the runtime,
-             a stale tab's command refused 403 with its predicate;
+             rulings, docs/PARALLEL.md); ~~the routes a deployment serves in
+             the route table, and every form's `action` and `method`
+             checked~~ (its second, and ADR-0260's fourth: ADR-0265, `just
+             e14-form-routes`); a refusal shown by the runtime, a stale
+             tab's command refused 403 with its predicate;
           5. **notifications, track `notifications`, W3** (docs/PARALLEL.md,
              under the integrator's rulings there): private, per-user live
              data derived from others' actions, a like, a reply or a follow

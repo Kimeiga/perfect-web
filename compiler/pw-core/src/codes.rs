@@ -610,6 +610,10 @@ codes! {
     // runtime set it; a `<select>`'s likewise. Found by the feed (ADR-0220).
     FORM_CONTROL_VALUE = "PW5036" / form_control_value / 1, Markup,
         "a form control's value is written where HTML reads it: a `<textarea>`'s as its text, a signal or text, once; a `<select>`'s by the option it marks `selected`";
+    // ADR-0265: no form but a file's was checked, so a form could send a
+    // `get` to `/sign-out`, which answers a `post`, or a `post` to a page.
+    FORM_ANSWERED_BY_NOTHING = "PW5041" / form_answered_by_nothing / 1, Markup,
+        "a form's `action` is a route that answers its `method`: a page's, the relying party's, or an upload's";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

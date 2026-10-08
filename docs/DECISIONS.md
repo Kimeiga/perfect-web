@@ -2192,3 +2192,11 @@ writing ADR-0263).
   it. No query's, subscription's or command's answer, and nothing markup
   prints, holds one now (PW5040); a user's or an organization's id is a
   name, and may.
+[ADR-0265](DECISIONS/ADR-0265-a-form-goes-where-something-answers-it.md):
+a form goes where something answers it (the identity track's second
+question, and the uploads track's fourth).
+- The route table states what each route answers: a page a `get`, the
+  relying party its four (`/sign-in`, `/sign-up`, the callback, a `get`;
+  `/sign-out`, a `post`), an upload a `post` of a file. A form's action
+  answers its method or is PW5041, and a link reaches what answers a `get`:
+  `/sign-in` no longer PW5009, `/sign-out` PW5009.

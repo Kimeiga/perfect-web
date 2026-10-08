@@ -885,3 +885,34 @@ fn the_development_provider_signs_up_and_in_through_the_flow() {
         "{row}"
     );
 }
+
+/// **The relying party answers the routes the compiler checks forms and
+/// links against** (ADR-0265): each of `pw_core::routes::RELYING_PARTY`
+/// with its method, and the other method at each, nothing of it. The
+/// compiler's table and this host's routes are one list, held here.
+#[test]
+fn the_relying_party_answers_the_routes_the_compiler_knows() {
+    let s = feed_with(Arc::new(TestProvider::default()));
+    let sent = |method: &str, route: &str| {
+        exchanged(
+            &s,
+            &format!(
+                "{method} {route} HTTP/1.1\r\nHost: t\r\nCookie: pw-session=s-routes\r\n\
+                 Sec-Fetch-Site: same-origin\r\ncontent-length: 0\r\n\r\n"
+            ),
+        )
+    };
+    for (method, route) in pw_core::routes::RELYING_PARTY {
+        let answer = sent(method, route);
+        assert!(
+            !answer.starts_with("HTTP/1.1 404"),
+            "{method} {route}: {answer}"
+        );
+        let other = if *method == "GET" { "POST" } else { "GET" };
+        let answer = sent(other, route);
+        assert!(
+            answer.starts_with("HTTP/1.1 404") || answer.starts_with("HTTP/1.1 405"),
+            "{other} {route}: {answer}"
+        );
+    }
+}

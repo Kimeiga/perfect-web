@@ -41,6 +41,18 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0265, 2026-10-08: a form goes where something answers it** (the
+identity track's second question and the uploads track's fourth). A link
+was checked against the program's pages and a form not at all, but a
+file's, so a form could send a `get` to `/sign-out`, which answers a
+`post`, and a link to `/sign-in` was refused, its route the host's. The
+route table states what each route answers now: a page a `get`, the
+relying party its four, every deployment's (`/sign-in`, `/sign-up` and the
+callback a `get`, `/sign-out` a `post`), an upload a `post` of a file. A
+form's action answers its method or is PW5041, and a link reaches what
+answers a `get`; the development server's identity is held to the same
+list by a test (`just e14-form-routes`).
+
 **ADR-0264, 2026-10-08: a session's handle never reaches the browser** (a
 soundness defect found writing ADR-0263). A session's id is its `HttpOnly`
 cookie's value, which the page's scripts never read, and a page could print

@@ -5671,7 +5671,7 @@ pub fn check_unit(unit: &Unit) -> Vec<Diagnostic> {
     let own = crate::resolve::Workspace::build(&[&unit.hir]);
     let inference = crate::effects::Inference::new(&sigs, &own);
     let manifest = crate::boundary::TypeFacts::default();
-    let routes = std::collections::BTreeSet::new();
+    let routes = crate::routes::Table::default();
     // One unit's own graph. Enough for a single-file caller, and honestly
     // narrower than the whole-program one: an edge to another file's query is
     // dangling here, which is why `check_units` is the entry point every real
@@ -5717,7 +5717,7 @@ fn check_unit_with(
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
     manifest: &crate::boundary::TypeFacts,
-    routes: &std::collections::BTreeSet<String>,
+    routes: &crate::routes::Table,
     graph: &crate::graph::Graph,
     // Each resource's value label, by path, where it names a reader
     // (ADR-0118).

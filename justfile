@@ -5073,3 +5073,22 @@ e14-session-to-browser:
        CARGO_INCREMENTAL=0 python3 scripts/session_mutations.py; \
      } > docs/evidence/E14/session-to-browser.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/session-to-browser.txt
+
+# ADR-0265: a form goes where something answers it: its action a route that
+# answers its method (PW5041), the relying party's routes among them, and a
+# link a route that answers a get. The checker's tests, the server's, and
+# the mutation controls.
+e14-form-routes:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0265 - a form goes where something answers it"; echo; \
+       echo "produced by: just e14-form-routes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/form_routes.rs)"; echo; \
+       cargo test --locked -p pw-core --test form_routes 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host's routes (spikes/own-renderer/server/src/tests/sign_in.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- the_relying_party_answers 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/form_route_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/form_route_mutations.py; \
+     } > docs/evidence/E14/form-routes.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/form-routes.txt
