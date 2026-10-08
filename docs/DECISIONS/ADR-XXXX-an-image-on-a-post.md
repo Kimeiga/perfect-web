@@ -244,6 +244,14 @@ not list, 415; past its width or height, 422; past its bytes, 413.
   have not failed it. The recipe now keeps a failure's panic. What it was
   is not known; a guess is a query's 2-second timeout under the machine's
   load, which every feed test shares.
+- **Two more, on CI** (verify run 37710494244, at b98fb32): the push
+  planned 24 recipes, and two failed in a mutation script's unmutated
+  baseline, after the same recipe's own run of the same tests passed:
+  `e14-not-found` (the server's 249 passed, then its baseline 248 of 249)
+  and `e14-computed-rows` (the feed's browser suite 60 of 60, then its
+  baseline 50 of 51). Neither script names the test its baseline failed,
+  so which is not known. Not re-run; each is the integrator's to judge.
+  `e14-uploads` and `e14-identity` passed there.
 
 ## Alternatives
 
