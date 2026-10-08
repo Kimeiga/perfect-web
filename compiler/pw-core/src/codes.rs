@@ -19,6 +19,7 @@
 //! PW50xx   placement, capability and unsafe boundaries
 //! PW55xx   the identity track's (ADR-0253): accounts, sign-in, `requires`
 //! PW56xx   the uploads track's (ADR-0253): typed uploads and blob storage
+//! PW57xx   the notifications track's (ADR-0253): the typed principal, notifications
 //! ```
 //!
 //! A parallel track registers its codes in its own block, with its own
@@ -93,6 +94,10 @@ pub enum Owner {
     /// ADR-0253: the uploads track's codes, PW56xx: a typed upload, its
     /// limits, a deployment's blob storage, and serving it safely.
     Uploads,
+    /// ADR-0253: the notifications track's codes, PW57xx: the typed
+    /// principal (`context.current_user()`, a user's handle the host's alone
+    /// to make) and the notifications on it.
+    Notifications,
 }
 
 impl fmt::Display for Code {
@@ -843,6 +848,7 @@ impl Owner {
             // The parallel tracks' blocks (ADR-0253), each held to its owner.
             Owner::Identity => "PW55",
             Owner::Uploads => "PW56",
+            Owner::Notifications => "PW57",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -899,7 +905,11 @@ mod tests {
         // its own block. A code of any other owner there is how two of them
         // take one number.
         for c in ALL {
-            for (owner, block) in [(Owner::Identity, "PW55"), (Owner::Uploads, "PW56")] {
+            for (owner, block) in [
+                (Owner::Identity, "PW55"),
+                (Owner::Uploads, "PW56"),
+                (Owner::Notifications, "PW57"),
+            ] {
                 assert!(
                     !c.id.starts_with(block) || c.owner == owner,
                     "{} sits in {block}, the {owner:?} track's block",

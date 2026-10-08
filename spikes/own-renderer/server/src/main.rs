@@ -533,6 +533,8 @@ mod identity;
 mod accounts;
 mod store;
 mod uploads;
+// TRACK SEAM (notifications): the typed principal, and notifications.
+mod notifications;
 
 struct Server {
     /// The templates the compiler emitted, deserialized once.
@@ -1561,6 +1563,11 @@ impl Server {
                 "pw:host/session#read".to_string(),
                 Self::session_operation(session),
             );
+            // TRACK SEAM (notifications): the reader's user, `current_user()`.
+            host.insert(
+                notifications::PRINCIPAL_READ.to_string(),
+                notifications::principal_operation(&self.identity.principals(), session),
+            );
 
             // What the command emits (ADR-0208): it computes each event's
             // values itself and hands them to the platform's outbox, which
@@ -2268,6 +2275,11 @@ impl Server {
             "pw:host/session#read".to_string(),
             Self::session_operation(session),
         );
+        // TRACK SEAM (notifications): the reader's user, `current_user()`.
+        host.insert(
+            notifications::PRINCIPAL_READ.to_string(),
+            notifications::principal_operation(&self.identity.principals(), session),
+        );
         let host = host
             .into_iter()
             .map(|(name, f)| {
@@ -2383,6 +2395,11 @@ impl Server {
                         .ok_or_else(|| format!("the page's `{name}` is given no value here"))
                 }
                 Some("current_session()") => Ok(Val::String(session.into())),
+                // TRACK SEAM (notifications): the reader's user, from the
+                // session's principal: never a value the browser sends.
+                Some(arg) if notifications::is_current_user(arg) => Ok(Val::String(
+                    notifications::user_of(&self.identity.principals(), session),
+                )),
                 Some(signal) if signals.contains(&signal) => {
                     let value = match keys {
                         Keys::Asked {
