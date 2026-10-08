@@ -186,7 +186,10 @@ test("the order's page keeps every rule, as the store moves it along", async ({ 
   await ready(page, "/order");
   expect(await audit(page), "no order").toEqual([]);
   await ready(page, "/stores/47");
+  // Answered before the cart is read (ADR-0268).
+  const added = page.waitForResponse("**/command/store.page.add_to_cart");
   await page.getByRole("button", { name: "Add Espresso" }).click();
+  await added;
   await expect(page.locator("#cart-count")).toHaveText("1");
   await ready(page, "/cart");
   await page.getByRole("button", { name: "Place order" }).click();

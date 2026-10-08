@@ -43,7 +43,10 @@ test("the store's page is kept by no cache, and a build's file names no session"
 // keeps pages for going back ask again too, and the test above holds it.
 test("back to the store, its cart is as it is now, not as it was left", async ({ page, context }) => {
   await ready(page);
+  // Answered before the page is left (ADR-0268).
+  const added = page.waitForResponse("**/command/store.page.add_to_cart");
   await page.getByRole("button", { name: "Add Espresso", exact: true }).click();
+  await added;
   await expect(page.locator("#cart-count")).toHaveText("1");
   await ready(page, "/stores/48");
   // The same session adds again, in another tab, while the first is away.

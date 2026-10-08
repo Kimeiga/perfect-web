@@ -63,7 +63,12 @@ test("the store's page links to the cart's", async ({ page }) => {
 /** The cart page with one Espresso in its session's cart. */
 async function oneEspresso(page) {
   await ready(page, "/stores/47");
+  // Answered before the cart is read: its count is the speculation's before
+  // the request has left, and a page left then lost the press, as WebKit did
+  // here on CI (ADR-0268).
+  const answered = page.waitForResponse("**/command/store.page.add_to_cart");
   await page.getByRole("button", { name: "Add Espresso" }).click();
+  await answered;
   await expect(page.locator("#cart-count")).toHaveText("1");
   await ready(page, "/cart");
 }

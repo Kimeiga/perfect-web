@@ -2207,3 +2207,9 @@ uploads track).
   parameters as a tuple and passes one pointer; each is held where it sits,
   aligned as its type is. Such an export was refused, so a row's record
   could not grow past it.
+[ADR-0268](DECISIONS/ADR-0268-a-command-outlives-the-page-that-sent-it.md):
+a command outlives the page that sent it (found by a WebKit failure on CI).
+- A press's speculation is shown before its request leaves, and a link
+  followed at once ended the request with the page. Each command's request
+  is kept alive now, within the Fetch standard's 64 KiB of such bodies in
+  flight, counted in bytes; past it, sent as before.

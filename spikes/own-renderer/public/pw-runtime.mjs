@@ -435,6 +435,9 @@ window.__pw = {
   ready: false,
   address: (path, part) => addressOf(path, part),
   indexSize: () => index.size,
+  /** The bytes of command bodies kept alive and not yet answered, and what
+   * they may come to (ADR-0268). */
+  keepalive: () => ({ inFlight: keptAlive, budget: keepaliveBudget }),
   /** Each streamed region that settled after boot, and who filled it:
    * `browser` where the platform applied its patch, `runtime` where this
    * did (ADR-0148). */
@@ -543,11 +546,21 @@ function loadHandler(identity) {
  * command the server ran answers with its first outcome (ADR-0121). An
  * answer of any kind, a refusal included, is an outcome, and never sent
  * again.
+ *
+ * **Kept alive past the page** (ADR-0268): a press's speculation is shown
+ * before its request leaves (ADR-0122), and a link followed at once ended the
+ * page and the request with it, a press shown taken and never made. A request
+ * marked `keepalive` outlives its document (the Fetch standard), within 64 KiB
+ * of such bodies in flight; one past what remains is sent as before.
  */
 async function command(component, args, interaction, retry) {
+  const sent = JSON.stringify(args);
+  const bytes = new Blob([sent]).size;
   for (let attempt = 0; ; attempt += 1) {
     let response;
     let body;
+    const keepalive = keptAlive + bytes <= keepaliveBudget;
+    if (keepalive) keptAlive += bytes;
     try {
       response = await fetch(`/command/${encodeURIComponent(component)}`, {
         method: "POST",
@@ -557,22 +570,38 @@ async function command(component, args, interaction, retry) {
         // command declared `idempotent_by InteractionId` runs once for it
         // however many times the request is sent.
         headers: { "content-type": "application/json", "pw-interaction": interaction },
-        body: JSON.stringify(args),
+        body: sent,
+        keepalive,
       });
       // An answer cut off in transit is no answer.
       if (response.ok) body = await response.text();
     } catch (error) {
+      if (keepalive) keptAlive -= bytes;
       if (!retry || attempt >= retry.max) throw error;
       log.push(`resent ${component}: no answer (${error.message ?? error})`);
       await new Promise((resolve) => setTimeout(resolve, resendDelay(retry, attempt)));
       continue;
     }
+    if (keepalive) keptAlive -= bytes;
     if (!response.ok) {
       throw new Error(`command ${component} refused: HTTP ${response.status}`);
     }
     return JSON.parse(body);
   }
 }
+
+/**
+ * The bytes of command bodies kept alive and not yet answered (ADR-0268),
+ * and what they may come to: the Fetch standard refuses a `keepalive` request
+ * that would take the page's past 64 KiB. `?keepalive=` lowers it, so a test
+ * reaches the bound with the store's few bytes, as `?transport=` pins an
+ * adapter; it never raises it.
+ */
+let keptAlive = 0;
+const keepaliveBudget = Math.min(
+  64 * 1024,
+  Number(new URLSearchParams(location.search).get("keepalive") ?? 64 * 1024) || 0,
+);
 
 /**
  * How long to wait before sending a command again (ADR-0173): a second,

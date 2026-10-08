@@ -41,6 +41,19 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0268, 2026-10-08: a command outlives the page that sent it** (found
+by a WebKit failure on CI). Verify run 37728182124 failed "a press the
+server refuses is restored on the cart's page" in WebKit: its setup pressed
+Add, waited for the cart's count, the speculation's, shown before the
+request leaves, and read `/cart`, which held no line. A user who follows a
+link at once meets the same race, and loses a press the page showed taken.
+Each command's request is marked `keepalive` now, which the Fetch standard
+lets outlive its document, within 64 KiB of such bodies in flight, counted
+in bytes; one past what remains is sent as before. The five tests that
+pressed and then left the page wait for the press's answer, and one leaves
+it at once on purpose (`just e14-keepalive`). The cause is inferred: the
+run's trace is not read.
+
 **ADR-0266, 2026-10-08: an export's parameters past the flat limit arrive
 in memory** (found by the uploads track). The Canonical ABI passes
 parameters flat up to 16 core values, and past it stores them as a tuple

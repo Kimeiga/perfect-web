@@ -576,6 +576,13 @@ awaited in order. What remains:
   - a signal's member, which the browser reads by field.
 - **`display` writes US dollars as en-US does** (ADR-0169). Other locales
   and currencies have no `display`.
+- **A press is sent only once its handler's code has arrived** (ADR-0268).
+  A command's request outlives its page, kept alive within 64 KiB, but a
+  press whose handler is still loading when the page is left is never
+  made, and a request's answer whose page is gone is read by no one: a
+  refusal is not shown, and the next page reads what is. A page whose
+  other scripts keep bodies alive can find a command refused by the
+  browser's bound, which this runtime does not see.
 - **A speculation reaches the top of a page** (ADR-0122, ADR-0172): its
   text, and each attribute, block and loop there that reads the speculated
   value, which the browser renders again. A speculated read inside another

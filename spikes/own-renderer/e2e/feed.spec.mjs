@@ -573,12 +573,18 @@ test("following someone shows their posts in Following, and unfollowing takes th
   await profile(page, "u-ada");
   await expect(page.locator("h1")).toHaveText("Ada");
   await expect(page.locator("#handle")).toHaveText("@ada");
+  // Each answered before the page is left (ADR-0268): `#unfollow` is the
+  // speculation's before the request has.
+  const followed = page.waitForResponse("**/command/feed.app.follow");
   await page.locator("#follow").click();
+  await followed;
   await expect(page.locator("#unfollow")).toHaveCount(1);
   await page.goto("/following");
   await expect(post(page, "Hello, feed.")).toHaveCount(1);
   await profile(page, "u-ada");
+  const unfollowed = page.waitForResponse("**/command/feed.app.unfollow");
   await page.locator("#unfollow").click();
+  await unfollowed;
   await expect(page.locator("#follow")).toHaveCount(1);
   await page.goto("/following");
   await expect(post(page, "Hello, feed.")).toHaveCount(0);
@@ -645,4 +651,28 @@ test("your own page says it is yours", async ({ page }, testInfo) => {
 test("a page of no one is not found", async ({ page }) => {
   const missing = await page.goto("/user/u-nobody");
   expect(missing.status()).toBe(404);
+});
+
+test("a post's request is kept alive, counted by its bytes", async ({ page }, testInfo) => {
+  // ADR-0268: the Fetch standard's 64 KiB are bytes, and a post's text is
+  // anyone's: an emoji is two of JavaScript's characters and four bytes.
+  await home(page);
+  let release;
+  const held = new Promise((resolve) => (release = resolve));
+  await page.route("**/command/feed.app.post", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const text = `\u{1F600} kept alive in ${testInfo.project.name} at ${Date.now()}`;
+  await page.getByLabel("What's happening?").fill(text);
+  const request = page.waitForRequest("**/command/feed.app.post");
+  await page.getByRole("button", { name: "Post" }).click();
+  const body = (await request).postData();
+  const bytes = Buffer.byteLength(body, "utf8");
+  expect(bytes).toBeGreaterThan(body.length);
+  const inFlight = () => page.evaluate(() => window.__pw.keepalive().inFlight);
+  await expect.poll(inFlight).toBe(bytes);
+  release();
+  await expect.poll(inFlight).toBe(0);
+  await expect(post(page, text).locator(".author")).toHaveText(/^Guest /);
 });
