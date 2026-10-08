@@ -327,11 +327,10 @@ refused by name:
 - **A map's key is an `Int`, a `String`, a `Bool`, or an opaque type over
   one** (ADR-0057, ADR-0248), and another key type is refused at check
   (PW0627), where it is written or where a call instantiates it. A map or set
-  a query is given, or a host answers, is checked on arrival and one out of
-  order stops the invocation (ruling 0057-c, to sort it on arrival instead,
-  is not built); one inside another value is refused, since nothing would
-  check it. A `for` loop reads a map or set through `Map.keys` or
-  `Set.to_list`.
+  a query is given, or a host answers, is sorted on arrival, and a key twice
+  stops the invocation (ADR-0259); one inside another value is refused,
+  since nothing would sort it. A `for` loop reads a map or set through
+  `Map.keys` or `Set.to_list`.
 - **Case mapping is per code point** (ADR-0056). A word-final capital sigma
   lowers to `σ`, where Unicode's default conversion gives `ς`. There is no
   case folding and no locale rule. The mapping is Unicode 17.0's, as the

@@ -836,9 +836,12 @@ const HELPERS: &[(&str, &[&str], &str)] = &[
     (
         "checked",
         &["key_order", "trap"],
-        "// A map or set from outside: each key below the next, or a trap.\n\
-         function checked(xs, of) {\n  for (let i = 1; i < xs.length; i++)\n    \
-         if (key_order(of(xs[i - 1]), of(xs[i])) >= 0) trap(\"a map or set out of order\");\n  return xs;\n}",
+        "// A map or set from outside, sorted by key as it arrives, stably; a key\n\
+         // twice is a trap (ruling 0057-c, ADR-0259).\n\
+         function checked(xs, of) {\n  const s = [...xs].sort((a, b) => key_order(of(a), of(b)));\n  \
+         for (let i = 1; i < s.length; i++)\n    \
+         if (key_order(of(s[i - 1]), of(s[i])) === 0) trap(\"a map or set from outside repeats a key\");\n  \
+         return s;\n}",
     ),
     (
         "merged",

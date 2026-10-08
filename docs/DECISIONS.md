@@ -2144,3 +2144,11 @@ deployment's (track `identity`, W1; merged by the integrator).
   Argon2id passwords, starts only in development on loopback. The feed's
   posts, replies and likes are their principal's, and its author may delete
   a post.
+[ADR-0259](DECISIONS/ADR-0259-a-map-or-set-from-outside-is-sorted-on-arrival.md):
+a map or set from outside is sorted on arrival (ruling 0057-c).
+- A query's map or set, or a host's answer, given out of order is sorted
+  by key as it arrives, in the component and in the browser's module, and
+  a key twice still stops the invocation. Refusing it tied every host to
+  code point order: a database's collation, an order by UTF-16 unit, a
+  hash map's. The divergences from the Component Model's `map` and from
+  `Map.from_lists`, both keeping the last of a repeated key, are recorded.

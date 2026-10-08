@@ -330,25 +330,85 @@ fn a_set_answers_as_a_btreeset_does() {
     }
 }
 
+/// **A map or set out of order is sorted on arrival** (ruling 0057-c,
+/// ADR-0259): given in any order it is the map or set Rust's `BTreeMap` and
+/// `BTreeSet` make of the same entries, its keys in code point order, and
+/// a key twice still stops the invocation. Until ADR-0259 one out of order
+/// stopped it too.
 #[test]
-fn a_map_or_set_out_of_order_stops_the_invocation() {
-    let (size, count) = (compiled("m.Size"), compiled("m.Count"));
+fn a_map_or_set_out_of_order_is_sorted_on_arrival() {
+    let (size, count, keys, lookup, member) = (
+        compiled("m.Size"),
+        compiled("m.Count"),
+        compiled("m.Keys"),
+        compiled("m.Lookup"),
+        compiled("m.Member"),
+    );
     let entry = |k: &str, v: i64| Val::Tuple(vec![text(k), Val::S64(v)]);
-    // Descending, and a key twice.
-    assert!(call(&size, &[Val::List(vec![entry("b", 1), entry("a", 2)])]).is_err());
-    assert!(call(&size, &[Val::List(vec![entry("a", 1), entry("a", 2)])]).is_err());
+    // Descending: sorted, and each key found where it is.
+    let descending = Val::List(vec![entry("b", 1), entry("a", 2)]);
     assert_eq!(
-        call(&size, &[Val::List(vec![entry("a", 1), entry("b", 2)])]),
+        call(&size, std::slice::from_ref(&descending)),
         Ok(Val::S64(2))
     );
-    // Code point order, not UTF-16's: U+FF61 is below U+1F600.
-    let ordered = Val::List(vec![text("\u{FF61}"), text("\u{1F600}")]);
-    assert_eq!(call(&count, &[ordered]), Ok(Val::S64(2)));
+    assert_eq!(
+        call(&keys, std::slice::from_ref(&descending)),
+        Ok(Val::List(vec![text("a"), text("b")]))
+    );
+    assert_eq!(
+        call(&lookup, &[descending, text("b")]),
+        Ok(some(Some(Val::S64(1))))
+    );
+    // A key twice, beside each other or apart, still stops it.
+    assert!(call(&size, &[Val::List(vec![entry("a", 1), entry("a", 2)])]).is_err());
+    assert!(
+        call(
+            &size,
+            &[Val::List(vec![entry("b", 1), entry("a", 2), entry("b", 3)])]
+        )
+        .is_err()
+    );
+    // Code point order, not UTF-16's: U+FF61 is below U+1F600, given after.
     let reversed = Val::List(vec![text("\u{1F600}"), text("\u{FF61}")]);
-    assert!(call(&count, &[reversed]).is_err());
+    assert_eq!(
+        call(&count, std::slice::from_ref(&reversed)),
+        Ok(Val::S64(2))
+    );
+    assert_eq!(
+        call(&member, &[reversed, text("\u{FF61}")]),
+        Ok(Val::Bool(true))
+    );
+    // And any order of any map: as `BTreeMap` makes it, each key found.
+    let mut rng = Rng(0x0057_C0DE);
+    for _ in 0..200 {
+        let mut m: BTreeMap<String, i64> = BTreeMap::new();
+        for _ in 0..rng.below(8) {
+            m.insert(rng.text(), rng.int());
+        }
+        let mut given: Vec<Val> = m
+            .iter()
+            .map(|(k, v)| Val::Tuple(vec![text(k), Val::S64(*v)]))
+            .collect();
+        // Fisher-Yates, by the generator: an order no host need choose.
+        for i in (1..given.len()).rev() {
+            given.swap(i, rng.below(i as u64 + 1) as usize);
+        }
+        let given = Val::List(given);
+        assert_eq!(
+            call(&keys, std::slice::from_ref(&given)),
+            Ok(Val::List(m.keys().map(|k| text(k)).collect())),
+            "{m:?}"
+        );
+        let probe = rng.text();
+        assert_eq!(
+            call(&lookup, &[given, text(&probe)]),
+            Ok(some(m.get(&probe).map(|v| Val::S64(*v)))),
+            "{m:?} at {probe:?}"
+        );
+    }
 }
 
-/// A host's answer, checked as a parameter is (ADR-0057).
+/// A host's answer, sorted as a parameter is (ADR-0057, ADR-0259).
 const HOSTED: &str = r#"module h
 
 import Map
@@ -364,7 +424,7 @@ public query Tallied(shard: String, word: String) -> Option<Int> {
 "#;
 
 #[test]
-fn a_map_a_host_answers_is_checked_when_it_arrives() {
+fn a_map_a_host_answers_is_sorted_when_it_arrives() {
     let r = Runnable::new(compile(&units(&[("h.pw", HOSTED)]), "h.Tallied"));
     let answer = |entries: Vec<(&'static str, i64)>| {
         let calls = Calls::default();
@@ -383,8 +443,14 @@ fn a_map_a_host_answers_is_checked_when_it_arrives() {
         r.call(&ordered, &args).map(|mut v| v.remove(0)),
         Ok(some(Some(Val::S64(2))))
     );
+    // Out of order, sorted as it arrives (ADR-0259); a key twice stops it.
     let unordered = answer(vec![("c", 3), ("b", 2), ("a", 1)]);
-    assert!(r.call(&unordered, &args).is_err());
+    assert_eq!(
+        r.call(&unordered, &args).map(|mut v| v.remove(0)),
+        Ok(some(Some(Val::S64(2))))
+    );
+    let twice = answer(vec![("b", 2), ("a", 1), ("b", 3)]);
+    assert!(r.call(&twice, &args).is_err());
 }
 
 fn bool_map(m: &BTreeMap<bool, i64>) -> Val {
@@ -460,26 +526,38 @@ fn a_map_keyed_by_a_bool_or_an_opaque_type_answers_as_a_btreemap_does() {
             "opaque from_list {ns:?}"
         );
     }
-    // Out of order on arrival: `true` before `false`, and a key twice.
-    let entry = |k: bool| Val::Tuple(vec![Val::Bool(k), Val::S64(1)]);
+    // Out of order on arrival, `true` before `false`: sorted, each value
+    // where its key is (ADR-0259); and a key twice stops it.
+    let entry = |k: bool, v: i64| Val::Tuple(vec![Val::Bool(k), Val::S64(v)]);
+    for (k, v) in [(true, 1), (false, 2)] {
+        assert_eq!(
+            call(
+                &switch,
+                &[
+                    Val::List(vec![entry(true, 1), entry(false, 2)]),
+                    Val::Bool(k)
+                ]
+            ),
+            Ok(some(Some(Val::S64(v))))
+        );
+    }
     assert!(
         call(
             &switch,
-            &[Val::List(vec![entry(true), entry(false)]), Val::Bool(true)]
-        )
-        .is_err()
-    );
-    assert!(
-        call(
-            &switch,
-            &[Val::List(vec![entry(false), entry(false)]), Val::Bool(true)]
+            &[
+                Val::List(vec![entry(false, 1), entry(false, 1)]),
+                Val::Bool(true)
+            ]
         )
         .is_err()
     );
     assert_eq!(
         call(
             &switch,
-            &[Val::List(vec![entry(false), entry(true)]), Val::Bool(true)]
+            &[
+                Val::List(vec![entry(false, 1), entry(true, 1)]),
+                Val::Bool(true)
+            ]
         ),
         Ok(some(Some(Val::S64(1))))
     );

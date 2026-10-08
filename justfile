@@ -5001,3 +5001,25 @@ e14-follows:
        CARGO_INCREMENTAL=0 python3 scripts/follows_mutations.py; \
      } > docs/evidence/E14/follows.txt
     @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/follows.txt
+
+# ADR-0259 (ruling 0057-c): a map or set from outside is sorted on arrival,
+# and a key twice still stops the invocation. The host's tests against
+# BTreeMap and BTreeSet, the browser's module against the component, and
+# the mutation controls: the sort's, and ADR-0057's, three re-anchored.
+# Needs `node`.
+e14-arrival:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0259 - a map or set from outside is sorted on arrival"; echo; \
+       echo "produced by: just e14-arrival"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== through the host, against BTreeMap and BTreeSet (compiler/pw-conformance/tests/maps.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test maps 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== the browser's module against the component (compiler/pw-conformance/tests/javascript.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test javascript -- the_modules_entry_check_is_the_components 2>&1 | grep -E '^(test |test result)'; \
+       echo; echo "== mutation controls (scripts/arrival_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/arrival_mutations.py; \
+       echo; echo "== ADR-0057's, three re-anchored (scripts/map_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/map_mutations.py; \
+     } > docs/evidence/E14/arrival.txt
+    @grep -E "^test result|mutants killed|^---- " docs/evidence/E14/arrival.txt

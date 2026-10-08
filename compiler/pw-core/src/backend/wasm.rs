@@ -5914,13 +5914,28 @@ impl Enc<'_> {
                     locals: vec![out, count],
                 }
             }
-            // From outside (ADR-0057): each key below the next, or a trap.
+            // From outside (ADR-0057): sorted by key as it arrives, stably,
+            // by the merge sort `List.sort_by` and `Map.from_lists` use, and a
+            // key twice traps (ruling 0057-c, ADR-0259). Until ADR-0259 one
+            // out of order trapped too.
             N::MapCheck | N::SetCheck => {
-                let (ptr, len) = (flats[0].1[0], flats[0].1[1]);
+                let (given, len) = (flats[0].1[0], flats[0].1[1]);
                 let Some((entry, key, _)) = self.entry_of(flats[0].0) else {
                     blocked!("`{}` checks a value that is not a map", self.export);
                 };
                 let (esize, _) = self.layout(&entry);
+                let ptr = match self.merge_sort(given, len, entry, &mut |this, a, b, take| {
+                    let o = match this.order_at(key, a, b) {
+                        Encoding::Encoded(o) => o,
+                        other => return other.map(|_| unreachable!()),
+                    };
+                    this.ops
+                        .extend([I::LocalGet(o), I::I32Const(0), I::I32LeS, I::LocalSet(take)]);
+                    Encoding::Encoded(())
+                }) {
+                    Encoding::Encoded(s) => s,
+                    other => return other.map(|_| unreachable!()),
+                };
                 let (i, before) = (
                     self.locals.fresh(ValType::I32),
                     self.locals.fresh(ValType::I32),
@@ -5945,7 +5960,8 @@ impl Enc<'_> {
                     Encoding::Encoded(o) => o,
                     other => return other.map(|_| unreachable!()),
                 };
-                self.ops.extend([I::LocalGet(o), I::I32Const(0), I::I32GeS]);
+                // Sorted, so a key twice is two neighbours of one key.
+                self.ops.extend([I::LocalGet(o), I::I32Eqz]);
                 trap_if(&mut self.ops);
                 self.ops.extend(increment(i));
                 self.ops.extend([I::Br(0), I::End, I::End]);

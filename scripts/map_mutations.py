@@ -59,8 +59,11 @@ MUTANTS = [
     (
         "a sort of entries is not stable",
         WASM,
-        ".extend([I::LocalGet(o), I::I32Const(0), I::I32LeS, I::LocalSet(take)]);",
-        ".extend([I::LocalGet(o), I::I32Const(0), I::I32LtS, I::LocalSet(take)]);",
+        # `Map.from_lists`' sort: the arrival sort's comparator is the same
+        # text, deeper (ADR-0259), and its stability shows nowhere, since a
+        # key twice traps there.
+        "this.ops\n                .extend([I::LocalGet(o), I::I32Const(0), I::I32LeS, I::LocalSet(take)]);",
+        "this.ops\n                .extend([I::LocalGet(o), I::I32Const(0), I::I32LtS, I::LocalSet(take)]);",
     ),
     (
         "a repeated key is kept",
@@ -78,8 +81,10 @@ MUTANTS = [
     (
         "the entry check lets a key through twice",
         WASM,
-        "self.ops.extend([I::LocalGet(o), I::I32Const(0), I::I32GeS]);",
-        "self.ops.extend([I::LocalGet(o), I::I32Const(0), I::I32GtS]);",
+        # Re-anchored by ADR-0259: sorted on arrival, a key twice is two
+        # neighbours of one key.
+        "self.ops.extend([I::LocalGet(o), I::I32Eqz]);",
+        "self.ops.extend([I::LocalGet(o), I::Drop, I::I32Const(0)]);",
     ),
     (
         "a map from outside is not checked",
@@ -114,8 +119,9 @@ MUTANTS = [
     (
         "the module's entry check lets a key through twice",
         JS,
-        ">= 0) trap(",
-        "> 0) trap(",
+        # Re-anchored by ADR-0259.
+        "=== 0) trap(",
+        "=== 2) trap(",
     ),
 ]
 

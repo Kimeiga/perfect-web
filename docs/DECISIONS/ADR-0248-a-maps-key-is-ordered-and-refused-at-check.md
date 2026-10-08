@@ -67,6 +67,6 @@ owner's Twitter list, item 2.
 ## Not claimed
 
 - **Ruling 0057-c**, a map or set arriving out of order sorted rather than
-  refused. Next.
+  refused. Next; built by ADR-0259.
 - **A record, a list or a sum type as a key.** None has an order the
   component and the module share, and the ruling admits none.

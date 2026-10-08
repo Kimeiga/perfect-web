@@ -359,10 +359,10 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         params.push((v, ty));
     }
 
-    // **A map or set from outside is checked on entry** (ADR-0057): its keys
-    // ascending, each once, or the invocation stops. A binary search over
-    // anything else answers wrongly. One inside another value is refused:
-    // nothing checks it.
+    // **A map or set from outside is sorted on entry** (ADR-0057, ruling
+    // 0057-c, ADR-0259): by its keys, stably, and a key twice stops the
+    // invocation. A binary search over anything else answers wrongly. One
+    // inside another value is refused: nothing sorts it.
     for (p, (v, ty)) in decl.params.iter().zip(&params) {
         let op = match ty {
             Type::Map(..) => Intrinsic::MapCheck,
@@ -5573,9 +5573,9 @@ impl<'a> Lower<'a> {
                     },
                     None => Type::Unit,
                 };
-                // A map or set the host answers is checked as a query's
-                // parameter is (ADR-0057); one inside another value is
-                // refused, since nothing checks it.
+                // A map or set the host answers is sorted as a query's
+                // parameter is (ADR-0057, ADR-0259); one inside another value
+                // is refused, since nothing sorts it.
                 let check = match &ty {
                     Type::Map(..) => Some(Intrinsic::MapCheck),
                     Type::Set(..) => Some(Intrinsic::SetCheck),

@@ -430,8 +430,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              (ADR-0254, `just e14-member-resolution`: the one the module
              sees, or PW0628). Before it,
              found fixing `e10-lexical`: ~~a secret returned early is
-             public~~ (ADR-0252, `just e14-returned-labels`). Then 0057-c, a
-             map or set sorted on arrival;
+             public~~ (ADR-0252, `just e14-returned-labels`). Then ~~0057-c,
+             a map or set sorted on arrival~~ (ADR-0259, `just
+             e14-arrival`);
           3. ADR-0195's ruling 10: ~~materialization chains~~ (ADR-0255,
              `just e14-materialization-chains`: one may read another, a
              cycle is refused, PW5109, and a write reaches each of a
@@ -477,8 +478,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
         - with the app layer: computed holes (0073-a: the host's part done,
           ADR-0226, and the browser's, ADR-0227, rows, ADR-0228, conditions,
           ADR-0229; the rest later), then ~~0071-a~~ (ADR-0230);
-          route-keyed speculation (0122-d); map keys (0057-a, 0057-c); ~~`let
-          _`~~ (ADR-0250), `while`, 0052-a, 0055-b, 0061-a, 0049-b; cheaper
+          route-keyed speculation (0122-d); ~~map keys (0057-a, 0057-c)~~
+          (ADR-0248, ADR-0259); ~~`let _`~~ (ADR-0250), `while`, 0052-a, 0055-b, 0061-a, 0049-b; cheaper
           instantiation (0046-a);
         - after it: 0060-a, 0078-a, 0056-a, 0047-a's parser split, and
           what waits for it, found on the way:
@@ -489,6 +490,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
             (`an export whose parameters exceed the flat limit`); they are
             to be passed indirectly, as the Canonical ABI says, so a row's
             record may grow. W2 carries a post's images as a list meanwhile;
+          - **a component's trap carries its cause** (ADR-0259's "Not
+            claimed"): a trap in the component is `unreachable`, and the
+            host reports a failed call, where the browser's module names
+            each ("Int overflow", "a map or set from outside repeats a
+            key"). Ruling 0057-c's "by name" holds in the component when
+            its trap does too;
           - **a host binding's shape, checked where it is written** (found
             by W2): `host "feed:uploads#claim"`, with no interface, broke
             WIT generation for every component, by an error naming no

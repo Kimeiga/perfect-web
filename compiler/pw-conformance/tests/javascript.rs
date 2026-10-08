@@ -1135,9 +1135,11 @@ fn the_modules_case_mapping_is_rusts_for_every_code_point() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
-/// **A map the module is given is checked as the component checks it**
-/// (ADR-0057): in order, out of order, a key twice, and in code point order
-/// that UTF-16's order reverses. A generated map is rarely any of these.
+/// **A map the module is given is sorted as the component sorts it**
+/// (ADR-0057, ADR-0259): in order, out of order, a key twice, and in code
+/// point order that UTF-16's order reverses. A generated map is rarely any
+/// of these. Only the key twice traps; the values in key order say which
+/// order each took.
 #[test]
 fn the_modules_entry_check_is_the_components() {
     let us = units(&[("j.pw", PROGRAM)]);
@@ -1152,5 +1154,16 @@ fn the_modules_entry_check_is_the_components() {
     ];
     let calls = maps.into_iter().map(|m| vec![Val::List(m)]).collect();
     let (queries, calls, traps) = agree_on(&us, &[("j.Given".to_string(), calls)], 0x57);
-    assert_eq!((queries, calls, traps), (1, 6, 3));
+    assert_eq!((queries, calls, traps), (1, 6, 1));
+    // The values in key order, by a map given out of order.
+    let flag = |k: bool, v: i64| Val::Tuple(vec![Val::Bool(k), Val::S64(v)]);
+    let toggled = vec![
+        vec![
+            Val::List(vec![flag(true, 7), flag(false, 8)]),
+            Val::Bool(true),
+        ],
+        vec![Val::List(vec![flag(true, 7)]), Val::Bool(false)],
+    ];
+    let (queries, calls, traps) = agree_on(&us, &[("j.Toggled".to_string(), toggled)], 0x58);
+    assert_eq!((queries, calls, traps), (1, 2, 0));
 }

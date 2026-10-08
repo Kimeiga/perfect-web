@@ -41,6 +41,16 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0259, 2026-10-07: a map or set from outside is sorted on arrival**
+(the owner's ruling 0057-c). A query's map or set, or a host's answer,
+given out of order stopped the invocation (ADR-0057), so every host had to
+give code point order: a database's collation, an order by UTF-16 unit, a
+hash map's iteration, each was refused. It is sorted as it arrives now, in
+the component and in the browser's module, and a key twice still stops the
+invocation, the module's trap saying so. The divergences from the Component
+Model's `map` and from `Map.from_lists`, both keeping the last of a repeated
+key, are recorded (`just e14-arrival`).
+
 **Correction, 2026-10-07: two tests edited the feed where they did not mean
 to.** CI's verification of `4fde2cb` (run 37700255338) found
 `e14-every-entry`'s "a private drop is told to no other session" surviving.

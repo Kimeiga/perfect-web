@@ -491,8 +491,8 @@ pub enum Intrinsic {
     /// The value at each position under the key at the same position; a
     /// later key replaces an earlier one; lists of two lengths trap.
     MapFromLists,
-    /// A map from outside, checked: its keys ascending, each once, or it
-    /// traps. Its value is the map.
+    /// A map from outside, sorted by key as it arrives, stably; a key twice
+    /// traps (ruling 0057-c, ADR-0259). Its value is the map sorted.
     MapCheck,
     SetEmpty,
     SetFromList,
@@ -504,7 +504,7 @@ pub enum Intrinsic {
     SetUnion,
     SetIntersection,
     SetDifference,
-    /// A set from outside, checked as `MapCheck` checks a map.
+    /// A set from outside, sorted as `MapCheck` sorts a map.
     SetCheck,
 }
 

@@ -31,6 +31,8 @@ Each operation answers a new value; a map does not change.
   an `Int` ordered by value, a `String` by code point. **(ruling needed)**:
   no other type has an order the component and the module share, so
   another key is refused by name.
+  Superseded in part by ADR-0248 (ruling 0057-a): a `Bool`, and an opaque
+  type over a key, is a key too, and another type is refused at check.
 - **Order.** Entries are in ascending key order, each key once. That is the
   order `keys`, `values` and `to_list` answer in. **(ruling needed)**:
   sorted, rather than the insertion order a JavaScript `Map` keeps.
@@ -44,6 +46,8 @@ it arrives: each key below the next, or the invocation stops. A binary
 search answers wrongly over anything else. **(ruling needed)**: checked and
 refused, not sorted into order. A host that repeats a key has said two
 things, and neither is chosen for it.
+Superseded in part by ADR-0259 (ruling 0057-c): one out of order is sorted
+as it arrives, and a key twice still stops the invocation.
 
 A map or set inside another value (a parameter's list, a record's field, a
 host's option) is refused by name, since nothing would check it.
