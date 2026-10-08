@@ -149,6 +149,17 @@ jobs:
           name: evidence-${{ matrix.shard.index }}
           path: ci-out/
           retention-days: 90
+      # A browser test that failed in a recipe keeps its trace, and what its
+      # page's runtime and the network said beside it (feed.spec.mjs's
+      # record): the evidence keeps the failure's name alone. Each run of a
+      # suite clears the directory, so this is the last run's.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: traces-${{ matrix.shard.index }}
+          path: spikes/own-renderer/test-results/
+          if-no-files-found: ignore
+          retention-days: 30
 
   # The recipes run against a database (ADR-0246): PostgreSQL as the
   # verified image runs it, a throwaway database each run.
@@ -223,6 +234,13 @@ jobs:
           name: evidence-database
           path: ci-out/
           retention-days: 90
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: traces-database
+          path: spikes/own-renderer/test-results/
+          if-no-files-found: ignore
+          retention-days: 30
 
   browser:
     name: browser ${{ matrix.engine }}
