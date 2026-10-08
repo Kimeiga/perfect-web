@@ -3,8 +3,11 @@
 // @dimension: helper extraction
 //
 // The private value arrives through a declared function rather than from the
-// query binding directly. `summarize` says in its own type that what it
-// returns is session-scoped.
+// query binding directly. What `summarize` returns is computed from the
+// cart, and the cart's label follows it through the call (ADR-0129). Until
+// 2026-10-08 it returned a `Session<SessionId>`, to say in its type that the
+// value is session-scoped; that type is the session's handle since ADR-0263,
+// and printing it gave the page the session's cookie (ADR-0264).
 module generality.cache_helper
 
 import store.queries
@@ -13,10 +16,9 @@ import cart.queries
 // the store reads it. This file wrote a bare `session` that nothing
 // declared, and it checked until a name used as a value had to resolve.
 import context.{ current_session }
-import capability.{ Session, SessionId }
 import domain.{ Cart, StoreId }
 
-fn summarize(c: Cart) -> Session<SessionId> !{} { todo }
+fn summarize(c: Cart) -> String !{} { todo }
 
 page StorePage(id: StoreId) {
     cache shared

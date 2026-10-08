@@ -386,11 +386,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
           speculated value~~ (ADR-0235, `just e14-speculated-values`);
         - **first, soundness** (found 2026-10-07): ~~a handle made by a
           program, answered by a data layer or supplied by the browser~~
-          (ADR-0263, `just e14-handles`); then **a session's handle never
-          reaches the browser** (ADR-0264): a page that prints one, a
-          signal's first value, a command's answer and a value the
-          browser's module reads each give a script the session's cookie,
-          which `HttpOnly` keeps from it;
+          (ADR-0263, `just e14-handles`); ~~a session's handle reaching
+          the browser~~ (ADR-0264, `just e14-session-to-browser`: no
+          answer, and nothing markup prints, holds one);
         - **then the Twitter gaps, in the owner's order** (relayed
           2026-10-07), each its own ADR as the feed hits it:
           1. ~~route-keyed speculation (0122-d): an optimistic reply~~

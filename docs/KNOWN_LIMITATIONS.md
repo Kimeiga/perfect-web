@@ -515,8 +515,7 @@ awaited in order. What remains:
   ADR-0263 `context.current_user()` is the host's operation,
   `pw:host/principal#read`, which no host answers until track
   `notifications` (W3) lands, and `current_organization()`'s no host
-  answers at all. A session's handle printed into a page gives its cookie's
-  value to the page's scripts (ADR-0264, next).
+  answers at all.
 - **An upload's image outlives its post only where it was copied**
   (ADR-0260, ADR-0261): a deleted post's image is served no more, and its
   blob is collected where no post names it, but a copy a browser or a CDN

@@ -104,6 +104,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // ADR-0263: a session's, a user's or an organization's handle is
         // the platform's to make.
         per_unit.extend(handles_are_the_platforms(&workspace, &sigs, i, &u.hir));
+        // ADR-0264: and a session's never reaches the browser.
+        per_unit.extend(sessions_stay_on_the_server(&workspace, &sigs, i, &u.hir));
         // ADR-0212: a `query` reads a query or a resource, and a
         // `subscription` a subscription.
         per_unit.extend(reads_name_their_kind(&workspace, &sigs, i, &u.hir));
@@ -2268,7 +2270,20 @@ fn handle_in(
     if !seen.insert(def) {
         return None;
     }
-    let decl = sigs.type_decl(def)?;
+    declared_parts(sigs, def)
+        .into_iter()
+        .find_map(|t| handle_in(sigs, t, seen))
+}
+
+/// **The parts of a declared type** (ADR-0264): its record's fields, its
+/// opaque representation and its cases' payloads, each resolved.
+fn declared_parts(
+    sigs: &Signatures,
+    def: crate::resolve::DefId,
+) -> Vec<&crate::resolved::ResolvedType> {
+    let Some(decl) = sigs.type_decl(def) else {
+        return Vec::new();
+    };
     decl.record
         .iter()
         .flatten()
@@ -2276,7 +2291,162 @@ fn handle_in(
         .chain(decl.representation.iter())
         .chain(decl.variants.iter().flatten().flat_map(|(_, ts)| ts.iter()))
         .filter_map(crate::resolved::TypeResolution::resolved)
-        .find_map(|t| handle_in(sigs, t, seen))
+        .collect()
+}
+
+/// **Whether a type holds a session's handle** (ADR-0264), wherever it sits.
+fn session_in(
+    sigs: &Signatures,
+    ty: &crate::resolved::ResolvedType,
+    seen: &mut BTreeSet<crate::resolve::DefId>,
+) -> bool {
+    if matches!(
+        sigs.privacy_qualifier(ty),
+        Some(crate::signatures::PrivacyQualifier::Session)
+    ) {
+        return true;
+    }
+    if ty.args().iter().any(|a| session_in(sigs, a, seen)) {
+        return true;
+    }
+    let Some(def) = ty.def_id() else {
+        return false;
+    };
+    seen.insert(def)
+        && declared_parts(sigs, def)
+            .into_iter()
+            .any(|t| session_in(sigs, t, seen))
+}
+
+/// [`session_in`], of the type the typer gives an expression.
+fn session_in_ty(
+    sigs: &Signatures,
+    ty: &crate::values::Ty,
+    seen: &mut BTreeSet<crate::resolve::DefId>,
+) -> bool {
+    use crate::values::Ty;
+    match ty {
+        Ty::Nominal(def, args) => {
+            matches!(
+                sigs.privacy_kind(*def),
+                Some(crate::signatures::PrivacyQualifier::Session)
+            ) || args.iter().any(|a| session_in_ty(sigs, a, seen))
+                || (seen.insert(*def)
+                    && declared_parts(sigs, *def)
+                        .into_iter()
+                        .any(|t| session_in(sigs, t, seen)))
+        }
+        Ty::Builtin(_, args) => args.iter().any(|a| session_in_ty(sigs, a, seen)),
+        _ => false,
+    }
+}
+
+/// **A session's handle never reaches the browser** (ADR-0264). A session's
+/// id is its cookie's value, and the cookie is `HttpOnly`, kept from the
+/// page's scripts; a page that printed the handle gave it back to them, and
+/// until ADR-0264 `<p>{mine.session}</p>` checked clean. What reaches the
+/// browser: what markup prints, as text or an attribute's value; and an
+/// answer, a query's or a subscription's that a page shows, speculates on
+/// or computes from in the browser, or a command's. Each is PW5040 where
+/// it holds one. A user's or an organization's id is a name, and the
+/// browser holding it reads nothing.
+fn sessions_stay_on_the_server(
+    workspace: &crate::resolve::Workspace,
+    sigs: &Signatures,
+    unit: usize,
+    hir: &Hir,
+) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    let refused = |message: String, span: crate::hir::Span| Diagnostic {
+        code: crate::codes::HANDLE_TO_BROWSER.id,
+        invariant: crate::codes::HANDLE_TO_BROWSER.invariant,
+        reason: "handle_to_browser",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message,
+        primary_span: span,
+        related: Vec::new(),
+        explanation: Some(
+            "A session's id is its cookie's value, and the cookie is `HttpOnly`: \
+             the page's scripts never read it, so a script a page runs cannot \
+             take the session away. A session's handle is that id, and what \
+             reaches the browser a script can read. A query reads the reader's \
+             data with `current_session()`; what it answers is that data, never \
+             the handle."
+                .to_string(),
+        ),
+        repairs: Vec::new(),
+    };
+    for (_, decl) in hir.all_decls() {
+        if !matches!(
+            decl.kind,
+            DeclKind::Query | DeclKind::Subscription | DeclKind::Command
+        ) {
+            continue;
+        }
+        let Some(ret) = &decl.ret else {
+            continue;
+        };
+        let holds = crate::resolved::resolve(
+            workspace,
+            unit,
+            None,
+            &decl.type_params,
+            ret,
+            decl.name_span.clone(),
+        )
+        .resolved()
+        .is_some_and(|t| session_in(sigs, t, &mut BTreeSet::new()));
+        if holds {
+            out.push(refused(
+                format!(
+                    "`{}`'s answer holds a session's handle, which would reach the browser",
+                    decl.name
+                ),
+                decl.name_span.clone(),
+            ));
+        }
+    }
+    let module = workspace
+        .modules
+        .iter()
+        .find(|m| m.unit == unit)
+        .map(|m| m.name.as_str());
+    for (_, body, _) in hir.bodies.iter() {
+        let decl = hir.decl(body.owner);
+        for (_, node, _) in body.nodes.iter() {
+            let mut printed: Vec<ExprId> = match node {
+                Node::Interpolation(e) => vec![*e],
+                Node::Element { attrs, .. } => attrs
+                    .iter()
+                    .filter(|a| !matches!(a.namespace(), Some(("on", _))))
+                    .filter_map(|a| match a.value {
+                        crate::hir::AttrValue::Expr(e) => Some(e),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            };
+            // A string with holes prints each hole.
+            printed = printed
+                .into_iter()
+                .flat_map(|e| match body.expr(e) {
+                    Expr::Interpolated { parts, .. } => parts.clone(),
+                    _ => vec![e],
+                })
+                .collect();
+            for e in printed {
+                let (ty, _) = crate::values::type_of(sigs, workspace, unit, module, decl, body, e);
+                if session_in_ty(sigs, &ty, &mut BTreeSet::new()) {
+                    out.push(refused(
+                        "this prints a session's handle, which would reach the browser".to_string(),
+                        body.expr_span(e),
+                    ));
+                }
+            }
+        }
+    }
+    out
 }
 
 /// **A session's, a user's or an organization's handle is the platform's

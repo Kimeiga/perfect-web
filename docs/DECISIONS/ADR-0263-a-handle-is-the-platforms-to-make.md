@@ -70,4 +70,5 @@ generalized and fixed by the integrator. Date: 2026-10-07. Milestone: E14.
   `{mine.session}`, and a session's id is its cookie's value, which
   `HttpOnly` keeps from scripts and a page that prints it gives back. A
   user's or an organization's id is a name, and the browser holding it
-  reads nothing; a session's is a credential. Next, as ADR-0264.
+  reads nothing; a session's is a credential. Next, as ADR-0264; built
+  there.

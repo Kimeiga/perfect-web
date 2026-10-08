@@ -49,8 +49,14 @@ MUTANTS = [
     (
         "a handle in a record's field is not found",
         CHECK,
-        "    decl.record\n        .iter()\n        .flatten()\n        .map(|(_, t)| t)\n        .chain(decl.representation.iter())\n",
-        "    decl.representation\n        .iter()\n",
+        # Re-anchored by ADR-0264: a type's parts are read in one place,
+        # `declared_parts`, which ADR-0264's walk shares.
+        "    decl.record\n        .iter()\n        .flatten()\n        .map(|(_, t)| t)\n"
+        "        .chain(decl.representation.iter())\n"
+        "        .chain(decl.variants.iter().flatten().flat_map(|(_, ts)| ts.iter()))\n"
+        "        .filter_map(crate::resolved::TypeResolution::resolved)\n        .collect()\n",
+        "    decl.representation\n        .iter()\n"
+        "        .filter_map(crate::resolved::TypeResolution::resolved)\n        .collect()\n",
     ),
     (
         "an organization's handle is not found in a type",

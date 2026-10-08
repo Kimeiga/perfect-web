@@ -41,6 +41,18 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0264, 2026-10-08: a session's handle never reaches the browser** (a
+soundness defect found writing ADR-0263). A session's id is its `HttpOnly`
+cookie's value, which the page's scripts never read, and a page could print
+it: a query answering a record that held the session, printed as
+`{mine.session}`, checked clean. No query's, subscription's or command's
+answer, and nothing markup prints (a hole, an attribute's value, a hole in
+an attribute's string, a view's prop), holds a session's handle now
+(PW5040); a user's or an organization's id is a name, and may. One corpus
+witness typed a session-scoped summary as `Session<SessionId>`; a value's
+scope is where it came from (ADR-0129), and it says so now (`just
+e14-session-to-browser`).
+
 **ADR-0263, 2026-10-07: a session's, a user's or an organization's handle is
 the platform's to make** (a soundness defect W3 found, generalized here). A
 handle reads the data of the one it names, and a program could make one:

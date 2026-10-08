@@ -2185,3 +2185,10 @@ a session's, a user's or an organization's handle is the platform's to make
   nothing the browser supplies holds one (PW5039); `current_user()` and
   `current_organization()` are the host's operations, where their bodies
   made one user and one organization of every reader.
+[ADR-0264](DECISIONS/ADR-0264-a-sessions-handle-never-reaches-the-browser.md):
+a session's handle never reaches the browser (a soundness defect, found
+writing ADR-0263).
+- A session's id is its `HttpOnly` cookie's value, and a page could print
+  it. No query's, subscription's or command's answer, and nothing markup
+  prints, holds one now (PW5040); a user's or an organization's id is a
+  name, and may.

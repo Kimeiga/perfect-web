@@ -5057,3 +5057,19 @@ e14-handles:
        CARGO_INCREMENTAL=0 python3 scripts/handle_mutations.py; \
      } > docs/evidence/E14/handles.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/handles.txt
+
+# ADR-0264: a session's handle never reaches the browser: no query's,
+# subscription's or command's answer, and nothing markup prints, holds one
+# (PW5040). The checker's tests and the mutation controls.
+e14-session-to-browser:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0264 - a session's handle never reaches the browser"; echo; \
+       echo "produced by: just e14-session-to-browser"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/session_to_browser.rs)"; echo; \
+       cargo test --locked -p pw-core --test session_to_browser 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/session_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/session_mutations.py; \
+     } > docs/evidence/E14/session-to-browser.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/session-to-browser.txt

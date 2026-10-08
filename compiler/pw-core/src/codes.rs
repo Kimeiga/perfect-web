@@ -522,6 +522,10 @@ codes! {
         "a data layer answers ids, never a handle: only the platform's operations answer a session's, a user's or an organization's";
     HANDLE_FROM_BROWSER = "PW5039" / handle_from_browser / 1, Privacy,
         "nothing the browser supplies holds a handle: no command's or page's parameter, and no signal, holds a session's, a user's or an organization's";
+    // ADR-0264: a page could print its session's handle, and a session's
+    // id is its cookie's value, which `HttpOnly` keeps from scripts.
+    HANDLE_TO_BROWSER = "PW5040" / handle_to_browser / 1, Privacy,
+        "a session's handle never reaches the browser: no query's, subscription's or command's answer, and nothing markup prints, holds one";
     DEAD_INTERNAL_LINK = "PW5009" / dead_internal_link / 1, Markup,
         "an internal link must name a route the program declares";
     UNSAFE_AUDIT_INCOMPLETE = "PW5010" / unsafe_audit_incomplete / 1, DeclarationRules,
