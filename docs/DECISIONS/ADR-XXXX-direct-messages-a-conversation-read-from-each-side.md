@@ -157,6 +157,21 @@ entries at them in each of their sessions and tells their open pages.
   feed's `known`, ADR-0257), as by `/user/{id}`; a message makes both its
   users known.
 
+- **The database job no longer fits its limit.** With `e14-messages` in
+  `NEEDS_DATABASE`, verify run 37831080654 (at c675180) ran its four
+  database recipes in series on one runner: `e14-identity` passed in 1958
+  s, `e14-messages` in 2695 s (25 of 25 mutants killed, the browser's 9 of
+  9, CI's evidence artifact), and the job's `timeout-minutes: 120`
+  cancelled it in `e14-notifications`, `e14-uploads` unrun; the summary
+  failed with it. Not re-run. verify.yml is the integrator's; reported by
+  message on 2026-10-08.
+- **An intermittent, not this track's**: the first push's verification
+  (run 37826467131, at b393cee) failed its `browser webkit` job (job
+  113480498704) in `e2e/feed.spec.mjs:419`, "Load more shows the next
+  page, and a post after it is shown over it": its rows stayed at 20 after
+  5 s (1 failed, 274 passed). The same flake ADR-0274 reported, the
+  integrator's to chase. Not re-run. `messages.spec.mjs` passed in that job.
+
 ## Alternatives
 
 - **A label naming both principals**: refused by ruling. Every label would
