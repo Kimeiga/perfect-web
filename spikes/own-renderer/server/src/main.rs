@@ -10701,6 +10701,10 @@ public query Store(",
     /// A materialization kept, and served (ADR-0277).
     mod materializations;
 
+    // TRACK SEAM (messages): direct messages, in memory and on PostgreSQL
+    // where a database is named.
+    mod messages;
+
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
     /// to the session's document. Until ADR-0218 the host served the store

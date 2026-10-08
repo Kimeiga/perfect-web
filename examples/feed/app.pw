@@ -159,7 +159,7 @@ type Viewer = Viewer { signed_in: Bool, account: Bool, name: String }
 // The host compares these with what the database it opens provides, and
 // does not serve on a mismatch.
 source FeedData
-    holds        Post, User, Follow, Notification
+    holds        Post, User, Follow, Notification, Message
     transactions serializable
     reads        strong
     changes      none
@@ -542,6 +542,7 @@ session page Home() {
     let me = query Me(current_session())
     let staged = query Attached(current_session()) // Track `uploads`.
     let waiting = query Unread(current_user()) // Track `notifications`.
+    let unread_dms = query UnreadMessages(current_user()) // Track `messages`.
 
     view {
         <title>Home</title>
@@ -551,6 +552,7 @@ session page Home() {
             {#if me.signed_in}
             <p id="me">Signed in as {me.name}</p>
             <p id="unread"><a href="/notifications">Notifications: {waiting} unread</a></p>
+            <p id="dm-unread"><a href="/messages">Messages: {unread_dms} unread</a></p>
             {#if me.account}<form method="post" action="/sign-out"><button type="submit">Sign out</button></form>{/if}
             {:else}
             <p id="signed-out" role="status">Sign in to post, reply or like.</p>
@@ -750,6 +752,7 @@ session page ProfilePage(id: UserId) {
                         Err(_) => pressed = pressed,
                     }}>Follow</button>
             {/match}
+            <p id="message-them"><a href="/messages/{id}">Message</a></p>
             <ul>
                 {#each person.posts as post (post.id)}
                     <li>
@@ -903,3 +906,262 @@ session page NotificationsPage() {
 }
 
 // --- end of track `notifications`. ------------------------------------------
+
+// --- Track `messages` (ADR-XXXX): direct messages. ---------------------------
+
+// **A message's id**: the layer's, never one another message had.
+opaque type MessageId = String
+
+// **A message's text**: something, and at most 10,000 characters, each a
+// code point as `String.length` counts it. Every construction is shown to
+// hold it at build, and the host holds a browser's to it.
+opaque type MessageText = String where String.length(value) >= 1 & String.length(value) <= 10000
+
+// **A draft as a message's text, or none**, as `post_text` is a post's.
+fn message_text(draft: String) -> Option<MessageText> !{} {
+    if String.length(draft) >= 1 & String.length(draft) <= 10000 {
+        Some(MessageText(draft))
+    } else {
+        None
+    }
+}
+
+// **A message, as its reader sees it**: who sent it, what it says, and
+// whether the reader has yet to read it. Never a post, and it notifies no
+// one.
+type Message = Message { id: MessageId, from: User, text: String, unread: Bool }
+
+// **A conversation, read from one side** (track `messages`): the other
+// user, the reader as the feed shows them, the newest messages between them
+// oldest first, whether the reader may not send (`closed`: the other neither
+// follows them nor has messaged them, or is them), and whether the other is
+// the reader. Its reader's alone: the other reads the same rows as their own.
+type Conversation = Conversation {
+    with: User,
+    me: User,
+    messages: List<Message>,
+    closed: Bool,
+    yourself: Bool,
+}
+
+// **A conversation as the reader's list shows it**: the other user, the
+// last message, and how many from them the reader has yet to read.
+type ConversationItem = ConversationItem { with: User, last: String, unread: Int }
+
+// **`from` sent `to` a message.** Both their sessions are told, each through
+// a parameter of its own (ADR-0270): no third user's entry is dropped.
+event Messaged(from: UserId, to: UserId)
+
+// **The reader's conversation with `with`**: the newest `limit` messages
+// either sent the other, by the reader's handle, which the host alone makes.
+// None with one the feed does not know.
+fn conversation(reader: capability.User<UserId>, with: UserId, limit: Int) -> Result<Conversation, FeedError> !{ database.read<Message>, database.read<User>, database.read<Follow> }
+    host "feed:data/messages#conversation"
+
+// **The reader's conversations**, newest first.
+fn conversations(reader: capability.User<UserId>) -> List<ConversationItem> !{ database.read<Message>, database.read<User> }
+    host "feed:data/messages#list"
+
+// **How many messages the reader has yet to read**, in every conversation.
+fn unread_messages(reader: capability.User<UserId>) -> Int !{ database.read<Message> }
+    host "feed:data/messages#unread"
+
+// **A message from the session's user to `to`**, written in the command's
+// transaction, and the conversation read for its sender.
+fn add_message(s: Session<SessionId>, to: UserId, text: MessageText) -> Result<Message, FeedError> !{ database.write<Message> }
+    host "feed:data/messages#send"
+
+// **The reader's conversation with `with`, read**: how many were unread.
+fn read_messages(reader: capability.User<UserId>, with: UserId) -> Result<Int, FeedError> !{ database.write<Message> }
+    host "feed:data/messages#read"
+
+// **The reader's conversation with `with`** (track `messages`): private to
+// the reader, by cache and by session, keyed by the reader's handle and the
+// other's id. A message either sends the other drops it in each of the
+// reader's sessions; and whether the reader may send is read again when the
+// other follows or unfollows them, or messages them.
+private query Conversation(reader: capability.User<UserId>, with: UserId, limit: Int) -> Result<Conversation, FeedError>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader, with, limit
+    invalidates_on Messaged(reader, with), Messaged(with, reader), Followed(with, reader),
+                   Unfollowed(with, reader)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    conversation(reader, with, limit)
+}
+
+// **The reader's conversations**, newest first: a message the reader sends
+// or is sent drops it in each of their sessions.
+private query Conversations(reader: capability.User<UserId>) -> List<ConversationItem>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader
+    invalidates_on Messaged(reader, _), Messaged(_, reader)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    conversations(reader)
+}
+
+// **How many messages the reader has yet to read**, on each page that shows
+// its reader, live.
+private query UnreadMessages(reader: capability.User<UserId>) -> Int
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader
+    invalidates_on Messaged(reader, _), Messaged(_, reader)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    unread_messages(reader)
+}
+
+// **A message to `to`** (track `messages`): only where `to` follows the
+// sender or has messaged them before, and never to oneself: `MayMessage(to)`
+// is the deployment's predicate, evaluated in the command's transaction
+// before the body runs. Shown before the server answers, last in the
+// conversation.
+command send(to: UserId, text: MessageText) -> Result<Message, FeedError>
+    requires      SignedIn, MayMessage(to)
+    idempotent_by InteractionId
+    emits         Messaged(author(current_session()), to)
+    optimistic    Conversation(current_user(), to, _) as talk => sent(talk, text)
+{
+    add_message(current_session(), to, text)
+}
+
+// **The reader's conversation with `with`, read**: the conversation, the
+// list and the count of each of the reader's sessions read again.
+command read_conversation(with: UserId) -> Result<Int, FeedError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    invalidates   Conversation(current_user(), with, _), Conversations(current_user()),
+                  UnreadMessages(current_user())
+{
+    read_messages(current_user(), with)
+}
+
+// **A message shown before the server answers** (ADR-0222): last in the
+// conversation, from the reader, keyed by an id the page made.
+fn sent(talk: Conversation, text: MessageText) -> Conversation !{} {
+    let id = MessageId("pending-{List.length(talk.messages)}")
+    let mine = Message { id: id, from: talk.me, text: text.value, unread: false }
+    Conversation {
+        with: talk.with,
+        me: talk.me,
+        messages: List.concat(talk.messages, [mine]),
+        closed: talk.closed,
+        yourself: talk.yourself,
+    }
+}
+
+// **A message shown before the server answers waits** (ADR-0275): its id is
+// the page's, which no server has, so nothing on it links until the
+// server's row stands in its place. By the timeline's own rule, `waits`.
+fn message_waits(id: MessageId) -> Bool !{} {
+    waits(PostId(id.value))
+}
+
+// **Why the reader may not send**, where they may not.
+fn why_not(talk: Conversation) -> String !{} {
+    if talk.yourself {
+        "You cannot message yourself."
+    } else {
+        "You can message {talk.with.name} once they follow you, or once they have messaged you."
+    }
+}
+
+// **The reader's conversations** (track `messages`): newest first, each
+// with its last message and how many are unread.
+session page MessagesPage() {
+    route     "/messages"
+    placement origin
+    cache     private
+
+    let talks = query Conversations(current_user())
+    let dm_count = query UnreadMessages(current_user())
+
+    view {
+        <title>Messages</title>
+        <main>
+            <h1>Messages</h1>
+            <nav aria-label="Timelines"><a href="/">Everyone</a> <a href="/following">Following</a></nav>
+            <p id="dm-unread-here" role="status">{counted(dm_count, "unread message", "unread messages")}</p>
+            {#if List.length(talks) == 0}<p id="no-conversations">No messages yet: open someone's page, and Message them.</p>{/if}
+            <ul id="conversations">
+                {#each talks as talk (talk.with.id)}
+                    <li class="conversation">
+                        <a class="with" href="/messages/{talk.with.id}">{talk.with.name}</a>
+                        <span class="last">{talk.last}</span>
+                        {#if talk.unread > 0}<span class="dm-new">{talk.unread} unread</span>{/if}
+                    </li>
+                {/each}
+            </ul>
+        </main>
+    }
+}
+
+// **A conversation, from the reader's side** (track `messages`): its
+// messages oldest first, Mark read, and a composer where the reader may
+// send; where they may not, why.
+session page ConversationPage(with: UserId) {
+    route        "/messages/{with}"
+    not_found_on FeedError.NotFound
+    placement    origin
+    cache        private
+
+    signal earlier: Int = 50
+    signal message_draft: String = ""
+    let talk = query Conversation(current_user(), with, earlier)
+    let me = query Me(current_session())
+
+    view {
+        <title>Conversation</title>
+        <main>
+            <h1>{talk.with.name}</h1>
+            <nav aria-label="Messages"><a href="/messages">All messages</a> <a href="/user/{with}">Their page</a></nav>
+            <button id="earlier-messages" type="button" on:press={() => earlier = earlier + 50}>Load earlier</button>
+            {#if List.length(talk.messages) == 0}<p id="no-messages">No messages yet.</p>{/if}
+            <ol id="messages">
+                {#each talk.messages as m (m.id)}
+                    <li class="message">
+                        {#if message_waits(m.id)}
+                            <span class="from">{m.from.name}</span>
+                            <span class="sending">Sending</span>
+                        {:else}
+                            <a class="from" href="/user/{m.from.id}">{m.from.name}</a>
+                        {/if}
+                        <p class="text">{m.text}</p>
+                        {#if m.unread}<span class="dm-new">New</span>{/if}
+                    </li>
+                {/each}
+            </ol>
+            <button id="mark-conversation-read" type="button" on:press={resumable(captures = { with }) => match read_conversation(with) {
+                Ok(_) => earlier = earlier,
+                Err(_) => earlier = earlier,
+            }}>Mark read</button>
+            <form id="composer" hidden={talk.closed} on:submit|prevent={resumable(captures = { with }) => match message_text(message_draft) {
+                Some(text) => match send(with, text) {
+                    Ok(_) => message_draft = "",
+                    Err(_) => message_draft = message_draft,
+                },
+                None => message_draft = message_draft,
+            }}>
+                <label>Your message <textarea bind:value={message_draft}></textarea></label>
+                <button type="submit" disabled={String.length(message_draft) == 0 | String.length(message_draft) > 10000}>Send</button>
+            </form>
+            {#if talk.closed}<p id="may-not-send" role="status">{why_not(talk)}</p>{/if}
+            {#if me.signed_in}{:else}<p id="sign-in-to-send" role="status">Sign in to send messages.</p>{/if}
+        </main>
+    }
+}
+
+// --- end of track `messages`. -----------------------------------------------
