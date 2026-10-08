@@ -267,18 +267,27 @@ pub fn lex(source: &str) -> Vec<Token> {
         // --- numbers ------------------------------------------------------
         if c.is_ascii_digit() {
             let start = i;
-            while i < b.len() && b[i].is_ascii_digit() {
-                i += 1;
-            }
+            // A `_` between two digits groups them, `5_000_000`, and is no
+            // part of the number's value (ADR-0276), as in Python (PEP 515),
+            // JavaScript (ES2021) and Go: one, between two digits, and nowhere
+            // else. Until ADR-0276 `5_000_000` was two tokens, `5` and the
+            // name `_000_000`.
+            let digits = |i: &mut usize| {
+                while *i < b.len()
+                    && (b[*i].is_ascii_digit()
+                        || (b[*i] == b'_' && *i + 1 < b.len() && b[*i + 1].is_ascii_digit()))
+                {
+                    *i += 1;
+                }
+            };
+            digits(&mut i);
             // `30.seconds` is a duration, not a float: only digits after the
             // dot make it a float. This distinction matters because the corpus
             // is full of `30.seconds` and `0.1`.
             let mut kind = Kind::Int;
             if i + 1 < b.len() && b[i] == b'.' && b[i + 1].is_ascii_digit() {
                 i += 1;
-                while i < b.len() && b[i].is_ascii_digit() {
-                    i += 1;
-                }
+                digits(&mut i);
                 kind = Kind::Float;
             }
             out.push(Token {
@@ -453,6 +462,44 @@ mod tests {
             .filter(|k| *k != Kind::Eof)
             .collect();
         assert_eq!(toks, vec![Kind::Float]);
+    }
+
+    /// **A `_` between two digits groups them** (ADR-0276): one token,
+    /// `5_000_000`, where it was `5` and the name `_000_000`, which `pw fmt`
+    /// wrote `5 _000_000`. One `_`, between two digits, and nowhere else.
+    #[test]
+    fn a_digit_separator_stands_between_two_digits() {
+        let tokens = |src: &str| -> Vec<(Kind, String)> {
+            lex(src)
+                .into_iter()
+                .filter(|t| !matches!(t.kind, Kind::Eof | Kind::Whitespace))
+                .map(|t| (t.kind, src[t.span].to_string()))
+                .collect()
+        };
+        let one = |kind: Kind, text: &str| vec![(kind, text.to_string())];
+        assert_eq!(tokens("5_000_000"), one(Kind::Int, "5_000_000"));
+        assert_eq!(tokens("1_000.000_5"), one(Kind::Float, "1_000.000_5"));
+        // A duration's count groups its digits as any count does.
+        assert_eq!(
+            tokens("30_000.millis"),
+            vec![
+                (Kind::Int, "30_000".to_string()),
+                (Kind::Dot, ".".to_string()),
+                (Kind::Ident, "millis".to_string()),
+            ]
+        );
+        // The controls: a `_` at the end, two together, or before the dot,
+        // groups nothing, and the number ends before it, as it did.
+        for (src, number, rest) in [
+            ("5_", "5", "_"),
+            ("5__000", "5", "__000"),
+            ("1_.5", "1", "_"),
+        ] {
+            let found = tokens(src);
+            assert_eq!(found[0], (Kind::Int, number.to_string()), "{src}");
+            assert_eq!(found[1].1, rest, "{src}");
+        }
+        assert!(round_trips("let n = 5_000_000 + 1_0"));
     }
 
     #[test]

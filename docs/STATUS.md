@@ -41,6 +41,20 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0276, 2026-10-08: `pw fmt` changes no program's meaning** (found
+formatting the feed; amends ADR-0013). `pw fmt` wrote the feed's `max_bytes
+5_000_000` as `5 _000_000`, which `pw check` refuses, and `-1` in a clause
+as `- 1`: a clause's value is tokens read as text, which the rules for an
+expression's spaces split, and ADR-0013's gate compared only the tokens. A
+`_` between two digits now groups them, one token, as in Python, JavaScript
+and Go; a policy's value keeps its gaps as written; and `pw fmt` refuses to
+write a program whose tokens, or a value's gaps, it would change, naming the
+first. Two layout defects with it: a lambda's `else` branch a level deeper
+than its `if` branch, and a clause's continued value flush with the
+clauses. The feed, the store, the demo and the generality cases are held to
+`pw fmt --check` now, 342 programs. 9 of 9 mutants killed (`just
+e14-fmt-meaning`).
+
 **ADR-0275, 2026-10-08: a row shown before the server answers waits**
 (found by W3, ADR-0274). A post the page shows before the server answers is
 keyed by an id the page made, `pending-..`, and its Like found no such post.
@@ -51,16 +65,6 @@ links and acts, and a like pressed on it is counted. The program's own,
 before the server answers still links to itself: the thread's replies are a
 view that contains itself, which computes no value yet (ruling 0073-a). 7 of
 7 mutants killed (`just e14-waiting-rows`).
-
-**Found, 2026-10-08: `pw fmt` changes what a clause says.** Run over the
-feed, it wrote `max_bytes 5_000_000` as `max_bytes 5 _000_000`, which `pw
-check` refuses, and `counted_follower(person, -1)` as `- 1`. A clause's value
-is printed token by token, and the upload's byte count is read from the
-clause's text as written; the lexer has no digit separator, so `5_000_000`
-is two tokens, and an expression refuses it as two statements (PW0030).
-ADR-0013's gate compared the tokens before and after, which are the same.
-The feed's and the store's sources are in no `pw fmt --check`. Queued first
-in NEXT.
 
 **ADR-0274, 2026-10-08: notifications** (track `notifications`, W3, on
 ADR-0270). A like, a reply or a follow that involves you writes a

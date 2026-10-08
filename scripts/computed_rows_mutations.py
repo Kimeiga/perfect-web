@@ -109,9 +109,11 @@ MUTANTS = [
         "a like is not shown before the server answers",
         "browser",
         FEED,
+        # Re-anchored by ADR-0276: the feed formatted, its continued value
+        # one level in from its clause.
         "    optimistic    Timeline(current_session(), _) as feed => liked(feed, post),\n"
-        "                  FollowingTimeline(current_session(), _) as feed => liked(feed, post),\n"
-        "                  Thread(post) as thread => liked_thread(thread, post)\n",
+        "        FollowingTimeline(current_session(), _) as feed => liked(feed, post),\n"
+        "        Thread(post) as thread => liked_thread(thread, post)\n",
         "",
     ),
     (

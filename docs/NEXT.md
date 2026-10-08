@@ -540,12 +540,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
             links placeholders and its Like and Delete disabled, until the
             server's row stands in its place; a reply's link waits on ruling
             0073-a, and ids the client makes on their own item);
-          - **`pw fmt` changes what a clause says** (found 2026-10-08,
-            STATUS): it prints a clause's value token by token, and
-            `max_bytes 5_000_000` became `5 _000_000`, refused. Next: a digit
-            separator the lexer reads, a clause's value printed as written,
-            `pw fmt` refusing to write a program that checks differently,
-            and the feed's and the store's sources in `pw fmt --check`;
+          - ~~**`pw fmt` changes what a clause says**~~ (ADR-0276, `just
+            e14-fmt-meaning`: a digit separator the lexer reads, a policy's
+            value printed with its gaps as written, `pw fmt` refusing a
+            change of what a program says, and 342 programs held to `pw fmt
+            --check`). What it leaves: a policy's value parsed as what it
+            is, so it can be spaced as an expression is;
           - ~~**`lexical_mutations.py`'s two label survivors**~~
             (ADR-0242), "a `for` loop's name carries no label" and "a
             lambda's parameters carry no label": each test held a value

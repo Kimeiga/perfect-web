@@ -52,8 +52,9 @@ MUTANTS = [
     (
         "a negative literal loses its sign",
         HIR_LOWER,
-        '                    Some((K::Int, s)) => Literal::Int(format!("{sign}{s}")),',
-        "                    Some((K::Int, s)) => Literal::Int(s),",
+        # Re-anchored by ADR-0276, whose literal's value drops its `_`.
+        '                    Some((K::Int, s)) => Literal::Int(format!("{sign}{}", s.replace(\'_\', ""))),',
+        "                    Some((K::Int, s)) => Literal::Int(s.replace('_', \"\")),",
     ),
     (
         "a name nested in a pattern is not typed",

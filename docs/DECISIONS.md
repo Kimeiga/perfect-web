@@ -2270,3 +2270,10 @@ a row shown before the server answers waits.
   the server's row stands in its place: its author and handle are
   placeholder links, its Like and Delete disabled. The program's own, by
   `waits(id)`; a reply's link waits on ruling 0073-a.
+[ADR-0276](DECISIONS/ADR-0276-pw-fmt-changes-no-programs-meaning.md):
+`pw fmt` changes no program's meaning (amends ADR-0013).
+- A `_` between two digits groups them, `5_000_000`; a policy's value keeps
+  its gaps as written; `pw fmt` refuses to write a program whose tokens, or
+  a value's gaps, it would change; `} else {` and a clause's continued
+  value indent as the tree says; and the feed, the store, the demo and the
+  generality cases are held to `pw fmt --check`.

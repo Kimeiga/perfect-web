@@ -104,11 +104,11 @@ public query Store(id: StoreId) -> Result<Store, StoreError>
 // Every store, the same for everybody: public, and cached `shared`
 // (ADR-0192).
 public query StoreList() -> List<Store>
-    freshness     30.seconds
-    consistency   snapshot
-    cache         shared
-    concurrency   one_per_key
-    timeout       2.seconds
+    freshness   30.seconds
+    consistency snapshot
+    cache       shared
+    concurrency one_per_key
+    timeout     2.seconds
 {
     Stores.list()
 }
@@ -437,9 +437,9 @@ session page StorePage(id: StoreId) {
 // own plan. Until 2026-10-04 a page that bound a query was served only at the
 // store's route.
 session page CartPage() {
-    route        "/cart"
-    placement    origin
-    cache        private
+    route     "/cart"
+    placement origin
+    cache     private
 
     let cart = query Cart(current_session())
     // Its order, once it is placed (ADR-0193).
@@ -529,9 +529,9 @@ session page CartPage() {
 // what it says of itself, linked to its page, and the session's cart beside
 // them. A store list is the first of a delivery site's pages.
 session page HomePage() {
-    route        "/"
-    placement    origin
-    cache        private
+    route     "/"
+    placement origin
+    cache     private
 
     let stores = query StoreList()
     let cart = query Cart(current_session())
@@ -559,9 +559,9 @@ session page HomePage() {
 // being prepared, on its way, delivered. What the store says next reaches the
 // page while it is open, and a screen reader says it.
 session page OrderPage() {
-    route        "/order"
-    placement    origin
-    cache        private
+    route     "/order"
+    placement origin
+    cache     private
 
     let order = query Order(current_session())
 

@@ -548,12 +548,13 @@ awaited in order. What remains:
   computes no value in its template yet (ruling 0073-a). An id the client
   makes and the server accepts, with which nothing would wait, is not
   built.
-- **`pw fmt` changes what a policy clause says** (found 2026-10-08). It
-  prints a clause's value token by token: `max_bytes 5_000_000`, read from
-  the clause's text, becomes `5 _000_000`, which `pw check` refuses, and
-  `-1` in a clause becomes `- 1`. The lexer has no digit separator: in an
-  expression `5_000_000` is two statements (PW0030). The feed's and the
-  store's sources are in no `pw fmt --check`, so nothing ran it over them.
+- **`pw fmt` keeps a policy's value as written** (ADR-0276). A clause's
+  value is tokens, which the grammar gives no expression's nodes, so the
+  formatter keeps their gaps as written, one space where there was any, and
+  spaces no value as it spaces an expression. It is a canonical spacing,
+  not a layout (ADR-0013): it breaks and joins no line. A `_` out of place in
+  a number, `5_` or `5__000`, has no message of its own. `examples/history`
+  is held to no format.
 - **Notifications tell a superset, and are the feed's own** (ADR-0270,
   ADR-0274). An event naming a user reads again every open page of the
   query, not only that user's; another user's page derives from its own

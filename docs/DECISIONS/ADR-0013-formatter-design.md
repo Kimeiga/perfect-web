@@ -142,3 +142,16 @@ Two defects that produced output which parsed, was idempotent, and was wrong:
   keeps a policy keyword as a bare token, so every column came out as one space.
   The output still parsed and was still idempotent — the check that caught it
   was comparing against the corpus, not any property of the formatter.
+
+---
+
+## Amendment, 2026-10-08 — semantics-preserving, checked (ADR-0276)
+
+The gate's "all corpus files round-trip" compared the significant tokens
+before and after, and so passed `max_bytes 5 _000_000` for the feed's
+`max_bytes 5_000_000`, which `pw check` refuses: the lexer read both as `5`
+and `_000_000`, and a policy's value is read as text. ADR-0276 rules a digit
+separator the lexer reads, a policy's value kept with its gaps as written,
+and `pw fmt` refusing to write a program whose tokens, or a value's gaps, it
+would change. The gate now reads every program `just ci` holds to `pw fmt
+--check`, the reference apps among them.

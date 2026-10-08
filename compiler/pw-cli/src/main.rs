@@ -476,13 +476,27 @@ fn fmt_command(paths: &[&String], check_only: bool) -> ExitCode {
         let parsed = pw_syntax::parse_tree(&src);
         if !check_only && !parsed.ok() {
             eprintln!(
-                "pw fmt: refusing to rewrite {path}: it does not parse cleanly,                  and formatting it would canonicalise a program whose meaning                  this compiler has not established. Run `pw check {path}` first."
+                "pw fmt: refusing to rewrite {path}: it does not parse cleanly, \
+                 and formatting it would canonicalise a program whose meaning \
+                 this compiler has not established. Run `pw check {path}` first."
             );
             refused.push((*path).clone());
             continue;
         }
         let out = pw_syntax::format_source(&src);
         if out == src {
+            continue;
+        }
+        // **Never write a program that says something else** (ADR-0276):
+        // the same tokens, and a policy's value its gaps as written. A
+        // formatter's bug is refused here, by name, before it reaches a
+        // file; `--check` reports it the same way.
+        if let Err(why) = pw_syntax::meaning_kept(&src, &out) {
+            eprintln!(
+                "pw fmt: refusing to rewrite {path}: formatting it would change what \
+                 it says, at {why}. This is a bug in `pw fmt`; the file is left as written."
+            );
+            refused.push((*path).clone());
             continue;
         }
         changed.push((*path).clone());
@@ -494,7 +508,7 @@ fn fmt_command(paths: &[&String], check_only: bool) -> ExitCode {
 
     if !refused.is_empty() {
         println!(
-            "pw fmt: refused {} file(s) that do not parse cleanly",
+            "pw fmt: refused {} file(s) that do not parse cleanly, or that formatting would change",
             refused.len()
         );
         return ExitCode::FAILURE;

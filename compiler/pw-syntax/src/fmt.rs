@@ -33,6 +33,7 @@ pub const INDENT: &str = "    ";
 pub fn format_tree(root: &SyntaxNode) -> String {
     let mut f = Fmt {
         src: root.text().to_string(),
+        tree: root.clone(),
         out: String::new(),
         indent: 0,
         at_line_start: true,
@@ -59,6 +60,9 @@ pub fn format_source(src: &str) -> String {
 struct Fmt {
     /// The original text, used only to ask whether two offsets share a line.
     src: String,
+    /// The tree it was parsed to, to ask which construct a line's first
+    /// closer ends (ADR-0276).
+    tree: SyntaxNode,
     out: String,
     /// Indentation for the line currently being written, decided when the
     /// line's first token is seen.
@@ -191,6 +195,15 @@ impl Fmt {
         if prev == ' ' {
             return false;
         }
+        // **A policy's value keeps its gaps as written** (ADR-0276). Its
+        // tokens are no expression's, and what reads a value reads its text:
+        // `max_bytes 5_000_000` is a count read as written, and `pw fmt`
+        // wrote it `5 _000_000`, which no reader takes. So two tokens written
+        // together stay together, and two written apart stay apart, one space
+        // between them.
+        if let Some(apart) = written_apart_in_a_policy_value(t) {
+            return apart;
+        }
         // Never a space directly inside a bracket, or before a separator.
         if matches!(prev, '(' | '[') {
             return false;
@@ -320,7 +333,7 @@ impl Fmt {
             if open >= start || !self.src[open..start].contains('\n') {
                 continue;
             }
-            let line = self.src[..open].matches('\n').count();
+            let line = self.line_of(open);
             // The token that closes a construct belongs to the outer level:
             // `}` lines up with the line that opened the block, not with its
             // contents. So do the brackets opened on that line with it: the
@@ -335,7 +348,12 @@ impl Fmt {
             }
             counted_lines.push(line);
             n += 1;
-            scope_since_last_decl = !is_decl_here;
+            // A policy's value continues a clause of the declaration's
+            // header, which the declaration indents already: its own level
+            // comes on top of the declaration's, where a field list's takes
+            // the place of its type's. Until ADR-0276 a value's next line came
+            // back flush with the clauses, as a clause of its own would.
+            scope_since_last_decl = !is_decl_here && a.kind() != K::Policy;
         }
 
         // A line that opens with an operator continues the line above it —
@@ -345,6 +363,33 @@ impl Fmt {
             n += 1;
         }
         n
+    }
+
+    /// **The line a construct opening at `open` indents from** (ADR-0276):
+    /// its own, or, where that line begins by closing a construct an earlier
+    /// line opened, that line's. `} else {` closes the block `if` opened, and
+    /// what the `else` opens sits where the `if`'s block did: counted apart,
+    /// an `if` in a call's argument put the `else` branch a level deeper than
+    /// the `if` branch.
+    fn line_of(&self, open: usize) -> usize {
+        let line = self.src[..open].matches('\n').count();
+        let start = self.src[..open].rfind('\n').map_or(0, |n| n + 1);
+        let first = self.src[start..open].trim_start();
+        if !first.starts_with(['}', ')', ']']) {
+            return line;
+        }
+        let at = start + (self.src[start..open].len() - first.len());
+        // The construct the closer ends, from the closer's own token.
+        let closer = self
+            .tree
+            .token_at_offset(rowan::TextSize::from(at as u32))
+            .right_biased();
+        match closer.and_then(|c| c.parent()) {
+            Some(closed) if usize::from(closed.text_range().start()) < start => {
+                self.line_of(usize::from(closed.text_range().start()))
+            }
+            _ => line,
+        }
     }
 
     fn trim_trailing_spaces(&mut self) {
@@ -361,6 +406,91 @@ impl Fmt {
 /// Does this policy own a block? `acquire { .. }`, `draw(ctx) { .. }`.
 fn has_block(policy: &SyntaxNode) -> bool {
     policy.children().any(|c| c.kind() == K::BlockExpr)
+}
+
+/// **Whether `t`, in a policy's value, was written apart from the token
+/// before it** (ADR-0276): `None` where `t` is in no policy, or in a policy
+/// that owns a block, whose body is formatted as any body is. A policy's name
+/// begins its line, where no space is asked of it.
+fn written_apart_in_a_policy_value(t: &SyntaxToken) -> Option<bool> {
+    policy_of(t)?;
+    Some(t.prev_token()?.kind().is_trivia())
+}
+
+/// The policy whose value holds `t`, where it owns no block.
+fn policy_of(t: &SyntaxToken) -> Option<SyntaxNode> {
+    t.parent_ancestors()
+        .find(|a| a.kind() == K::Policy)
+        .filter(|p| !has_block(p))
+}
+
+/// **Whether formatting `before` as `after` kept what it says** (ADR-0013's
+/// "semantics-preserving", as ADR-0276 checks it): the same significant
+/// tokens, in the same order, and in each policy's value the same gaps, since
+/// what reads a value reads its text. `Err` names the first difference.
+///
+/// Comparing the tokens alone, as ADR-0013's gate did, passed `max_bytes
+/// 5 _000_000` for `max_bytes 5_000_000`: the lexer read both as `5` and
+/// `_000_000` then.
+pub fn meaning_kept(before: &str, after: &str) -> Result<(), String> {
+    // Each source's significant tokens as its tree holds them, which reads
+    // markup as markup where the lexer alone reads it as code.
+    let tokens = |src: &str| -> Vec<SyntaxToken> {
+        crate::grammar::parse_tree(src)
+            .green
+            .descendants_with_tokens()
+            .filter_map(|e| e.into_token())
+            .filter(|t| !t.kind().is_trivia() && t.kind() != K::Eof)
+            .collect()
+    };
+    let (was, is) = (tokens(before), tokens(after));
+    let line = |t: &SyntaxToken| {
+        before[..usize::from(t.text_range().start())]
+            .matches('\n')
+            .count()
+            + 1
+    };
+    for (w, n) in was.iter().zip(&is) {
+        if w.kind() != n.kind() || w.text() != n.text() {
+            return Err(format!(
+                "line {}: `{}` would be `{}`",
+                line(w),
+                w.text(),
+                n.text()
+            ));
+        }
+    }
+    if was.len() != is.len() {
+        return Err(format!("{} tokens would be {}", was.len(), is.len()));
+    }
+    // Each gap between two tokens of one policy's value, as written: the
+    // i-th token is the i-th in both, as the loop above holds.
+    let apart = |toks: &[SyntaxToken], i: usize| {
+        toks[i].text_range().end() != toks[i + 1].text_range().start()
+    };
+    for i in 0..was.len().saturating_sub(1) {
+        let (Some(a), Some(b)) = (policy_of(&was[i]), policy_of(&was[i + 1])) else {
+            continue;
+        };
+        if a != b || apart(&was, i) == apart(&is, i) {
+            continue;
+        }
+        let name = first_significant(&a)
+            .map(|f| f.text().to_string())
+            .unwrap_or_default();
+        let shown = |src: &str, toks: &[SyntaxToken]| {
+            src[usize::from(toks[i].text_range().start())
+                ..usize::from(toks[i + 1].text_range().end())]
+                .to_string()
+        };
+        return Err(format!(
+            "line {}: `{name}`'s value `{}` would be `{}`",
+            line(&was[i]),
+            shown(before, &was),
+            shown(after, &is)
+        ));
+    }
+    Ok(())
 }
 
 fn policy_column(list: &SyntaxNode) -> usize {
@@ -676,6 +806,78 @@ mod tests {
         // would pass while the formatter had been broken for ordinary code.
         let out = format_source("module p\n\nfn f(a: Int) -> Bool !{} {\n    a<1\n}\n");
         assert!(out.contains("a < 1"), "a comparison is an operator:\n{out}");
+    }
+
+    /// **A policy's value keeps its gaps as written** (ADR-0276). `pw fmt`
+    /// wrote the feed's `max_bytes 5_000_000` as `5 _000_000`, which no reader
+    /// takes, and `counted_follower(person, -1)` as `- 1`: a value's tokens
+    /// are no expression's, and the rules for an expression's spaces split
+    /// them.
+    #[test]
+    fn a_policys_value_keeps_its_gaps_as_written() {
+        let src = "upload U\n    route \"/u\"\n    max_bytes   5_000_000\n\n\
+                   command c(x: Int) -> Int\n    emits E(x)\n    \
+                   optimistic Q(x)  as q => f(q, -1),\n        R(x) as r => g(r,1)\n{\n    x\n}\n";
+        let out = format_source(src);
+        assert!(out.contains("    max_bytes 5_000_000\n"), "{out}");
+        assert!(out.contains("as q => f(q, -1),\n"), "{out}");
+        // Written apart, one space; written together, together: `g(r,1)` is
+        // a value's as written, where a body's call is spaced.
+        assert!(out.contains("optimistic Q(x) as q"), "{out}");
+        assert!(out.contains("R(x) as r => g(r,1)\n"), "{out}");
+        assert_eq!(meaning_kept(src, &out), Ok(()));
+        // The controls: a body's expression is spaced as ever, and so is the
+        // body of a policy that owns a block.
+        let body = format_source("fn f(x: Int) -> Int !{} {\n    g(x,1)+-2\n}\n");
+        assert!(body.contains("g(x, 1) + -2"), "{body}");
+        let block = format_source(
+            "resource R(id: Int) -> Int\n{\n    affine\n    acquire {\n        g(id,1)\n    }\n}\n",
+        );
+        assert!(block.contains("        g(id, 1)\n"), "{block}");
+    }
+
+    /// **`pw fmt` refuses what would change what a program says** (ADR-0276):
+    /// a token changed, or a gap in a policy's value.
+    #[test]
+    fn a_change_of_what_a_program_says_is_named() {
+        let src = "command c(x: Int) -> Int\n    optimistic Q(x) as q => f(q, -1)\n{\n    x\n}\n";
+        let spaced = src.replace("-1", "- 1");
+        assert_eq!(
+            meaning_kept(src, &spaced),
+            Err("line 2: `optimistic`'s value `-1` would be `- 1`".to_string())
+        );
+        assert_eq!(
+            meaning_kept(src, &src.replace("-1", "-2")),
+            Err("line 2: `1` would be `2`".to_string())
+        );
+        // The controls: a body's spaces, and a value's run of them, are no
+        // change of what it says.
+        let body = "fn f(x: Int) -> Int !{} {\n    g(x,1)\n}\n";
+        assert_eq!(meaning_kept(body, &body.replace("x,1", "x, 1")), Ok(()));
+        assert_eq!(meaning_kept(src, &src.replace("as q", "as   q")), Ok(()));
+    }
+
+    /// **`} else {` sits where its `if` does** (ADR-0276): an `if` in a
+    /// call's argument put the `else` branch a level deeper than the `if`
+    /// branch, and its closing line a level deeper than the `} else {`.
+    #[test]
+    fn an_else_branch_lines_up_with_its_if_branch() {
+        let src = "fn f(items: List<Int>) -> List<Int> !{} {\n    List.map(items, (i) => if i == 1 {\n        2\n    } else {\n        i\n    })\n}\n";
+        assert_eq!(format_source(src), src);
+    }
+
+    /// **A policy's value on a second line sits under its clause**
+    /// (ADR-0276): one level in from the clauses, which a declaration indents
+    /// already. It came back flush with the clauses, as a clause of its own.
+    #[test]
+    fn a_policys_value_continues_one_level_in() {
+        let src = "query Q(id: Int) -> Int\n    cache          shared\n    invalidates_on A(id), B(id),\n                   C(id)\n{\n    id\n}\n";
+        let out = format_source(src);
+        assert!(
+            out.contains("    invalidates_on A(id), B(id),\n        C(id)\n"),
+            "{out}"
+        );
+        assert_eq!(format_source(&out), out);
     }
 
     #[test]

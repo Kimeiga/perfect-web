@@ -240,13 +240,13 @@ fn viewer(s: Session<SessionId>) -> Viewer !{ session.read }
 // **The session's reader** (track `identity`): private to it. Signing in or
 // out gives the browser a new session, so its pages ask again.
 session query Me(session: Session<SessionId>) -> Viewer
-    freshness      0.seconds
-    consistency    read_your_writes
-    cache          private
-    key            session
-    concurrency    one_per_key
-    on_key_change  cancel
-    timeout        2.seconds
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    key           session
+    concurrency   one_per_key
+    on_key_change cancel
+    timeout       2.seconds
 {
     viewer(session)
 }
@@ -289,7 +289,7 @@ public query Profile(id: UserId) -> Result<Profile, FeedError>
     cache          shared
     key            id
     invalidates_on Followed(_, id), Unfollowed(_, id), Followed(id, _),
-                   Unfollowed(id, _), Posted(id), Liked(_), Deleted(_)
+        Unfollowed(id, _), Posted(id), Liked(_), Deleted(_)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
@@ -299,13 +299,13 @@ public query Profile(id: UserId) -> Result<Profile, FeedError>
 
 // **What the reader is to a user** (ADR-0257): the reader's own.
 session query Relation(session: Session<SessionId>, user: UserId) -> Relation
-    freshness      0.seconds
-    consistency    read_your_writes
-    cache          private
-    key            session, user
-    concurrency    one_per_key
-    on_key_change  cancel
-    timeout        2.seconds
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    key           session, user
+    concurrency   one_per_key
+    on_key_change cancel
+    timeout       2.seconds
 {
     relation(session, user)
 }
@@ -313,13 +313,13 @@ session query Relation(session: Session<SessionId>, user: UserId) -> Relation
 // **The image the session attached** (track `uploads`): the reader's own,
 // read again whenever its page is, since a form posts it.
 session query Attached(session: Session<SessionId>) -> List<Attached>
-    freshness      0.seconds
-    consistency    read_your_writes
-    cache          private
-    key            session
-    concurrency    one_per_key
-    on_key_change  cancel
-    timeout        2.seconds
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    key           session
+    concurrency   one_per_key
+    on_key_change cancel
+    timeout       2.seconds
 {
     attached(session)
 }
@@ -432,8 +432,8 @@ command like(post: PostId) -> Result<Post, FeedError>
     idempotent_by InteractionId
     emits         Liked(post), Notified(owner(post))
     optimistic    Timeline(current_session(), _) as feed => liked(feed, post),
-                  FollowingTimeline(current_session(), _) as feed => liked(feed, post),
-                  Thread(post) as thread => liked_thread(thread, post)
+        FollowingTimeline(current_session(), _) as feed => liked(feed, post),
+        Thread(post) as thread => liked_thread(thread, post)
 {
     add_like(current_session(), post)
 }
@@ -447,7 +447,7 @@ command follow(user: UserId) -> Result<UserId, FeedError>
     emits         Followed(author(current_session()), user)
     invalidates   FollowingTimeline(current_session(), _), Relation(current_session(), user)
     optimistic    Relation(current_session(), user) as now => followed(now),
-                  Profile(user) as person => counted_follower(person, 1)
+        Profile(user) as person => counted_follower(person, 1)
 {
     add_follow(current_session(), user)
 }
@@ -459,7 +459,7 @@ command unfollow(user: UserId) -> Result<UserId, FeedError>
     emits         Unfollowed(author(current_session()), user)
     invalidates   FollowingTimeline(current_session(), _), Relation(current_session(), user)
     optimistic    Relation(current_session(), user) as now => unfollowed(now),
-                  Profile(user) as person => counted_follower(person, -1)
+        Profile(user) as person => counted_follower(person, -1)
 {
     remove_follow(current_session(), user)
 }

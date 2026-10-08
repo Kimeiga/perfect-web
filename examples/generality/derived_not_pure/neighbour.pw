@@ -15,9 +15,9 @@ fn shout(s: String) -> String !{} {
 }
 
 page Clock() !{ clock.wall } {
-    route "/clock"
+    route     "/clock"
     placement origin
-    cache private
+    cache     private
 
     signal pressed: Int = 0
     let now = clock.now_wall()

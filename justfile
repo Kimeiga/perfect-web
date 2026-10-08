@@ -109,7 +109,9 @@ test-unit:
 # `pw check examples/rejected/*.pw` deliberately exits 1 — that is the point —
 # so it is asserted in tests rather than run bare here.
 test-compile:
-    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw packages/*/*.pw
+    # ADR-0276: the reference apps, the demo and the generality cases too;
+    # `examples/history` keeps the sources as they were.
+    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw
     cargo run --quiet -p corpus-check -- examples
     # The accepted corpus as the ONE program it is: the shared library plus
     # every accepted file. Feeding it the rejected files too would ask the
@@ -5241,3 +5243,23 @@ e14-materialization-bodies:
        CARGO_INCREMENTAL=0 python3 scripts/materialization_body_mutations.py; \
      } > docs/evidence/E14/materialization-bodies.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/materialization-bodies.txt
+
+# ADR-0276: `pw fmt` changes no program's meaning. The lexer's, the
+# formatter's and the backend's tests, every program held to `pw fmt
+# --check`, and the mutation controls.
+e14-fmt-meaning:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0276 - pw fmt changes no program's meaning"; echo; \
+       echo "produced by: just e14-fmt-meaning"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the lexer and the formatter (compiler/pw-syntax)"; echo; \
+       cargo test --locked -p pw-syntax 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== a number's grouped digits (compiler/pw-core/tests/backend_lowering.rs)"; echo; \
+       cargo test --locked -p pw-core --test backend_lowering 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== every program held to pw fmt --check"; echo; \
+       cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw 2>&1; \
+       echo; echo "== mutation controls (scripts/fmt_meaning_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/fmt_meaning_mutations.py; \
+     } > docs/evidence/E14/fmt-meaning.txt
+    @grep -E "^test result|already formatted|need formatting|mutants killed|^---- |panicked at" docs/evidence/E14/fmt-meaning.txt

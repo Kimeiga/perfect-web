@@ -245,6 +245,44 @@ fn the_real_add_to_cart_lowers_to_its_import_calls() {
 /// requires"*. It has no `host` binding, so it is compiled Pleris however
 /// effectful it is — and the capability it needs is a separate fact that has
 /// not moved.
+/// **A number's digits grouped by `_` are the number** (ADR-0276):
+/// `5_000_000` is one literal, lowered to 5000000. Until ADR-0276 it was `5`
+/// and the name `_000_000`, two statements on one line (PW0030), and the
+/// backend reads a literal's digits as an `s64`, which a `_` would refuse.
+#[test]
+fn a_numbers_grouped_digits_are_the_number() {
+    let constants = |src: &str| -> Vec<i64> {
+        let built = Built::synthetic(src);
+        let (p, refusals) = lowered(&built);
+        let f = p
+            .functions
+            .iter()
+            .find(|f| f.export == "Size")
+            .unwrap_or_else(|| {
+                panic!(
+                    "{:?}",
+                    refusals.iter().map(|r| r.to_string()).collect::<Vec<_>>()
+                )
+            });
+        f.blocks
+            .iter()
+            .flat_map(|b| &b.instrs)
+            .filter_map(|i| match i {
+                Instr::Const {
+                    value: pw_core::backend::ir::Const::Int(n),
+                    ..
+                } => Some(*n),
+                _ => None,
+            })
+            .collect()
+    };
+    let grouped =
+        "module m\n\ncommand Size() -> Int\n    requires SignedIn\n{\n    5_000_000 + 1_0\n}\n";
+    assert_eq!(constants(grouped), [5_000_000, 10]);
+    // The control: the same digits written whole lower to the same numbers.
+    assert_eq!(constants(&grouped.replace('_', "")), [5_000_000, 10]);
+}
+
 #[test]
 fn an_effectful_function_without_a_host_binding_is_an_ordinary_call() {
     let src = "\

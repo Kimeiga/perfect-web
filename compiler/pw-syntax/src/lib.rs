@@ -34,7 +34,7 @@ pub mod lexer;
 pub mod strings;
 pub mod tree;
 
-pub use fmt::{format_source, format_tree};
+pub use fmt::{format_source, format_tree, meaning_kept};
 pub use grammar::{
     DECL_STARTERS, POLICY_KEYWORDS, Parse, PatternKind, RESOURCE_NOUNS, SyntaxError, UI_NOUNS,
     heads_a_clause, parse_each_head, parse_expr, parse_expr_list, parse_transition_clause,

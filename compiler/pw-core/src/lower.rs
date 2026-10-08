@@ -962,9 +962,11 @@ impl Lowerer<'_> {
 
             K::LiteralExpr => {
                 let t = own_tokens(node);
+                // A number's value is its digits: a `_` between two of them
+                // groups them, and is no part of it (ADR-0276).
                 let lit = match t.first().map(|t| (t.kind(), t.text().to_string())) {
-                    Some((K::Int, s)) => Literal::Int(s),
-                    Some((K::Float, s)) => Literal::Float(s),
+                    Some((K::Int, s)) => Literal::Int(s.replace('_', "")),
+                    Some((K::Float, s)) => Literal::Float(s.replace('_', "")),
                     Some((K::Str, s)) => {
                         // A string with `{..}` holes is not a literal: the holes
                         // are expressions, and a checker that has to search the
@@ -1810,8 +1812,8 @@ impl Lowerer<'_> {
                     _ => ("", t.as_slice()),
                 };
                 let lit = match t.first().map(|t| (t.kind(), t.text().to_string())) {
-                    Some((K::Int, s)) => Literal::Int(format!("{sign}{s}")),
-                    Some((K::Float, s)) => Literal::Float(format!("{sign}{s}")),
+                    Some((K::Int, s)) => Literal::Int(format!("{sign}{}", s.replace('_', ""))),
+                    Some((K::Float, s)) => Literal::Float(format!("{sign}{}", s.replace('_', ""))),
                     Some((K::Str, s)) if sign.is_empty() => Literal::Str(s),
                     _ => return b.pat(Pattern::Error, span),
                 };

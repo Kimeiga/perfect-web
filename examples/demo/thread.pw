@@ -27,11 +27,11 @@ type Comment = Comment { id: Int, author: String, text: String, replies: List<Co
 
 // The discussion, the same for everybody.
 public query Discussion() -> Comment
-    freshness     30.seconds
-    consistency   snapshot
-    cache         shared
-    concurrency   one_per_key
-    timeout       2.seconds
+    freshness   30.seconds
+    consistency snapshot
+    cache       shared
+    concurrency one_per_key
+    timeout     2.seconds
 {
     Comment {
         id: 1,

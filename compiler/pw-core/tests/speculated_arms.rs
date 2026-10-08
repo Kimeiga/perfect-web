@@ -179,8 +179,10 @@ fn arms_are_separated_by_commas() {
     // (ADR-0237). It is the one error now, and the arm is read.
     let program = feed(&|s| {
         s.replace(
-            "liked(feed, post),\n                  Thread(post)",
-            "liked(feed, post)\n                  Thread(post)",
+            // The feed formatted (ADR-0276): the clause's continued value one
+            // level in.
+            "liked(feed, post),\n        Thread(post)",
+            "liked(feed, post)\n        Thread(post)",
         )
     });
     assert_eq!(

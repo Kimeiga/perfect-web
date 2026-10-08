@@ -92,11 +92,13 @@ MUTANTS = [
         "the feed's like on the thread page is not speculated",
         "browser",
         FEED,
+        # Re-anchored by ADR-0276: the feed formatted, its continued value
+        # one level in from its clause.
         "    optimistic    Timeline(current_session(), _) as feed => liked(feed, post),\n"
-        "                  FollowingTimeline(current_session(), _) as feed => liked(feed, post),\n"
-        "                  Thread(post) as thread => liked_thread(thread, post)\n",
+        "        FollowingTimeline(current_session(), _) as feed => liked(feed, post),\n"
+        "        Thread(post) as thread => liked_thread(thread, post)\n",
         "    optimistic    Timeline(current_session(), _) as feed => liked(feed, post),\n"
-        "                  FollowingTimeline(current_session(), _) as feed => liked(feed, post)\n",
+        "        FollowingTimeline(current_session(), _) as feed => liked(feed, post)\n",
     ),
 ]
 

@@ -11127,7 +11127,7 @@ public query Store(",
                 "",
             )
             .replace(
-                "liked(feed, post),\n                  Thread(post) as thread => liked_thread(thread, post)\n",
+                "liked(feed, post),\n        Thread(post) as thread => liked_thread(thread, post)\n",
                 "liked(feed, post)\n",
             )
         });
