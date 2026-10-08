@@ -93,7 +93,7 @@ half of ADR-0195's ruling 10. Date: 2026-10-07. Milestone: E14.
   does. What one materialization reads of another is checked, and its
   invalidation propagates; what it builds from it does not exist yet.
   "Materializations made real" is queued in NEXT, and the follows timeline
-  (ADR-0256) is built on queries meanwhile.
+  (ADR-0257) is built on queries meanwhile.
 - **Regeneration order.** A chain's entries are invalidated together. Which
   is rebuilt first, so the reader is rebuilt from the fresh entry and not
   the stale one, waits for materializations made real.
