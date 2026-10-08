@@ -477,10 +477,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
              reading again only that user's open pages; `identified_by`
              gone, the feed's reads by session moved to `current_user()`;
              and a stream's `current_user()`;
-          6. direct messages (after the timeline): data private to exactly
-             two users. The privacy
-             labels with two principals, and a cache that never shows one
-             conversation to a third user;
+          6. **direct messages, track `messages`, W4** (docs/PARALLEL.md,
+             under the integrator's rulings there): a conversation private
+             to its two users, read from each side by a private query keyed
+             by the reader's handle and the other's id; a list with unread
+             counts; sending shown before the server answers; live to both;
+             to someone who follows you or has messaged you, by X's rule;
+             and a third user held to seeing none of it by page, by
+             `/pw-read`, by cache and by stream;
           7. ~~**track `uploads`, W2**~~ (ADR-0260, `just e14-uploads`: an
              image on a post, a typed upload served safely). What it leaves,
              in order: ~~a deleted post's image no longer served, and its

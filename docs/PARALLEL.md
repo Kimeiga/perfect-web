@@ -22,20 +22,22 @@ charter+ADR reading (`AGENTS.md`); small merges; full gate tests").
 | accounts and sign-in: a `requires` evaluator, sign-up, sign-in and sign-out, per-user sessions, an OIDC-style deployment interface with a local provider that is plainly not production | `track/identity` | W1, a local session; merged 2026-10-07 (ADR-0258) |
 | image uploads on a post: a typed upload with size and content-type limits, a deployment's blob-storage capability, served safely | `track/uploads` | W2, a local agent of the session that runs W1; merged 2026-10-07 (ADR-0260) |
 | notifications: private, per-user live data from others' actions (a like, a reply or a follow involving you), an unread count and mark-read, on a typed principal | `track/notifications` | W3, a local agent of the session that runs W1 and W2; merged 2026-10-08 (ADR-0270, ADR-0274) |
+| direct messages: a conversation private to its two users, a list of them with unread counts, a conversation page that sends, live to both, to someone who follows you or has messaged you | `track/messages` | W4, a local agent of the session that runs W1 to W3 |
 
 The follows timeline landed on 2026-10-07 (ADR-0257), and notifications
-on 2026-10-08 (ADR-0270, ADR-0274); direct messages come next.
+on 2026-10-08 (ADR-0270, ADR-0274); direct messages are W4's, under the
+rulings below.
 
 ## What each track owns
 
-| | identity | uploads | notifications |
-|---|---|---|---|
-| recipes | `just/identity.just` | `just/uploads.just` | `just/notifications.just` |
-| diagnostic codes | `PW55xx`, `Owner::Identity` | `PW56xx`, `Owner::Uploads` | `PW57xx`, `Owner::Notifications` |
-| the development server | `spikes/own-renderer/server/src/identity.rs` | `spikes/own-renderer/server/src/uploads.rs` | `spikes/own-renderer/server/src/notifications.rs` |
-| new files | anything new under a directory or name the track's own: `identity`, `accounts`, `sign_in` | `uploads`, `blob` | `notifications`, `principal` |
-| browser hosts | `PORT+70..72`, `IDENTITY_PORTS` | `PORT+80..82`, `UPLOADS_PORTS` | `PORT+90..92`, `NOTIFICATIONS_PORTS` |
-| PostgreSQL migrations | `0003` | `0005` | `0006` |
+| | identity | uploads | notifications | messages |
+|---|---|---|---|---|
+| recipes | `just/identity.just` | `just/uploads.just` | `just/notifications.just` | `just/messages.just` |
+| diagnostic codes | `PW55xx`, `Owner::Identity` | `PW56xx`, `Owner::Uploads` | `PW57xx`, `Owner::Notifications` | `PW58xx`, `Owner::Messages` |
+| the development server | `spikes/own-renderer/server/src/identity.rs` | `spikes/own-renderer/server/src/uploads.rs` | `spikes/own-renderer/server/src/notifications.rs` | `spikes/own-renderer/server/src/messages.rs` |
+| new files | anything new under a directory or name the track's own: `identity`, `accounts`, `sign_in` | `uploads`, `blob` | `notifications`, `principal` | `messages`, `conversation` |
+| browser hosts | `PORT+70..72`, `IDENTITY_PORTS` | `PORT+80..82`, `UPLOADS_PORTS` | `PORT+90..92`, `NOTIFICATIONS_PORTS` | `PORT+100..102`, `MESSAGES_PORTS` |
+| PostgreSQL migrations | `0003` | `0005` | `0006` | `0007` |
 
 - **Recipes**: the root `justfile` imports each track's file, whose recipes
   run in the repository's root under the root's settings and `PATH`. An
@@ -65,6 +67,9 @@ on 2026-10-08 (ADR-0270, ADR-0274); direct messages come next.
   - `pw:host/principal#read` (W3), answered beside `pw:host/session#read`
     where a query's and a command's host operations are built, from the
     identity's principals.
+  - `Identity::holds` (W4): the predicate `MayMessage(to)`, beside
+    `OwnsPost(post)` and evaluated as it is, at lines marked `TRACK SEAM
+    (messages)`.
 - **Shared files** (the compiler, the runtime, the platform packages, the
   examples): a track may change them where its work needs, in small,
   separate commits whose messages say why, and says so to the integrator
@@ -211,3 +216,88 @@ Each a decision for a track, with its date; a track's ADR records it too.
   session moved to `current_user()`), and a stream's `current_user()`. Its
   finding, a speculated row's Like acting on an id no server has, is the
   feed's to fix (NEXT), as ruled.
+- **2026-10-08, direct messages (W4).** A conversation is two users'
+  private data. Nothing in the language holds a value private to two yet,
+  and nothing needs to: each reads it as their own.
+  - **A conversation is read from one side.** Each participant reads it
+    through a private query keyed by their own handle and the other's id:
+    `Conversation(reader: User<UserId>, with: UserId, ..)`, `cache
+    private`, `key reader, with`. The same rows are read twice, each read
+    private to its reader, as a notification is its user's (ADR-0274). A
+    label naming two principals, a value either may read, would need a
+    reader set in every label and a check at every flow; no read here is
+    on two users' behalf, and the host binds the one it is on. A program
+    makes no handle (ADR-0263), so a session reads only its own side.
+  - **A list and a count on the same footing**: `Conversations(reader)`,
+    newest first, each with the other user, the last message and its
+    unread count; `UnreadMessages(reader)`, "Messages: N unread", on each
+    page that shows its reader, as notifications' count.
+  - **An event naming both reaches each of their sessions**: `send` emits
+    `Messaged(from, to)`. The conversation listens `invalidates_on
+    Messaged(reader, with), Messaged(with, reader)`, and the list and the
+    count `Messaged(reader, _), Messaged(_, reader)`: ADR-0270's listener
+    rule binds each `User<..>` parameter to the event's id, so the sender's
+    other sessions and the recipient's are told, and no third user's entry
+    is dropped. Telling only their sessions waits with telling by
+    principal (NEXT).
+  - **Who may message whom is X's rule**: the recipient follows the
+    sender, or has sent the sender a message before. X's help center
+    ("About Direct Messages", read 2026-10-08) lets one start a conversation
+    "with anyone who follows you", and lets one you do not follow message
+    you where you have messaged them before. Its opt-ins (messages from
+    anyone, from verified users) are not claimed. No one messages
+    themselves.
+    - `send` `requires SignedIn, MayMessage(to)`, evaluated by
+      `Identity::requires` through the command's own operations, in its
+      transaction, as `OwnsPost(post)` is. A refusal is the 403
+      `{"committed":false,"refused":"MayMessage"}`.
+    - A page shows the composer only where its reader may send: a value
+      the conversation's query carries, read again on `Followed(with,
+      reader)`, `Unfollowed(with, reader)` and `Messaged(with, reader)`.
+      Where the reader may not, the page says why.
+  - **A message is a row of its own**, in both of the feed's layers
+    (migration `0007`): its sender, its recipient, its text and its time,
+    written in the command's transaction; and a read mark per reader and
+    other user. A message is not a post, and writes no notification; its
+    count is its own.
+  - **Reading is a command**: `read_conversation(with)` sets the reader's
+    mark, and invalidates the reader's conversation, list and count, in
+    each of their sessions. Sending marks the conversation read for its
+    sender. A page runs no command when it is shown, so the conversation
+    page has a "Mark read" button, as notifications' page has; a command a
+    page runs when it is shown is the integrator's, queued.
+  - **A message is shown before the server answers** (ADR-0222): the
+    conversation speculated on, `optimistic Conversation(current_user(),
+    to, _)`, the message last and keyed by an id the page made,
+    `pending-..`. Anything on it waits until the server's row stands in
+    its place, by ADR-0275's rule; a conversation is a flat list, so a
+    link waits too, where ruling 0073-a stops a reply's.
+  - **Its text**: `MessageText`, 1 to 10,000 code points, refused past
+    them as a post's text is (ADR-0225). 10,000 is X's limit since August
+    2015, as reported; W4 checks it or states it as its own.
+  - **A third user, signed in and not, is held by test**:
+    - by page: `/messages` lists only their own conversations, and
+      `/messages/{a}` shows only their own with `a`, never a message
+      between `a` and `b`;
+    - by `/pw-read`: a read of `Conversation`, `Conversations` or
+      `UnreadMessages`, for any key the browser asks, is answered from the
+      session's own principal, never from what the request names; and
+      another session's page, asked for by its number, is no page of
+      theirs: superseded or refused, as notifications' tests hold;
+    - by the cache every reader shares: none of the three is in it
+      (`cache private`); and by session, every entry read is keyed by its
+      session's own user;
+    - by stream: while `a` messages `b`, a third user's open conversation
+      and list are sent no frame holding the text;
+    - and a guest, who may not send (`SignedIn`), reads nothing of anyone
+      else's.
+  - **Not claimed, by ruling**: blocking, which on X ends a one-on-one
+    conversation with the account blocked and which reaches follows,
+    timelines and notifications too, queued after W4 as the integrator's;
+    group conversations; message requests and messages from anyone;
+    deleting a message, which X does for the one who deletes it alone;
+    editing; read receipts; images; search.
+  - **In order**: the rows, in memory and on PostgreSQL, and the commands;
+    then the pages; then live delivery and the third-user tests; then the
+    browser suite in three engines and the mutation controls,
+    `e14-messages`.
