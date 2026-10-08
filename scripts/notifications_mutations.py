@@ -105,8 +105,8 @@ MUTANTS = [
         "following again notifies again",
         SERVER,
         FEED,
-        "                    if new\n",
-        "                    if new || !new\n",
+        "                    let new = !s.follows.contains(&(follower.clone(), user.clone()));\n",
+        "                    let new = !s.follows.contains(&(follower.clone(), user.clone())) || true;\n",
     ),
     (
         "another user's notifications are listed",
