@@ -24,7 +24,7 @@ e14-identity:
          echo "postgres: $(psql "$PW_FEED_DATABASE_URL" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)')"; \
        else echo "postgres: PW_FEED_DATABASE_URL is not set, so the PostgreSQL tests pass doing nothing"; fi; echo; \
        echo "== the server (identity.rs, accounts.rs, tests/sign_in.rs)"; echo; \
-       cargo test --locked -p pw-dev-server -- identity:: accounts:: sign_in:: 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-dev-server -- identity:: accounts:: sign_in:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the flows in three engines (e2e/identity.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/identity.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
@@ -32,4 +32,4 @@ e14-identity:
        echo; echo "== mutation controls (scripts/identity_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/identity_mutations.py; \
      } > docs/evidence/E14/identity.txt
-    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/identity.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/identity.txt

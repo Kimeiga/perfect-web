@@ -7847,10 +7847,14 @@ public query Store(",
         let failed = page_as(&s, "a");
         assert!(failed.starts_with("HTTP/1.1 200"), "{failed}");
         assert!(visible(&failed).contains("Espresso"), "{failed}");
-        let arm = &failed[failed.find("<template for=").expect("the region's arm")..];
+        // In place or as its patch: an estimator that fails at once can
+        // answer before the document is rendered, and what has settled then
+        // is rendered in place (`Settling::for_document`). Until 2026-10-07
+        // this read the patch alone, and failed on CI when the estimate won.
+        let shown = slot(&failed, "Delivery");
         assert!(
-            visible(arm).contains("Delivery estimate unavailable"),
-            "{arm}"
+            shown.contains("Delivery estimate unavailable"),
+            "{shown}: {failed}"
         );
         // And a declared error is a failure too, where the arm binds none.
         estimate(&s, "b", Some("declared"), 35);

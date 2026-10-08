@@ -41,6 +41,23 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**Correction, 2026-10-07: a test read a region one way it can arrive.** The
+verification of `e075289` (run 37694155286) failed `e14-keyed-reads` and
+`e14-query-blocks` on one server test,
+`a_failed_estimate_fills_its_region_and_the_page_is_served`, and
+`e14-slots` and `32f293b`'s `e14-not-found` on a test their mutation
+baselines do not name; before `e075289` the suite had passed on CI each
+time it ran. The test read the estimate's region from its patch, after the
+document. But its estimator fails at once, and a region whose query has
+answered when the document is rendered is rendered in place, with no patch
+(`Settling::for_document`). Forced here, by holding the document back half
+a second, the test fails as CI's did, "the region's arm"; it reads the
+region in place or as its patch now, as the slots' tests do. That CI's
+failures were this one is inferred, since the evidence kept the test's name
+and not its assertion: a recipe that keeps a test run's lines keeps where a
+test failed now too, its `panicked at` line, and the next verification
+says.
+
 **ADR-0259, 2026-10-07: a map or set from outside is sorted on arrival**
 (the owner's ruling 0057-c). A query's map or set, or a host's answer,
 given out of order stopped the invocation (ADR-0057), so every host had to
