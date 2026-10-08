@@ -5092,3 +5092,19 @@ e14-form-routes:
        CARGO_INCREMENTAL=0 python3 scripts/form_route_mutations.py; \
      } > docs/evidence/E14/form-routes.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/form-routes.txt
+
+# ADR-0266: an export's parameters past the flat limit arrive in memory, a
+# tuple of them at one pointer, each held where it sits. Through the host,
+# and the mutation controls.
+e14-wide-parameters:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0266 - an export's parameters past the flat limit arrive in memory"; echo; \
+       echo "produced by: just e14-wide-parameters"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== through the host (compiler/pw-conformance/tests/wide_parameters.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test wide_parameters 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/wide_parameter_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/wide_parameter_mutations.py; \
+     } > docs/evidence/E14/wide-parameters.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/wide-parameters.txt

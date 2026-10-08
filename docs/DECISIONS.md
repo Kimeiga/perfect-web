@@ -2200,3 +2200,10 @@ question, and the uploads track's fourth).
   `/sign-out`, a `post`), an upload a `post` of a file. A form's action
   answers its method or is PW5041, and a link reaches what answers a `get`:
   `/sign-in` no longer PW5009, `/sign-out` PW5009.
+[ADR-0266](DECISIONS/ADR-0266-an-exports-parameters-past-the-flat-limit-arrive-in-memory.md):
+an export's parameters past the flat limit arrive in memory (found by the
+uploads track).
+- Past the Canonical ABI's 16 flat values, the host stores an export's
+  parameters as a tuple and passes one pointer; each is held where it sits,
+  aligned as its type is. Such an export was refused, so a row's record
+  could not grow past it.

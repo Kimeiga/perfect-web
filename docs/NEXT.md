@@ -505,13 +505,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           instantiation (0046-a);
         - after it: 0060-a, 0078-a, 0056-a, 0047-a's parser split, and
           what waits for it, found on the way:
-          - **an export's parameters past the flat limit** (found by the
-            uploads track, W2): a timeline row's derived value takes its
-            whole item as its export's parameters, and an `Item` that
-            flattens past the Canonical ABI's MAX_FLAT_PARAMS (16) is refused
-            (`an export whose parameters exceed the flat limit`); they are
-            to be passed indirectly, as the Canonical ABI says, so a row's
-            record may grow. W2 carries a post's images as a list meanwhile;
+          - ~~**an export's parameters past the flat limit**~~ (ADR-0266,
+            `just e14-wide-parameters`: held in memory where the host
+            stores them, each aligned; a call's arguments to a host's
+            operation past it stay refused);
           - **a component's trap carries its cause** (ADR-0259's "Not
             claimed"): a trap in the component is `unreachable`, and the
             host reports a failed call, where the browser's module names

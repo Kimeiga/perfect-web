@@ -316,14 +316,9 @@ pub fn core_module_with(
     let export_index = imported + 1;
     let post_index = imported + 2;
 
+    // Past the flat limit, an export's parameters arrive in memory, at the one
+    // pointer the core function takes (ADR-0266).
     let export_sig = resolve.wasm_signature(AbiVariant::GuestExport, &export_fn);
-    if export_sig.indirect_params {
-        refuse!(
-            "an export whose parameters exceed the flat limit",
-            "`{export}` takes more than {} flat values",
-            Resolve::MAX_FLAT_PARAMS
-        );
-    }
 
     let realloc_ty = ty(vec![ValType::I32; 4], vec![ValType::I32]);
     let export_ty = ty(
@@ -1820,21 +1815,43 @@ fn export_body(
         ),
     };
 
-    // Parameters arrive flat, in the order the world lists them.
+    // Parameters arrive flat, in the order the world lists them; or, where
+    // they flatten past the Canonical ABI's limit (`MAX_FLAT_PARAMS`, 16), in
+    // memory, a tuple of them that the host stores and passes the one pointer
+    // to, each held where it sits (ADR-0266). Until ADR-0266 that export was
+    // refused, and a row's record could not grow past it.
     let mut next_param = 0u32;
+    let mut offset = 0u32;
     for ((value, own), param) in function.params.iter().zip(&export_fn.params) {
-        let Some(flats) = flat(resolve, &param.ty) else {
-            refuse!(
-                "a parameter that does not flatten",
-                "`{}` does not flatten within the core parameter limit",
-                param.name
-            );
-        };
-        let ls: Vec<u32> = (next_param..next_param + flats.len() as u32).collect();
-        next_param += flats.len() as u32;
-        let arrived = Held::Flat {
-            ty: param.ty,
-            locals: ls,
+        let arrived = if export_sig.indirect_params {
+            let (size, align) = enc.layout(&param.ty);
+            offset = offset.next_multiple_of(align);
+            let at = enc.locals.fresh(ValType::I32);
+            enc.ops.extend([
+                I::LocalGet(0),
+                I::I32Const(offset as i32),
+                I::I32Add,
+                I::LocalSet(at),
+            ]);
+            offset += size;
+            Held::Memory {
+                ty: param.ty,
+                ptr: at,
+            }
+        } else {
+            let Some(flats) = flat(resolve, &param.ty) else {
+                refuse!(
+                    "a parameter that does not flatten",
+                    "`{}` does not flatten within the core parameter limit",
+                    param.name
+                );
+            };
+            let ls: Vec<u32> = (next_param..next_param + flats.len() as u32).collect();
+            next_param += flats.len() as u32;
+            Held::Flat {
+                ty: param.ty,
+                locals: ls,
+            }
         };
         // A type that contains itself arrives as its nodes, and is the
         // body's value from here (ADR-0194).

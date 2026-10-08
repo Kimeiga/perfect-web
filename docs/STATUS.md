@@ -41,6 +41,15 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0266, 2026-10-08: an export's parameters past the flat limit arrive
+in memory** (found by the uploads track). The Canonical ABI passes
+parameters flat up to 16 core values, and past it stores them as a tuple
+the host allocates and passes one pointer to; the backend refused such an
+export, so a row's derived value could not take an `Item` past 16 values,
+and the uploads track carried a post's image as a list. Each parameter is
+held where the host stores it now, at its offset in the tuple, aligned as
+its type is (`just e14-wide-parameters`).
+
 **ADR-0265, 2026-10-08: a form goes where something answers it** (the
 identity track's second question and the uploads track's fourth). A link
 was checked against the program's pages and a form not at all, but a
