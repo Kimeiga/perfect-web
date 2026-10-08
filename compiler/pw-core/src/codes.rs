@@ -20,6 +20,7 @@
 //! PW55xx   the identity track's (ADR-0253): accounts, sign-in, `requires`
 //! PW56xx   the uploads track's (ADR-0253): typed uploads and blob storage
 //! PW57xx   the notifications track's (ADR-0253): the typed principal, notifications
+//! PW58xx   the messages track's (ADR-0253): direct messages
 //! ```
 //!
 //! A parallel track registers its codes in its own block, with its own
@@ -98,6 +99,9 @@ pub enum Owner {
     /// principal (`context.current_user()`, a user's handle the host's alone
     /// to make) and the notifications on it.
     Notifications,
+    /// ADR-0253: the messages track's codes, PW58xx: direct messages, a
+    /// conversation read from each side, and who may message whom.
+    Messages,
 }
 
 impl fmt::Display for Code {
@@ -849,6 +853,7 @@ impl Owner {
             Owner::Identity => "PW55",
             Owner::Uploads => "PW56",
             Owner::Notifications => "PW57",
+            Owner::Messages => "PW58",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -909,6 +914,7 @@ mod tests {
                 (Owner::Identity, "PW55"),
                 (Owner::Uploads, "PW56"),
                 (Owner::Notifications, "PW57"),
+                (Owner::Messages, "PW58"),
             ] {
                 assert!(
                     !c.id.starts_with(block) || c.owner == owner,
