@@ -2233,3 +2233,10 @@ a reader is told once per burst, and served in turn (found by WebKit's
   hold was taken in no order, so under a burst of posts a page's own read
   waited seconds. A reader is told once for every commit waiting, one
   telling at a time, and a session's hold is taken in the order asked.
+[ADR-0272](DECISIONS/ADR-0272-a-region-the-browser-fills-while-the-runtime-boots-is-bound.md):
+a region the browser fills while the runtime boots is bound (found by the
+notifications track on CI).
+- The runtime indexes a page and then boots across the network; Chrome 150
+  can fill a streamed region meanwhile, which was indexed pending, never
+  read again, and its buttons bound to nothing. One that settled while the
+  runtime booted is read again and bound now.

@@ -5183,3 +5183,24 @@ e14-telling:
        CARGO_INCREMENTAL=0 python3 scripts/telling_mutations.py; \
      } > docs/evidence/E14/telling.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/telling.txt
+
+# ADR-0272: a region the browser fills while the runtime boots is bound. In
+# the host's Chrome, and the mutation controls.
+e14-stream-boot:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0272 - a region the browser fills while the runtime boots is bound"; echo; \
+       echo "produced by: just e14-stream-boot"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== in the host's Chrome (e2e/stream.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/stream.spec.mjs \
+          -g "while the runtime boots|Chrome 150 and later" --project=chromium --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/stream_boot_mutations.py)"; echo; \
+       python3 scripts/stream_boot_mutations.py; \
+     } > docs/evidence/E14/stream-boot.txt
+    @grep -E "passed|failed|skipped|mutants killed|Error:" docs/evidence/E14/stream-boot.txt

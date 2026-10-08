@@ -125,6 +125,49 @@ test("with JavaScript off, the placeholder stays where the platform cannot fill 
   await context.close();
 });
 
+test("a region Chrome fills while the runtime boots is bound", async ({
+  request,
+  baseURL,
+}, testInfo) => {
+  // ADR-0272, found by the notifications track (run 37748154579): the
+  // runtime indexes the page, then boots across the network, and Chrome
+  // filled the region meanwhile. Indexed pending and found settled after,
+  // it was never read again, and its buttons were bound to nothing. Here
+  // the boot is held at the network until Chrome has filled it, every time.
+  test.skip(testInfo.project.name !== "chromium", "one run: it launches the host's Chrome");
+  let chrome;
+  try {
+    chrome = await chromium.launch({ channel: "chrome" });
+  } catch {
+    test.skip(true, "no Chrome installed on this host");
+  }
+  const major = Number(chrome.version().split(".")[0]);
+  test.skip(major < 150, `Chrome ${chrome.version()} predates out-of-order streaming`);
+  // Long enough that the runtime has indexed the page before the region
+  // arrives.
+  await recommender(request, "delay=1500");
+  const context = await chrome.newContext({ baseURL });
+  const page = await context.newPage();
+  let release;
+  const held = new Promise((resolve) => (release = resolve));
+  await page.route("**/pw-handlers", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const booting = page.waitForRequest("**/pw-handlers");
+  await page.goto(PAGE, { waitUntil: "commit" });
+  await booting;
+  // Chrome fills the region while the runtime waits.
+  await expect(page.locator("#picks li")).toHaveCount(2);
+  expect(await page.evaluate(() => document.documentElement.dataset.pwReady ?? null)).toBe(null);
+  release();
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
+  expect(await page.evaluate(() => window.__pw.settled)).toEqual([{ part: 3, by: "browser" }]);
+  await page.locator("#picks button").nth(1).click();
+  await expect(page.locator("#picked")).toHaveText("Cold Brew");
+  await chrome.close();
+});
+
 test("Chrome 150 and later fills a region itself, with JavaScript off", async ({
   request,
   baseURL,

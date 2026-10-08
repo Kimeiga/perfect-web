@@ -41,6 +41,18 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0272, 2026-10-08: a region the browser fills while the runtime boots
+is bound** (found by the notifications track on CI, run 37748154579). A
+press on a recommendation Chrome had streamed into its region did nothing:
+the runtime indexes the page, then boots across the network, and Chrome 150
+filled the region meanwhile, which the runtime had indexed pending and
+never read again, its buttons bound to nothing ("no element 1 for part
+6"). A region pending at the first index and settled when the runtime has
+booted is read again and bound now, and reported filled by the browser. A
+test holds the runtime's boot at the network until Chrome has filled the
+region, so the race comes every time; without the fix it failed 4 runs of 4
+(`just e14-stream-boot`).
+
 **ADR-0271, 2026-10-08: a reader is told once per burst, and served in
 turn** (found by WebKit's "Load more", which failed on CI six times). The
 records a failing feed test keeps showed it here, under six workers: a

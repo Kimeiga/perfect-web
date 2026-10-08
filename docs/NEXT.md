@@ -423,11 +423,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
              commit told every reader, and the session's hold was taken in no
              order. A reader is told once per burst now, and its hold taken
              in turn: 13 of 160 runs failed before, 2 of 160 after; and
-             `stream.spec.mjs`'s "Chrome 150 and later fills a region itself"
-             again, in Chromium (run 37748154579, found by the notifications
-             track): a button in the region Chrome filled was pressed, and
-             `#picked` still read "nothing" five seconds later; its trace
-             will say whether the press was bound; and
+             ~~`stream.spec.mjs`'s "Chrome 150 and later fills a region
+             itself" again~~ (ADR-0272, `just e14-stream-boot`, found by the
+             notifications track): Chrome filled the region while the
+             runtime booted, which had indexed it pending and never read it
+             again, its buttons bound to nothing; and
              ~~`e10-recursion`'s "a record or variant is passed flat"~~,
              equivalent since ADR-0059 and retired (STATUS, 2026-10-07).
              Further grammar and clause defects go under 0047-a below,

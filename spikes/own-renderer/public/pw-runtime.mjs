@@ -1297,6 +1297,13 @@ const STREAM_NAME = /^pw-(\d+)$/;
 /** The stream parts still showing their placeholder, as of boot and since. */
 const pendingStreams = new Set();
 
+/** **The stream parts pending when the page was first indexed** (ADR-0272):
+ * the runtime boots across the network, and a browser that streams a region
+ * itself can fill one meanwhile. Until ADR-0272 such a region was indexed
+ * pending, found settled after boot, and never read again: its buttons were
+ * bound to nothing, and a press on one did nothing. */
+const pendingAtIndex = new Set();
+
 /** Is the region of stream `id` still pending: does it hold its start
  * marker, a processing instruction or, where the parser has none, the
  * comment it reads one as? */
@@ -1359,6 +1366,14 @@ function settleStreams() {
 function watchStreams() {
   for (const p of parts.parts ?? []) {
     if (p.kind === "stream" && streamPending(String(p.id))) pendingStreams.add(String(p.id));
+  }
+  // A region that settled while the runtime booted, which only the browser
+  // fills: read again and bound, as one settling later is.
+  const whileBooting = [...pendingAtIndex].filter((id) => !pendingStreams.has(id));
+  if (whileBooting.length > 0) {
+    for (const id of whileBooting) window.__pw.settled.push({ part: Number(id), by: "browser" });
+    buildIndex();
+    bindEvents();
   }
   if (pendingStreams.size === 0) return;
   settleStreams();
@@ -1896,6 +1911,9 @@ async function attach() {
   // One traversal, before anything else. Every later lookup is a map hit.
   const indexed = buildIndex();
   log.push(`indexed ${indexed} address(es)`);
+  for (const p of parts.parts ?? []) {
+    if (p.kind === "stream" && streamPending(String(p.id))) pendingAtIndex.add(String(p.id));
+  }
 
   await bootDecision();
 
