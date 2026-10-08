@@ -2240,3 +2240,11 @@ notifications track on CI).
   can fill a streamed region meanwhile, which was indexed pending, never
   read again, and its buttons bound to nothing. One that settled while the
   runtime booted is read again and bound now.
+[ADR-0273](DECISIONS/ADR-0273-a-materialization-is-a-value-its-body-derives.md):
+a materialization is a value its body derives (ruling 10's last piece,
+first part).
+- One that declares its type derives it in its body, reading what it
+  depends on as a page does, `query R(..)`, which the graph takes as its
+  edges; `depends_on` beside a body is PW5110. A materialization is a term,
+  read by `query`; inside a block, a clause's value ends with its line
+  unless it cannot have.

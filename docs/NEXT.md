@@ -454,9 +454,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
              dropped in every session's partition); ~~a timeline built from
              who you follow~~ (ADR-0257, `just e14-follows`: follow and
              unfollow, `/following`, and a user's page with follower
-             counts, on queries); then materializations made real: a body
-             and a type, a generator, a page reading one, and a chain
-             rebuilt in order;
+             counts, on queries); then materializations made real: ~~a body
+             and a type~~ (ADR-0273, `just e14-materialization-bodies`: held
+             to its type, its reads its edges), a generator, a page reading
+             one, and a chain rebuilt in order;
           4. ~~**track `identity`, W1**~~ (ADR-0258, `just e14-identity`:
              accounts and sign-in, Pleris the relying party and the
              provider the deployment's). What it leaves, in order: a

@@ -109,6 +109,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // ADR-0212: a `query` reads a query or a resource, and a
         // `subscription` a subscription.
         per_unit.extend(reads_name_their_kind(&workspace, &sigs, i, &u.hir));
+        per_unit.extend(dependencies_stated_once(&u.hir));
         // ADR-0148: a streamed query is read by a `<stream>`, which shows
         // each state its query can be in.
         per_unit.extend(crate::streams::check(&workspace, &hirs, &sigs, i, &u.hir));
@@ -738,7 +739,7 @@ fn unresolved_uses(
                     .next()
                     .is_some_and(|h| in_scope.contains(h) && !declared.contains(h)),
             };
-            if !bound && let Some(def) = names_no_term(workspace, unit, &path) {
+            if !bound && let Some(def) = names_no_term(workspace, hirs, unit, &path) {
                 out.push(not_a_term(hirs, hir, decl, body, id, &path, def));
                 continue;
             }
@@ -858,9 +859,12 @@ fn unresolved_uses(
 /// **What a call names, when it names no term** (ADR-0087): the declaration
 /// a view, a page, an event or an effect is, where no function or type has
 /// the name. A call names a term, or a type it builds (`resolve::Namespace`);
-/// the rest are rendered, emitted or performed, and never called.
+/// the rest are rendered, emitted or performed, and never called. A
+/// materialization is a term since ADR-0273, read by `query`, and called by
+/// nothing still: the materializer runs it.
 fn names_no_term(
     workspace: &crate::resolve::Workspace,
+    hirs: &[&Hir],
     unit: usize,
     path: &str,
 ) -> Option<crate::resolve::DefId> {
@@ -869,6 +873,11 @@ fn names_no_term(
         true => workspace.resolve_path_in(unit, ns, path),
         false => workspace.resolve_in(unit, ns, path),
     };
+    if let Resolution::Local(d) | Resolution::Imported { def: d, .. } = found(Namespace::Term)
+        && crate::resolve::declaration(hirs, d).is_some_and(|x| x.kind == DeclKind::Materialize)
+    {
+        return Some(d);
+    }
     if [Namespace::Term, Namespace::Type]
         .into_iter()
         .any(|ns| found(ns) != Resolution::Unresolved)
@@ -2212,6 +2221,56 @@ fn reads_name_their_kind(
             if reads.contains(&kind) {
                 continue;
             }
+            // **A materialization that derives its value is read as a query
+            // is** (ADR-0273), by another that derives its own. One that
+            // derives none is a fragment the host renders, and a page reads
+            // one once the host serves it.
+            if kind == DeclKind::Materialize && keyword == "query" {
+                let derives = sigs.by_def(def).is_some_and(|s| s.returns.is_some());
+                let deriving = decl.kind == DeclKind::Materialize && decl.ret.is_some();
+                if derives && deriving {
+                    continue;
+                }
+                let (message, repair) = if derives {
+                    (
+                        format!(
+                            "`query {name}` reads a materialization, which {} does not read: \
+                             the host serves none yet",
+                            described(decl.kind)
+                        ),
+                        "read the queries it reads".to_string(),
+                    )
+                } else {
+                    (
+                        format!(
+                            "`query {name}` reads a materialization that declares no type: a \
+                             fragment the host renders, which derives no value"
+                        ),
+                        format!("declare `{name}`'s type, and derive it in its body"),
+                    )
+                };
+                out.push(Diagnostic {
+                    code: crate::codes::READ_NAMES_ANOTHER_KIND.id,
+                    invariant: crate::codes::READ_NAMES_ANOTHER_KIND.invariant,
+                    reason: "read_names_another_kind",
+                    detector: Detector::DeclarationRule,
+                    severity: Severity::Error,
+                    message,
+                    primary_span: body.expr_span(id),
+                    related: Vec::new(),
+                    explanation: Some(
+                        "A materialization that declares its type derives it in its body, \
+                         and another that derives its own reads it as a query is (ADR-0273). \
+                         Until ADR-0273 no materialization was a value."
+                            .to_string(),
+                    ),
+                    repairs: vec![Repair {
+                        description: repair,
+                        replacement: None,
+                    }],
+                });
+                continue;
+            }
             out.push(Diagnostic {
                 code: crate::codes::READ_NAMES_ANOTHER_KIND.id,
                 invariant: crate::codes::READ_NAMES_ANOTHER_KIND.invariant,
@@ -2241,6 +2300,42 @@ fn reads_name_their_kind(
         }
     }
     out
+}
+
+/// **A materialization that derives its value states what it depends on by
+/// reading it** (ADR-0273): `query R(..)` in its body, which the graph takes
+/// as its edges, as a page's. A `depends_on` beside it would state a fact
+/// the body states, a second place to keep it, and refused. One that
+/// declares no type keeps its `depends_on`: a fragment the host renders.
+fn dependencies_stated_once(hir: &Hir) -> Vec<Diagnostic> {
+    hir.all_decls()
+        .filter(|(_, d)| d.kind == DeclKind::Materialize && d.ret.is_some())
+        .filter_map(|(_, d)| Some((d, d.policy("depends_on")?)))
+        .map(|(d, p)| Diagnostic {
+            code: crate::codes::DEPENDENCY_STATED_TWICE.id,
+            invariant: crate::codes::DEPENDENCY_STATED_TWICE.invariant,
+            reason: "dependency_stated_twice",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message: format!(
+                "`{}` derives its value, and states what it depends on by reading it: \
+                 `depends_on` states it again",
+                d.name
+            ),
+            primary_span: p.span.clone(),
+            related: Vec::new(),
+            explanation: Some(
+                "A materialization that declares its type reads what it depends on in \
+                 its body, `query R(..)`, and the graph takes those reads as its edges, \
+                 as a page's (ADR-0273)."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: "remove the `depends_on`, and read each in the body".to_string(),
+                replacement: None,
+            }],
+        })
+        .collect()
 }
 
 /// **An opaque type's own module reads its representation as `.value`, so it

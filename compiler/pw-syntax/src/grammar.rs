@@ -2426,9 +2426,49 @@ impl<'a> P<'a> {
                 continue;
             }
             let mut depth = 0i32;
+            // The last token the value took, for where its line ends.
+            let mut last: Option<Kind> = None;
             while !self.at_eof() {
                 let k = self.cur();
                 if depth == 0 && k == Kind::LBrace {
+                    break;
+                }
+                // **Inside a block, a value ends with its line, unless it
+                // cannot have** (ADR-0273): a bracket still open, or a line
+                // that ends wanting more, a comma or an operator, goes on to
+                // the next. A materialization that derives its value has a
+                // body after its clauses, and one that began with a name, a
+                // literal or a constructor was the last clause's value:
+                // `regenerate on_invalidation` took the body `n` as
+                // `on_invalidation n`. A header's clauses end at the body's
+                // `{`, and read on across a missing comma, which a check then
+                // names (ADR-0237).
+                if in_block
+                    && depth == 0
+                    && self.newline_ahead()
+                    && !matches!(
+                        last,
+                        Some(
+                            Kind::Comma
+                                | Kind::Colon
+                                | Kind::Dot
+                                | Kind::Arrow
+                                | Kind::FatArrow
+                                | Kind::Cmp
+                                | Kind::Pipe
+                                | Kind::PipeGt
+                                | Kind::Bang
+                                | Kind::Eq
+                                | Kind::Question
+                                | Kind::Amp
+                                | Kind::Plus
+                                | Kind::Minus
+                                | Kind::Star
+                                | Kind::Slash
+                                | Kind::Percent
+                        )
+                    )
+                {
                     break;
                 }
                 // A policy list inside a `materialize` block ends at the
@@ -2494,6 +2534,7 @@ impl<'a> P<'a> {
                     Kind::RParen | Kind::RBracket | Kind::RAngle => depth -= 1,
                     _ => {}
                 }
+                last = Some(k);
                 self.bump();
             }
             self.finish();

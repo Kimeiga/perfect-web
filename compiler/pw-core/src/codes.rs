@@ -651,11 +651,15 @@ codes! {
     // ADR-0212 (ruling 0108-a): `let v = query helper(id)` over a `fn`
     // checked, and the page kept the function's answer as an entry.
     READ_NAMES_ANOTHER_KIND = "PW5108" / read_names_another_kind / 1, ResourceGraph,
-        "a `query` reads a query or a resource, and a `subscription` a subscription";
+        "a `query` reads a query or a resource, or in a materialization's body one that derives its value; and a `subscription` a subscription";
     // ADR-0255 (ADR-0195's ruling 10): a materialization may read another,
     // and the build refuses a cycle.
     MATERIALIZATION_CYCLE = "PW5109" / materialization_cycle / 1, ResourceGraph,
         "a materialization depends on nothing that depends on it";
+    // ADR-0273 (ruling 10's last part): a materialization that derives its
+    // value reads what it depends on, and the graph takes those reads.
+    DEPENDENCY_STATED_TWICE = "PW5110" / dependency_stated_twice / 1, ResourceGraph,
+        "a materialization that derives its value states what it depends on by reading it, and nowhere else";
 
     // --- what a capability names (PW52xx, E8) -----------------------------
     //

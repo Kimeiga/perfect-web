@@ -52,6 +52,23 @@ fn a_call_names_no_view_and_no_page() {
 }
 
 #[test]
+fn a_call_names_no_materialization() {
+    // A term since ADR-0273, read by `query`: the materializer runs it, and
+    // nothing calls it.
+    let sized = "module t\n\nmaterialize Sized(n: Int) -> Int {\n    placement edge\n    \
+                 partition public\n    regenerate on_invalidation\n\n    n\n}\n\n";
+    one(
+        &format!("{sized}fn f() -> Int !{{}} {{\n    Sized(1)\n}}\n"),
+        "PW0027 `Sized` is a materialization, which a call cannot name",
+    );
+    // The control: the function it might have been.
+    clean(&format!(
+        "{sized}fn sized(n: Int) -> Int !{{}} {{ n }}\n\n\
+                    fn f() -> Int !{{}} {{\n    sized(1)\n}}\n"
+    ));
+}
+
+#[test]
 fn a_call_names_no_event() {
     let src = "module t\n\nevent Changed(n: Int)\n\n\
                fn f(n: Int) -> Int !{} {\n    let e = Changed(n)\n    1\n}\n";

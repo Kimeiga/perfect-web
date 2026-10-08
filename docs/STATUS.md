@@ -41,6 +41,21 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0273, 2026-10-08: a materialization is a value its body derives**
+(ruling 10's last piece, "materializations made real", first part). A
+materialization was declared and inert: no body, type or generator, and no
+page could read one. One that declares its type derives it in its body now,
+held to it as a query's is, reading what it depends on as a page does,
+`query R(..)`, which the graph takes as its edges, so a cycle or a private
+read through them is refused as through `depends_on`, and `depends_on`
+beside a body is PW5110. Found on the way: a materialization was in the
+views' namespace, so a read of one was never typed, and a test of a chain
+passed on nothing; and inside a block a clause's value ended only at a known
+head, so a body beginning with a name or a literal was the last clause's
+value. A materialization is a term now, and such a value ends with its line
+unless it cannot have (`just e14-materialization-bodies`). Its generator,
+and the host serving one, are the next parts.
+
 **ADR-0272, 2026-10-08: a region the browser fills while the runtime boots
 is bound** (found by the notifications track on CI, run 37748154579). A
 press on a recommendation Chrome had streamed into its region did nothing:

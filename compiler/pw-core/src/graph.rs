@@ -325,7 +325,10 @@ impl Graph {
                 // discovered differently, because a page has no policy for it
                 // and requiring one would make the graph a second place to
                 // state a fact the body already states.
-                if decl.kind == DeclKind::Page
+                // A materialization that derives its value states them so
+                // too (ADR-0273).
+                if (decl.kind == DeclKind::Page
+                    || (decl.kind == DeclKind::Materialize && decl.ret.is_some()))
                     && let Some(body_id) = decl.body
                 {
                     for (name, key) in queried(hir.body(body_id)) {

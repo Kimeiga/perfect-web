@@ -440,17 +440,17 @@ pub fn carries_terms(head: &str) -> bool {
 /// `emits CartChanged(current_session())` an event. Each key is a term.
 ///
 /// `depends_on` names a resource, or a materialization (ADR-0255, ADR-0195's
-/// ruling 10), which is looked up in the namespace views share.
+/// ruling 10), a term since ADR-0273, as a query is.
 pub fn keyed(
     head: &str,
 ) -> Option<&'static [(crate::resolve::Namespace, &'static [crate::hir::DeclKind])]> {
     use crate::hir::DeclKind as K;
     use crate::resolve::Namespace;
     const RESOURCES: &[K] = &[K::Query, K::Subscription, K::Resource];
-    const READ: &[(Namespace, &[K])] = &[
-        (Namespace::Term, RESOURCES),
-        (Namespace::Ui, &[K::Materialize]),
-    ];
+    const READ: &[(Namespace, &[K])] = &[(
+        Namespace::Term,
+        &[K::Query, K::Subscription, K::Resource, K::Materialize],
+    )];
     const RESOURCE: &[(Namespace, &[K])] = &[(Namespace::Term, RESOURCES)];
     const EVENT: &[(Namespace, &[K])] = &[(Namespace::Event, &[K::Event])];
     match domain_of(head)? {

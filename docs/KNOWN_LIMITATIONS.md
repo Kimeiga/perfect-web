@@ -540,11 +540,14 @@ awaited in order. What remains:
   session of its user by nothing until it reads again; a user's page lists
   their newest 20 posts. No blocks, mutes, follow requests, private
   accounts or lists of followers.
-- **A materialization is checked, and does not run** (ADR-0255). One may
-  read another, a cycle of them is refused (PW5109), and an event reaching
-  one reaches what reads it. But a materialization has no body, type or
-  generator, and no page reads one; which entry of a chain is rebuilt first
-  is not decided. The follows timeline is built on queries meanwhile.
+- **A materialization is checked, and does not run** (ADR-0255,
+  ADR-0273). One may read another, a cycle of them is refused (PW5109), and
+  an event reaching one reaches what reads it. One that declares its type
+  derives it in its body, held to it, reading what it depends on; but no
+  generator is compiled, no host serves one, and no page reads one; which
+  entry of a chain is rebuilt first is not decided. One that declares no
+  type is a fragment the host renders, the store's wired by hand. The
+  follows timeline is built on queries meanwhile.
 - **A source's guarantees are held to the database the feed opens**
   (ADR-0207, ADR-0246): the host measures a PostgreSQL feed's isolation and
   whether it may write, and refuses to serve on a shortfall. The store's

@@ -23,14 +23,14 @@ MUTANTS = [
     (
         "a call that names no term is not refused",
         CHECK,
-        "            if !bound && let Some(def) = names_no_term(workspace, unit, &path) {",
-        "            if !bound && let Some(def) = names_no_term(workspace, unit, &path).filter(|_| false) {",
+        "            if !bound && let Some(def) = names_no_term(workspace, hirs, unit, &path) {",
+        "            if !bound && let Some(def) = names_no_term(workspace, hirs, unit, &path).filter(|_| false) {",
     ),
     (
         "a binding that shares the name is not its value",
         CHECK,
-        "            if !bound && let Some(def) = names_no_term(workspace, unit, &path) {",
-        "            if let Some(def) = names_no_term(workspace, unit, &path) {",
+        "            if !bound && let Some(def) = names_no_term(workspace, hirs, unit, &path) {",
+        "            if let Some(def) = names_no_term(workspace, hirs, unit, &path) {",
     ),
     (
         "a function or a type that shares the name is not what a call names",

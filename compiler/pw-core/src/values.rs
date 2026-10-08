@@ -1659,7 +1659,7 @@ impl<'a> Typer<'a> {
     /// What this declaration declares it returns, where its body is its
     /// result.
     fn declared_result(&self) -> Option<Ty> {
-        if !returns_its_body(self.decl.kind) {
+        if !returns_its_body(self.decl) {
             return None;
         }
         let written = self.decl.ret.as_ref()?;
@@ -4774,7 +4774,7 @@ fn returns(
     decl: &Decl,
     out: &mut Vec<ValueRelation>,
 ) {
-    if !returns_its_body(decl.kind) {
+    if !returns_its_body(decl) {
         return;
     }
     let def = DefId {
@@ -4836,14 +4836,16 @@ fn returns(
 
 /// The declarations whose body's value IS their result.
 ///
-/// A `view`, `component` or `page` renders markup; a `materialize`,
-/// `subscription` or `resource` body declares a lifecycle. None is checked
-/// against a result here, because none says its body is one.
-fn returns_its_body(kind: DeclKind) -> bool {
+/// A `view`, `component` or `page` renders markup; a `subscription` or
+/// `resource` body declares a lifecycle. None is checked against a result
+/// here, because none says its body is one. A `materialize` that declares
+/// its type derives it in its body (ADR-0273): one that declares none is a
+/// fragment the host renders, and its body is its clauses.
+fn returns_its_body(decl: &Decl) -> bool {
     matches!(
-        kind,
+        decl.kind,
         DeclKind::Fn | DeclKind::Query | DeclKind::Command | DeclKind::Task
-    )
+    ) || (decl.kind == DeclKind::Materialize && decl.ret.is_some())
 }
 
 /// **Every written type resolves, or the program is told.** E9-V5.

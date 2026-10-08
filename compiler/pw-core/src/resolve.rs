@@ -94,10 +94,12 @@ impl Namespace {
             | DeclKind::Command
             | DeclKind::Subscription
             | DeclKind::Resource
-            | DeclKind::Task => Namespace::Term,
-            DeclKind::View | DeclKind::Component | DeclKind::Page | DeclKind::Materialize => {
-                Namespace::Ui
-            }
+            | DeclKind::Task
+            // **Read as a query is** (ADR-0273): `query M(..)` names it, in
+            // a page or another materialization. It was a fragment of the
+            // page, beside the views, until a materialization had a value.
+            | DeclKind::Materialize => Namespace::Term,
+            DeclKind::View | DeclKind::Component | DeclKind::Page => Namespace::Ui,
             DeclKind::Event => Namespace::Event,
             DeclKind::Effect => Namespace::Effect,
             // A source is named by nothing a program writes (ADR-0207), and

@@ -5204,3 +5204,18 @@ e14-stream-boot:
        python3 scripts/stream_boot_mutations.py; \
      } > docs/evidence/E14/stream-boot.txt
     @grep -E "passed|failed|skipped|mutants killed|Error:" docs/evidence/E14/stream-boot.txt
+
+# ADR-0273: a materialization is a value its body derives. The checker's
+# tests, and the mutation controls.
+e14-materialization-bodies:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0273 - a materialization is a value its body derives"; echo; \
+       echo "produced by: just e14-materialization-bodies"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== derived, read and stated once (compiler/pw-core/tests/materialization_bodies.rs, calls_name_terms.rs)"; echo; \
+       cargo test --locked -p pw-core --test materialization_bodies --test calls_name_terms 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/materialization_body_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/materialization_body_mutations.py; \
+     } > docs/evidence/E14/materialization-bodies.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/materialization-bodies.txt
