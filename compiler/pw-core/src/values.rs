@@ -1469,6 +1469,28 @@ impl<'a> Typer<'a> {
             .any(|(_, r)| r.root == id)
     }
 
+    /// **Whether a listener's argument `id`, of type `actual`, is a user's
+    /// handle over the event's `expected`** (track `notifications`, ADR-XXXX,
+    /// amending ADR-0091): `invalidates_on Notified(reader)`, `reader` a
+    /// `User<UserId>` and `Notified`'s value a `UserId`. The entries at that
+    /// user are dropped, in each of their sessions: the platform's `User` is
+    /// ABI-transparent, so the event's value is the entry's key. A listener
+    /// alone, `User` alone, and its own argument alone.
+    fn handle_over(&self, id: ExprId, actual: &Ty, expected: &Ty) -> bool {
+        let Ty::Nominal(def, args) = actual else {
+            return false;
+        };
+        let [over] = args.as_slice() else {
+            return false;
+        };
+        self.listens_with(id)
+            && matches!(
+                self.sigs.privacy_kind(*def),
+                Some(crate::signatures::PrivacyQualifier::User)
+            )
+            && unify(&mut Subst::default(), expected, over) == Verdict::Agree
+    }
+
     /// The type a binding holds, as far as it is known.
     fn local(&self, b: Binder) -> Ty {
         self.locals.borrow().get(&b).cloned().unwrap_or(Ty::Unknown)
@@ -2488,6 +2510,11 @@ impl<'a> Typer<'a> {
                         match unify(&mut s, &e, &a) {
                             Verdict::Agree => Outcome::Agree,
                             Verdict::Undecided => Outcome::Undecided(Undecided::Unknown),
+                            // Track `notifications` (ADR-XXXX, amending
+                            // ADR-0091): a listener's parameter that is a
+                            // user's handle binds the event's value of that
+                            // user's id.
+                            Verdict::Disagree if self.handle_over(*value, &a, &e) => Outcome::Agree,
                             Verdict::Disagree => Outcome::Disagree {
                                 expected: self.display(&s.close(&e)),
                                 actual: self.display(&a),
