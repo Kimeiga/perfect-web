@@ -429,7 +429,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
              runtime booted, which had indexed it pending and never read it
              again, its buttons bound to nothing; and
              ~~`e10-recursion`'s "a record or variant is passed flat"~~,
-             equivalent since ADR-0059 and retired (STATUS, 2026-10-07).
+             equivalent since ADR-0059 and retired (STATUS, 2026-10-07);
+             and, open, **`feed.spec.mjs`'s "Load more shows the next page"
+             in WebKit, on CI again** (run 37826467131 at `b393cee`, job
+             113480498704: its rows stayed at twenty). ADR-0271 left 2 of 160
+             failing under loads past CI's; this one was on CI's own.
              Further grammar and clause defects go under 0047-a below,
              unless the feed, the next Twitter item or soundness needs one;
           2. ~~map keys (0057-a)~~ (ADR-0248, `just e14-map-keys`) and ~~`let

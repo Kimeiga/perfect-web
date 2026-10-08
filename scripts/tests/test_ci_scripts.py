@@ -1,9 +1,9 @@
 """The verification run's scripts (ADR-0245), each on what it decides.
 
 - `ci_plan.py` deals recipes into shards, the costliest first, the same way
-  every time, leaves out the measurements of a machine, sends a recipe run
-  against a database to the database job, and reaches from a change to the
-  mutation scripts it touches;
+  every time, leaves out the measurements of a machine, gives a recipe run
+  against a database a shard and a PostgreSQL of its own, and reaches from a
+  change to the mutation scripts it touches;
 - `ci_recipes.py` takes what a recipe wrote to be the files whose bytes
   changed while it ran, and frees what its builds leave;
 - `ci_summary.py` fails a run where a recipe failed, a mutant survived, or a
@@ -42,8 +42,8 @@ class Plan(unittest.TestCase):
         self.assertEqual(
             plan.plan(list(costs), costs, 2),
             [
-                {"index": 0, "recipes": ["a", "d"], "browsers": False, "build": False},
-                {"index": 1, "recipes": ["b", "c"], "browsers": False, "build": False},
+                {"index": 0, "recipes": ["a", "d"], "browsers": False, "build": False, "database": False},
+                {"index": 1, "recipes": ["b", "c"], "browsers": False, "build": False, "database": False},
             ],
         )
 
@@ -132,35 +132,70 @@ class Plan(unittest.TestCase):
             self.assertEqual(plan.recipes_at(text, [(3, 3)], ["e14-track"]), {"e14-track"})
             self.assertEqual(plan.recipes_at(text, [(1, 1)], ["e14-track"]), set())
 
-    def test_a_recipe_run_against_a_database_goes_to_the_database_job(self) -> None:
+    def test_a_recipe_run_against_a_database_is_a_shard_of_its_own(self) -> None:
         out = subprocess.run(
             [sys.executable, str(SCRIPTS / "ci_plan.py"), "--shards", "2", "e14-feed-postgres", "e14-feed"],
             capture_output=True,
             text=True,
             check=True,
         ).stdout.splitlines()
+        # Its shard has a PostgreSQL beside it (ADR-0278), and sets up
+        # nothing more than its recipe needs (ADR-0258): `e14-feed-postgres`
+        # drives no browser and reads no page built.
         self.assertEqual(
-            out[0],
-            'shards=[{"index": 0, "recipes": ["e14-feed"], "browsers": true, "build": true}]',
+            out,
+            [
+                'shards=[{"index": 0, "recipes": ["e14-feed"], "browsers": true, "build": true, '
+                '"database": false}, {"index": 1, "recipes": ["e14-feed-postgres"], "browsers": false, '
+                '"build": false, "database": true}]'
+            ],
         )
-        self.assertEqual(out[1], 'database=["e14-feed-postgres"]')
-        # It sets up nothing more than its recipes need (ADR-0258):
-        # `e14-feed-postgres` drives no browser and reads no page built.
-        self.assertEqual(out[2], "database_browsers=false")
-        self.assertEqual(out[3], "database_build=false")
 
-    def test_the_database_job_sets_up_what_its_recipes_need(self) -> None:
+    def test_a_shard_with_a_database_sets_up_what_its_recipe_needs(self) -> None:
         # `e14-identity` drives three browsers against its PostgreSQL tests'
-        # database (ADR-0258): the job installs them, as a shard would.
+        # database (ADR-0258): its shard installs them, as any would.
         out = subprocess.run(
             [sys.executable, str(SCRIPTS / "ci_plan.py"), "--shards", "2", "e14-identity"],
             capture_output=True,
             text=True,
             check=True,
         ).stdout.splitlines()
-        self.assertEqual(out[1], 'database=["e14-identity"]')
-        self.assertEqual(out[2], "database_browsers=true")
-        self.assertEqual(out[3], "database_build=true")
+        self.assertEqual(
+            out,
+            ['shards=[{"index": 0, "recipes": ["e14-identity"], "browsers": true, "build": true, "database": true}]'],
+        )
+
+    def test_each_recipe_run_against_a_database_has_a_database_of_its_own(self) -> None:
+        # ADR-0278: in series on one database, four recipes outlasted their
+        # job's 120 minutes; each is a shard of its own, its PostgreSQL its
+        # own, within the run's shards, the others dealt into those left.
+        costs = {"a": 5, "b": 3, "d1": 9, "d2": 2, "d3": 1}
+        need = {"d1": (True, True)}
+        shards = plan.plan(list(costs), costs, 5, need, {"d1", "d2", "d3"})
+        self.assertEqual(
+            [(s["recipes"], s["browsers"], s["build"], s["database"]) for s in shards],
+            [
+                (["a"], False, False, False),
+                (["b"], False, False, False),
+                (["d1"], True, True, True),
+                (["d2"], False, False, True),
+                (["d3"], False, False, True),
+            ],
+        )
+        self.assertEqual([s["index"] for s in shards], [0, 1, 2, 3, 4])
+
+    def test_recipes_run_against_a_database_share_when_the_shards_run_out(self) -> None:
+        # Three shards, and others to deal: one is left for them, and the
+        # three on a database share two, dealt as any are.
+        costs = {"a": 5, "b": 3, "d1": 9, "d2": 2, "d3": 1}
+        shards = plan.plan(list(costs), costs, 3, {}, {"d1", "d2", "d3"})
+        self.assertEqual(
+            [(s["recipes"], s["database"]) for s in shards],
+            [(["a", "b"], False), (["d1"], True), (["d2", "d3"], True)],
+        )
+        # With no others, every shard is theirs.
+        only = plan.plan(["d1", "d2", "d3"], costs, 3, {}, {"d1", "d2", "d3"})
+        self.assertEqual([s["recipes"] for s in only], [["d1"], ["d2"], ["d3"]])
 
     def test_a_recipes_cost_counts_the_mutants_it_plants(self) -> None:
         body = "    python3 scripts/statements_separated_mutations.py\n"

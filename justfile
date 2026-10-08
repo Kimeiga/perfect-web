@@ -4982,7 +4982,7 @@ e14-materialization-chains:
 # ADR-0256 (ADR-0195's ruling 10): an entry written `_` is every entry at the
 # rest, dropped in every session's partition. The PostgreSQL test runs where
 # PW_FEED_DATABASE_URL names a database, and passes doing nothing otherwise:
-# the database job runs it in `e14-feed-postgres`.
+# `e14-feed-postgres` runs it there.
 e14-every-entry:
     @mkdir -p docs/evidence/E14
     @{ echo "ADR-0256 - an entry written with a wildcard is every entry at the rest"; echo; \
@@ -5004,9 +5004,9 @@ e14-every-entry:
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/every-entry.txt
 
 # ADR-0257: the follows timeline. The server's tests (on PostgreSQL where
-# PW_FEED_DATABASE_URL names a database, and doing nothing otherwise; the
-# database job runs them in `e14-feed-postgres`), the feed in three engines,
-# and the mutation controls.
+# PW_FEED_DATABASE_URL names a database, and doing nothing otherwise;
+# `e14-feed-postgres` runs them there), the feed in three engines, and the
+# mutation controls.
 e14-follows:
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @bash spikes/own-renderer/feed.sh > /dev/null

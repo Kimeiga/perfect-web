@@ -13,18 +13,19 @@ The recipes are `just`'s own list, kept where they record evidence
 
 Each is dealt to the shard with the least work so far, the costliest first,
 by an estimate of its cost: the mutants the scripts it runs plant, each a
-build and a test run; one that needs a database (`NEEDS_DATABASE`) goes to
-the run's database job instead. A recipe that drives a browser, or reads
-what the build makes (the servers, `pw`), shares its shards with its kind
-(ADR-0249): only those shards install the browsers and build, most of a
-shard's setup, and the others do neither. Prints, for `$GITHUB_OUTPUT`,
-`shards=<json>`, a list of `{"index": i, "recipes": [...], "browsers": b,
-"build": b}`, and `database=<json>`, a list of recipes, each empty where
+build and a test run. One that needs a database (`NEEDS_DATABASE`) is a
+shard of its own, which the run gives a PostgreSQL of its own (ADR-0278),
+while the shards go round; the rest are dealt into the shards left. A
+recipe that drives a browser, or reads what the build makes (the servers,
+`pw`), shares its shards with its kind (ADR-0249): only those shards install
+the browsers and build, most of a shard's setup, and the others do neither.
+Prints, for `$GITHUB_OUTPUT`, `shards=<json>`, a list of `{"index": i,
+"recipes": [...], "browsers": b, "build": b, "database": b}`, empty where
 nothing is to run.
 
-    python3 scripts/ci_plan.py --shards 16 --all
-    python3 scripts/ci_plan.py --shards 16 --changed BASE HEAD
-    python3 scripts/ci_plan.py --shards 16 e14-feed e14-read-whole
+    python3 scripts/ci_plan.py --shards 17 --all
+    python3 scripts/ci_plan.py --shards 17 --changed BASE HEAD
+    python3 scripts/ci_plan.py --shards 17 e14-feed e14-read-whole
 """
 
 import argparse
@@ -50,10 +51,10 @@ LOCAL_ONLY = {
     "e10-memory",
 }
 
-# Recipes run against a database, which the run's database job provides
-# (ADR-0246): they are planned there and not in a shard. The job sets up
-# what a shard would for them (ADR-0258): `e14-identity` and `e14-uploads`
-# (ADR-0260) drive browsers.
+# Recipes run against a database (ADR-0246). Each is a shard of its own,
+# beside a PostgreSQL of its own (ADR-0278), set up as any shard is for its
+# recipe (ADR-0258): `e14-identity` and `e14-uploads` (ADR-0260) drive
+# browsers.
 NEEDS_DATABASE = {"e14-feed-postgres", "e14-identity", "e14-uploads", "e14-notifications"}
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
@@ -246,11 +247,21 @@ def plan(
     costs: dict[str, int],
     shards: int,
     need: dict[str, tuple[bool, bool]] | None = None,
+    database: frozenset[str] | set[str] = frozenset(),
 ) -> list[dict]:
     """Deal `names` into at most `shards`, each kind of recipe (browsers and
     a build, a build alone, neither) into shards of its own, as many as its
-    share of the work, at least one where it has a recipe."""
+    share of the work, at least one where it has a recipe.
+
+    A recipe of `database` is a shard of its own, beside a PostgreSQL of its
+    own (ADR-0278), while the shards go round, leaving one for the rest
+    where there are any; past that, they share theirs, dealt as any are.
+    Theirs are numbered after the others'."""
     need = need or {}
+    on_database = [n for n in names if n in database]
+    names = [n for n in names if n not in database]
+    beside = min(len(on_database), max(1, shards - (1 if names else 0))) if on_database else 0
+    shards = max(1, shards - beside)
     kinds: dict[tuple[bool, bool], list[str]] = {}
     for n in names:
         kinds.setdefault(need.get(n, (False, False)), []).append(n)
@@ -268,7 +279,21 @@ def plan(
     out = []
     for k in order:
         for recipes in deal(kinds[k], costs, share[k]):
-            out.append({"index": len(out), "recipes": recipes, "browsers": k[0], "build": k[1]})
+            out.append(
+                {"index": len(out), "recipes": recipes, "browsers": k[0], "build": k[1], "database": False}
+            )
+    # Each sets up what its recipes need, as a shard of their kind would.
+    for recipes in deal(on_database, costs, beside):
+        setup = [need.get(n, (False, False)) for n in recipes]
+        out.append(
+            {
+                "index": len(out),
+                "recipes": recipes,
+                "browsers": any(b for b, _ in setup),
+                "build": any(b for _, b in setup),
+                "database": True,
+            }
+        )
     return out
 
 
@@ -296,16 +321,9 @@ def main() -> int:
         print("ci_plan: say --all, --changed BASE HEAD, or the recipes", file=sys.stderr)
         return 1
     body = bodies()
-    database = sorted(n for n in names if n in NEEDS_DATABASE)
-    sharded = [n for n in names if n not in NEEDS_DATABASE]
-    costs = {n: cost(body.get(n, "")) for n in sharded}
-    need = {n: needs(body.get(n, "")) for n in sharded}
-    print("shards=" + json.dumps(plan(sharded, costs, args.shards, need)))
-    print("database=" + json.dumps(database))
-    # What the database job sets up, as a shard does: its recipes' needs.
-    setup = [needs(body.get(n, "")) for n in database]
-    print("database_browsers=" + json.dumps(any(b for b, _ in setup)))
-    print("database_build=" + json.dumps(any(b for _, b in setup)))
+    costs = {n: cost(body.get(n, "")) for n in names}
+    need = {n: needs(body.get(n, "")) for n in names}
+    print("shards=" + json.dumps(plan(names, costs, args.shards, need, NEEDS_DATABASE)))
     return 0
 
 

@@ -23,6 +23,17 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0278, 2026-10-08: a recipe run against a database is a shard of its
+own** (found by the messages track; amends ADR-0246 and ADR-0249). The
+database job ran its recipes in series on one PostgreSQL, and the messages
+track's run 37831080654 outlasted its 120 minutes: `e14-identity` took 33
+minutes and `e14-messages` 45, then the job was cancelled inside
+`e14-notifications`, and `e14-uploads` never ran. Each such recipe is a shard
+of its own now, beside a PostgreSQL of its own; one matrix job gives it only
+to them, since a service whose image is empty does not start. They count
+among a run's 17 shards, which with the three browser jobs are the Free
+plan's 20 at once, and the rest are dealt into the shards left.
+
 **Correction, 2026-10-07: a mutant survived at 07f8a2c.** The first
 verification run of `e10-recursion` on Linux (run 37646762298) recorded 6
 of 7, and so does this host: "a record or variant is passed flat" survives.

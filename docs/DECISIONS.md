@@ -2285,3 +2285,10 @@ a materialization is kept, and a page reads it.
   The host keeps its value as the materializer's entry, makes a chain again
   in its order when an event reaches it, and tells each document that reads
   an entry made again at its key; a page reads a public one as a query.
+[ADR-0278](DECISIONS/ADR-0278-a-recipe-run-against-a-database-is-a-shard-of-its-own.md):
+a recipe run against a database is a shard of its own (amends ADR-0246 and
+ADR-0249).
+- Each recipe in `NEEDS_DATABASE` has a shard and a PostgreSQL of its own,
+  which the `recipes` job's matrix starts only for it; the database job is
+  gone; such shards count among a run's 17 (a track's 9), leaving at least
+  one for the rest.
