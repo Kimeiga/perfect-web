@@ -25,6 +25,9 @@ pub(crate) const GRANTS: &[&str] = &[
     // user, written with what they do.
     "database.read<Notification>",
     "database.write<Notification>",
+    // Track `messages` (ADR-XXXX): a message, and each reader's mark.
+    "database.read<Message>",
+    "database.write<Message>",
 ];
 
 /// One post as kept: its author by id, and what it replies to.
@@ -59,6 +62,8 @@ struct State {
     /// oldest first, and how many were ever written, each its own id.
     notes: Vec<crate::notifications::Note>,
     noted: usize,
+    /// Track `messages`: every message, and each reader's mark.
+    messages: crate::messages::Messages,
 }
 
 /// What a command changes, staged until it commits.
@@ -83,6 +88,10 @@ enum Change {
     Notify(crate::notifications::Note),
     /// Track `notifications`: every notification of a user, read.
     ReadAll(String),
+    /// Track `messages`: a message, and its sender's side read to it.
+    Message(crate::messages::Sent),
+    /// Track `messages`: a reader's conversation with another, read.
+    ReadConversation(String, String),
 }
 
 pub(crate) struct FeedData {
@@ -429,6 +438,16 @@ fn reads_of(state: Arc<State>, principals: Principals) -> crate::data::Ops {
             other => Err(format!("posts#author received {other:?}")),
         }),
     );
+    // Track `messages` (ADR-XXXX): a reader's conversation, their list and
+    // count, each by the reader's handle, and who may message whom.
+    let (u, k) = (state.clone(), state.clone());
+    crate::messages::reads(
+        &mut ops,
+        Arc::new(state.messages.clone()),
+        Arc::new(state.follows.clone()),
+        Arc::new(move |id: &str| user_val(&u, id)),
+        Arc::new(move |id: &str| known(&k, id)),
+    );
     ops.insert(
         "feed:data/users#viewer".to_string(),
         Arc::new(move |args: &[Val]| match args {
@@ -539,6 +558,10 @@ impl crate::data::Staged for Staging<'_> {
                 }
                 Change::User(id, profile) => {
                     self.state.users.insert(id, profile);
+                }
+                Change::Message(sent) => self.state.messages.commit(sent),
+                Change::ReadConversation(reader, with) => {
+                    self.state.messages.read(&reader, &with);
                 }
                 Change::Like(id) => {
                     if let Some(row) = self.state.posts.iter_mut().find(|r| r.id == id) {
@@ -826,6 +849,55 @@ impl crate::data::DataLayer for FeedData {
                     )))])
                 }
                 other => Err(format!("notifications#read received {other:?}")),
+            }),
+        );
+        // Track `messages` (ADR-XXXX): a message from the session's user,
+        // written by the author a post is, and the sender's side read to it.
+        // Who may is `requires MayMessage(to)`'s, evaluated before the
+        // command runs.
+        let (s, into, p) = (seen.clone(), staged.clone(), principals.clone());
+        ops.insert(
+            "feed:data/messages#send".to_string(),
+            Arc::new(move |args: &[Val]| match args {
+                [Val::String(session), Val::String(to), Val::String(text)] => {
+                    let mut staged = into.lock().expect("staged");
+                    let from = author(&p, session, &mut staged);
+                    let before = staged
+                        .iter()
+                        .filter(|c| matches!(c, Change::Message(_)))
+                        .count() as u64;
+                    let sent = crate::messages::Sent {
+                        seq: s.messages.next_seq(before),
+                        from: from.clone(),
+                        to: to.clone(),
+                        text: text.clone(),
+                        at: crate::messages::now(),
+                    };
+                    let answer = ok(crate::messages::message_val(
+                        &sent.id(),
+                        user_val(&s, &from),
+                        text,
+                        false,
+                    ));
+                    staged.push(Change::Message(sent));
+                    Ok(vec![answer])
+                }
+                other => Err(format!("messages#send received {other:?}")),
+            }),
+        );
+        // Track `messages`: a reader's conversation, read: how many were
+        // unread.
+        let (s, into) = (seen.clone(), staged.clone());
+        ops.insert(
+            "feed:data/messages#read".to_string(),
+            Arc::new(move |args: &[Val]| match args {
+                [Val::String(reader), Val::String(with)] => {
+                    into.lock()
+                        .expect("staged")
+                        .push(Change::ReadConversation(reader.clone(), with.clone()));
+                    Ok(vec![ok(Val::S64(s.messages.unread_from(reader, with)))])
+                }
+                other => Err(format!("messages#read received {other:?}")),
             }),
         );
         let (s, into, p) = (seen, staged.clone(), principals);

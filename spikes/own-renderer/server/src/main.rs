@@ -537,6 +537,8 @@ mod uploads;
 mod notifications;
 // ADR-0277: a materialization kept, and served.
 mod materializations;
+// TRACK SEAM (messages): direct messages.
+mod messages;
 
 struct Server {
     /// The templates the compiler emitted, deserialized once.
