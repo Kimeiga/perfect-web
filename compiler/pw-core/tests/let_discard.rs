@@ -391,20 +391,25 @@ fn a_resource_a_result_carries_is_held_with_a_question_mark() {
     let src = transacting("Result<(), CartError>", "let tx = open()?\n    tx.commit()")
         .replace("fn f(", &format!("{open}fn f("));
     assert_eq!(found(&src, true), vec![]);
-    // Matched where it is made, what the arms bind is not followed. The
-    // repair names `?`, and only `destroy`: `f`'s row releases a handle, and
-    // takes none.
+    // Matched where it is made, the arm that binds it holds it (ADR-0269):
+    // until then this was refused, what the arms bind not followed.
     let matched = mapping(
         "match Maps.create(c, at) {\n        Ok(h) => Maps.destroy(h),\n        \
          Err(_) => (),\n    }\n    Ok(())",
     );
-    let f = found(&matched, true);
+    assert_eq!(found(&matched, true), vec![]);
+    // An arm that drops it is refused. The repair names `?`, and only
+    // `destroy`: `f`'s row releases a handle, and takes none.
+    let dropped = mapping(
+        "match Maps.create(c, at) {\n        Ok(_) => (),\n        \
+         Err(_) => (),\n    }\n    Ok(())",
+    );
+    let f = found(&dropped, true);
     assert_eq!(
         said(&f),
         vec![(
             "PW2005",
-            "affine resource `MapHandle` is matched where it is acquired, and what the arms \
-             bind is not followed",
+            "affine resource `MapHandle` is bound to `_`, and nothing can release it",
             "Maps.create(c, at)"
         )],
         "{f:#?}"

@@ -527,11 +527,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
             is refused as two statements in a block, and as what an
             argument list or a hole reads elsewhere; read as an index and
             refused by name, `List.get(items, 0)`, it would say what it is;
-          - **a resource matched where it is made** (ADR-0250): `match
-            Maps.create(..) { Ok(h) => Maps.destroy(h), .. }`, and `let r =
-            Maps.create(..)` then `match r`, are refused though an arm ends
-            the handle: what an arm binds is not followed, and `let h =
-            Maps.create(..)?` is the form that is;
+          - ~~**a resource matched where it is made**~~ (ADR-0269, `just
+            e14-matched-resources`: held by the arm or the `?` that takes
+            apart what carries it, and refused where an arm drops it);
+          - **a speculated row's control acts on an id no server has**
+            (found by the notifications track, 2026-10-08): a post shown
+            before its command answered is `pending-..`, and its Like sends
+            that id, which the server refuses, and the page shows "0
+            likes". A control on a speculated row is either held until the
+            row is the server's, or acts on an id the server accepts;
           - ~~**`lexical_mutations.py`'s two label survivors**~~
             (ADR-0242), "a `for` loop's name carries no label" and "a
             lambda's parameters carry no label": each test held a value

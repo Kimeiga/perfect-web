@@ -2213,3 +2213,9 @@ a command outlives the page that sent it (found by a WebKit failure on CI).
   followed at once ended the request with the page. Each command's request
   is kept alive now, within the Fetch standard's 64 KiB of such bodies in
   flight, counted in bytes; past it, sent as before.
+[ADR-0269](DECISIONS/ADR-0269-a-resource-is-held-by-what-takes-it-apart.md):
+a resource is held by what takes it apart (found by ADR-0250).
+- A `Result` or an `Option` carrying what a call acquires is held by the
+  arm or the `?` that takes it out, `Ok(h)`, `Some(h)` or `let h = r?`,
+  which must end it; an arm or a failure that carries none owes nothing.
+  A match on it was refused however its arms ended it.

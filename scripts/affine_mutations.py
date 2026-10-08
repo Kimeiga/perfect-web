@@ -31,8 +31,8 @@ MUTANTS = [
     (
         "a failing `?` is not an exit",
         AFFINE,
-        "                .then(Flow::exit(span.clone()).or(Flow::identity())),",
-        "                .then(Flow::identity()),",
+        "                self.expr(*value).then(fails.or(Flow::identity()))\n",
+        "                self.expr(*value).then(Flow::identity())\n",
     ),
     (
         "a second release is not counted",

@@ -5131,3 +5131,18 @@ e14-keepalive:
        python3 scripts/keepalive_mutations.py; \
      } > docs/evidence/E14/keepalive.txt
     @grep -E "passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/keepalive.txt
+
+# ADR-0269: a resource is held by what takes it apart. The checker's tests,
+# and the mutation controls.
+e14-matched-resources:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0269 - a resource is held by what takes it apart"; echo; \
+       echo "produced by: just e14-matched-resources"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== taken apart (compiler/pw-core/tests/matched_resources.rs, let_discard.rs)"; echo; \
+       cargo test --locked -p pw-core --test matched_resources --test let_discard 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/matched_resource_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/matched_resource_mutations.py; \
+     } > docs/evidence/E14/matched-resources.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/matched-resources.txt

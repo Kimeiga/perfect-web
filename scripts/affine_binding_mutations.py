@@ -24,8 +24,12 @@ MUTANTS = [
     (
         "a use is any name spelled like the value",
         AFFINE,
-        "    matches!(body.expr(e), Expr::Name(_)) && types.lexical().binder(e) == Some(a.binder)",
-        "    matches!(body.expr(e), Expr::Name(n) if *n == a.name)",
+        "    matches!(body.expr(e), Expr::Name(_))\n"
+        "        && types\n"
+        "            .lexical()\n"
+        "            .binder(e)\n"
+        "            .is_some_and(|b| b == a.binder || a.holders.contains(&b))\n",
+        "    matches!(body.expr(e), Expr::Name(n) if *n == a.name)\n",
     ),
     (
         "a local bound to a release counts nothing",

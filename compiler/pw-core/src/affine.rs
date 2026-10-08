@@ -86,6 +86,15 @@ struct Acquired {
     /// What a `release` clause is given: its block, through which it must
     /// end it (ADR-0251).
     clause: Option<ExprId>,
+    /// A `Result` or an `Option` carries the resource, so a `?` or an arm
+    /// takes it out (ADR-0269).
+    carried: bool,
+    /// The names that hold what it carries: an arm's `Ok(h)` or `Some(h)`,
+    /// or `let h = r?` (ADR-0269).
+    holders: Vec<Binder>,
+    /// The `match` that takes it apart where it is made, which no name holds
+    /// whole: the scope it is ended in (ADR-0269).
+    matched: Option<ExprId>,
 }
 
 pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
@@ -117,7 +126,15 @@ pub fn check(hir: &Hir, sigs: &Signatures, out: &mut Vec<Diagnostic>) {
         }
         owned.extend(released_parameters(hir, sigs, id, decl, body));
         owned.extend(released_clauses(body, decl, sigs, &types, &reached));
-        for a in owned {
+        for mut a in owned {
+            if a.carried && a.matched.is_none() {
+                let (holders, dropped) = holders_of(body, &types, &a, &reached);
+                a.holders = holders;
+                if let Some(fault) = dropped {
+                    report_unconsumed(hir, sigs, decl, &a, fault, &at, out);
+                    continue;
+                }
+            }
             let (releases, given) = releases_of(body, sigs, &types, &a, &reached);
             if let Some(escape) = escape_of(body, &types, &a, &module_state, &reached) {
                 report_escape(hir, decl, &a, escape, &at, out);
@@ -174,6 +191,9 @@ fn released_parameters(
                 scoped: false,
                 parameter: true,
                 clause: None,
+                carried: false,
+                holders: Vec::new(),
+                matched: None,
             })
         })
         .collect()
@@ -213,6 +233,9 @@ fn released_clauses(
             scoped: false,
             parameter: false,
             clause: Some(r.root),
+            carried: false,
+            holders: Vec::new(),
+            matched: None,
         });
     }
     for (clause, acquire) in types.lexical().released() {
@@ -239,6 +262,9 @@ fn released_clauses(
             scoped: false,
             parameter: false,
             clause: Some(block),
+            carried: false,
+            holders: Vec::new(),
+            matched: None,
         });
     }
     out
@@ -330,6 +356,7 @@ fn acquisitions<'a>(
             ty: &ty,
             gives,
             resource,
+            carried: carried(sig),
         };
         match walk.holder(id) {
             Holder::Binding {
@@ -337,6 +364,7 @@ fn acquisitions<'a>(
                 name,
                 at,
                 scoped,
+                carried,
             } => {
                 // `let tx = if c { Database.begin() } else { .. }`: two
                 // acquisitions, one binding to follow.
@@ -349,9 +377,30 @@ fn acquisitions<'a>(
                         scoped,
                         parameter: false,
                         clause: None,
+                        carried,
+                        holders: Vec::new(),
+                        matched: None,
                     });
                 }
             }
+            // `match Maps.create(..) { Ok(h) => .., Err(_) => .. }`: the arm
+            // that binds it holds it, within the match (ADR-0269).
+            Holder::Arm {
+                binder,
+                name,
+                matched,
+            } => owned.push(Acquired {
+                binder,
+                name,
+                ty,
+                span: body.expr_span(id),
+                scoped: false,
+                parameter: false,
+                clause: None,
+                carried: true,
+                holders: Vec::new(),
+                matched: Some(matched),
+            }),
             Holder::Kept => {}
             Holder::Nothing(dropped) => unheld.push(Unheld {
                 ty,
@@ -414,6 +463,16 @@ enum Holder {
         /// The binding statement.
         at: ExprId,
         scoped: bool,
+        /// It holds the `Result` or the `Option` the resource is carried in,
+        /// not taken out by a `?` (ADR-0269).
+        carried: bool,
+    },
+    /// `Ok(h)` or `Some(h)`, an arm of a `match` on the acquisition, binds
+    /// what it carries (ADR-0269): the arm's name, and the `match`.
+    Arm {
+        binder: Binder,
+        name: String,
+        matched: ExprId,
     },
     /// Ended where it is made, given to the caller, or held by a resource's
     /// `acquire` clause.
@@ -434,8 +493,12 @@ enum Dropped {
     Clause(Span),
     /// Given to a call that does not release it: the call, and its callee.
     Taken(Span, String),
-    /// Matched where it is made: what the arms bind is not followed.
+    /// Matched where it is made, where nothing carries it: what the arms
+    /// bind is not followed.
     Matched(Span),
+    /// Held whole by an arm's name, `r => ..`, which nothing follows
+    /// (ADR-0269).
+    Whole(Span),
     /// A function value's result, which nothing follows.
     Returned(Span),
     /// Kept in another value, or read for a field: that value.
@@ -462,6 +525,9 @@ struct Holding<'a, 'b> {
     gives: bool,
     /// What holds a resource's value (`resource_roots`).
     resource: &'b BTreeSet<ExprId>,
+    /// The call answers a `Result` or an `Option` that carries what it
+    /// acquires.
+    carried: bool,
 }
 
 impl Holding<'_, '_> {
@@ -471,6 +537,9 @@ impl Holding<'_, '_> {
     fn holder(&self, call: ExprId) -> Holder {
         let body = self.body;
         let mut at = call;
+        // A `?` takes the resource out of what carries it, and `Ok(..)` or
+        // `Some(..)` puts it back in one.
+        let mut carrying = self.carried;
         loop {
             let Some(&p) = self.parents.get(&at) else {
                 // A `resource`'s `acquire` clause: the resource holds its
@@ -518,11 +587,15 @@ impl Holding<'_, '_> {
                     }
                 }
                 Expr::If { cond, .. } if *cond != at => {}
-                Expr::Match { scrutinee, .. } if *scrutinee == at => {
-                    return Holder::Nothing(Dropped::Matched(body.expr_span(p)));
+                Expr::Match { scrutinee, arms } if *scrutinee == at => {
+                    if !carrying {
+                        return Holder::Nothing(Dropped::Matched(body.expr_span(p)));
+                    }
+                    return held_by_arms(body, arms, p);
                 }
-                Expr::Match { .. } | Expr::Try { .. } => {}
-                Expr::Call { .. } if wraps(body, self.types, p) == Some(at) => {}
+                Expr::Match { .. } => {}
+                Expr::Try { .. } => carrying = false,
+                Expr::Call { .. } if wraps(body, self.types, p) == Some(at) => carrying = true,
                 Expr::Let { pat, .. } => {
                     return match pat.map(|q| (q, body.pat(q))) {
                         Some((q, crate::hir::Pattern::Bind { name, .. })) => Holder::Binding {
@@ -530,6 +603,7 @@ impl Holding<'_, '_> {
                             name: name.clone(),
                             at: p,
                             scoped: false,
+                            carried: carrying,
                         },
                         Some((_, crate::hir::Pattern::Wild)) => {
                             Holder::Nothing(Dropped::Discarded(body.expr_span(p)))
@@ -550,6 +624,7 @@ impl Holding<'_, '_> {
                             name: name.clone(),
                             at: p,
                             scoped: true,
+                            carried: carrying,
                         },
                         None => Holder::Nothing(Dropped::Contained(body.expr_span(p))),
                     };
@@ -630,10 +705,129 @@ fn wraps(body: &Body, types: &Types<'_>, e: ExprId) -> Option<ExprId> {
         .then_some(arg.value)
 }
 
+/// What an arm of a `match` on a value that carries a resource does with it
+/// (ADR-0269), in order: an arm meets the cases no arm before it took whole.
+enum ArmTakes {
+    /// `Ok(h)` or `Some(h)`: binds it, and its body must end it.
+    Binds(crate::hir::PatternId, String),
+    /// `Err(..)`, `None`, or an arm no carrying case reaches: it holds
+    /// nothing to end.
+    Nothing,
+    /// `Ok(_)`, or `_` where a carrying case reaches it: drops it.
+    Drops(Span),
+    /// A name, or an or-pattern, where a carrying case reaches it: holds the
+    /// value whole, which nothing follows.
+    Whole(Span),
+}
+
+fn arm_takes(body: &Body, arms: &[crate::hir::MatchArm]) -> Vec<ArmTakes> {
+    use crate::hir::Pattern;
+    // A carrying case: the language's own `Ok` or `Some`, as written or
+    // qualified by its type, as `check` names them; never by a last segment,
+    // which another type's case may share (the last-segment audit).
+    let carrying = |path: &str| matches!(path, "Ok" | "Result.Ok" | "Some" | "Option.Some");
+    let mut taken = false;
+    arms.iter()
+        .map(|arm| match body.pat(arm.pat) {
+            _ if taken => ArmTakes::Nothing,
+            Pattern::Ctor { path, args } if carrying(path) => {
+                taken = true;
+                match args.as_slice() {
+                    [q] => match body.pat(*q) {
+                        Pattern::Bind { name, .. } => ArmTakes::Binds(*q, name.clone()),
+                        Pattern::Wild => ArmTakes::Drops(body.pat_span(*q)),
+                        _ => ArmTakes::Whole(body.pat_span(arm.pat)),
+                    },
+                    _ => ArmTakes::Whole(body.pat_span(arm.pat)),
+                }
+            }
+            Pattern::Wild => {
+                taken = true;
+                ArmTakes::Drops(body.pat_span(arm.pat))
+            }
+            Pattern::Bind { .. } | Pattern::Or(_) => {
+                taken = true;
+                ArmTakes::Whole(body.pat_span(arm.pat))
+            }
+            _ => ArmTakes::Nothing,
+        })
+        .collect()
+}
+
+/// What holds an acquisition a `match` takes apart where it is made
+/// (ADR-0269): the arm that binds it, or what drops it.
+fn held_by_arms(body: &Body, arms: &[crate::hir::MatchArm], matched: ExprId) -> Holder {
+    let mut bound = None;
+    for take in arm_takes(body, arms) {
+        match take {
+            ArmTakes::Binds(q, name) => bound = Some((q, name)),
+            ArmTakes::Drops(span) => return Holder::Nothing(Dropped::Discarded(span)),
+            ArmTakes::Whole(span) => return Holder::Nothing(Dropped::Whole(span)),
+            ArmTakes::Nothing => {}
+        }
+    }
+    match bound {
+        Some((q, name)) => Holder::Arm {
+            binder: Binder::Pattern(q),
+            name,
+            matched,
+        },
+        // No arm takes it: a match that misses a case is PW0305's.
+        None => Holder::Nothing(Dropped::Matched(body.expr_span(matched))),
+    }
+}
+
 /// Does `e` mean the value `a` holds: a name whose binding is `a`'s
-/// (ADR-0080)?
+/// (ADR-0080), or one that holds what it carries (ADR-0269)?
 fn means(body: &Body, types: &Types<'_>, e: ExprId, a: &Acquired) -> bool {
-    matches!(body.expr(e), Expr::Name(_)) && types.lexical().binder(e) == Some(a.binder)
+    matches!(body.expr(e), Expr::Name(_))
+        && types
+            .lexical()
+            .binder(e)
+            .is_some_and(|b| b == a.binder || a.holders.contains(&b))
+}
+
+/// The names that hold what a carrying binding carries (ADR-0269): each
+/// `Ok(h)` or `Some(h)` of a `match` on it, and `let h = r?`; and the first
+/// arm that drops it or holds it whole, which `check` refuses.
+fn holders_of(
+    body: &Body,
+    types: &Types<'_>,
+    a: &Acquired,
+    reached: &[ExprId],
+) -> (Vec<Binder>, Option<Fault>) {
+    let (mut holders, mut fault) = (Vec::new(), None);
+    for &id in reached {
+        match body.expr(id) {
+            Expr::Match { scrutinee, arms } if means(body, types, *scrutinee, a) => {
+                for (arm, take) in arms.iter().zip(arm_takes(body, arms)) {
+                    match take {
+                        ArmTakes::Binds(q, _) => holders.push(Binder::Pattern(q)),
+                        // Reported at the arm that drops it, `Ok(_)`.
+                        ArmTakes::Drops(_) => {
+                            fault.get_or_insert(Fault::Dropped(body.pat_span(arm.pat)));
+                        }
+                        ArmTakes::Whole(span) => {
+                            fault.get_or_insert(Fault::Whole(span));
+                        }
+                        ArmTakes::Nothing => {}
+                    }
+                }
+            }
+            Expr::Let {
+                pat: Some(q),
+                init: Some(init),
+                ..
+            } if matches!(body.pat(*q), crate::hir::Pattern::Bind { .. })
+                && matches!(body.expr(*init), Expr::Try { value }
+                    if means(body, types, *value, a)) =>
+            {
+                holders.push(Binder::Pattern(*q));
+            }
+            _ => {}
+        }
+    }
+    (holders, fault)
 }
 
 /// Calls in this body that release the value, by span; and the calls that
@@ -818,17 +1012,33 @@ impl Paths<'_> {
                 self.expr(*cond).then(self.expr(*then).or(e))
             }
             Expr::Match { scrutinee, arms } => {
+                // Taking apart what carries it (ADR-0269): the arm that binds
+                // it ends it in its body, and an arm no carrying case reaches
+                // holds nothing to end.
+                let takes = (self.acquired.matched == Some(id) || self.carries(*scrutinee))
+                    .then(|| arm_takes(self.body, arms));
                 let taken = arms
                     .iter()
-                    .map(|a| self.expr(a.body))
+                    .enumerate()
+                    .map(|(i, a)| match takes.as_ref().map(|t| &t[i]) {
+                        Some(ArmTakes::Nothing) => Flow::releasing(1).then(self.expr(a.body)),
+                        _ => self.expr(a.body),
+                    })
                     .reduce(Flow::or)
                     .unwrap_or_else(Flow::identity);
                 self.expr(*scrutinee).then(taken)
             }
-            // `e?` leaves the body when `e` fails, with what it has released.
-            Expr::Try { value } => self
-                .expr(*value)
-                .then(Flow::exit(span.clone()).or(Flow::identity())),
+            // `e?` leaves the body when `e` fails, with what it has released;
+            // where `e` carries the value, its failure carries none, and holds
+            // nothing to end (ADR-0269).
+            Expr::Try { value } => {
+                let fails = if self.carries(*value) {
+                    Flow::releasing(1).then(Flow::exit(span.clone()))
+                } else {
+                    Flow::exit(span.clone())
+                };
+                self.expr(*value).then(fails.or(Flow::identity()))
+            }
             // **A loop's body runs any number of times** (ADR-0211, ruling
             // 0045-a). Its iterable is evaluated once. A path that leaves the
             // body inside a pass, `return` or a failing `?`, leaves it as any
@@ -866,6 +1076,13 @@ impl Paths<'_> {
             }
             _ => self.children(id),
         }
+    }
+
+    /// Is `e` the name that holds what carries the value, not taken out?
+    fn carries(&self, e: ExprId) -> bool {
+        self.acquired.carried
+            && matches!(self.body.expr(e), Expr::Name(_))
+            && self.types.lexical().binder(e) == Some(self.acquired.binder)
     }
 
     /// The first release inside `id`, where a reader meets it.
@@ -969,6 +1186,10 @@ enum Fault {
     /// Given to a function value, `f(tx)`, which may release it where
     /// nothing counts (ADR-0080): the call, and what it calls.
     Given(Span, String),
+    /// An arm takes what it carries and drops it, `Ok(_)` (ADR-0269).
+    Dropped(Span),
+    /// An arm's name holds it whole, which nothing follows (ADR-0269).
+    Whole(Span),
 }
 
 /// The scope `a` is acquired in: the statements after its binding, in the
@@ -992,6 +1213,9 @@ fn fault_of(
     let (flow, end) = if let Some(clause) = a.clause {
         // What a `release` clause is given, through its block (ADR-0251).
         (paths.expr(clause), body.expr_span(clause))
+    } else if let Some(m) = a.matched {
+        // Taken apart where it is made: the `match` (ADR-0269).
+        (paths.expr(m), body.expr_span(m))
     } else if a.parameter {
         (paths.expr(body.root), body.expr_span(body.root))
     } else {
@@ -1156,6 +1380,31 @@ fn report_unconsumed(
                 a.name
             ),
         ),
+        Fault::Dropped(span) => (
+            "affine_value_discarded",
+            format!(
+                "affine resource `{}: {}` is bound to `_` in an arm, and nothing can release it",
+                a.name, a.ty
+            ),
+            span,
+            format!(
+                "bind what `{}` carries to a name in the arm, `Ok(x)`, and end it with {ways}",
+                a.name
+            ),
+        ),
+        Fault::Whole(span) => (
+            "affine_value_held_whole",
+            format!(
+                "affine resource `{}: {}` is matched by a name that holds it whole, which \
+                 nothing follows",
+                a.name, a.ty
+            ),
+            span,
+            format!(
+                "take what `{}` carries apart in the arm, `Ok(x)`, and end it with {ways}",
+                a.name
+            ),
+        ),
         Fault::Repeated(span) => (
             "affine_value_released_repeatedly",
             format!(
@@ -1257,6 +1506,15 @@ fn report_unheld(sigs: &Signatures, decl: &Decl, u: Unheld, at: &Span, out: &mut
             ),
             span,
             "nothing follows a value an arm binds".to_string(),
+        ),
+        Dropped::Whole(span) => (
+            "affine_value_held_whole",
+            format!(
+                "affine resource `{ty}` is matched by a name that holds it whole, which nothing \
+                 follows"
+            ),
+            span,
+            "this name holds it whole".to_string(),
         ),
         Dropped::Returned(span) => (
             "affine_value_returned_by_a_function_value",

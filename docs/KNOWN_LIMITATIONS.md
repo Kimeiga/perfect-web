@@ -345,14 +345,15 @@ refused by name:
   on every path. There is no way to say "this function reads the value and
   hands it back"; a `use` block releases its value and is the scoped form. A
   release inside a loop is refused even when the loop would run once.
-- **An acquisition is followed from a name** (ADR-0250). One is held by a
-  binding, `let x = ..`, `use x = ..` or `let h = Maps.create(..)?`; ended
-  where it is made; given to a caller, by a declaration that answers one;
-  or held by a resource's `acquire` clause. Anywhere else it is refused,
-  even where it would be ended: `match Maps.create(..) { Ok(h) =>
-  Maps.destroy(h), .. }` is refused, since what an arm binds is not
-  followed, and so is `let o = Some(Database.begin())`, which no release
-  takes. `use _ = ..` is refused, not read as a scope holding a value it
+- **An acquisition is followed from a name** (ADR-0250, ADR-0269). One is
+  held by a binding, `let x = ..`, `use x = ..` or `let h =
+  Maps.create(..)?`; by what takes apart the `Result` or `Option` carrying
+  it, an arm's `Ok(h)` or `Some(h)`, or `let h = r?`; ended where it is
+  made; given to a caller, by a declaration that answers one; or held by a
+  resource's `acquire` clause. Anywhere else it is refused, even where it
+  would be ended: a bare handle matched, `match h { x => .. }`, a carrying
+  value nested in another or bound by an or-pattern, and `let o =
+  Some(Database.begin())`, which no release takes. `use _ = ..` is refused, not read as a scope holding a value it
   never names, and so is an acquisition no name holds inside a keyword's
   block, `unsafe.imperative { Maps.create(..) }`. In a clause other than
   `acquire`, a `release`, a key, a `draw` or a transition, an acquisition

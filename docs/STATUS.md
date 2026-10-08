@@ -41,6 +41,18 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0269, 2026-10-08: a resource is held by what takes it apart** (found
+by ADR-0250). `match Maps.create(c, at) { Ok(h) => Maps.destroy(h), Err(_)
+=> () }` was PW2005, "matched where it is acquired", and the same match on
+a binding, or `let h = r?` on one, was "not consumed on every path": a
+release of `h` counted for nothing, and the failure, which holds no handle,
+owed one. What carries a resource is held by what takes it apart now, the
+arm's name or the `?`'s, which must end it once on every path, and an arm
+or a failure that carries none owes nothing; `Ok(_)`, a `_` that meets the
+handle and a name holding it whole are refused where they drop it. The
+last-segment audit refused the first version's `Result.Ok`, read by its
+last segment: the cases are named exactly (`just e14-matched-resources`).
+
 **ADR-0268, 2026-10-08: a command outlives the page that sent it** (found
 by a WebKit failure on CI). Verify run 37728182124 failed "a press the
 server refuses is restored on the cart's page" in WebKit: its setup pressed

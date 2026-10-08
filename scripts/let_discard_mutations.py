@@ -111,14 +111,14 @@ MUTANTS = [
     (
         "a `?` keeps what it holds",
         AFFINE,
-        "                Expr::Match { .. } | Expr::Try { .. } => {}\n",
-        "                Expr::Match { .. } => {}\n",
+        "                Expr::Try { .. } => carrying = false,\n",
+        "",
     ),
     (
         "a match holds what it matches",
         AFFINE,
-        "                Expr::Match { scrutinee, .. } if *scrutinee == at => {\n",
-        "                Expr::Match { scrutinee, .. } if *scrutinee == at && false => {\n",
+        "                Expr::Match { scrutinee, arms } if *scrutinee == at => {\n",
+        "                Expr::Match { scrutinee, arms } if *scrutinee == at && false => {\n",
     ),
     (
         "a function value's result is the caller's",
