@@ -47,94 +47,96 @@ APP = ROOT / "examples/feed/app.pw"
 RUST = "rust"
 BROWSER = "browser"
 
-# (what is undone, file, anchor, replacement, which tests)
+# (what is undone, which tests, file, anchor, replacement): the shape
+# scripts/mutation_anchors.py reads, its last three the file and the edit.
 MUTANTS = [
     (
         "the kind is the sender's: anything is a PNG",
+        RUST,
         SNIFF,
         "    let kind = sniff(bytes).ok_or(Unreadable::Unrecognized)?;\n",
         "    let kind = sniff(bytes).unwrap_or(Kind::Png);\n",
-        RUST,
     ),
     (
         "a served image is typed by its path's extension",
+        RUST,
         UPLOADS,
         "            let kind = sniff::sniff(&bytes)?;\n",
         "            let kind = Kind::named(ext)?;\n",
-        RUST,
     ),
     (
         "a PNG's IHDR CRC is not checked",
+        RUST,
         SNIFF,
         "    if crc32(&b[12..29]) != crc {\n",
         "    if crc32(&b[12..29]) != crc && false {\n",
-        RUST,
     ),
     (
         "the size limit raised before the body is read",
+        RUST,
         UPLOADS,
         "        if length > declared.max_bytes + FORM_OVERHEAD {\n",
         "        if length > 1000 * declared.max_bytes + FORM_OVERHEAD {\n",
-        RUST,
     ),
     (
         "the size limit raised after the body is read",
+        RUST,
         UPLOADS,
         "        if bytes.len() as u64 > declared.max_bytes {\n",
         "        if bytes.len() as u64 > declared.max_bytes + 1 {\n",
-        RUST,
     ),
     (
         "the width and height are not checked",
+        RUST,
         UPLOADS,
         "        if measured.width > declared.max_width || measured.height > declared.max_height {\n",
         "        if false {\n",
-        RUST,
     ),
     (
         "a JPEG's Exif turn is ignored",
+        RUST,
         SNIFF,
         "            return Ok(if turned { (y, x) } else { (x, y) });\n",
         "            return Ok((x, y));\n",
-        RUST,
     ),
     (
         "a deployment may raise a program's limit",
+        RUST,
         UPLOADS,
         "                Some(n) if n > *ours => Err(format!(\n",
         "                Some(n) if n > u64::MAX - 1 => Err(format!(\n",
-        RUST,
     ),
     (
         "a key need not be 64 hex digits: a path built from what a sender wrote",
+        RUST,
         BLOB,
         "        (text.len() == 64 && text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))\n",
         "        (!text.is_empty())\n",
-        RUST,
     ),
     (
         "nosniff dropped",
+        RUST,
         UPLOADS,
         '    ("x-content-type-options", "nosniff"),\n',
         "",
-        RUST,
     ),
     (
         "the sandbox dropped",
+        RUST,
         UPLOADS,
         "    (\"content-security-policy\", \"default-src 'none'; sandbox\"),\n",
         "",
-        RUST,
     ),
     (
         "a committed image is not kept by caches as immutable",
+        RUST,
         UPLOADS,
         '            "public, max-age=31536000, immutable".to_string(),\n',
         '            "no-cache".to_string(),\n',
-        RUST,
     ),
     (
         "a lease is shown to any session",
+        RUST,
         UPLOADS,
         "            state\n"
         "                .leases\n"
@@ -144,79 +146,78 @@ MUTANTS = [
         "                .leases\n"
         "                .values()\n"
         "                .find(|l| l.id == id && !session.is_empty())\n",
-        RUST,
     ),
     (
         "a lease is served where committed images are, before its post",
+        RUST,
         UPLOADS,
         "            let bytes = self.blobs.get(&key).ok()??;\n",
         "            let bytes = self.blobs.get(&key).ok().flatten()\n"
         "                .or_else(|| self.staged.get(&key).ok().flatten())?;\n",
-        RUST,
     ),
     (
         "an upload from another origin is taken",
+        RUST,
         UPLOADS,
         "        if !same_origin(headers) {\n",
         "        if !same_origin(headers) && false {\n",
-        RUST,
     ),
     (
         "a claim no transaction committed is not given back",
+        RUST,
         UPLOADS,
         "        if self.settled {\n            return;\n        }\n",
         "        if self.settled || !self.settled {\n            return;\n        }\n",
-        RUST,
     ),
     (
         "a discarded lease is kept",
+        RUST,
         UPLOADS,
         "                Fate::Discarded => leases.discarded(claimed),\n",
         "                Fate::Discarded => leases.unclaim(claimed),\n",
-        RUST,
     ),
     (
         "a post's image commits without its bytes in the deployment's storage",
+        RUST,
         FEED,
         '        self.claims.lock().expect("claims").keep()?;\n',
         "",
-        RUST,
     ),
     (
         "on PostgreSQL, a post's image commits without its bytes in storage",
+        "postgres",
         PG,
         '        self.claims.lock().expect("claims").keep()?;\n',
         "",
-        "postgres",
     ),
     (
         "PW5603: a form that sends a file may post anywhere",
+        RUST,
         CHECK,
         "            if to_upload.is_none() {\n",
         "            if to_upload.is_none() && false {\n",
-        RUST,
     ),
     (
         "PW5602: an upload's route may be a page's",
+        RUST,
         CHECK,
         "                let page = pages.iter().find(|(r, _)| route_matches(r, &path));\n",
         "                let page = pages.iter().find(|(r, _)| r.is_empty() && route_matches(r, &path));\n",
-        RUST,
     ),
     (
         "PW5601: a limit above what a host reads whole",
+        RUST,
         CHECK,
         "        && bytes <= MOST_BYTES\n",
         "        && bytes > 0\n",
-        RUST,
     ),
     (
         "an image's width and height are left out of the timeline's markup",
+        BROWSER,
         APP,
         "<img class=\"photo\" src={shown_image.src} width={shown_image.width} "
         "height={shown_image.height} alt={shown_image.alt}>",
         "<img class=\"photo\" src={shown_image.src} alt={shown_image.alt}>",
-        BROWSER,
     ),
 ]
 
@@ -276,7 +277,7 @@ def main():
     )
 
     survivors, skipped = 0, 0
-    for what, path, anchor, replacement, which in MUTANTS:
+    for what, which, path, anchor, replacement in MUTANTS:
         if which == "postgres" and not database():
             print(f"{what}: NOT RUN (no database named; the in-memory layer's is above)")
             skipped += 1

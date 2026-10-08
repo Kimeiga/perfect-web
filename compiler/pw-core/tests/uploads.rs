@@ -315,6 +315,23 @@ fn a_build_writes_each_upload_for_its_host() {
             max_height: 4096,
         }]
     );
+    // A malformed upload is not written for its host: past what a host
+    // reads whole, or a kind no host sniffs.
+    for malformed in [
+        PROGRAM.replace("max_bytes  5_000_000", "max_bytes  100_000_001"),
+        PROGRAM.replace("types      png, jpeg, webp, gif", "types      png, svg"),
+    ] {
+        let units: Vec<pw_core::check::Unit> = program(&malformed)
+            .into_iter()
+            .map(|(path, src)| pw_core::check::Unit {
+                hir: pw_core::lower::lower_file(&src, &pw_syntax::parse_tree(&src).green),
+                path,
+                src,
+            })
+            .collect();
+        let hirs: Vec<&pw_core::hir::Hir> = units.iter().map(|u| &u.hir).collect();
+        assert_eq!(pw_core::uploads::upload_clauses(&hirs), [], "{malformed}");
+    }
     // A link to an upload's route is no link to a page (PW5009).
     let link = PROGRAM.replace(
         "<h1>About</h1>",
