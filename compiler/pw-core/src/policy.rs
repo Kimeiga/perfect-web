@@ -121,6 +121,12 @@ pub enum Domain {
     EffectRef,
     /// A quoted interface name: `host "pw:host/database#read"`.
     Str,
+    /// **An operation a host provides** (ADR-0262), quoted:
+    /// `"namespace:package/interface#name"`, each part a WIT identifier.
+    /// Until ADR-0262 any string was taken, and one with no interface,
+    /// `feed:uploads#claim`, broke WIT generation for every component with
+    /// an error naming no line.
+    HostOp,
     /// One or more worlds: `placement browser, edge, origin`.
     Worlds,
     /// A privacy label constructor applied to a term: `privacy User(consumer)`.
@@ -308,7 +314,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "placement" => Domain::Worlds,
         "privacy" => Domain::LabelCtor,
         "capability" => Domain::EffectRef,
-        "host" => Domain::Str,
+        "host" => Domain::HostOp,
         // ADR-0040: the operation the compiler supplies, by its name.
         "intrinsic" => Domain::Str,
         "route" => Domain::RoutePattern,
@@ -819,6 +825,8 @@ pub enum ValueFault {
     Flag,
     /// Not a whole number greater than zero, as digits (track `uploads`).
     Count,
+    /// Not an operation a host provides (ADR-0262), and why.
+    HostOp(String),
     /// No operator of that name, where these are the domain's.
     Operator(String, Vec<&'static str>),
     /// An operator's arguments opened and never closed.
@@ -840,6 +848,57 @@ pub enum ValueFault {
 /// **The fault in `value`, as `head`'s domain reads it**, or `None` where the
 /// domain has it or is not one this reads. A name the value mentions, a
 /// parameter or a type, is resolved where scope is known (`check.rs`).
+/// **An operation a host provides, as a binding writes it** (ADR-0262):
+/// `"namespace:package/interface#name"`, quoted, its package, interface and
+/// name each a WIT identifier. Answers the four parts, or why not.
+pub fn host_op(value: &str) -> Result<[&str; 4], String> {
+    let quoted = value
+        .trim()
+        .strip_prefix('"')
+        .and_then(|v| v.strip_suffix('"'))
+        .ok_or("it is not quoted")?;
+    let (interface, name) = quoted
+        .split_once('#')
+        .ok_or("it names no operation after `#`")?;
+    let (package, interface) = interface
+        .split_once('/')
+        .ok_or("it names no interface after its package, `/`")?;
+    let (namespace, package) = package
+        .split_once(':')
+        .ok_or("its package has no namespace, `namespace:package`")?;
+    let parts = [namespace, package, interface, name];
+    for part in parts {
+        wit_id(part)?;
+    }
+    Ok(parts)
+}
+
+/// **A WIT identifier**, as wit-parser 0.257.1's `validate_id` holds one:
+/// words joined by `-`, each all lowercase or all uppercase ASCII letters,
+/// digits among them, the first beginning with a letter.
+fn wit_id(id: &str) -> Result<(), String> {
+    if id.is_empty() {
+        return Err("a part is empty".to_string());
+    }
+    for (i, word) in id.split('-').enumerate() {
+        let Some(first) = word.chars().next() else {
+            return Err(format!("`{id}` has an empty word"));
+        };
+        if i == 0 && !first.is_ascii_alphabetic() {
+            return Err(format!("`{id}` begins with `{first}`, not a letter"));
+        }
+        let lower = word.chars().any(|c| c.is_ascii_lowercase());
+        let upper = word.chars().any(|c| c.is_ascii_uppercase());
+        if let Some(c) = word.chars().find(|c| !c.is_ascii_alphanumeric()) {
+            return Err(format!("`{id}` has `{c}`, which no WIT identifier has"));
+        }
+        if lower && upper {
+            return Err(format!("`{id}`'s `{word}` mixes cases"));
+        }
+    }
+    Ok(())
+}
+
 pub fn value_fault(head: &str, value: &str) -> Option<ValueFault> {
     let value = value.trim();
     match domain_of(head)? {
@@ -867,6 +926,7 @@ pub fn value_fault(head: &str, value: &str) -> Option<ValueFault> {
             .map(|w| ValueFault::World(w.to_string())),
         Domain::Flag => (!value.is_empty()).then_some(ValueFault::Flag),
         Domain::Count => count(value).is_none().then_some(ValueFault::Count),
+        Domain::HostOp => host_op(value).err().map(ValueFault::HostOp),
         Domain::Operator(ops, words) => {
             if words.contains(&value) {
                 return None;

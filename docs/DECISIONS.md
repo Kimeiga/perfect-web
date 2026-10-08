@@ -2170,3 +2170,9 @@ first question at its merge).
   (`DataLayer::names_blob`), and a layer that cannot say is answered 503.
   Once a delete commits, a blob no post names is deleted, unless a command
   in flight holds a claim to the same bytes, which its post will name.
+[ADR-0262](DECISIONS/ADR-0262-a-host-binding-is-an-operation-a-host-provides.md):
+a host binding is an operation a host provides (found by the uploads track).
+- `host "namespace:package/interface#name"`, each part a WIT identifier,
+  held to that where it is written (PW0335). Any string was taken, and one
+  with no interface broke WIT generation for every component with an error
+  naming no line.

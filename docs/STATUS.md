@@ -41,6 +41,14 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0262, 2026-10-07: a host binding is an operation a host provides**
+(found by the uploads track). A binding was any quoted string, and one with
+no interface, `feed:uploads#claim`, broke WIT generation for every
+component of the program with an error naming no line. It is held where it
+is written now: `"namespace:package/interface#name"`, each part a WIT
+identifier as wit-parser 0.257.1 holds one, or PW0335 at the clause, saying
+which part and why (`just e14-host-bindings`).
+
 **ADR-0261, 2026-10-07: a deleted post's image is not served, and its blob
 is collected** (ADR-0260's first question at its merge). ADR-0260 served
 every blob it kept, and kept every one, so a deleted post's image stayed

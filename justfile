@@ -5023,3 +5023,20 @@ e14-arrival:
        CARGO_INCREMENTAL=0 python3 scripts/map_mutations.py; \
      } > docs/evidence/E14/arrival.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/arrival.txt
+
+# ADR-0262: a host binding is an operation a host provides,
+# `"namespace:package/interface#name"`, each part a WIT identifier, held to
+# that where it is written (PW0335). The checker's tests and the mutation
+# controls.
+e14-host-bindings:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0262 - a host binding is an operation a host provides"; echo; \
+       echo "produced by: just e14-host-bindings"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/host_bindings.rs)"; echo; \
+       cargo test --locked -p pw-core --test host_bindings 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/host_binding_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/host_binding_mutations.py; \
+     } > docs/evidence/E14/host-bindings.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/host-bindings.txt

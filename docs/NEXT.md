@@ -514,11 +514,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
             each ("Int overflow", "a map or set from outside repeats a
             key"). Ruling 0057-c's "by name" holds in the component when
             its trap does too;
-          - **a host binding's shape, checked where it is written** (found
-            by W2): `host "feed:uploads#claim"`, with no interface, broke
-            WIT generation for every component, by an error naming no
-            source line; a binding not `package:ns/interface#name` is to
-            be refused at check, with its span;
+          - ~~**a host binding's shape, checked where it is written**~~
+            (ADR-0262, `just e14-host-bindings`: `"namespace:package/
+            interface#name"`, each part a WIT identifier, PW0335 at the
+            clause);
           - **clauses nothing reads** (ADR-0243): `respects`,
             `intrinsic_height` and a `handler_policy`'s clauses are read by
             no analysis, generator or runtime (the rolling deployment a

@@ -1085,6 +1085,10 @@ fn policy_value(
                 "`{value}` is not a count: a whole number greater than zero, as digits, \
                  `5_000_000`"
             ),
+            ValueFault::HostOp(why) => format!(
+                "`{value}` is no operation a host provides, \
+                 `\"namespace:package/interface#name\"`: {why}"
+            ),
             ValueFault::Operator(name, ops) => {
                 format!(
                     "`{name}` is none of `{}`'s operators: {}",
