@@ -495,6 +495,24 @@ impl Identity {
         self.principals.set_accounts(true);
     }
 
+    /// **`session` signed in as `user`, without the flow** (track
+    /// `notifications`): the accounts model, a test's principal, so a test
+    /// holds one user in two sessions and another user beside them. The
+    /// flow itself is `tests/sign_in.rs`'s to hold.
+    #[cfg(test)]
+    pub fn signed_in_for_test(&self, session: &str, user: &str, name: &str) {
+        self.principals.set_accounts(true);
+        self.principals.open(
+            session,
+            Principal {
+                user: user.to_string(),
+                handle: format!("@{user}"),
+                name: name.to_string(),
+                issuer: "https://id.example.test".to_string(),
+            },
+        );
+    }
+
     /// **A request the identity track answers**, before any other route.
     /// `true` when it answered on `stream`; `false` leaves the request to
     /// the routes after it.
