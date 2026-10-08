@@ -342,11 +342,13 @@ def run(which):
 
 
 def main():
+    import mutation_baseline  # keeps what each command says, for a red baseline
     for which in (RUST, BROWSER):
         built, passed, failed = run(which)
         print(f"baseline ({which}): {passed} passed, {failed} failed")
         if not built or failed or not passed:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+            mutation_baseline.explain()
             return 1
     print(
         "postgres: "

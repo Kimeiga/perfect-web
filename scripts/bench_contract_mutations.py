@@ -97,6 +97,7 @@ def run_suite(stack):
 
 
 def main():
+    import mutation_baseline  # keeps what each command says, for a red baseline
     for stack in ("pleris", "next-react", "sveltekit"):
         if not build(stack):
             print(f"FAIL: {stack} does not build unmutated")
@@ -105,6 +106,7 @@ def main():
         print(f"baseline {stack}: {passed} passed, {failed} failed")
         if failed or not passed:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+            mutation_baseline.explain()
             return 1
 
     survivors = 0

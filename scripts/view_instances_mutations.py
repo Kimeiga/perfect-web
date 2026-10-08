@@ -319,6 +319,7 @@ SUITES = {"cargo": cargo_tests, "runtime": runtime_tests, "build": build_tests}
 
 
 def main():
+    import mutation_baseline  # keeps what each command says, for a red baseline
     if not STAGED.exists():
         print("FAIL: no staged build; run `BUILD_ONLY=1 bash spikes/own-renderer/run.sh`")
         return 1
@@ -327,6 +328,7 @@ def main():
         print(f"baseline ({suite}): {passed} passed, {failed} failed")
         if not built or failed or not passed:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+            mutation_baseline.explain()
             return 1
 
     survivors = 0

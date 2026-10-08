@@ -102,11 +102,13 @@ def run(kind):
 
 
 def main():
+    import mutation_baseline  # keeps what each command says, for a red baseline
     for kind in CARGO:
         built, passed, failed = run(kind)
         print(f"baseline ({kind}): {passed} passed, {failed} failed")
         if not built or failed or not passed:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+            mutation_baseline.explain()
             return 1
 
     survivors = 0

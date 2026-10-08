@@ -117,6 +117,7 @@ def run_tests():
 
 
 def main():
+    import mutation_baseline  # keeps what each command says, for a red baseline
     # Stopped from outside, the source is still restored: SIGTERM raises
     # here, and the `finally` below runs.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
@@ -124,6 +125,7 @@ def main():
     print(f"baseline: {passed} passed, {failed} failed", flush=True)
     if not built or failed or not passed:
         print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+        mutation_baseline.explain()
         return 1
 
     survivors = 0

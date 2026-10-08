@@ -124,10 +124,12 @@ def run_tests():
 
 
 def main():
+    import mutation_baseline  # keeps what each command says, for a red baseline
     code, compiled, passed, failed = run_tests()
     print(f"baseline: {passed} passed, {failed} failed (exit {code})")
     if code != 0 or failed or not passed:
         print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+        mutation_baseline.explain()
         return 1
 
     survivors = 0

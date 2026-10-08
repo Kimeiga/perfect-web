@@ -226,11 +226,13 @@ SUITES = {"cargo": cargo_tests, "browser": browser_tests}
 
 
 def main():
+    import mutation_baseline  # keeps what each command says, for a red baseline
     for suite, run in SUITES.items():
         built, passed, failed = run()
         print(f"baseline ({suite}): {passed} passed, {failed} failed")
         if not built or failed or not passed:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+            mutation_baseline.explain()
             return 1
 
     survivors = 0

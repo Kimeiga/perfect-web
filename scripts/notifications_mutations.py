@@ -271,12 +271,14 @@ def run_tests(group):
 
 
 def main():
+    import mutation_baseline  # keeps what each command says, for a red baseline
     groups = [COMPILER, SERVER, BROWSER] + ([POSTGRES] if DATABASE else [])
     for group in groups:
         built, passed, failed = run_tests(group)
         print(f"baseline ({group}): {passed} passed, {failed} failed")
         if not built or failed or not passed:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+            mutation_baseline.explain()
             return 1
 
     survivors, run = 0, 0

@@ -106,6 +106,7 @@ def run_tests():
 
 
 def main():
+    import mutation_baseline  # keeps what each command says, for a red baseline
     if not os.environ.get("PW_FEED_DATABASE_URL"):
         print("FAIL: PW_FEED_DATABASE_URL is not set; without a database every test")
         print("passes doing nothing, and no mutant can mean anything")
@@ -114,6 +115,7 @@ def main():
     print(f"baseline: {passed} passed, {failed} failed")
     if not built or failed or not passed:
         print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+        mutation_baseline.explain()
         return 1
 
     survivors = 0
