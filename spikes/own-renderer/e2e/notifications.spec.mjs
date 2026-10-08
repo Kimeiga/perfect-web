@@ -58,6 +58,17 @@ async function signIn(page, who, name) {
   await expect(page.locator("#me")).toHaveText(`Signed in as ${name}`);
 }
 
+/**
+ * **A press, and its command's answer** (ADR-0268): the page shows what a
+ * press speculates before its request leaves, so a test that goes on to
+ * navigate waits for the server's answer first.
+ */
+async function answered(page, command, press) {
+  const answer = page.waitForResponse(`**/command/feed.app.${command}`);
+  await press();
+  await answer;
+}
+
 /** The timeline's post with `text`. */
 const post = (page, text) => page.locator("main > ul > li").filter({ hasText: text });
 
@@ -72,8 +83,11 @@ async function people(browser, testInfo) {
   await signUp(ben, handle(testInfo, "ben"), `Ben ${engine}`);
   const text = `Ada's at ${Date.now()}`;
   await ada.getByLabel("What's happening?").fill(text);
-  await ada.getByRole("button", { name: "Post" }).click();
+  await answered(ada, "post", () => ada.getByRole("button", { name: "Post" }).click());
   await expect(post(ada, text)).toHaveCount(1);
+  // The row shown before the server answered is `pending-..`, which no like
+  // finds: the server's row, by its id, before anyone presses on it.
+  await expect(post(ada, text).locator(".author")).toHaveAttribute("href", /^\/post\/p\d+$/);
   return { contexts, ada, again, ben, text, engine };
 }
 
@@ -88,13 +102,13 @@ test("a like and a reply reach each of the author's pages, and reading them each
 
   // Ben likes it, and replies on its page.
   await at(ben, "/");
-  await post(ben, text).getByRole("button", { name: "Like" }).click();
+  await answered(ben, "like", () => post(ben, text).getByRole("button", { name: "Like" }).click());
   await expect(ada.locator("#unread")).toHaveText("Notifications: 1 unread");
   await expect(again.locator("#unread")).toHaveText("Notifications: 1 unread");
   await post(ben, text).locator(".author").click();
   await ben.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
   await ben.getByLabel("Your reply").fill(`Ben answers ${engine}`);
-  await ben.getByRole("button", { name: "Reply" }).click();
+  await answered(ben, "reply", () => ben.getByRole("button", { name: "Reply" }).click());
   // Live, on both of Ada's open pages; Ben's own is his.
   await expect(ada.locator("#unread")).toHaveText("Notifications: 2 unread");
   await expect(again.locator("#unread")).toHaveText("Notifications: 2 unread");
@@ -114,7 +128,9 @@ test("a like and a reply reach each of the author's pages, and reading them each
   await expect(again.locator(".new")).toHaveCount(2);
 
   // Read: none unread at once, and on her other open page, live.
-  await again.getByRole("button", { name: "Mark all read" }).click();
+  await answered(again, "mark_read", () =>
+    again.getByRole("button", { name: "Mark all read" }).click(),
+  );
   await expect(again.locator("#unread-here")).toHaveText("0 unread");
   await expect(again.locator(".new")).toHaveCount(0);
   await expect(ada.locator("#unread")).toHaveText("Notifications: 0 unread");
@@ -126,7 +142,7 @@ test("a like and a reply reach each of the author's pages, and reading them each
 
 test("one's own like notifies no one", async ({ browser }, testInfo) => {
   const { contexts, ada, again, text } = await people(browser, testInfo);
-  await post(ada, text).getByRole("button", { name: "Like" }).click();
+  await answered(ada, "like", () => post(ada, text).getByRole("button", { name: "Like" }).click());
   await expect(post(ada, text).locator(".likes")).toHaveText("1 like");
   await at(again, "/");
   await expect(again.locator("#unread")).toHaveText("Notifications: 0 unread");
@@ -140,7 +156,7 @@ test("another user's session, signed in and not, sees none of it", async ({
 }, testInfo) => {
   const { contexts, ada, ben, text } = await people(browser, testInfo);
   await at(ben, "/");
-  await post(ben, text).getByRole("button", { name: "Like" }).click();
+  await answered(ben, "like", () => post(ben, text).getByRole("button", { name: "Like" }).click());
   await expect(ada.locator("#unread")).toHaveText("Notifications: 1 unread");
   const nobody = await browser.newContext();
   const stranger = await nobody.newPage();
