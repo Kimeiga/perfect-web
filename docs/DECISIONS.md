@@ -2226,6 +2226,14 @@ a resource is held by what takes it apart (found by ADR-0250).
   arm or the `?` that takes it out, `Ok(h)`, `Some(h)` or `let h = r?`,
   which must end it; an arm or a failure that carries none owes nothing.
   A match on it was refused however its arms ended it.
+[ADR-0270](DECISIONS/ADR-0270-the-readers-user-is-the-hosts-and-a-listener-binds-a-users-id.md):
+the reader's user is the host's, and a listener's handle binds a user's id
+(track `notifications`, W3; amends ADR-0091).
+- `context.current_user()` is answered by the host from the session's
+  principal (`pw:host/principal#read`), and a user's id is the platform's
+  `capability.UserId`. In `invalidates_on` alone, a parameter of the
+  platform's `User<T>` binds an event's value of type `T`, so an event
+  naming a user drops that user's entries in each of their sessions.
 [ADR-0271](DECISIONS/ADR-0271-a-reader-is-told-once-per-burst-and-served-in-turn.md):
 a reader is told once per burst, and served in turn (found by WebKit's
 "Load more" failures).
@@ -2248,3 +2256,11 @@ first part).
   edges; `depends_on` beside a body is PW5110. A materialization is a term,
   read by `query`; inside a block, a clause's value ends with its line
   unless it cannot have.
+[ADR-0274](DECISIONS/ADR-0274-notifications-a-row-an-act-writes-private-to-its-user.md):
+notifications, a row a like, a reply or a follow writes, private to its user
+(track `notifications`, W3).
+- A notification is a row its act writes in its own transaction, in memory
+  and on PostgreSQL; one's own act notifies no one, and a deleted post's go
+  with it. Its queries are keyed by the reader's handle, `cache private`;
+  an unread count on the home page, a page of them, and mark-read reaching
+  each of the reader's sessions.

@@ -15,7 +15,7 @@ import List
 import String
 import context.{ current_session, current_user }
 import capability.{ Session, SessionId }
-// Track `notifications` (ADR-XXXX): a user's id is the platform's, the
+// Track `notifications` (ADR-0270): a user's id is the platform's, the
 // principal's `UserId`, which a handle, `User<UserId>`, is over. An id names
 // someone and grants nothing; a handle is the host's alone to make.
 import capability.{ UserId }
@@ -176,7 +176,7 @@ fn author(s: Session<SessionId>) -> UserId !{ database.read<User> }
 fn publish(s: Session<SessionId>, text: PostText) -> Result<Post, FeedError> !{ database.write<Post> }
     host "feed:data/posts#publish"
 
-// Track `notifications` (ADR-XXXX): a reply, a like, a follow and a delete
+// Track `notifications` (ADR-0274): a reply, a like, a follow and a delete
 // each write the notifications they tell of, or take with them, in their own
 // transaction: `database.write<Notification>`.
 fn add_reply(s: Session<SessionId>, to: PostId, text: PostText) -> Result<Post, FeedError> !{ database.write<Post>, database.write<Notification> }
@@ -746,7 +746,7 @@ session page ProfilePage(id: UserId) {
     }
 }
 
-// --- Track `notifications` (ADR-XXXX): what others do that involves you. ---
+// --- Track `notifications` (ADR-0274): what others do that involves you. ---
 
 // **A notification's id**: the layer's, never one a deleted one had.
 opaque type NotificationId = String

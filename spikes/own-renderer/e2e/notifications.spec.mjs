@@ -1,4 +1,4 @@
-// Track `notifications` (ADR-XXXX): what others do that involves you, in
+// Track `notifications` (ADR-0274): what others do that involves you, in
 // three engines. The feed is served on hosts of its own
 // (NOTIFICATIONS_PORTS), one per engine, its sessions signed in through the
 // development identity provider (`PW_IDENTITY=dev-accounts`), so one user

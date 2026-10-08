@@ -460,20 +460,23 @@ E14 comes before E11-E13. Its plan, controls and task list are
              one, and a chain rebuilt in order;
           4. ~~**track `identity`, W1**~~ (ADR-0258, `just e14-identity`:
              accounts and sign-in, Pleris the relying party and the
-             provider the deployment's). What it leaves, in order: a
+             provider the deployment's). What it leaves, in order: ~~a
              typed principal, `context.current_user()` answered by the
-             host from the session's principal, which notifications need
-             first (its first question; built by W3 under the integrator's
-             rulings, docs/PARALLEL.md); ~~the routes a deployment serves in
+             host from the session's principal~~ (ADR-0270, built by W3);
+             ~~the routes a deployment serves in
              the route table, and every form's `action` and `method`
              checked~~ (its second, and ADR-0260's fourth: ADR-0265, `just
              e14-form-routes`); a refusal shown by the runtime, a stale
              tab's command refused 403 with its predicate;
-          5. **notifications, track `notifications`, W3** (docs/PARALLEL.md,
-             under the integrator's rulings there): private, per-user live
-             data derived from others' actions, a like, a reply or a follow
-             involving you, with an unread count and mark-read, on the
-             typed principal (item 4's first);
+          5. ~~**notifications, track `notifications`, W3**~~ (ADR-0270,
+             ADR-0274, `just e14-notifications`: rows each act writes,
+             private to their user by cache and by session, an unread count
+             and mark-read). What it leaves, in order: a speculated row's
+             Like acting on an id no server has (found by W3, the feed's to
+             fix, below); telling by principal, an event naming a user
+             reading again only that user's open pages; `identified_by`
+             gone, the feed's reads by session moved to `current_user()`;
+             and a stream's `current_user()`;
           6. direct messages (after the timeline): data private to exactly
              two users. The privacy
              labels with two principals, and a cache that never shows one

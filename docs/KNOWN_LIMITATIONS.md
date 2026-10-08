@@ -540,6 +540,14 @@ awaited in order. What remains:
   session of its user by nothing until it reads again; a user's page lists
   their newest 20 posts. No blocks, mutes, follow requests, private
   accounts or lists of followers.
+- **Notifications tell a superset, and are the feed's own** (ADR-0270,
+  ADR-0274). An event naming a user reads again every open page of the
+  query, not only that user's; another user's page derives from its own
+  kept entry and is sent nothing. A like, a reply and a follow notify; a
+  mention does not, an unlike there is none of, and there is no grouping,
+  no other language, no push and no email. The feed still reads its
+  timelines and relations by the session through `identified_by`, and a
+  stream reads no `current_user()`.
 - **A materialization is checked, and does not run** (ADR-0255,
   ADR-0273). One may read another, a cycle of them is refused (PW5109), and
   an event reaching one reaches what reads it. One that declares its type

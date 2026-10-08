@@ -1,4 +1,4 @@
--- What others do that involves a user (track `notifications`, ADR-XXXX): a
+-- What others do that involves a user (track `notifications`, ADR-0274): a
 -- row a like, a reply or a follow writes in its own transaction, beside what
 -- it writes, as a post's image is the post's (ADR-0260). 0005 is the
 -- uploads'.

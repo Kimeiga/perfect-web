@@ -1,4 +1,4 @@
-//! **Notifications** (track `notifications`, ADR-XXXX): a like, a reply or a
+//! **Notifications** (track `notifications`, ADR-0274): a like, a reply or a
 //! follow writes a row for the user it involves, in its own transaction;
 //! one's own act notifies no one; a deleted post's notifications go with it;
 //! a user's unread count and list are theirs alone, by page, by `/pw-read`,

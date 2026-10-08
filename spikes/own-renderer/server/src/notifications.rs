@@ -1,5 +1,5 @@
 //! **The reader's user, and what others do that involves them** (track
-//! `notifications`, ADR-XXXX; docs/PARALLEL.md, the integrator's rulings of
+//! `notifications`, ADR-0274; docs/PARALLEL.md, the integrator's rulings of
 //! 2026-10-07).
 //!
 //! The typed principal: `context.current_user()` is the platform's

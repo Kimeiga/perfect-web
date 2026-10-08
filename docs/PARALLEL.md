@@ -21,10 +21,10 @@ charter+ADR reading (`AGENTS.md`); small merges; full gate tests").
 |---|---|---|
 | accounts and sign-in: a `requires` evaluator, sign-up, sign-in and sign-out, per-user sessions, an OIDC-style deployment interface with a local provider that is plainly not production | `track/identity` | W1, a local session; merged 2026-10-07 (ADR-0258) |
 | image uploads on a post: a typed upload with size and content-type limits, a deployment's blob-storage capability, served safely | `track/uploads` | W2, a local agent of the session that runs W1; merged 2026-10-07 (ADR-0260) |
-| notifications: private, per-user live data from others' actions (a like, a reply or a follow involving you), an unread count and mark-read, on a typed principal | `track/notifications` | W3, a local agent of the session that runs W1 and W2 |
+| notifications: private, per-user live data from others' actions (a like, a reply or a follow involving you), an unread count and mark-read, on a typed principal | `track/notifications` | W3, a local agent of the session that runs W1 and W2; merged 2026-10-08 (ADR-0270, ADR-0274) |
 
-The follows timeline landed on 2026-10-07 (ADR-0257); notifications are
-W3's, under the rulings below, and direct messages come after them.
+The follows timeline landed on 2026-10-07 (ADR-0257), and notifications
+on 2026-10-08 (ADR-0270, ADR-0274); direct messages come next.
 
 ## What each track owns
 
@@ -200,3 +200,14 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - **An unread count on each page that shows its reader**, live, and a
     page of them; reading them is a command that invalidates the reader's
     count and list, which reaches each of the reader's sessions.
+- **2026-10-08, at notifications' merge (ADR-0270, ADR-0274).** W3 stopped
+  at the account's weekly limit after its last push, its work complete; the
+  integrator merged it from its tip, f20ed75. Its three questions:
+  `e14-notifications` runs on the database job (`NEEDS_DATABASE`); the root
+  justfile keeps its import line, as identity's and uploads' are; and
+  `identity.rs`'s test-only `signed_in_for_test` stays. Queued from its Not
+  claimed: telling by principal (an event naming a user reads again every
+  open page of the query), `identified_by` gone (the feed's reads by
+  session moved to `current_user()`), and a stream's `current_user()`. Its
+  finding, a speculated row's Like acting on an id no server has, is the
+  feed's to fix (NEXT), as ruled.

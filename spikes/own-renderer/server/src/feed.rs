@@ -21,7 +21,7 @@ pub(crate) const GRANTS: &[&str] = &[
     "database.write<Attached>",
     "resource.acquire<Upload>",
     "resource.release<Upload>",
-    // Track `notifications` (ADR-XXXX): what others do that involves a
+    // Track `notifications` (ADR-0274): what others do that involves a
     // user, written with what they do.
     "database.read<Notification>",
     "database.write<Notification>",
@@ -389,7 +389,7 @@ fn reads_of(state: Arc<State>, principals: Principals) -> crate::data::Ops {
             other => Err(format!("users#of-session received {other:?}")),
         }),
     );
-    // Track `notifications` (ADR-XXXX): a reader's notifications and how
+    // Track `notifications` (ADR-0274): a reader's notifications and how
     // many are unread, each by the reader's handle, which is their id on the
     // wire, and who wrote a post, an id that grants nothing.
     let s = state.clone();

@@ -1,5 +1,5 @@
 //! **The reader's user, and an event that names a user** (track
-//! `notifications`, ADR-XXXX).
+//! `notifications`, ADR-0270).
 //!
 //! `context.current_user()` is the host's operation `pw:host/principal#read`,
 //! a handle, `User<UserId>`. A private query keyed by one serves its reader

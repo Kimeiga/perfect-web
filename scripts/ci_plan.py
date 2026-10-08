@@ -54,7 +54,7 @@ LOCAL_ONLY = {
 # (ADR-0246): they are planned there and not in a shard. The job sets up
 # what a shard would for them (ADR-0258): `e14-identity` and `e14-uploads`
 # (ADR-0260) drive browsers.
-NEEDS_DATABASE = {"e14-feed-postgres", "e14-identity", "e14-uploads"}
+NEEDS_DATABASE = {"e14-feed-postgres", "e14-identity", "e14-uploads", "e14-notifications"}
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
 

@@ -1,4 +1,4 @@
-# ADR-XXXX: notifications, a row a like, a reply or a follow writes, private to its user
+# ADR-0274: notifications, a row a like, a reply or a follow writes, private to its user
 
 Status: proposed by track `notifications` (W3, `track/notifications`), under
 the integrator's rulings of 2026-10-07 (docs/PARALLEL.md, "notifications
@@ -293,3 +293,14 @@ suite, 270 tests with PostgreSQL's, passed after the rebase onto de500be.
 - **Ports**: the recipe's browser suite, run here, was given `PORT=6100`,
   away from the integrator's suites on the default; the mutation script's
   browser mutants take `PW_NOTIFICATIONS_PORT`, by default 6100.
+
+## At the merge
+
+Numbered ADR-0274 by the integrator, on 2026-10-08, its typed principal
+beside it ADR-0270. Its questions, answered: `e14-notifications` runs on
+CI's database job (`NEEDS_DATABASE`, `scripts/ci_plan.py`); the root
+justfile keeps its import line, as identity's and uploads' are; and
+`identity.rs`'s test-only `signed_in_for_test` stays. The recorded evidence
+keeps the header it was recorded with, `ADR-XXXX`, until a run records it
+again. The speculated row's Like (Found) is the feed's to fix, queued in
+NEXT.

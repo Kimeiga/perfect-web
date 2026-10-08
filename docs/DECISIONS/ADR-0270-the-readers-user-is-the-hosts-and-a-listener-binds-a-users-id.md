@@ -1,4 +1,4 @@
-# ADR-XXXX: the reader's user is the host's, and a listener's handle binds a user's id
+# ADR-0270: the reader's user is the host's, and a listener's handle binds a user's id
 
 Status: proposed by track `notifications` (W3, `track/notifications`), under
 the integrator's rulings of 2026-10-07 (docs/PARALLEL.md, "notifications
@@ -182,3 +182,13 @@ Recorded by `just e14-notifications` in
   authors and its relations by the session, which a layer maps to a user
   through the identity's principals. Moving them to `current_user()` is a
   change of every one of those queries' keys, and is not this track's.
+
+## At the merge
+
+Numbered ADR-0270 by the integrator, on 2026-10-08, with its notifications
+beside it numbered ADR-0274 (`ADR-XXXX` in the code read one or the other,
+as the code it marks is the principal's or the notifications'). Merged from
+the track's tip, f20ed75, rebased onto ADR-0273 without a conflict: W3
+stopped at the account's weekly limit after its last push, its work
+complete. Telling by principal, `identified_by` gone and a stream's
+`current_user()` are queued in NEXT.

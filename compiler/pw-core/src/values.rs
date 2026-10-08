@@ -1470,7 +1470,7 @@ impl<'a> Typer<'a> {
     }
 
     /// **Whether a listener's argument `id`, of type `actual`, is a user's
-    /// handle over the event's `expected`** (track `notifications`, ADR-XXXX,
+    /// handle over the event's `expected`** (track `notifications`, ADR-0270,
     /// amending ADR-0091): `invalidates_on Notified(reader)`, `reader` a
     /// `User<UserId>` and `Notified`'s value a `UserId`. The entries at that
     /// user are dropped, in each of their sessions: the platform's `User` is
@@ -2510,7 +2510,7 @@ impl<'a> Typer<'a> {
                         match unify(&mut s, &e, &a) {
                             Verdict::Agree => Outcome::Agree,
                             Verdict::Undecided => Outcome::Undecided(Undecided::Unknown),
-                            // Track `notifications` (ADR-XXXX, amending
+                            // Track `notifications` (ADR-0270, amending
                             // ADR-0091): a listener's parameter that is a
                             // user's handle binds the event's value of that
                             // user's id.

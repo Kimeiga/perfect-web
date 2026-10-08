@@ -5,7 +5,7 @@
 # `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and is planned by the
 # verification run like any other (scripts/ci_plan.py reads this file too).
 
-# Track `notifications` (ADR-XXXX): the reader's user the host's, a
+# Track `notifications` (ADR-0274): the reader's user the host's, a
 # listener's handle binding an event's id (ADR-0091 as amended), and what
 # others do that involves you. The compiler's tests
 # (compiler/pw-core/tests/principal.rs); the server's (notifications.rs and
@@ -18,7 +18,7 @@ e14-notifications:
     @bash spikes/own-renderer/feed.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX (track notifications) - the reader's user the host's, and notifications on it"; echo; \
+    @{ echo "ADR-0270 and ADR-0274 - the reader's user the host's, and notifications on it"; echo; \
        echo "produced by: just e14-notifications"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \

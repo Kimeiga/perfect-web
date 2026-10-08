@@ -41,6 +41,21 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0274, 2026-10-08: notifications** (track `notifications`, W3, on
+ADR-0270). A like, a reply or a follow that involves you writes a
+notification, a row in the act's own transaction, in memory and on
+PostgreSQL (migration 0006), for the post's author, the replied-to post's,
+or the one followed; one's own act writes none, and a deleted post takes
+its rows with it. The reader's notifications and unread count are private
+queries keyed by the reader's handle, `cache private`: another user's
+session, signed in and not, sees none of it by page, by `/pw-read`, or by
+the cache every reader shares. The home page shows "Notifications: N
+unread", `/notifications` lists them twenty at a time, and Mark all read
+reaches each of the reader's sessions. 23 of 23 mutants killed, the browser
+suite 9 of 9 in three engines (`just e14-notifications`, on the database
+job). W3 stopped at the account's weekly limit after its last push, its work
+complete; the integrator merged it from its tip.
+
 **ADR-0273, 2026-10-08: a materialization is a value its body derives**
 (ruling 10's last piece, "materializations made real", first part). A
 materialization was declared and inert: no body, type or generator, and no
@@ -80,6 +95,17 @@ telling at a time, and one more for a commit that came meanwhile; the
 session's hold is taken in turn (`Turns`). Four rounds of forty, before
 and after in turn: 13 of 160 failed before, 2 of 160 after (`just
 e14-telling`).
+
+**ADR-0270, 2026-10-08: the reader's user is the host's, and a listener's
+handle binds a user's id** (track `notifications`, W3; amends ADR-0091).
+`context.current_user()` is the host's now, answered from the session's
+principal, or its guest where no one signed in; a user's id is the
+platform's `capability.UserId` throughout the feed, which a program may
+make, where a handle it may not (ADR-0263). In `invalidates_on` alone, a
+parameter of the platform's `User<T>` binds an event's value of type `T`:
+`invalidates_on Notified(reader)` drops the entries at that user in each
+of their sessions, and their open pages are told. Telling only that user's
+sessions is queued.
 
 **ADR-0269, 2026-10-08: a resource is held by what takes it apart** (found
 by ADR-0250). `match Maps.create(c, at) { Ok(h) => Maps.destroy(h), Err(_)

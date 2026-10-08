@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Mutation controls for track `notifications` (ADR-XXXX).
+"""Mutation controls for track `notifications` (ADR-0270, ADR-0274).
 
-Each mutant undoes one piece: the listener rule as ADR-XXXX amends ADR-0091
+Each mutant undoes one piece: the listener rule as ADR-0270 amends ADR-0091
 (a handle binds an event's id, in a listener alone, for `User` alone, over
 the event's own type); the host answering the reader's user; a like, a reply
 or a follow writing a notification, and one's own act writing none; a

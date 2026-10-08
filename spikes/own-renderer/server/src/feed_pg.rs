@@ -41,7 +41,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0005_post_images",
         include_str!("../migrations/feed/0005_post_images.sql"),
     ),
-    // Track `notifications` (ADR-XXXX): what others do that involves a user.
+    // Track `notifications` (ADR-0274): what others do that involves a user.
     (
         "0006_notifications",
         include_str!("../migrations/feed/0006_notifications.sql"),
@@ -430,7 +430,7 @@ fn reads_through(
             other => Err(format!("users#profile received {other:?}")),
         }),
     );
-    // Track `notifications` (ADR-XXXX): a reader's notifications and how
+    // Track `notifications` (ADR-0274): a reader's notifications and how
     // many are unread, by the reader's handle, their id on the wire; and who
     // wrote a post, an id.
     let r = run.clone();
