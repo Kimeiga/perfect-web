@@ -2940,6 +2940,27 @@ e14-optimistic-posts:
      } > docs/evidence/E14/optimistic-posts.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/optimistic-posts.txt
 
+# ADR-0275: a row shown before the server answers waits. The feed in three
+# engines (e2e/feed.spec.mjs), and the mutation controls.
+e14-waiting-rows:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0275 - a row shown before the server answers waits"; echo; \
+       echo "produced by: just e14-waiting-rows"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/waiting_rows_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/waiting_rows_mutations.py; \
+     } > docs/evidence/E14/waiting-rows.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/waiting-rows.txt
+
 # ADR-0221: a form control's value is written where HTML reads it. The
 # compiler's and the renderer's tests, the bound fields in three engines, the
 # corpus, and the mutation controls.

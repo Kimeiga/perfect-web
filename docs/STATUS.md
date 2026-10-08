@@ -41,6 +41,27 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0275, 2026-10-08: a row shown before the server answers waits**
+(found by W3, ADR-0274). A post the page shows before the server answers is
+keyed by an id the page made, `pending-..`, and its Like found no such post.
+Until the server's row stands in its place, its author and handle are
+placeholder links and its Like and Delete are disabled; the server's row
+links and acts, and a like pressed on it is counted. The program's own,
+`waits(id)` in the feed, as ruled at notifications' merge. A reply shown
+before the server answers still links to itself: the thread's replies are a
+view that contains itself, which computes no value yet (ruling 0073-a). 7 of
+7 mutants killed (`just e14-waiting-rows`).
+
+**Found, 2026-10-08: `pw fmt` changes what a clause says.** Run over the
+feed, it wrote `max_bytes 5_000_000` as `max_bytes 5 _000_000`, which `pw
+check` refuses, and `counted_follower(person, -1)` as `- 1`. A clause's value
+is printed token by token, and the upload's byte count is read from the
+clause's text as written; the lexer has no digit separator, so `5_000_000`
+is two tokens, and an expression refuses it as two statements (PW0030).
+ADR-0013's gate compared the tokens before and after, which are the same.
+The feed's and the store's sources are in no `pw fmt --check`. Queued first
+in NEXT.
+
 **ADR-0274, 2026-10-08: notifications** (track `notifications`, W3, on
 ADR-0270). A like, a reply or a follow that involves you writes a
 notification, a row in the act's own transaction, in memory and on

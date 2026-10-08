@@ -540,6 +540,20 @@ awaited in order. What remains:
   session of its user by nothing until it reads again; a user's page lists
   their newest 20 posts. No blocks, mutes, follow requests, private
   accounts or lists of followers.
+- **A row shown before the server answers waits, as the feed says**
+  (ADR-0275). Its id is the page's, `pending-..`; the feed's timeline row
+  links nowhere and acts on nothing until the server's row replaces it. A
+  reply shown so still links to itself, `/post/pending-reply-{n}`, not
+  found: the thread's replies are a view that contains itself, which
+  computes no value in its template yet (ruling 0073-a). An id the client
+  makes and the server accepts, with which nothing would wait, is not
+  built.
+- **`pw fmt` changes what a policy clause says** (found 2026-10-08). It
+  prints a clause's value token by token: `max_bytes 5_000_000`, read from
+  the clause's text, becomes `5 _000_000`, which `pw check` refuses, and
+  `-1` in a clause becomes `- 1`. The lexer has no digit separator: in an
+  expression `5_000_000` is two statements (PW0030). The feed's and the
+  store's sources are in no `pw fmt --check`, so nothing ran it over them.
 - **Notifications tell a superset, and are the feed's own** (ADR-0270,
   ADR-0274). An event naming a user reads again every open page of the
   query, not only that user's; another user's page derives from its own

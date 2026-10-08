@@ -406,6 +406,17 @@ fn pending(feed: List<Item>, text: PostText) -> List<Item> !{} {
     List.concat([Item { id: id, author: you, text: text.value, likes: 0, mine: true, images: [] }], feed)
 }
 
+// **A row shown before the server answers waits** (ADR-0275): its id is one
+// the page made, `pending()`'s or `replied()`'s, which no server has, so
+// nothing on the timeline's row acts or links until the server's row stands
+// in its place. A like pressed on one found no such post (ADR-0274). A reply
+// shown before the server answers still links to itself: the thread's
+// replies are a view that contains itself, which computes no value in its
+// template yet (ruling 0073-a).
+fn waits(id: PostId) -> Bool !{} {
+    String.starts_with(id.value, "pending-")
+}
+
 // **A count, in words** (ADR-0226): "1 reply", "3 likes". The thread
 // page computes its counts with it, in the template.
 fn counted(n: Int, one: String, many: String) -> String !{} {
@@ -588,18 +599,23 @@ session page Home() {
             <ul>
                 {#each feed as p (p.id)}
                     <li>
-                        <a class="author" href="/post/{p.id}">{p.author.name}</a>
-                        <a class="handle" href="/user/{p.author.id}">{p.author.handle}</a>
+                        {#if waits(p.id)}
+                            <a class="author">{p.author.name}</a>
+                            <a class="handle">{p.author.handle}</a>
+                        {:else}
+                            <a class="author" href="/post/{p.id}">{p.author.name}</a>
+                            <a class="handle" href="/user/{p.author.id}">{p.author.handle}</a>
+                        {/if}
                         <p>{p.text}</p>
                         {#each p.images as shown_image (shown_image.src)}
                             <img class="photo" src={shown_image.src} width={shown_image.width} height={shown_image.height} alt={shown_image.alt}>
                         {/each}
-                        <button type="button" on:press={resumable(captures = { p }) => match like(p.id) {
+                        <button type="button" disabled={waits(p.id)} on:press={resumable(captures = { p }) => match like(p.id) {
                             Ok(_) => draft = draft,
                             Err(_) => draft = draft,
                         }}>Like</button>
                         <span class="likes">{counted(p.likes, "like", "likes")}</span>
-                        {#if p.mine}<button type="button" class="delete" on:press={resumable(captures = { p }) => match delete(p.id) {
+                        {#if p.mine}<button type="button" class="delete" disabled={waits(p.id)} on:press={resumable(captures = { p }) => match delete(p.id) {
                             Ok(_) => draft = draft,
                             Err(_) => draft = draft,
                         }}>Delete</button>{/if}

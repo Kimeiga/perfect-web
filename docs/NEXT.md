@@ -471,9 +471,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
           5. ~~**notifications, track `notifications`, W3**~~ (ADR-0270,
              ADR-0274, `just e14-notifications`: rows each act writes,
              private to their user by cache and by session, an unread count
-             and mark-read). What it leaves, in order: a speculated row's
-             Like acting on an id no server has (found by W3, the feed's to
-             fix, below); telling by principal, an event naming a user
+             and mark-read). What it leaves, in order: ~~a speculated
+             row's Like acting on an id no server has~~ (ADR-0275, `just
+             e14-waiting-rows`); telling by principal, an event naming a user
              reading again only that user's open pages; `identified_by`
              gone, the feed's reads by session moved to `current_user()`;
              and a stream's `current_user()`;
@@ -531,12 +531,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
           - ~~**a resource matched where it is made**~~ (ADR-0269, `just
             e14-matched-resources`: held by the arm or the `?` that takes
             apart what carries it, and refused where an arm drops it);
-          - **a speculated row's control acts on an id no server has**
-            (found by the notifications track, 2026-10-08): a post shown
-            before its command answered is `pending-..`, and its Like sends
-            that id, which the server refuses, and the page shows "0
-            likes". A control on a speculated row is either held until the
-            row is the server's, or acts on an id the server accepts;
+          - ~~**a speculated row's control acts on an id no server has**~~
+            (ADR-0275, `just e14-waiting-rows`: the feed's row waits, its
+            links placeholders and its Like and Delete disabled, until the
+            server's row stands in its place; a reply's link waits on ruling
+            0073-a, and ids the client makes on their own item);
+          - **`pw fmt` changes what a clause says** (found 2026-10-08,
+            STATUS): it prints a clause's value token by token, and
+            `max_bytes 5_000_000` became `5 _000_000`, refused. Next: a digit
+            separator the lexer reads, a clause's value printed as written,
+            `pw fmt` refusing to write a program that checks differently,
+            and the feed's and the store's sources in `pw fmt --check`;
           - ~~**`lexical_mutations.py`'s two label survivors**~~
             (ADR-0242), "a `for` loop's name carries no label" and "a
             lambda's parameters carry no label": each test held a value

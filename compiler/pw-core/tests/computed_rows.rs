@@ -108,12 +108,31 @@ fn a_value_computed_in_a_row_is_each_rows() {
     let plan = plan_of(&b, "feed.app.Home");
     // The likes in words: a read of each row's item, by the steps to its
     // input, then its function, set in the row by the path the compiler
-    // named from the item.
+    // named from the item. Of the values the row computes from its item, it
+    // is the one the template reads in the row's `.likes`; the others are
+    // whether the row waits (ADR-0275).
     let computed: Vec<&pw_core::page_values::RowRead> =
         plan.rows.iter().filter(|r| r.path.contains(".#")).collect();
-    let [row] = computed.as_slice() else {
-        panic!("one row value: {:?}", plan.rows);
-    };
+    let template = b
+        .templates
+        .iter()
+        .find(|t| t.path == "feed.app.Home")
+        .expect("the home page's template");
+    let chunks = format!("{:?}", template.chunks);
+    let (_, likes) = chunks
+        .split_once(r#"class=\"likes\""#)
+        .unwrap_or_else(|| panic!("the row's likes: {chunks}"));
+    let row = computed
+        .iter()
+        .filter_map(|r| likes.find(&format!("\"{}\"", r.path)).map(|at| (at, *r)))
+        .min_by_key(|(at, _)| *at)
+        .map(|(_, r)| r)
+        .unwrap_or_else(|| panic!("no row value read in the likes: {:?}", plan.rows));
+    assert!(
+        computed.len() > 1,
+        "and whether the row waits: {:?}",
+        plan.rows
+    );
     assert_eq!(
         (row.collection.as_str(), row.binding.as_str()),
         ("feed", "p")
@@ -127,17 +146,6 @@ fn a_value_computed_in_a_row_is_each_rows() {
         row.steps,
         [Step::Derived(format!("feed.app.Home.derived_{part}"))]
     );
-    // The template reads it there.
-    let template = b
-        .templates
-        .iter()
-        .find(|t| t.path == "feed.app.Home")
-        .expect("the home page's template");
-    assert!(
-        format!("{:?}", template.chunks).contains(&format!("\"{}\"", row.path)),
-        "{:?}",
-        template.chunks
-    );
     // And the speculation computes it for each row it renders, from the
     // item: the like's transition counts the like in the timeline.
     let home = b
@@ -148,10 +156,12 @@ fn a_value_computed_in_a_row_is_each_rows() {
     let pw_core::backend::wasm::Encoding::Encoded(module) = &home.module else {
         panic!("{:?}", home.module);
     };
+    let (_, rows) = module
+        .source
+        .split_once("rows: {")
+        .unwrap_or_else(|| panic!("{}", module.source));
     assert!(
-        module
-            .source
-            .contains(&format!("rows: {{ \"#feed.app.Home~{part}\": f")),
+        rows.contains(&format!("\"#feed.app.Home~{part}\": f")),
         "{}",
         module.source
     );

@@ -86,7 +86,8 @@ async function people(browser, testInfo) {
   await answered(ada, "post", () => ada.getByRole("button", { name: "Post" }).click());
   await expect(post(ada, text)).toHaveCount(1);
   // The row shown before the server answered is `pending-..`, which no like
-  // finds: the server's row, by its id, before anyone presses on it.
+  // finds, and waits (ADR-0275): the server's row, by its id, before anyone
+  // presses on it.
   await expect(post(ada, text).locator(".author")).toHaveAttribute("href", /^\/post\/p\d+$/);
   return { contexts, ada, again, ben, text, engine };
 }

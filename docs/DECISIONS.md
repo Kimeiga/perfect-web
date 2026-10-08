@@ -2264,3 +2264,9 @@ notifications, a row a like, a reply or a follow writes, private to its user
   with it. Its queries are keyed by the reader's handle, `cache private`;
   an unread count on the home page, a page of them, and mark-read reaching
   each of the reader's sessions.
+[ADR-0275](DECISIONS/ADR-0275-a-row-shown-before-the-server-answers-waits.md):
+a row shown before the server answers waits.
+- A row the page made, `pending-..`, links nowhere and acts on nothing until
+  the server's row stands in its place: its author and handle are
+  placeholder links, its Like and Delete disabled. The program's own, by
+  `waits(id)`; a reply's link waits on ruling 0073-a.

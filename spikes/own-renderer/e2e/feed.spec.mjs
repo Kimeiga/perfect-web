@@ -29,7 +29,9 @@
 //     fails is taken back (ADR-0236, ruling 0122-d);
 //   - a like on the thread page shows before the server answers, though
 //     `like` speculates on the timeline too, which the page does not show
-//     (ADR-0238).
+//     (ADR-0238);
+//   - a post shown before the server answers waits: nothing on it links or
+//     acts until the server's row stands in its place (ADR-0275).
 import { expect, test } from "@playwright/test";
 import { FEED_PORTS } from "../playwright.config.mjs";
 
@@ -282,6 +284,44 @@ test("a post shows before the server answers, and is the server's after", async 
   await expect(post(page, text)).toHaveCount(1);
   await expect(page.getByLabel("What's happening?")).toHaveValue("");
   expect(await unreloaded(page)).toBe(true);
+});
+
+test("a post shown before the server answers waits, and acts once it is the server's", async ({
+  page,
+}, testInfo) => {
+  // ADR-0275: its id is the page's own, `pending-..`, which no server has; a
+  // like pressed on it found no such post (ADR-0274). Nothing on it links or
+  // acts until the server's row stands in its place.
+  await home(page);
+  let release;
+  const held = new Promise((r) => (release = r));
+  await page.route("**/command/feed.app.post", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const text = `Waiting in ${testInfo.project.name}, ${Date.now()}`;
+  await page.getByLabel("What's happening?").fill(text);
+  await page.getByRole("button", { name: "Post" }).click();
+  const row = post(page, text);
+  await expect(row.locator(".author")).toHaveText("You");
+  for (const name of [".author", ".handle"]) {
+    await expect(row.locator(name)).not.toHaveAttribute("href");
+  }
+  await expect(row.getByRole("button", { name: "Like" })).toBeDisabled();
+  await expect(row.getByRole("button", { name: "Delete" })).toBeDisabled();
+  release();
+  // The server's: it links to the post and to its author, and a like
+  // pressed on it is the server's.
+  await expect(row.locator(".author")).toHaveAttribute("href", /^\/post\/p\d+$/);
+  await expect(row.locator(".handle")).toHaveAttribute("href", /^\/user\/.+$/);
+  await expect(row.getByRole("button", { name: "Delete" })).toBeEnabled();
+  const liked = page.waitForResponse("**/command/feed.app.like");
+  await row.getByRole("button", { name: "Like" }).click();
+  await liked;
+  await expect(row.locator(".likes")).toHaveText("1 like");
+  expect(await unreloaded(page)).toBe(true);
+  await page.reload();
+  await expect(post(page, text).locator(".likes")).toHaveText("1 like");
 });
 
 test("a like shows before the server answers, and one that fails is taken back", async ({
