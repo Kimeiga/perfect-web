@@ -142,7 +142,23 @@ test("a message reaches both users live, is read, and is answered", async ({
   // in its place; then on her other page and Ben's count, live.
   const text = `Hello Ben, from ${engine} ${Date.now()}`;
   await ada.getByLabel("Your message").fill(text);
-  await answered(ada, "send", () => ada.getByRole("button", { name: "Send" }).click());
+  // The request held until the speculated message is seen waiting: it says
+  // "Sending", and its sender's name links nowhere (ADR-0275).
+  let release;
+  const held = new Promise((resolve) => (release = resolve));
+  await ada.route("**/command/feed.app.send", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const sending = ada.waitForResponse("**/command/feed.app.send");
+  await ada.getByRole("button", { name: "Send" }).click();
+  await expect(messages(ada)).toHaveCount(1);
+  await expect(messages(ada).last()).toContainText(text);
+  await expect(messages(ada).last().locator(".sending")).toHaveText("Sending");
+  await expect(messages(ada).last().locator("a.from")).toHaveCount(0);
+  release();
+  await sending;
+  await ada.unroute("**/command/feed.app.send");
   await expect(ada.getByLabel("Your message")).toHaveValue("");
   await expect(messages(ada)).toHaveCount(1);
   await expect(messages(ada).last()).toContainText(text);

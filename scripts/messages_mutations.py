@@ -6,8 +6,10 @@ one side, its reader's alone; who may message whom (X's rule, `requires
 MayMessage(to)`); no one messaging themselves; a message reaching both
 users' sessions and no third user's; sending marking the sender's side
 read; reading as a command that reaches each of the reader's sessions; the
-conversation, the list and the count cached private; and a message writing
-no notification. The tests in
+conversation, the list and the count cached private; a message writing no
+notification; and a message shown before the server answers waiting, by
+ADR-0275's rule, whose mutants in `waiting_rows_mutations.py` reach it too.
+The tests in
 `spikes/own-renderer/server/src/tests/messages.rs` and `messages.rs`, or the
 browser suite `e2e/messages.spec.mjs`, must then fail.
 
@@ -33,6 +35,7 @@ APP = ROOT / "examples/feed/app.pw"
 SERVER = "server"
 POSTGRES = "postgres"
 BROWSER = "browser"
+PROGRAM = "program in the browser"
 
 # (what is undone, which tests, file, anchor, replacement)
 MUTANTS = [
@@ -218,18 +221,50 @@ MUTANTS = [
         '            "MayMessage" => crate::messages::may_message(self.principals.of(session), bound, host)\n'
         "                .map(|_| true),\n",
     ),
+    (
+        "in the browser, a message shown before the server answers does not wait",
+        PROGRAM,
+        APP,
+        "    waits(PostId(id.value))\n",
+        "    false\n",
+    ),
+    # ADR-0275's rule, which `message_waits` delegates to: waiting_rows'
+    # mutants of it, as they reach the conversation's pending message.
+    (
+        "in the browser, no row waits (waiting_rows' mutant)",
+        PROGRAM,
+        APP,
+        '    String.starts_with(id.value, "pending-")\n',
+        '    String.starts_with(id.value, "pending-none-")\n',
+    ),
+    (
+        "in the browser, a reply waits, and nothing else (waiting_rows' mutant)",
+        PROGRAM,
+        APP,
+        '    String.starts_with(id.value, "pending-")\n',
+        '    String.starts_with(id.value, "pending-reply-")\n',
+    ),
+    (
+        "in the browser, a row the server made waits too (waiting_rows' mutant)",
+        PROGRAM,
+        APP,
+        '    String.starts_with(id.value, "pending-")\n',
+        '    String.starts_with(id.value, "")\n',
+    ),
 ]
 
 # The browser's: the server built again, then the suite in three engines on
 # hosts of their own ports, away from any other suite's (`PORT`). A mutant of
-# the program's source would leave the feed's build stale, and the suite
-# unrun, so these mutate the server alone.
+# the program's source builds the feed again first (`FEED`), and the feed is
+# built again as it is once the mutants are done.
 BUILD = ["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server"]
+FEED = ["bash", "spikes/own-renderer/feed.sh"]
 PLAYWRIGHT = ["pnpm", "exec", "playwright", "test", "e2e/messages.spec.mjs", "--reporter=line"]
 
 TESTS = {
     SERVER: [["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "messages"]],
     BROWSER: [BUILD, PLAYWRIGHT],
+    PROGRAM: [FEED, BUILD, PLAYWRIGHT],
     POSTGRES: [
         ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "tests::messages::on_postgres_"]
     ],
@@ -242,8 +277,8 @@ def run_tests(group):
     """(built, passed, failed) over the group's test commands."""
     built, passed, failed = True, 0, 0
     for cmd in TESTS[group]:
-        if cmd is BUILD:
-            if subprocess.run(cmd, cwd=ROOT).returncode != 0:
+        if cmd is BUILD or cmd is FEED:
+            if subprocess.run(cmd, cwd=ROOT, capture_output=cmd is FEED).returncode != 0:
                 return False, 0, 0
             continue
         if cmd is PLAYWRIGHT:
@@ -283,6 +318,8 @@ def main():
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
+    # The program's mutants run the browser's suite, whose baseline is above.
+    groups.append(PROGRAM)
 
     survivors, run = 0, 0
     for what, group, path, anchor, replacement in MUTANTS:
@@ -309,7 +346,9 @@ def main():
             survivors += 1
         print(f"{what}: {verdict}")
 
-    # The server the browser's mutants built, built again as it is.
+    # The feed and the server the browser's mutants built, built again as
+    # they are.
+    subprocess.run(FEED, cwd=ROOT, capture_output=True)
     subprocess.run(BUILD, cwd=ROOT)
     print(f"{run - survivors} of {run} mutants killed")
     return 1 if survivors else 0
