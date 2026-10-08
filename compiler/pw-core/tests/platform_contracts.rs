@@ -443,7 +443,7 @@ fn the_trusted_platform_contract_is_hashed() {
     // places its cart as an order and follows it (ADR-0193).
     // ADR-0208 declared `outbox.write`, the effect of emitting an event, and
     // ADR-0214 renamed `LayoutSnapshot`'s accessor from `value` to `measured`.
-    const EXPECTED: u64 = 0x7acfc650a1279909;
+    const EXPECTED: u64 = 0x37769cace0f350fa;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

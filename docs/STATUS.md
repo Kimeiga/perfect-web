@@ -41,6 +41,20 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0263, 2026-10-07: a session's, a user's or an organization's handle is
+the platform's to make** (a soundness defect W3 found, generalized here). A
+handle reads the data of the one it names, and a program could make one:
+`Session("someone-elses-session")` checked clean, and so did a command whose
+session the browser supplies in its body; the platform's own
+`current_user()` was `User("")`, every reader one user. No program
+constructs a handle now (PW5037), no data layer's operation answers one
+(PW5038), and no command's or page's parameter or signal holds one
+(PW5039); `current_user()` and `current_organization()` are the host's
+operations, `pw:host/principal#read` and `pw:host/organization#read`. An id
+is still the program's to make: it names someone and grants nothing (`just
+e14-handles`). Next, ADR-0264: a session's handle printed into a page gives
+its cookie's value to the page's scripts.
+
 **ADR-0262, 2026-10-07: a host binding is an operation a host provides**
 (found by the uploads track). A binding was any quoted string, and one with
 no interface, `feed:uploads#claim`, broke WIT generation for every

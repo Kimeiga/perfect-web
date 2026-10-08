@@ -101,6 +101,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // ADR-0214: an opaque type's `.value` is its representation in its
         // own module, and nothing else there.
         per_unit.extend(representation_unshadowed(&sigs, i, &u.hir));
+        // ADR-0263: a session's, a user's or an organization's handle is
+        // the platform's to make.
+        per_unit.extend(handles_are_the_platforms(&workspace, &sigs, i, &u.hir));
         // ADR-0212: a `query` reads a query or a resource, and a
         // `subscription` a subscription.
         per_unit.extend(reads_name_their_kind(&workspace, &sigs, i, &u.hir));
@@ -2243,6 +2246,210 @@ fn reads_name_their_kind(
 /// `browser` declared `fn value<T>(snapshot: LayoutSnapshot<T>) -> T`, and
 /// in `browser` `snapshot.value` named both; `fn value(p: PositiveInt) ->
 /// Int { p.value }` would call itself for ever.
+/// **The handle a type holds, if any** (ADR-0263): a session's, a user's or
+/// an organization's, wherever it sits: the type itself, an argument, a
+/// record's field, a case's payload, an opaque type's representation.
+fn handle_in(
+    sigs: &Signatures,
+    ty: &crate::resolved::ResolvedType,
+    seen: &mut BTreeSet<crate::resolve::DefId>,
+) -> Option<&'static str> {
+    use crate::signatures::PrivacyQualifier as Q;
+    match sigs.privacy_qualifier(ty) {
+        Some(Q::Session) => return Some("a session's"),
+        Some(Q::User) => return Some("a user's"),
+        Some(Q::Organization) => return Some("an organization's"),
+        _ => {}
+    }
+    if let Some(held) = ty.args().iter().find_map(|a| handle_in(sigs, a, seen)) {
+        return Some(held);
+    }
+    let def = ty.def_id()?;
+    if !seen.insert(def) {
+        return None;
+    }
+    let decl = sigs.type_decl(def)?;
+    decl.record
+        .iter()
+        .flatten()
+        .map(|(_, t)| t)
+        .chain(decl.representation.iter())
+        .chain(decl.variants.iter().flatten().flat_map(|(_, ts)| ts.iter()))
+        .filter_map(crate::resolved::TypeResolution::resolved)
+        .find_map(|t| handle_in(sigs, t, seen))
+}
+
+/// **A session's, a user's or an organization's handle is the platform's
+/// to make** (ADR-0263). A handle is what reads that one's data: a program
+/// that could make one could read anyone's, and until ADR-0263 one could.
+/// `Session("…")` checked clean, and so did a command whose session the
+/// browser supplies. Three ways one was made, each refused where it is
+/// written: constructed by a program at all, since the host makes each one
+/// from the request it answers (PW5037),
+/// answered by an operation that is not the platform's (PW5038), and
+/// supplied by the browser, as a command's or a page's parameter or a
+/// signal's value (PW5039).
+fn handles_are_the_platforms(
+    workspace: &crate::resolve::Workspace,
+    sigs: &Signatures,
+    unit: usize,
+    hir: &Hir,
+) -> Vec<Diagnostic> {
+    use crate::signatures::PrivacyQualifier as Q;
+    let mut out = Vec::new();
+    let diagnostic = |code: crate::codes::Code,
+                      reason: &'static str,
+                      message: String,
+                      span: crate::hir::Span,
+                      explanation: &str| Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason,
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message,
+        primary_span: span,
+        related: Vec::new(),
+        explanation: Some(explanation.to_string()),
+        repairs: Vec::new(),
+    };
+    // PW5037: made by a call to its type, anywhere a program is written.
+    for (_, body, _) in hir.bodies.iter() {
+        for (_, e, span) in body.exprs.iter() {
+            let Expr::Call { callee, .. } = e else {
+                continue;
+            };
+            let crate::values::Named::Target(crate::values::Target::Opaque(def)) =
+                crate::values::named(sigs, workspace, unit, body, *callee)
+            else {
+                continue;
+            };
+            let whose = match sigs.privacy_kind(def) {
+                Some(Q::Session) => "a session's",
+                Some(Q::User) => "a user's",
+                Some(Q::Organization) => "an organization's",
+                _ => continue,
+            };
+            out.push(diagnostic(
+                crate::codes::HANDLE_MADE,
+                "handle_made",
+                format!("{whose} handle is the platform's to make, and this makes one"),
+                span.clone(),
+                "A handle is what reads the data of the one it names: a session's \
+                 cart, a user's notifications. Only the platform makes one, from the \
+                 request it is answering (`current_session()`, `current_user()`), so a \
+                 program reads its reader's data and no one else's. An id names someone \
+                 and is the program's to make; a handle grants, and is not.",
+            ));
+        }
+    }
+    for (_, decl) in hir.all_decls() {
+        let resolved = |declared: &crate::hir::DeclaredType, span: &crate::hir::Span| {
+            crate::resolved::resolve(
+                workspace,
+                unit,
+                None,
+                &decl.type_params,
+                declared,
+                span.clone(),
+            )
+            .resolved()
+            .and_then(|t| handle_in(sigs, t, &mut BTreeSet::new()))
+        };
+        // PW5038: answered by an operation outside the platform's.
+        if decl.kind == DeclKind::Fn
+            && let Some(op) = crate::backend::host_binding(decl)
+            && !op.interface.starts_with("pw:")
+            && let Some(ret) = &decl.ret
+            && let Some(whose) = resolved(ret, &decl.name_span)
+        {
+            out.push(diagnostic(
+                crate::codes::HANDLE_ANSWERED,
+                "handle_answered",
+                format!(
+                    "`{}` is answered by `{}#{}`, which is not the platform's, and its \
+                     answer holds {whose} handle",
+                    decl.name, op.interface, op.name
+                ),
+                decl.name_span.clone(),
+                "A data layer answers ids, never a handle: a handle it answered would \
+                 read the data of whomever it named. The platform's own operations \
+                 (`pw:host/…`) answer the reader's, from the request.",
+            ));
+        }
+        // PW5039: a command's or a page's parameter, which the browser
+        // supplies, in a command's body or a page's address.
+        if matches!(decl.kind, DeclKind::Command | DeclKind::Page) {
+            for p in &decl.params {
+                let Some(whose) = p.ty.as_ref().and_then(|t| resolved(t, &p.span)) else {
+                    continue;
+                };
+                out.push(diagnostic(
+                    crate::codes::HANDLE_FROM_BROWSER,
+                    "handle_from_browser",
+                    format!(
+                        "`{}`'s parameter `{}` holds {whose} handle, which the browser \
+                         would supply",
+                        decl.name, p.name
+                    ),
+                    p.span.clone(),
+                    "What the browser supplies is whatever its sender writes: a handle \
+                     there would read the data of whomever it named. A command or a page \
+                     reads its reader's own with `current_session()` or `current_user()`.",
+                ));
+            }
+        }
+        // PW5039: a signal a module declares, `signal drawer: Bool`.
+        if decl.kind == DeclKind::Signal
+            && let Some(ret) = &decl.ret
+            && let Some(whose) = resolved(ret, &decl.name_span)
+        {
+            out.push(diagnostic(
+                crate::codes::HANDLE_FROM_BROWSER,
+                "handle_from_browser",
+                format!("the signal `{}` holds {whose} handle", decl.name),
+                decl.name_span.clone(),
+                "A signal is the browser's state, and what the browser holds it may \
+                 write: a handle there would read the data of whomever it named.",
+            ));
+        }
+    }
+    // PW5039: a page's or a view's signal, `signal x: T = e`.
+    for (_, body, _) in hir.bodies.iter() {
+        let owner = hir.decl(body.owner);
+        for at in &body.signals {
+            let Expr::Let { ty: Some(t), .. } = body.expr(*at) else {
+                continue;
+            };
+            let span = body.expr_span(*at);
+            let Some(written) = crate::resolved::written_in_body(body, *t) else {
+                continue;
+            };
+            let Some(whose) = crate::resolved::resolve(
+                workspace,
+                unit,
+                None,
+                &owner.type_params,
+                &written,
+                span.clone(),
+            )
+            .resolved()
+            .and_then(|t| handle_in(sigs, t, &mut BTreeSet::new())) else {
+                continue;
+            };
+            out.push(diagnostic(
+                crate::codes::HANDLE_FROM_BROWSER,
+                "handle_from_browser",
+                format!("a signal of `{}` holds {whose} handle", owner.name),
+                span,
+                "A signal is the browser's state, and what the browser holds it may \
+                 write: a handle there would read the data of whomever it named.",
+            ));
+        }
+    }
+    out
+}
+
 fn representation_unshadowed(sigs: &Signatures, unit: usize, hir: &Hir) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for (id, decl) in hir.all_decls() {

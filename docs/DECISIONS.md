@@ -2176,3 +2176,12 @@ a host binding is an operation a host provides (found by the uploads track).
   held to that where it is written (PW0335). Any string was taken, and one
   with no interface broke WIT generation for every component with an error
   naming no line.
+[ADR-0263](DECISIONS/ADR-0263-a-handle-is-the-platforms-to-make.md):
+a session's, a user's or an organization's handle is the platform's to make
+(a soundness defect, found by W3).
+- `Session("…")` checked clean, and so did a command whose session the
+  browser supplies, so a program could read anyone's data. No program
+  constructs a handle (PW5037), no data layer answers one (PW5038), and
+  nothing the browser supplies holds one (PW5039); `current_user()` and
+  `current_organization()` are the host's operations, where their bodies
+  made one user and one organization of every reader.

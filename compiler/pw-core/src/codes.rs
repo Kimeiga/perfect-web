@@ -513,6 +513,15 @@ codes! {
     // `{#each}` checked until 2026-09-26, and the handler build refused it.
     HANDLER_READS_UNCAPTURED = "PW5025" / handler_reads_uncaptured / 1, Privacy,
         "a resumable handler reads what it captures, and what it binds itself";
+    // ADR-0263: a session's, a user's or an organization's handle is what
+    // reads its data, and a program could make one: `Session("…")` checked
+    // clean, and so did a command whose session the browser supplies.
+    HANDLE_MADE = "PW5037" / handle_made / 1, Privacy,
+        "a session's, a user's or an organization's handle is the platform's to make: a program constructs none";
+    HANDLE_ANSWERED = "PW5038" / handle_answered / 1, Privacy,
+        "a data layer answers ids, never a handle: only the platform's operations answer a session's, a user's or an organization's";
+    HANDLE_FROM_BROWSER = "PW5039" / handle_from_browser / 1, Privacy,
+        "nothing the browser supplies holds a handle: no command's or page's parameter, and no signal, holds a session's, a user's or an organization's";
     DEAD_INTERNAL_LINK = "PW5009" / dead_internal_link / 1, Markup,
         "an internal link must name a route the program declares";
     UNSAFE_AUDIT_INCOMPLETE = "PW5010" / unsafe_audit_incomplete / 1, DeclarationRules,

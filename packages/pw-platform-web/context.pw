@@ -40,8 +40,14 @@ import capability.{ Session, User, Organization, SessionId, UserId, Organization
 fn current_session() -> Session<SessionId> !{ session.read }
     host "pw:host/session#read"
 
-fn current_user() -> User<UserId> !{ session.read } { User("") }
+// **Who reads, as the host answers it** (ADR-0263): the session's
+// principal's user, or the session's own guest where no one signed in.
+// Until ADR-0263 its body was `User("")`, and every reader was one user.
+fn current_user() -> User<UserId> !{ session.read }
+    host "pw:host/principal#read"
 
-fn current_organization() -> Organization<OrganizationId> !{ session.read } {
-    Organization("")
-}
+// **The reader's organization, as the host answers it** (ADR-0263). Until
+// ADR-0263 its body was `Organization("")`, every reader in one. No host
+// answers it yet: a program that asks is refused where it is served.
+fn current_organization() -> Organization<OrganizationId> !{ session.read }
+    host "pw:host/organization#read"

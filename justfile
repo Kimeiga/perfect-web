@@ -5040,3 +5040,20 @@ e14-host-bindings:
        CARGO_INCREMENTAL=0 python3 scripts/host_binding_mutations.py; \
      } > docs/evidence/E14/host-bindings.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/host-bindings.txt
+
+# ADR-0263: a session's, a user's or an organization's handle is the
+# platform's to make: constructed by no program (PW5037), answered by no
+# data layer (PW5038), supplied by no browser (PW5039). The checker's tests
+# and the mutation controls.
+e14-handles:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0263 - a handle is the platform's to make"; echo; \
+       echo "produced by: just e14-handles"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker (compiler/pw-core/tests/handles.rs)"; echo; \
+       cargo test --locked -p pw-core --test handles 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/handle_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/handle_mutations.py; \
+     } > docs/evidence/E14/handles.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/handles.txt
