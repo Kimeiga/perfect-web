@@ -25,9 +25,9 @@ e14-uploads:
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; \
        echo "postgres: $([ -n "${PW_FEED_DATABASE_URL:-}" ] && (psql "$PW_FEED_DATABASE_URL" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)') || echo 'none: PW_FEED_DATABASE_URL is not set')"; echo; \
        echo "== the server (uploads.rs, uploads/sniff.rs, uploads/multipart.rs, blob.rs, tests/uploads.rs)"; echo; \
-       cargo test --locked -p pw-dev-server -- uploads blob 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-dev-server -- uploads blob 2>&1 | awk '/^(test |test result)/ { print } /panicked at/ { p = 5 } p > 0 { print; p-- }'; \
        echo; echo "== the declaration and its checks (compiler/pw-core/tests/uploads.rs)"; echo; \
-       cargo test --locked -p pw-core --test uploads 2>&1 | grep -E '^(test |test result)'; \
+       cargo test --locked -p pw-core --test uploads 2>&1 | awk '/^(test |test result)/ { print } /panicked at/ { p = 5 } p > 0 { print; p-- }'; \
        echo; echo "== an image on a post in three engines (e2e/uploads.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/uploads.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
