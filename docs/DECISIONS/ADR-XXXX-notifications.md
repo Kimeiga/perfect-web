@@ -118,8 +118,12 @@ command mark_read() -> Result<Int, FeedError>
   the server's row by its id before anyone presses on it. A reader pressing
   that fast meets it too: a speculated row's buttons act on an id no
   server has. The integrator took it as a defect of the feed's, found by
-  W3, to queue in NEXT and rule on (defer the command until the row is
-  reconciled, or ids the server accepts).
+  W3, and ruled: not a runtime rule (disabling a speculated row's controls
+  breaks the store, whose speculated cart line carries a real item id),
+  but the program's own, since `pending()` makes `PostId("pending-{n}")`.
+  The feed is to say that row's actions wait, a change the integrator
+  makes in app.pw after this merges; the Like markup here is unchanged.
+  Ids the client makes and the server accepts are queued.
 - **An intermittent, not this track's**: the first push's verification
   (run 37732376131, at c65b87a, on c51654d) failed its `browser webkit`
   job in `e2e/feed.spec.mjs:379`, "Load more shows the next page, and a
@@ -268,7 +272,8 @@ suite, 270 tests with PostgreSQL's, passed after the rebase onto de500be.
 - **Rebased onto ADR-0263** (de500be): context.pw is master's, and the
   platform hash is master's, 0x37769cace0f350fa. This track's first commit
   had made the same declaration, and gave way. Then rebased onto 328c306,
-  c51654d and 98e099b (ADR-0268): the browser suite waits for each
+  c51654d, 98e099b (ADR-0268), 996e231, 2e68763, 468ff73 and 844eb66:
+  the browser suite waits for each
   command's answer before it navigates, and for the server's row before
   it presses on it. The recorded evidence keeps the header it was recorded
   with, 83992dc; the spec's two waits came after it, and the suite passed
