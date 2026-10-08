@@ -264,6 +264,25 @@ fn an_upload_is_read_within_its_own_limits_not_a_commands() {
     assert_eq!(blobs(&s, "staged"), 1, "a's alone");
 }
 
+/// **One signed out attaches nothing** (track `identity`, ADR-0258): the
+/// development provider's accounts model, where a session no sign-in
+/// opened is no one, and `requires SignedIn` holds a post to a principal.
+#[test]
+fn one_signed_out_attaches_nothing() {
+    let s = served_feed();
+    let provider =
+        crate::accounts::DevProvider::start(&crate::identity::Deployment::development(3143))
+            .expect("the development provider");
+    s.identity
+        .use_provider(Arc::new(provider), "http://127.0.0.1:3143/sign-in/callback");
+    let head = attach(&s, "a", &fixture("six-by-four.png"));
+    assert!(head.starts_with("http/1.1 403"), "{head}");
+    assert_eq!(blobs(&s, "staged"), 0);
+    // The control: the guest model, where every session is its own guest.
+    s.identity.use_guests();
+    assert!(attach(&s, "a", &fixture("six-by-four.png")).starts_with("http/1.1 303"));
+}
+
 /// **What is not an image is never kept**, whatever its sender calls it.
 #[test]
 fn what_is_not_an_image_is_refused_whatever_it_is_called() {

@@ -315,7 +315,11 @@ fn relation(c: &mut Client, reader: &str, user: &str) -> Result<Val, postgres::E
 
 /// **A thread**: the post and its replies, as deep as they go, read in one
 /// statement, so one snapshot.
-fn thread(c: &mut Client, id: &str, l: Option<&crate::uploads::Leases>) -> Result<Val, postgres::Error> {
+fn thread(
+    c: &mut Client,
+    id: &str,
+    l: Option<&crate::uploads::Leases>,
+) -> Result<Val, postgres::Error> {
     let rows = c.query(
         &format!(
             "WITH RECURSIVE t AS ( \

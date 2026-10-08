@@ -1066,7 +1066,10 @@ impl Server {
             store,
             data,
         );
-        server.uploads = uploads; // TRACK SEAM (uploads, ADR-0253)
+        // TRACK SEAM (uploads, ADR-0253): the uploads, and who uploads, as
+        // the identity's principals say.
+        uploads.identified_by(server.identity.principals());
+        server.uploads = uploads;
         // **What the program imports, its data layer supplies** (ADR-0218):
         // refused here, as uncompiled handlers are, rather than when a press
         // first reaches the operation.

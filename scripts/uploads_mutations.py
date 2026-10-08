@@ -12,6 +12,8 @@ Each mutant undoes one piece, and the tests must then fail:
   path is built from what a sender wrote; `nosniff`, the sandbox or the
   immutable cache dropped; a lease served to another session, or served
   where committed images are before its post commits;
+- who: one signed out attaching an image; a user's hourly count, or bytes,
+  not held;
 - its life: an upload from another origin taken; a claim a command did not
   commit not given back; a discarded lease kept; a post's image committed
   without its bytes in the deployment's storage (in memory and on
@@ -189,6 +191,27 @@ MUTANTS = [
         PG,
         '        self.claims.lock().expect("claims").keep()?;\n',
         "",
+    ),
+    (
+        "one signed out may attach an image",
+        RUST,
+        UPLOADS,
+        "            Some(principals) => principals.of(session).map(|p| p.user),\n",
+        "            Some(principals) => Some(principals.user_of(session)),\n",
+    ),
+    (
+        "a user's hourly count of images is not held",
+        RUST,
+        UPLOADS,
+        "        if spent.len() >= UPLOADS_AN_HOUR || bytes_spent + size > BYTES_AN_HOUR * declared.max_bytes\n",
+        "        if bytes_spent + size > BYTES_AN_HOUR * declared.max_bytes\n",
+    ),
+    (
+        "a user's hourly bytes are not held",
+        RUST,
+        UPLOADS,
+        "        if spent.len() >= UPLOADS_AN_HOUR || bytes_spent + size > BYTES_AN_HOUR * declared.max_bytes\n",
+        "        if spent.len() >= UPLOADS_AN_HOUR\n",
     ),
     (
         "PW5603: a form that sends a file may post anywhere",

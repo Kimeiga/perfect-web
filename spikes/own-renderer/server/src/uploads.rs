@@ -129,7 +129,17 @@ struct State {
     holds: BTreeMap<BlobKey, u32>,
     next: u64,
     staged_bytes: u64,
+    /// What each user leased in the last hour, when and how many bytes: their
+    /// budget's spending.
+    spent: BTreeMap<String, std::collections::VecDeque<(Instant, u64)>>,
 }
+
+/// **A user's budget**: at most so many images in an hour, and at most so
+/// many times the declaration's bytes. Each upload is spent, posted or not:
+/// what it costs is the server's work and its memory, not the post.
+const UPLOADS_AN_HOUR: usize = 30;
+const BYTES_AN_HOUR: u64 = 20;
+const BUDGET_WINDOW: Duration = Duration::from_secs(60 * 60);
 
 /// What the module shares with the feed's data layer, which commits a lease
 /// with a post in the post's own transaction.
@@ -141,6 +151,9 @@ pub(crate) struct Shared {
     blobs: Box<dyn BlobStore>,
     state: Mutex<State>,
     lease_for: Duration,
+    /// Track `identity`'s principals, handed once: who uploads. Where none
+    /// are handed, each session is its own user.
+    principals: std::sync::OnceLock<crate::identity::Principals>,
 }
 
 /// **The leases, as the feed's data layer holds them.**
@@ -265,6 +278,7 @@ impl Uploads {
                 blobs,
                 state: Mutex::new(State::default()),
                 lease_for,
+                principals: std::sync::OnceLock::new(),
             })),
         }
     }
@@ -296,6 +310,15 @@ impl Uploads {
             |n| format!("{n} blob(s) kept"),
         );
         Some(format!("{}; {kept}", each.join("; ")))
+    }
+
+    /// **Who uploads** (track `identity`, ADR-0258): the identity's
+    /// principals, handed once when the server is built, as a data layer is
+    /// handed them (`DataLayer::identified_by`).
+    pub fn identified_by(&self, principals: crate::identity::Principals) {
+        if let Some(shared) = &self.shared {
+            let _ = shared.principals.set(principals);
+        }
     }
 
     pub(crate) fn leases(&self) -> Option<Leases> {
@@ -369,19 +392,7 @@ fn header<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
 /// route to the same check (`Identity::answer`); an upload is answered
 /// before it, so holds itself to it.
 pub(crate) fn same_origin(headers: &str) -> bool {
-    if let Some(site) = header(headers, "sec-fetch-site") {
-        return site == "same-origin" || site == "none";
-    }
-    match header(headers, "origin") {
-        None => true,
-        Some(origin) => {
-            let host = origin
-                .split_once("://")
-                .map(|(_, rest)| rest)
-                .unwrap_or("\u{0}");
-            header(headers, "host").is_some_and(|h| h.eq_ignore_ascii_case(host))
-        }
-    }
+    crate::identity::same_origin("POST", headers).is_ok()
 }
 
 /// **Where a browser goes once its file is leased**: the page it posted
@@ -496,6 +507,7 @@ fn reason(code: u16) -> &'static str {
         403 => "Forbidden",
         404 => "Not Found",
         409 => "Conflict",
+        429 => "Too Many Requests",
         411 => "Length Required",
         413 => "Content Too Large",
         415 => "Unsupported Media Type",
@@ -559,6 +571,15 @@ impl Shared {
         if !same_origin(headers) {
             return Answer::text(403, "a cross-origin request");
         }
+        // Who uploads: a session's principal, which `requires SignedIn`
+        // holds a post to. One signed out has nothing to post it with.
+        let user = match self.principals.get() {
+            Some(principals) => principals.of(session).map(|p| p.user),
+            None => Some(format!("u-{session}")),
+        };
+        let Some(user) = user else {
+            return Answer::refused(403, "Sign in to attach an image.", &back);
+        };
         if header(headers, "transfer-encoding").is_some() {
             return Answer::text(411, "an upload states its length");
         }
@@ -632,35 +653,70 @@ impl Shared {
             );
             return Answer::refused(422, &why, &back);
         }
-        match self.lease(session, bytes, measured) {
+        match self.lease(session, &user, declared, bytes, measured) {
             Ok(()) => {
                 let mut a = Answer::new(303, "text/plain; charset=utf-8", Vec::new());
                 a.set("location", back);
                 a
             }
-            Err((status, why)) => Answer::refused(status, why, &back),
+            Err((status, why, retry)) => {
+                let mut a = Answer::refused(status, why, &back);
+                if let Some(after) = retry {
+                    a.set("retry-after", after.as_secs().max(1).to_string());
+                }
+                a
+            }
         }
     }
 
     /// **`bytes` staged, and leased to `session`**, its earlier lease ended.
-    fn lease(&self, session: &str, bytes: &[u8], m: Measured) -> Result<(), (u16, &'static str)> {
+    fn lease(
+        &self,
+        session: &str,
+        user: &str,
+        declared: &Declared,
+        bytes: &[u8],
+        m: Measured,
+    ) -> Result<(), (u16, &'static str, Option<Duration>)> {
         let mut state = self.state.lock().expect("uploads");
         self.sweep(&mut state);
         if state.leases.get(session).is_some_and(|l| l.claimed) {
-            return Err((409, "The image attached before is being posted."));
+            return Err((409, "The image attached before is being posted.", None));
         }
         let size = bytes.len() as u64;
+        // The user's budget, for the hour before now.
+        let now = Instant::now();
+        let spent = state.spent.entry(user.to_string()).or_default();
+        while spent
+            .front()
+            .is_some_and(|(at, _)| now.duration_since(*at) >= BUDGET_WINDOW)
+        {
+            spent.pop_front();
+        }
+        let bytes_spent: u64 = spent.iter().map(|(_, b)| b).sum();
+        if spent.len() >= UPLOADS_AN_HOUR || bytes_spent + size > BYTES_AN_HOUR * declared.max_bytes
+        {
+            let retry = spent
+                .front()
+                .map(|(at, _)| BUDGET_WINDOW.saturating_sub(now.duration_since(*at)));
+            return Err((
+                429,
+                "You have attached as many images as an hour allows; try again later.",
+                retry,
+            ));
+        }
         let replaced = state.leases.get(session).map_or(0, |l| l.bytes);
         if state.staged_bytes - replaced + size > STAGED_CAP {
             return Err((
                 503,
                 "Too many images are waiting to be posted; try again later.",
+                None,
             ));
         }
         let key = self
             .staged
             .put(bytes)
-            .map_err(|_| (500, "The image could not be kept."))?;
+            .map_err(|_| (500, "The image could not be kept.", None))?;
         if let Some(old) = state.leases.remove(session) {
             self.end(&mut state, old);
         }
@@ -668,6 +724,11 @@ impl Shared {
         let id = format!("up-{}", state.next);
         *state.holds.entry(key.clone()).or_default() += 1;
         state.staged_bytes += size;
+        state
+            .spent
+            .entry(user.to_string())
+            .or_default()
+            .push_back((now, size));
         state.leases.insert(
             session.to_string(),
             Lease {
@@ -1538,6 +1599,42 @@ pub(crate) mod tests {
             1,
             "the committed image alone"
         );
+    }
+
+    /// **A user's budget**: so many images an hour, and so many times the
+    /// declaration's bytes, whichever is spent first; another user's is
+    /// their own. Spent by an upload, posted or not.
+    #[test]
+    fn a_user_attaches_within_an_hours_budget() {
+        let d = dir();
+        let u = uploads(d.path(), declared(), LEASE);
+        // Images: each small, the count spent first.
+        for n in 0..UPLOADS_AN_HOUR {
+            let a = post(&u, "s-1", &png(1 + n as u32, 1), "a.png", "image/png");
+            assert_eq!(a.status, 303, "upload {n}");
+        }
+        let over = post(&u, "s-1", &png(64, 1), "a.png", "image/png");
+        assert_eq!(over.status, 429);
+        assert!(body(&over).contains("as many images as an hour allows"));
+        let retry: u64 = over.header("retry-after").expect("when").parse().unwrap();
+        assert!((1..=3600).contains(&retry), "{retry}");
+        assert_eq!(
+            post(&u, "s-2", &png(64, 1), "a.png", "image/png").status,
+            303
+        );
+        // Bytes: each at the declaration's most, the bytes spent first.
+        let mut large = png(2, 2);
+        large.resize(4096, 0);
+        for n in 0..BYTES_AN_HOUR {
+            large[40] = n as u8;
+            assert_eq!(
+                post(&u, "s-3", &large, "a.png", "image/png").status,
+                303,
+                "{n}"
+            );
+        }
+        large[40] = 255;
+        assert_eq!(post(&u, "s-3", &large, "a.png", "image/png").status, 429);
     }
 
     #[test]
