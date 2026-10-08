@@ -414,7 +414,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
              `feed.spec.mjs`'s "Load more shows the next page" in WebKit,
              which in run 37663299969 still showed 20 rows five seconds after
              the press, and here, in 20 runs, never stopped at 20; a failing
-             test on CI keeps its trace now, for the next time; and
+             test on CI keeps its trace now, and its runtime's record, which
+             in run 37707617400 said the read was applied, `{"applied":1}`,
+             one stream was asked and none after it, and nothing failed.
+             Here it failed twice in 40 runs with six workers on one host
+             (the read unanswered for five seconds while the others' posts
+             flowed to the page), and never in 40 serial runs or 30 under
+             load. A failing feed test keeps what the network saw now too:
+             each stream and read asked, answered and ended, and a stream's
+             cursors; the next failure says whether the frames reached the
+             engine; and
              ~~`e10-recursion`'s "a record or variant is passed flat"~~,
              equivalent since ADR-0059 and retired (STATUS, 2026-10-07).
              Further grammar and clause defects go under 0047-a below,

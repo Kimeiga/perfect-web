@@ -41,11 +41,47 @@ test.use({
 
 test.describe.configure({ mode: "serial" });
 
+// What the network saw of the page's subscription and reads: when each
+// `/stream` and `/pw-read` was asked, answered and ended, a stream's
+// cursors and a read's answer. Recorded beside the page, not in it.
+const network = new WeakMap();
+test.beforeEach(async ({ page }) => {
+  const seen = [];
+  network.set(page, seen);
+  const started = Date.now();
+  const at = () => `${Date.now() - started} ms`;
+  const named = (url) => url.match(/\/((?:stream|pw-read)\?.*)$/)?.[1].slice(0, 80);
+  page.on("request", (r) => named(r.url()) && seen.push(`${at()} asked ${named(r.url())}`));
+  page.on("response", (r) => {
+    if (named(r.url())) seen.push(`${at()} answered ${r.status()} ${named(r.url())}`);
+  });
+  page.on("requestfailed", (r) => {
+    if (named(r.url())) seen.push(`${at()} failed ${named(r.url())}: ${r.failure()?.errorText}`);
+  });
+  page.on("requestfinished", async (r) => {
+    if (!named(r.url())) return;
+    const ended = at();
+    const body = await r
+      .response()
+      .then((answer) => answer?.text())
+      .catch(() => null);
+    const said =
+      body == null
+        ? "its body unread"
+        : r.url().includes("/stream?")
+          ? `${body.length} bytes, cursors ${[...body.matchAll(/"cursor":(\d+)/g)].map((m) => m[1]).join(",") || "none"}`
+          : body.slice(0, 80);
+    seen.push(`${ended} ended ${named(r.url())}: ${said}`);
+  });
+});
+
 // What the page's runtime said, beside a failure and its trace: its log,
-// its transport, how often it asked again, and the versions it holds and
-// knows. WebKit's "Load more" failed on CI with nothing of it (runs
-// 37663299969, 37681083688): the server answered the read, and the page
-// kept its twenty rows.
+// its transport, how often it asked again, the versions it holds and
+// knows, and what the network saw. WebKit's "Load more" failed on CI with
+// none of it (runs 37663299969, 37681083688): the server answered the read,
+// and the page kept its twenty rows. With the runtime's (run 37707617400),
+// the read was applied, `{"applied":1}`, one stream was asked and none
+// after it, and the runtime logged no failure.
 test.afterEach(async ({ page }, testInfo) => {
   if (testInfo.status === testInfo.expectedStatus) return;
   const said = await page
@@ -58,6 +94,7 @@ test.afterEach(async ({ page }, testInfo) => {
       known: window.__pwKnown?.() ?? null,
     }))
     .catch((e) => ({ unavailable: String(e) }));
+  said.network = network.get(page) ?? null;
   await testInfo.attach("runtime", {
     body: JSON.stringify(said, null, 2),
     contentType: "application/json",
