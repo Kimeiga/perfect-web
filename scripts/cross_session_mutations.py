@@ -64,8 +64,8 @@ MUTANTS = [
     (
         "what waits is never told",
         SERVER,
-        "        for (session, reached) in waiting {\n",
-        "        for (session, reached) in waiting.into_iter().take(0) {\n",
+        "            .flat_map(|(session, reached)| self.others_reading(session, reached))\n",
+        "            .take(0)\n            .flat_map(|(session, reached)| self.others_reading(session, reached))\n",
     ),
     (
         "a connection tells no one",

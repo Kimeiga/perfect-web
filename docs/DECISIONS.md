@@ -2226,3 +2226,10 @@ a resource is held by what takes it apart (found by ADR-0250).
   arm or the `?` that takes it out, `Ok(h)`, `Some(h)` or `let h = r?`,
   which must end it; an arm or a failure that carries none owes nothing.
   A match on it was refused however its arms ended it.
+[ADR-0271](DECISIONS/ADR-0271-a-reader-is-told-once-per-burst-and-served-in-turn.md):
+a reader is told once per burst, and served in turn (found by WebKit's
+"Load more" failures).
+- Each commit read every other reader's documents again, and a session's
+  hold was taken in no order, so under a burst of posts a page's own read
+  waited seconds. A reader is told once for every commit waiting, one
+  telling at a time, and a session's hold is taken in the order asked.

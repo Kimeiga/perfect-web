@@ -564,7 +564,8 @@ struct Server {
     /// interactions it names. Until 2026-10-03 two drains of one session
     /// interleaved, and two values were sent at one version: a page took the
     /// first, ignored the second, and lost a line until the next change.
-    sessions: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
+    /// Taken in turn since ADR-0271.
+    sessions: Mutex<BTreeMap<String, Arc<Turns>>>,
     /// The graph the compiler emitted: what each command emits and what each
     /// entry listens for. Read once; a test replaces it.
     graph: pw_materialize::Graph,
@@ -638,6 +639,10 @@ struct Server {
     /// with the session that committed: told once the request that
     /// committed is answered (`tell_waiting`).
     telling: Mutex<Vec<(String, Vec<String>)>>,
+    /// **The sessions being told, and whether a commit reached one again
+    /// meanwhile** (ADR-0271): one telling of a session at a time, and one
+    /// more after it for every commit that came while it ran.
+    told: Mutex<BTreeMap<String, bool>>,
     /// **The version each speculated value was last sent at** (ADR-0222), by
     /// session, page, binding and the page's parameters its key reads
     /// (ADR-0236): what a commit's answer names, so the page keeps its
@@ -652,6 +657,11 @@ struct Server {
     /// once: a commit there is the race the apply is held against.
     #[cfg(test)]
     keyed_fetched: Mutex<Option<KeyedFetched>>,
+    /// **What a test does after a telling's render, before it lets go**
+    /// (ADR-0271), once: a commit there is the one the telling must tell
+    /// after it, and a panic there must not silence the session.
+    #[cfg(test)]
+    told_rendered: Mutex<Option<KeyedFetched>>,
     /// **What each session's connections meet** (charter §15.5's one-shot
     /// network error and forced reconnect, ADR-0175): whether its next
     /// command's connection is dropped, and when its subscriptions are cut
@@ -762,6 +772,41 @@ fn speculated_entry(session: &str, page: &str, binding: &str, route: &[String]) 
 /// **A session's documents' entry** (ADR-0218): what a commit's change is
 /// sent against for a program whose data layer keeps no entry of its own for
 /// the session.
+/// **A lock taken in the order it is asked for** (ADR-0271): a ticket each,
+/// served in turn. `std`'s mutex promises no order, and a session told of
+/// every commit another made took its lock again and again while the
+/// session's own read, and its subscription, waited seconds for it.
+#[derive(Default)]
+struct Turns {
+    /// The next ticket, and the one being served.
+    tickets: Mutex<(u64, u64)>,
+    served: std::sync::Condvar,
+}
+
+/// A turn being served; the next is served when it ends, a panic included.
+struct Turn<'a>(&'a Turns);
+
+impl Turns {
+    /// Wait for this caller's turn. A `LockResult`, as a mutex's is, though
+    /// a turn is never poisoned: one that panics ends, and serves the next.
+    fn lock(&self) -> std::sync::LockResult<Turn<'_>> {
+        let mut tickets = self.tickets.lock().expect("tickets");
+        let mine = tickets.0;
+        tickets.0 += 1;
+        while tickets.1 != mine {
+            tickets = self.served.wait(tickets).expect("tickets");
+        }
+        Ok(Turn(self))
+    }
+}
+
+impl Drop for Turn<'_> {
+    fn drop(&mut self) {
+        self.0.tickets.lock().expect("tickets").1 += 1;
+        self.0.served.notify_all();
+    }
+}
+
 fn session_documents(session: &str) -> ResourceEntryId {
     ResourceEntryId::derive(
         &EntryIdentity::new(
@@ -1178,10 +1223,13 @@ impl Server {
             params: Mutex::new(BTreeMap::new()),
             pages: Mutex::new(BTreeMap::new()),
             telling: Mutex::new(Vec::new()),
+            told: Mutex::new(BTreeMap::new()),
             speculated_versions: Mutex::new(BTreeMap::new()),
             split_fills: std::sync::atomic::AtomicU64::new(0),
             #[cfg(test)]
             keyed_fetched: Mutex::new(None),
+            #[cfg(test)]
+            told_rendered: Mutex::new(None),
             connection_faults: Mutex::new(BTreeMap::new()),
             materializer_faults: Mutex::new(std::collections::BTreeSet::new()),
             keyed: Mutex::new(BTreeMap::new()),
@@ -2081,23 +2129,93 @@ impl Server {
     /// (ADR-0219): run by a connection once its request is answered and
     /// closed. Whichever connection takes a commit's telling tells it; each
     /// session is read when it is told, so a session told late is told the
-    /// latest.
+    /// latest. **Each session once**, for every commit that reached it
+    /// (ADR-0271): until then each commit read every reader's documents
+    /// again, so a burst of posts was a burst of renders for each reader,
+    /// and a reader's own read waited behind them.
     fn tell_waiting(&self) {
         let waiting = std::mem::take(&mut *self.telling.lock().expect("telling"));
-        for (session, reached) in waiting {
-            self.tell_others(&session, &reached);
+        let others: std::collections::BTreeSet<String> = waiting
+            .iter()
+            .flat_map(|(session, reached)| self.others_reading(session, reached))
+            .collect();
+        for other in others {
+            self.tell(&other);
         }
     }
 
-    /// **Every other session's open documents that read what a commit
-    /// dropped are read again and sent what changed** (ADR-0219): a post
-    /// reaches every open timeline, not only its author's. Each session in
-    /// its own hold, taken after the committing session's is given up, so
-    /// two sessions committing at once never wait on each other. Until
-    /// ADR-0219 another reader saw a change when it next loaded the page.
-    fn tell_others(&self, session: &str, reached: &[String]) {
+    /// **`other`'s open documents read again and sent what changed**
+    /// (ADR-0219), in its own hold, taken after the committing session's is
+    /// given up, so two sessions committing at once never wait on each
+    /// other. **One telling of a session at a time** (ADR-0271): a commit
+    /// that reaches it while one runs asks for one more after it, which
+    /// reads the latest, and returns at once.
+    fn tell(&self, other: &str) {
+        {
+            let mut told = self.told.lock().expect("told");
+            if let Some(again) = told.get_mut(other) {
+                *again = true;
+                return;
+            }
+            told.insert(other.to_string(), false);
+        }
+        // A telling that panics must not silence the session for good: the
+        // next commit finds it not being told. One that ends lets go of it
+        // where it sees no commit came, in the same hold, so none is lost
+        // between the two.
+        struct Unwound<'a> {
+            server: &'a Server,
+            other: &'a str,
+            ended: bool,
+        }
+        impl Drop for Unwound<'_> {
+            fn drop(&mut self) {
+                if !self.ended {
+                    self.server.told.lock().expect("told").remove(self.other);
+                }
+            }
+        }
+        let mut unwound = Unwound {
+            server: self,
+            other,
+            ended: false,
+        };
+        loop {
+            {
+                let lock = self.one_at_a_time(other);
+                let _one = lock.lock().expect("one change of a session at a time");
+                self.clock.advance(1);
+                let version = Version(self.clock.now());
+                self.send_documents(other, &session_documents(other), version, false);
+            }
+            // Taken out of its hold first: a hook that panics must not leave
+            // it poisoned for the next telling.
+            #[cfg(test)]
+            {
+                let then = self.told_rendered.lock().expect("told rendered").take();
+                if let Some(then) = then {
+                    then(self);
+                }
+            }
+            let mut told = self.told.lock().expect("told");
+            match told.get_mut(other) {
+                Some(again) if *again => *again = false,
+                _ => {
+                    told.remove(other);
+                    unwound.ended = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    /// **The other sessions whose open documents read what a commit
+    /// dropped** (ADR-0219): a post reaches every open timeline, not only
+    /// its author's. Until ADR-0219 another reader saw a change when it
+    /// next loaded the page.
+    fn others_reading(&self, session: &str, reached: &[String]) -> Vec<String> {
         if reached.is_empty() {
-            return;
+            return Vec::new();
         }
         // The open documents, read before their pages: no two of these
         // tables are held at once.
@@ -2108,19 +2226,11 @@ impl Server {
             .keys()
             .cloned()
             .collect();
-        let others: std::collections::BTreeSet<String> = open
-            .into_iter()
+        open.into_iter()
             .filter(|(s, _)| s != session)
             .filter(|doc| self.reads_any(&self.page_of(doc), reached))
             .map(|(s, _)| s)
-            .collect();
-        for other in others {
-            let lock = self.one_at_a_time(&other);
-            let _one = lock.lock().expect("one change of a session at a time");
-            self.clock.advance(1);
-            let version = Version(self.clock.now());
-            self.send_documents(&other, &session_documents(&other), version, false);
-        }
+            .collect()
     }
 
     /// **Whether a page reads any of `resources`**, by a `let` or a stream
@@ -2444,7 +2554,7 @@ impl Server {
     }
 
     /// The lock a session's one change at a time holds (ADR-0172).
-    fn one_at_a_time(&self, session: &str) -> Arc<Mutex<()>> {
+    fn one_at_a_time(&self, session: &str) -> Arc<Turns> {
         self.sessions
             .lock()
             .expect("sessions")
@@ -10311,6 +10421,179 @@ public query Store(",
         assert!(
             format!("{set:?}").contains("Seen by everyone"),
             "the other reader's timeline shows the post: {set:?}"
+        );
+    }
+
+    /// **A burst of posts tells another reader once** (ADR-0271): every
+    /// commit waiting when a connection tells is told together, and the
+    /// other session's open timeline is read again once, showing each post.
+    /// Until ADR-0271 it was read again for each: a render per post per
+    /// reader, which under a burst kept the reader's own read waiting.
+    #[test]
+    fn a_burst_of_posts_tells_another_reader_once() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        let before = sets_of(&s, &theirs).len();
+        for i in 0..5 {
+            let answered = s
+                .command_answered(
+                    "feed.app.post",
+                    "a",
+                    &[Val::String(format!("Burst {i}"))],
+                    Some(&format!("i-{i}")),
+                )
+                .expect("runs");
+            assert!(answered.committed, "{:?}", answered.result);
+        }
+        s.tell_waiting();
+        assert_eq!(
+            sets_of(&s, &theirs).len(),
+            before + 1,
+            "one patch set, for five posts"
+        );
+        let set = format!("{:?}", sets_of(&s, &theirs).pop().expect("a patch set"));
+        for i in 0..5 {
+            assert!(set.contains(&format!("Burst {i}")), "post {i}: {set}");
+        }
+        // And the reader is told of the next, its telling let go of.
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("After the burst".into())],
+            Some("i-after"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        assert_eq!(sets_of(&s, &theirs).len(), before + 2);
+        let set = format!("{:?}", sets_of(&s, &theirs).pop().expect("a patch set"));
+        assert!(set.contains("After the burst"), "{set}");
+    }
+
+    /// **A commit that comes while a reader is told is told after it**
+    /// (ADR-0271): its telling, finding the reader being told, asks for one
+    /// more and returns; the one more reads the latest. Without it, the post
+    /// would wait for the next commit to be seen.
+    #[test]
+    fn a_commit_while_a_reader_is_told_is_told_after_it() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        *s.told_rendered.lock().expect("told rendered") = Some(Box::new(|s: &Server| {
+            s.command_answered(
+                "feed.app.post",
+                "a",
+                &[Val::String("Late".into())],
+                Some("i-2"),
+            )
+            .expect("runs");
+            // `b` is being told: this asks for one more, and returns.
+            s.tell_waiting();
+        }));
+        s.tell_waiting();
+        let set = format!("{:?}", sets_of(&s, &theirs).pop().expect("a patch set"));
+        assert!(set.contains("Late"), "the late post is told: {set}");
+    }
+
+    /// **A telling that panics does not silence the reader** (ADR-0271): the
+    /// next commit tells it, as one more would have.
+    #[test]
+    fn a_telling_that_panics_does_not_silence_the_reader() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        *s.told_rendered.lock().expect("told rendered") =
+            Some(Box::new(|_: &Server| panic!("a telling that fails")));
+        let told = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| s.tell_waiting()));
+        assert!(told.is_err(), "the telling panicked");
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("Next".into())],
+            Some("i-2"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        let set = format!("{:?}", sets_of(&s, &theirs).pop().expect("a patch set"));
+        assert!(set.contains("Next"), "told after the panic: {set}");
+    }
+
+    /// **A session's turns are served in the order they are asked**
+    /// (ADR-0271): each waits for those asked before it, and none asked
+    /// after it comes first. `std`'s mutex promises no order, and a session
+    /// told again and again took its lock before the session's own read.
+    #[test]
+    fn a_sessions_turns_are_served_in_the_order_asked() {
+        let turns = Arc::new(Turns::default());
+        let asked = |n: u64| {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            while turns.tickets.lock().expect("tickets").0 < n {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "ticket {n} never asked"
+                );
+                std::thread::yield_now();
+            }
+        };
+        let served = Mutex::new(Vec::new());
+        std::thread::scope(|scope| {
+            let first = turns.lock().unwrap();
+            for i in 0..8u64 {
+                let (turns, served) = (&turns, &served);
+                scope.spawn(move || {
+                    let _turn = turns.lock().unwrap();
+                    served.lock().expect("served").push(i);
+                });
+                // The next asks only once this one has its ticket.
+                asked(i + 2);
+            }
+            drop(first);
+        });
+        assert_eq!(*served.lock().expect("served"), (0..8).collect::<Vec<_>>());
+        // And a turn that panics serves the next. Each on a thread of its
+        // own, waited for no longer than it should take: a turn that served
+        // no one would leave the next waiting for ever.
+        let panicking = Arc::clone(&turns);
+        let held = std::thread::spawn(move || {
+            let _turn = panicking.lock().unwrap();
+            panic!("a telling that fails");
+        })
+        .join();
+        assert!(held.is_err());
+        let (sent, served_next) = std::sync::mpsc::channel();
+        let next = Arc::clone(&turns);
+        std::thread::spawn(move || {
+            let _turn = next.lock().unwrap();
+            let _ = sent.send(());
+        });
+        assert!(
+            served_next
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .is_ok(),
+            "the next is served after a panic"
         );
     }
 

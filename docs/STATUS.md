@@ -41,6 +41,19 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0271, 2026-10-08: a reader is told once per burst, and served in
+turn** (found by WebKit's "Load more", which failed on CI six times). The
+records a failing feed test keeps showed it here, under six workers: a
+page received some seventy renders of others' posts, each of its twenty
+rows, while its own read for forty waited past five seconds. Each commit
+told every other reader (ADR-0219), and a session's hold, a `std` mutex,
+was taken in no order, so a reader told again and again took it before the
+reader's own read. A reader is told once for every commit waiting, one
+telling at a time, and one more for a commit that came meanwhile; the
+session's hold is taken in turn (`Turns`). Four rounds of forty, before
+and after in turn: 13 of 160 failed before, 2 of 160 after (`just
+e14-telling`).
+
 **ADR-0269, 2026-10-08: a resource is held by what takes it apart** (found
 by ADR-0250). `match Maps.create(c, at) { Ok(h) => Maps.destroy(h), Err(_)
 => () }` was PW2005, "matched where it is acquired", and the same match on

@@ -5165,3 +5165,21 @@ e14-trap-causes:
        CARGO_INCREMENTAL=0 python3 scripts/trap_cause_mutations.py; \
      } > docs/evidence/E14/trap-causes.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/trap-causes.txt
+
+# ADR-0271: a reader is told once per burst, and served in turn. The
+# development server's tests, and the mutation controls.
+e14-telling:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0271 - a reader is told once per burst, and served in turn"; echo; \
+       echo "produced by: just e14-telling"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== told once, in turn (spikes/own-renderer/server/src/main.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_burst_of_posts_tells_another_reader_once \
+         a_commit_while_a_reader_is_told_is_told_after_it a_telling_that_panics_does_not_silence_the_reader \
+         a_sessions_turns_are_served_in_the_order_asked a_post_reaches_every_open_timeline 2>&1 \
+         | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/telling_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/telling_mutations.py; \
+     } > docs/evidence/E14/telling.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/telling.txt
