@@ -102,6 +102,13 @@ export const IDENTITY_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT 
 // blob storage of its own (`PW_BLOB_DIR`), so one engine's images are never
 // another's. Served only when the feed is built.
 export const UPLOADS_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 80 + i]));
+// The notifications track's hosts (ADR-XXXX): the feed's build again, its
+// sessions signed in through the development identity provider, so one user
+// reads in two sessions and another beside them. One per engine, because a
+// notification is its user's on a host. Served only when the feed is built.
+export const NOTIFICATIONS_PORTS = Object.fromEntries(
+  ENGINES.map((e, i) => [e, PORT + 90 + i]),
+);
 // A build serves the runtime it was built with. One built before the runtime
 // changed runs the old runtime against the new server, and fails for a reason
 // that is no test's: `dist-keyed` did, once each page's subscription named
@@ -187,6 +194,8 @@ export default defineConfig({
     ...(FEED_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/identity.spec.mjs"]),
     // The uploads track's, the feed's build with its images.
     ...(FEED_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/uploads.spec.mjs"]),
+    // The notifications track's, the feed's build with accounts.
+    ...(FEED_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/notifications.spec.mjs"]),
   ],
   fullyParallel: true,
   reporter: [["list"]],
@@ -243,6 +252,15 @@ export default defineConfig({
       ? Object.values(UPLOADS_PORTS).map((port) => ({
           command: `../../target/debug/pw-dev-server dist-feed`,
           env: { PORT: String(port), PW_BLOB_DIR: `dist-feed/blobs-${port}`, ...IN_MEMORY },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))
+      : []),
+    ...(FEED_BUILT && !process.env.PW_PERFORMANCE
+      ? Object.values(NOTIFICATIONS_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist-feed`,
+          env: { PORT: String(port), PW_IDENTITY: "dev-accounts", ...IN_MEMORY },
           port,
           reuseExistingServer: !!process.env.PW_REUSE,
           timeout: 60_000,
