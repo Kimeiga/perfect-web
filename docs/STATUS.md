@@ -41,6 +41,28 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0260, 2026-10-07: an image on a post** (track `uploads`, W2, the
+second track merged under ADR-0253). A program states its upload,
+`upload PostImage` with its route, what it serves, its bytes, its types
+and its width and height, checked at build (PW5601-PW5603: each clause
+stated and literal, its paths its own, and a form that sends a file
+posting it to one), and the host holds a browser to it; a deployment may
+lower a limit, and one raised stops the server at its start. What a file
+is comes from its bytes, PNG's, JPEG's (an Exif turn included), WebP's and
+GIF's headers read by hand, never from what the browser says it is. A
+signed-in user attaches within an hour's budget (429 past it); the bytes
+wait in the server's memory, leased to the session, until a command claims
+them and publishes them with the post, in its transaction, or discards
+them, PW2005 holding each path; the image is the post's own data, in memory
+and in migration `0005`'s columns. Only what a post committed is served, at
+its SHA-256, typed by its bytes again, `nosniff`, sandboxed and immutable.
+No crate was added. Its questions at the merge: a deleted post's image
+stops being served and its blob is collected (queued first), a runtime
+that sends a file so a draft survives attaching (queued), `e14-uploads` on
+the database job (done), and every form's `action` checked with the host's
+routes (queued, with identity's). Its recorded evidence is from `2af787b`,
+before its last rebase; the merge's verification records it again.
+
 **Correction, 2026-10-07: a test read a region one way it can arrive.** The
 verification of `e075289` (run 37694155286) failed `e14-keyed-reads` and
 `e14-query-blocks` on one server test,

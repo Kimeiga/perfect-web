@@ -36,7 +36,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0004_follows",
         include_str!("../migrations/feed/0004_follows.sql"),
     ),
-    // Track `uploads` (ADR-XXXX): a post's image, kept with it.
+    // Track `uploads` (ADR-0260): a post's image, kept with it.
     (
         "0005_post_images",
         include_str!("../migrations/feed/0005_post_images.sql"),

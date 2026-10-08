@@ -1,4 +1,4 @@
--- A post's image (track `uploads`, ADR-XXXX): kept with the post, written in
+-- A post's image (track `uploads`, ADR-0260): kept with the post, written in
 -- the post's own transaction. Its bytes are the deployment's blob storage's,
 -- by their SHA-256; what is kept here is that key, the kind sniffed from the
 -- bytes, the width and height a browser shows them at, and the author's

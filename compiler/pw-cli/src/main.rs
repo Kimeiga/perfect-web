@@ -150,7 +150,7 @@ fn explain_with(
                     let _ = writeln!(s, "             {} {}", p.name, p.value);
                 }
             }
-            // Track `uploads` (ADR-XXXX): a file a form posts, and its limits.
+            // Track `uploads` (ADR-0260): a file a form posts, and its limits.
             DeclKind::Upload => {
                 let _ = writeln!(s, "upload       {name}");
                 for p in &d.policies {

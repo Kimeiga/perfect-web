@@ -1,5 +1,5 @@
 //! **An upload states where a form posts a file, and its limits** (track
-//! `uploads`, ADR-XXXX; the integrator's ruling on its Q1).
+//! `uploads`, ADR-0260; the integrator's ruling on its Q1).
 //!
 //! `upload PostImage  route "/uploads/post-image"  serves "/images"
 //! max_bytes 5_000_000  types png, jpeg, webp, gif  max_width 4096

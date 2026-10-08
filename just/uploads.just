@@ -6,7 +6,7 @@
 # and is planned by the verification run like any other (scripts/ci_plan.py
 # reads this file too).
 
-# Track `uploads` (ADR-XXXX): an image on a post. The header readers, the
+# Track `uploads` (ADR-0260): an image on a post. The header readers, the
 # form's body, the blob storage, the leases and serving (the server's
 # `uploads` and `blob` tests, PostgreSQL's where PW_FEED_DATABASE_URL names
 # a database and passing doing nothing otherwise); the `upload` declaration
@@ -18,7 +18,7 @@ e14-uploads:
     @bash spikes/own-renderer/feed.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX (track uploads) - an image on a post: a typed upload, a deployment's blob storage, served safely"; echo; \
+    @{ echo "ADR-0260 (track uploads) - an image on a post: a typed upload, a deployment's blob storage, served safely"; echo; \
        echo "produced by: just e14-uploads"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \

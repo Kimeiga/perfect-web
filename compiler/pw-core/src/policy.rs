@@ -349,7 +349,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "transactions" => Domain::Word(&["serializable", "snapshot", "read_committed", "none"]),
         "reads" => Domain::Words(&["strong", "snapshot", "read_your_writes", "eventual"]),
         "changes" => Domain::Word(&["none", "feed"]),
-        // An upload's (track `uploads`, ADR-XXXX): where its committed files
+        // An upload's (track `uploads`, ADR-0260): where its committed files
         // are served, its limits, and its kinds, a closed set each sniffed
         // from a file's bytes.
         "serves" => Domain::Str,
@@ -571,7 +571,7 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         "host" => (&[K::Fn, K::Effect], "a function"),
         // A data source's (ADR-0207).
         "holds" | "transactions" | "reads" | "changes" => (&[K::Source], "a data source"),
-        // An upload's (track `uploads`, ADR-XXXX).
+        // An upload's (track `uploads`, ADR-0260).
         "serves" | "max_bytes" | "types" | "max_width" | "max_height" => {
             (&[K::Upload], "an upload")
         }

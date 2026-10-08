@@ -1,4 +1,4 @@
-// Track `uploads` (ADR-XXXX): an image on a post, in three engines. The
+// Track `uploads` (ADR-0260): an image on a post, in three engines. The
 // feed's build (`feed.sh`), served on hosts of the track's own, one per
 // engine, each with its own blob storage (`UPLOADS_PORTS`, PW_BLOB_DIR):
 //   - an image attached by the home page's form, a plain multipart form the

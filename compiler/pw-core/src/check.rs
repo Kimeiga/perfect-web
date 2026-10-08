@@ -217,7 +217,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // parameters, and one route is one page's.
             out.extend(crate::routes::parameters_agree(&u.hir, i, &sigs));
             out.extend(crate::routes::declared_twice(&hirs, i));
-            // Track `uploads` (ADR-XXXX): an upload's clauses, its paths, and
+            // Track `uploads` (ADR-0260): an upload's clauses, its paths, and
             // the forms that post a file.
             out.extend(crate::uploads::check(&hirs, i));
             // ADR-0163: a page says when its address names nothing.

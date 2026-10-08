@@ -34,7 +34,7 @@ argon2.workspace = true
 # codes from the operating system's random source.
 base64.workspace = true
 getrandom.workspace = true
-# The identity track's PKCE, and the uploads track's (ADR-XXXX) blob keys,
+# The identity track's PKCE, and the uploads track's (ADR-0260) blob keys,
 # the SHA-256 of their bytes.
 sha2.workspace = true
 serde.workspace = true

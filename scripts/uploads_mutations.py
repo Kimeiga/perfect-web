@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for the uploads track (ADR-XXXX): an image on a post.
+"""Mutation controls for the uploads track (ADR-0260): an image on a post.
 
 Each mutant undoes one piece, and the tests must then fail:
 

@@ -52,8 +52,9 @@ LOCAL_ONLY = {
 
 # Recipes run against a database, which the run's database job provides
 # (ADR-0246): they are planned there and not in a shard. The job sets up
-# what a shard would for them (ADR-0258): `e14-identity` drives browsers.
-NEEDS_DATABASE = {"e14-feed-postgres", "e14-identity"}
+# what a shard would for them (ADR-0258): `e14-identity` and `e14-uploads`
+# (ADR-0260) drive browsers.
+NEEDS_DATABASE = {"e14-feed-postgres", "e14-identity", "e14-uploads"}
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
 

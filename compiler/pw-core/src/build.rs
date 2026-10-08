@@ -52,7 +52,7 @@ pub struct Build {
     /// **What each data source states it guarantees** (ADR-0207), which a
     /// host compares with what the database it opens provides (ADR-0246).
     pub sources: Vec<crate::check::SourceClauses>,
-    /// Track `uploads` (ADR-XXXX): each upload the program declares, which
+    /// Track `uploads` (ADR-0260): each upload the program declares, which
     /// a host holds a browser's file to.
     pub uploads: Vec<crate::uploads::UploadClauses>,
 }

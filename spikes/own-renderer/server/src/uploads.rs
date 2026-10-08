@@ -1,5 +1,5 @@
 //! **A request whose body is a file** (track `uploads`, `docs/PARALLEL.md`,
-//! ADR-0253; the track's ADR, `ADR-XXXX-an-image-on-a-post`).
+//! ADR-0253; the track's ADR, `ADR-0260-an-image-on-a-post`).
 //!
 //! The uploads track owns this module: a typed upload with the limits its
 //! program declares, stored through a deployment's blob storage

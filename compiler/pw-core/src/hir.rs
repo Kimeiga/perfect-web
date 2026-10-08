@@ -156,7 +156,7 @@ pub enum DeclKind {
     /// `source StoreData` (ADR-0207): a database the program's effects name,
     /// and what it guarantees. Named by nothing a program writes.
     Source,
-    /// `upload PostImage` (track `uploads`, ADR-XXXX): a file a form posts to
+    /// `upload PostImage` (track `uploads`, ADR-0260): a file a form posts to
     /// its `route`, served once committed under `serves`, and its limits.
     /// Named by nothing a program writes; `pw build` writes it for the host.
     Upload,

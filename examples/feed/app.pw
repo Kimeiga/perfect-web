@@ -43,7 +43,7 @@ type Post = Post {
     text: String,
     likes: Int,
     replies: List<Post>,
-    images: List<Image>, // Track `uploads` (ADR-XXXX): none, or one.
+    images: List<Image>, // Track `uploads` (ADR-0260): none, or one.
 }
 
 // **A post as a timeline shows it** (ADR-0222): who wrote it, what it says,
@@ -56,10 +56,10 @@ type Item = Item {
     // Whether the reader wrote it (track `identity`): the timeline is
     // private, and a post its author may delete shows a Delete button.
     mine: Bool,
-    images: List<Image>, // Track `uploads` (ADR-XXXX): none, or one.
+    images: List<Image>, // Track `uploads` (ADR-0260): none, or one.
 }
 
-// --- Track `uploads` (ADR-XXXX): an image on a post. -----------------------
+// --- Track `uploads` (ADR-0260): an image on a post. -----------------------
 
 // **An image a post carries**: where it is served, its width and height as
 // a browser shows it, so its page keeps its place before it loads

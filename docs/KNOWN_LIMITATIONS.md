@@ -513,6 +513,15 @@ awaited in order. What remains:
   stale tab's command refused with 403 shows the runtime's generic failure.
   The program reads who its reader is through a data layer op, not a typed
   principal (`context.current_user()` is not answered yet).
+- **An upload's image is kept after its post is deleted** (ADR-0260): its
+  blob stays, and is served at its key to anyone who kept the address (next
+  in NEXT). A budget of uploads is the server's memory, as a lease is, so a
+  restart or a second host forgets it; the development blob store is a
+  directory, and there is no production store, CDN, signed address,
+  private image, re-encoding or resizing. Metadata is served as uploaded,
+  an Exif position among it; EXIF orientation is read in JPEG alone. A
+  post carries one image, attaching it navigates the page and loses a draft
+  typed before it, and an image is not part of a post's speculation.
 - **The follows timeline is a query** (ADR-0257): read on each render
   from the posts of those followed, not a materialization fanned out on
   write. A reader is told of its own follow by its session, and another

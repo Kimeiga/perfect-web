@@ -458,22 +458,31 @@ E14 comes before E11-E13. Its plan, controls and task list are
              provider the deployment's). What it leaves, in order: a
              typed principal, `context.current_user()` answered by the
              host from the session's principal, which notifications need
-             first (its first question); the routes a deployment's identity
-             serves in the route table, so a form to `/sign-in` is checked
-             (its second); a refusal shown by the runtime, a stale tab's
-             command refused 403 with its predicate;
-          5. notifications (after the timeline, ADR-0253): private,
-             per-user live data derived from others' actions, a like or a
-             reply to your post, with an unread count;
+             first (its first question; built by W3 under the integrator's
+             rulings, docs/PARALLEL.md); the routes a deployment serves in
+             the route table, its identity's and its uploads', and every
+             form's `action` and `method` checked against them and the
+             program's pages and commands as PW5009 checks a link (its
+             second, and ADR-0260's fourth); a refusal shown by the runtime,
+             a stale tab's command refused 403 with its predicate;
+          5. **notifications, track `notifications`, W3** (docs/PARALLEL.md,
+             under the integrator's rulings there): private, per-user live
+             data derived from others' actions, a like, a reply or a follow
+             involving you, with an unread count and mark-read, on the
+             typed principal (item 4's first);
           6. direct messages (after the timeline): data private to exactly
              two users. The privacy
              labels with two principals, and a cache that never shows one
              conversation to a third user;
-          7. **track `uploads`, W2** (ADR-0253, docs/PARALLEL.md): image
-             uploads on a post: a typed upload with size and
-             content-type limits, stored through a deployment's blob-storage
-             capability (Pleris builds no storage and no CDN), and served
-             safely;
+          7. ~~**track `uploads`, W2**~~ (ADR-0260, `just e14-uploads`: an
+             image on a post, a typed upload served safely). What it leaves,
+             in order: a deleted post's image no longer served, and its blob
+             collected where no post names it, a claim in flight kept (its
+             first question at the merge); a runtime that sends a file, so a
+             draft typed before attaching survives (its second, after
+             notifications); and from its "Not claimed", a budget kept across
+             restarts and hosts, EXIF orientation outside JPEG, and more than
+             one image a post;
           8. ~~a real database for the feed~~ (ADR-0246, written on
              `pg-data-layer` in parallel and integrated here; `just
              e14-feed-postgres`). What it leaves (its "Not claimed"): a

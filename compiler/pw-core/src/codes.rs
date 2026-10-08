@@ -728,7 +728,7 @@ codes! {
     STREAMED_WITHOUT_TIMEOUT = "PW5402" / streamed_without_timeout / 1, Streaming,
         "a query declared `delivery streamed` declares how long it may take";
 
-    // --- the uploads track (PW56xx, ADR-0253; track `uploads`, ADR-XXXX) ----
+    // --- the uploads track (PW56xx, ADR-0253; track `uploads`, ADR-0260) ----
     //
     // An `upload` declaration states where a form posts a file, where what is
     // committed is served, and its limits, each a literal the host holds a

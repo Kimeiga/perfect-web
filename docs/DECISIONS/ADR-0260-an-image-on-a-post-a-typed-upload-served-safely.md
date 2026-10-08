@@ -1,9 +1,11 @@
-# ADR-XXXX: an image on a post, a typed upload served safely
+# ADR-0260: an image on a post, a typed upload served safely
 
-Status: proposed by track `uploads` (W2, `track/uploads`), under the
+Status: accepted at its merge, 2026-10-07, under the owner's delegation of
+2026-10-02; proposed by track `uploads` (W2, `track/uploads`), under the
 integrator's rulings of 2026-10-07 on its four questions and its one ask
-(below, "The integrator's answers"). Date: 2026-10-07. Milestone: E14, the
-owner's Twitter list, item 7.
+(below, "The integrator's answers"), and its questions at the merge
+answered after them. Date: 2026-10-07. Milestone: E14, the owner's Twitter
+list, item 7.
 
 ## Context
 
@@ -383,6 +385,50 @@ Recorded by `just e14-uploads` in `docs/evidence/E14/uploads.txt`, at
   integrator queues indirect parameters past 16 flat values, and a refusal
   of a malformed host binding where it is written. The image's words always
   shown: fine.
+
+## The integrator's answers at the merge
+
+2026-10-07.
+
+1. **A deleted post's image: stop serving it at once, and collect its
+   blob.** Delete promises its author the post is gone, and its image,
+   served at a key anyone shown it can keep, was not. Serving asks the
+   layer whether a committed post names the key, both layers by an index,
+   and answers 404 where none does; a blob no post names is deleted after
+   the deleting transaction commits, unless a command in flight holds a
+   claim to the same key, which will name it or give it back and be
+   collected then. A copy a CDN or a browser keeps under `immutable` is the
+   deployment's to purge as its store deletes. Queued first in NEXT.
+2. **A runtime that sends a file: yes, queued** after notifications. The
+   page posts the file itself and reads the attached image as the attach
+   form's answer shows it, so a draft typed before attaching survives; the
+   plain form stays for a page without its runtime.
+3. **`e14-uploads` on the database job: yes, at this merge.**
+   `NEEDS_DATABASE` names it, and the database job sets up the browsers
+   and the build for it (ADR-0258's merge).
+4. **Every form's `action`: yes, with the host's routes** (ADR-0258's
+   second answer). The platform states the routes a deployment serves, the
+   identity's and an upload's, and every form's `action` and `method` is
+   checked against them and the program's pages and commands, as PW5009
+   checks a link; PW5603 stays a file form's own check. One item in NEXT.
+
+**The intermittents.** `e14-not-found`'s baseline failing one server test
+of 249 is most likely the estimate test that read its region one way it can
+arrive, fixed at `e447b72` (STATUS's correction of 2026-10-07): a recipe
+keeps a failure's `panicked at` line since, and a feed test's failure what
+the network saw (`1fcabdd`), so the next of either says which.
+`e14-computed-rows`' browser baseline and this track's one local
+`on_postgres_an_image_is_kept_with_its_post` stay unknown until then.
+
+## At the merge
+
+- Numbered ADR-0260; `ADR-XXXX` reads `ADR-0260` in the code, the recipe
+  and the scripts. The recorded evidence keeps the header it was recorded
+  with, at `2af787b`, before the track's last rebase; the merge's
+  verification records `e14-uploads` again, on the database job.
+- `scripts/ci_plan.py` plans `e14-uploads` on the database job.
+- `docs/PARALLEL.md`: W2 merged; W3, notifications, added under the
+  integrator's rulings.
 
 ## Report
 

@@ -65,7 +65,7 @@ pub const DECL_STARTERS: &[&str] = &[
     "event",
     // ADR-0207: a data source, and what it guarantees.
     "source",
-    // Track `uploads` (ADR-XXXX): a file a form posts, and its limits.
+    // Track `uploads` (ADR-0260): a file a form posts, and its limits.
     "upload",
     "effect",
     "prelude",
@@ -135,7 +135,7 @@ pub const RESOURCE_NOUNS: &[&str] = &[
     // ADR-0207: what a database the program's effects name guarantees:
     // `source StoreData  holds Carts, Orders  transactions serializable`.
     "source",
-    // Track `uploads` (ADR-XXXX): `upload PostImage  route "/uploads/post-image"
+    // Track `uploads` (ADR-0260): `upload PostImage  route "/uploads/post-image"
     // serves "/images"  max_bytes 5_000_000  types png, jpeg`.
     "upload",
     "replicated",
@@ -251,7 +251,7 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     "transactions",
     "reads",
     "changes",
-    // Track `uploads` (ADR-XXXX): where an upload's committed files are
+    // Track `uploads` (ADR-0260): where an upload's committed files are
     // served, and its limits, each a literal.
     "serves",
     "max_bytes",

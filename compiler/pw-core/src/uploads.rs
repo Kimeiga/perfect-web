@@ -1,4 +1,4 @@
-//! **A file a form posts, and its limits** (track `uploads`, ADR-XXXX; the
+//! **A file a form posts, and its limits** (track `uploads`, ADR-0260; the
 //! integrator's ruling of 2026-10-07 on its Q1).
 //!
 //! ```text

@@ -20,21 +20,22 @@ charter+ADR reading (`AGENTS.md`); small merges; full gate tests").
 | track | branch | worker |
 |---|---|---|
 | accounts and sign-in: a `requires` evaluator, sign-up, sign-in and sign-out, per-user sessions, an OIDC-style deployment interface with a local provider that is plainly not production | `track/identity` | W1, a local session; merged 2026-10-07 (ADR-0258) |
-| image uploads on a post: a typed upload with size and content-type limits, a deployment's blob-storage capability, served safely | `track/uploads` | W2, a local agent of the session that runs W1 |
+| image uploads on a post: a typed upload with size and content-type limits, a deployment's blob-storage capability, served safely | `track/uploads` | W2, a local agent of the session that runs W1; merged 2026-10-07 (ADR-0260) |
+| notifications: private, per-user live data from others' actions (a like, a reply or a follow involving you), an unread count and mark-read, on a typed principal | `track/notifications` | W3, a local agent of the session that runs W1 and W2 |
 
-The follows timeline landed on 2026-10-07 (ADR-0257); notifications and
-direct messages come next, the integrator's.
+The follows timeline landed on 2026-10-07 (ADR-0257); notifications are
+W3's, under the rulings below, and direct messages come after them.
 
 ## What each track owns
 
-| | identity | uploads |
-|---|---|---|
-| recipes | `just/identity.just` | `just/uploads.just` |
-| diagnostic codes | `PW55xx`, `Owner::Identity` | `PW56xx`, `Owner::Uploads` |
-| the development server | `spikes/own-renderer/server/src/identity.rs` | `spikes/own-renderer/server/src/uploads.rs` |
-| new files | anything new under a directory or name the track's own: `identity`, `accounts`, `sign_in` | `uploads`, `blob` |
-| browser hosts | `PORT+70..72`, `IDENTITY_PORTS` | `PORT+80..82` |
-| PostgreSQL migrations | `0003` | the next free after `0004`, the follows timeline's |
+| | identity | uploads | notifications |
+|---|---|---|---|
+| recipes | `just/identity.just` | `just/uploads.just` | `just/notifications.just` |
+| diagnostic codes | `PW55xx`, `Owner::Identity` | `PW56xx`, `Owner::Uploads` | `PW57xx`, `Owner::Notifications` |
+| the development server | `spikes/own-renderer/server/src/identity.rs` | `spikes/own-renderer/server/src/uploads.rs` | `spikes/own-renderer/server/src/notifications.rs` |
+| new files | anything new under a directory or name the track's own: `identity`, `accounts`, `sign_in` | `uploads`, `blob` | `notifications`, `principal` |
+| browser hosts | `PORT+70..72`, `IDENTITY_PORTS` | `PORT+80..82`, `UPLOADS_PORTS` | `PORT+90..92`, `NOTIFICATIONS_PORTS` |
+| PostgreSQL migrations | `0003` | `0005` | `0006` |
 
 - **Recipes**: the root `justfile` imports each track's file, whose recipes
   run in the repository's root under the root's settings and `PATH`. An
@@ -61,6 +62,9 @@ direct messages come next, the integrator's.
     within its own limits, where a command's is bounded to 64 KiB.
   - Each module's state is a field of `Server`, `identity` and `uploads`,
     built by `Default`; a track grows its own struct.
+  - `pw:host/principal#read` (W3), answered beside `pw:host/session#read`
+    where a query's and a command's host operations are built, from the
+    identity's principals.
 - **Shared files** (the compiler, the runtime, the platform packages, the
   examples): a track may change them where its work needs, in small,
   separate commits whose messages say why, and says so to the integrator
@@ -68,8 +72,8 @@ direct messages come next, the integrator's.
 
 ## Branches, commits and ADRs
 
-- Branch `track/identity` or `track/uploads` from `master`, in a worktree of
-  its own, with its own `CARGO_TARGET_DIR`.
+- Branch `track/<name>` from `master`, in a worktree of its own, with its
+  own `CARGO_TARGET_DIR`.
 - **An ADR is unnumbered**: `docs/DECISIONS/ADR-XXXX-<slug>.md`, its title
   `# ADR-XXXX: ..`. The integrator numbers it when it merges, and indexes it.
 - **A worker never edits the four status documents.** What it would write
@@ -153,3 +157,46 @@ Each a decision for a track, with its date; a track's ADR records it too.
   host's routes in the route table and a refusal shown by the runtime are
   queued (NEXT); the database job sets up browsers and the build for a
   recipe that needs them, and `e14-identity` runs there.
+- **2026-10-07, at uploads' merge (ADR-0260).** Its four questions are
+  answered in ADR-0260: a deleted post's image stops being served and its
+  blob is collected (queued first, the integrator's), a runtime that sends
+  a file (queued after notifications), `e14-uploads` on the database job
+  (done), and every form's `action` checked with the host's routes
+  (queued, with identity's).
+- **2026-10-07, notifications (W3).** The typed principal is ruled here, a
+  language decision, and W3 builds it as its first commits, before the
+  notifications on it.
+  - **The reader's user is the host's**: `context.current_user()` becomes a
+    platform operation the host answers from the session's principal, its
+    `user`, or the session's guest where no one signed in, labelled
+    `User<UserId>`. `identified_by` goes once nothing reads a user through
+    it.
+  - **A user's handle is the host's alone to make**: a program constructs
+    no `User<..>`, and a data layer answers a user's id (who wrote a post),
+    never another user's handle. So a private query keyed by a handle
+    serves its reader alone.
+  - **An event naming a user reaches each of their sessions**: an event's
+    value of a user's id reaches a query parameter of type `User<..>` over
+    that id, and the host drops the entries at that user in every
+    session's partition (ADR-0256) and tells their open pages (ADR-0219).
+    This changes ADR-0091's relation of a listener to its event, a rule
+    other code relies on: W3 brings the change to the integrator before it
+    lands.
+  - **Which type a user's id is** is W3's first question, with research:
+    the platform's `capability.UserId` throughout the feed (which
+    fabricates `UserId("you")` for an optimistic author today), or the
+    program's own type, named by the principal it reads; with what the
+    compiler holds of generic opaque types and of `User<U>`'s
+    representation.
+  - **A notification is a row** that a like, a reply or a follow writes in
+    its own transaction, beside what it writes, as an image is its post's
+    (ADR-0260). No materialization: materializations made real stay
+    queued, the integrator's. One's own act notifies no one, and a deleted
+    post's notifications go with it.
+  - **Private to its user, by cache and by session** (charter §15.6): its
+    queries keyed by the reader's handle, `cache private`; a test holds
+    another user's session, signed in and not, to seeing none of it, by
+    page and by `/pw-read`.
+  - **An unread count on each page that shows its reader**, live, and a
+    page of them; reading them is a command that invalidates the reader's
+    count and list, which reaches each of the reader's sessions.

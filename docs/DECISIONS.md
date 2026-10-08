@@ -2152,3 +2152,14 @@ a map or set from outside is sorted on arrival (ruling 0057-c).
   code point order: a database's collation, an order by UTF-16 unit, a
   hash map's. The divergences from the Component Model's `map` and from
   `Map.from_lists`, both keeping the last of a repeated key, are recorded.
+[ADR-0260](DECISIONS/ADR-0260-an-image-on-a-post-a-typed-upload-served-safely.md):
+an image on a post, a typed upload served safely (track `uploads`, W2;
+merged by the integrator).
+- A program states its upload, `upload PostImage`, its route, what it
+  serves, its bytes, its types and its size, checked (PW5601-PW5603) and
+  held by the host; a deployment may lower a limit and never raise one. A
+  file's kind and size are read from its bytes, never from what the browser
+  says; a signed-in user attaches within an hour's budget, a command claims
+  the upload and publishes it with the post or discards it (PW2005 holds
+  each path), and only what a post committed is served, `nosniff`,
+  sandboxed and immutable.

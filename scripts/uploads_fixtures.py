@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The uploads track's image fixtures (track `uploads`, ADR-XXXX).
+"""The uploads track's image fixtures (track `uploads`, ADR-0260).
 
 Real encoders' output, so the header readers in
 `spikes/own-renderer/server/src/uploads/sniff.rs` are checked against files

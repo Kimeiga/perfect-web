@@ -1,4 +1,4 @@
-//! **An image on a post** (track `uploads`, ADR-XXXX): the feed's own
+//! **An image on a post** (track `uploads`, ADR-0260): the feed's own
 //! upload, attached by a form over HTTP through the seam `main.rs` gives it,
 //! committed with its post by the program's command in the post's own
 //! transaction, shown with its width, height and words, and served from

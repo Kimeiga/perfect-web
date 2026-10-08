@@ -98,7 +98,7 @@ export const FEED_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 60
 // (`PW_IDENTITY=dev-accounts`). One per engine, because an account and a post
 // are every reader's on a host. Served only when the feed is built.
 export const IDENTITY_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 70 + i]));
-// The uploads track's hosts (ADR-XXXX): the feed's build again, each with a
+// The uploads track's hosts (ADR-0260): the feed's build again, each with a
 // blob storage of its own (`PW_BLOB_DIR`), so one engine's images are never
 // another's. Served only when the feed is built.
 export const UPLOADS_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 80 + i]));
