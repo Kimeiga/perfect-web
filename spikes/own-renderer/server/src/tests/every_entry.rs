@@ -14,18 +14,21 @@ use super::*;
 /// **The feed, and two commands liking a post**: one dropping the
 /// session's timelines at every limit, and one every session's at 20. A
 /// command that writes nothing commits nothing, its invalidations among it,
-/// and one that writes a post reaches every reader of one (PW5106).
+/// and one that writes a post reaches every reader of one (PW5106). Track
+/// `notifications`: `add_like` writes a notification too, so each drops
+/// every reader's notifications as PW5106 asks.
 pub(super) fn forgetting(app: &str) -> String {
     format!(
         "{app}\n\
          command forget(post: PostId) -> Result<Post, FeedError>\n    \
          requires      SignedIn\n    \
          invalidates   Timeline(current_session(), _), \
-         FollowingTimeline(current_session(), _)\n{{\n    \
+         FollowingTimeline(current_session(), _), Notifications(_, _), Unread(_)\n{{\n    \
          add_like(current_session(), post)\n}}\n\n\
          command forget_twenty(post: PostId) -> Result<Post, FeedError>\n    \
          requires      SignedIn\n    \
-         invalidates   Timeline(_, 20), FollowingTimeline(_, 20)\n{{\n    \
+         invalidates   Timeline(_, 20), FollowingTimeline(_, 20), Notifications(_, _), \
+         Unread(_)\n{{\n    \
          add_like(current_session(), post)\n}}\n"
     )
 }

@@ -10371,6 +10371,10 @@ public query Store(",
     // PostgreSQL where a database is named.
     mod uploads;
 
+    // TRACK SEAM (notifications): notifications, in memory and on
+    // PostgreSQL where a database is named.
+    mod notifications;
+
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
     /// to the session's document. Until ADR-0218 the host served the store

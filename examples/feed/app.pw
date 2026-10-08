@@ -13,12 +13,13 @@ module feed.app
 
 import List
 import String
-import context.{ current_session }
+import context.{ current_session, current_user }
 import capability.{ Session, SessionId }
 // Track `notifications` (ADR-XXXX): a user's id is the platform's, the
 // principal's `UserId`, which a handle, `User<UserId>`, is over. An id names
 // someone and grants nothing; a handle is the host's alone to make.
 import capability.{ UserId }
+import capability
 
 opaque type PostId = String
 opaque type InteractionId = String
@@ -158,7 +159,7 @@ type Viewer = Viewer { signed_in: Bool, account: Bool, name: String }
 // The host compares these with what the database it opens provides, and
 // does not serve on a mismatch.
 source FeedData
-    holds        Post, User, Follow
+    holds        Post, User, Follow, Notification
     transactions serializable
     reads        strong
     changes      none
@@ -175,10 +176,13 @@ fn author(s: Session<SessionId>) -> UserId !{ database.read<User> }
 fn publish(s: Session<SessionId>, text: PostText) -> Result<Post, FeedError> !{ database.write<Post> }
     host "feed:data/posts#publish"
 
-fn add_reply(s: Session<SessionId>, to: PostId, text: PostText) -> Result<Post, FeedError> !{ database.write<Post> }
+// Track `notifications` (ADR-XXXX): a reply, a like, a follow and a delete
+// each write the notifications they tell of, or take with them, in their own
+// transaction: `database.write<Notification>`.
+fn add_reply(s: Session<SessionId>, to: PostId, text: PostText) -> Result<Post, FeedError> !{ database.write<Post>, database.write<Notification> }
     host "feed:data/posts#reply"
 
-fn add_like(s: Session<SessionId>, post: PostId) -> Result<Post, FeedError> !{ database.write<Post> }
+fn add_like(s: Session<SessionId>, post: PostId) -> Result<Post, FeedError> !{ database.write<Post>, database.write<Notification> }
     host "feed:data/posts#like"
 
 // **The image the session attached** (track `uploads`): none, or the one.
@@ -217,7 +221,7 @@ fn relation(s: Session<SessionId>, user: UserId) -> Relation !{ database.read<Us
 
 // **The session's user follows `user`** (ADR-0257): once, whatever how
 // often; one the feed does not know, or itself, is not found.
-fn add_follow(s: Session<SessionId>, user: UserId) -> Result<UserId, FeedError> !{ database.read<User>, database.write<Follow> }
+fn add_follow(s: Session<SessionId>, user: UserId) -> Result<UserId, FeedError> !{ database.read<User>, database.write<Follow>, database.write<Notification> }
     host "feed:data/users#follow"
 
 // **The session's user follows `user` no more** (ADR-0257): one it does not
@@ -225,7 +229,7 @@ fn add_follow(s: Session<SessionId>, user: UserId) -> Result<UserId, FeedError> 
 fn remove_follow(s: Session<SessionId>, user: UserId) -> Result<UserId, FeedError> !{ database.read<User>, database.write<Follow> }
     host "feed:data/users#unfollow"
 
-fn remove(s: Session<SessionId>, post: PostId) -> Result<PostId, FeedError> !{ database.write<Post> }
+fn remove(s: Session<SessionId>, post: PostId) -> Result<PostId, FeedError> !{ database.write<Post>, database.write<Notification> }
     host "feed:data/posts#delete"
 
 // Who the session is, which the platform's session capability reads: a
@@ -372,7 +376,7 @@ command discard_image() -> Result<Attached, FeedError>
 command reply(to: PostId, text: PostText) -> Result<Post, FeedError>
     requires      SignedIn
     idempotent_by InteractionId
-    emits         Posted(author(current_session()))
+    emits         Posted(author(current_session())), Notified(owner(to))
     optimistic    Thread(to) as thread => replied(thread, text)
 {
     add_reply(current_session(), to, text)
@@ -415,7 +419,7 @@ fn counted(n: Int, one: String, many: String) -> String !{} {
 command like(post: PostId) -> Result<Post, FeedError>
     requires      SignedIn
     idempotent_by InteractionId
-    emits         Liked(post)
+    emits         Liked(post), Notified(owner(post))
     optimistic    Timeline(current_session(), _) as feed => liked(feed, post),
                   FollowingTimeline(current_session(), _) as feed => liked(feed, post),
                   Thread(post) as thread => liked_thread(thread, post)
@@ -526,6 +530,7 @@ session page Home() {
     let feed = query Timeline(current_session(), shown)
     let me = query Me(current_session())
     let staged = query Attached(current_session()) // Track `uploads`.
+    let waiting = query Unread(current_user()) // Track `notifications`.
 
     view {
         <title>Home</title>
@@ -534,6 +539,7 @@ session page Home() {
             <nav aria-label="Timelines"><a href="/" aria-current="page">Everyone</a> <a href="/following">Following</a></nav>
             {#if me.signed_in}
             <p id="me">Signed in as {me.name}</p>
+            <p id="unread"><a href="/notifications">Notifications: {waiting} unread</a></p>
             {#if me.account}<form method="post" action="/sign-out"><button type="submit">Sign out</button></form>{/if}
             {:else}
             <p id="signed-out" role="status">Sign in to post, reply or like.</p>
@@ -739,3 +745,145 @@ session page ProfilePage(id: UserId) {
         </main>
     }
 }
+
+// --- Track `notifications` (ADR-XXXX): what others do that involves you. ---
+
+// **A notification's id**: the layer's, never one a deleted one had.
+opaque type NotificationId = String
+
+// **What someone did that involves you**: liked a post of yours, replied to
+// one, or followed you.
+type Act =
+    | LikedYourPost
+    | RepliedToYourPost
+    | FollowedYou
+
+// **A notification** (track `notifications`): who did what, the post it is
+// about (the post liked, or the reply written; none for a follow), and
+// whether you have read it. Its user's alone.
+type Notification = Notification {
+    id: NotificationId,
+    actor: User,
+    act: Act,
+    posts: List<PostId>,
+    unread: Bool,
+}
+
+// **Something happened that involves `user`**: a like or a reply to a post
+// of theirs. A follow tells them by `Followed`'s followee.
+event Notified(user: UserId)
+
+// **The reader's notifications**, newest first, at most `limit`: by the
+// reader's handle, which the host alone makes, so only the reader's.
+fn notifications(reader: capability.User<UserId>, limit: Int) -> List<Notification> !{ database.read<Notification>, database.read<User> }
+    host "feed:data/notifications#list"
+
+// **How many of the reader's notifications are unread.**
+fn unread_count(reader: capability.User<UserId>) -> Int !{ database.read<Notification> }
+    host "feed:data/notifications#unread"
+
+// **Every notification of the reader, read**: how many were unread.
+fn read_all(reader: capability.User<UserId>) -> Result<Int, FeedError> !{ database.write<Notification> }
+    host "feed:data/notifications#read"
+
+// **Who wrote a post**, an id that grants nothing; none for a post that is
+// not there.
+fn owner(post: PostId) -> UserId !{ database.read<Post> }
+    host "feed:data/posts#author"
+
+// **The reader's notifications** (track `notifications`): private to their
+// user, by cache and by session. A like or a reply to one of their posts,
+// and a follow of them, drops the entries at that user in each of their
+// sessions, and their open pages are told; a deleted post takes its
+// notifications with it, whoever's they were.
+private query Notifications(reader: capability.User<UserId>, limit: Int) -> List<Notification>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader, limit
+    invalidates_on Notified(reader), Followed(_, reader), Deleted(_)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    notifications(reader, limit)
+}
+
+// **How many of the reader's notifications are unread**, on each page that
+// shows its reader, live.
+private query Unread(reader: capability.User<UserId>) -> Int
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader
+    invalidates_on Notified(reader), Followed(_, reader), Deleted(_)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    unread_count(reader)
+}
+
+// **Your notifications, read**: the count and the list of each of your
+// sessions read again. None unread, shown before the server answers.
+command mark_read() -> Result<Int, FeedError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    invalidates   Notifications(current_user(), _), Unread(current_user())
+    optimistic    Unread(current_user()) as n => none_unread(n)
+{
+    read_all(current_user())
+}
+
+// **None unread**, shown before the server answers.
+fn none_unread(n: Int) -> Int !{} {
+    0
+}
+
+// **What a notification says someone did.**
+fn described(act: Act) -> String !{} {
+    match act {
+        LikedYourPost => "liked your post",
+        RepliedToYourPost => "replied to your post",
+        FollowedYou => "followed you",
+    }
+}
+
+// **What others did that involves you** (track `notifications`): newest
+// first, a page at a time, and Mark all read.
+session page NotificationsPage() {
+    route     "/notifications"
+    placement origin
+    cache     private
+
+    signal listed: Int = 20
+    let notes = query Notifications(current_user(), listed)
+    let unread = query Unread(current_user())
+
+    view {
+        <title>Notifications</title>
+        <main>
+            <h1>Notifications</h1>
+            <nav aria-label="Timelines"><a href="/">Everyone</a> <a href="/following">Following</a></nav>
+            <p id="unread-here" role="status">{counted(unread, "unread", "unread")}</p>
+            <button id="mark-read" type="button" on:press={() => match mark_read() {
+                Ok(_) => listed = listed,
+                Err(_) => listed = listed,
+            }}>Mark all read</button>
+            {#if List.length(notes) == 0}<p id="no-notifications">Nothing yet: a like or a reply to a post of yours, or a follow, is shown here.</p>{/if}
+            <ul id="notifications">
+                {#each notes as note (note.id)}
+                    <li class="notification">
+                        <a class="actor" href="/user/{note.actor.id}">{note.actor.name}</a>
+                        <span class="act">{described(note.act)}</span>
+                        {#each note.posts as about (about)}<a class="about" href="/post/{about}">See it</a>{/each}
+                        {#if note.unread}<span class="new">New</span>{/if}
+                    </li>
+                {/each}
+            </ul>
+            <button id="more-notifications" type="button" on:press={() => listed = listed + 20}>Load more</button>
+        </main>
+    }
+}
+
+// --- end of track `notifications`. ------------------------------------------
