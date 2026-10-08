@@ -15,8 +15,11 @@ import List
 import String
 import context.{ current_session }
 import capability.{ Session, SessionId }
+// Track `notifications` (ADR-XXXX): a user's id is the platform's, the
+// principal's `UserId`, which a handle, `User<UserId>`, is over. An id names
+// someone and grants nothing; a handle is the host's alone to make.
+import capability.{ UserId }
 
-opaque type UserId = String
 opaque type PostId = String
 opaque type InteractionId = String
 
