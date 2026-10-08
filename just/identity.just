@@ -32,4 +32,4 @@ e14-identity:
        echo; echo "== mutation controls (scripts/identity_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/identity_mutations.py; \
      } > docs/evidence/E14/identity.txt
-    @grep -E "^test result|passed|mutants killed" docs/evidence/E14/identity.txt
+    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/identity.txt
