@@ -66,6 +66,23 @@ pressed and then left the page wait for the press's answer, and one leaves
 it at once on purpose (`just e14-keepalive`). The cause is inferred: the
 run's trace is not read.
 
+**ADR-0267, 2026-10-08: a component's trap says why it stopped**
+(ADR-0259's "Not claimed"). The browser's module names each trap, and
+ruling 0057-c's repeated key stops an invocation "by name"; in the
+component every trap was Wasm's `unreachable`, and the host reported a
+failed call. Each trap of the component's own calls a function named by its
+cause before it stops, the name section saying `pw-trap: <its words>`, and
+the host reads the cause from the frame the trap stopped in, as Wasmtime's
+own documented example reads a function's name; Wasm's own traps it names
+by their code: `stopped: Int overflow: ...`. The host's engine states the
+backtrace and the absence of inlining that reading a frame needs, both
+Wasmtime 48's defaults. The browser test compares a trap by its cause now,
+where it compared that both stopped (`just e14-trap-causes`). The committed
+components, the store's and kiokun's, hold the seven functions and the name
+section, 315 bytes more each, and are committed again (`just e10-component`,
+`just e10-kiokun`); the invariants controls' first baseline, red, found them
+stale.
+
 **ADR-0266, 2026-10-08: an export's parameters past the flat limit arrive
 in memory** (found by the uploads track). The Canonical ABI passes
 parameters flat up to 16 core values, and past it stores them as a tuple

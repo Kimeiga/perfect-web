@@ -1,18 +1,18 @@
 E10 - the kiokun slice
 
 produced by: just e10-kiokun
-commit: 2cbd5d8af9ce7101f290cdb2b4c3d97b7796de45
+commit: 02b4134ccf7ce2b09817fa5f76dc07db9f97e0d1 + uncommitted changes
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == pw build, examples/kiokun
 
 pw build: 2 template(s), 0 handler(s), 4 component(s), 6 contract(s) -> docs/evidence/E10/kiokun
-  component  kiokun.page.Lookup  4021 bytes (490 core), 2 function(s) audited, imports [kiokun:data/entries#get]
-  component  kiokun.page.Search  11736 bytes (9247 core), 4 function(s) audited, imports [kiokun:data/index#fold, kiokun:data/index#alias, kiokun:data/index#candidates]
+  component  kiokun.page.Lookup  4336 bytes (805 core), 2 function(s) audited, imports [kiokun:data/entries#get]
+  component  kiokun.page.Search  12087 bytes (9598 core), 4 function(s) audited, imports [kiokun:data/index#fold, kiokun:data/index#alias, kiokun:data/index#candidates]
   no body    kiokun.page.SearchPage  a Page
   no body    kiokun.page.WordPage  a Page
-  component  shards.Place  5343 bytes (4177 core), 1 function(s) audited, imports []
-  component  shards.Places  5570 bytes (4368 core), 1 function(s) audited, imports []
+  component  shards.Place  5694 bytes (4528 core), 1 function(s) audited, imports []
+  component  shards.Places  5923 bytes (4721 core), 1 function(s) audited, imports []
   module     shards.Place  7833 bytes
   module     shards.Places  8527 bytes
   page       kiokun.page.WordPage  0 binding(s), 0 part(s)
@@ -43,7 +43,7 @@ test tests::the_compiled_shard_rule_places_every_word_kiokun_has ... ignored, re
 test tests::the_pages_are_the_compiled_templates_with_no_script ... ok
 test tests::the_sample_is_one_shard ... sample: 28 entries, 293 rows, 4 aliases
 test tests::the_shard_rule_is_kiokuns ... ok
-test result: ok. 10 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 3.17s
+test result: ok. 10 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 5.57s
 
 == the whole shard, and every word kiokun has
 
@@ -51,4 +51,4 @@ test result: ok. 10 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; fin
 
 == in browser engines (spikes/own-renderer/e2e/kiokun.spec.mjs)
 
-  21 passed (31.2s)
+  21 passed (46.8s)

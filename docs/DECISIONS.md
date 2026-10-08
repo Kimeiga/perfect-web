@@ -2207,6 +2207,13 @@ uploads track).
   parameters as a tuple and passes one pointer; each is held where it sits,
   aligned as its type is. Such an export was refused, so a row's record
   could not grow past it.
+[ADR-0267](DECISIONS/ADR-0267-a-components-trap-says-why-it-stopped.md):
+a component's trap says why it stopped (ADR-0259's "Not claimed", for
+ruling 0057-c's "by name").
+- Each trap of the component's own calls a function the name section names
+  by its cause, `pw-trap: <its words>`, and the host reads the cause from
+  the frame the trap stopped in, and Wasm's own by their code: `stopped:
+  <cause>: ...`. Every trap had read as Wasm's `unreachable`.
 [ADR-0268](DECISIONS/ADR-0268-a-command-outlives-the-page-that-sent-it.md):
 a command outlives the page that sent it (found by a WebKit failure on CI).
 - A press's speculation is shown before its request leaves, and a link

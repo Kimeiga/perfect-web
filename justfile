@@ -5146,3 +5146,22 @@ e14-matched-resources:
        CARGO_INCREMENTAL=0 python3 scripts/matched_resource_mutations.py; \
      } > docs/evidence/E14/matched-resources.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/matched-resources.txt
+
+# ADR-0267: a component's trap says why it stopped. Each cause through the
+# host, the browser's module agreeing by cause, and the mutation controls.
+e14-trap-causes:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0267 - a component's trap says why it stopped"; echo; \
+       echo "produced by: just e14-trap-causes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== each cause through the host (compiler/pw-conformance/tests/trap_causes.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test trap_causes 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== nodes that are no tree, by name (compiler/pw-conformance/tests/recursive_types.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test recursive_types 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the browser's module and the component agree by cause (compiler/pw-conformance/tests/javascript.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test javascript 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/trap_cause_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/trap_cause_mutations.py; \
+     } > docs/evidence/E14/trap-causes.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/trap-causes.txt

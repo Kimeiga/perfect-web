@@ -689,12 +689,22 @@ for (const [id, list] of Object.entries(cases)) {
     try {
       out = enc(m.run(...args));
     } catch (e) {
-      out = String(e.message).startsWith("trap:") ? { trap: true } : { error: String(e) };
+      out = String(e.message).startsWith("trap: ")
+        ? { trap: String(e.message).slice("trap: ".length) }
+        : { error: String(e) };
     }
     console.log(JSON.stringify(out));
   }
 }
 "#;
+
+/// **Why the component stopped**, as the host says it (ADR-0267):
+/// `stopped: <cause>: <the error>`, or the error whole where it names none.
+fn cause(why: &str) -> String {
+    why.strip_prefix("stopped: ")
+        .and_then(|rest| rest.split_once(": "))
+        .map_or_else(|| why.to_string(), |(c, _)| c.to_string())
+}
 
 /// Every query in `ids`, compiled both ways from `us`, called with the same
 /// generated arguments. Returns (queries, calls, trapped in both).
@@ -734,9 +744,11 @@ fn agree_on(
         for args in calls {
             // As the program holds the result: a type that contains itself
             // nested, as the module's values are (ADR-0194).
+            // A trap by its cause, as the host says it (ADR-0267): the
+            // module and the component stop for the same reason.
             let want = match r.call_untangled(&ops, args) {
                 Ok(v) => canonical(&v[0]),
-                Err(_) => serde_json::json!({ "trap": true }),
+                Err(why) => serde_json::json!({ "trap": cause(&why) }),
             };
             list.push(format!(
                 "[{}]",

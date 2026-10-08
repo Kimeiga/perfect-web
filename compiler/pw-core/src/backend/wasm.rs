@@ -64,7 +64,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use wasm_encoder::{
     CodeSection, ConstExpr, DataSection, ElementSection, Elements, EntityType, ExportKind,
     ExportSection, Function, FunctionSection, GlobalSection, GlobalType, ImportSection, MemArg,
-    MemorySection, MemoryType, Module, RefType, TableSection, TableType, TypeSection, ValType,
+    MemorySection, MemoryType, Module, NameMap, NameSection, RefType, TableSection, TableType,
+    TypeSection, ValType,
 };
 use wit_parser::abi::{AbiVariant, FlatTypes, WasmSignature, WasmType};
 use wit_parser::{
@@ -363,7 +364,7 @@ pub fn core_module_with(
         callees.insert(
             (c.def, c.instance.clone()),
             Callee {
-                index: post_index + 1 + n as u32,
+                index: post_index + 1 + CAUSES + n as u32,
                 params,
                 result,
             },
@@ -425,7 +426,7 @@ pub fn core_module_with(
             );
         }
     }
-    let first_closure = post_index + 1 + function.callees.len() as u32;
+    let first_closure = post_index + 1 + CAUSES + function.callees.len() as u32;
     let mut closures: BTreeMap<u32, ClosureCode> = BTreeMap::new();
     for (n, c) in function.closures.iter().enumerate() {
         let f = &c.function;
@@ -518,6 +519,11 @@ pub fn core_module_with(
     funcs.function(realloc_ty);
     funcs.function(export_ty);
     funcs.function(post_ty);
+    // A function for each cause a trap has, after `post-return` (ADR-0267).
+    let trap_ty = ty(vec![], vec![]);
+    for _ in Cause::ALL {
+        funcs.function(trap_ty);
+    }
     for t in &callee_types {
         funcs.function(*t);
     }
@@ -587,9 +593,15 @@ pub fn core_module_with(
     );
 
     let mut code = CodeSection::new();
-    code.function(&realloc());
+    code.function(&realloc(realloc_index));
     code.function(&body);
     code.function(&post_return(heap_base));
+    for _ in Cause::ALL {
+        let mut f = Function::new(vec![]);
+        f.instruction(&wasm_encoder::Instruction::Unreachable);
+        f.instruction(&wasm_encoder::Instruction::End);
+        code.function(&f);
+    }
     for b in &internal_bodies {
         code.function(b);
     }
@@ -641,7 +653,71 @@ pub fn core_module_with(
         );
         module.section(&data);
     }
+    // **Each trap's function named by its cause** (ADR-0267), so the host
+    // reads why a component stopped from the frame it stopped in.
+    let mut names = NameMap::new();
+    for cause in Cause::ALL {
+        names.append(
+            trap_index(realloc_index, cause),
+            &format!("{TRAP_PREFIX}{}", cause.words()),
+        );
+    }
+    let mut section = NameSection::new();
+    section.functions(&names);
+    module.section(&section);
     Encoding::Encoded(module.finish())
+}
+
+/// **Why a component stopped** (ADR-0267): each cause of a trap of the
+/// backend's own, called by its trap as a function the module's name section
+/// names `pw-trap: <its words>`, so the host can say which. The words are the
+/// browser's module's where it traps for the same cause. A zero divisor and
+/// a stack too deep are Wasm's own traps, which the host names by their code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Cause {
+    IntOverflow,
+    RepeatedKey,
+    ListsOfTwoLengths,
+    NotAScalar,
+    TooLongForMemory,
+    MemoryExhausted,
+    NotATree,
+}
+
+/// How many causes, so how many functions follow `post-return`.
+const CAUSES: u32 = Cause::ALL.len() as u32;
+
+/// What a trap's function is named before its cause's words.
+pub const TRAP_PREFIX: &str = "pw-trap: ";
+
+impl Cause {
+    const ALL: [Cause; 7] = [
+        Cause::IntOverflow,
+        Cause::RepeatedKey,
+        Cause::ListsOfTwoLengths,
+        Cause::NotAScalar,
+        Cause::TooLongForMemory,
+        Cause::MemoryExhausted,
+        Cause::NotATree,
+    ];
+
+    pub(crate) fn words(self) -> &'static str {
+        match self {
+            Cause::IntOverflow => "Int overflow",
+            Cause::RepeatedKey => "a map or set from outside repeats a key",
+            Cause::ListsOfTwoLengths => "lists of two lengths",
+            Cause::NotAScalar => "not a Unicode scalar value",
+            Cause::TooLongForMemory => "a value too long for memory",
+            Cause::MemoryExhausted => "memory exhausted",
+            Cause::NotATree => "a value from outside whose nodes are no tree",
+        }
+    }
+}
+
+/// **The function a trap of `cause` calls**: the causes' functions follow
+/// `cabi_realloc`, the export and its `post-return`, in `Cause::ALL`'s order.
+fn trap_index(realloc_index: u32, cause: Cause) -> u32 {
+    realloc_index + 3 + cause as u32
 }
 
 /// A map's value (ADR-0057): its type and its offset in the entry. A set's
@@ -3698,11 +3774,12 @@ impl Enc<'_> {
             _ => unreachable!("comparisons returned above"),
         };
         self.ops.extend([get(a), get(b), code, I::LocalSet(r)]);
+        let trap = trap_index(self.realloc_index, Cause::IntOverflow);
         let ops = &mut self.ops;
         match op {
-            BinaryOp::Add => trap_on_add_overflow(ops, a, b, r),
-            BinaryOp::Sub => trap_on_sub_overflow(ops, a, b, r),
-            BinaryOp::Mul => trap_on_mul_overflow(ops, a, b, r),
+            BinaryOp::Add => trap_on_add_overflow(ops, a, b, r, trap),
+            BinaryOp::Sub => trap_on_sub_overflow(ops, a, b, r, trap),
+            BinaryOp::Mul => trap_on_mul_overflow(ops, a, b, r, trap),
             BinaryOp::Div => euclidean_quotient(ops, a, b, r),
             BinaryOp::Rem => euclidean_remainder(ops, b, r),
             _ => {}
@@ -3723,7 +3800,8 @@ impl Enc<'_> {
         let out = match (op, dealias(self.resolve, t)) {
             (UnaryOp::Neg, WitType::S64) => {
                 let out = self.locals.fresh(ValType::I64);
-                trap_on_negation_overflow(&mut self.ops, v[0]);
+                let trap = trap_index(self.realloc_index, Cause::IntOverflow);
+                trap_on_negation_overflow(&mut self.ops, v[0], trap);
                 self.ops.extend([
                     I::I64Const(0),
                     I::LocalGet(v[0]),
@@ -3848,6 +3926,7 @@ impl Enc<'_> {
             I::I64Const(i32::MAX as i64),
             I::I64GtU,
             I::If(Empty),
+            I::Call(trap_index(self.realloc_index, Cause::TooLongForMemory)),
             I::Unreachable,
             I::End,
             I::LocalGet(wide),
@@ -4548,6 +4627,7 @@ impl Enc<'_> {
             I::I64Const(i32::MAX as i64),
             I::I64GtU,
             I::If(wasm_encoder::BlockType::Empty),
+            I::Call(trap_index(self.realloc_index, Cause::TooLongForMemory)),
             I::Unreachable,
             I::End,
         ]);
@@ -5865,7 +5945,10 @@ impl Enc<'_> {
                 // Lists of two lengths stop the invocation.
                 self.ops
                     .extend([I::LocalGet(kl), I::LocalGet(vl), I::I32Ne]);
-                trap_if(&mut self.ops);
+                trap_if(
+                    &mut self.ops,
+                    trap_index(self.realloc_index, Cause::ListsOfTwoLengths),
+                );
                 let pairs = self.alloc_array(kl, esize, ealign);
                 let (i, value_to) = (
                     self.locals.fresh(ValType::I32),
@@ -5979,7 +6062,10 @@ impl Enc<'_> {
                 };
                 // Sorted, so a key twice is two neighbours of one key.
                 self.ops.extend([I::LocalGet(o), I::I32Eqz]);
-                trap_if(&mut self.ops);
+                trap_if(
+                    &mut self.ops,
+                    trap_index(self.realloc_index, Cause::RepeatedKey),
+                );
                 self.ops.extend(increment(i));
                 self.ops.extend([I::Br(0), I::End, I::End]);
                 Held::Flat {
@@ -6816,6 +6902,7 @@ fn encode_graph(
             I::I32Const(i32::MAX / size),
             I::I32GtU,
             I::If(Empty),
+            I::Call(trap_index(realloc, Cause::TooLongForMemory)),
             I::Unreachable,
             I::End,
         ];
@@ -7017,6 +7104,7 @@ fn encode_graph(
 /// 8 tag
 fn decode_graph(
     layout: &GraphLayout,
+    realloc_index: u32,
 ) -> (Vec<(u32, ValType)>, Vec<wasm_encoder::Instruction<'static>>) {
     use wasm_encoder::BlockType::Empty;
     use wasm_encoder::Instruction as I;
@@ -7028,7 +7116,12 @@ fn decode_graph(
         memory_index: 0,
     };
     let trap_if = |mut cond: Vec<I<'static>>| {
-        cond.extend([I::If(Empty), I::Unreachable, I::End]);
+        cond.extend([
+            I::If(Empty),
+            I::Call(trap_index(realloc_index, Cause::NotATree)),
+            I::Unreachable,
+            I::End,
+        ]);
         cond
     };
     let mut ops = trap_if(vec![I::LocalGet(len), I::I32Eqz]);
@@ -7347,6 +7440,7 @@ fn string_helper(
                 I::I32And,
                 I::I32Or,
                 I::If(Empty),
+                I::Call(trap_index(realloc_index, Cause::NotAScalar)),
                 I::Unreachable,
                 I::End,
                 I::LocalGet(7),
@@ -7581,6 +7675,7 @@ fn string_helper(
                 I::I64Const(i32::MAX as i64),
                 I::I64GtU,
                 I::If(Empty),
+                I::Call(trap_index(realloc_index, Cause::TooLongForMemory)),
                 I::Unreachable,
                 I::End,
                 I::LocalGet(10),
@@ -7989,11 +8084,13 @@ fn string_helper(
 
 type Ops = Vec<wasm_encoder::Instruction<'static>>;
 
-/// `unreachable` when the `i32` on the stack is not zero.
-fn trap_if(ops: &mut Ops) {
+/// **A trap when the `i32` on the stack is not zero**: a call of its cause's
+/// function, `trap`, which is `unreachable` (ADR-0267).
+fn trap_if(ops: &mut Ops, trap: u32) {
     use wasm_encoder::Instruction as I;
     ops.extend([
         I::If(wasm_encoder::BlockType::Empty),
+        I::Call(trap),
         I::Unreachable,
         I::End,
     ]);
@@ -8001,7 +8098,7 @@ fn trap_if(ops: &mut Ops) {
 
 /// After `r = a + b`: it overflowed iff both operands' signs differ from the
 /// result's.
-fn trap_on_add_overflow(ops: &mut Ops, a: u32, b: u32, r: u32) {
+fn trap_on_add_overflow(ops: &mut Ops, a: u32, b: u32, r: u32, trap: u32) {
     use wasm_encoder::Instruction as I;
     ops.extend([
         I::LocalGet(a),
@@ -8014,12 +8111,12 @@ fn trap_on_add_overflow(ops: &mut Ops, a: u32, b: u32, r: u32) {
         I::I64Const(0),
         I::I64LtS,
     ]);
-    trap_if(ops);
+    trap_if(ops, trap);
 }
 
 /// After `r = a - b`: it overflowed iff the operands' signs differ and the
 /// result's differs from the left one's.
-fn trap_on_sub_overflow(ops: &mut Ops, a: u32, b: u32, r: u32) {
+fn trap_on_sub_overflow(ops: &mut Ops, a: u32, b: u32, r: u32, trap: u32) {
     use wasm_encoder::Instruction as I;
     ops.extend([
         I::LocalGet(a),
@@ -8032,13 +8129,13 @@ fn trap_on_sub_overflow(ops: &mut Ops, a: u32, b: u32, r: u32) {
         I::I64Const(0),
         I::I64LtS,
     ]);
-    trap_if(ops);
+    trap_if(ops, trap);
 }
 
 /// After `r = a * b`: it is exact iff dividing back gives the other operand.
 /// `r / a` traps by itself only for `MIN / -1`, which is `b == MIN`: an
 /// overflow either way.
-fn trap_on_mul_overflow(ops: &mut Ops, a: u32, b: u32, r: u32) {
+fn trap_on_mul_overflow(ops: &mut Ops, a: u32, b: u32, r: u32, trap: u32) {
     use wasm_encoder::Instruction as I;
     ops.extend([
         I::LocalGet(a),
@@ -8051,7 +8148,7 @@ fn trap_on_mul_overflow(ops: &mut Ops, a: u32, b: u32, r: u32) {
         I::LocalGet(b),
         I::I64Ne,
     ]);
-    trap_if(ops);
+    trap_if(ops, trap);
     ops.push(I::End);
 }
 
@@ -8114,10 +8211,10 @@ fn euclidean_remainder(ops: &mut Ops, b: u32, m: u32) {
 }
 
 /// Before `0 - a`: `-MIN` does not fit.
-fn trap_on_negation_overflow(ops: &mut Ops, a: u32) {
+fn trap_on_negation_overflow(ops: &mut Ops, a: u32, trap: u32) {
     use wasm_encoder::Instruction as I;
     ops.extend([I::LocalGet(a), I::I64Const(i64::MIN), I::I64Eq]);
-    trap_if(ops);
+    trap_if(ops, trap);
 }
 
 /// **Write flat values into a value's canonical layout**: the inverse of
@@ -8537,7 +8634,7 @@ fn allocate(
 /// region, grows memory when the allocation does not fit, and traps rather
 /// than returning an address it does not own. A reallocation copies what the
 /// old block held.
-fn realloc() -> Function {
+fn realloc(realloc_index: u32) -> Function {
     use wasm_encoder::Instruction as I;
     // params: 0 old_ptr, 1 old_size, 2 align, 3 new_size; locals: 4 ptr, 5 end
     let mut f = Function::new([(2, ValType::I32)]);
@@ -8561,6 +8658,7 @@ fn realloc() -> Function {
         I::LocalGet(4),
         I::I32LtU,
         I::If(wasm_encoder::BlockType::Empty),
+        I::Call(trap_index(realloc_index, Cause::MemoryExhausted)),
         I::Unreachable,
         I::End,
         // grow when end is past the current memory
@@ -8584,6 +8682,7 @@ fn realloc() -> Function {
         I::I32Const(-1),
         I::I32Ne,
         I::BrIf(0),
+        I::Call(trap_index(realloc_index, Cause::MemoryExhausted)),
         I::Unreachable,
         I::End,
         I::LocalGet(5),
@@ -8763,7 +8862,7 @@ impl Helper {
             | Helper::Slice
             | Helper::CaseMap => string_helper(self, realloc_index),
             Helper::Encode(i) => encode_graph(&graphs[i as usize], realloc_index),
-            Helper::Decode(i) => decode_graph(&graphs[i as usize]),
+            Helper::Decode(i) => decode_graph(&graphs[i as usize], realloc_index),
             // params: 0 p1, 1 l1, 2 p2, 3 l2; local 4 i
             Helper::StrEq => (
                 vec![(1, ValType::I32)],

@@ -886,6 +886,13 @@ pub mod engine {
         // and a trap cannot express. Resumable effect handlers would need
         // stack switching, not exceptions.
         config.wasm_exceptions(false);
+        // A trap's cause is read from the frame it stopped in (ADR-0267): a
+        // backtrace captured, the youngest frame first, and no function
+        // inlined into its caller, since a backtrace may omit an inlined
+        // frame. Both are Wasmtime 48's defaults, stated so that a release
+        // changing them does not drop the causes.
+        config.wasm_backtrace_max_frames(std::num::NonZeroUsize::new(20));
+        config.compiler_inlining(wasmtime::Inlining::No);
         config
     }
 
@@ -2287,6 +2294,44 @@ pub mod engine {
         }
     }
 
+    /// **What a trap's function is named before its cause** (ADR-0267): the
+    /// compiler names each function a trap of its own calls `pw-trap: <its
+    /// cause's words>` (`pw_core::backend::wasm::TRAP_PREFIX`, which a
+    /// conformance test holds equal to this).
+    pub const TRAP_PREFIX: &str = "pw-trap: ";
+
+    /// **Why a call stopped** (ADR-0267): a trap of the component's own, by
+    /// the function it stopped in, which the compiler names by its cause;
+    /// Wasm's own, by its code; and after it, the error as it was. Until
+    /// ADR-0267 every trap read as Wasm's "`unreachable` instruction
+    /// executed", whatever stopped it.
+    fn stopped(e: &wasmtime::Error) -> String {
+        let named = e
+            .downcast_ref::<wasmtime::WasmBacktrace>()
+            .and_then(|trace| {
+                trace
+                    .frames()
+                    .iter()
+                    .find_map(|f| f.func_name()?.strip_prefix(TRAP_PREFIX))
+                    .map(str::to_string)
+            });
+        let coded = || {
+            use wasmtime::Trap;
+            let words = match e.downcast_ref::<Trap>()? {
+                Trap::IntegerDivisionByZero => "division by zero",
+                Trap::IntegerOverflow => "Int overflow",
+                Trap::OutOfFuel => "out of fuel",
+                Trap::StackOverflow => "calls nested too deep",
+                _ => return None,
+            };
+            Some(words.to_string())
+        };
+        match named.or_else(coded) {
+            Some(cause) => format!("stopped: {cause}: {e:#}"),
+            None => format!("{e:#}"),
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn run_measured(
         engine: &wasmtime::Engine,
@@ -2418,7 +2463,7 @@ pub mod engine {
             .map(|(v, (_, t))| graph::tangle(v, &t))
             .collect::<Result<_, _>>()?;
         func.call(&mut store, &args, &mut results)
-            .map_err(|e| format!("{e:#}"))?;
+            .map_err(|e| stopped(&e))?;
         let usage = Usage {
             fuel: fuel_before.saturating_sub(store.get_fuel().map_err(|e| e.to_string())?),
             peak_memory: store.data().limits.peak_memory,

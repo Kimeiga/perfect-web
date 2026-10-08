@@ -147,9 +147,14 @@ refused by name:
 - list and string operations beyond the ones the standard library declares
   (ADR-0040, below).
 
-- **Traps are not distinguished by cause.** An `Int` overflow and a zero
-  divisor both stop the invocation, and the host reports a failed call; which
-  one it was is not carried.
+- **A trap's cause is read from a function's name** (ADR-0267). Each trap
+  of the component's own calls a function the name section names by its
+  cause, and the host reads the cause from the frame the trap stopped in;
+  Wasm's own it names by their code. A tool that strips the name section
+  takes the causes with it, the traps staying where they were, and an
+  engine that inlines functions may omit the frame, which the host's
+  engine is configured not to. Until ADR-0267 traps were not distinguished
+  by cause: an `Int` overflow and a zero divisor read alike.
 - **An operand the checker cannot type is undecided** (ADR-0043). PW0609
   refuses operands of two known types that an operator does not take, and
   counts the rest as undecided; the backend refuses what remains.

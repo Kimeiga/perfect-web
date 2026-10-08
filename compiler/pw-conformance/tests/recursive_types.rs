@@ -599,10 +599,15 @@ fn nodes_that_are_not_one_tree_in_level_order_trap() {
         Ok(Val::String("a".into()))
     );
     for (what, ns) in cases {
-        let result = raw(&root, &[Val::List(ns.clone())]);
-        assert!(result.is_err(), "{what}: {result:?}");
-        let result = raw(&size, &[Val::List(ns.clone())]);
-        assert!(result.is_err(), "{what}: {result:?}");
+        // Stopped, and by name (ADR-0267).
+        for r in [&root, &size] {
+            let result = raw(r, &[Val::List(ns.clone())]);
+            assert!(
+                result.as_ref().is_err_and(|why| why
+                    .starts_with("stopped: a value from outside whose nodes are no tree: ")),
+                "{what}: {result:?}"
+            );
+        }
         // The host refuses the same nodes from a component, by name.
         let untangled = pw_host::engine::graph::untangle(Val::List(ns), &size_param_type(&size));
         assert!(untangled.is_err(), "{what}: the host took {untangled:?}");

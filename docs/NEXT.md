@@ -509,12 +509,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
             `just e14-wide-parameters`: held in memory where the host
             stores them, each aligned; a call's arguments to a host's
             operation past it stay refused);
-          - **a component's trap carries its cause** (ADR-0259's "Not
-            claimed"): a trap in the component is `unreachable`, and the
-            host reports a failed call, where the browser's module names
-            each ("Int overflow", "a map or set from outside repeats a
-            key"). Ruling 0057-c's "by name" holds in the component when
-            its trap does too;
+          - ~~**a component's trap carries its cause**~~ (ADR-0267, `just
+            e14-trap-causes`: each trap of the component's own calls a
+            function named by its cause, and the host reads the cause from
+            the frame it stopped in, Wasm's own by their code);
           - ~~**a host binding's shape, checked where it is written**~~
             (ADR-0262, `just e14-host-bindings`: `"namespace:package/
             interface#name"`, each part a WIT identifier, PW0335 at the

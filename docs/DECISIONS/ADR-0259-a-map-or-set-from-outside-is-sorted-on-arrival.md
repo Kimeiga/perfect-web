@@ -78,7 +78,7 @@ ruling 0057-c (ADR-0210). Date: 2026-10-07. Milestone: E14.
   (KNOWN_LIMITATIONS, "Traps are not distinguished by cause"): the host
   reports a failed call. The ruling's "by name" holds in the browser's
   module; in the component it waits for a trap carrying its cause, queued
-  in NEXT.
+  in NEXT. Built by ADR-0267.
 - **A map in order is sorted anyway.** The check this replaces cost one
   comparison per entry and no copy; the sort costs n log n comparisons, a
   copy, and a scratch array as long. A first pass that skips the sort for a
