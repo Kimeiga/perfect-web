@@ -41,6 +41,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0005_post_images",
         include_str!("../migrations/feed/0005_post_images.sql"),
     ),
+    // Track `notifications` (ADR-XXXX): what others do that involves a user.
+    (
+        "0006_notifications",
+        include_str!("../migrations/feed/0006_notifications.sql"),
+    ),
 ];
 
 /// **How a command's transaction is opened.** The layer sets serializable on
@@ -423,6 +428,43 @@ fn reads_through(
         Arc::new(move |args: &[Val]| match args {
             [Val::String(id)] => Ok(vec![r(&mut |c| profile(c, id).map_err(pg))?]),
             other => Err(format!("users#profile received {other:?}")),
+        }),
+    );
+    // Track `notifications` (ADR-XXXX): a reader's notifications and how
+    // many are unread, by the reader's handle, their id on the wire; and who
+    // wrote a post, an id.
+    let r = run.clone();
+    ops.insert(
+        "feed:data/notifications#list".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(reader), Val::S64(limit)] => Ok(vec![r(&mut |c| {
+                crate::notifications::pg::list(c, reader, *limit).map_err(pg)
+            })?]),
+            other => Err(format!("notifications#list received {other:?}")),
+        }),
+    );
+    let r = run.clone();
+    ops.insert(
+        "feed:data/notifications#unread".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(reader)] => Ok(vec![r(&mut |c| {
+                crate::notifications::pg::unread(c, reader)
+                    .map(Val::S64)
+                    .map_err(pg)
+            })?]),
+            other => Err(format!("notifications#unread received {other:?}")),
+        }),
+    );
+    let r = run.clone();
+    ops.insert(
+        "feed:data/posts#author".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(id)] => Ok(vec![r(&mut |c| {
+                c.query_opt("SELECT author FROM posts WHERE id = $1", &[id])
+                    .map(|row| Val::String(row.map(|r| r.get(0)).unwrap_or_default()))
+                    .map_err(pg)
+            })?]),
+            other => Err(format!("posts#author received {other:?}")),
         }),
     );
     let (r, p) = (run, principals.clone());
@@ -945,6 +987,9 @@ impl crate::data::DataLayer for FeedPg {
                         )
                         .map_err(pg)?;
                     let id: String = row.get(0);
+                    // Track `notifications`: the replied-to post's author
+                    // told, in the reply's transaction, unless it is theirs.
+                    crate::notifications::pg::replied(c, &id, &author).map_err(pg)?;
                     let post = post_alone(c, &id, l.as_ref())
                         .map_err(pg)?
                         .ok_or("a reply just written")?;
@@ -970,12 +1015,18 @@ impl crate::data::DataLayer for FeedPg {
                     if follower == *user || !known {
                         return Ok((not_found(), false));
                     }
-                    c.execute(
-                        "INSERT INTO follows (follower, followee) VALUES ($1, $2) \
-                         ON CONFLICT DO NOTHING",
-                        &[&follower, user],
-                    )
-                    .map_err(pg)?;
+                    let new = c
+                        .execute(
+                            "INSERT INTO follows (follower, followee) VALUES ($1, $2) \
+                             ON CONFLICT DO NOTHING",
+                            &[&follower, user],
+                        )
+                        .map_err(pg)?;
+                    // Track `notifications`: the one followed told, once:
+                    // following again writes nothing, and tells no one.
+                    if new == 1 {
+                        crate::notifications::pg::followed(c, user, &follower).map_err(pg)?;
+                    }
                     Ok((ok(Val::String(user.clone())), true))
                 }
                 other => Err(format!("users#follow received {other:?}")),
@@ -1004,8 +1055,21 @@ impl crate::data::DataLayer for FeedPg {
                 other => Err(format!("users#unfollow received {other:?}")),
             }),
         );
+        // Track `notifications`: a user's notifications, read.
+        write(
+            "feed:data/notifications#read",
+            Arc::new(|c: &mut Client, args: &[Val]| match args {
+                [Val::String(reader)] => {
+                    let read = crate::notifications::pg::read_all(c, reader).map_err(pg)?;
+                    Ok((ok(Val::S64(read as i64)), true))
+                }
+                other => Err(format!("notifications#read received {other:?}")),
+            }),
+        );
         // **A post deleted** (track `identity`): it, every reply under it,
-        // and their likes, in one statement, so one snapshot. Who may is
+        // and their likes, in one statement, so one snapshot. Track
+        // `notifications`: and their notifications, by their foreign key's
+        // `ON DELETE CASCADE`, in the same statement. Who may is
         // `requires OwnsPost(post)`'s, evaluated in this transaction before
         // the command runs.
         write(
@@ -1055,11 +1119,15 @@ impl crate::data::DataLayer for FeedPg {
                     if !there {
                         return Ok((not_found(), false));
                     }
+                    let liker = p.user_of(session);
                     c.execute(
                         "INSERT INTO likes (post, liker) VALUES ($1, $2)",
-                        &[id, &p.user_of(session)],
+                        &[id, &liker],
                     )
                     .map_err(pg)?;
+                    // Track `notifications`: the post's author told, in the
+                    // like's transaction, unless it is theirs.
+                    crate::notifications::pg::liked(c, id, &liker).map_err(pg)?;
                     let post = post_alone(c, id, l.as_ref())
                         .map_err(pg)?
                         .ok_or("a post just liked")?;

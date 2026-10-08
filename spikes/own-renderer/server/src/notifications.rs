@@ -35,6 +35,195 @@ pub(crate) fn is_current_user(arg: &str) -> bool {
     matches!(arg, "current_user()" | "context.current_user()")
 }
 
+// ---------------------------------------------------------------------------
+// Notifications: a row a like, a reply or a follow writes
+// ---------------------------------------------------------------------------
+
+/// **What someone did that involves a user**, the program's `Act`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Act {
+    /// Liked a post of theirs.
+    Liked,
+    /// Replied to a post of theirs.
+    Replied,
+    /// Followed them.
+    Followed,
+}
+
+impl Act {
+    /// The program's case, as the component names it.
+    fn case(self) -> &'static str {
+        match self {
+            Act::Liked => "liked-your-post",
+            Act::Replied => "replied-to-your-post",
+            Act::Followed => "followed-you",
+        }
+    }
+
+    /// As PostgreSQL keeps it (`notifications.act`).
+    pub(crate) fn named(word: &str) -> Option<Act> {
+        match word {
+            "liked" => Some(Act::Liked),
+            "replied" => Some(Act::Replied),
+            "followed" => Some(Act::Followed),
+            _ => None,
+        }
+    }
+}
+
+/// **One notification, as kept**: whom it is for, who did what, the post
+/// it is about (the post liked, or the reply written; none for a follow),
+/// and whether its user has read it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Note {
+    pub id: String,
+    pub recipient: String,
+    pub actor: String,
+    pub act: Act,
+    pub post: Option<String>,
+    pub read: bool,
+}
+
+/// **The notification an act writes**, or none: one's own act notifies no
+/// one. Its id is the layer's to give.
+pub(crate) fn noted(recipient: &str, actor: &str, act: Act, post: Option<&str>) -> Option<Note> {
+    (recipient != actor && !recipient.is_empty()).then(|| Note {
+        id: String::new(),
+        recipient: recipient.to_string(),
+        actor: actor.to_string(),
+        act,
+        post: post.map(str::to_string),
+        read: false,
+    })
+}
+
+/// **A notification as the program's `Notification` is**: its id, who did
+/// it (`actor`, the user record the layer reads for them), what, the post
+/// it is about as a list of none or one, and whether it is unread.
+pub(crate) fn note_val(note: &Note, actor: Val) -> Val {
+    Val::Record(vec![
+        ("id".into(), Val::String(note.id.clone())),
+        ("actor".into(), actor),
+        ("act".into(), Val::Variant(note.act.case().into(), None)),
+        (
+            "posts".into(),
+            Val::List(note.post.iter().cloned().map(Val::String).collect()),
+        ),
+        ("unread".into(), Val::Bool(!note.read)),
+    ])
+}
+
+/// **A user's notifications in memory**: theirs alone, newest first, at
+/// most `limit`.
+pub(crate) fn listed<'a>(notes: &'a [Note], reader: &str, limit: i64) -> Vec<&'a Note> {
+    notes
+        .iter()
+        .rev()
+        .filter(|n| n.recipient == reader)
+        .take(limit.max(0) as usize)
+        .collect()
+}
+
+/// **How many of a user's notifications are unread.**
+pub(crate) fn unread(notes: &[Note], reader: &str) -> i64 {
+    notes
+        .iter()
+        .filter(|n| n.recipient == reader && !n.read)
+        .count() as i64
+}
+
+/// **Notifications in PostgreSQL** (migration `0006_notifications`): each
+/// written by the statement after the act's own, in the act's transaction,
+/// and read in one statement.
+pub(crate) mod pg {
+    use super::*;
+    use postgres::Client;
+
+    /// **A user's notifications**, newest first, at most `limit`, each with
+    /// who did it as the feed shows them.
+    pub(crate) fn list(c: &mut Client, reader: &str, limit: i64) -> Result<Val, postgres::Error> {
+        let rows = c.query(
+            "SELECT n.id, n.actor, u.handle, u.name, n.act, n.post, n.read \
+             FROM notifications n LEFT JOIN users u ON u.id = n.actor \
+             WHERE n.recipient = $1 ORDER BY n.seq DESC LIMIT $2",
+            &[&reader, &limit.max(0)],
+        )?;
+        Ok(Val::List(
+            rows.iter()
+                .filter_map(|r| {
+                    let (handle, name): (Option<String>, Option<String>) = (r.get(2), r.get(3));
+                    let note = Note {
+                        id: r.get(0),
+                        recipient: reader.to_string(),
+                        actor: r.get(1),
+                        act: Act::named(r.get(4))?,
+                        post: r.get(5),
+                        read: r.get(6),
+                    };
+                    let actor = crate::feed::user_record(&note.actor, handle.zip(name));
+                    Some(note_val(&note, actor))
+                })
+                .collect(),
+        ))
+    }
+
+    /// **How many of a user's notifications are unread.**
+    pub(crate) fn unread(c: &mut Client, reader: &str) -> Result<i64, postgres::Error> {
+        Ok(c.query_one(
+            "SELECT count(*) FROM notifications WHERE recipient = $1 AND NOT read",
+            &[&reader],
+        )?
+        .get(0))
+    }
+
+    /// **A like's notification**, for the post's author, unless the liker
+    /// is.
+    pub(crate) fn liked(c: &mut Client, post: &str, liker: &str) -> Result<u64, postgres::Error> {
+        c.execute(
+            "INSERT INTO notifications (recipient, actor, act, post) \
+             SELECT author, $2, 'liked', id FROM posts WHERE id = $1 AND author <> $2",
+            &[&post, &liker],
+        )
+    }
+
+    /// **A reply's notification**, for the replied-to post's author, about
+    /// the reply, unless the replier is.
+    pub(crate) fn replied(
+        c: &mut Client,
+        reply: &str,
+        replier: &str,
+    ) -> Result<u64, postgres::Error> {
+        c.execute(
+            "INSERT INTO notifications (recipient, actor, act, post) \
+             SELECT t.author, $2, 'replied', r.id \
+             FROM posts r JOIN posts t ON t.id = r.reply_to \
+             WHERE r.id = $1 AND t.author <> $2",
+            &[&reply, &replier],
+        )
+    }
+
+    /// **A follow's notification**, for the one followed.
+    pub(crate) fn followed(
+        c: &mut Client,
+        followee: &str,
+        follower: &str,
+    ) -> Result<u64, postgres::Error> {
+        c.execute(
+            "INSERT INTO notifications (recipient, actor, act) \
+             SELECT $1, $2, 'followed' WHERE $1 <> $2",
+            &[&followee, &follower],
+        )
+    }
+
+    /// **Every notification of a user, read**: how many were unread.
+    pub(crate) fn read_all(c: &mut Client, reader: &str) -> Result<u64, postgres::Error> {
+        c.execute(
+            "UPDATE notifications SET read = true WHERE recipient = $1 AND NOT read",
+            &[&reader],
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -51,6 +240,40 @@ mod tests {
         // Two sessions, two users: one session's handle is never another's.
         let other = principal_operation(&principals, "s-2");
         assert_ne!(read(&[]).expect("read"), other(&[]).expect("read"));
+    }
+
+    #[test]
+    fn ones_own_act_notifies_no_one() {
+        assert_eq!(noted("u-a", "u-a", Act::Liked, Some("p1")), None);
+        assert_eq!(noted("", "u-a", Act::Liked, Some("p1")), None);
+        let n = noted("u-a", "u-b", Act::Replied, Some("p4")).expect("noted");
+        assert_eq!((n.recipient.as_str(), n.actor.as_str()), ("u-a", "u-b"));
+        assert!(!n.read);
+    }
+
+    #[test]
+    fn a_users_notifications_are_theirs_alone_newest_first() {
+        let note = |id: &str, to: &str, read: bool| Note {
+            id: id.into(),
+            recipient: to.into(),
+            actor: "u-z".into(),
+            act: Act::Followed,
+            post: None,
+            read,
+        };
+        let notes = [
+            note("n1", "u-a", true),
+            note("n2", "u-b", false),
+            note("n3", "u-a", false),
+        ];
+        let ids: Vec<&str> = listed(&notes, "u-a", 10)
+            .iter()
+            .map(|n| n.id.as_str())
+            .collect();
+        assert_eq!(ids, ["n3", "n1"]);
+        assert_eq!(listed(&notes, "u-a", 1).len(), 1);
+        assert_eq!((unread(&notes, "u-a"), unread(&notes, "u-b")), (1, 1));
+        assert_eq!(unread(&notes, "u-c"), 0);
     }
 
     #[test]

@@ -21,6 +21,10 @@ pub(crate) const GRANTS: &[&str] = &[
     "database.write<Attached>",
     "resource.acquire<Upload>",
     "resource.release<Upload>",
+    // Track `notifications` (ADR-XXXX): what others do that involves a
+    // user, written with what they do.
+    "database.read<Notification>",
+    "database.write<Notification>",
 ];
 
 /// One post as kept: its author by id, and what it replies to.
@@ -51,6 +55,10 @@ struct State {
     /// Track `uploads`: the leases a post's image is committed from, where
     /// the program declares an upload.
     leases: Option<crate::uploads::Leases>,
+    /// Track `notifications`: what others did that involves each user,
+    /// oldest first, and how many were ever written, each its own id.
+    notes: Vec<crate::notifications::Note>,
+    noted: usize,
 }
 
 /// What a command changes, staged until it commits.
@@ -70,6 +78,11 @@ enum Change {
     /// Track `uploads`: an attached image discarded, which ends its lease
     /// once the command commits.
     Discard,
+    /// Track `notifications`: a notification, written with the like, the
+    /// reply or the follow it tells of.
+    Notify(crate::notifications::Note),
+    /// Track `notifications`: every notification of a user, read.
+    ReadAll(String),
 }
 
 pub(crate) struct FeedData {
@@ -376,6 +389,46 @@ fn reads_of(state: Arc<State>, principals: Principals) -> crate::data::Ops {
             other => Err(format!("users#of-session received {other:?}")),
         }),
     );
+    // Track `notifications` (ADR-XXXX): a reader's notifications and how
+    // many are unread, each by the reader's handle, which is their id on the
+    // wire, and who wrote a post, an id that grants nothing.
+    let s = state.clone();
+    ops.insert(
+        "feed:data/notifications#list".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(reader), Val::S64(limit)] => Ok(vec![Val::List(
+                crate::notifications::listed(&s.notes, reader, *limit)
+                    .into_iter()
+                    .map(|n| crate::notifications::note_val(n, user_val(&s, &n.actor)))
+                    .collect(),
+            )]),
+            other => Err(format!("notifications#list received {other:?}")),
+        }),
+    );
+    let s = state.clone();
+    ops.insert(
+        "feed:data/notifications#unread".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(reader)] => Ok(vec![Val::S64(crate::notifications::unread(
+                &s.notes, reader,
+            ))]),
+            other => Err(format!("notifications#unread received {other:?}")),
+        }),
+    );
+    let s = state.clone();
+    ops.insert(
+        "feed:data/posts#author".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(id)] => Ok(vec![Val::String(
+                s.posts
+                    .iter()
+                    .find(|r| r.id == *id)
+                    .map(|r| r.author.clone())
+                    .unwrap_or_default(),
+            )]),
+            other => Err(format!("posts#author received {other:?}")),
+        }),
+    );
     ops.insert(
         "feed:data/users#viewer".to_string(),
         Arc::new(move |args: &[Val]| match args {
@@ -463,6 +516,26 @@ impl crate::data::Staged for Staging<'_> {
                             .filter_map(|r| r.image.as_ref().map(|i| i.key.clone())),
                     );
                     self.state.posts.retain(|r| !gone.contains(&r.id));
+                    // Track `notifications`: a deleted post's notifications
+                    // go with it, and its replies'.
+                    self.state
+                        .notes
+                        .retain(|n| !n.post.as_ref().is_some_and(|p| gone.contains(p)));
+                }
+                Change::Notify(mut note) => {
+                    self.state.noted += 1;
+                    note.id = format!("n{}", self.state.noted);
+                    self.state.notes.push(note);
+                }
+                Change::ReadAll(reader) => {
+                    for n in self
+                        .state
+                        .notes
+                        .iter_mut()
+                        .filter(|n| n.recipient == reader)
+                    {
+                        n.read = true;
+                    }
                 }
                 Change::User(id, profile) => {
                     self.state.users.insert(id, profile);
@@ -598,6 +671,19 @@ impl crate::data::DataLayer for FeedData {
                         image: None,
                     };
                     let answer = ok(post_val(&s, &row, false));
+                    // Track `notifications`: the replied-to post's author is
+                    // told, in the reply's transaction, unless it is theirs.
+                    let to_author = s.posts.iter().find(|r| r.id == *to).map(|r| &r.author);
+                    if let Some(note) = to_author.and_then(|a| {
+                        crate::notifications::noted(
+                            a,
+                            &row.author,
+                            crate::notifications::Act::Replied,
+                            Some(&row.id),
+                        )
+                    }) {
+                        staged.push(Change::Notify(note));
+                    }
                     staged.push(Change::Post(row));
                     Ok(vec![answer])
                 }
@@ -669,9 +755,21 @@ impl crate::data::DataLayer for FeedData {
                     if follower == *user || !known(&s, user) {
                         return Ok(vec![not_found()]);
                     }
-                    into.lock()
-                        .expect("staged")
-                        .push(Change::Follow(follower, user.clone()));
+                    let mut staged = into.lock().expect("staged");
+                    // Track `notifications`: the one followed is told, once:
+                    // following again is no change, and tells no one.
+                    let new = !s.follows.contains(&(follower.clone(), user.clone()));
+                    if new
+                        && let Some(note) = crate::notifications::noted(
+                            user,
+                            &follower,
+                            crate::notifications::Act::Followed,
+                            None,
+                        )
+                    {
+                        staged.push(Change::Notify(note));
+                    }
+                    staged.push(Change::Follow(follower, user.clone()));
                     Ok(vec![ok(Val::String(user.clone()))])
                 }
                 other => Err(format!("users#follow received {other:?}")),
@@ -713,19 +811,49 @@ impl crate::data::DataLayer for FeedData {
                 other => Err(format!("posts#delete received {other:?}")),
             }),
         );
-        let (s, into) = (seen, staged.clone());
+        // Track `notifications`: a user's notifications, read: how many
+        // were unread.
+        let (s, into) = (seen.clone(), staged.clone());
+        ops.insert(
+            "feed:data/notifications#read".to_string(),
+            Arc::new(move |args: &[Val]| match args {
+                [Val::String(reader)] => {
+                    into.lock()
+                        .expect("staged")
+                        .push(Change::ReadAll(reader.clone()));
+                    Ok(vec![ok(Val::S64(crate::notifications::unread(
+                        &s.notes, reader,
+                    )))])
+                }
+                other => Err(format!("notifications#read received {other:?}")),
+            }),
+        );
+        let (s, into, p) = (seen, staged.clone(), principals);
         ops.insert(
             "feed:data/posts#like".to_string(),
             Arc::new(move |args: &[Val]| match args {
-                [Val::String(_), Val::String(id)] => match s.posts.iter().find(|r| r.id == *id) {
-                    Some(row) => {
-                        let mut liked = row.clone();
-                        liked.likes += 1;
-                        into.lock().expect("staged").push(Change::Like(id.clone()));
-                        Ok(vec![ok(post_val(&s, &liked, false))])
+                [Val::String(session), Val::String(id)] => {
+                    match s.posts.iter().find(|r| r.id == *id) {
+                        Some(row) => {
+                            let mut liked = row.clone();
+                            liked.likes += 1;
+                            let mut staged = into.lock().expect("staged");
+                            // Track `notifications`: the post's author is told,
+                            // in the like's transaction, unless it is theirs.
+                            if let Some(note) = crate::notifications::noted(
+                                &row.author,
+                                &p.user_of(session),
+                                crate::notifications::Act::Liked,
+                                Some(id),
+                            ) {
+                                staged.push(Change::Notify(note));
+                            }
+                            staged.push(Change::Like(id.clone()));
+                            Ok(vec![ok(post_val(&s, &liked, false))])
+                        }
+                        None => Ok(vec![not_found()]),
                     }
-                    None => Ok(vec![not_found()]),
-                },
+                }
                 other => Err(format!("posts#like received {other:?}")),
             }),
         );
