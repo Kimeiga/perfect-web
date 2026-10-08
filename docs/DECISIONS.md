@@ -2163,3 +2163,10 @@ merged by the integrator).
   the upload and publishes it with the post or discards it (PW2005 holds
   each path), and only what a post committed is served, `nosniff`,
   sandboxed and immutable.
+[ADR-0261](DECISIONS/ADR-0261-a-deleted-posts-image-is-not-served-and-its-blob-is-collected.md):
+a deleted post's image is not served, and its blob is collected (ADR-0260's
+first question at its merge).
+- A blob is served while a committed row names it, as the data layer says
+  (`DataLayer::names_blob`), and a layer that cannot say is answered 503.
+  Once a delete commits, a blob no post names is deleted, unless a command
+  in flight holds a claim to the same bytes, which its post will name.

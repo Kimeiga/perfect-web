@@ -611,6 +611,10 @@ pub(crate) struct Staging<'a> {
     /// Track `uploads`: the leases the command claimed, given back where it
     /// does not commit.
     claims: crate::uploads::Claiming,
+    /// The leases, and the images of the posts the command deletes, each
+    /// collected once it commits where no post names it (ADR-0261).
+    leases: Option<crate::uploads::Leases>,
+    released: Arc<Mutex<Vec<String>>>,
 }
 
 impl crate::data::Staged for Staging<'_> {
@@ -676,6 +680,20 @@ impl crate::data::Staged for Staging<'_> {
         // Track `uploads`: each lease the command committed or discarded
         // ended, now that its transaction has.
         self.claims.lock().expect("claims").settle();
+        // **A deleted post's image, collected where no post names it**
+        // (ADR-0261): read after the commit, while this command still holds
+        // the writes' lock, so no other commits between the look and the
+        // delete.
+        if let Some(leases) = &self.leases {
+            for key in self.released.lock().expect("released").drain(..) {
+                let collected = names_blob(c, &key)
+                    .map_err(pg)
+                    .and_then(|named| leases.collect(&key, named));
+                if let Err(why) = collected {
+                    eprintln!("pw dev server: blob {key} was not collected: {why}");
+                }
+            }
+        }
         match delivered(c, &ids) {
             Ok(read) => Ok(Some(read)),
             // Committed, and not read back: what it handed is what
@@ -687,6 +705,15 @@ impl crate::data::Staged for Staging<'_> {
             }
         }
     }
+}
+
+/// **Whether a committed post names the blob `key`** (ADR-0261).
+fn names_blob(c: &mut Client, key: &str) -> Result<bool, postgres::Error> {
+    c.query_one(
+        "SELECT EXISTS (SELECT 1 FROM posts WHERE image_key = $1)",
+        &[&key],
+    )
+    .map(|row| row.get(0))
 }
 
 /// **What the outbox committed, read back and consumed**: what is delivered
@@ -761,6 +788,10 @@ impl crate::data::DataLayer for FeedPg {
         let _ = self.uploaded.set(leases);
     }
 
+    fn names_blob(&self, key: &str) -> Result<bool, String> {
+        self.pool.with(|c| names_blob(c, key))
+    }
+
     fn identified_by(&self, principals: Principals) {
         *self.principals.write().expect("principals") = principals;
     }
@@ -810,6 +841,7 @@ impl crate::data::DataLayer for FeedPg {
                 discarded.store(true, Ordering::SeqCst)
             }),
         );
+        let released: Arc<Mutex<Vec<String>>> = Arc::default();
         let mut write = |key: &str, op: Arc<InTransaction>| {
             let (conn, why, wrote) = (conn.clone(), why.clone(), wrote.clone());
             ops.insert(
@@ -978,31 +1010,40 @@ impl crate::data::DataLayer for FeedPg {
         // the command runs.
         write(
             "feed:data/posts#delete",
-            Arc::new(|c: &mut Client, args: &[Val]| match args {
-                [Val::String(_), Val::String(id)] => {
-                    let gone: i64 = c
-                        .query_one(
-                            "WITH RECURSIVE t AS ( \
+            Arc::new({
+                let released = released.clone();
+                move |c: &mut Client, args: &[Val]| match args {
+                    [Val::String(_), Val::String(id)] => {
+                        // And the images of what it deletes (ADR-0261), each
+                        // collected once the command commits.
+                        let row = c
+                            .query_one(
+                                "WITH RECURSIVE t AS ( \
                                  SELECT id FROM posts WHERE id = $1 \
                                  UNION ALL \
                                  SELECT p.id FROM posts p JOIN t ON p.reply_to = t.id), \
                              unliked AS (DELETE FROM likes WHERE post IN (SELECT id FROM t)), \
                              deleted AS (DELETE FROM posts WHERE id IN (SELECT id FROM t) \
-                                 RETURNING id) \
-                             SELECT count(*) FROM deleted",
-                            &[id],
-                        )
-                        .map_err(pg)?
-                        .get(0);
-                    if gone == 0 {
-                        return Ok((not_found(), false));
+                                 RETURNING id, image_key) \
+                             SELECT count(*), \
+                                 COALESCE(array_remove(array_agg(DISTINCT image_key), NULL), '{}') \
+                             FROM deleted",
+                                &[id],
+                            )
+                            .map_err(pg)?;
+                        let gone: i64 = row.get(0);
+                        if gone == 0 {
+                            return Ok((not_found(), false));
+                        }
+                        let keys: Vec<String> = row.get(1);
+                        released.lock().expect("released").extend(keys);
+                        Ok((ok(Val::String(id.clone())), true))
                     }
-                    Ok((ok(Val::String(id.clone())), true))
+                    other => Err(format!("posts#delete received {other:?}")),
                 }
-                other => Err(format!("posts#delete received {other:?}")),
             }),
         );
-        let (p, l) = (principals, leases);
+        let (p, l) = (principals, leases.clone());
         write(
             "feed:data/posts#like",
             Arc::new(move |c: &mut Client, args: &[Val]| match args {
@@ -1035,6 +1076,8 @@ impl crate::data::DataLayer for FeedPg {
             committed: false,
             ops,
             claims,
+            leases,
+            released,
         })
     }
 

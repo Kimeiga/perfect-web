@@ -476,9 +476,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              conversation to a third user;
           7. ~~**track `uploads`, W2**~~ (ADR-0260, `just e14-uploads`: an
              image on a post, a typed upload served safely). What it leaves,
-             in order: a deleted post's image no longer served, and its blob
-             collected where no post names it, a claim in flight kept (its
-             first question at the merge); a runtime that sends a file, so a
+             in order: ~~a deleted post's image no longer served, and its
+             blob collected where no post names it~~ (ADR-0261, `just
+             e14-uploads`); a runtime that sends a file, so a
              draft typed before attaching survives (its second, after
              notifications); and from its "Not claimed", a budget kept across
              restarts and hosts, EXIF orientation outside JPEG, and more than

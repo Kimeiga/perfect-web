@@ -1023,6 +1023,16 @@ impl Server {
         // from the uploads' leases, in the post's own transaction.
         if let Some(leases) = uploads.leases() {
             data.uploaded_by(leases);
+            // And it says which blobs its committed rows name (ADR-0261):
+            // the uploads serve no other. Held weakly, since the layer holds
+            // the leases.
+            let layer = Arc::downgrade(&data);
+            uploads.named_by(Box::new(move |key: &str| {
+                layer
+                    .upgrade()
+                    .ok_or_else(|| "the data layer is gone".to_string())?
+                    .names_blob(key)
+            }));
         }
         // **What the program's sources state, its database provides**
         // (ADR-0246): compared here, before anything is served, as an

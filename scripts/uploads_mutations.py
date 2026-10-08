@@ -10,14 +10,20 @@ Each mutant undoes one piece, and the tests must then fail:
   program's limit;
 - where it is kept and served: a key that is not 64 hex digits taken, so a
   path is built from what a sender wrote; `nosniff`, the sandbox or the
-  immutable cache dropped; a lease served to another session, or served
-  where committed images are before its post commits;
+  immutable cache dropped; a lease served to another session (one served
+  where committed images are, before its post commits, is retired as
+  equivalent by ADR-0261: no post names a lease's bytes, and that is asked
+  first);
 - who: one signed out attaching an image; a user's hourly count, or bytes,
   not held;
 - its life: an upload from another origin taken; a claim a command did not
   commit not given back; a discarded lease kept; a post's image committed
   without its bytes in the deployment's storage (in memory and on
   PostgreSQL's layer alike);
+- a deleted post's image (ADR-0261): a blob served though no post names
+  it, a layer that cannot say taken to say yes, a claim in flight not
+  keeping its blob, a blob collected that a post still names or none
+  collected, and a layer naming none, in memory and on PostgreSQL's layer;
 - the language: PW5603's form posting anywhere, PW5602's route shared with a
   page, PW5601's limit above what a host reads whole;
 - the page: an image's width and height left out of its markup, killed by
@@ -150,14 +156,6 @@ MUTANTS = [
         "                .find(|l| l.id == id && !session.is_empty())\n",
     ),
     (
-        "a lease is served where committed images are, before its post",
-        RUST,
-        UPLOADS,
-        "            let bytes = self.blobs.get(&key).ok()??;\n",
-        "            let bytes = self.blobs.get(&key).ok().flatten()\n"
-        "                .or_else(|| self.staged.get(&key).ok().flatten())?;\n",
-    ),
-    (
         "an upload from another origin is taken",
         RUST,
         UPLOADS,
@@ -212,6 +210,62 @@ MUTANTS = [
         UPLOADS,
         "        if spent.len() >= UPLOADS_AN_HOUR || bytes_spent + size > BYTES_AN_HOUR * declared.max_bytes\n",
         "        if spent.len() >= UPLOADS_AN_HOUR\n",
+    ),
+    (
+        "a blob is served whether or not a post names it",
+        RUST,
+        UPLOADS,
+        "            Some(Ok(false)) | None => return Answer::text(404, \"not found\"),\n",
+        "            Some(Ok(false)) | None => {}\n",
+    ),
+    (
+        "a layer that cannot say whether a post names a blob is taken to say yes",
+        RUST,
+        UPLOADS,
+        "                return Answer::text(503, \"unavailable\");\n",
+        "",
+    ),
+    (
+        "a claim in flight does not keep its blob",
+        RUST,
+        UPLOADS,
+        "        if named || state.leases.values().any(|l| l.claimed && l.key == key) {\n",
+        "        if named {\n",
+    ),
+    (
+        "the memory layer collects a blob a post still names",
+        RUST,
+        FEED,
+        "                let named = names(&self.state.posts, &key);\n",
+        "                let named = false;\n",
+    ),
+    (
+        "the memory layer collects no deleted post's image",
+        RUST,
+        FEED,
+        "                if let Err(why) = leases.collect(&key, named) {\n",
+        "                if let Err(why) = Ok::<bool, String>(named) {\n",
+    ),
+    (
+        "the memory layer names no blob, so none is served",
+        RUST,
+        FEED,
+        "        Ok(names(&self.state.lock().expect(\"feed\").posts, key))\n",
+        "        Ok(false)\n",
+    ),
+    (
+        "PostgreSQL's layer collects no deleted post's image",
+        "postgres",
+        PG,
+        "                    .and_then(|named| leases.collect(&key, named));\n",
+        "                    .map(|named| named);\n",
+    ),
+    (
+        "PostgreSQL's layer names no blob, so none is served",
+        "postgres",
+        PG,
+        "        self.pool.with(|c| names_blob(c, key))\n",
+        "        self.pool.with(|c| names_blob(c, key)).map(|_| false)\n",
     ),
     (
         "PW5603: a form that sends a file may post anywhere",

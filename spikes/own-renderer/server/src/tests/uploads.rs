@@ -296,6 +296,58 @@ fn what_is_not_an_image_is_refused_whatever_it_is_called() {
     assert!(attach(&s, "a", &fixture("ten-by-six-lossy.webp")).starts_with("http/1.1 303"));
 }
 
+/// The newest post's id, first in the home page's timeline.
+fn newest(s: &Server) -> String {
+    let home = page(s, "b", "feed.app.Home", &Params::new());
+    let at = home.find("href=\"/post/").expect("a post's link") + "href=\"/post/".len();
+    home[at..at + home[at..].find('"').expect("its end")].to_string()
+}
+
+fn delete(s: &Server, session: &str, post: &str, interaction: &str) -> Answered {
+    s.command_answered(
+        "feed.app.delete",
+        session,
+        &[Val::String(post.into())],
+        Some(interaction),
+    )
+    .expect("runs")
+}
+
+/// **A deleted post's image is no longer served, and its blob is collected
+/// where no post names it** (ADR-0261): two posts of the same bytes share
+/// one blob, which outlives the first's delete and not the second's.
+fn deleted_and_collected(s: &Server) {
+    let png = fixture("six-by-four.png");
+    let src = format!("/images/{}.png", crate::blob::BlobKey::of(&png).hex());
+    assert!(attach(s, "a", &png).starts_with("http/1.1 303"));
+    assert!(post_image(s, "a", "First", "A gradient", "i-1").committed);
+    let first = newest(s);
+    assert!(attach(s, "a", &png).starts_with("http/1.1 303"));
+    assert!(post_image(s, "a", "Second", "A gradient", "i-2").committed);
+    let second = newest(s);
+    assert_ne!(first, second);
+    assert_eq!(blobs(s, "blobs"), 1, "the same bytes, one blob");
+    // The first deleted: the second names the bytes still, which are served.
+    assert!(delete(s, "a", &first, "i-3").committed);
+    assert!(get(s, &src).0.starts_with("http/1.1 200"));
+    assert_eq!(blobs(s, "blobs"), 1);
+    // The second deleted: served to no one, and collected.
+    assert!(delete(s, "a", &second, "i-4").committed);
+    let (head, _) = get(s, &src);
+    assert!(head.starts_with("http/1.1 404"), "{head}");
+    assert_eq!(blobs(s, "blobs"), 0);
+    // The control: a post's image is served until its post is deleted.
+    assert!(attach(s, "a", &png).starts_with("http/1.1 303"));
+    assert!(post_image(s, "a", "Third", "A gradient", "i-5").committed);
+    assert!(get(s, &src).0.starts_with("http/1.1 200"));
+    assert_eq!(blobs(s, "blobs"), 1);
+}
+
+#[test]
+fn a_deleted_posts_image_is_not_served_and_its_blob_is_collected() {
+    deleted_and_collected(&served_feed());
+}
+
 fn on_postgres(test: &str) -> Option<super::feed_pg::OnPostgres> {
     let url = match std::env::var("PW_FEED_DATABASE_URL") {
         Ok(url) if !url.is_empty() => url,
@@ -324,11 +376,16 @@ fn on_postgres_an_image_is_kept_with_its_post() {
     );
     // A row with part of an image is refused by the database itself: the
     // test's own schema holds the constraint that says all five or none.
+    // Its constraint found first, materialized, and only then read: a
+    // condition beside the schema's could be evaluated first, on another
+    // test's constraint as its schema is dropped ("could not open relation
+    // with OID", found 2026-10-07).
     let whole = s.db.count(
-        "SELECT count(*) FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace \
-         WHERE c.conname = 'posts_image_whole' AND n.nspname = current_schema() \
-         AND pg_get_constraintdef(c.oid) LIKE '%num_nonnulls(image_key, image_kind, \
-         image_width, image_height, image_alt)%'",
+        "WITH mine AS MATERIALIZED ( \
+             SELECT c.oid FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace \
+             WHERE c.conname = 'posts_image_whole' AND n.nspname = current_schema()) \
+         SELECT count(*) FROM mine WHERE pg_get_constraintdef(mine.oid) LIKE \
+         '%num_nonnulls(image_key, image_kind, image_width, image_height, image_alt)%'",
     );
     assert_eq!(whole, 1);
 }
@@ -342,6 +399,19 @@ fn on_postgres_posting_an_image_with_none_attached_commits_nothing() {
     assert_eq!(
         s.db.count("SELECT count(*) FROM posts WHERE image_key IS NOT NULL"),
         0
+    );
+}
+
+#[test]
+fn on_postgres_a_deleted_posts_image_is_not_served_and_its_blob_is_collected() {
+    let Some(s) = on_postgres("post_image_deleted") else {
+        return;
+    };
+    deleted_and_collected(&s);
+    assert_eq!(
+        s.db.count("SELECT count(*) FROM posts WHERE image_key IS NOT NULL"),
+        1,
+        "the third post's alone"
     );
 }
 

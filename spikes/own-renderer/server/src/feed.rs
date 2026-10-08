@@ -445,6 +445,8 @@ impl crate::data::Staged for Staging<'_> {
         if !staged.is_empty() {
             self.state.commits += 1;
         }
+        // ADR-0261: the images of the posts it deletes.
+        let mut released = std::collections::BTreeSet::new();
         for change in staged {
             match change {
                 Change::Post(row) => {
@@ -453,6 +455,13 @@ impl crate::data::Staged for Staging<'_> {
                 }
                 Change::Delete(id) => {
                     let gone = under(&self.state.posts, &id);
+                    released.extend(
+                        self.state
+                            .posts
+                            .iter()
+                            .filter(|r| gone.contains(&r.id))
+                            .filter_map(|r| r.image.as_ref().map(|i| i.key.clone())),
+                    );
                     self.state.posts.retain(|r| !gone.contains(&r.id));
                 }
                 Change::User(id, profile) => {
@@ -475,7 +484,25 @@ impl crate::data::Staged for Staging<'_> {
         // Track `uploads`: each lease the command committed or discarded
         // ended, now that its transaction has.
         self.claims.lock().expect("claims").settle();
+        // **A deleted post's image, collected where no post names it**
+        // (ADR-0261), under the feed's lock, so no other command commits
+        // between the look and the delete.
+        if let Some(leases) = &self.state.leases {
+            for key in released {
+                let named = names(&self.state.posts, &key);
+                if let Err(why) = leases.collect(&key, named) {
+                    eprintln!("pw dev server: blob {key} was not collected: {why}");
+                }
+            }
+        }
     }
+}
+
+/// **Whether a post names the blob `key`** (ADR-0261).
+fn names(posts: &[Row], key: &str) -> bool {
+    posts
+        .iter()
+        .any(|r| r.image.as_ref().is_some_and(|i| i.key == key))
 }
 
 impl FeedData {
@@ -509,6 +536,10 @@ fn next_id(state: &State, staged: &[Change]) -> String {
 }
 
 impl crate::data::DataLayer for FeedData {
+    fn names_blob(&self, key: &str) -> Result<bool, String> {
+        Ok(names(&self.state.lock().expect("feed").posts, key))
+    }
+
     fn reads(&self, _session: &str, _stopped: Option<Stopped>) -> crate::data::Ops {
         reads_of(
             Arc::new(self.state.lock().expect("feed").clone()),

@@ -41,6 +41,20 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0261, 2026-10-07: a deleted post's image is not served, and its blob
+is collected** (ADR-0260's first question at its merge). ADR-0260 served
+every blob it kept, and kept every one, so a deleted post's image stayed
+served at the address its readers had been shown. A blob is served now
+while a committed row names it, as the data layer says, and a layer that
+cannot say is answered 503; once a delete commits, a blob no post names is
+deleted, in memory and on PostgreSQL, unless a command in flight holds a
+claim to the same bytes, which its post will name. One of ADR-0260's
+mutants, a lease served where committed images are, is retired as
+equivalent: no post names a lease's bytes, and that is asked first (`just
+e14-uploads`). Found on the way: ADR-0260's one local intermittent, a test
+whose catalog query could read another test's constraint as its schema was
+dropped; it reads its own first now.
+
 **ADR-0260, 2026-10-07: an image on a post** (track `uploads`, W2, the
 second track merged under ADR-0253). A program states its upload,
 `upload PostImage` with its route, what it serves, its bytes, its types

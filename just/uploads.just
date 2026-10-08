@@ -35,4 +35,4 @@ e14-uploads:
        echo; echo "== mutation controls (scripts/uploads_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/uploads_mutations.py; \
      } > docs/evidence/E14/uploads.txt
-    @grep -E "^test result|passed|mutants killed|^---- " docs/evidence/E14/uploads.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/uploads.txt

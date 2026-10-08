@@ -62,6 +62,14 @@ pub(crate) trait DataLayer: Send + Sync {
     /// declares an upload. By default a layer keeps no upload.
     fn uploaded_by(&self, _leases: crate::uploads::Leases) {}
 
+    /// **Whether a committed row names the blob `key`** (ADR-0261): the
+    /// uploads serve a blob only while one does, so a deleted post's image
+    /// is not served. By default a layer names none, and a layer that keeps
+    /// no upload has none to serve.
+    fn names_blob(&self, _key: &str) -> Result<bool, String> {
+        Ok(false)
+    }
+
     /// **Every operation it supplies**, read from the functions it builds,
     /// not from a list kept beside them.
     fn operations(&self) -> BTreeSet<String> {

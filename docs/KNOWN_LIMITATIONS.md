@@ -513,9 +513,12 @@ awaited in order. What remains:
   stale tab's command refused with 403 shows the runtime's generic failure.
   The program reads who its reader is through a data layer op, not a typed
   principal (`context.current_user()` is not answered yet).
-- **An upload's image is kept after its post is deleted** (ADR-0260): its
-  blob stays, and is served at its key to anyone who kept the address (next
-  in NEXT). A budget of uploads is the server's memory, as a lease is, so a
+- **An upload's image outlives its post only where it was copied**
+  (ADR-0260, ADR-0261): a deleted post's image is served no more, and its
+  blob is collected where no post names it, but a copy a browser or a CDN
+  kept under `immutable` stays, and a blob a failed commit put stays in the
+  store, served to no one. A budget of uploads is the server's memory, as a
+  lease is, so a
   restart or a second host forgets it; the development blob store is a
   directory, and there is no production store, CDN, signed address,
   private image, re-encoding or resizing. Metadata is served as uploaded,

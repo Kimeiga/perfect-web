@@ -154,10 +154,18 @@ pub(crate) struct Shared {
     /// Track `identity`'s principals, handed once: who uploads. Where none
     /// are handed, each session is its own user.
     principals: std::sync::OnceLock<crate::identity::Principals>,
+    /// **Whether a committed row names a blob** (ADR-0261), the data
+    /// layer's answer, handed once: a blob is served only while one does.
+    /// None handed, none is served.
+    named: std::sync::OnceLock<Named>,
 }
 
 /// **The leases, as the feed's data layer holds them.**
 pub(crate) type Leases = Arc<Shared>;
+
+/// **Whether a committed row names the blob with this key** (ADR-0261), as
+/// the data layer answers it.
+pub(crate) type Named = Box<dyn Fn(&str) -> Result<bool, String> + Send + Sync>;
 
 impl std::fmt::Debug for Shared {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -279,6 +287,7 @@ impl Uploads {
                 state: Mutex::new(State::default()),
                 lease_for,
                 principals: std::sync::OnceLock::new(),
+                named: std::sync::OnceLock::new(),
             })),
         }
     }
@@ -318,6 +327,15 @@ impl Uploads {
     pub fn identified_by(&self, principals: crate::identity::Principals) {
         if let Some(shared) = &self.shared {
             let _ = shared.principals.set(principals);
+        }
+    }
+
+    /// **Which blobs a committed row names** (ADR-0261): the data layer's
+    /// answer, handed once when the server is built, as it is handed the
+    /// leases. A blob no row names is not served.
+    pub(crate) fn named_by(&self, named: Named) {
+        if let Some(shared) = &self.shared {
+            let _ = shared.named.set(named);
         }
     }
 
@@ -777,13 +795,28 @@ impl Shared {
     /// **A committed image**, `<key>.<kind>`, from the deployment's blob
     /// storage, its type sniffed from its bytes again as it is served.
     fn serve(&self, name: &str, headers: &str) -> Answer {
-        let found = name.split_once('.').and_then(|(hex, ext)| {
-            let key = BlobKey::parse(hex)?;
-            let bytes = self.blobs.get(&key).ok()??;
+        let Some((key, ext)) = name
+            .split_once('.')
+            .and_then(|(hex, ext)| Some((BlobKey::parse(hex)?, ext)))
+        else {
+            return Answer::text(404, "not found");
+        };
+        // **Served while a committed row names it** (ADR-0261): a deleted
+        // post's image is not, whether or not its bytes are collected yet,
+        // and a layer that cannot say is not taken to say yes.
+        match self.named.get().map(|named| named(key.hex())) {
+            Some(Ok(true)) => {}
+            Some(Ok(false)) | None => return Answer::text(404, "not found"),
+            Some(Err(why)) => {
+                eprintln!("pw dev server: whether a post names {}: {why}", key.hex());
+                return Answer::text(503, "unavailable");
+            }
+        }
+        let found = self.blobs.get(&key).ok().flatten().and_then(|bytes| {
             let kind = sniff::sniff(&bytes)?;
-            (kind.word() == ext).then_some((key, kind, bytes))
+            (kind.word() == ext).then_some((kind, bytes))
         });
-        let Some((key, kind, bytes)) = found else {
+        let Some((kind, bytes)) = found else {
             return Answer::text(404, "not found");
         };
         let etag = format!("\"{}\"", key.hex());
@@ -908,6 +941,26 @@ impl Shared {
         {
             lease.claimed = false;
         }
+    }
+
+    /// **A blob no post names any more, deleted** (ADR-0261), once the
+    /// transaction that deleted its last post has committed. `named` is
+    /// whether a committed row still names it, which the caller reads while
+    /// no other command can commit. Kept while a command holds a claim to
+    /// the same bytes: its post will name them. The claims are read and the
+    /// blob deleted under the leases' lock, so a claim taken after is one
+    /// whose `keep` puts the bytes back before its post commits. Answers
+    /// whether it is gone.
+    pub(crate) fn collect(&self, key: &str, named: bool) -> Result<bool, String> {
+        let Some(key) = BlobKey::parse(key) else {
+            return Err(format!("`{key}` is no blob's key"));
+        };
+        let state = self.state.lock().expect("uploads");
+        if named || state.leases.values().any(|l| l.claimed && l.key == key) {
+            return Ok(false);
+        }
+        self.blobs.delete(&key).map_err(|e| e.to_string())?;
+        Ok(true)
     }
 
     /// How many blobs its leases hold, and how many its posts committed.
@@ -1562,8 +1615,27 @@ pub(crate) mod tests {
         assert!(s.claim("s-1").is_none());
         assert_eq!(files(&d.path().join("staged")), 0);
         assert_eq!(files(&d.path().join("blobs")), 1);
-        // Served now, as what it is, kept forever by any cache.
+        // Served while a post names it, as the layer says (ADR-0261).
         let src = s.src(&key, Kind::Png);
+        assert_eq!(
+            get(&u, &src, "s-anyone", "").status,
+            404,
+            "no layer handed: none named"
+        );
+        let (named, erring) = (
+            Arc::new(Mutex::new(std::collections::BTreeSet::<String>::new())),
+            Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        );
+        u.named_by(Box::new({
+            let (named, erring) = (named.clone(), erring.clone());
+            move |key: &str| match erring.load(std::sync::atomic::Ordering::SeqCst) {
+                true => Err("the layer cannot say".to_string()),
+                false => Ok(named.lock().expect("named").contains(key)),
+            }
+        }));
+        assert_eq!(get(&u, &src, "s-anyone", "").status, 404, "named by none");
+        named.lock().expect("named").insert(key.hex().to_string());
+        // Served now, as what it is, kept forever by any cache.
         assert_eq!(src, format!("/images/{}.png", key.hex()));
         let served = get(&u, &src, "s-anyone", "");
         assert_eq!(served.status, 200);
@@ -1584,6 +1656,14 @@ pub(crate) mod tests {
         // Its kind is its bytes': the same key as another kind is nothing.
         assert_eq!(get(&u, &src.replace(".png", ".gif"), "s", "").status, 404);
         assert_eq!(get(&u, "/images/../../etc/passwd", "s", "").status, 404);
+        // A layer that cannot say is not taken to say yes; and a post that
+        // names it no more is served no more, its bytes kept or not.
+        erring.store(true, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(get(&u, &src, "s-anyone", "").status, 503);
+        erring.store(false, std::sync::atomic::Ordering::SeqCst);
+        named.lock().expect("named").clear();
+        assert_eq!(get(&u, &src, "s-anyone", "").status, 404);
+        assert_eq!(files(&d.path().join("blobs")), 1);
 
         // A second lease, discarded: its blob forgotten.
         assert_eq!(
@@ -1599,6 +1679,46 @@ pub(crate) mod tests {
             1,
             "the committed image alone"
         );
+    }
+
+    /// **A blob no post names is collected, and one a claim holds is kept**
+    /// (ADR-0261): a command in flight with the same bytes will name them.
+    #[test]
+    fn a_blob_no_post_names_is_collected_unless_a_claim_holds_it() {
+        let d = dir();
+        let u = uploads(d.path(), declared(), LEASE);
+        let s = shared(&u);
+        let blobs = || files(&d.path().join("blobs"));
+        assert_eq!(
+            post(&u, "s-1", &png(64, 48), "a.png", "image/png").status,
+            303
+        );
+        let claimed = s.claim("s-1").expect("claimed");
+        s.keep(&claimed).expect("kept");
+        let key = claimed.key.hex().to_string();
+        s.committed(claimed);
+        assert_eq!(blobs(), 1);
+        // A post names it still: kept.
+        assert_eq!(s.collect(&key, true), Ok(false));
+        assert_eq!(blobs(), 1);
+        // Another session's lease of the same bytes, claimed by a command in
+        // flight that has kept them: kept, since its post will name them.
+        assert_eq!(
+            post(&u, "s-2", &png(64, 48), "b.png", "image/png").status,
+            303
+        );
+        let theirs = s.claim("s-2").expect("claimed");
+        s.keep(&theirs).expect("kept");
+        assert_eq!(s.collect(&key, false), Ok(false));
+        assert_eq!(blobs(), 1);
+        // Given back, and named by no post: collected.
+        s.unclaim(theirs);
+        assert_eq!(s.collect(&key, false), Ok(true));
+        assert_eq!(blobs(), 0);
+        // Again: gone already, and no error.
+        assert_eq!(s.collect(&key, false), Ok(true));
+        // A key that is no key builds no path.
+        assert!(s.collect("../../etc/passwd", false).is_err());
     }
 
     /// **A user's budget**: so many images an hour, and so many times the

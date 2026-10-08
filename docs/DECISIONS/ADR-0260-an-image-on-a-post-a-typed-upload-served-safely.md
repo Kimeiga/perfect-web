@@ -398,7 +398,8 @@ Recorded by `just e14-uploads` in `docs/evidence/E14/uploads.txt`, at
    the deleting transaction commits, unless a command in flight holds a
    claim to the same key, which will name it or give it back and be
    collected then. A copy a CDN or a browser keeps under `immutable` is the
-   deployment's to purge as its store deletes. Queued first in NEXT.
+   deployment's to purge as its store deletes. Queued first in NEXT; built
+   by ADR-0261.
 2. **A runtime that sends a file: yes, queued** after notifications. The
    page posts the file itself and reads the attached image as the attach
    form's answer shows it, so a draft typed before attaching survives; the
