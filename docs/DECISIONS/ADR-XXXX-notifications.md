@@ -108,6 +108,28 @@ command mark_read() -> Result<Int, FeedError>
   count and list by their handle, which reaches each of their sessions
   the same way.
 
+## Found
+
+- **A like pressed on a row shown before the server answered is
+  refused.** The browser suite's first run after the rebase onto 98e099b
+  pressed Like on Ada's post while it was still the `pending-..` row
+  `pending` shows, and the like found no such post: "0 likes" (Chromium,
+  once). A test's order, not a notification's: each test now waits for
+  the server's row by its id before anyone presses on it. A reader pressing
+  that fast meets it too: a speculated row's buttons act on an id no
+  server has. The integrator took it as a defect of the feed's, found by
+  W3, to queue in NEXT and rule on (defer the command until the row is
+  reconciled, or ids the server accepts).
+- **An intermittent, not this track's**: the first push's verification
+  (run 37732376131, at c65b87a, on c51654d) failed its `browser webkit`
+  job in `e2e/feed.spec.mjs:379`, "Load more shows the next page, and a
+  post after it is shown over it": its rows stayed at 20 after 5 s (1
+  failed, 265 passed; trace
+  `test-results/feed-Load-more-shows-the-n-e04d0-t-after-it-is-shown-over-it-webkit/trace.zip`).
+  Not re-run. The integrator's answer: the same flake, the third time, its
+  own to chase. The next push's WebKit job (run 37735378203, at 809348d)
+  passed.
+
 ## Alternatives
 
 - **A materialization of each user's notifications**: the ruling's "no
@@ -245,7 +267,13 @@ suite, 270 tests with PostgreSQL's, passed after the rebase onto de500be.
   - these ADRs and the evidence.
 - **Rebased onto ADR-0263** (de500be): context.pw is master's, and the
   platform hash is master's, 0x37769cace0f350fa. This track's first commit
-  had made the same declaration, and gave way. Then rebased onto 328c306.
+  had made the same declaration, and gave way. Then rebased onto 328c306,
+  c51654d and 98e099b (ADR-0268): the browser suite waits for each
+  command's answer before it navigates, and for the server's row before
+  it presses on it. The recorded evidence keeps the header it was recorded
+  with, 83992dc; the spec's two waits came after it, and the suite passed
+  9 of 9 again locally at 98e099b, and on CI.
+- **The four status documents are untouched**, as PARALLEL.md asks.
 - **Shared files**:
   - `compiler/pw-core/src/codes.rs`: `Owner::Notifications`, PW57, with no
     codes;
