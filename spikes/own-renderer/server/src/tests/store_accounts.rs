@@ -239,6 +239,27 @@ fn a_guests_cart_follows_them_in() {
     assert_eq!(s.cart_lines(&earlier).len(), 2, "ada keeps hers");
 }
 
+/// **A session already signed in that signs in as someone else joins
+/// nothing to them**, on a program that keys its cart by the session (the
+/// benchmark's copy of the store), where the session's cart is what the
+/// reader signed in held: the identity tells the deployment of a guest's
+/// sign-in alone, and a signed-in session is no guest.
+#[test]
+fn a_signed_in_sessions_cart_is_not_joined_to_the_next_user() {
+    let provider = Arc::new(TestProvider::default());
+    let s = served_from_patches(|app| app.to_string(), &[]);
+    s.identity.use_provider(provider.clone(), REDIRECT);
+    // This program's cart requires a reader signed in: ada's session's.
+    let ada = signed_in(&s, &provider, "came-ada", "ada");
+    s.command(ADD, &ada, &add("espresso", 1), false)
+        .expect("ada adds");
+    assert_eq!(s.cart_lines(&ada), [("espresso".to_string(), 1)]);
+    // Ada, signed in, signs in again as ben: what her session held stays.
+    let ben = signed_in(&s, &provider, &ada, "ben");
+    assert!(s.cart_lines(&ben).is_empty(), "ben is joined ada's session's cart");
+    assert_eq!(s.cart_lines(&ada), [("espresso".to_string(), 1)]);
+}
+
 /// **A join past what a line can hold is refused, and the sign-in still
 /// completes** (Q2): the guest's lines stay the guest's, the user's cart is as
 /// it was, and the browser is signed in.
