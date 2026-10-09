@@ -58,10 +58,8 @@ pub(crate) fn place(subdirectory: &str, file: &str) -> Option<PathBuf> {
         && subdirectory
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
-    let segment = !file.is_empty()
-        && file != "."
-        && file != ".."
-        && !file.contains(['/', '\\', '\0']);
+    let segment =
+        !file.is_empty() && file != "." && file != ".." && !file.contains(['/', '\\', '\0']);
     (hex && segment).then(|| PathBuf::from(subdirectory).join(format!("{file}.json.deflate")))
 }
 
@@ -113,7 +111,11 @@ fn keyed<'a>(
     records.map(move |r| {
         let id = text(r, field);
         let n = seen.entry(id.clone()).or_default();
-        let key = if *n == 0 { id.clone() } else { format!("{id}:{n}") };
+        let key = if *n == 0 {
+            id.clone()
+        } else {
+            format!("{id}:{n}")
+        };
         *n += 1;
         (key, r)
     })
@@ -251,7 +253,11 @@ pub(crate) fn entry(json: &serde_json::Value) -> Val {
 /// **The file `subdirectory/file` names, read**: its JSON, or `None` where
 /// there is no such file. An error is a file that is not kiokun's: not raw
 /// DEFLATE, or not JSON.
-pub(crate) fn read(root: &Path, subdirectory: &str, file: &str) -> Result<Option<serde_json::Value>, String> {
+pub(crate) fn read(
+    root: &Path,
+    subdirectory: &str,
+    file: &str,
+) -> Result<Option<serde_json::Value>, String> {
     let Some(rel) = place(subdirectory, file) else {
         return Ok(None);
     };

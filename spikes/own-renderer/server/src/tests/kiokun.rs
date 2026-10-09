@@ -12,7 +12,11 @@ fn built_kiokun_with(change: fn(&str) -> String) -> (tempfile::TempDir, std::pat
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let dir = tempfile::TempDir::with_prefix("pw-kiokun-").expect("a temporary directory");
     let mut paths: Vec<std::path::PathBuf> = Vec::new();
-    for d in ["packages/pw-std", "packages/pw-platform-web", "examples/kiokun-site"] {
+    for d in [
+        "packages/pw-std",
+        "packages/pw-platform-web",
+        "examples/kiokun-site",
+    ] {
         let mut ps: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(d))
             .unwrap_or_else(|e| panic!("{d}: {e}"))
             .map(|e| e.expect("entry").path())
@@ -120,16 +124,31 @@ fn the_word_page_shows_each_languages_words_as_kiokun_does() {
     let s = served_kiokun();
     let page = fetched(&s, &path_of("人"));
     let chinese = visible(section(&page, "chinese"));
-    for shown in ["Chinese", "[rén]", "[jan4]", "person", "CL:個|个[gè],位[wèi]"] {
+    for shown in [
+        "Chinese",
+        "[rén]",
+        "[jan4]",
+        "person",
+        "CL:個|个[gè],位[wèi]",
+    ] {
         assert!(chinese.contains(shown), "{shown}: {chinese}");
     }
     let japanese = section(&page, "japanese");
-    assert!(japanese.contains("<span class=\"kana-pronunciation\">ひと</span>"), "{japanese}");
+    assert!(
+        japanese.contains("<span class=\"kana-pronunciation\">ひと</span>"),
+        "{japanese}"
+    );
     // 1580640 is common, 1366420 is not: a star for one.
     assert!(japanese.contains("★"), "{japanese}");
-    assert!(visible(japanese).contains("indicates nationality, race, origin, etc."), "{japanese}");
+    assert!(
+        visible(japanese).contains("indicates nationality, race, origin, etc."),
+        "{japanese}"
+    );
     // A part of speech is a label of its sense.
-    assert!(japanese.contains("<span class=\"tag\">ctr</span>"), "{japanese}");
+    assert!(
+        japanese.contains("<span class=\"tag\">ctr</span>"),
+        "{japanese}"
+    );
     let korean = visible(section(&page, "korean"));
     for shown in ["인", "[人]", "Affix", "A suffix used to mean a person."] {
         assert!(korean.contains(shown), "{shown}: {korean}");
@@ -148,7 +167,12 @@ fn the_word_page_shows_each_languages_words_as_kiokun_does() {
 fn what_kiokun_com_does_not_show_is_not_shown() {
     let s = served_kiokun();
     let page = visible(&fetched(&s, &path_of("人")));
-    for hidden in ["Strokes", "School grade", "Frequency rank", "Meaning in Korean"] {
+    for hidden in [
+        "Strokes",
+        "School grade",
+        "Frequency rank",
+        "Meaning in Korean",
+    ] {
         assert!(!page.contains(hidden), "{hidden}: {page}");
     }
 }
@@ -160,7 +184,10 @@ fn one_japanese_sense_is_not_numbered_and_many_are() {
     let s = served_kiokun();
     let page = fetched(&s, &path_of("人"));
     let japanese = section(&page, "japanese");
-    assert!(japanese.contains("<div class=\"single-sense\">"), "{japanese}");
+    assert!(
+        japanese.contains("<div class=\"single-sense\">"),
+        "{japanese}"
+    );
     assert!(japanese.contains("<ol class=\"sense-list\">"), "{japanese}");
 }
 
@@ -204,7 +231,13 @@ fn write_entry(dir: &std::path::Path, word: &str, json: &str) {
     let sub = format!("{:02x}", hash & 0xff);
     let name: String = word
         .chars()
-        .map(|c| if "/\\:*?\"<>|".contains(c) || c.is_control() { '_' } else { c })
+        .map(|c| {
+            if "/\\:*?\"<>|".contains(c) || c.is_control() {
+                '_'
+            } else {
+                c
+            }
+        })
         .collect();
     std::fs::create_dir_all(dir.join(&sub)).expect("a subdirectory");
     std::fs::write(
@@ -234,7 +267,10 @@ fn a_file_answers_only_for_the_word_it_records() {
         "a/b/b",
         r#"{"key":"a/b/b","chinese_words":[{"_id":"1","simp":"a/b/b","trad":"a/b/b","items":[{"pinyin":"x","definitions":["the word a/b/b"]}]}]}"#,
     );
-    assert!(dir.path().join("47/a_b_b.json.deflate").exists(), "the file");
+    assert!(
+        dir.path().join("47/a_b_b.json.deflate").exists(),
+        "the file"
+    );
     let s = served_kiokun_on(dir.path());
     let found = fetched(&s, "/word/a%2Fb%2Fb");
     assert!(found.starts_with("HTTP/1.1 200 OK\r\n"), "{found}");
@@ -271,16 +307,25 @@ fn what_kiokun_com_leaves_out_is_left_out() {
     let page = fetched(&s, "/word/%E8%A9%A6");
     assert!(page.starts_with("HTTP/1.1 200 OK\r\n"), "{page}");
     let chinese = visible(section(&page, "chinese"));
-    assert!(chinese.contains("[shì]") && chinese.contains("[si3]"), "{chinese}");
+    assert!(
+        chinese.contains("[shì]") && chinese.contains("[si3]"),
+        "{chinese}"
+    );
     assert!(!chinese.contains("no-senses"), "{chinese}");
     // `simp / trad` where they differ.
     assert!(chinese.contains("试 / 試"), "{chinese}");
     let japanese = section(&page, "japanese");
     assert!(japanese.contains("rare-form"), "{japanese}");
-    assert!(japanese.contains("<span class=\"info-tag\">(rK)</span>"), "{japanese}");
+    assert!(
+        japanese.contains("<span class=\"info-tag\">(rK)</span>"),
+        "{japanese}"
+    );
     assert!(!japanese.contains("search-only-form"), "{japanese}");
     // A gloss's type, and glosses joined by "; ".
-    assert!(visible(japanese).contains("(lit) trial; test"), "{japanese}");
+    assert!(
+        visible(japanese).contains("(lit) trial; test"),
+        "{japanese}"
+    );
     let korean = visible(section(&page, "korean"));
     assert!(korean.contains("a test"), "{korean}");
     assert!(!korean.contains("Sentence"), "{korean}");
@@ -292,7 +337,10 @@ fn what_kiokun_com_leaves_out_is_left_out() {
 #[test]
 fn the_layer_reads_no_path_but_one_of_kiokuns_files() {
     use crate::kiokun::place;
-    assert_eq!(place("ba", "人"), Some(std::path::PathBuf::from("ba/人.json.deflate")));
+    assert_eq!(
+        place("ba", "人"),
+        Some(std::path::PathBuf::from("ba/人.json.deflate"))
+    );
     for (sub, file) in [
         ("..", "人"),
         ("b", "人"),
@@ -325,7 +373,9 @@ fn a_record_listed_twice_is_shown_twice_each_keyed_once() {
         panic!("a record")
     };
     let names = &fields.iter().find(|(k, _)| k == "names").expect("names").1;
-    let Val::List(names) = names else { panic!("a list") };
+    let Val::List(names) = names else {
+        panic!("a list")
+    };
     let ids: Vec<String> = names
         .iter()
         .map(|n| match n {

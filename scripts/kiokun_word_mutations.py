@@ -88,14 +88,14 @@ MUTANTS = [
     (
         "a file name may hold a separator",
         LAYER,
-        "        && !file.contains(['/', '\\\\', '\\0']);",
-        "        ;",
+        " && !file.contains(['/', '\\\\', '\\0']);",
+        ";",
     ),
     (
         "a repeated id keys two records",
         LAYER,
-        '        let key = if *n == 0 { id.clone() } else { format!("{id}:{n}") };',
-        "        let key = id.clone();",
+        '        } else {\n            format!("{id}:{n}")\n        };',
+        "        } else {\n            id.clone()\n        };",
     ),
     (
         "the layer promises no strong reads, which the program states",
