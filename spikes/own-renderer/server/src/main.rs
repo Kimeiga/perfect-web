@@ -11394,6 +11394,36 @@ public query Store(",
         assert!(set.contains("First"), "told: {set}");
     }
 
+    /// **A keyed read whose document changed while it derived is derived
+    /// against again** (ADR-XXXX): "Load more"'s rows are applied over what
+    /// the page shows, never over what it showed.
+    #[test]
+    fn a_keyed_read_whose_document_changed_while_it_derived_is_derived_again() {
+        let s = served_feed();
+        for i in 0..21 {
+            s.command_answered(
+                "feed.app.post",
+                "b",
+                &[Val::String(format!("Post {i}"))],
+                Some(&format!("i-{i}")),
+            )
+            .expect("runs");
+        }
+        let (_, cursor, _, _) = s
+            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        let derived = replace_while_derived(&s, &doc, 1);
+        let more = BTreeMap::from([("shown".to_string(), serde_json::json!(40))]);
+        let read = s.read_keyed("a", "feed", 1, cursor, &more, STAYED);
+        assert!(matches!(read, Ok(KeyOutcome::Applied)), "applied");
+        assert_eq!(
+            derived.load(std::sync::atomic::Ordering::SeqCst),
+            2,
+            "derived against what it shows, again"
+        );
+    }
+
     /// **A document changed at every attempt is still told** (ADR-XXXX): the
     /// last attempt is derived inside the table, where nothing reaches it.
     #[test]

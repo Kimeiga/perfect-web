@@ -58,7 +58,9 @@ finding (WebKit's "Load more", failing on CI since 2026-10-07). Date:
 
 - **The development server's tests**: the table is free while a telling
   derives, and while a keyed read derives; a document changed while its
-  change is derived is derived against again; a document changed at every
+  change is derived is derived against again, by a telling and by a keyed
+  read (the first run of the mutation controls found the keyed read's check
+  untested); a document changed at every
   attempt is still told, each attempt but the last outside; a document's
   trail says what reached it, and only to its own session.
 - **`scripts/tests/test_mutation_baseline.py`**: a failing test's records

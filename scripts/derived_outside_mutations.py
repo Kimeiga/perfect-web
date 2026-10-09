@@ -117,6 +117,7 @@ COMMANDS = {
     "host": [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
         "the_table_is_free", "a_document_changed", "a_documents_trail",
+        "a_keyed_read_whose_document_changed",
     ],
     "scripts": [sys.executable, "-m", "unittest", "scripts/tests/test_mutation_baseline.py"],
 }
