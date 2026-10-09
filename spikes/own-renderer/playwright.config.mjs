@@ -176,6 +176,18 @@ if (FEED_WHY !== null) {
   console.warn(`${FEED_WHY}: e2e/feed.spec.mjs is not run; run feed.sh again`);
 }
 const FEED_BUILT = existsSync(new URL("./dist-feed/build", import.meta.url)) && FEED_WHY === null;
+// kiokun's build (track `kiokun`), held to the same: its runtime and its
+// sources (`kiokun-site.sh`).
+const KIOKUN_WHY = !existsSync(new URL("./dist-kiokun/build", import.meta.url))
+  ? null
+  : builtWith("dist-kiokun") !== RUNTIME
+    ? "dist-kiokun was built with another pw-runtime.mjs"
+    : changedSince("dist-kiokun");
+if (KIOKUN_WHY !== null) {
+  console.warn(`${KIOKUN_WHY}: e2e/kiokun-site.spec.mjs is not run; run kiokun-site.sh again`);
+}
+const KIOKUN_BUILT =
+  existsSync(new URL("./dist-kiokun/build", import.meta.url)) && KIOKUN_WHY === null;
 
 const HOSTS = process.env.PW_PERFORMANCE
   ? [MUTABLE_PORTS.performance.chromium]
@@ -211,6 +223,8 @@ export default defineConfig({
     ...(FEED_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/notifications.spec.mjs"]),
     // The messages track's, the feed's build with accounts.
     ...(FEED_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/messages.spec.mjs"]),
+    // The kiokun track's, kiokun's build (`kiokun-site.sh`).
+    ...(KIOKUN_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/kiokun-site.spec.mjs"]),
   ],
   fullyParallel: true,
   reporter: [["list"]],
@@ -285,6 +299,18 @@ export default defineConfig({
       ? Object.values(MESSAGES_PORTS).map((port) => ({
           command: `../../target/debug/pw-dev-server dist-feed`,
           env: { PORT: String(port), PW_IDENTITY: "dev-accounts", ...IN_MEMORY },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))
+      : []),
+    // The kiokun track's hosts: kiokun's build, its entries read from
+    // KIOKUN_DATA where the caller names it, the repository's sample
+    // otherwise.
+    ...(KIOKUN_BUILT && !process.env.PW_PERFORMANCE
+      ? Object.values(KIOKUN_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist-kiokun`,
+          env: { PORT: String(port) },
           port,
           reuseExistingServer: !!process.env.PW_REUSE,
           timeout: 60_000,
