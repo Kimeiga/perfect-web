@@ -62,6 +62,12 @@ MUTANTS = [
         "        if best is None or ends <= best[0]:\n",
     ),
     (
+        "a plan of nothing takes the longest of no shards",
+        PLAN,
+        "    if not names:\n        return []\n",
+        "",
+    ),
+    (
         "a recipe that failed has its seconds kept",
         FETCH,
         '    return {r["recipe"]: round(r["seconds"]) for r in results if r.get("status") == 0}\n',
