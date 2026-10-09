@@ -109,6 +109,8 @@ class Recipe(unittest.TestCase):
     def test_the_recipe_is_local_since_no_runner_has_the_checkout(self) -> None:
         plan = load("ci_plan")
         self.assertIn("e14-kiokun-inventory", plan.LOCAL_ONLY)
+        # And the sample of the whole dictionary, which reads it too.
+        self.assertIn("e14-kiokun-sample", plan.LOCAL_ONLY)
         recipes = (SCRIPTS.parent / "just" / "kiokun.just").read_text()
         self.assertIn("\ne14-kiokun-inventory:\n", recipes)
 

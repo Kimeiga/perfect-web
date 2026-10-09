@@ -29,6 +29,35 @@ e14-kiokun-inventory:
     @grep -q "^inventory: OK" docs/evidence/E14/kiokun-inventory.txt
     @! grep -qE "SURVIVED|ANCHOR NOT FOUND|^FAIL" docs/evidence/E14/kiokun-inventory.txt
 
+# A sample of the whole dictionary, served and timed (the integrator's order
+# of 2026-10-09: numbers before the word page's component grows further).
+# Every KIOKUN_SAMPLE_EVERY'th file (256 by default) of every subdirectory
+# of KIOKUN_DATA is looked up through the development server's HTTP path, in
+# release: each page's status, and the time to its last byte. Then the same
+# sample served by the word page's first milestone (ADR-0286's `app.pw`, at
+# the merge), for a baseline. Local: it reads the owner's kiokun-data
+# checkout (scripts/ci_plan.py's LOCAL_ONLY), and its times are this
+# machine's.
+e14-kiokun-sample:
+    @test -n "${KIOKUN_DATA:-}" || { echo "KIOKUN_DATA must name a kiokun-data checkout's output_dictionary"; exit 1; }
+    @mkdir -p docs/evidence/E14
+    @git show 3036497:examples/kiokun-site/app.pw > "${TMPDIR:-/tmp}/kiokun-site-0286.pw"
+    @{ echo "A sample of the whole dictionary, served by the development server and timed"; echo; \
+       echo "produced by: just e14-kiokun-sample (local: reads a kiokun-data checkout)"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "host: $(uname -sm), $(sysctl -n hw.ncpu 2>/dev/null || nproc) cores, $(uptime | sed 's/.*load/load/')"; \
+       echo "KIOKUN_APP: ${KIOKUN_APP:-not set}"; echo; \
+       echo "== this branch's word page"; echo; \
+       cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::a_sample 2>&1 \
+         | grep -E '^(server|files|status|per request|slowest|defect|test result)|panicked'; \
+       echo; echo "== the word page's first milestone (ADR-0286), the same sample"; echo; \
+       KIOKUN_SAMPLE_APP="${TMPDIR:-/tmp}/kiokun-site-0286.pw" \
+         cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::a_sample 2>&1 \
+         | grep -E '^(server|files|status|per request|slowest|defect|test result)|panicked'; \
+     } > docs/evidence/E14/kiokun-sample.txt
+    @cat docs/evidence/E14/kiokun-sample.txt
+    @! grep -qE "panicked|FAILED" docs/evidence/E14/kiokun-sample.txt
+
 # The word page (the track's step 1), served by the development server as a
 # third program beside the store and the feed (docs/PARALLEL.md, "W6's
 # inventory, answered", Q2): `examples/kiokun-site`, its entries read by the

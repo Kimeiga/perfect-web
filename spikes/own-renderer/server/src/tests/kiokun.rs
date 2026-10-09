@@ -861,3 +861,125 @@ fn an_equivalent_forms_words_are_shown_on_the_canonical_page() {
     assert!(back.contains("behind") && back.contains("queen"), "{back}");
     assert!(!back.contains("surplus"), "{back}");
 }
+
+/// The value at fraction `q` of sorted `values` (nearest rank).
+fn quantile(sorted: &[f64], q: f64) -> f64 {
+    if sorted.is_empty() {
+        return f64::NAN;
+    }
+    let rank = ((q * sorted.len() as f64).ceil() as usize).clamp(1, sorted.len());
+    sorted[rank - 1]
+}
+
+/// **A sample of the whole dictionary, served and timed** (local: it reads
+/// the owner's kiokun-data checkout through `KIOKUN_DATA`, and
+/// `KIOKUN_APP` where it is set). Every `KIOKUN_SAMPLE_EVERY`th file (256 by
+/// default) of every subdirectory, in name order, is looked up by the word
+/// its file records, through the server's own HTTP path, one request at a
+/// time on a fresh connection: its status, and the time from the request to
+/// the response's last byte. Run in release by `just e14-kiokun-sample`.
+///
+/// Every word a file records has a page: anything but 200 is a defect,
+/// named.
+#[test]
+#[ignore = "reads a kiokun-data checkout named by KIOKUN_DATA; a measurement, run by `just e14-kiokun-sample`"]
+fn a_sample_of_the_whole_dictionary_is_served_and_timed() {
+    let Some(root) = std::env::var_os("KIOKUN_DATA").map(std::path::PathBuf::from) else {
+        panic!("KIOKUN_DATA must name a kiokun-data checkout's output_dictionary");
+    };
+    let every: usize = std::env::var("KIOKUN_SAMPLE_EVERY")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(256);
+    let started = std::time::Instant::now();
+    // `KIOKUN_SAMPLE_APP` names another `app.pw` to serve, an earlier
+    // milestone's, for a baseline.
+    let (_dir, out) = built_kiokun_with(|app| match std::env::var_os("KIOKUN_SAMPLE_APP") {
+        Some(other) => std::fs::read_to_string(other).expect("KIOKUN_SAMPLE_APP"),
+        None => app.to_string(),
+    });
+    let s = Server::from_build(out.clone(), out.clone()).expect("served");
+    let word_component = std::fs::metadata(out.join("components/kiokun.site.Word.wasm"))
+        .expect("the Word component")
+        .len();
+    println!(
+        "server built in {:.1} s (the program compiled and loaded); the Word component {} bytes; KIOKUN_APP {}",
+        started.elapsed().as_secs_f64(),
+        word_component,
+        if std::env::var_os("KIOKUN_APP").is_some() {
+            "set"
+        } else {
+            "not set"
+        }
+    );
+    // Every file, in name order, every `every`th of them.
+    let mut files: Vec<std::path::PathBuf> = Vec::new();
+    let mut subs: Vec<std::path::PathBuf> = std::fs::read_dir(&root)
+        .expect("KIOKUN_DATA is a directory")
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.is_dir())
+        .collect();
+    subs.sort();
+    let mut total = 0usize;
+    for sub in subs {
+        let mut names: Vec<std::path::PathBuf> = std::fs::read_dir(&sub)
+            .expect("a subdirectory")
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.to_string_lossy().ends_with(".json.deflate"))
+            .collect();
+        names.sort();
+        total += names.len();
+        files.extend(names.into_iter().step_by(every.max(1)));
+    }
+    println!("files: {total}; sampled: {} (every {every}th)", files.len());
+    let mut times: Vec<f64> = Vec::new();
+    let mut statuses: BTreeMap<String, usize> = BTreeMap::new();
+    let mut defects: Vec<String> = Vec::new();
+    let mut slowest: Vec<(f64, String)> = Vec::new();
+    for file in &files {
+        let raw = std::fs::read(file).expect("the file");
+        let json: serde_json::Value = serde_json::from_slice(
+            &miniz_oxide::inflate::decompress_to_vec(&raw).expect("raw DEFLATE"),
+        )
+        .expect("JSON");
+        let word = json["key"].as_str().unwrap_or_default().to_string();
+        let at = std::time::Instant::now();
+        let page: String = fetched_as(&s, &path_of(&word), Some("sample"))
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        let ms = at.elapsed().as_secs_f64() * 1e3;
+        let status = page.lines().next().unwrap_or_default().to_string();
+        *statuses.entry(status.clone()).or_default() += 1;
+        times.push(ms);
+        slowest.push((ms, word.clone()));
+        if !status.starts_with("HTTP/1.1 200") {
+            let body = page.split("\r\n\r\n").nth(1).unwrap_or_default();
+            defects.push(format!(
+                "{word}: {status}: {}",
+                body.chars().take(300).collect::<String>()
+            ));
+        }
+    }
+    times.sort_by(|a, b| a.partial_cmp(b).expect("a time"));
+    slowest.sort_by(|a, b| b.0.partial_cmp(&a.0).expect("a time"));
+    for (status, n) in &statuses {
+        println!("status: {status}: {n}");
+    }
+    let mean = times.iter().sum::<f64>() / times.len().max(1) as f64;
+    println!(
+        "per request, ms: mean {mean:.1}, p50 {:.1}, p90 {:.1}, p99 {:.1}, max {:.1}",
+        quantile(&times, 0.5),
+        quantile(&times, 0.9),
+        quantile(&times, 0.99),
+        quantile(&times, 1.0)
+    );
+    for (ms, word) in slowest.iter().take(5) {
+        println!("slowest: {word}: {ms:.1} ms");
+    }
+    println!("defects: {}", defects.len());
+    for d in defects.iter().take(20) {
+        println!("defect: {d}");
+    }
+    assert!(defects.is_empty(), "{} page(s) not served", defects.len());
+}
