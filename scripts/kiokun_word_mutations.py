@@ -441,14 +441,28 @@ MUTANTS = [
     ),
 ]
 
-# One test thread per core again: each distinct program is now compiled
+# Four test threads, not one per core. Each distinct program is compiled
 # once per test process and its files written into each test's own TempDir
 # (the integrator's ruling of 2026-10-09; ADR-0158 holds). Measured back to
-# back with /usr/bin/time -l on 12 cores at a load near 16: before, 92.8 s
-# and 3.61 GB at one thread per core (ADR-0292's 4 GiB bound stopped a
-# baseline) or 138.7 s and 2.09 GB on four; after, 76.0 s and 2.71 GB at
-# one per core, with half the CPU time (487 s to 261 s).
-TESTS = [["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "kiokun"]]
+# back with /usr/bin/time -l on 12 cores at a load near 16, the tests alone
+# take 76.0 s and 2.71 GB at one thread per core, or 99.0 s and 2.39 GB on
+# four (before the cache: 92.8 s and 3.61 GB, or 138.7 s and 2.09 GB). In
+# a whole run at one thread per core, ADR-0292's 4 GiB bound still stopped
+# the test process in 19 of 69 mutants' runs; on four threads, a whole run
+# before the cache stopped none.
+TESTS = [
+    [
+        "cargo",
+        "test",
+        "--quiet",
+        "--locked",
+        "-p",
+        "pw-dev-server",
+        "--",
+        "kiokun",
+        "--test-threads=4",
+    ]
+]
 
 
 def run_tests():

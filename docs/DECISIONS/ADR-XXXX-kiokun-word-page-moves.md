@@ -96,8 +96,11 @@ Numbered after ADR-0299's 19.
    - One test's own time is about 7.1 s to compile and 7.7 s for the
      server to load the components (Wasmtime compiling them in a debug
      build); the cache removes the first.
-   - `scripts/kiokun_word_mutations.py` runs one test thread per core
-     again: 2.71 GB is 1.6 GB under ADR-0292's bound.
+   - `scripts/kiokun_word_mutations.py` stays on four test threads. At
+     one thread per core the tests alone peak at 2.71 GB, but in a whole
+     mutation run ADR-0292's 4 GiB bound still stopped the test process
+     in 19 of 69 mutants' runs. That run was discarded, since each of
+     those kills may have been the bound's alone.
    - CI runs on four cores, where CPU time decides, so the shard should
      take about half its time.
 
