@@ -1,0 +1,63 @@
+ADR-XXXX - a mutation script's processes are bounded in memory
+
+produced by: just e14-mutation-bound
+commit: 53cadc07074536830778f7c5bf7ffa78adff0c59
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37908865560 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+python: Python 3.12.3
+platform: Linux x86_64
+
+== the bound (scripts/tests/test_mutation_bound.py, test_mutation_baseline.py)
+
+test_a_number_used_again_is_watched_again (scripts.tests.test_mutation_bound.Bound.test_a_number_used_again_is_watched_again) ... ok
+test_a_process_past_the_bound_is_stopped_and_said (scripts.tests.test_mutation_bound.Bound.test_a_process_past_the_bound_is_stopped_and_said) ... ok
+test_a_process_within_the_bound_runs_to_its_end (scripts.tests.test_mutation_bound.Bound.test_a_process_within_the_bound_runs_to_its_end) ... ok
+test_a_run_the_bound_did_not_touch_says_so (scripts.tests.test_mutation_bound.Bound.test_a_run_the_bound_did_not_touch_says_so) ... ok
+test_a_stop_names_the_verdict_after_it_a_kind_of_its_own (scripts.tests.test_mutation_bound.Bound.test_a_stop_names_the_verdict_after_it_a_kind_of_its_own) ... ok
+test_a_test_binary_is_named_without_its_hash (scripts.tests.test_mutation_bound.Bound.test_a_test_binary_is_named_without_its_hash) ... ok
+test_a_watch_that_cannot_read_the_processes_says_so (scripts.tests.test_mutation_bound.Bound.test_a_watch_that_cannot_read_the_processes_says_so) ... ok
+test_one_whose_parents_read_again_are_anothers_is_left_alone (scripts.tests.test_mutation_bound.Bound.test_one_whose_parents_read_again_are_anothers_is_left_alone) ... ok
+test_only_the_scripts_own_are_read_each_stop_said_once (scripts.tests.test_mutation_bound.Bound.test_only_the_scripts_own_are_read_each_stop_said_once) ... ok
+test_started_once_however_often_asked (scripts.tests.test_mutation_bound.Bound.test_started_once_however_often_asked) ... ok
+test_the_bound_is_4_GiB_or_a_quarter_of_the_machine (scripts.tests.test_mutation_bound.Bound.test_the_bound_is_4_GiB_or_a_quarter_of_the_machine) ... ok
+test_the_bounds_line_is_the_scripts_last (scripts.tests.test_mutation_bound.Bound.test_the_bounds_line_is_the_scripts_last) ... ok
+test_the_processes_watched_are_those_the_root_started_and_theirs (scripts.tests.test_mutation_bound.Bound.test_the_processes_watched_are_those_the_root_started_and_theirs) ... ok
+test_the_structures_read_on_macos_are_the_sdks (scripts.tests.test_mutation_bound.Bound.test_the_structures_read_on_macos_are_the_sdks) ... ok
+test_what_a_process_holds_counts_what_it_wrote (scripts.tests.test_mutation_bound.Bound.test_what_a_process_holds_counts_what_it_wrote) ... ok
+test_imported_it_bounds_every_process_the_script_starts (scripts.tests.test_mutation_baseline.Bounded.test_imported_it_bounds_every_process_the_script_starts) ... ok
+test_every_red_baseline_says_what_failed (scripts.tests.test_mutation_baseline.EveryScript.test_every_red_baseline_says_what_failed) ... ok
+test_every_script_keeps_what_its_commands_say_from_its_start (scripts.tests.test_mutation_baseline.EveryScript.test_every_script_keeps_what_its_commands_say_from_its_start) ... ok
+test_a_browser_suites_failure_read_through_its_escapes (scripts.tests.test_mutation_baseline.Failures.test_a_browser_suites_failure_read_through_its_escapes) ... ok
+test_a_build_that_failed (scripts.tests.test_mutation_baseline.Failures.test_a_build_that_failed) ... ok
+test_a_failed_commands_output_with_no_result_is_shown_as_it_ended (scripts.tests.test_mutation_baseline.Failures.test_a_failed_commands_output_with_no_result_is_shown_as_it_ended) ... ok
+test_a_failing_test_and_its_panic (scripts.tests.test_mutation_baseline.Failures.test_a_failing_test_and_its_panic) ... ok
+test_a_command_not_captured_keeps_how_it_ended (scripts.tests.test_mutation_baseline.Heard.test_a_command_not_captured_keeps_how_it_ended) ... ok
+test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then (scripts.tests.test_mutation_baseline.Heard.test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then) ... ok
+test_commands_that_ended_well_say_what_each_counted (scripts.tests.test_mutation_baseline.Heard.test_commands_that_ended_well_say_what_each_counted) ... ok
+test_explain_names_what_failed_as_it_failed (scripts.tests.test_mutation_baseline.Heard.test_explain_names_what_failed_as_it_failed) ... ok
+test_explain_runs_nothing_again (scripts.tests.test_mutation_baseline.Heard.test_explain_runs_nothing_again) ... ok
+test_only_the_last_commands_are_kept (scripts.tests.test_mutation_baseline.Heard.test_only_the_last_commands_are_kept) ... ok
+test_what_a_command_said_is_kept_with_how_it_ended (scripts.tests.test_mutation_baseline.Heard.test_what_a_command_said_is_kept_with_how_it_ended) ... ok
+Ran 29 tests in 6.696s
+OK
+
+== mutation controls (scripts/mutation_bound_mutations.py)
+
+baseline: 58 passed, 0 failed
+a process past the bound is said stopped and runs on: KILLED (3 of 58 tests fail)
+only the processes the script started itself are watched: KILLED (3 of 58 tests fail)
+a process stopped is said again at each look: KILLED (1 of 58 tests fail)
+a process at the bound is stopped: KILLED (1 of 58 tests fail)
+the script itself is watched: KILLED (2 of 58 tests fail)
+every process is watched: KILLED (2 of 58 tests fail)
+a process is stopped on the first reading alone: KILLED (1 of 58 tests fail)
+a number used again is never watched again: KILLED (1 of 58 tests fail)
+the bound is the machine's memory: KILLED (1 of 58 tests fail)
+a watch that cannot read the processes stops without a word: KILLED (1 of 58 tests fail)
+the macOS footprint is read where the resident size is: KILLED (1 of 58 tests fail)
+a stop is not named after the verdict it may have decided: KILLED (2 of 58 tests fail)
+a run the bound did not touch says nothing: KILLED (2 of 58 tests fail)
+an indented note is read as a verdict: KILLED (1 of 58 tests fail)
+the run's summary leaves out what the bound stopped: KILLED (1 of 58 tests fail)
+a mutation script starts no bound: KILLED (2 of 58 tests fail)
+16 of 16 mutants killed
+memory bound: no process was stopped

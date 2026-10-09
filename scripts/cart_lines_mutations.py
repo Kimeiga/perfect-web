@@ -232,8 +232,9 @@ MUTANTS = [
         "a field is read by its WIT name",
         "host",
         HOST,
-        "                    let written = field.name.replace('-', \"_\");\n",
-        "                    let written = field.name.to_string();\n",
+        # Its next line too, since ADR-0291 writes the same in `project`.
+        "                    let written = field.name.replace('-', \"_\");\n                    let value = o\n",
+        "                    let written = field.name.to_string();\n                    let value = o\n",
     ),
     (
         "a missing field is passed as nothing",

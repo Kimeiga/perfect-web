@@ -91,12 +91,19 @@ MUTANTS = [
         "a field the answer lacks is filled with nothing",
         "engine",
         ENGINE,
-        "                    let v = given.remove(field.name).ok_or_else(|| {\n"
-        "                        format!(\"the host's record has no field `{}`\", field.name)\n"
-        "                    })?;\n",
-        "                    let v = given\n"
-        "                        .remove(field.name)\n"
-        "                        .unwrap_or(Val::String(String::new()));\n",
+        # Re-anchored by ADR-0291: a field read by either of its names.
+        "                        .or_else(|| given.remove(&written))\n"
+        "                        .ok_or_else(|| match written == field.name {\n",
+        "                        .or_else(|| given.remove(&written))\n"
+        "                        .or(Some(Val::String(String::new())))\n"
+        "                        .ok_or_else(|| match written == field.name {\n",
+    ),
+    (
+        "a field is read by its WIT name alone",
+        "engine",
+        ENGINE,
+        "                        .or_else(|| given.remove(&written))\n",
+        "                        .or_else(|| given.remove(field.name))\n",
     ),
     (
         "a list's rows are passed as they are",
