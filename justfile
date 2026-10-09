@@ -18,6 +18,7 @@ import 'just/identity.just'
 import 'just/uploads.just'
 import 'just/notifications.just'
 import 'just/messages.just'
+import 'just/kiokun.just'
 
 default:
     @just --list
