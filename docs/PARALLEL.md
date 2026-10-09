@@ -767,3 +767,48 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - **The store's hosts on development accounts** at
     `STORE_ACCOUNTS_PORTS`, as allocated; the guest model stays the store's
     default everywhere else.
+- **2026-10-09, W8's finding in `boundary.rs`, answered.** `TypeFacts`'s
+  type-level scope ignored `private` (a type only `private` queries produce
+  carried none, so a view's parameter of it could be captured into a public
+  manifest, R-030's case at the user level), and where scoped producers
+  disagreed the last declaration read won, by unit order. Ruled: `private`
+  maps to `User`, as `manifest_scope` does; disagreeing producers' scopes
+  are joined, never dropped, since the type is all a view's parameter says
+  (R-030); a corpus fixture and a unit test for each, and their mutants. The
+  store's own precision is the program's to give: one record type made by a
+  session query and a user query cannot be proven to hold only the user's,
+  so either `lib/Resources.pw`'s unused session `Cart` leaves the store's
+  build (its fixtures on a module of their own) or the user's cart is a
+  type of its own.
+- **2026-10-09, W8's question: `private` is two things, answered (1).**
+  `private` is both the user's scope (resume, boundary, the checks) and "not
+  importable" (resolve, PW0023), so a user's query could not be imported. A
+  `user` visibility is added, importable as `session` is and user-scoped as
+  `private` is, a contextual keyword at a declaration's start; the store
+  says `user query Cart` and `user page`. `private` keeps both meanings for
+  now: whether it goes on implying the user's scope is the integrator's
+  ruling (NEXT), a change to every program using it.
+- **2026-10-09, W8: the superset telling corrected, telling by principal
+  (A).** With `Cart` keyed by the user, a cart's change reached every live
+  session reading `Cart`, and five browser tests failed on other sessions'
+  empty patch sets. **Corrected:** the integrator's Q1 answer accepted that
+  superset as "a cost of derivation, not of exposure"; it is an exposure, a
+  frame to user B each time user A changes A's own cart. W8 builds NEXT's
+  queued telling by principal: a private entry keyed by a user's handle
+  reaches only that user's sessions (the guest model's included), a
+  session's entry stays its session's, and a shared one reaches every
+  reader with its empty set as before (ADR-0219).
+- **2026-10-09, W6's 1d merged** as ADR-0299 (kiokun's examples and pitch
+  accent), from `7e3cb51`: verify 37961821792, both recipes green (64 of 64
+  mutants), only WebKit's "Load more" failing, fixed on master since. Its
+  evidence is taken over master's though master's run is the later commit:
+  that run (W5's) tested kiokun's older code, and this one 1d's. **W6's
+  finding: `e14-kiokun-word` took 4 h 01 m on CI**, 220 s a mutant, each of
+  its tests compiling the program into its own `TempDir`. Ruled: the
+  build's files, as bytes, are kept in memory once per test process, keyed
+  by a hash of the sources compiled (after a test's `change`), and written
+  into each test's own `TempDir` as now. Not the refused static `TempDir`:
+  nothing on disk outlives its test (ADR-0158), and a mutant's program is
+  compiled once per distinct source instead of once per test, which also
+  cuts how many compile at once (the 4 GiB bound). A mutant that still
+  takes long is given the tests that can see its rule.

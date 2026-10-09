@@ -1,0 +1,63 @@
+{
+ "kiokun_commit": "abf71a89af1111f4039578cd1fde58e06f14c4bf",
+ "node": "v22.21.1",
+ "oracle": {
+  "answered": 11,
+  "answers": {
+   "上": [
+    "飛行機は山の上を飛んだ。 / The plane flew over the mountain.",
+    "本棚の上に手が届きますか。 / Can you reach to the top of the bookshelf?",
+    "机の上に本があります。 / There is a book on the desk.",
+    "彼のスキーの腕は私よりはるかに上だ。 / He is far above me in skiing.",
+    "彼は私の兄よりも年が上に見えます。 / He looks older than my brother.",
+    "彼は仕事の上では私の先輩だ。 / He has more experience on the job than I.",
+    "寒かったうえに、風も強かった。 / It was cold, and, in addition, it was windy.",
+    "彼らは合意の上で敏速な行動をとった。 / They acted immediately by agreement.",
+    "彼は経済上の理由で計画を断念した。 / He gave up the plan for economic reasons.",
+    "地図上の青い線は川に相当する。 / The blue lines on the map correspond to rivers."
+   ],
+   "人": [
+    "この人は画家だ！ / This fellow is an artist!",
+    "人は意識のある生き物だ。 / Man is a conscious being.",
+    "人がなんと言おうと僕は君の味方だ。 / I'll stand by you no matter what others may say.",
+    "確かに彼はハンサムでないが、人がよい。 / He is not handsome, to be sure, but he is good-natured.",
+    "２００人の人が昨年コレラで死んだ。 / Two hundred people died of cholera last year."
+   ],
+   "半": [
+    "半時間したら彼はここに来るでしょう。 / He will be here in half an hour."
+   ],
+   "博": [],
+   "多": [],
+   "市": [
+    "市は月曜ごとに立つ。 / The market is held every Monday.",
+    "ワシントン市の友人宅に泊まります。 / I'm staying at my friend's house in Washington City."
+   ],
+   "形": [
+    "物質は温度によって形を変える。 / Matter changes its form according to temperature.",
+    "給料をかたに私に５００ドルが、前払いされた。 / I received a five hundred dollar advance on my pay.",
+    "君なりのやり方で仕事しなさい。 / Do your work in your own way.",
+    "進行形の文では、動詞のing形、つまり現在分詞となります。 / In a progressive tense sentence it becomes the -ing form verb, that is the present participle."
+   ],
+   "空": [
+    "警棒で空をなぐりつけ、よろめいて体勢をたてなおしたガードマンは、自分に向かって突進してくる金網づくりのクズカゴを見た。 / The guard's truncheon hit air. Off balance, he regained his posture to see a metal-mesh rubbish bin flying towards him.",
+    "ワシが空を飛んでいる。 / An eagle is flying in the sky.",
+    "ほとんど空なのでガソリンを入れなくてはなりません。 / I need to put some gas in the car, as it's almost empty."
+   ],
+   "色": [
+    "その色は彼女の髪の毛とよく合った。 / The color went beautifully with her hair.",
+    "満足の色が彼の顔に浮かんだ。 / A look of contentment appeared on his face."
+   ],
+   "酒": [
+    "僕は酒も煙草もやらないんだ。 / I neither drink nor smoke."
+   ],
+   "青": [
+    "信号が青に変わったわよ。 / The traffic light turned green."
+   ]
+  },
+  "named": {},
+  "read": 28,
+  "stride": 1
+ },
+ "pleris_commit": "f7087d42818df15aa1026bf25d519fa3afdc2d12",
+ "produced_by": "just e14-kiokun-examples"
+}

@@ -2458,3 +2458,13 @@ the store's data behind the seam, in memory and on PostgreSQL (track
   both. Found: an order dropped its lines, `OrderChanged` was never consumed
   in memory, a menu change's event was committed nowhere, `/bench/stock`
   set a stock no menu knew, and store 48's items were answered not found.
+[ADR-0299](DECISIONS/ADR-0299-kiokun-examples-and-pitch-accent.md):
+kiokun's examples and pitch accent (track `kiokun`, W6).
+- A sense's examples as kiokun.com's `SenseExampleList` shows them, the
+  first shown and the rest behind a disclosure; a word's pitch accent from
+  kiokun.com's own pitch files, its morae high and low and its pattern
+  named, each rule named for the function it is read from. The Japanese
+  examples are held to kiokun.com's own code over every 256th entry (an
+  oracle run locally, its CI fixture committed). Found: kiokun.com hashes
+  its entries' files over code points and its pitch files over UTF-16
+  units, which differ past U+FFFF.
