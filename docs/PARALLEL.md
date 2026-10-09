@@ -307,3 +307,21 @@ Each a decision for a track, with its date; a track's ADR records it too.
   became ADR-0278, under which its recipe ran in a shard of its own. Its
   verification was red only on WebKit's "Load more", NEXT's open item.
   Blocking is the integrator's next of its leftovers.
+- **2026-10-08, the DoorDash customer app's tracks (the owner's target,
+  relayed 2026-10-08).** One worker at a time beside the integrator, each
+  launched here when the slot frees, with its own rulings then; the order
+  and why are NEXT's:
+  - **W5, the store's data on PostgreSQL**, after W4's merge: the store
+    behind the DataLayer seam as the feed is (ADR-0246), with its
+    guarantees stated as ADR-0207 states a source's. Disjoint from the
+    integrator's soft navigation, which is the runtime's; the integrator's
+    accounts in the store wait for its merge, since they change its
+    tables.
+  - **W6, search and filters**, after W5: run in the database or a
+    declared search source; no search engine is built here.
+  - **W7, ratings and reviews**, after W6 and the integrator's accounts: a
+    review is a user's.
+  - **The integrator's**: the soft navigation, the store's accounts,
+    delivery addresses, store hours, and checkout with payment, the last
+    the integrator's because a payment capability is `secret<Payments>`
+    and any crate it needs waits for the owner's approval.

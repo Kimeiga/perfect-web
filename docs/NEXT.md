@@ -432,8 +432,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
              equivalent since ADR-0059 and retired (STATUS, 2026-10-07);
              and, open, **`feed.spec.mjs`'s "Load more shows the next page"
              in WebKit, on CI again** (run 37826467131 at `b393cee`, job
-             113480498704: its rows stayed at twenty). ADR-0271 left 2 of 160
-             failing under loads past CI's; this one was on CI's own.
+             113480498704: its rows stayed at twenty, and again in run
+             37867532722's job 113617759049). ADR-0271 left 2 of 160 failing
+             under loads past CI's; this one was on CI's own; and, open,
+             **a resume manifest's document and scope are constants**
+             (found writing the capability matrix, 2026-10-08): every
+             document's manifest says `"document": "cart-doc"` and `"scope":
+             "public"` (`resume_manifest` in the server's `main.rs`), and the
+             browser's decision holds them to the same constants
+             (`pw-resume-wasm`), so ADR-0132's checks of a document's schema
+             and its privacy scope pass for any page, a private cart's
+             among them.
              Further grammar and clause defects go under 0047-a below,
              unless the feed, the next Twitter item or soundness needs one;
           2. ~~map keys (0057-a)~~ (ADR-0248, `just e14-map-keys`) and ~~`let
@@ -528,6 +537,180 @@ E14 comes before E11-E13. Its plan, controls and task list are
              second host on one database, a measured serialization failure
              between concurrent writers, idempotency committed with the
              writes, and the browser suite and the store on PostgreSQL;
+        - **then the DoorDash customer app** (the owner, relayed
+          2026-10-08): the store built out into DoorDash's customer side,
+          after W4's merge and ADR-0280, each gap its own ADR, findings
+          before features. The merchant, courier and support apps are out of
+          scope. The integrator's, in order:
+          1. **the parts two pages share kept in place**, ADR-0280's next:
+             a soft navigation, which item 3's test needs;
+          2. **accounts in the store**: ADR-0258's identity and ADR-0270's
+             principal wired in, so the cart and the orders are a user's,
+             not only a session's; after W5's merge, whose tables they
+             change;
+          3. **delivery addresses**: entered and saved, a delivery zone
+             checked, estimates and availability keyed by the address
+             chosen. Accepted by the owner's own Next.js bug: save an
+             address, go to a store, and its page shows the new address's
+             estimate, with no cache-busting parameter, no reload and no
+             header mounted again, in three engines;
+          4. **store hours**: open and closed by the platform's clock
+             effect, ordering refused while closed, and orders scheduled;
+          5. **checkout**: fees, taxes, a tip and promo codes, in money that
+             cannot round silently (`Money` is USD's alone, so no other
+             currency, conversion or locale's format, said where it
+             limits); payment through a deployment's payment capability
+             with a development provider, card data never reaching Pleris
+             (the provider's hosted fields), a payment idempotent and
+             charged at most once, under `secret<Payments>`; a Stripe
+             adapter in test mode only with the owner's approval of each
+             crate, and with test keys only.
+
+          The worker tracks, one at a time beside the integrator (the
+          owner's budget rule), each launched under docs/PARALLEL.md when
+          the slot frees:
+          - **W5, the store's data on PostgreSQL**, behind the DataLayer
+            seam as the feed's is (ADR-0246), its guarantees stated as
+            ADR-0207 states a source's. First, so that each later gap is
+            built and tested on both layers;
+          - **W6, search and filters**: stores and dishes, by name and
+            cuisine, run in the database or a declared search source, its
+            guarantees stated as ADR-0207 states a source's; no search engine
+            is built here;
+          - **W7, ratings and reviews** of orders and stores, after
+            accounts.
+
+          Not claimed: a live courier map (ADR-0075 refuses a mounted
+          resource); the merchant, courier and support apps; subscriptions
+          (DashPass); currencies other than USD; and courier dispatch,
+          routing and fraud, the backend's services, outside the app layer
+          (the owner's scope);
+        - **then the evidence that answers "is Pleris perfect?"** (the
+          owner, relayed 2026-10-08): the reference apps prove breadth, and
+          these the claim. In this order, ahead of the next app, so that
+          what the museum finds Pleris does not catch is fixed before more
+          breadth is built:
+          1. **the bug museum, extended and finished**: charter proof P0,
+             "the executable thesis" (MILESTONES), which exists in three
+             parts already: `examples/rejected/`'s 59 programs (R-001 on),
+             its exhibits; `research/failures/`, the failure census of 224
+             invariant-level failures in 24 families, with 76 external
+             sources (SOURCES.md, which "extends rather than replaces" the
+             museum) and statuses down to "missing"; and
+             `web-recompiled/proof-roadmap.md` §3's Milestone 0, the shape
+             planned (the familiar implementation, why it compiles, the
+             Pleris form, the refusal, a source and a runnable test). What
+             it lacks, in order:
+             - each `R-*` exhibit linked to its census leaf and to a
+               primary source where one exists (a postmortem, a CVE, a
+               public incident report, a framework's issue);
+             - the roadmap's missing half, "compiles in TypeScript/React but
+               fails here": a runnable Next.js or SvelteKit reproduction
+               showing the bug happen there;
+             - the census's "missing" and "partially covered" leaves made
+               exhibits that say "Pleris does not catch this yet", each a
+               gap here, or fixed;
+             - the new real-world entries, each with its primary source: a
+               page stale after a mutation because it is keyed by its URL
+               alone (the owner's own Next.js case, ADR-0280's); one user's
+               private data served from a shared cache; a double charge or
+               submission from a retried request that is not idempotent; a
+               dead button; a transaction or resource leaked on an early
+               return; a session credential exposed to the page; a
+               cross-site request forgery on an endpoint that changes state;
+               a request storm from a reactive identity change (charter
+               §9.5's own example); a race between a pending navigation and
+               a save; layout shift from images without dimensions; and an
+               inaccessible form or dialog;
+             - each with its recipe and its evidence; and the playground,
+               where a reader runs an exhibit, when it is judged worth
+               building;
+          2. **the head-to-head comparison**, extending E14's three-stack
+             store contract (ADR-0120) rather than starting again: the
+             DoorDash customer side, in Pleris, Next.js and SvelteKit.
+             - Fair: idiomatic in each framework, never a strawman, each
+               stack's standard libraries allowed.
+             - Measured by lines of code under a stated counting rule; the
+               defects one hidden suite finds; the museum's entries each
+               stack permits; bytes shipped; Core Web Vitals; and an
+               accessibility audit.
+             - Every number from a recorded command; each framework's
+               version pinned and verified against primary sources
+               (tools/versions.lock); any package it adds waits for the
+               owner's approval.
+             - Where Pleris loses, said as plainly as where it wins.
+
+             The feed's comparison follows the Google Docs-shaped app;
+        - **then the reference apps the capability matrix chooses** (the
+          owner's north star, relayed 2026-10-08: Pleris makes any complex
+          web app as perfectly as possible, and Twitter and DoorDash are
+          instruments for that, not the goal). `docs/vision/capabilities.md`
+          rows what complex web apps need, each built, partial, missing or
+          never Pleris's, with its ADR or its reason, and the next apps are
+          chosen to cover its missing rows, in the owner's order (relayed
+          2026-10-08):
+          1. **a Google Docs-shaped collaborative app**: rich-text
+             documents; several editors at once, with live cursors and
+             presence; comments on ranges; sharing and permissions (owner,
+             editor, commenter, viewer, and link sharing), which the
+             privacy checker holds; version history and restore; and
+             offline edits merged on reconnect. Its three rulings, each
+             researched when it is reached:
+             - how concurrent edits merge: an existing CRDT or OT reused
+               (Yjs or yrs, Automerge, or OT) behind charter §9.1's kind 4,
+               `replicated` with an explicit conflict policy, which is
+               parsed only today; a universal CRDT system is one charter §2
+               says not to build;
+             - the editor surface: whether this is where mounted resources
+               and foreign components are built, with their capability and
+               privacy boundary (ADR-0075 refuses them today), or whether
+               Pleris renders the document itself;
+             - how presence and cursors ride the live transport, at a
+               frequency far past anything it carries now.
+
+             Any npm or crates.io download it needs (Yjs, yrs, Automerge,
+             ProseMirror, ...) waits for the owner's approval, asked when
+             it is reached;
+          2. **end-to-end-encrypted direct messages**, ADR-0279's upgraded
+             (the owner, relayed 2026-10-08), after the Docs app because both
+             need the same foundation, data and computation that live in the
+             browser:
+             - the guarantee that makes it Pleris's: a placement label
+               (device-only, charter §9.3's "browser/device-only → browser
+               execution", under §7.8's privacy) by which the compiler proves
+               a message's plaintext and the private keys never reach the
+               server: not in a command's argument, a query, a log, a cache
+               or an event; only ciphertext crosses;
+             - its prerequisites, each likely its own ADR: computation and
+               rendering placed in the browser, which decrypts and renders
+               what the server cannot (E10-T2's browser Wasm, the renderer's
+               browser blocks); device-local storage under an explicit
+               policy, the key store and history in IndexedDB with
+               WebCrypto keys made non-extractable where they can be
+               (charter §9.1's kind 4, shared with the Docs app); keys per
+               device, for several devices; and the features that change
+               shape, each said so: a push or notification preview carries
+               no content, search runs on the device, and the server cannot
+               moderate;
+             - the protocol reused, never invented: MLS (RFC 9420) through
+               OpenMLS, MIT and built for wasm by its own CI, though not
+               tested there (read 2026-10-08); libsignal is AGPL-3.0, which
+               `deny.toml` admits only by an ADR, and which this MIT or
+               Apache-2.0 repository does not take. Any crate or npm
+               download waits for the owner's approval;
+             - not claimed, and said plainly: the web's code delivery. The
+               server that serves the encrypting code could serve another;
+               reproducible, content-addressed builds anyone can check,
+               Subresource Integrity and a published manifest in the manner
+               of Code Verify are mitigations to weigh, not a fix;
+             - tested and mutated: a command sent a plaintext is refused at
+               build; the server's stored rows and its frames never hold a
+               plaintext; and a third user, and the server's operator, see
+               ciphertext alone;
+          3. **a multi-tenant SaaS admin** (item 22's): organizations and
+             roles, data tables, charts, i18n, background jobs and email,
+             webhooks, and an audit log;
+          4. **the app on three kinds of database** (item 22's third);
         - then what ruling 0073-a still refuses (several values, a page's
           parameter, the browser's values inside a block, instances), and
           everything below;

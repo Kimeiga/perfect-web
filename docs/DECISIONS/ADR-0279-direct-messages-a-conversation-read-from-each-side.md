@@ -1,6 +1,7 @@
 # ADR-0279: direct messages, a conversation read from each side
 
-Status: proposed by track `messages` (W4, `track/messages`), under the
+Status: accepted at its merge, 2026-10-08, under the owner's delegation of
+2026-10-02; proposed by track `messages` (W4, `track/messages`), under the
 integrator's rulings of 2026-10-08 (docs/PARALLEL.md, "direct messages
 (W4)"). Date: 2026-10-08. Milestone: E14, the owner's Twitter list.
 
