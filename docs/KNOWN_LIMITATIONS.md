@@ -606,14 +606,28 @@ awaited in order. What remains:
   (ADR-0287): `post_paint` and `frame` run in the browser too, but only a
   handler's work is held where it runs. No program places a page with frame
   phases anywhere but the browser.
-- **kiokun's word page is its words, its labels, its character header and
-  its written forms** (ADR-0286, ADR-0288, ADR-0289): examples, pitch, the
-  mnemonic's text and components, contains and appears in (waiting on a
-  list's render time), the canonical redirect (`KiokunError.Moved` is
-  declared and not returned until a page can answer it) and the SEO head are
-  still to come; the route is `/word/{word}` until `/_pw/` lands; the tests
+- **kiokun's word page is its words, its labels, its character header,
+  its written forms and its head's title and description** (ADR-0286,
+  ADR-0288, ADR-0289, ADR-0293): examples, pitch, the mnemonic's text and
+  components, contains and appears in (a list renders in its length since
+  ADR-0294; re-timed when W6 records the sample again), and the canonical
+  redirect (`KiokunError.Moved` is declared, and a page can answer it since
+  ADR-0295; kiokun's query does not return it yet) are still to come; the head has no canonical link, `og:url`
+  or JSON-LD until the integrator's canonical and std `Json` land, and no
+  preview image (`og:image`, `twitter:card`) until the owner approves an
+  image renderer; its title and description match kiokun.com's own code on
+  5,513 sampled words, read raw, where a stub's or a merged form's page is
+  held by the server's tests alone; the route is `/word/{word}` until `/_pw/` lands; the tests
   run on the repository's sample, and no page was rendered beside
   kiokun.com's yet.
+- **A page is moved only to another address of itself** (ADR-0295): a
+  `redirect_on` case fills the page's own route, of one parameter; a move to
+  another page, to a route of several parameters, or one that adds to the
+  query (kiokun.com's deinflection adds `from`, `conj` and `alt`) is not
+  expressed. A redirect is the document's: a keyed read whose query answers
+  the case in the browser fails as any read does. The development server
+  keeps no move; a deployment's cache policy for a permanent one is not
+  ruled.
 - **A source's guarantees are held to the database the feed opens**
   (ADR-0207, ADR-0246): the host measures a PostgreSQL feed's isolation and
   whether it may write, and refuses to serve on a shortfall. The store's

@@ -510,7 +510,20 @@ E14 comes before E11-E13. Its plan, controls and task list are
              back, and the page's stream waited up to 1.6 s a pass; the fix,
              each change derived outside the lock and pushed only where the
              document still shows what it was derived against, is in CI on
-             `track/stream-records` (its first WebKit job passed);
+             `track/stream-records` (its first WebKit job passed, and its
+             second; every other branch's WebKit job fails "Load more" now);
+             open, next, **`feed.spec.mjs`'s "a follow reaches another reader"
+             fails in CI's three-engine runs of the feed**: five mutation
+             baselines red in run 37918808029 (`track/arrival-clock`, in
+             Chromium and Firefox), three in run 37893301747
+             (`track/stream-records`, with "a reply reaches every reader"),
+             and none in the browser jobs; the second reader's count never
+             moved in five seconds, and its streams wrote nothing for four.
+             Not the server's new telling (arrival-clock has the old one),
+             and not the earlier test's unanswered unfollow (arrival-clock
+             awaits it). Next: a failing feed test prints its pages' and the
+             server's records, a red baseline shows them, and the recipe runs
+             again alone until it is caught;
              ~~**`e14-graphs-on-the-wire` took CI's runner down**~~
              (ADR-0292) every time it ran there (the nightly of 2026-10-08,
              navigate's verify twice): the heartbeat (run 37902799186) named

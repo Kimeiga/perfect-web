@@ -2403,3 +2403,22 @@ kiokun's page head, held to kiokun.com's own code (track `kiokun`, W6).
   oracle: 5,513 sampled words, every title and description the same; CI
   holds a fixture of its answers. A sample of the whole dictionary, served
   and timed, found the renderer quadratic in a list's length.
+[ADR-0294](DECISIONS/ADR-0294-a-list-renders-in-its-length.md):
+a list renders in its length (W6's finding on kiokun's sample).
+- An item's scope shares the page's values by pointer: `Env` holds each
+  binding's value, its fragments, its settled streams and its capabilities
+  by `Arc`, and entering a scope copies the map of pointers and adds the
+  item's own. Each item had copied the page's whole value, the list among
+  it, so `n` items over a page of size `m` rendered in `n × m`: kiokun's
+  128 names took 215 ms, and 2,000 names took 7.1 s where they now take
+  18 ms on CI.
+[ADR-0295](DECISIONS/ADR-0295-a-page-at-another-address-of-the-page-is-moved-there.md):
+a page at another address of the page is moved there (for track `kiokun`'s
+`KiokunError.Moved`).
+- `redirect_on Type.Case permanent|temporary` on a page (PW0350): a case of
+  one value, of the type of the one parameter the page's route carries, that
+  a query the page reads can answer. The host answers it 308 or 307 to the
+  page's own route with that value, encoded as a link's hole is, the query
+  kept, no origin named, kept by no cache; a move to itself or to a value no
+  segment carries is the program's fault (500), and a case the page does not
+  name a failure (503).
