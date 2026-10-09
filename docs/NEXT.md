@@ -556,7 +556,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
              header mounted again, in three engines;
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled;
-          5. **checkout**: fees, taxes, a tip and promo codes, in money that
+          5. **idempotency committed with the writes** (PW0348, ADR-0246's
+             Not claimed), before a payment depends on it: an interaction's
+             answer kept in the transaction that commits its command, in
+             both layers;
+          6. **checkout**: fees, taxes, a tip and promo codes, in money that
              cannot round silently (`Money` is USD's alone, so no other
              currency, conversion or locale's format, said where it
              limits); payment through a deployment's payment capability
@@ -572,7 +576,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
           - **W5, the store's data on PostgreSQL**, behind the DataLayer
             seam as the feed's is (ADR-0246), its guarantees stated as
             ADR-0207 states a source's. First, so that each later gap is
-            built and tested on both layers;
+            built and tested on both layers. Its rulings are PARALLEL.md's
+            (2026-10-08), the first a finding: ADR-0193 rules that an order
+            is the cart's lines, and the store keeps its status alone;
           - **W6, search and filters**: stores and dishes, by name and
             cuisine, run in the database or a declared search source, its
             guarantees stated as ADR-0207 states a source's; no search engine

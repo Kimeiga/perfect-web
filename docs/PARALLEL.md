@@ -325,3 +325,63 @@ Each a decision for a track, with its date; a track's ADR records it too.
     delivery addresses, store hours, and checkout with payment, the last
     the integrator's because a payment capability is `secret<Payments>`
     and any crate it needs waits for the owner's approval.
+- **2026-10-08, the store on PostgreSQL (W5's plan).** Track `store-pg`,
+  branch `track/store-pg`, the store's data behind the DataLayer seam on
+  PostgreSQL as the feed's is (ADR-0246), so that each DoorDash gap after it
+  is built and tested on both layers. Its own ADR, `ADR-XXXX`, numbered at
+  the merge. The rulings, from a map of the store's data (2026-10-08):
+  - **Found, first: an order keeps its lines.** ADR-0193 rules that an
+    order is the cart's lines and a status, but `orders#place` keeps the
+    status alone, and the lines go with the emptied cart. Fix it in memory
+    first, with its test, then carry it to PostgreSQL.
+  - **All of the store's state through the seam**, in both layers. Today
+    much of it bypasses the seam:
+    - the menus: store 47's is written by `broadcast_menu` and a test
+      route, and store 48's and the catalogue are code;
+    - the stock, the recommender and the estimates, the notice, the
+      preparation time and the categories, each written by a `/bench`
+      route.
+
+    Each becomes a write the layer stages and commits, its events in the
+    same transaction. A route that changes data is a command's path, not a
+    direct write. The fault hooks stay test controls, which the layer
+    applies.
+  - **Delivery: a session's cart reaches its pages on PostgreSQL too.** The
+    host redraws a session's cart from the materializer's SQLite outbox
+    (`drain_held`). A layer whose commit keeps its own outbox writes nothing
+    there, and the cart would never be sent. W5 makes the events its commit
+    delivers reach the materializer as the feed's do, and tests a cart
+    change reaching an open page on PostgreSQL.
+  - **Its own schema, migrations and lock** (`migrations/store/`, its own
+    version table and advisory lock), never the feed's. Every command runs
+    serializable, and `provides()` measures it as the feed's does.
+  - **Its guarantees.** The store's `source StoreData`
+    (`examples/lib/StoreData.pw`) is held to the database it opens. Its
+    comment, "one SQLite database", is corrected. The grants no source
+    holds (`Notices`, `Kitchen`, `Categories`) are held by a source or
+    stated.
+  - **Tests on both layers.** A store test that reads the in-memory
+    layer's internals (`cart_value`'s `self.store.carts`,
+    `materializer.state("cart:..")`, `s.store.orders`, and the rest) reads
+    through the layer instead, so that it runs on both. The server's store
+    tests run on PostgreSQL, each in a schema of its own, as the feed's do.
+    Among them, on PostgreSQL:
+    - a refused commit commits neither its state nor its event;
+    - eight sessions adding five times each commit all forty;
+    - a retried interaction runs its command once.
+
+    Then parity in memory and on PostgreSQL, and the negative controls.
+    The browser suite stays in memory, as the feed's does.
+  - **Its recipe and mutation controls**: `e14-store-postgres`, in
+    `NEEDS_DATABASE`. The thirteen scripts whose anchors are in `store.rs`
+    are re-anchored and run whole. Its own controls include a commit
+    without its events, an order without its lines, the outbox not read
+    back, and the isolation not measured.
+  - **Not claimed**, inherited from ADR-0246: a second host; idempotency
+    committed with the writes (PW0348), queued before checkout as the
+    integrator's; a measured serialization failure; and the browser suite
+    on PostgreSQL.
+  - **Disjoint from the integrator's work**: the soft navigation is the
+    runtime's, and ADR-0280 changes the store's page and `store-ir.json`
+    only, where a rebase meets it. The integrator's accounts in the store
+    wait for this track's merge.
