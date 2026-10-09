@@ -279,6 +279,15 @@ class Fetch(unittest.TestCase):
         self.assertEqual(fetch.stamp("raw output\n", self.SHA, self.URL, "r"), "raw output\n")
 
 
+    def test_main_reaches_the_refusal_by_its_own_name(self) -> None:
+        # `main` keeps a list of refused files; a function of the same name
+        # was shadowed there, and `main` failed before it fetched anything.
+        import ast
+        tree = ast.parse((SCRIPTS / "evidence_fetch.py").read_text())
+        main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+        assigned = {t.id for n in ast.walk(main) if isinstance(n, ast.Assign) for t in n.targets if isinstance(t, ast.Name)}
+        self.assertNotIn("refusal", assigned)
+
     def test_a_run_that_failed_is_fetched_only_where_its_failures_are_known(self) -> None:
         # ADR-0281: a merge names each failure open in NEXT, and its
         # evidence is fetched beside it.
@@ -288,16 +297,16 @@ class Fetch(unittest.TestCase):
             {"name": "browser webkit", "conclusion": "failure"},
             {"name": "summary", "conclusion": "failure"},
         ]
-        self.assertIsNone(fetch.refused(run, jobs, ["browser webkit", "summary"]))
-        self.assertIn("summary", fetch.refused(run, jobs, ["browser webkit"]))
-        self.assertIn("browser webkit", fetch.refused(run, jobs, []))
+        self.assertIsNone(fetch.refusal(run, jobs, ["browser webkit", "summary"]))
+        self.assertIn("summary", fetch.refusal(run, jobs, ["browser webkit"]))
+        self.assertIn("browser webkit", fetch.refusal(run, jobs, []))
         # A recipe shard is never known: its evidence is what is copied.
         shard = jobs + [{"name": "recipes 3", "conclusion": "failure"}]
-        self.assertIn("recipes 3", fetch.refused(run, shard, ["browser webkit", "summary", "recipes 3"]))
+        self.assertIn("recipes 3", fetch.refusal(run, shard, ["browser webkit", "summary", "recipes 3"]))
         # A run that has not finished, or one that failed nowhere, is not.
-        self.assertIn("in_progress", fetch.refused({"status": "in_progress", "conclusion": None}, jobs, []))
-        self.assertIsNone(fetch.refused({"status": "completed", "conclusion": "success"}, jobs, []))
-        self.assertIn("no job", fetch.refused(run, [{"name": "recipes 0", "conclusion": "success"}], ["x"]))
+        self.assertIn("in_progress", fetch.refusal({"status": "in_progress", "conclusion": None}, jobs, []))
+        self.assertIsNone(fetch.refusal({"status": "completed", "conclusion": "success"}, jobs, []))
+        self.assertIn("no job", fetch.refusal(run, [{"name": "recipes 0", "conclusion": "success"}], ["x"]))
 
 class Summary(unittest.TestCase):
     def run_summary(self, shards: list[list[dict]], files: dict[str, str], planned: int) -> int:

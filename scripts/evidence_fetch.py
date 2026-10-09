@@ -54,7 +54,7 @@ def stamp(text: str, sha: str, url: str, runner: str) -> str:
     return text
 
 
-def refused(run: dict, jobs: list[dict], known: list[str]) -> str | None:
+def refusal(run: dict, jobs: list[dict], known: list[str]) -> str | None:
     """Why a run's evidence is not fetched, or `None`. A run that failed is
     fetched only where every job that failed is named as known, and none is
     a recipe shard, whose evidence the fetch copies."""
@@ -79,7 +79,7 @@ def main() -> int:
     parser.add_argument("--known", action="append", default=[], metavar="JOB")
     args = parser.parse_args()
     run = json.loads(gh("run", "view", args.run, "--json", "headSha,url,status,conclusion,workflowName,jobs"))
-    why = refused(run, run.get("jobs", []), args.known)
+    why = refusal(run, run.get("jobs", []), args.known)
     if why is not None:
         print(f"evidence-fetch: run {args.run} {why}", file=sys.stderr)
         return 1
