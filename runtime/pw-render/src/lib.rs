@@ -45,6 +45,7 @@ pub use ir::{
 };
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// Why a render produced no bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -501,9 +502,15 @@ pub enum Settled {
 /// The values a render has, by path.
 #[derive(Debug, Clone, Default)]
 pub struct Env {
-    values: BTreeMap<String, Value>,
+    /// **Each binding's value, shared** (ADR-XXXX): an item's scope is the
+    /// page's bindings and the item's, and entering it copies the map of
+    /// bindings, not their values. It copied them until ADR-XXXX, the page's
+    /// whole query value with them, once for each item: a list rendered in
+    /// its length times the page's size, and kiokun's さえこ, 128 names, took
+    /// 218 ms where its values were read in 0.5.
+    values: BTreeMap<String, Arc<Value>>,
     /// Capabilities the caller presented, for `RawHtml` parts.
-    granted: Vec<String>,
+    granted: Arc<Vec<String>>,
     /// Who shares an identity with whom.
     ///
     /// A TYPE, not a free-form salt. It used to be `document: String`, and a
@@ -526,11 +533,11 @@ pub struct Env {
     /// part, which is what makes "shared" mean shared — two readers get the
     /// same bytes because they are the same bytes, not because two renders
     /// happened to agree.
-    materialized: BTreeMap<PartId, String>,
+    materialized: Arc<BTreeMap<PartId, String>>,
     /// **What each stream's query settled to** (ADR-0148). A stream with no
     /// entry is pending: a streamed one shows its placeholder, and one the
     /// page waits for is refused, since nothing gave its answer.
-    settled: BTreeMap<PartId, Settled>,
+    settled: Arc<BTreeMap<PartId, Settled>>,
     /// How many elements enclose the root of the template being rendered,
     /// through the instances around it (ADR-0203).
     elements: u32,
@@ -542,13 +549,13 @@ impl Env {
     }
 
     pub fn set(mut self, path: &str, value: Value) -> Env {
-        self.values.insert(path.to_string(), value);
+        self.values.insert(path.to_string(), Arc::new(value));
         self
     }
 
     /// Present a capability. Without it, a `RawHtml` part is refused.
     pub fn grant(mut self, capability: &str) -> Env {
-        self.granted.push(capability.to_string());
+        Arc::make_mut(&mut self.granted).push(capability.to_string());
         self
     }
 
@@ -565,13 +572,13 @@ impl Env {
     /// omitted them would be unaddressable, and a fragment that had different
     /// ones would be addressable at a name nothing else uses.
     pub fn materialized(mut self, part: PartId, html: &str) -> Env {
-        self.materialized.insert(part, html.to_string());
+        Arc::make_mut(&mut self.materialized).insert(part, html.to_string());
         self
     }
 
     /// Give a stream what its query settled to (ADR-0148).
     pub fn settle(mut self, part: PartId, outcome: Settled) -> Env {
-        self.settled.insert(part, outcome);
+        Arc::make_mut(&mut self.settled).insert(part, outcome);
         self
     }
 
@@ -586,11 +593,11 @@ impl Env {
     /// (ADR-0170). No field's name holds a `.`, so the two cannot meet.
     fn get(&self, path: &str) -> Option<&Value> {
         if let Some(v) = self.values.get(path) {
-            return Some(v);
+            return Some(&**v);
         }
         let segments: Vec<&str> = path.split('.').collect();
         for cut in (1..segments.len()).rev() {
-            let Some(mut value) = self.values.get(&segments[..cut].join(".")) else {
+            let Some(mut value) = self.values.get(&segments[..cut].join(".")).map(|v| &**v) else {
                 continue;
             };
             let mut rest = &segments[cut..];
@@ -611,7 +618,7 @@ impl Env {
 
     fn with(&self, name: &str, value: Value) -> Env {
         let mut next = self.clone();
-        next.values.insert(name.to_string(), value);
+        next.values.insert(name.to_string(), Arc::new(value));
         next
     }
 
@@ -634,8 +641,8 @@ impl Env {
             granted: self.granted.clone(),
             domain: self.domain.clone(),
             path,
-            materialized: BTreeMap::new(),
-            settled: BTreeMap::new(),
+            materialized: Arc::default(),
+            settled: Arc::default(),
             elements,
         }
     }
@@ -1424,7 +1431,7 @@ fn capture_json(v: &Value, name: &str) -> Result<serde_json::Value, Blocked> {
 fn value_at<'e>(env: &'e Env, path: &str) -> Option<&'e Value> {
     let segments: Vec<&str> = path.split('.').collect();
     for split in (1..=segments.len()).rev() {
-        let Some(mut v) = env.values.get(&segments[..split].join(".")) else {
+        let Some(mut v) = env.values.get(&segments[..split].join(".")).map(|v| &**v) else {
             continue;
         };
         for field in &segments[split..] {
@@ -2105,5 +2112,30 @@ fn escaped(value: &str, context: Context) -> String {
         // As an attribute's, which a patch to it carries (ADR-0221): the
         // document writes it as text, in `emit`.
         Context::Content => escape::attribute(value),
+    }
+}
+
+#[cfg(test)]
+mod scopes {
+    use super::*;
+
+    /// **An item's scope shares the page's values** (ADR-XXXX): entering it
+    /// copies the map of bindings, and every value but the item's is the one
+    /// the page holds, by pointer, as are the page's fragments and streams.
+    #[test]
+    fn an_items_scope_shares_the_pages_values() {
+        let names = Value::List((0..128).map(|i| Value::Text(format!("n{i}"))).collect());
+        let page = Env::new()
+            .set("names", names)
+            .materialized(PartId(9), "<p>shared</p>")
+            .settle(PartId(8), Settled::Ready(Value::Int(1)));
+        let item = page.with("name", Value::Text("n0".into()));
+        assert!(Arc::ptr_eq(&page.values["names"], &item.values["names"]));
+        assert!(Arc::ptr_eq(&page.materialized, &item.materialized));
+        assert!(Arc::ptr_eq(&page.settled, &item.settled));
+        assert!(Arc::ptr_eq(&page.granted, &item.granted));
+        // The item's own value is its own, and the page does not see it.
+        assert_eq!(item.get("name"), Some(&Value::Text("n0".into())));
+        assert_eq!(page.get("name"), None);
     }
 }
