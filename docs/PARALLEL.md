@@ -579,3 +579,42 @@ Each a decision for a track, with its date; a track's ADR records it too.
     word page), from `d19850f`, after the fix (a 503 before, a 404 now) and
     green runs (verify 37886442522, every engine). Next, 1b: Japanese
     labels through `KIOKUN_APP` with Q4's lookup, and the character header.
+- **2026-10-09, W7's plan: TodoMVC, launched when W5's slot frees** (the
+  owner's, relayed 2026-10-08: "something people are familiar with"; NEXT,
+  "W7, TodoMVC"). Track `todomvc`, branch `track/todomvc`, from `master`.
+  Its ADRs are `ADR-XXXX`, numbered at the merge; its recipes live in
+  `just/todomvc.just`; its code block is **PW61** (`Owner::Todomvc =>
+  "PW61"`); its Playwright runs use PORT=7541 (7541 to 7740, where nothing
+  listens here; ranges are 200 wide), its hosts at PORT+140..142
+  (`TODOMVC_PORTS`).
+  - **The reference is TodoMVC's own**: its spec (`app-spec.md`) and its
+    official behavioural tests (`tests/cypress/e2e/spec.cy.js`), run
+    unchanged. Cypress, `todomvc-app-css` and `todomvc-common` (npm, MIT)
+    are approved downloads (the owner, 2026-10-08), each one's source and
+    size stated when fetched; nothing else is.
+  - **A fourth program on the development server**, `examples/todomvc/
+    app.pw`, beside the store, the feed and kiokun, with a layer of its own
+    at a `TRACK SEAM (todomvc)` in `from_build_with`, chosen where the
+    program imports `todomvc:`. A session's todos, as the spec allows "the
+    framework's own persistence" in place of localStorage; the version on
+    a device's own storage waits for the Docs app's device-local storage
+    (charter §9.1's kind 4) and says so.
+  - **Every behaviour the spec states**, each with its test and its
+    mutation control: adding on Enter, trimmed, never empty; the counter's
+    "1 item left" and "2 items left"; toggling one and all; editing on a
+    double-click, the field focused, Enter and blur saving, Escape
+    discarding, an edit trimmed to nothing destroying the item; clear
+    completed, shown only where one is; the footer and the toggle-all
+    hidden with no items; and the three filters.
+  - **The filters' hash routes** (`#/`, `#/active`, `#/completed`) reach no
+    server, so a page reads its address's fragment. That is the language's
+    and the runtime's, the integrator's to rule when W7 asks, as the plan
+    says. The direction: a page binds a signal to its fragment, whose type
+    names the forms it takes; the runtime keeps it to `location.hash` at
+    start and on each `hashchange`; the server renders its declared
+    default. W7 builds the rest meanwhile.
+  - **What a gap needs of the language, the runtime or the host goes to
+    the integrator as a question**, as W5's and W6's did.
+  - **In order**: the app with its tests in three engines and its recipe;
+    the official Cypress suite, unchanged, as its acceptance; then the
+    showcase, W7's second milestone (NEXT).
