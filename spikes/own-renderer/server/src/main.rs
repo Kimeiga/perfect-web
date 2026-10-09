@@ -2031,6 +2031,21 @@ impl Server {
         {
             return Err(Unread::NotFound(format!("{resource} answered {case}")));
         }
+        // A declared error the page says means its address is another of
+        // the page's (ADR-0295): what the case carries fills the route.
+        if let Val::Result(Err(Some(e))) = &answer
+            && let Val::Variant(case, carried) = e.as_ref()
+            && binding["redirect"]["case"] == case.as_str()
+        {
+            let permanent = binding["redirect"]["permanent"] == true;
+            return Err(match carried.as_deref() {
+                Some(Val::String(to)) => Unread::Moved {
+                    to: to.clone(),
+                    permanent,
+                },
+                _ => Unread::Failed(format!("{resource} answered {case} with no address")),
+            });
+        }
         Ok(unwrapped(resource, answer)?)
     }
 
@@ -5391,6 +5406,9 @@ enum Unread {
     /// A binding's query answered the case the page's `not_found_on` names:
     /// answered 404.
     NotFound(String),
+    /// A binding's query answered the case the page's `redirect_on` names
+    /// (ADR-0295): answered 308, or 307, to the page's route at `to`.
+    Moved { to: String, permanent: bool },
     /// Any other failure (ADR-0147): answered 503.
     Failed(String),
 }
@@ -5400,6 +5418,7 @@ impl Unread {
     fn of(self, what: &str) -> Unread {
         match self {
             Unread::NotFound(why) => Unread::NotFound(format!("{what}: {why}")),
+            moved @ Unread::Moved { .. } => moved,
             Unread::Failed(why) => Unread::Failed(format!("{what}: {why}")),
         }
     }
@@ -5415,6 +5434,7 @@ impl std::fmt::Display for Unread {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Unread::NotFound(why) => write!(f, "not found: {why}"),
+            Unread::Moved { to, .. } => write!(f, "moved to `{to}`"),
             Unread::Failed(why) => f.write_str(why),
         }
     }
@@ -6839,7 +6859,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             match server.page_params(path, query) {
                 // One that binds a query as the store's is (ADR-0190).
                 Ok(params) if server.binds_a_query(path) => {
-                    serve_bound(server, &mut stream, &session, fresh, path, params)
+                    serve_bound(server, &mut stream, &session, fresh, path, params, query)
                 }
                 Ok(params) => serve_page(server, &mut stream, &session, fresh, path, params),
                 Err(why) => respond(
@@ -6924,6 +6944,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 fresh,
                 &page,
                 store_params(STORE_ID),
+                query,
             );
         }
         // A command this server does not host, including the address-resolving
@@ -6947,7 +6968,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .is_some_and(|(page, _)| server.binds_a_query(page)) =>
         {
             let (page, params) = routed.expect("matched");
-            serve_bound(server, &mut stream, &session, fresh, &page, params)
+            serve_bound(server, &mut stream, &session, fresh, &page, params, query)
         }
         ("GET", _) if routed.is_some() => {
             let (page, params) = routed.expect("matched");
@@ -7170,9 +7191,15 @@ fn serve_bound(
     fresh: bool,
     page: &str,
     params: Params,
+    query: &str,
 ) {
     let template = server.template_of(page);
     let unavailable = |stream: &mut TcpStream, why: Unread| match why {
+        // A page whose address is another of the page's, as the page
+        // declares it (ADR-0295), is moved there.
+        Unread::Moved { to, permanent } => moved(
+            server, stream, session, fresh, page, &params, query, &to, permanent,
+        ),
         // A page whose address names nothing, as the page declares it
         // (ADR-0163), is not found.
         Unread::NotFound(_) => respond(
@@ -7267,6 +7294,82 @@ fn serve_bound(
         );
         server.respond_streaming(stream, session, fresh, &html, template, &env, &mut settling);
     });
+}
+
+/// **A page moved** (ADR-0295): 308 where the move is permanent and 307
+/// where it is not, to the page's route with its one parameter `to`,
+/// encoded as a link's hole is, and the address's query kept (RFC 9110:
+/// a `Location` may be a path, resolved against the address asked for).
+/// Kept by no cache, as every answer to a session is: a heuristically
+/// cacheable 308 would outlive the data that decided it. A value no
+/// segment can carry, or the address asked for itself, is the program's
+/// fault, answered 500 and said.
+#[allow(clippy::too_many_arguments)]
+fn moved(
+    server: &Server,
+    stream: &mut TcpStream,
+    session: &str,
+    fresh: bool,
+    page: &str,
+    params: &Params,
+    query: &str,
+    to: &str,
+    permanent: bool,
+) {
+    let plan = server.plan_of(page);
+    let route = plan["route"].as_str().unwrap_or_default();
+    let holes: Vec<&str> = route
+        .split('/')
+        .filter_map(|s| s.strip_prefix('{').and_then(|s| s.strip_suffix('}')))
+        .collect();
+    let fault = |stream: &mut TcpStream, why: String| {
+        eprintln!("pw-dev-server: `{page}` cannot be moved: {why}");
+        respond(
+            stream,
+            500,
+            "text/plain; charset=utf-8",
+            session,
+            fresh,
+            format!("`{page}` cannot be moved: {why}").as_bytes(),
+        );
+    };
+    let [hole] = holes.as_slice() else {
+        return fault(stream, format!("its route `{route}` has no one parameter"));
+    };
+    if to.is_empty() || to == "." || to == ".." {
+        return fault(stream, format!("`{to}` is no segment of an address"));
+    }
+    if params.get(*hole).map(String::as_str) == Some(to) {
+        return fault(stream, format!("it moves `{to}` to itself"));
+    }
+    let mut location = route.replace(
+        &format!("{{{hole}}}"),
+        &pw_render::escape::url_component(to),
+    );
+    if !query.is_empty() {
+        location.push('?');
+        location.push_str(query);
+    }
+    let shown = pw_render::escape::text(&location);
+    let body = format!(
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
+         <title>Moved</title>\n</head>\n<body>\n<main>\n<h1>Moved</h1>\n\
+         <p>This page is at <a href=\"{}\">{shown}</a>.</p>\n</main>\n</body>\n</html>\n",
+        pw_render::escape::attribute(&location)
+    );
+    let cookie = if fresh {
+        identity::session_cookie(session)
+    } else {
+        String::new()
+    };
+    write_response(
+        stream,
+        if permanent { 308 } else { 307 },
+        "text/html; charset=utf-8",
+        &format!("{PRIVATE}{cookie}location: {location}\r\n"),
+        body.as_bytes(),
+    );
 }
 
 /// **A page that binds no query, at the parameters `params` give it**
@@ -7819,9 +7922,12 @@ fn respond_json(stream: &mut TcpStream, code: u16, session: &str, fresh: bool, b
 fn reason(code: u16) -> &'static str {
     match code {
         200 => "OK",
+        307 => "Temporary Redirect",
+        308 => "Permanent Redirect",
         404 => "Not Found",
         405 => "Method Not Allowed",
         413 => "Content Too Large",
+        500 => "Internal Server Error",
         503 => "Service Unavailable",
         _ => "",
     }
@@ -8209,10 +8315,15 @@ public query Store(",
             let cookie = session
                 .map(|id| format!("Cookie: pw-session={id}\r\n"))
                 .unwrap_or_default();
+            // Started before the request is written: the server starts
+            // nothing before it reads the request, so a part it sends after
+            // a delay is never measured sooner than the delay. Started after,
+            // a recommendation delayed 600 ms was measured at 599.75 ms on CI
+            // (run 37899457744), the server's clock ahead of this one.
+            let started = std::time::Instant::now();
             client
                 .write_all(format!("GET {path} HTTP/1.1\r\nHost: t\r\n{cookie}\r\n").as_bytes())
                 .expect("request");
-            let started = std::time::Instant::now();
             let mut chunks = Vec::new();
             let mut buf = [0u8; 65536];
             loop {
@@ -10792,6 +10903,9 @@ public query Store(",
 
     /// A materialization kept, and served (ADR-0277).
     mod materializations;
+
+    /// A page at another address of the page, moved there (ADR-0295).
+    mod redirects;
 
     // TRACK SEAM (messages): direct messages, in memory and on PostgreSQL
     // where a database is named.

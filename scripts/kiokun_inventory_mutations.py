@@ -72,8 +72,8 @@ MUTANTS = [
     (
         "the recipe is planned on a runner, which has no checkout",
         PLAN,
-        '    "e14-kiokun-inventory",\n}',
-        "}",
+        '    "e14-kiokun-inventory",\n',
+        "",
     ),
 ]
 

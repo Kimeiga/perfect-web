@@ -1528,6 +1528,33 @@ impl<'p> Emitter<'p> {
                 })?;
                 self.line(&format!("const {r} = {decoded};"));
             }
+            // **A handler goes to a page once its command commits**
+            // (ADR-0280): through its context, the page's route and each
+            // parameter's value as text, by name. The runtime fills the route
+            // and goes; nothing after it runs (PW5043).
+            Instr::Navigate { route, args, .. } => {
+                if !self.handler {
+                    return Err(format!(
+                        "a navigation to `{route}`, which only a handler's own body makes"
+                    ));
+                }
+                let mut given = Vec::new();
+                for (name, a) in args {
+                    let t = self.type_of(*a)?.clone();
+                    // As a command's argument is sent: an opaque value as
+                    // its representation, which is text here (PW0621).
+                    given.push(format!("{}: {}", json(name), self.wire(&val(*a), &t)?));
+                }
+                let given = match given.is_empty() {
+                    true => "{}".to_string(),
+                    false => format!("{{ {} }}", given.join(", ")),
+                };
+                self.line(&format!(
+                    "await context.navigate({}, {given});",
+                    json(route)
+                ));
+                self.line(&format!("const {r} = undefined;"));
+            }
             // A page's signal (ADR-0130), through the handler's context, as
             // JSON carries it.
             Instr::SignalGet { signal, ty, .. } => {

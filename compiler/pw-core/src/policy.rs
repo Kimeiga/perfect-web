@@ -319,6 +319,9 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "intrinsic" => Domain::Str,
         "route" => Domain::RoutePattern,
         "not_found_on" => Domain::CaseRef,
+        // ADR-0295: `redirect_on KiokunError.Moved permanent`, a case and how
+        // the move is answered, held by `routes::redirect_case`.
+        "redirect_on" => Domain::CaseRef,
         "impact" => Domain::ConditionedWord(&[
             "layout_read",
             "layout_write",
@@ -597,7 +600,7 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         // Where it runs.
         "placement" => (PLACED, "a declaration that holds code"),
         // Placed by their own rules.
-        "requires" | "not_found_on" => (EVERY, "a command"),
+        "requires" | "not_found_on" | "redirect_on" => (EVERY, "a command"),
         "rollback" => (
             &[
                 K::Query,
@@ -1071,6 +1074,7 @@ mod tests {
         "placement",
         "route",
         "not_found_on",
+        "redirect_on",
         "privacy",
         "capability",
         "host",

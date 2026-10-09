@@ -267,9 +267,13 @@ codes! {
         "a command's record of an interaction commits with its writes";
     SOURCE_MALFORMED = "PW0349" / source_malformed / 1, DeclarationRules,
         "a source holds what the program's effects name, and each is held by one";
+    // ADR-0295: a page whose address is another address of the page answers
+    // a redirect there, as kiokun.com's word page does.
+    REDIRECT_NAMES_A_CASE = "PW0350" / redirect_names_a_case / 1, DeclarationRules,
+        "a page's `redirect_on` names a case a query it reads can answer, which carries the one parameter of the page's route, and says whether the move is permanent";
     // ADR-XXXX: a refusal is told in the words of the predicate that refused.
     PREDICATE_DECLARED = "PW0351" / predicate_declared / 1, DeclarationRules,
-        "a command's `requires` names declared predicates, each given its parameters by type, and each predicate says what a reader is told when it refuses";
+        "a predicate a program declares says, in one string with no hole, what a reader is told when it refuses, is declared once, and is given its parameters by type wherever a `requires` names it";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
 
@@ -630,6 +634,12 @@ codes! {
     // `get` to `/sign-out`, which answers a `post`, or a `post` to a page.
     FORM_ANSWERED_BY_NOTHING = "PW5041" / form_answered_by_nothing / 1, Markup,
         "a form's `action` is a route that answers its `method`: a page's, the relying party's, or an upload's";
+    // ADR-0280: a handler goes to a page once its command commits. A link
+    // names a route by its text; `navigate` names the page.
+    NAVIGATE_NAMES_NO_PAGE = "PW5042" / navigate_names_no_page / 1, Markup,
+        "a `navigate` names a page by its declaration";
+    NAVIGATE_BEFORE_A_COMMIT = "PW5043" / navigate_before_a_commit / 1, Markup,
+        "a `navigate` is a handler's, last in the `Ok` arm of the command's answer nearest it: a page is left only once a command has committed";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

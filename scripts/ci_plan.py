@@ -71,6 +71,12 @@ LOCAL_ONLY = {
     # has. What needs the owner's local data is recorded here; what a
     # committed sample shows runs on CI.
     "e14-kiokun-inventory",
+    # The kiokun track's sample of the whole dictionary: the owner's data, and
+    # this machine's times.
+    "e14-kiokun-sample",
+    # And its page head against kiokun.com's own code, copied from the
+    # owner's checkout.
+    "e14-kiokun-seo",
 }
 
 # Recipes run against a database (ADR-0246). Each is a shard of its own,
@@ -327,6 +333,10 @@ def plan(
     the others are dealt into the rest, at least one where there are any.
     Theirs are numbered after the others'."""
     need = need or {}
+    # Nothing to run, no shard: a push that touches no recipe plans none
+    # (until 2026-10-09 this took the longest of no shards, and failed).
+    if not names:
+        return []
     on_database = [n for n in names if n in database]
     rest = [n for n in names if n not in database]
     # At most every shard but one for the rest, where there is any; one,

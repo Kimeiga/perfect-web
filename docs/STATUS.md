@@ -23,6 +23,70 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-09, navigate merged (ADR-0280, below), and two more recipes
+recorded for the first time.** **Corrected:** ADR-0248's `just
+e14-map-keys` and ADR-0272's `just e14-stream-boot` were cited and never
+recorded on `master`; navigate's run records them (11 of 11, 3 of 3
+mutants). With the four found this morning, six recipes were claimed
+without their evidence; every recipe is audited for its file next.
+
+**ADR-0295, 2026-10-09: a page at another address of the page is moved
+there** (track `kiokun`'s need: `KiokunError.Moved`, declared and never
+returned). A page declares the error that means its address is another of
+its own, and how it moves: `redirect_on KiokunError.Moved permanent`.
+PW0350 holds it to one value of the type of the one parameter the page's
+route carries, a case a query the page reads can answer, and not the case
+it is absent by. The host answers it 308, or 307, to the page's own route
+with that value, encoded as a link's hole is, the query kept and no origin
+named, so no `Host` header picks one; kept by no cache; a move to itself or
+to `..` is the program's fault, 500, never a loop. 7 compiler tests, 5 of
+the host's on kiokun's word page, 15 of 15 mutants killed on CI (run
+37912147550). **Corrected with it:** ADR-0262's `just e14-host-bindings`
+was cited and never recorded on `master`; that run records it, 6 of 6.
+
+**2026-10-09, three findings fixed, and three recipes recorded for the
+first time** (`track/arrival-clock`). **Corrected:** ADR-0257's `just
+e14-follows`, ADR-0268's `just e14-keepalive` and ADR-0275's `just
+e14-waiting-rows` were cited with their mutants killed, and no evidence of
+any of them was ever on `master`; CI recorded all three in run 37918808029
+(12 of 12, 8 of 8 and 7 of 7). Fixed: ADR-0290's plan crashed on a push
+that touches no recipe, taking the longest of no shards, so every such push
+failed its plan job (d81b8af's did): it plans no shard now. A part sent
+after a delay was measured 0.25 ms early on CI, the test's clock started
+after its request was written: it starts before. And the feed's "a follow
+shows before the server answers" ended with its unfollow unanswered; it
+waits for the answer. One test and one mutant (`just e14-dealt-by-time`, 9
+of 9). Named at the merge: WebKit's "Load more", and five recipes' baselines
+red on it and on "a follow reaches another reader" (open, NEXT), whose
+evidence is not taken.
+
+**ADR-0294, 2026-10-09: a list renders in its length** (W6's finding on
+kiokun's sample). さえこ's 128 names took 215 ms to render, and the curve
+was quadratic: 32 names 16.7 ms, 64 57.7 ms, 128 218 ms. Each item's scope
+copied the page's whole environment, the page's value and so the list
+among it, and every fragment's HTML. An item's scope now shares them by
+pointer and holds its own binding alone: on CI, 250 names render in 2.2 ms
+and 2,000 in 18 ms, a ratio of 8.3 for eight times the names, where scopes
+that copy took 7.1 s for 2,000. 2 of 2 mutants killed, and the renderer's
+other recipes re-run (run 37899457744; `e14-nested-lists` again alone, 6 of
+6, run 37915325800).
+
+**ADR-0293, 2026-10-09: kiokun's page head, held to kiokun.com's own
+code** (track `kiokun`, W6, merged from `4df071b`). The word page's title
+and description are kiokun.com's `buildDictionarySeo` in Pleris: its forms,
+its meanings as `definitionFragments` makes them, and its cuts at 68 and 158
+UTF-16 units, never inside a surrogate pair, where JavaScript's would. The
+head carries robots, Open Graph's and Twitter's tags; the canonical link and
+JSON-LD wait on the integrator's rulings, the preview image on an image
+renderer the owner approves. kiokun.com's own code is the oracle, run by
+Node from the owner's checkout and never committed: 5,513 sampled words, no
+unnamed difference; CI holds the served head to a committed fixture of its
+answers. The integrator's sample of the whole dictionary first: 5,938 of
+5,938 answered at 1c's page, p50 2.3 ms, p99 13.8 ms, and さえこ's 128 names 311 ms, the
+renderer quadratic in a list's length (fixed by ADR-0294).
+23 server tests, 15 browser tests, 53 of 53 mutants killed on CI (run
+37911011082, beside WebKit's known flake).
+
 **ADR-0292, 2026-10-09: a mutation script's processes are bounded in
 memory** (found by CI's heartbeat). CI's runner died every time
 `e14-graphs-on-the-wire` ran there, with exit 143 and no word: under its
@@ -195,6 +259,22 @@ refused without the name's label too, for running where a secret decides it
 "cannot log a `Secret<Payments>` value", where without it the log is refused
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
+
+**ADR-0280, 2026-10-08: a handler navigates after its command commits**
+(the owner's brief, from a Next.js bug: a save, then a soft navigation to a
+page the Router Cache served from before it). `navigate Page(args)` names
+the page and types its parameters, and is written last in the `Ok` arm of
+a command's answer: an `Ok` is a commit, and the runtime refuses one that
+did not commit. From the navigation the page takes no press and no second
+navigation, and each press made before it is answered first, whichever
+answer comes first; then the page's address is loaded, read after the
+commit by the order of answers and reads, never from a cache. The store's
+"Place order" goes to the order's page, in three engines. Two premises of
+the brief as NEXT wrote it were wrong: a link's arguments are not checked,
+and no ruling carries a basis across a navigation, which here is a document
+load. Keeping the parts two pages share in place is the next ruling. Merged
+2026-10-09: 6 compiler tests, 10 browser tests, 19 of 19 mutants killed on
+CI (run 37911914095).
 
 **ADR-0277, 2026-10-08: a materialization is kept, and a page reads it**
 (ruling 10's last piece, second part). A materialization that derives its

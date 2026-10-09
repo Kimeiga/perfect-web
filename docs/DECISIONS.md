@@ -2301,6 +2301,15 @@ direct messages, a conversation read from each side (track `messages`, W4).
   shown before the server answers and waiting by ADR-0275's rule; a third
   user, signed in or not, sees none of it, by page, `/pw-read`, cache and
   stream.
+[ADR-0280](DECISIONS/ADR-0280-a-handler-navigates-after-its-command-commits.md):
+a handler navigates after its command commits.
+- `navigate Page(args)`: the page by its declaration, its parameters typed
+  as a call's are (PW5042), last in the `Ok` arm of the command's answer
+  nearest it, in a handler (PW5043). The runtime refuses an `Ok` that did
+  not commit, takes no press and no second navigation once the page
+  leaves, answers each press made before it first, and loads the page's
+  address, each value one encoded segment: read after the commit, never
+  from a cache, with no cache-busting parameter and no reload.
 [ADR-0281](DECISIONS/ADR-0281-a-merge-is-held-to-ci-s-verification-run.md):
 a merge is held to CI's verification run.
 - A branch is merged when its tip's `ci` and `verify` runs are green,
@@ -2394,3 +2403,31 @@ a mutation script's processes are bounded in memory.
   says whether any mutant's run had a process stopped, and the run's summary
   lists those apart. Only the script's own processes are read, and one is
   stopped only where two readings agree it is the script's.
+[ADR-0293](DECISIONS/ADR-0293-kiokun-page-head-held-to-kiokuns-own-code.md):
+kiokun's page head, held to kiokun.com's own code (track `kiokun`, W6).
+- The word page describes itself as kiokun.com's does, its title and
+  description made in Pleris by kiokun.com's rules and cut as JavaScript
+  cuts, never inside a surrogate pair. kiokun.com's own `seo.ts`, copied
+  from the owner's checkout into a temporary directory each run, is the
+  oracle: 5,513 sampled words, every title and description the same; CI
+  holds a fixture of its answers. A sample of the whole dictionary, served
+  and timed, found the renderer quadratic in a list's length.
+[ADR-0294](DECISIONS/ADR-0294-a-list-renders-in-its-length.md):
+a list renders in its length (W6's finding on kiokun's sample).
+- An item's scope shares the page's values by pointer: `Env` holds each
+  binding's value, its fragments, its settled streams and its capabilities
+  by `Arc`, and entering a scope copies the map of pointers and adds the
+  item's own. Each item had copied the page's whole value, the list among
+  it, so `n` items over a page of size `m` rendered in `n × m`: kiokun's
+  128 names took 215 ms, and 2,000 names took 7.1 s where they now take
+  18 ms on CI.
+[ADR-0295](DECISIONS/ADR-0295-a-page-at-another-address-of-the-page-is-moved-there.md):
+a page at another address of the page is moved there (for track `kiokun`'s
+`KiokunError.Moved`).
+- `redirect_on Type.Case permanent|temporary` on a page (PW0350): a case of
+  one value, of the type of the one parameter the page's route carries, that
+  a query the page reads can answer. The host answers it 308 or 307 to the
+  page's own route with that value, encoded as a link's hole is, the query
+  kept, no origin named, kept by no cache; a move to itself or to a value no
+  segment carries is the program's fault (500), and a case the page does not
+  name a failure (503).

@@ -649,3 +649,21 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - **In order**: the app with its tests in three engines and its recipe;
     the official Cypress suite, unchanged, as its acceptance; then the
     showcase, W7's second milestone (NEXT).
+- **2026-10-09, W6's 1e merged** as ADR-0293 (kiokun's page head, held to
+  kiokun.com's own code), from `4df071b`: verify 37911011082, its one recipe
+  shard passed, 53 of 53 mutants killed; it failed only in WebKit's known
+  "Load more" flake. W6's 1d (the Japanese examples and pitch accent),
+  held until this merge, may go to CI. Its questions were answered before
+  the merge (above); the canonical link and std `Json` are the
+  integrator's.
+- **2026-10-09, W5's store-pg packet, answered: master first.** Its tip
+  `1a32fdc` (verify 37894506239: 28 of 29 recipes, `e14-store-postgres`
+  among them on PostgreSQL) failed only in WebKit's "Load more" and in
+  `e14-instance-changes`, whose survivor `master` fixed at `a609560`
+  (move-in-place). Not merged as it is: it is based on `3036497`, before
+  ADR-0287 to ADR-0295, and its merge into `master` conflicts in the
+  host's choice of layer (`KiokunData::new()` is fallible since W6's 1c).
+  W5 merges `master`, keeps its `(store, data)` tuple with master's `?`,
+  re-anchors and re-runs the scripts that move, builds in its own target,
+  and pushes; the integrator merges on that run, the ADR numbered then.
+  W7 (TodoMVC) launches after it.

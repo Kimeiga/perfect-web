@@ -434,6 +434,9 @@ window.__pw = {
   updated: [],
   ready: false,
   address: (path, part) => addressOf(path, part),
+  /** A page's address from its route and its parameters' values, as a
+   * navigation goes to it (ADR-0280). */
+  pageAddress: (route, args) => pageAddress(route, args),
   indexSize: () => index.size,
   /** The bytes of command bodies kept alive and not yet answered, and what
    * they may come to (ADR-0268). */
@@ -1789,6 +1792,78 @@ function recoverOnPress(part, owners, verdict) {
 /** When the latest press's handler started (ADR-0152): the next press's
  * starts after it, so presses run in the order they were made. */
 let lastPressStarted = Promise.resolve();
+/** Each press whose handler has not finished, as a promise of its finishing
+ * (ADR-0280): a navigation waits for each made before it. */
+const pressing = new Set();
+/** Whether a handler has gone to another page (ADR-0280): from then the page
+ * takes no press and no second navigation. A page the browser brings back
+ * from its back-forward cache takes them again. */
+let navigating = false;
+addEventListener("pageshow", (e) => {
+  if (e.persisted) navigating = false;
+});
+/**
+ * **A handler goes to a page once its command commits** (ADR-0280). Its
+ * module calls this last in the `Ok` arm of a command's answer, and an `Ok`
+ * is a commit: the command callback refuses one that is not. From now the
+ * page takes no press. Each press made before this one finishes first, its
+ * command answered and its arms run, so the page it goes to is read after
+ * every commit this page was answered. Then the browser loads it: a document
+ * the server serves after the session's turn, never from a cache
+ * (`no-store`), so no parameter busts one and nothing is reloaded. A second
+ * navigation, made while the page leaves, is not taken: the first decides.
+ */
+async function navigate(route, args, mine) {
+  if (navigating) {
+    log.push(`navigation to ${route} not taken: the page is already leaving`);
+    return;
+  }
+  const url = pageAddress(route, args);
+  navigating = true;
+  await Promise.allSettled([...pressing].filter((p) => p !== mine));
+  log.push(`navigating to ${url}`);
+  // A navigation stopped, by the user or `window.stop()`, leaves the page
+  // where it was, and it takes presses again: where the browser says so.
+  // The Navigation API's `navigate` event fires for this one too, and its
+  // signal aborts when it is stopped. Where there is none, the page stays
+  // leaving until it is loaded again.
+  if (typeof navigation !== "undefined") {
+    navigation.addEventListener(
+      "navigate",
+      (e) => e.signal.addEventListener("abort", () => (navigating = false), { once: true }),
+      { once: true },
+    );
+  }
+  location.assign(url);
+}
+
+/**
+ * **A page's address** (ADR-0280): each `{name}` segment of its route given
+ * its value, encoded as the renderer encodes a link's (`url_component`):
+ * every UTF-8 byte but RFC 3986's unreserved characters, so a value is one
+ * segment, whatever it holds. A value no segment can carry, empty, `.` or
+ * `..`, which the URL parser drops or climbs by, is refused, and the press
+ * fails visibly.
+ */
+function pageAddress(route, args) {
+  return route.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, name) => {
+    const value = args[name];
+    if (typeof value !== "string") {
+      throw new Error(`no value for {${name}} in ${route}`);
+    }
+    if (value === "" || value === "." || value === "..") {
+      throw new Error(`{${name}} in ${route} cannot be ${JSON.stringify(value)}: no segment carries it`);
+    }
+    let out = "";
+    for (const b of new TextEncoder().encode(value)) {
+      const unreserved =
+        (b >= 0x41 && b <= 0x5a) || (b >= 0x61 && b <= 0x7a) || (b >= 0x30 && b <= 0x39) ||
+        b === 0x2d || b === 0x2e || b === 0x5f || b === 0x7e;
+      out += unreserved ? String.fromCharCode(b) : "%" + b.toString(16).toUpperCase().padStart(2, "0");
+    }
+    return out;
+  });
+}
 /** Each element's parts a listener is bound for: an element may handle two
  * events, `on:input` and `on:keydown`, each its own listener. */
 const bound = new WeakMap();
@@ -1909,6 +1984,13 @@ function bindEvent(template, part) {
       // Declared, so done now, synchronously (ADR-0131).
       if (modifiers.includes("prevent")) e.preventDefault();
       if (modifiers.includes("stop")) e.stopPropagation();
+      // **A page that is leaving takes no press** (ADR-0280): a handler has
+      // gone to another page once its command committed, and that page is
+      // loading. A press now would send what no one here would read.
+      if (navigating) {
+        log.push(`press on ${part.value} not taken: the page is leaving`);
+        return;
+      }
       lastActed = el;
       // What its last press was told, taken back (ADR-XXXX).
       untell(el);
@@ -1926,6 +2008,11 @@ function bindEvent(template, part) {
       const myTurn = lastPressStarted;
       let started;
       lastPressStarted = new Promise((resolve) => (started = resolve));
+      // This press until its handler finishes: a navigation waits for each
+      // press made before it (ADR-0280).
+      let finished;
+      const done = new Promise((resolve) => (finished = resolve));
+      pressing.add(done);
       try {
         // Authorised above; loaded here. The order is the point of E7-L:
         // the bytes for this handler do not exist in this page until
@@ -1988,8 +2075,17 @@ function bindEvent(template, part) {
             if (!("result" in answer)) {
               throw new Error(`${component} answered no value`);
             }
+            // **An answer that is not a declared error is a commit**
+            // (ADR-0280): an `Ok` arm runs only after one, and a navigation
+            // in it goes only after one. One that did not commit has failed
+            // the press, whatever it says.
+            if (answer.committed !== true && answer.result?.$case !== "err") {
+              throw new Error(`${component} answered without committing`);
+            }
             return answer.result;
           },
+          // Goes to a page once the command it follows commits (ADR-0280).
+          navigate: (route, args) => navigate(route, args, done),
         });
       } catch (error) {
         // A load or a refused command is VISIBLE and leaves the button
@@ -2009,6 +2105,9 @@ function bindEvent(template, part) {
         }
         log.push(`handler ${part.value} failed: ${error.message ?? error}`);
         window.__pw.handlerErrors = (window.__pw.handlerErrors ?? 0) + 1;
+      } finally {
+        pressing.delete(done);
+        finished();
       }
     });
   }

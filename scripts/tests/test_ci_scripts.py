@@ -94,6 +94,10 @@ class Plan(unittest.TestCase):
 
     def test_no_shard_is_planned_empty(self) -> None:
         self.assertEqual(len(plan.plan(["a", "b"], {}, 16)), 2)
+        # And nothing to run plans no shard: a change that touches no recipe
+        # (run 37914111273 failed its plan instead, ADR-0290's first week).
+        self.assertEqual(plan.plan([], {}, 9), [])
+        self.assertEqual(plan.plan([], {}, 9, {}, {"d1"}), [])
 
     def test_a_measurement_of_the_machine_is_not_planned(self) -> None:
         self.assertIn("e10-close-bench", plan.LOCAL_ONLY)

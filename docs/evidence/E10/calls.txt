@@ -1,7 +1,8 @@
 ADR-0068 - what each construct takes, checked
 
 produced by: just e10-calls
-commit: e30d7555d0cd5af55908ef641e7a74cb69aa7b35
+commit: 661c8a0b2294e82f23e01740a66e760d88114966
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37911914095 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == calls, loops, tries and branches (compiler/pw-core/tests/calls_and_branches.rs)
@@ -11,16 +12,16 @@ test a_try_takes_an_option_or_a_result ... ok
 test a_for_loop_runs_over_a_list ... ok
 test a_value_called_must_be_a_function ... ok
 test an_elif_chain_is_one_if_nested_in_another ... ok
-test branches_whose_value_is_used_produce_one_type ... ok
 test a_call_through_a_function_value_is_checked ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+test branches_whose_value_is_used_produce_one_type ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
 
 == elif chains through the E8 host (compiler/pw-conformance/tests/if_chains.rs)
 
 test a_chain_without_else_is_a_statement ... ok
 test a_chain_of_four_branches_reaches_the_last ... ok
 test an_elif_chain_of_bools_answers_each_branch ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.92s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
 
 == mutation controls (scripts/call_branch_mutations.py)
 
@@ -36,6 +37,7 @@ branches are not related: KILLED (2 of 10 tests fail)
 a statement's branches are related as a used value's: KILLED (1 of 10 tests fail)
 an `elif` chain's next condition is its `else`: KILLED (4 of 10 tests fail)
 10 of 10 mutants killed
+memory bound: no process was stopped
 
 NOT CLAIMED: a lambda with no annotation, called directly, whose
 parameter's type no use gives.

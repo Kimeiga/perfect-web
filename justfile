@@ -5302,6 +5302,29 @@ e14-fmt-meaning:
      } > docs/evidence/E14/fmt-meaning.txt
     @grep -E "^test result|already formatted|need formatting|mutants killed|^---- |panicked at" docs/evidence/E14/fmt-meaning.txt
 
+# ADR-0280: a handler navigates after its command commits. The compiler's
+# tests, the store's order placed and gone to in three engines
+# (e2e/navigate.spec.mjs), and the mutation controls.
+e14-navigate:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0280 - a handler navigates after its command commits"; echo; \
+       echo "produced by: just e14-navigate"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/navigate.rs)"; echo; \
+       cargo test --locked -p pw-core --test navigate 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the order placed and gone to, in three engines (e2e/navigate.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/navigate.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/navigate_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/navigate_mutations.py; \
+     } > docs/evidence/E14/navigate.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/navigate.txt
+
 # ADR-0277: a materialization is kept, and a page reads it. The compiler's,
 # the materializer's and the server's tests, the store's chain in three
 # engines (e2e/materialized.spec.mjs), and the mutation controls.
@@ -5408,3 +5431,36 @@ e14-mutation-bound:
        python3 scripts/mutation_bound_mutations.py; \
      } > docs/evidence/E14/mutation-bound.txt
     @grep -E "^Ran |^OK|^FAILED|mutants killed" docs/evidence/E14/mutation-bound.txt
+
+# ADR-0294: a list renders in its length (W6's finding on kiokun's sample).
+# The renderer's scope test, the list's scale timed, and the mutation controls.
+e14-shared-scopes:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0294 - a list renders in its length"; echo; \
+       echo "produced by: just e14-shared-scopes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the renderer (runtime/pw-render: scopes, tests/list_scale.rs)"; echo; \
+       cargo test --locked -p pw-render --lib scopes 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-render --test list_scale -- --include-ignored --nocapture 2>&1 | grep -E '^(test |test result)|names|ratio|panicked at'; \
+       echo; echo "== mutation controls (scripts/shared_scopes_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/shared_scopes_mutations.py; \
+     } > docs/evidence/E14/shared-scopes.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at|ratio" docs/evidence/E14/shared-scopes.txt
+
+# ADR-0295: a page at another address of the page is moved there. The
+# compiler's tests, the development server's, and the mutation controls.
+e14-redirects:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0295 - a page at another address of the page is moved there"; echo; \
+       echo "produced by: just e14-redirects"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/redirects.rs, not_found.rs)"; echo; \
+       cargo test --locked -p pw-core --test redirects --test not_found 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the development server (spikes/own-renderer/server/src/tests/redirects.rs)"; echo; \
+       cargo test --locked -p pw-dev-server tests::redirects 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/redirects_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/redirects_mutations.py; \
+     } > docs/evidence/E14/redirects.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/redirects.txt

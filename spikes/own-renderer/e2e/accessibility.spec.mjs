@@ -192,7 +192,11 @@ test("the order's page keeps every rule, as the store moves it along", async ({ 
   await added;
   await expect(page.locator("#cart-count")).toHaveText("1");
   await ready(page, "/cart");
+  // Placed, the cart goes to the order's page (ADR-0280); back on the cart,
+  // it links there.
   await page.getByRole("button", { name: "Place order" }).click();
+  await page.waitForURL(/\/order$/);
+  await ready(page, "/cart");
   await expect(page.locator("#order-link")).toBeVisible();
   expect(await audit(page), "the cart, its order placed").toEqual([]);
   await ready(page, "/order");
