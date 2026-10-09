@@ -71,6 +71,12 @@ LOCAL_ONLY = {
     # has. What needs the owner's local data is recorded here; what a
     # committed sample shows runs on CI.
     "e14-kiokun-inventory",
+    # The kiokun track's sample of the whole dictionary: the owner's data, and
+    # this machine's times.
+    "e14-kiokun-sample",
+    # And its page head against kiokun.com's own code, copied from the
+    # owner's checkout.
+    "e14-kiokun-seo",
 }
 
 # Recipes run against a database (ADR-0246). Each is a shard of its own,

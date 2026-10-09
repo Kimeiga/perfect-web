@@ -53,7 +53,7 @@ test("an entry shows its words in each language, as kiokun.com's page does", asy
   const response = await page.goto(at("人"));
   expect(response.status()).toBe(200);
   await shows人(page);
-  await expect(page).toHaveTitle("人 | Kiokun");
+  await expect(page).toHaveTitle("人 — person, man, people | Kiokun");
   expect(errors, "no error in the console").toEqual([]);
 });
 

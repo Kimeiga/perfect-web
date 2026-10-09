@@ -238,6 +238,7 @@ fn sense(s: &serde_json::Value) -> Val {
                         record(vec![
                             ("text", Val::String(text(g, "text"))),
                             ("kind", Val::String(text(g, "type"))),
+                            ("lang", Val::String(text(g, "lang"))),
                         ])
                     })
                     .collect(),
@@ -430,6 +431,20 @@ fn japanese_char(j: &serde_json::Value) -> Val {
             ),
         ),
         ("readings", kanji_readings(&meaning, "readings")),
+        (
+            "meanings",
+            Val::List(
+                list(&meaning, "groups")
+                    .flat_map(|g| list(g, "meanings"))
+                    .map(|m| {
+                        record(vec![
+                            ("lang", Val::String(text(m, "lang"))),
+                            ("value", Val::String(text(m, "value"))),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
     ])
 }
 
@@ -438,6 +453,7 @@ fn korean_char(k: &serde_json::Value) -> Val {
     record(vec![
         ("character", Val::String(text(k, "character"))),
         ("hanja", Val::String(text(k, "hanjaForm"))),
+        ("meanings-en", strings(k, "meaningsEn")),
         ("readings", texts(k, "readings", "hangul")),
     ])
 }

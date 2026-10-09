@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0293, 2026-10-09: kiokun's page head, held to kiokun.com's own
+code** (track `kiokun`, W6, merged from `4df071b`). The word page's title
+and description are kiokun.com's `buildDictionarySeo` in Pleris: its forms,
+its meanings as `definitionFragments` makes them, and its cuts at 68 and 158
+UTF-16 units, never inside a surrogate pair, where JavaScript's would. The
+head carries robots, Open Graph's and Twitter's tags; the canonical link and
+JSON-LD wait on the integrator's rulings, the preview image on an image
+renderer the owner approves. kiokun.com's own code is the oracle, run by
+Node from the owner's checkout and never committed: 5,513 sampled words, no
+unnamed difference; CI holds the served head to a committed fixture of its
+answers. The integrator's sample of the whole dictionary first: 5,938 of
+5,938 answered at 1c's page, p50 2.3 ms, p99 13.8 ms, and さえこ's 128 names 311 ms, the
+renderer quadratic in a list's length (its fix is `track/shared-scopes`).
+23 server tests, 15 browser tests, 53 of 53 mutants killed on CI (run
+37911011082, beside WebKit's known flake).
+
 **ADR-0292, 2026-10-09: a mutation script's processes are bounded in
 memory** (found by CI's heartbeat). CI's runner died every time
 `e14-graphs-on-the-wire` ran there, with exit 143 and no word: under its

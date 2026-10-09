@@ -2394,3 +2394,12 @@ a mutation script's processes are bounded in memory.
   says whether any mutant's run had a process stopped, and the run's summary
   lists those apart. Only the script's own processes are read, and one is
   stopped only where two readings agree it is the script's.
+[ADR-0293](DECISIONS/ADR-0293-kiokun-page-head-held-to-kiokuns-own-code.md):
+kiokun's page head, held to kiokun.com's own code (track `kiokun`, W6).
+- The word page describes itself as kiokun.com's does, its title and
+  description made in Pleris by kiokun.com's rules and cut as JavaScript
+  cuts, never inside a surrogate pair. kiokun.com's own `seo.ts`, copied
+  from the owner's checkout into a temporary directory each run, is the
+  oracle: 5,513 sampled words, every title and description the same; CI
+  holds a fixture of its answers. A sample of the whole dictionary, served
+  and timed, found the renderer quadratic in a list's length.

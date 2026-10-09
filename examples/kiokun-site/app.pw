@@ -60,6 +60,14 @@ type Headword = Headword {
 type Gloss = Gloss {
     text: String,
     kind: String,
+    lang: String,
+}
+
+// One of KANJIDIC's meanings: its language ("" for English, as KANJIDIC
+// writes it) and its text.
+type CharMeaning = CharMeaning {
+    lang: String,
+    value: String,
 }
 
 // One sense of a Japanese word: its glosses, notes and labels.
@@ -140,6 +148,7 @@ type JapaneseChar = JapaneseChar {
     grouped: Bool,
     groups: List<ReadingGroup>,
     readings: List<KanjiReading>,
+    meanings: List<CharMeaning>,
 }
 
 // The character as the hanja table gives it (`korean_char`): the
@@ -148,6 +157,7 @@ type KoreanChar = KoreanChar {
     character: String,
     hanja: String,
     readings: List<String>,
+    meanings_en: List<String>,
 }
 
 // A mnemonic card (`semantic_mnemonic`, `semantic_mnemonic_variants`): the
@@ -1309,6 +1319,172 @@ fn forms_shown(forms: List<Form>, gloss: String) -> List<ShownForm> {
     })
 }
 
+// ---------------------------------------------------------------------------
+// The page's description of itself (`src/lib/seo.ts`, `buildDictionarySeo`).
+
+// A text's length as JavaScript counts it, in UTF-16 units: a code point
+// past U+FFFF is two.
+fn units(text: String) -> Int {
+    List.fold(String.codepoints(text), 0, (n, c) => n + if c > 65535 { 2 } else { 1 })
+}
+
+type Taken = Taken {
+    points: List<Int>,
+    units: Int,
+    open: Bool,
+}
+
+// The longest prefix of at most `limit` UTF-16 units that splits no code
+// point (`text.slice(0, limit)` splits a surrogate pair; this stops before).
+fn prefix_units(text: String, limit: Int) -> String {
+    let none: List<Int> = []
+    let taken = List.fold(String.codepoints(text), Taken { points: none, units: 0, open: true }, (t, c) => take_unit(t, c, limit))
+    String.from_codepoints(taken.points)
+}
+
+fn take_unit(t: Taken, c: Int, limit: Int) -> Taken {
+    let width = if c > 65535 { 2 } else { 1 }
+    if t.open & t.units + width <= limit { Taken { points: List.concat(t.points, [c]), units: t.units + width, open: true } } else { Taken { points: t.points, units: t.units, open: false } }
+}
+
+// The first place `c` is in `points` at or after `from`, or -1.
+fn first_index(points: List<Int>, c: Int, from: Int) -> Int {
+    match List.get(points, from) {
+        Some(p) => if p == c { from } else { first_index(points, c, from + 1) },
+        None => -1,
+    }
+}
+
+// Each `<..>` a space (`/<[^>]*>/g`): a `<` with no `>` after it stays.
+fn untagged(points: List<Int>) -> List<Int> {
+    let open = first_index(points, 60, 0)
+    let close = if open == -1 { -1 } else { first_index(points, 62, open) }
+    if open == -1 | close == -1 {
+        points
+    } else {
+        List.concat(List.concat(List.slice(points, 0, open), [32]), untagged(List.drop(points, close + 1)))
+    }
+}
+
+// `cleanText`: tags out, white space runs one space, trimmed.
+fn clean_text(value: String) -> String {
+    String.trim(spaced(String.from_codepoints(untagged(String.codepoints(value)))))
+}
+
+// `truncate`: the clean text, or its first `length` less one UTF-16 units,
+// trimmed at the end, and `…`.
+fn truncate(value: String, length: Int) -> String {
+    let text = clean_text(value)
+    let kept = String.trim(prefix_units(text, if length > 1 { length - 1 } else { 0 }))
+    if units(text) <= length { text } else { "{kept}…" }
+}
+
+// `unique`: each clean, none empty, each once.
+fn unique_clean(values: List<String>) -> List<String> {
+    distinct(List.map(values, clean_text))
+}
+
+type Split = Split {
+    done: List<String>,
+    current: List<Int>,
+}
+
+// The pieces between `;` and `；`.
+fn pieces(text: String) -> List<String> {
+    let none: List<String> = []
+    let nothing: List<Int> = []
+    let split = List.fold(String.codepoints(text), Split { done: none, current: nothing }, (s, c) => if c == 59 | c == 65307 {
+        Split { done: List.concat(s.done, [String.from_codepoints(s.current)]), current: nothing }
+    } else {
+        Split { done: s.done, current: List.concat(s.current, [c]) }
+    })
+    List.concat(split.done, [String.from_codepoints(split.current)])
+}
+
+fn leading_digits(points: List<Int>, n: Int) -> Int {
+    match List.get(points, n) {
+        Some(c) => if c >= 48 & c <= 57 { leading_digits(points, n + 1) } else { n },
+        None => n,
+    }
+}
+
+// A piece without its leading `1.` or `2)` (`/^\d+[.)]\s*/`).
+fn unnumbered(piece: String) -> String {
+    let points = String.codepoints(String.trim(piece))
+    let digits = leading_digits(points, 0)
+    let after = match List.get(points, digits) {
+        Some(c) => c == 46 | c == 41,
+        None => false,
+    }
+    if digits > 0 & after { String.trim(String.from_codepoints(List.drop(points, digits + 1))) } else { String.trim(String.from_codepoints(points)) }
+}
+
+// `/^(?:CL|classifier)\s*:/i`.
+fn classifier(piece: String) -> Bool {
+    let lower = String.to_lower_ascii(piece)
+    let after_classifier = String.trim(String.slice(lower, 10, String.length(lower)))
+    let after_cl = String.trim(String.slice(lower, 2, String.length(lower)))
+    (String.starts_with(lower, "classifier") & String.starts_with(after_classifier, ":")) | (String.starts_with(lower, "cl") & String.starts_with(after_cl, ":"))
+}
+
+// `definitionFragments`: each value cleaned and split at `;`, unnumbered,
+// each once, longer than one unit and at most 96, no classifier.
+fn fragments(values: List<String>) -> List<String> {
+    let none: List<String> = []
+    let all = List.fold(values, none, (out, v) => List.concat(out, List.map(pieces(clean_text(v)), unnumbered)))
+    List.filter(unique_clean(all), v => units(v) > 1 & units(v) <= 96 & !classifier(v))
+}
+
+// `dictionaryDefinitions`: the Chinese words' senses, the Japanese words'
+// English glosses, KANJIDIC's English meanings, the Korean words'
+// definitions and the hanja table's English meanings.
+fn definitions_of(e: Entry) -> List<String> {
+    let none: List<String> = []
+    let chinese = List.fold(e.chinese, none, (out, w) => List.fold(w.items, out, (o, i) => List.concat(o, i.definitions)))
+    let japanese = List.fold(e.japanese, none, (out, w) => List.fold(w.senses, out, (o, s) => List.concat(o, List.map(List.filter(s.glosses, g => g.lang == "" | g.lang == "eng"), g => g.text))))
+    let kanji = match e.japanese_char {
+        Some(j) => List.map(List.filter(j.meanings, m => m.lang == "" | m.lang == "en"), m => m.value),
+        None => none,
+    }
+    let korean = List.fold(e.korean, none, (out, w) => List.concat(out, w.definitions))
+    let hanja = match e.korean_char {
+        Some(k) => k.meanings_en,
+        None => none,
+    }
+    fragments(List.concat(List.concat(List.concat(chinese, japanese), List.concat(kanji, korean)), hanja))
+}
+
+// `dictionaryForms`: the word and the character's forms, at most six.
+fn seo_forms(word: String, e: Entry) -> List<String> {
+    let own = context_of(e)
+    List.take(unique_clean(List.concat(List.concat([word, own.character, own.hong_kong], own.simplified), List.concat(own.traditional, [own.japanese, own.korean]))), 6)
+}
+
+// What the page says of itself in its head.
+type Seo = Seo {
+    title: String,
+    description: String,
+}
+
+// `buildDictionarySeo` (`seo.ts:163-198`): the word and up to three other
+// forms, its learner gloss and first definitions; truncated as kiokun.com
+// truncates them.
+fn seo_of(word: String, e: Entry) -> Seo {
+    let forms = seo_forms(word, e)
+    let character = List.length(String.codepoints(word)) == 1
+    let gloss = learner_gloss(e)
+    let shown = List.take(unique_clean(List.concat([gloss], definitions_of(e))), 5)
+    let suffix = String.join(List.take(List.filter(forms, f => f != word), 3), "・")
+    let subject = if suffix != "" { "{word} ({suffix})" } else { word }
+    let meaning = String.join(List.take(shown, 3), ", ")
+    let kind = if character { "Character" } else { "Word" }
+    let titled = if meaning != "" { "{subject} — {meaning}" } else { subject }
+    let described = if meaning != "" { "{subject} means {meaning}" } else { subject }
+    Seo {
+        title: truncate("{titled} | Kiokun", 68),
+        description: truncate("{described}. {kind} readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.", 158),
+    }
+}
 // The entry a stub names, where the word's file is a stub.
 fn target_of(first: Option<Entry>) -> Option<String> {
     match first {
@@ -1364,6 +1540,7 @@ fn characters_for(word: String, page: Option<Loaded>) -> List<String> {
 // each language's words.
 type WordShown = WordShown {
     word: String,
+    seo: Seo,
     header: Header,
     chinese: List<ShownChinese>,
     japanese: List<ShownJapanese>,
@@ -1376,6 +1553,7 @@ fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>)
     let e = l.data
     WordShown {
         word: word,
+        seo: seo_of(word, e),
         header: header(e, forms_of(word, l, glosses)),
         chinese: List.fold(e.chinese, none, (out, w) => List.concat(out, chinese_shown(w, word))),
         japanese: List.map(e.japanese, w => japanese_shown(w, labels)),
@@ -1433,7 +1611,16 @@ page WordPage(word: String) {
     let page = query Word(word)
 
     view {
-        <title>{word} | Kiokun</title>
+        <title>{page.seo.title}</title>
+        <meta name="description" content="{page.seo.description}" />
+        <meta name="robots" content="index, follow" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Kiokun" />
+        <meta property="og:locale" content="en_US" />
+        <meta property="og:title" content="{page.seo.title}" />
+        <meta property="og:description" content="{page.seo.description}" />
+        <meta name="twitter:title" content="{page.seo.title}" />
+        <meta name="twitter:description" content="{page.seo.description}" />
         <main>
             <h1 id="headword">{page.word}</h1>
             {#if page.header.shown}
