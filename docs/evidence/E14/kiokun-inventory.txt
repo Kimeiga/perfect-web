@@ -1,0 +1,28 @@
+kiokun.com's parity inventory, held to the SvelteKit app it inventories
+
+produced by: just e14-kiokun-inventory (local: reads a kiokun-data checkout)
+commit: a95802db7e3a937eeecfbebebeff3545bb7ff21d
+python: Python 3.12.8
+
+== the inventory against the app (scripts/kiokun_inventory.py)
+
+the app: /Users/haki/code/kiokun-data/output_dictionary/../sveltekit-app at abf71a89af1111f4039578cd1fde58e06f14c4bf + uncommitted changes to 11 file(s)
+the inventory: ADR-XXXX-kiokun-parity-inventory.md
+routes: 102 (49 pages, 53 endpoints)
+marked: 0 built, 4 partial, 98 missing
+features: 63, marked 4 built, 11 partial, 48 missing
+inventory: OK
+
+== mutation controls (scripts/kiokun_inventory_mutations.py)
+
+baseline: 9 passed, 0 failed
+any directory is a route: KILLED (7 of 9 tests fail)
+an endpoint is not a route: KILLED (7 of 9 tests fail)
+a route listed twice passes: KILLED (1 of 9 tests fail)
+a row's status may be any word: KILLED (1 of 9 tests fail)
+a route the app does not have passes: KILLED (1 of 9 tests fail)
+a route the inventory leaves out passes: KILLED (2 of 9 tests fail)
+a route row is counted as a feature: KILLED (1 of 9 tests fail)
+the check passes whatever it finds: KILLED (1 of 9 tests fail)
+the recipe is planned on a runner, which has no checkout: KILLED (1 of 9 tests fail)
+9 of 9 mutants killed
