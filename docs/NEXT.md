@@ -490,8 +490,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
              resolves a callee's name without its scope), and **only a
              fold's seed takes the checker's type in the backend**
              (ADR-0284's: `List.concat([], xs)` in a `let` is refused);
-             and, open, found probing ADR-0283, **a page's handler is held
-             to the page's placement**: the row check keeps an `on:`
+             and ~~found probing ADR-0283, **a page's handler is held
+             to the page's placement**~~ (ADR-0287): the row check keeps an `on:`
              handler's effects in the page's row and grants them against
              the page's world, so a page placed at `build` whose button
              sends a command is refused (PW5005, `database.write<Thing>`

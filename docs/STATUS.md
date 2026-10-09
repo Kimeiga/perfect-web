@@ -23,6 +23,33 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0288 and ADR-0289, 2026-10-09: kiokun's labels and character
+header, its loader's merges and the header's written forms** (track
+`kiokun`, W6, merged from `de0c4ca`). The word page shows JMdict's codes by
+kiokun.com's own label table, read from `KIOKUN_APP` (a code the table lacks
+as it is, as kiokun.com shows one), and the character header: the learner
+gloss, its HSK and JLPT levels, the mnemonic's meanings and each language's
+readings. A word's files are read in one batch; kiokun.com's loader rules (a
+stub followed, its variants and related forms merged, an equivalent form
+found) and the header's written forms are Pleris, each named for the
+kiokun.com function it is read from. Found: a host record's field is named as
+its world names it, in kebab case (the host reading either name is on
+`track/record-names`). Twenty server tests, fifteen browser tests in three
+engines, 45 of 45 mutants killed on CI (run 37896778819, beside WebKit's
+known flake and the lone-shard summary, fixed on master).
+
+**ADR-0287, 2026-10-09: a handler is held where it runs** (found probing
+ADR-0283). A page placed at `build` whose button sends a command was refused,
+"`database.write<Thing>` is not available at placement Build", for a lambda
+that calls the command and for the command named alike, where its contract
+allows `build`, the row check lets it be, and ADR-0113 holds a handler in the
+browser, where a command it calls is a request the command performs. Only
+the declared-placement check held a handler's work to the page's placement.
+It no longer does; a handler that writes the database itself is still
+refused, once, where it runs. The DoorDash menu, every customer's alike and
+built ahead, needs it. Three tests, 1 of 1 mutant killed on CI (run
+37900218861).
+
 **ADR-0283 and ADR-0284, 2026-10-09: a component's contract is what its
 code does, and a value of any type is fixed by the call that meets it**
 (W6's two findings on kiokun's word page, and what probing them found). A

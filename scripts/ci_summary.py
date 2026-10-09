@@ -18,6 +18,18 @@ import sys
 SURVIVED = ("SURVIVED", "ANCHOR NOT FOUND")
 
 
+def shards_of(root: pathlib.Path) -> list[pathlib.Path]:
+    """Each shard's directory: `evidence-N` under the root, or the root
+    itself where the run had one shard. `download-artifact` extracts a lone
+    match into the path it is given, not into a directory of its name, so a
+    run of one shard reported none until 2026-10-09 (W6's 1b, run
+    37889326640)."""
+    found = sorted(p.parent for p in root.glob("evidence-*/results.json"))
+    if not found and (root / "results.json").exists():
+        found = [root]
+    return found
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("artifacts")
@@ -25,14 +37,14 @@ def main() -> int:
     args = parser.parse_args()
     root = pathlib.Path(args.artifacts)
     rows, failed = [], []
-    shards = sorted(root.glob("evidence-*/results.json"))
+    shards = shards_of(root)
     if len(shards) != args.shards:
         failed.append(f"{args.shards} shards planned, {len(shards)} reported")
-    for results in shards:
-        for r in json.loads(results.read_text()):
+    for shard in shards:
+        for r in json.loads((shard / "results.json").read_text()):
             survived = []
             for path in r["wrote"]:
-                text = (results.parent / "evidence" / path).read_text(errors="replace")
+                text = (shard / "evidence" / path).read_text(errors="replace")
                 survived += [line.strip() for line in text.splitlines() if any(s in line for s in SURVIVED)]
             ok = r["status"] == 0 and not survived
             rows.append((r["recipe"], "ok" if ok else "FAILED", r["seconds"], len(r["wrote"])))

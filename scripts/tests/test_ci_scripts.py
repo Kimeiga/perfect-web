@@ -19,6 +19,7 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
@@ -230,6 +231,33 @@ class Recipes(unittest.TestCase):
         )
 
 
+    def test_a_failed_recipe_says_its_last_lines_in_the_jobs_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = pathlib.Path(tmp)
+            (out / "logs").mkdir()
+            (out / "logs" / "e14-x.log").write_text("".join(f"line {i}\n" for i in range(100)))
+            (out / "evidence" / "docs").mkdir(parents=True)
+            (out / "evidence" / "docs" / "x.txt").write_text("built\nError: no such module\n")
+            said = recipes.failed_tail("e14-x", out, ["docs/x.txt"], lines=5)
+        self.assertIn("| line 99", said)
+        self.assertNotIn("| line 94", said)
+        self.assertIn("| Error: no such module", said)
+
+    def test_a_heartbeat_says_what_a_recipe_is_doing_until_it_ends(self) -> None:
+        # A runner that dies mid-recipe keeps what reached the job's log.
+        import contextlib, io, threading
+        stop = threading.Event()
+        said = io.StringIO()
+        with contextlib.redirect_stdout(said):
+            beat = threading.Thread(target=recipes.heartbeat, args=("e14-x", stop, 0.05))
+            beat.start()
+            time.sleep(0.3)
+            stop.set()
+            beat.join()
+        lines = [l for l in said.getvalue().splitlines() if l.startswith("  [e14-x, ")]
+        self.assertTrue(lines, said.getvalue())
+        self.assertIn("evidence", lines[-1])
+
 class Prune(unittest.TestCase):
     def test_what_builds_leave_is_freed_and_the_newest_binary_kept(self) -> None:
         import os
@@ -340,6 +368,25 @@ class Summary(unittest.TestCase):
 
     def test_a_shard_that_reported_nothing_fails_the_run(self) -> None:
         self.assertEqual(self.run_summary([[self.result()]], {}, 2), 1)
+
+    def test_a_run_of_one_shard_is_read_where_it_was_extracted(self) -> None:
+        # `download-artifact` puts a lone match in the path itself: W6's 1b
+        # ran one shard, passed it, and the run reported none.
+        def one(results: list[dict], files: dict[str, str]) -> int:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)
+                (root / "evidence").mkdir()
+                (root / "results.json").write_text(json.dumps(results))
+                for path, text in files.items():
+                    (root / "evidence" / path).write_text(text)
+                return subprocess.run(
+                    [sys.executable, str(SCRIPTS / "ci_summary.py"), tmp, "--shards", "1"],
+                    capture_output=True,
+                    text=True,
+                ).returncode
+
+        self.assertEqual(one([self.result(wrote=["a.txt"])], {"a.txt": "3 of 3 mutants killed\n"}), 0)
+        self.assertEqual(one([self.result(wrote=["a.txt"])], {"a.txt": "x: SURVIVED\n"}), 1)
 
 
 if __name__ == "__main__":

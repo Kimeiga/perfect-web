@@ -108,8 +108,16 @@ fn section<'a>(html: &'a str, id: &str) -> &'a str {
 #[test]
 fn kiokun_is_served_by_the_host_its_entries_read_from_kiokuns_files() {
     let s = served_kiokun();
-    assert_eq!(s.data.grants(), vec!["database.read<Entry>"]);
+    assert_eq!(
+        s.data.grants(),
+        vec![
+            "database.read<Entry>",
+            "database.read<Label>",
+            "database.read<CharGloss>"
+        ]
+    );
     assert!(s.data.operations().contains("kiokun:data/entries#read"));
+    assert!(s.data.operations().contains("kiokun:data/labels#japanese"));
     let page = fetched(&s, &path_of("人"));
     assert!(page.starts_with("HTTP/1.1 200 OK\r\n"), "{page}");
     assert!(page.contains("<h1 id=\"headword\">人</h1>"), "{page}");
@@ -250,7 +258,7 @@ fn write_entry(dir: &std::path::Path, word: &str, json: &str) {
 /// kiokun's program, its entries read from `dir`.
 fn served_kiokun_on(dir: &std::path::Path) -> Served {
     let mut s = served_kiokun();
-    s.server.data = Arc::new(crate::kiokun::KiokunData::at(dir.to_path_buf()));
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(dir.to_path_buf(), None));
     s
 }
 
@@ -427,4 +435,429 @@ fn a_word_too_long_to_be_a_file_name_is_not_found() {
     use crate::kiokun::place;
     assert!(place("00", &longest).is_some());
     assert_eq!(place("00", &"a".repeat(243)), None);
+}
+/// The repository's sample (ADR-0037), as the layer reads it by default.
+fn sample() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../examples/kiokun/data/han-1char-3")
+}
+
+/// An app beside kiokun's files whose label table is `labels`, as
+/// `sveltekit-app/src/lib/japanese-labels.json` is laid out.
+fn app_with_labels(labels: &str) -> tempfile::TempDir {
+    app_with(labels, "{}")
+}
+
+/// An app whose label table is `labels` and whose component glosses are
+/// `glosses` (`static/game_data/component_glosses.json`).
+fn app_with(labels: &str, glosses: &str) -> tempfile::TempDir {
+    let app = tempfile::TempDir::with_prefix("pw-kiokun-app-").expect("a directory");
+    std::fs::create_dir_all(app.path().join("src/lib")).expect("its lib");
+    std::fs::write(app.path().join("src/lib/japanese-labels.json"), labels).expect("written");
+    std::fs::create_dir_all(app.path().join("static/game_data")).expect("its game data");
+    std::fs::write(
+        app.path().join("static/game_data/component_glosses.json"),
+        glosses,
+    )
+    .expect("written");
+    app
+}
+
+/// **A code is shown by kiokun.com's label for it** (`japaneseLabels.ts`):
+/// a part of speech and a form's note from their own tables; a code a table
+/// lacks, as it is. kiokun.com's table spells `adj_na` where JMdict's code
+/// is `adj-na`, and kiokun.com shows `adj-na`; this page shows the label the
+/// table means (the integrator's ruling of 2026-10-09).
+#[test]
+fn a_code_is_shown_by_kiokuns_label_for_it() {
+    let app = app_with_labels(
+        r#"{"labels":{"pos":{"n":"noun","ctr":"counter","adj_na":"na adj."},
+                      "misc":{"uk":"usually kana"},"field":{},"dial":{},
+                      "head_info":{"rkanji":"rare","io":"irreg."}}}"#,
+    );
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(sample(), Some(app.path())));
+    let japanese = section(&fetched(&s, &path_of("人")), "japanese").to_string();
+    assert!(
+        japanese.contains("<span class=\"tag\">counter</span>"),
+        "{japanese}"
+    );
+    assert!(
+        japanese.contains("<span class=\"tag\">noun</span>"),
+        "{japanese}"
+    );
+    assert!(
+        !japanese.contains("<span class=\"tag\">ctr</span>"),
+        "{japanese}"
+    );
+    // 空's senses carry `adj-na`, which the table spells `adj_na`.
+    let sky = section(&fetched(&s, &path_of("空")), "japanese").to_string();
+    assert!(sky.contains("<span class=\"tag\">na adj.</span>"), "{sky}");
+    assert!(!sky.contains("<span class=\"tag\">adj-na</span>"), "{sky}");
+    // A code in neither spelling is shown as it is: `adj-no`.
+    assert!(sky.contains("<span class=\"tag\">adj-no</span>"), "{sky}");
+    // A form's note, `rK` read as the table's `rkanji`.
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "稀",
+        r#"{"key":"稀","japanese_words":[{"id":"j","kanji":[{"text":"稀","tags":["rK"],"common":false}],
+            "kana":[{"text":"まれ","tags":[],"common":false}],"sense":[]}]}"#,
+    );
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        Some(app.path()),
+    ));
+    let rare = section(&fetched(&s, &path_of("稀")), "japanese").to_string();
+    assert!(
+        rare.contains("<span class=\"info-tag\">(rare)</span>"),
+        "{rare}"
+    );
+    // Control: with no app, a code is shown as it is. A server of its own,
+    // since a word's page is in the shared cache once read.
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(sample(), None));
+    let bare = section(&fetched(&s, &path_of("人")), "japanese").to_string();
+    assert!(bare.contains("<span class=\"tag\">ctr</span>"), "{bare}");
+}
+
+/// **An app named without its label table is refused**, not served with
+/// codes where labels were meant.
+#[test]
+fn an_app_without_its_label_table_is_refused() {
+    let empty = tempfile::TempDir::with_prefix("pw-kiokun-app-").expect("a directory");
+    assert!(crate::kiokun::labels_of(empty.path()).is_err());
+    assert!(crate::kiokun::app_of(empty.path()).is_err());
+    // Its component glosses too: a label table alone is refused.
+    std::fs::create_dir_all(empty.path().join("src/lib")).expect("its lib");
+    std::fs::write(empty.path().join("src/lib/japanese-labels.json"), "{}").expect("written");
+    assert!(crate::kiokun::labels_of(empty.path()).is_ok());
+    assert!(crate::kiokun::app_of(empty.path()).is_err());
+}
+
+/// What a page renders, before the scripts that carry its blocks'
+/// templates for the browser: those hold every block's markup, shown or not.
+fn rendered(html: &str) -> &str {
+    &html[..html.find("<script").unwrap_or(html.len())]
+}
+
+/// The character header's text.
+fn header_of(html: &str) -> String {
+    let start = html
+        .find("<div id=\"character-header\"")
+        .unwrap_or_else(|| panic!("no header: {html}"));
+    let end = start + html[start..].find("<section").unwrap_or(html.len() - start);
+    visible(&html[start..end])
+}
+
+/// The text of the element whose id is `id`.
+fn text_of(html: &str, id: &str) -> String {
+    let at = html
+        .find(&format!("id=\"{id}\""))
+        .unwrap_or_else(|| panic!("no {id}: {html}"));
+    let start = at + html[at..].find('>').expect("its tag's end") + 1;
+    let end = start + html[start..].find("</").expect("its end");
+    visible(&html[start..end])
+}
+
+/// **The character header** (`[word]/+page.svelte:572-690`): the learner
+/// gloss with the HSK and former JLPT levels beside it, and the readings,
+/// each labelled. 人's Mandarin is the frequency list's `rén` alone, since
+/// its words read `rén` and not `ren`.
+#[test]
+fn the_character_header_shows_its_gloss_levels_and_readings() {
+    let s = served_kiokun();
+    let person = fetched(&s, &path_of("人"));
+    assert_eq!(text_of(&person, "entry-gloss"), "person");
+    let header = header_of(&person);
+    for shown in [
+        "HSK 1",
+        "N4",
+        "Mandarin",
+        "rén",
+        "Cantonese",
+        "jan4",
+        "Korean",
+        "인",
+    ] {
+        assert!(header.contains(shown), "{shown}: {header}");
+    }
+    assert!(!header.contains("rén, ren"), "{header}");
+    let music = fetched(&s, &path_of("樂"));
+    // No keyword: the mnemonic's meaning.
+    assert_eq!(text_of(&music, "entry-gloss"), "music");
+    let header = header_of(&music);
+    for shown in [
+        "HSK 10",
+        "N3",
+        "lè, yuè",
+        "lok6",
+        "ガク、ラク、ゴウ",
+        "たの.しい、たの.しむ、この.む",
+        "악, 락, 요",
+    ] {
+        assert!(header.contains(shown), "{shown}: {header}");
+    }
+}
+
+/// **The header's own rules**, each with its control: no header for an
+/// entry with no Chinese or Japanese character; a source marker taken off
+/// the gloss (`normalizeLearnerGloss`); the keyword before the meaning, and
+/// the dictionary meanings shown beside a keyword; Mandarin from older
+/// sources where the frequency list has none, and from the words where
+/// neither has; a level of 0 not shown.
+#[test]
+fn the_character_headers_rules_hold() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "あ",
+        r#"{"key":"あ","japanese_words":[{"id":"j","kanji":[],"kana":[{"text":"あ","tags":[],"common":true}],"sense":[]}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "甲",
+        r#"{"key":"甲","chinese_char":{"gloss":"shell (trad/jp) armour (TRAD)","pinyinFrequencies":[],
+              "oldPronunciations":[{"pinyin":"jiǎ"}],"cantonese":[],"statistics":{"hskLevel":0}},
+            "semantic_mnemonic":{"mnemonic_keyword":"turtle","meaning":"shell","lexical_gloss":"first; shell"}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "乙",
+        r#"{"key":"乙","chinese_words":[{"_id":"1","simp":"乙","trad":"乙","items":[{"pinyin":"yǐ","definitions":["second"]}]}],
+            "chinese_char":{"gloss":"second (simp)","pinyinFrequencies":[],"oldPronunciations":[]}}"#,
+    );
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        None,
+    ));
+    let kana = fetched(&s, &path_of("あ"));
+    assert!(kana.starts_with("HTTP/1.1 200 OK\r\n"), "{kana}");
+    assert!(!rendered(&kana).contains("character-header"), "{kana}");
+    let shell = fetched(&s, &path_of("甲"));
+    assert_eq!(text_of(&shell, "entry-gloss"), "turtle");
+    let header = header_of(&shell);
+    assert!(
+        header.contains("Mnemonic keyword · Actual meanings: first; shell"),
+        "{header}"
+    );
+    assert!(header.contains("jiǎ"), "{header}");
+    assert!(!header.contains("HSK"), "{header}");
+    let second = fetched(&s, &path_of("乙"));
+    assert_eq!(text_of(&second, "entry-gloss"), "second");
+    // A Chinese word whose forms are empty is shown as the word looked up
+    // (`trad || simp || word`).
+    write_entry(
+        dir.path(),
+        "丁",
+        r#"{"key":"丁","chinese_words":[{"_id":"1","simp":"","trad":"","items":[{"pinyin":"dīng","definitions":["fourth"]}]}]}"#,
+    );
+    let fourth = fetched(&s, &path_of("丁"));
+    let chinese = section(&fourth, "chinese");
+    assert!(
+        chinese.contains("<span class=\"chinese-word-text\">"),
+        "{chinese}"
+    );
+    assert!(visible(chinese).contains("丁"), "{chinese}");
+    assert!(!rendered(&second).contains("mnemonic-keyword"), "{second}");
+    let header = header_of(&second);
+    assert!(
+        header.contains("Mandarin") && header.contains("yǐ"),
+        "{header}"
+    );
+    // The markers, ignoring case, and the space before each.
+    write_entry(
+        dir.path(),
+        "丙",
+        r#"{"key":"丙","chinese_char":{"gloss":"third (trad/jp) bright (TRAD)  (Jp)","cantonese":["bing2","bing2"]},
+            "japanese_char":{"misc":{},"readingMeaning":{"readings":[{"type":"ja_on","value":"ヘイ"}]}},
+            "semantic_mnemonic":{"mnemonic_keyword":"","meaning":"","lexical_gloss":"fire"}}"#,
+    );
+    let third = fetched(&s, &path_of("丙"));
+    assert_eq!(text_of(&third, "entry-gloss"), "third bright");
+    let header = header_of(&third);
+    // A reading once, however often the file lists it.
+    assert!(
+        header.contains("bing2") && !header.contains("bing2, bing2"),
+        "{header}"
+    );
+    // KANJIDIC's older flat list, where the file has no groups.
+    assert!(header.contains("ヘイ"), "{header}");
+    // Dictionary meanings with no keyword are not shown as a keyword's.
+    assert!(!rendered(&third).contains("mnemonic-keyword"), "{third}");
+}
+
+/// The header's written forms, each as `form-roles` shows it: its
+/// character and its short roles.
+fn forms_of(html: &str) -> Vec<String> {
+    let header = &html[html
+        .find("<div id=\"character-header\"")
+        .expect("the header")..];
+    let mut out = Vec::new();
+    let mut rest = header;
+    // An element's attributes may carry the renderer's own (`data-pw`), so
+    // each is found by its class, not by its tag's opening.
+    while let Some(at) = rest.find("class=\"character-specimen\"") {
+        rest = &rest[at..];
+        let character = text_of_class(rest, " lang=");
+        let roles = &rest[rest.find("class=\"form-roles\"").expect("its roles")..];
+        let hidden = &roles[roles.find("aria-hidden=\"true\"").expect("its short roles")..];
+        let short = &hidden[hidden.find('>').expect("its tag's end") + 1..];
+        let short = &short[..short.find('<').expect("its end")];
+        out.push(format!("{character} {short}"));
+        rest = &rest[1..];
+    }
+    out
+}
+
+/// The text inside the first element whose tag begins `open`.
+fn text_of_class(html: &str, open: &str) -> String {
+    let at = html.find(open).expect("the element");
+    let start = at + html[at..].find('>').expect("its tag's end") + 1;
+    let end = start + html[start..].find('<').expect("its end");
+    html[start..end].to_string()
+}
+
+/// **The header's written forms** (`buildCharacterHeaderForms`): 樂 is
+/// traditional, Hong Kong's and Korean; 乐, its simplified form; 楽, its
+/// Japanese form; and the hanja table's form, U+F914, the compatibility
+/// ideograph, a code point of its own and so a form of its own, as
+/// kiokun.com shows it. Each form's meaning is its card's, else kiokun.com's
+/// component gloss, its source marker removed.
+#[test]
+fn the_header_shows_each_written_form_with_its_roles() {
+    let app = app_with("{}", r#"{"乐":"music (simp)","楽":"fun (jp)"}"#);
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(sample(), Some(app.path())));
+    let music = fetched(&s, &path_of("樂"));
+    assert_eq!(
+        forms_of(&music),
+        ["樂 Trad · HK · KR", "乐 Simp", "楽 JP", "\u{F914} KR"]
+    );
+    let header = header_of(&music);
+    for meaning in ["music", "fun"] {
+        assert!(header.contains(meaning), "{meaning}: {header}");
+    }
+    assert!(
+        !header.contains("(simp)") && !header.contains("(jp)"),
+        "{header}"
+    );
+    assert!(
+        music.contains("aria-label=\"樂: Traditional / Hong Kong / Korean\""),
+        "{music}"
+    );
+    assert!(music.contains("lang=\"zh-Hans\">乐</div>"), "{music}");
+    assert!(music.contains("lang=\"ja\">楽</div>"), "{music}");
+}
+
+/// **A stub's page shows its target's forms and its own** (the related
+/// forms, `+page.ts:236-280`): 谚 is 諺's simplified form, read as the
+/// related form it is. 諺 is the hanja table's character too.
+#[test]
+fn a_stubs_page_shows_its_targets_forms_and_its_own() {
+    let s = served_kiokun();
+    let proverb = fetched(&s, &path_of("谚"));
+    assert_eq!(forms_of(&proverb), ["諺 Trad · HK · JP · KR", "谚 Simp"]);
+}
+
+/// **A stub's card stays the page's** (`+page.ts:438-462`): the stub's
+/// meaning heads the page, not its target's; with no card of its own, the
+/// target's.
+#[test]
+fn a_stubs_card_heads_the_page_it_names() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "乙",
+        r#"{"key":"乙","chinese_char":{"char":"乙"},
+            "semantic_mnemonic":{"character":"乙","meaning":"target meaning"}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "甲",
+        r#"{"key":"甲","redirect":"乙","semantic_mnemonic":{"character":"甲","meaning":"stub meaning"}}"#,
+    );
+    write_entry(dir.path(), "丙", r#"{"key":"丙","redirect":"乙"}"#);
+    let s = served_kiokun_on(dir.path());
+    assert_eq!(
+        text_of(&fetched(&s, &path_of("甲")), "entry-gloss"),
+        "stub meaning"
+    );
+    assert_eq!(
+        text_of(&fetched(&s, &path_of("丙")), "entry-gloss"),
+        "target meaning"
+    );
+}
+
+/// **A stub of several traditional forms shows each one's Chinese words**
+/// (`+page.ts:464-492`), once by id; a stub of one shows its target's alone.
+#[test]
+fn a_stub_of_several_traditional_forms_shows_each_ones_words() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    let word = |key: &str, id: &str, def: &str| {
+        format!(
+            r#"{{"key":"{key}","chinese_words":[{{"_id":"{id}","simp":"当","trad":"{key}","items":[{{"pinyin":"dāng","definitions":["{def}"]}}]}}]}}"#
+        )
+    };
+    write_entry(dir.path(), "當", &word("當", "a", "to serve as"));
+    write_entry(dir.path(), "噹", &word("噹", "b", "a clang"));
+    write_entry(
+        dir.path(),
+        "当",
+        r#"{"key":"当","redirect":"當","chinese_char":{"char":"当","tradVariants":["當","噹"]}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "档",
+        r#"{"key":"档","redirect":"當","chinese_char":{"char":"档","tradVariants":["當"]}}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    let both = visible(section(&fetched(&s, &path_of("当")), "chinese"));
+    assert!(
+        both.contains("to serve as") && both.contains("a clang"),
+        "{both}"
+    );
+    // 當 is read twice, as the target and as a variant: its word once.
+    assert_eq!(both.matches("to serve as").count(), 1, "{both}");
+    let one = visible(section(&fetched(&s, &path_of("档")), "chinese"));
+    assert!(
+        one.contains("to serve as") && !one.contains("a clang"),
+        "{one}"
+    );
+}
+
+/// **An equivalent simplified form's words are shown on its traditional
+/// page** (`mergeEquivalentFormData`): 后 is the simplified form of 後 alone
+/// and their cards teach one concept, so 後's page shows 后's words; 余,
+/// whose card teaches another, keeps its own.
+#[test]
+fn an_equivalent_forms_words_are_shown_on_the_canonical_page() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "後",
+        r#"{"key":"後","chinese_char":{"char":"後","simpVariants":["后","余"]},
+            "chinese_words":[{"_id":"t","simp":"后","trad":"後","items":[{"pinyin":"hòu","definitions":["behind"]}]}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "后",
+        r#"{"key":"后","simplified_form_of":"後","chinese_char":{"char":"后","tradVariants":["後"]},
+            "semantic_mnemonic":{"character":"后","meaning":"Back"},
+            "semantic_mnemonic_variants":[{"character":"後","meaning":"back "}],
+            "chinese_words":[{"_id":"s","simp":"后","trad":"后","items":[{"pinyin":"hòu","definitions":["queen"]}]}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "余",
+        r#"{"key":"余","simplified_form_of":"後","chinese_char":{"char":"余","tradVariants":["後"]},
+            "semantic_mnemonic":{"character":"余","meaning":"surplus"},
+            "semantic_mnemonic_variants":[{"character":"後","meaning":"back"}],
+            "chinese_words":[{"_id":"r","simp":"余","trad":"余","items":[{"pinyin":"yú","definitions":["surplus"]}]}]}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    let back = visible(section(&fetched(&s, &path_of("後")), "chinese"));
+    assert!(back.contains("behind") && back.contains("queen"), "{back}");
+    assert!(!back.contains("surplus"), "{back}");
 }

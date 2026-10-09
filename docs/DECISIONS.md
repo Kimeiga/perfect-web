@@ -2345,3 +2345,26 @@ kiokun's word page, a third program on the development server (track
   the file (the shard rule, kiokun's escape) and answers only for the word it
   records; a stub is followed one hop; what kiokun.com does not show is not
   shown; differences from kiokun.com are stated, its label bug not copied.
+[ADR-0287](DECISIONS/ADR-0287-a-handler-is-held-where-it-runs.md):
+a handler is held where it runs.
+- A page's declared placement grants what the page renders; its handlers'
+  work is held where handlers run, in the browser, by ADR-0113's rule, where
+  a command they call is a request the command performs. A page built ahead
+  may have a button that sends a command.
+[ADR-0288](DECISIONS/ADR-0288-kiokun-labels-and-character-header.md):
+kiokun's labels for JMdict's codes, and the character header (track
+`kiokun`, W6).
+- The word page shows a sense's part of speech, field, misc and dialect, and
+  a form's note, by kiokun.com's label table read from `KIOKUN_APP`, a code
+  the table lacks as it is; the character header shows the learner gloss,
+  its levels, the mnemonic's meanings and the readings, each rule named for
+  the kiokun.com function it is read from. Found: a host record's field is
+  named as its world names it, in kebab case.
+[ADR-0289](DECISIONS/ADR-0289-kiokun-loader-merges-and-written-forms.md):
+kiokun's loader merges, and the header's written forms (track `kiokun`,
+W6).
+- A word's files in one batched read; kiokun.com's loader rules in Pleris
+  (a stub followed, its variants and related forms merged, an equivalent
+  target found), each named for the function it is read from; the header's
+  written forms, each with its roles, language, label and meaning, the
+  component glosses read from `KIOKUN_APP`.
