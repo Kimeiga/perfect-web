@@ -113,6 +113,7 @@ fn noun_of(kind: DeclKind) -> &'static str {
         DeclKind::Event => "event",
         DeclKind::Source => "source",
         DeclKind::Upload => "upload",
+        DeclKind::Predicate => "predicate",
         DeclKind::Prelude => "prelude",
         DeclKind::Effect => "effect",
         DeclKind::Fn => "fn",

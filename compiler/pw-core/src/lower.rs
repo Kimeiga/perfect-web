@@ -160,6 +160,7 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
                 "event" => DeclKind::Event,
                 "source" => DeclKind::Source,
                 "upload" => DeclKind::Upload,
+                "predicate" => DeclKind::Predicate,
                 "task" => DeclKind::Task,
                 _ => {
                     let _ = src;

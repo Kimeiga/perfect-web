@@ -274,6 +274,9 @@ codes! {
     // a redirect there, as kiokun.com's word page does.
     REDIRECT_NAMES_A_CASE = "PW0350" / redirect_names_a_case / 1, DeclarationRules,
         "a page's `redirect_on` names a case a query it reads can answer, which carries the one parameter of the page's route, and says whether the move is permanent";
+    // ADR-XXXX: a refusal is told in the words of the predicate that refused.
+    PREDICATE_DECLARED = "PW0351" / predicate_declared / 1, DeclarationRules,
+        "a predicate a program declares says, in one string with no hole, what a reader is told when it refuses, is declared once, and is given its parameters by type wherever a `requires` names it";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
     // ADR-XXXX: a page is shown in its layout, which the pages that name it

@@ -654,6 +654,15 @@ impl Env {
 /// are two of them. Ten more are left for a host's shell around the page.
 pub const NESTED_ELEMENTS: u32 = 500;
 
+/// **The page's announcer** (ADR-XXXX): where the runtime says what a failed
+/// press is told, a `role="status"` read by ear and seen by no one. Written
+/// into every document that ships the runtime, so it is the same node from
+/// the page's first byte (ADR-0182): a live region added with its words is
+/// not reliably said.
+pub const ANNOUNCER: &str = "<div role=\"status\" class=\"pw-announcer\" style=\"position:absolute;\
+width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);\
+white-space:nowrap\"></div>";
+
 /// **Markup being written, and each instance inside it, written later**
 /// (ADR-0203). A view that contains itself goes as deep as its data, and a
 /// renderer that went down with each instance would overflow its thread's

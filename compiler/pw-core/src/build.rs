@@ -55,6 +55,9 @@ pub struct Build {
     /// Track `uploads` (ADR-0260): each upload the program declares, which
     /// a host holds a browser's file to.
     pub uploads: Vec<crate::uploads::UploadClauses>,
+    /// **The words each predicate the program declares is told in**
+    /// (ADR-XXXX), which a host answers a refusal by it with.
+    pub predicates: std::collections::BTreeMap<String, String>,
 }
 
 impl Build {
@@ -76,6 +79,9 @@ impl Build {
     ///                               where the program declares no upload
     /// DIR/sources.json              what each data source guarantees, which
     ///                               a host holds its database to (ADR-0246)
+    /// DIR/predicates.json           the words a refusal by each predicate the
+    ///                               program declares is told in (ADR-XXXX);
+    ///                               none where it declares none
     /// DIR/speculations/<page>.*     each page's speculations (ADR-0122)
     /// DIR/computed/<page>.mjs       what each page computes from its
     ///                               signals, in the browser (ADR-0227)
@@ -176,6 +182,14 @@ impl Build {
         if !self.uploads.is_empty() {
             let uploads = serde_json::to_string_pretty(&self.uploads).map_err(|e| e.to_string())?;
             write("uploads.json", format!("{uploads}\n").as_bytes())?;
+        }
+        // The words a refusal by each predicate the program declares is told
+        // in (ADR-XXXX). A program that declares none has no file, and its
+        // host tells each in the deployment's words.
+        if !self.predicates.is_empty() {
+            let words =
+                serde_json::to_string_pretty(&self.predicates).map_err(|e| e.to_string())?;
+            write("predicates.json", format!("{words}\n").as_bytes())?;
         }
         for s in &self.speculations {
             if let crate::backend::wasm::Encoding::Encoded(m) = &s.module {
@@ -394,6 +408,7 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
         pages,
         sources: crate::check::source_clauses(&hirs),
         uploads: crate::uploads::upload_clauses(&hirs),
+        predicates: crate::predicates::words_of(&hirs),
     })
 }
 
