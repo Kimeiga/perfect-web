@@ -122,7 +122,24 @@ async function record(page, testInfo, name = "") {
       body: JSON.stringify(server, null, 2),
       contentType: "application/json",
     });
+    said.server = server;
   }
+  // And printed, the latest of each, one line a page: a mutation script's
+  // red baseline shows a failing test's records (`pw-record`), where a
+  // recipe keeps no attachment. "a follow reaches another reader" failed in
+  // five of them in run 37918808029, and in no browser job.
+  const latest = (list, n) => (Array.isArray(list) ? list.slice(-n) : list);
+  console.log(
+    `pw-record${name} ${JSON.stringify({
+      log: latest(said.log, 40),
+      network: latest(said.network, 40),
+      transport: said.transport,
+      reconnects: said.reconnects,
+      trail: latest(said.server?.trail, 80),
+      slow: latest(said.server?.slow, 20),
+      at: said.server?.at,
+    })}`,
+  );
 }
 test.afterEach(async ({ page }, testInfo) => {
   if (testInfo.status === testInfo.expectedStatus) return;
@@ -680,8 +697,9 @@ test("a follow shows before the server answers, and is the server's after", asyn
   // Left as it was found, for the next test's count, and answered before the
   // page is left (ADR-0268): `#follow` is the speculation's, before the
   // server has it. Not awaited, the unfollow could commit after the next
-  // test read its count, which then expected one follower too many (CI's
-  // baselines, run 37893301747, three of three).
+  // test read its count. Suspected, and not the cause, of the next test's
+  // failures in CI's baselines (run 37893301747): awaited, it failed again
+  // (run 37918808029).
   const unfollowed = page.waitForResponse("**/command/feed.app.unfollow");
   await page.locator("#unfollow").click();
   await unfollowed;
