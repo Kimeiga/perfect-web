@@ -113,7 +113,8 @@ fn kiokun_is_served_by_the_host_its_entries_read_from_kiokuns_files() {
         vec![
             "database.read<Entry>",
             "database.read<Label>",
-            "database.read<CharGloss>"
+            "database.read<CharGloss>",
+            "database.read<PitchReading>"
         ]
     );
     assert!(s.data.operations().contains("kiokun:data/entries#read"));
@@ -1355,4 +1356,145 @@ fn the_japanese_examples_match_kiokuns_answers_for_the_sample() {
     let s = served_kiokun_on(&sample());
     let differ = examples_held_to_oracle(&s, oracle);
     assert!(differ.is_empty(), "{differ:#?}");
+}
+
+/// The pitch shard a word is in, as `PitchAccent.svelte` hashes it: over
+/// UTF-16 units, the reference the program's rule is held to.
+fn pitch_shard_of(word: &str) -> String {
+    let h = word
+        .encode_utf16()
+        .fold(0u32, |h, u| h.wrapping_mul(31).wrapping_add(u32::from(u)));
+    format!("{:02x}", h & 0xff)
+}
+
+/// Writes `json` as pitch shard `shard` of `app`.
+fn write_pitch(app: &std::path::Path, shard: &str, json: &str) {
+    std::fs::create_dir_all(app.join("static/pitch")).expect("the pitch directory");
+    std::fs::write(app.join(format!("static/pitch/{shard}.json")), json).expect("written");
+}
+
+/// The pitch a Japanese word shows: each mora, `^` where it is high, and the
+/// pattern's name; "" where it shows none.
+fn pitches_in(section: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = section;
+    while let Some(at) = rest.find("class=\"pronunciation-slot\"") {
+        rest = &rest[at + 1..];
+        let end = rest
+            .find("class=\"pronunciation-slot\"")
+            .unwrap_or(rest.len());
+        let this = &rest[..end];
+        let Some(display) = this.find("class=\"pitch-display\"") else {
+            out.push(String::new());
+            continue;
+        };
+        let mut shown = String::new();
+        let mut morae = &this[display..];
+        while let Some(m) = morae.find("class=\"pitch-mora") {
+            let high = morae[m..].starts_with("class=\"pitch-mora high\"");
+            let text = text_of_class(&morae[m..], "class=\"pitch-mora");
+            shown.push_str(&if high { format!("^{text}") } else { text });
+            morae = &morae[m + 1..];
+        }
+        shown.push(' ');
+        shown.push_str(&text_of_class(this, "class=\"pitch-label\""));
+        out.push(shown);
+    }
+    out
+}
+
+/// **Pitch accent** (`PitchAccent.svelte`), from kiokun.com's pitch data
+/// through `KIOKUN_APP`: the accent of the word's reading where the data has
+/// it, else of its first reading, in the data's order; each mora high or
+/// low by the accent; the pattern named 平板, 頭高, 中高 or 尾高; a small kana
+/// joined to the mora before it; nothing where the accent is `null` or the
+/// word is not in the data.
+#[test]
+fn a_japanese_word_shows_its_pitch_accent() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    let word = |key: &str, words: &str| format!(r#"{{"key":"{key}","japanese_words":[{words}]}}"#);
+    let jword = |id: &str, kanji: &str, kana: &str| {
+        format!(
+            r#"{{"id":"{id}","kanji":[{{"text":"{kanji}","tags":[],"common":false}}],"kana":[{{"text":"{kana}","tags":[],"common":false}}],"sense":[]}}"#
+        )
+    };
+    write_entry(dir.path(), "話", &word("話", &jword("1", "話", "はなし")));
+    write_entry(dir.path(), "弟", &word("弟", &jword("2", "弟", "おとうと")));
+    write_entry(
+        dir.path(),
+        "今日",
+        &word("今日", &jword("3", "今日", "きょう")),
+    );
+    write_entry(
+        dir.path(),
+        "人",
+        &word(
+            "人",
+            &format!("{},{}", jword("4", "人", "ひと"), jword("5", "人", "じん")),
+        ),
+    );
+    write_entry(dir.path(), "無", &word("無", &jword("6", "無", "む")));
+    write_entry(dir.path(), "空", &word("空", &jword("7", "空", "そら")));
+    let app = app_with("{}", "{}");
+    write_pitch(app.path(), &pitch_shard_of("話"), r#"{"話":{"はなし":3}}"#);
+    write_pitch(
+        app.path(),
+        &pitch_shard_of("弟"),
+        r#"{"弟":{"おとうと":2}}"#,
+    );
+    write_pitch(
+        app.path(),
+        &pitch_shard_of("今日"),
+        r#"{"今日":{"きょう":1}}"#,
+    );
+    // じん is not there: the first reading's, in the file's order (`にん`
+    // before `ひと`, though `ひと` sorts first).
+    write_pitch(
+        app.path(),
+        &pitch_shard_of("人"),
+        r#"{"人":{"にん":1,"ひと":0}}"#,
+    );
+    write_pitch(app.path(), &pitch_shard_of("無"), r#"{"無":{"む":null}}"#);
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        Some(app.path()),
+    ));
+    let pitch = |w: &str| pitches_in(section(&fetched(&s, &path_of(w)), "japanese"));
+    assert_eq!(pitch("話"), ["は^な^し 尾高"]);
+    assert_eq!(pitch("弟"), ["お^とうと 中高"]);
+    assert_eq!(pitch("今日"), ["^きょう 頭高"]);
+    assert_eq!(pitch("人"), ["ひ^と 平板", "^じん 頭高"]);
+    assert_eq!(pitch("無"), [""]);
+    assert_eq!(pitch("空"), [""]);
+}
+
+/// **A pitch shard is the hash over UTF-16 units**, not the entries' shard
+/// rule over code points: a word past U+FFFF is in another shard by each.
+#[test]
+fn a_pitch_shard_is_its_words_hash_over_utf16_units() {
+    let word = "𠀋";
+    let by_points = format!(
+        "{:02x}",
+        word.chars()
+            .fold(0u32, |h, c| h.wrapping_mul(31).wrapping_add(u32::from(c)))
+            & 0xff
+    );
+    assert_ne!(pitch_shard_of(word), by_points);
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        word,
+        r#"{"key":"𠀋","japanese_words":[{"id":"1","kanji":[{"text":"𠀋","tags":[],"common":false}],"kana":[{"text":"じょう","tags":[],"common":false}],"sense":[]}]}"#,
+    );
+    let app = app_with("{}", "{}");
+    write_pitch(app.path(), &pitch_shard_of(word), r#"{"𠀋":{"じょう":0}}"#);
+    write_pitch(app.path(), &by_points, r#"{"𠀋":{"じょう":1}}"#);
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        Some(app.path()),
+    ));
+    let page = fetched(&s, &path_of(word));
+    assert_eq!(pitches_in(section(&page, "japanese")), ["じょ^う 平板"]);
 }
