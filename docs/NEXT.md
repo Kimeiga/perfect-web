@@ -698,16 +698,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
           scope. The integrator's, in order:
           1. **the parts two pages share kept in place**, ADR-0280's next:
              a soft navigation, which item 3's test needs;
-          2. **accounts in the store**: ADR-0258's identity and ADR-0270's
-             principal wired in, so the cart and the orders are a user's,
-             not only a session's; after W5's merge, whose tables they
-             change;
-          3. **delivery addresses**: entered and saved, a delivery zone
-             checked, estimates and availability keyed by the address
-             chosen. Accepted by the owner's own Next.js bug: save an
-             address, go to a store, and its page shows the new address's
-             estimate, with no cache-busting parameter, no reload and no
-             header mounted again, in three engines;
+          2. ~~**accounts in the store**~~ and 3. ~~**delivery
+             addresses**~~: **W8's since 2026-10-09** (the owner: DoorDash
+             faster, with a third worker; PARALLEL.md, "the DoorDash track"),
+             launched first in the next free slot after W5's merge, whose
+             tables they change. Accepted by the owner's own Next.js bug:
+             save an address, go to a store, and its page shows the new
+             address's estimate, with no cache-busting parameter, no reload
+             and, once item 1 lands, no header mounted again, in three
+             engines. The integrator's own items here (1, 4, 5, 6) come
+             before kiokun's and the infrastructure follow-ups (the owner,
+             2026-10-09);
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled;
           5. **idempotency committed with the writes** (PW0348, ADR-0246's
