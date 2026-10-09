@@ -2316,3 +2316,18 @@ what a value holds is one label (amends ADR-0118, corrects ADR-0128).
   declaration holds, as the cache rules read it, in the checker and the
   contract alike; and a placement refusal names the label that rules each
   world out. Four soundness findings of 2026-10-03, each fixed.
+[ADR-0283](DECISIONS/ADR-0283-a-components-contract-is-what-its-code-does.md):
+a component's contract is what its code does (amends ADR-0078's readers and
+E8-0's handler rule).
+- A component imports what the functions compiled into it call; placement,
+  the source checks and the contract read what a body performs as the row
+  check does, function values and members included; and only a handler's
+  work is deferred. W6's finding, and a query that read the database
+  through a function value or a lambda and could be placed in the browser,
+  both fixed.
+[ADR-0284](DECISIONS/ADR-0284-a-value-of-any-type-is-fixed-by-the-call-that-meets-it.md):
+a value of any type is fixed by the call that meets it (amends ADR-0065).
+- A variable bound to a type with parts of any type gets a variable for
+  each, so a fold's function fixes its accumulator: the checker refuses
+  ill-typed folds it passed, and the backend builds a seed its context does
+  not type at the fold's solved type. W6's finding.

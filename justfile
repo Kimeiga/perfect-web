@@ -5311,3 +5311,20 @@ e14-held-labels:
      } > docs/evidence/E14/held-labels.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/held-labels.txt
 
+
+# ADR-0283 and ADR-0284, from W6's report on kiokun's word page: a
+# component's contract is what its code does, and a value of any type is
+# fixed by the call that meets it. The compiler's tests, the store's
+# contracts and worlds held to the committed ones, and the mutation controls.
+e14-what-a-component-does:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0283 and ADR-0284 - a component's contract is what its code does; a value of any type is fixed by the call that meets it"; echo; \
+       echo "produced by: just e14-what-a-component-does"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (what_a_component_does.rs, any_type.rs, component_contract.rs, evidence_is_current.rs)"; echo; \
+       cargo test --locked -p pw-core --test what_a_component_does --test any_type --test component_contract --test evidence_is_current 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/what_a_component_does_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/what_a_component_does_mutations.py; \
+     } > docs/evidence/E14/what-a-component-does.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/what-a-component-does.txt

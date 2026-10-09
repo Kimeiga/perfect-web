@@ -433,8 +433,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
              and, open, **`feed.spec.mjs`'s "Load more shows the next page"
              in WebKit, on CI again** (run 37826467131 at `b393cee`, job
              113480498704: its rows stayed at twenty, and again in run
-             37867532722's job 113617759049). ADR-0271 left 2 of 160 failing
-             under loads past CI's; this one was on CI's own; and, open,
+             37867532722's job 113617759049, and in run 37877464406's job
+             113649231199, read 2026-10-09: the runtime's own record shows
+             the Load-more read answered `{"applied":1}` at 8804 ms on an
+             open stream, with no reconnect, and no frame applied in the
+             four seconds after, while the 25 seeding posts had taken up to
+             598 ms each to commit. The server applied the read, and its
+             frame never came, or came late: what the server did with doc
+             22's frames is the next thing to record, in the failure's
+             attachment). ADR-0271 left 2 of 160 failing under loads past
+             CI's; this one was on CI's own; and, open,
              **a resume manifest's document and scope are constants**
              (found writing the capability matrix, 2026-10-08): every
              document's manifest says `"document": "cart-doc"` and `"scope":
@@ -469,6 +477,28 @@ E14 comes before E11-E13. Its plan, controls and task list are
                 any world: it requires" and nothing after it, where a label
                 alone, not an effect, rules out every world;
 
+             and ~~**W6's two compiler findings**~~ (ADR-0283, ADR-0284,
+             `just e14-what-a-component-does`, 2026-10-09): a host call
+             reached through a function, imported; a fold's empty seed,
+             typed, after the checker was found passing ill-typed folds;
+             and, found probing them, a query that read the database
+             through a function value or inside a lambda required no
+             capability and could be placed in the browser; and, open,
+             small, each over-stating or refusing rather than granting:
+             **a call through a local is charged its namesake's effects**
+             (ADR-0283's first limit: the effect inference's call walk
+             resolves a callee's name without its scope), and **only a
+             fold's seed takes the checker's type in the backend**
+             (ADR-0284's: `List.concat([], xs)` in a `let` is refused);
+             and, open, found probing ADR-0283, **a page's handler is held
+             to the page's placement**: the row check keeps an `on:`
+             handler's effects in the page's row and grants them against
+             the page's world, so a page placed at `build` whose button
+             sends a command is refused (PW5005, `database.write<Thing>`
+             not available at Build), where its contract, which defers the
+             handler, allows `build`. A handler runs in the browser, and a
+             command it sends at the command's own placement: the
+             DoorDash menu's static pages with an Add button need this;
              and, open, next, the integrator's, **the host's paths
              reserved under `/_pw/`** (W6's question, PARALLEL.md
              2026-10-08): the runtime's files and its root endpoints moved
