@@ -108,8 +108,12 @@ fn section<'a>(html: &'a str, id: &str) -> &'a str {
 #[test]
 fn kiokun_is_served_by_the_host_its_entries_read_from_kiokuns_files() {
     let s = served_kiokun();
-    assert_eq!(s.data.grants(), vec!["database.read<Entry>"]);
+    assert_eq!(
+        s.data.grants(),
+        vec!["database.read<Entry>", "database.read<Label>"]
+    );
     assert!(s.data.operations().contains("kiokun:data/entries#read"));
+    assert!(s.data.operations().contains("kiokun:data/labels#japanese"));
     let page = fetched(&s, &path_of("人"));
     assert!(page.starts_with("HTTP/1.1 200 OK\r\n"), "{page}");
     assert!(page.contains("<h1 id=\"headword\">人</h1>"), "{page}");
@@ -250,7 +254,7 @@ fn write_entry(dir: &std::path::Path, word: &str, json: &str) {
 /// kiokun's program, its entries read from `dir`.
 fn served_kiokun_on(dir: &std::path::Path) -> Served {
     let mut s = served_kiokun();
-    s.server.data = Arc::new(crate::kiokun::KiokunData::at(dir.to_path_buf()));
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(dir.to_path_buf(), None));
     s
 }
 
@@ -427,4 +431,234 @@ fn a_word_too_long_to_be_a_file_name_is_not_found() {
     use crate::kiokun::place;
     assert!(place("00", &longest).is_some());
     assert_eq!(place("00", &"a".repeat(243)), None);
+}
+/// The repository's sample (ADR-0037), as the layer reads it by default.
+fn sample() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../examples/kiokun/data/han-1char-3")
+}
+
+/// An app beside kiokun's files whose label table is `labels`, as
+/// `sveltekit-app/src/lib/japanese-labels.json` is laid out.
+fn app_with_labels(labels: &str) -> tempfile::TempDir {
+    let app = tempfile::TempDir::with_prefix("pw-kiokun-app-").expect("a directory");
+    std::fs::create_dir_all(app.path().join("src/lib")).expect("its lib");
+    std::fs::write(app.path().join("src/lib/japanese-labels.json"), labels).expect("written");
+    app
+}
+
+/// **A code is shown by kiokun.com's label for it** (`japaneseLabels.ts`):
+/// a part of speech and a form's note from their own tables; a code a table
+/// lacks, as it is. kiokun.com's table spells `adj_na` where JMdict's code
+/// is `adj-na`, and kiokun.com shows `adj-na`; this page shows the label the
+/// table means (the integrator's ruling of 2026-10-09).
+#[test]
+fn a_code_is_shown_by_kiokuns_label_for_it() {
+    let app = app_with_labels(
+        r#"{"labels":{"pos":{"n":"noun","ctr":"counter","adj_na":"na adj."},
+                      "misc":{"uk":"usually kana"},"field":{},"dial":{},
+                      "head_info":{"rkanji":"rare","io":"irreg."}}}"#,
+    );
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(sample(), Some(app.path())));
+    let japanese = section(&fetched(&s, &path_of("人")), "japanese").to_string();
+    assert!(
+        japanese.contains("<span class=\"tag\">counter</span>"),
+        "{japanese}"
+    );
+    assert!(
+        japanese.contains("<span class=\"tag\">noun</span>"),
+        "{japanese}"
+    );
+    assert!(
+        !japanese.contains("<span class=\"tag\">ctr</span>"),
+        "{japanese}"
+    );
+    // 空's senses carry `adj-na`, which the table spells `adj_na`.
+    let sky = section(&fetched(&s, &path_of("空")), "japanese").to_string();
+    assert!(sky.contains("<span class=\"tag\">na adj.</span>"), "{sky}");
+    assert!(!sky.contains("<span class=\"tag\">adj-na</span>"), "{sky}");
+    // A code in neither spelling is shown as it is: `adj-no`.
+    assert!(sky.contains("<span class=\"tag\">adj-no</span>"), "{sky}");
+    // A form's note, `rK` read as the table's `rkanji`.
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "稀",
+        r#"{"key":"稀","japanese_words":[{"id":"j","kanji":[{"text":"稀","tags":["rK"],"common":false}],
+            "kana":[{"text":"まれ","tags":[],"common":false}],"sense":[]}]}"#,
+    );
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        Some(app.path()),
+    ));
+    let rare = section(&fetched(&s, &path_of("稀")), "japanese").to_string();
+    assert!(
+        rare.contains("<span class=\"info-tag\">(rare)</span>"),
+        "{rare}"
+    );
+    // Control: with no app, a code is shown as it is. A server of its own,
+    // since a word's page is in the shared cache once read.
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(sample(), None));
+    let bare = section(&fetched(&s, &path_of("人")), "japanese").to_string();
+    assert!(bare.contains("<span class=\"tag\">ctr</span>"), "{bare}");
+}
+
+/// **An app named without its label table is refused**, not served with
+/// codes where labels were meant.
+#[test]
+fn an_app_without_its_label_table_is_refused() {
+    let empty = tempfile::TempDir::with_prefix("pw-kiokun-app-").expect("a directory");
+    assert!(crate::kiokun::labels_of(empty.path()).is_err());
+}
+
+/// What a page renders, before the scripts that carry its blocks'
+/// templates for the browser: those hold every block's markup, shown or not.
+fn rendered(html: &str) -> &str {
+    &html[..html.find("<script").unwrap_or(html.len())]
+}
+
+/// The character header's text.
+fn header_of(html: &str) -> String {
+    let start = html
+        .find("<div id=\"character-header\"")
+        .unwrap_or_else(|| panic!("no header: {html}"));
+    let end = start + html[start..].find("<section").unwrap_or(html.len() - start);
+    visible(&html[start..end])
+}
+
+/// The text of the element whose id is `id`.
+fn text_of(html: &str, id: &str) -> String {
+    let at = html
+        .find(&format!("id=\"{id}\""))
+        .unwrap_or_else(|| panic!("no {id}: {html}"));
+    let start = at + html[at..].find('>').expect("its tag's end") + 1;
+    let end = start + html[start..].find("</").expect("its end");
+    visible(&html[start..end])
+}
+
+/// **The character header** (`[word]/+page.svelte:572-690`): the learner
+/// gloss with the HSK and former JLPT levels beside it, and the readings,
+/// each labelled. 人's Mandarin is the frequency list's `rén` alone, since
+/// its words read `rén` and not `ren`.
+#[test]
+fn the_character_header_shows_its_gloss_levels_and_readings() {
+    let s = served_kiokun();
+    let person = fetched(&s, &path_of("人"));
+    assert_eq!(text_of(&person, "entry-gloss"), "person");
+    let header = header_of(&person);
+    for shown in [
+        "HSK 1",
+        "N4",
+        "Mandarin",
+        "rén",
+        "Cantonese",
+        "jan4",
+        "Korean",
+        "인",
+    ] {
+        assert!(header.contains(shown), "{shown}: {header}");
+    }
+    assert!(!header.contains("rén, ren"), "{header}");
+    let music = fetched(&s, &path_of("樂"));
+    // No keyword: the mnemonic's meaning.
+    assert_eq!(text_of(&music, "entry-gloss"), "music");
+    let header = header_of(&music);
+    for shown in [
+        "HSK 10",
+        "N3",
+        "lè, yuè",
+        "lok6",
+        "ガク、ラク、ゴウ",
+        "たの.しい、たの.しむ、この.む",
+        "악, 락, 요",
+    ] {
+        assert!(header.contains(shown), "{shown}: {header}");
+    }
+}
+
+/// **The header's own rules**, each with its control: no header for an
+/// entry with no Chinese or Japanese character; a source marker taken off
+/// the gloss (`normalizeLearnerGloss`); the keyword before the meaning, and
+/// the dictionary meanings shown beside a keyword; Mandarin from older
+/// sources where the frequency list has none, and from the words where
+/// neither has; a level of 0 not shown.
+#[test]
+fn the_character_headers_rules_hold() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "あ",
+        r#"{"key":"あ","japanese_words":[{"id":"j","kanji":[],"kana":[{"text":"あ","tags":[],"common":true}],"sense":[]}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "甲",
+        r#"{"key":"甲","chinese_char":{"gloss":"shell (trad/jp) armour (TRAD)","pinyinFrequencies":[],
+              "oldPronunciations":[{"pinyin":"jiǎ"}],"cantonese":[],"statistics":{"hskLevel":0}},
+            "semantic_mnemonic":{"mnemonic_keyword":"turtle","meaning":"shell","lexical_gloss":"first; shell"}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "乙",
+        r#"{"key":"乙","chinese_words":[{"_id":"1","simp":"乙","trad":"乙","items":[{"pinyin":"yǐ","definitions":["second"]}]}],
+            "chinese_char":{"gloss":"second (simp)","pinyinFrequencies":[],"oldPronunciations":[]}}"#,
+    );
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        None,
+    ));
+    let kana = fetched(&s, &path_of("あ"));
+    assert!(kana.starts_with("HTTP/1.1 200 OK\r\n"), "{kana}");
+    assert!(!rendered(&kana).contains("character-header"), "{kana}");
+    let shell = fetched(&s, &path_of("甲"));
+    assert_eq!(text_of(&shell, "entry-gloss"), "turtle");
+    let header = header_of(&shell);
+    assert!(
+        header.contains("Mnemonic keyword · Actual meanings: first; shell"),
+        "{header}"
+    );
+    assert!(header.contains("jiǎ"), "{header}");
+    assert!(!header.contains("HSK"), "{header}");
+    let second = fetched(&s, &path_of("乙"));
+    assert_eq!(text_of(&second, "entry-gloss"), "second");
+    // A Chinese word whose forms are empty is shown as the word looked up
+    // (`trad || simp || word`).
+    write_entry(
+        dir.path(),
+        "丁",
+        r#"{"key":"丁","chinese_words":[{"_id":"1","simp":"","trad":"","items":[{"pinyin":"dīng","definitions":["fourth"]}]}]}"#,
+    );
+    let fourth = fetched(&s, &path_of("丁"));
+    let chinese = section(&fourth, "chinese");
+    assert!(chinese.contains("<span class=\"chinese-word-text\">"), "{chinese}");
+    assert!(visible(chinese).contains("丁"), "{chinese}");
+    assert!(!rendered(&second).contains("mnemonic-keyword"), "{second}");
+    let header = header_of(&second);
+    assert!(
+        header.contains("Mandarin") && header.contains("yǐ"),
+        "{header}"
+    );
+    // The markers, ignoring case, and the space before each.
+    write_entry(
+        dir.path(),
+        "丙",
+        r#"{"key":"丙","chinese_char":{"gloss":"third (trad/jp) bright (TRAD)  (Jp)","cantonese":["bing2","bing2"]},
+            "japanese_char":{"misc":{},"readingMeaning":{"readings":[{"type":"ja_on","value":"ヘイ"}]}},
+            "semantic_mnemonic":{"mnemonic_keyword":"","meaning":"","lexical_gloss":"fire"}}"#,
+    );
+    let third = fetched(&s, &path_of("丙"));
+    assert_eq!(text_of(&third, "entry-gloss"), "third bright");
+    let header = header_of(&third);
+    // A reading once, however often the file lists it.
+    assert!(
+        header.contains("bing2") && !header.contains("bing2, bing2"),
+        "{header}"
+    );
+    // KANJIDIC's older flat list, where the file has no groups.
+    assert!(header.contains("ヘイ"), "{header}");
+    // Dictionary meanings with no keyword are not shown as a keyword's.
+    assert!(!rendered(&third).contains("mnemonic-keyword"), "{third}");
 }

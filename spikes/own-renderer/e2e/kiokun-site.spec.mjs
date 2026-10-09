@@ -23,6 +23,12 @@ const at = (word) => `/word/${encodeURIComponent(word)}`;
 /** What a page for 人 shows, whichever way it was rendered. */
 async function shows人(page) {
   await expect(page.locator("#headword")).toHaveText("人");
+  // The character header: the learner gloss, the levels, the readings.
+  await expect(page.locator("#entry-gloss")).toHaveText("person");
+  await expect(page.locator("#character-header .level-badge.hsk")).toHaveText("HSK 1");
+  await expect(page.locator("#character-header .level-badge.jlpt")).toHaveText("N4");
+  await expect(page.locator("#character-header .text-pinyin")).toHaveText("rén");
+  await expect(page.locator("#character-header .text-cantonese")).toHaveText("jan4");
   await expect(page.locator("#chinese-heading")).toHaveText("Chinese");
   await expect(page.locator("#chinese .chinese-pronunciation").first()).toHaveText("[rén]");
   await expect(page.locator("#chinese .cantonese-pronunciation").first()).toHaveText("[jan4]");
