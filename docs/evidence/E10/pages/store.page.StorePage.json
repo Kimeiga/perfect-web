@@ -6,25 +6,6 @@
   ],
   "bindings": [
     {
-      "binding": "cart~StoreLayout",
-      "resource": "store.page.Cart",
-      "args": [
-        "current_session()"
-      ],
-      "policy": {
-        "cache": "private",
-        "privacy": "session",
-        "freshness_ms": 0,
-        "timeout_ms": 2000,
-        "attempts": 1,
-        "parallel": false,
-        "key": [
-          0
-        ],
-        "on_key_change": "cancel"
-      }
-    },
-    {
       "binding": "store",
       "resource": "store.page.Store",
       "args": [
@@ -112,16 +93,6 @@
   "parts": [
     {
       "part": 0,
-      "path": "cart~StoreLayout.line_count",
-      "binding": "cart~StoreLayout",
-      "steps": [
-        {
-          "member": "domain.line_count"
-        }
-      ]
-    },
-    {
-      "part": 1,
       "path": "store.name",
       "binding": "store",
       "steps": [
@@ -131,7 +102,7 @@
       ]
     },
     {
-      "part": 2,
+      "part": 1,
       "path": "store.description",
       "binding": "store",
       "steps": [
@@ -141,13 +112,13 @@
       ]
     },
     {
-      "part": 3,
+      "part": 2,
       "path": "summary",
       "binding": "summary",
       "steps": []
     },
     {
-      "part": 16,
+      "part": 15,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -157,7 +128,7 @@
       ]
     },
     {
-      "part": 28,
+      "part": 27,
       "path": "cart.subtotal.display",
       "binding": "cart",
       "steps": [
@@ -182,18 +153,18 @@
   ],
   "live": [
     {
-      "part": 30,
+      "part": 29,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
     }
   ],
   "blocks": [
-    29
+    28
   ],
   "streams": [
     {
-      "part": 4,
+      "part": 3,
       "resource": "store.page.Estimate",
       "args": [
         "current_session()"
@@ -213,7 +184,7 @@
       "streamed": true
     },
     {
-      "part": 32,
+      "part": 31,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -275,13 +246,8 @@
     }
   ],
   "attributes": [
-    17
+    16
   ],
-  "title": 35,
-  "layout": {
-    "path": "store.page.StoreLayout",
-    "schema": "d92ef64b146df5d6",
-    "parts": 1,
-    "elements": 0
-  }
+  "title": 34,
+  "scope": "session:"
 }

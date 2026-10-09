@@ -469,6 +469,25 @@ pub(crate) fn capture_names_and_types(
 /// Unmarked is `Public`, which is R-030's case: a `view` with no visibility
 /// renders into the shared shell, and a session value in that shell is served
 /// to whoever the shell is served to.
+/// **A page's scope, as its documents' resume manifest says it**
+/// (ADR-XXXX): `public`, or the principal its documents are partitioned by
+/// (`session:`, `user:`, `organization:`), or `private:` where it is cached
+/// privately and names none. Read from [`manifest_scope`], so the two cannot
+/// say different things; the browser's decision holds a capture to it.
+pub fn page_scope(hir: &Hir, decl: &Decl) -> &'static str {
+    let Some(label) = manifest_scope(hir, decl) else {
+        return "private:";
+    };
+    match label.restrictions().next() {
+        None => "public",
+        Some(Restriction::Session(_)) => "session:",
+        Some(Restriction::User(_)) => "user:",
+        Some(Restriction::Organization(_)) => "organization:",
+        // A page is no device's and holds no capability's secret.
+        Some(Restriction::Device | Restriction::Secret(_)) => "private:",
+    }
+}
+
 pub(crate) fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::Label> {
     // A declared principal. `session`, `user` and `organization` each name WHO
     // the scope belongs to, which is what a flow relation needs.

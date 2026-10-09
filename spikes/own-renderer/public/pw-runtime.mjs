@@ -370,10 +370,15 @@ function applyList(key, scope, op) {
 
 let decide = null;
 
+/** **The build that served this runtime** (ADR-XXXX), by its name, from its
+ * handler table: empty until the table is read. */
+let servedBuild = "";
+
 async function bootDecision() {
   const response = await fetch("/pw-resume.wasm");
   const { instance } = await WebAssembly.instantiateStreaming(response, {});
-  const { memory, alloc, decide_manifest, last_recovery, know } = instance.exports;
+  const { memory, alloc, decide_manifest, last_recovery, know, know_document } =
+    instance.exports;
 
   const write = (s) => {
     const bytes = new TextEncoder().encode(s);
@@ -388,6 +393,17 @@ async function bootDecision() {
   const table = await fetch("/pw-handlers").then((r) => (r.ok ? r.text() : ""));
   const known = know(...write(table));
   log.push(`knows ${known} handler(s)`);
+  // **What this build says of this page's documents** (ADR-XXXX): its name,
+  // and this page's document schema and scope, from the same table and never
+  // from the document; the decision holds each handler's document to them.
+  const lines = table.split("\n");
+  servedBuild = lines.find((l) => l.startsWith("#build|"))?.slice("#build|".length) ?? "";
+  const page = lines.find((l) => l.startsWith(`#page|${PAGE}|`));
+  if (page && know_document) {
+    const [, , schema, scope] = page.split("|");
+    know_document(...write(`${schema}|${scope}`));
+    log.push(`knows ${PAGE}'s documents: ${schema} ${scope}`);
+  }
   // `last_recovery` returns an INDEX into this list, not a pointer. A first
   // version read it as one and every decision threw `Start offset -1 is
   // outside the bounds of the buffer`, which the page reported as "boot
@@ -437,6 +453,8 @@ window.__pw = {
   /** A page's address from its route and its parameters' values, as a
    * navigation goes to it (ADR-0280). */
   pageAddress: (route, args) => pageAddress(route, args),
+  /** The build that served this runtime (ADR-XXXX). */
+  build: () => servedBuild,
   indexSize: () => index.size,
   /** The bytes of command bodies kept alive and not yet answered, and what
    * they may come to (ADR-0268). */

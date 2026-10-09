@@ -111,8 +111,10 @@ MUTANTS = [
         "the plan does not name the title",
         "core",
         PLAN,
-        "            title,\n            layout,\n        },\n        members,\n",
-        "            title: None,\n            layout,\n        },\n        members,\n",
+        # Re-anchored by the build id's ADR, whose plan names its scope after
+        # the title, and the layouts', its layout after the scope.
+        "            title,\n            scope: crate::resume::page_scope(hir, decl).to_string(),\n",
+        "            title: None,\n            scope: crate::resume::page_scope(hir, decl).to_string(),\n",
     ),
     (
         "a title that reads a speculated value is let through",
