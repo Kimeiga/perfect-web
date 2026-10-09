@@ -9,12 +9,14 @@ and where it ran, and a reader can open the run and its logs. A recipe run
 here again writes the file without it.
 
 Refused, before anything is copied:
-- a run that has not completed, or did not succeed;
+- a run that has not completed, or did not succeed, unless each job that
+  failed is one `--known` names: a failure open in NEXT, which a merge names
+  (ADR-0281). A recipe shard is never known: its evidence is the record;
 - a file whose `commit:` line names another commit than the run's: it would
   be evidence of something else;
 - a run of another commit than `HEAD`, unless `--any-commit` says so.
 
-    python3 scripts/evidence_fetch.py <run-id> [--any-commit]
+    python3 scripts/evidence_fetch.py <run-id> [--any-commit] [--known JOB]...
 """
 
 import argparse
@@ -52,15 +54,37 @@ def stamp(text: str, sha: str, url: str, runner: str) -> str:
     return text
 
 
+def refused(run: dict, jobs: list[dict], known: list[str]) -> str | None:
+    """Why a run's evidence is not fetched, or `None`. A run that failed is
+    fetched only where every job that failed is named as known, and none is
+    a recipe shard, whose evidence the fetch copies."""
+    if run["status"] != "completed":
+        return f"is {run['status']}"
+    if run["conclusion"] == "success":
+        return None
+    failed = [j["name"] for j in jobs if j.get("conclusion") not in ("success", "skipped")]
+    shards = [n for n in failed if n.startswith("recipes")]
+    if shards:
+        return f"failed in {', '.join(shards)}, whose evidence this would copy"
+    unknown = [n for n in failed if n not in known]
+    if unknown or not failed:
+        return f"is {run['conclusion']}, failed in {', '.join(unknown) or 'no job'}"
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("run")
     parser.add_argument("--any-commit", action="store_true")
+    parser.add_argument("--known", action="append", default=[], metavar="JOB")
     args = parser.parse_args()
-    run = json.loads(gh("run", "view", args.run, "--json", "headSha,url,status,conclusion,workflowName"))
-    if run["status"] != "completed" or run["conclusion"] != "success":
-        print(f"evidence-fetch: run {args.run} is {run['status']}, {run['conclusion']}", file=sys.stderr)
+    run = json.loads(gh("run", "view", args.run, "--json", "headSha,url,status,conclusion,workflowName,jobs"))
+    why = refused(run, run.get("jobs", []), args.known)
+    if why is not None:
+        print(f"evidence-fetch: run {args.run} {why}", file=sys.stderr)
         return 1
+    if run["conclusion"] != "success":
+        print(f"evidence-fetch: run {args.run} failed only in {', '.join(args.known)}, known (ADR-0281)")
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     if run["headSha"] != head and not args.any_commit:
         print(f"evidence-fetch: run {args.run} is of {run['headSha']}, and HEAD is {head}", file=sys.stderr)

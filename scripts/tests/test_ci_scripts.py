@@ -9,7 +9,8 @@
 - `ci_summary.py` fails a run where a recipe failed, a mutant survived, or a
   shard reported nothing;
 - `evidence_fetch.py` names the run after a file's `commit:` line, and
-  refuses a file of another commit.
+  refuses a file of another commit, and a run that failed anywhere but in
+  the jobs it is told are known.
 """
 
 import importlib.util
@@ -277,6 +278,26 @@ class Fetch(unittest.TestCase):
     def test_a_file_with_no_commit_is_copied_as_it_is(self) -> None:
         self.assertEqual(fetch.stamp("raw output\n", self.SHA, self.URL, "r"), "raw output\n")
 
+
+    def test_a_run_that_failed_is_fetched_only_where_its_failures_are_known(self) -> None:
+        # ADR-0281: a merge names each failure open in NEXT, and its
+        # evidence is fetched beside it.
+        run = {"status": "completed", "conclusion": "failure"}
+        jobs = [
+            {"name": "recipes 0", "conclusion": "success"},
+            {"name": "browser webkit", "conclusion": "failure"},
+            {"name": "summary", "conclusion": "failure"},
+        ]
+        self.assertIsNone(fetch.refused(run, jobs, ["browser webkit", "summary"]))
+        self.assertIn("summary", fetch.refused(run, jobs, ["browser webkit"]))
+        self.assertIn("browser webkit", fetch.refused(run, jobs, []))
+        # A recipe shard is never known: its evidence is what is copied.
+        shard = jobs + [{"name": "recipes 3", "conclusion": "failure"}]
+        self.assertIn("recipes 3", fetch.refused(run, shard, ["browser webkit", "summary", "recipes 3"]))
+        # A run that has not finished, or one that failed nowhere, is not.
+        self.assertIn("in_progress", fetch.refused({"status": "in_progress", "conclusion": None}, jobs, []))
+        self.assertIsNone(fetch.refused({"status": "completed", "conclusion": "success"}, jobs, []))
+        self.assertIn("no job", fetch.refused(run, [{"name": "recipes 0", "conclusion": "success"}], ["x"]))
 
 class Summary(unittest.TestCase):
     def run_summary(self, shards: list[list[dict]], files: dict[str, str], planned: int) -> int:
