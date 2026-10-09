@@ -52,6 +52,20 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0280, 2026-10-08: a handler navigates after its command commits**
+(the owner's brief, from a Next.js bug: a save, then a soft navigation to a
+page the Router Cache served from before it). `navigate Page(args)` names
+the page and types its parameters, and is written last in the `Ok` arm of
+a command's answer: an `Ok` is a commit, and the runtime refuses one that
+did not commit. From the navigation the page takes no press and no second
+navigation, and each press made before it is answered first, whichever
+answer comes first; then the page's address is loaded, read after the
+commit by the order of answers and reads, never from a cache. The store's
+"Place order" goes to the order's page, in three engines. Two premises of
+the brief as NEXT wrote it were wrong: a link's arguments are not checked,
+and no ruling carries a basis across a navigation, which here is a document
+load. Keeping the parts two pages share in place is the next ruling.
+
 **ADR-0277, 2026-10-08: a materialization is kept, and a page reads it**
 (ruling 10's last piece, second part). A materialization that derives its
 value is a component now: each `query R(..)` its body reads is the

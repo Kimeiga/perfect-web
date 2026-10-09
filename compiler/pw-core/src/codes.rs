@@ -619,6 +619,12 @@ codes! {
     // `get` to `/sign-out`, which answers a `post`, or a `post` to a page.
     FORM_ANSWERED_BY_NOTHING = "PW5041" / form_answered_by_nothing / 1, Markup,
         "a form's `action` is a route that answers its `method`: a page's, the relying party's, or an upload's";
+    // ADR-0280: a handler goes to a page once its command commits. A link
+    // names a route by its text; `navigate` names the page.
+    NAVIGATE_NAMES_NO_PAGE = "PW5042" / navigate_names_no_page / 1, Markup,
+        "a `navigate` names a page by its declaration";
+    NAVIGATE_BEFORE_A_COMMIT = "PW5043" / navigate_before_a_commit / 1, Markup,
+        "a `navigate` is a handler's, last in the `Ok` arm of the command's answer nearest it: a page is left only once a command has committed";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

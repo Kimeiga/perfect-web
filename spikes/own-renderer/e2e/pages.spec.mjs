@@ -142,10 +142,8 @@ test("an order is placed from the cart, and its page follows it as the store mov
   // as the store says where it is.
   const page = await context.newPage();
   await oneEspresso(page);
+  // Placed, the cart goes to the order's page (ADR-0280).
   await page.getByRole("button", { name: "Place order" }).click();
-  await expect(page.locator("#cart-notice")).toHaveText("Your order is placed.");
-  await expect(page.locator("#cart-count")).toHaveText("0");
-  await page.getByRole("link", { name: "Follow your order" }).click();
   await expect(page).toHaveURL(/\/order$/);
   await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1", null, {
     polling: 50,

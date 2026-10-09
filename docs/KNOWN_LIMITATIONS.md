@@ -578,6 +578,18 @@ awaited in order. What remains:
   binding named `line` beside the cart's `{#each cart.lines as line}` was
   read for `line.name` inside the loop, and the build refused. The checker
   accepts the shadowing; the binding is named `summary`.
+- **A navigation is a document load** (ADR-0280): the page a handler goes
+  to replaces this one whole, so the parts the two share are rendered
+  again, not kept in place with their focus and scroll; a soft navigation
+  is next. A navigation the user stops lets the page take presses again
+  only where the browser says it stopped (Chromium's Navigation API):
+  Firefox 146 has none, and WebKit 26.0's aborts nothing, so there the page
+  stays leaving until it is loaded again. A press that never answers holds
+  the navigation as long as the browser waits for it.
+- **A link's hole that is `.` or `..`** (found with ADR-0280): the URL
+  parser resolves `/stores/..` to `/`, so such a link goes elsewhere, and
+  PW5009 matched its text to the route. `navigate` refuses such a value; a
+  link does not.
 - **A source's guarantees are held to the database the feed opens**
   (ADR-0207, ADR-0246): the host measures a PostgreSQL feed's isolation and
   whether it may write, and refuses to serve on a shortfall. The store's

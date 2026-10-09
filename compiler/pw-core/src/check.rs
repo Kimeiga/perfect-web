@@ -229,6 +229,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // ADR-0163: a page says when its address names nothing.
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
+            // ADR-0280: a handler navigates once its command commits.
+            out.extend(navigations(&workspace, &u.hir, i, &sigs));
             out.extend(check_unit_with(
                 &labels,
                 &reads,
@@ -577,6 +579,211 @@ fn ok_payloads(body: &Body, p: hir::PatternId) -> Vec<hir::PatternId> {
             .collect(),
         HPat::Or(ps) => ps.iter().flat_map(|q| ok_payloads(body, *q)).collect(),
         _ => Vec::new(),
+    }
+}
+
+/// **A handler navigates once its command commits** (ADR-0280): `navigate
+/// Page(args)` names a page (PW5042), whose parameters type its arguments as
+/// a call's are, and is written in a handler, last in the `Ok` arm of the
+/// command's answer nearest it (PW5043). An `Ok` is a commit, so the page is
+/// left only once one is made; an `Err` arm, a speculation, or code before
+/// the answer would leave it on a refusal or before it.
+fn navigations(
+    ws: &crate::resolve::Workspace,
+    hir: &Hir,
+    unit: usize,
+    sigs: &Signatures,
+) -> Vec<Diagnostic> {
+    use crate::lexical::{Binder, Lexical};
+    use crate::resolve::{Namespace, Resolution};
+    let mut out = Vec::new();
+    for (_, decl) in hir.all_decls() {
+        let Some(b) = decl.body else { continue };
+        let body = hir.body(b);
+        let written: Vec<ExprId> = body
+            .walk()
+            .into_iter()
+            .filter(|e| matches!(body.expr(*e), Expr::Keyword { keyword, .. } if keyword == "navigate"))
+            .collect();
+        if written.is_empty() {
+            continue;
+        }
+        // What each names: a page, by its declaration.
+        for e in &written {
+            let Expr::Keyword { modifiers, .. } = body.expr(*e) else {
+                continue;
+            };
+            let name = modifiers.first().cloned().unwrap_or_default();
+            // A page is rendered, so named among the views; what it names
+            // otherwise is said by its kind.
+            let kind = [Namespace::Ui, Namespace::Term].into_iter().find_map(|ns| {
+                let found = match name.contains('.') {
+                    true => ws.resolve_path_in(unit, ns, &name),
+                    false => ws.resolve_in(unit, ns, &name),
+                };
+                match found {
+                    Resolution::Local(def) | Resolution::Imported { def, .. } => sigs.kind_of(def),
+                    _ => None,
+                }
+            });
+            if kind == Some(DeclKind::Page) {
+                continue;
+            }
+            let what = match kind {
+                Some(k) => format!("names {}", described(k)),
+                None if name.is_empty() => "names nothing".to_string(),
+                None => "names nothing this module sees".to_string(),
+            };
+            let code = crate::codes::NAVIGATE_NAMES_NO_PAGE;
+            out.push(Diagnostic {
+                code: code.id,
+                invariant: code.invariant,
+                reason: "navigate_names_no_page",
+                detector: Detector::Signature,
+                severity: Severity::Error,
+                message: format!("`navigate {name}` {what}: a navigation goes to a page"),
+                primary_span: body.expr_span(*e),
+                related: Vec::new(),
+                explanation: Some(
+                    "`navigate` takes the page by its declaration, and its arguments as the \
+                     page's parameters, so the address it goes to is one the page is served \
+                     at, with values of the types its route gives."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "name a page this module declares or imports".to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+        // Where each may be: last in the `Ok` arm of the command's answer
+        // nearest it, in a handler.
+        let handlers = crate::resume::handlers_in(body);
+        let lexical = Lexical::build(decl, body);
+        // Each name a `let` binds to a command's answer, by its pattern.
+        let mut answers: BTreeSet<hir::PatternId> = BTreeSet::new();
+        for h in &handlers {
+            for e in body.walk_from(*h) {
+                if let Expr::Let {
+                    pat: Some(p),
+                    init: Some(i),
+                    ..
+                } = body.expr(e)
+                    && command_called(body, sigs, unit, *i).is_some()
+                {
+                    answers.insert(*p);
+                }
+            }
+        }
+        let is_answer = |e: ExprId| {
+            command_called(body, sigs, unit, e).is_some()
+                || matches!(lexical.binder(e), Some(Binder::Pattern(p)) if answers.contains(&p))
+        };
+        let mut allowed = BTreeSet::new();
+        for h in &handlers {
+            let start = match body.expr(*h) {
+                Expr::Lambda { body: inner, .. } => *inner,
+                _ => *h,
+            };
+            after_a_commit(body, &is_answer, start, false, &mut allowed);
+        }
+        for e in written {
+            if allowed.contains(&e) {
+                continue;
+            }
+            let inside = handlers.iter().any(|h| body.walk_from(*h).contains(&e));
+            let message = match inside {
+                false => "`navigate` is written outside a handler: a page is left by a \
+                          handler, once its command commits"
+                    .to_string(),
+                true => "`navigate` is not last in the `Ok` arm of a command's answer: a \
+                         page is left only once its command has committed, and nothing \
+                         runs after it"
+                    .to_string(),
+            };
+            let code = crate::codes::NAVIGATE_BEFORE_A_COMMIT;
+            out.push(Diagnostic {
+                code: code.id,
+                invariant: code.invariant,
+                reason: "navigate_before_a_commit",
+                detector: Detector::Signature,
+                severity: Severity::Error,
+                message,
+                primary_span: body.expr_span(e),
+                related: Vec::new(),
+                explanation: Some(
+                    "A command's `Ok` is its commit (ADR-0157). Written there, last, the \
+                     navigation follows it: the page it goes to is read after the commit, \
+                     and a refusal, whose `Err` arm runs, leaves the page where it is."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "write it last in the `Ok` arm of `match command(..) { .. }`, \
+                                  or link to the page"
+                        .to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// Each `navigate` in `e` that is last in the `Ok` arm of the command's
+/// answer nearest it (`last`: `e` is in that arm's last place), into
+/// `allowed` (ADR-0280). A block's last statement, each branch of an `if`
+/// and each arm of a `match` on anything but an answer are in its place; an
+/// answer's own `match` decides it again, by its arm; anything else is not.
+fn after_a_commit(
+    body: &Body,
+    is_answer: &dyn Fn(ExprId) -> bool,
+    e: ExprId,
+    last: bool,
+    allowed: &mut BTreeSet<ExprId>,
+) {
+    match body.expr(e) {
+        Expr::Keyword { keyword, .. } if keyword == "navigate" => {
+            if last {
+                allowed.insert(e);
+            }
+        }
+        Expr::Match { scrutinee, arms } => {
+            after_a_commit(body, is_answer, *scrutinee, false, allowed);
+            let answer = is_answer(*scrutinee);
+            for arm in arms {
+                let place = match answer {
+                    true => is_ok(body, arm.pat),
+                    false => last,
+                };
+                after_a_commit(body, is_answer, arm.body, place, allowed);
+            }
+        }
+        Expr::Block { stmts } => {
+            for (i, s) in stmts.iter().enumerate() {
+                after_a_commit(body, is_answer, *s, last && i + 1 == stmts.len(), allowed);
+            }
+        }
+        Expr::If { cond, then, els } => {
+            after_a_commit(body, is_answer, *cond, false, allowed);
+            after_a_commit(body, is_answer, *then, last, allowed);
+            if let Some(els) = els {
+                after_a_commit(body, is_answer, *els, last, allowed);
+            }
+        }
+        _ => {
+            for c in body.children(e) {
+                after_a_commit(body, is_answer, c, false, allowed);
+            }
+        }
+    }
+}
+
+/// Whether an arm's pattern is the answer's `Ok`, through `|`.
+fn is_ok(body: &Body, p: hir::PatternId) -> bool {
+    match body.pat(p) {
+        HPat::Ctor { path, .. } => path == "Ok" || path == "Result.Ok",
+        HPat::Or(ps) => !ps.is_empty() && ps.iter().all(|q| is_ok(body, *q)),
+        _ => false,
     }
 }
 

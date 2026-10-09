@@ -3,7 +3,7 @@
     "path": "store.page.CartPage",
     "name": "CartPage",
     "params": [],
-    "schema": "d10395c54bc23d86",
+    "schema": "95fe67fb33f312bd",
     "chunks": [
       {
         "chunk": "static",
@@ -276,7 +276,7 @@
           "id": 16,
           "owner": 5,
           "event": "press",
-          "handler": "1dba658cf8c3c6a1",
+          "handler": "578d00c93ecefccd",
           "name": "place_order"
         }
       },

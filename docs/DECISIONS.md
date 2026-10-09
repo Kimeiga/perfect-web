@@ -2292,3 +2292,12 @@ ADR-0249).
   which the `recipes` job's matrix starts only for it; the database job is
   gone; such shards count among a run's 17 (a track's 9), leaving at least
   one for the rest.
+[ADR-0280](DECISIONS/ADR-0280-a-handler-navigates-after-its-command-commits.md):
+a handler navigates after its command commits.
+- `navigate Page(args)`: the page by its declaration, its parameters typed
+  as a call's are (PW5042), last in the `Ok` arm of the command's answer
+  nearest it, in a handler (PW5043). The runtime refuses an `Ok` that did
+  not commit, takes no press and no second navigation once the page
+  leaves, answers each press made before it first, and loads the page's
+  address, each value one encoded segment: read after the commit, never
+  from a cache, with no cache-busting parameter and no reload.

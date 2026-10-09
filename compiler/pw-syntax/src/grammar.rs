@@ -109,6 +109,9 @@ const STMT_KEYWORDS: &[&str] = &[
     "query",
     "command",
     "subscription",
+    // `Ok(_) => navigate OrderPage()`: a handler goes to a page once its
+    // command commits (ADR-0280). One expression, as `query` is.
+    "navigate",
     "use",
     "observe",
     "animate",

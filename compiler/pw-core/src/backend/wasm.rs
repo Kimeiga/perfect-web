@@ -3326,6 +3326,12 @@ impl Enc<'_> {
                 "`{}` calls `{command}`; only a handler's module calls a command",
                 self.export
             ),
+            // A handler's (ADR-0280): the browser goes to the page.
+            Instr::Navigate { route, .. } => refuse!(
+                "a navigation from inside a component",
+                "`{}` goes to `{route}`; only a handler's module goes to a page",
+                self.export
+            ),
             // A handler's (ADR-0130): a signal lives in the browser.
             Instr::SignalGet { signal, .. } | Instr::SignalSet { signal, .. } => refuse!(
                 "a signal reached from inside a component",
