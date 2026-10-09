@@ -11108,6 +11108,10 @@ public query Store(",
     // where a database is named.
     mod messages;
 
+    /// Track `store-pg`: the store on PostgreSQL, the tests that look at the
+    /// database itself, which skip without one.
+    mod store_pg;
+
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
     mod kiokun;
@@ -13220,6 +13224,64 @@ public query Store(",
             |app| app.to_string(),
             &[],
         ));
+    }
+
+    /// **Every event a commit stages is consumed once it is delivered**
+    /// (track `store-pg`), on whichever layer the store is: after orders are
+    /// placed and moved along, the materializer's outbox holds nothing.
+    /// Until 2026-10-08 each `OrderChanged` was kept for good, since no entry
+    /// a drain names reaches it.
+    #[test]
+    fn every_event_a_commit_stages_is_consumed_once_delivered() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        s.serve_document_settled("a", ORDER_PAGE, &Params::new(), &[])
+            .expect("served");
+        for round in 0..3 {
+            s.command(ADD, "a", &add_shown("espresso", 1), false)
+                .expect("added");
+            s.command(PLACE, "a", &[], false).expect("placed");
+            let answer = posted(&s, "/bench/order?status=preparing", "a", "", "");
+            assert!(answer.starts_with("HTTP/1.1 200"), "{round}: {answer}");
+        }
+        s.broadcast_menu(MenuOp::Rename {
+            id: "cortado".into(),
+            name: "Gibraltar".into(),
+        })
+        .expect("renamed");
+        assert_eq!(s.order_of("a").map(|o| o.0).as_deref(), Some("preparing"));
+        assert_eq!(
+            s.materializer.retained_events(),
+            0,
+            "the outbox holds nothing"
+        );
+    }
+
+    /// **A program that names one of the host's own operations is refused**
+    /// (track `store-pg`): the routes that change the store's data stage
+    /// `store:host/…` through the layer, and no grant gives a program one,
+    /// whatever capability it declares for it.
+    #[test]
+    fn a_program_naming_a_host_operation_is_refused() {
+        let (_dir, out) = built_from_patches_in(
+            "examples",
+            |app| {
+                format!(
+                    "{app}\nfn post_notice(id: StoreId) -> Int !{{ database.read<Stores> }}\n    \
+                     host \"store:host/notices#post\"\n\npublic query Posting(id: StoreId) -> \
+                     Int\n    freshness 0.seconds\n    cache shared\n    concurrency one_per_key\n    \
+                     on_key_change cancel\n    timeout 2.seconds\n{{\n    post_notice(id)\n}}\n"
+                )
+            },
+            &[],
+        );
+        let Err(why) = Server::from_build(out.clone(), out) else {
+            panic!("served");
+        };
+        assert!(
+            why.contains("store:host/notices#post")
+                && why.contains("an operation the host keeps for its own routes"),
+            "{why}"
+        );
     }
 
     /// **The stores, as the home page** (ADR-0192): at `/`, each store this
