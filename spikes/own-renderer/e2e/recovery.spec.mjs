@@ -87,6 +87,16 @@ test("a press on a handler from another build reads the page again, once (charte
   });
   await ready(page);
   await expect(page.locator("#cart-count")).toHaveText("0");
+  // The decision names its recovery in `pw-resume`'s order (ADR-0155): the
+  // store's page is a session's (its plan's scope), so its region is a
+  // private slot, rendered again from the server. Until the build named a
+  // page's scope every page was planned public, a region to refetch, and a
+  // list read one place off made that "none", which no press acted on; a
+  // session's page made it "refetch-region", which reloads as well, and only
+  // this name tells the two apart.
+  expect(await page.evaluate(() => window.__pw.log.join("\n"))).toMatch(
+    /refused \S+: code \d+ recovery rerender-private-slot/,
+  );
   // The press reads the page again, from this build, and is not replayed.
   const reloaded = page.waitForEvent("load");
   await page.locator("#menu button").first().click();
@@ -115,10 +125,11 @@ test("a document of another schema reads the page again, once (ADR-XXXX)", async
     await route.fulfill({ response, body });
   });
   await ready(page);
-  // Told by the table, never by the document.
-  expect(await page.evaluate(() => window.__pw.log.join("\n"))).toMatch(
-    /knows store\.page\.StorePage's documents: \S+ session:/,
-  );
+  // Told by the table, never by the document; and its recovery named in
+  // `pw-resume`'s order, a session's region rendered again (ADR-0155).
+  const told = await page.evaluate(() => window.__pw.log.join("\n"));
+  expect(told).toMatch(/knows store\.page\.StorePage's documents: \S+ session:/);
+  expect(told).toMatch(/refused \S+: code \d+ recovery rerender-private-slot/);
   await expect(page.locator("#cart-count")).toHaveText("0");
   const reloaded = page.waitForEvent("load");
   await page.locator("#menu button").first().click();

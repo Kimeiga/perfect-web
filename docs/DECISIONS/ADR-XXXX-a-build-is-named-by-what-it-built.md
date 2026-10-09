@@ -78,6 +78,19 @@ build.
   refused at its first press, read again once, and its next press works.
 - **`scripts/build_id_mutations.py`**, recorded by `just e14-build-id`.
 
+## Found
+
+- **A runtime-recovery mutant survived on CI** (verify 37985418508, `just
+  e14-runtime-recovery`): "the recovery codes are read one place off"
+  (ADR-0155). The stale handler's test killed it only while every page was
+  planned public: a public page's region is refetched, `refetch-region`,
+  which the list read one place off made `none`, and no press acts on
+  `none`. With the page's real scope, a session's, its recovery is
+  `rerender-private-slot`, read one place off as `refetch-region`, and both
+  read the page again. The test, and this ADR's own for a document of another
+  schema, now hold the decision's recovery to its name, from the log the
+  runtime writes as it binds the press; 3 of 3 mutants killed locally.
+
 ## Not claimed
 
 - **Entries' generation is still the host's constant** (`BUILD`): entries
