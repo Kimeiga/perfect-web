@@ -34,8 +34,8 @@ MUTANTS = [
     (
         "a stub's redirect is read and not shown",
         APP,
-        "                Some(t) => Ok(shown(word, t, labels)),",
-        "                Some(t) => Ok(shown(word, e, labels)),",
+        "                Some(t) => Some(followed_from(t, f)),",
+        "                Some(_) => Some(f),",
     ),
     (
         "kiokun's file names escape control characters alone",
@@ -202,8 +202,8 @@ MUTANTS = [
     (
         "a hanja reading is its romanization",
         LAYER,
-        '    record(vec![("readings", texts(k, "readings", "hangul"))])',
-        '    record(vec![("readings", texts(k, "readings", "romanization"))])',
+        '        ("readings", texts(k, "readings", "hangul")),',
+        '        ("readings", texts(k, "readings", "romanization")),',
     ),
     (
         "the forms' notes are not read from the table",
@@ -214,8 +214,80 @@ MUTANTS = [
     (
         "an app without its label table is served with none",
         LAYER,
-        '    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;',
-        '    let text = std::fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());',
+        '    let path = app.join("src/lib/japanese-labels.json");\n    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;',
+        '    let path = app.join("src/lib/japanese-labels.json");\n    let text = std::fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());',
+    ),
+    (
+        "a stub's card yields to its target's",
+        APP,
+        "    let primary = match stub.mnemonic {",
+        "    let primary = match target.mnemonic {",
+    ),
+    (
+        "a stub's traditional variants are not read",
+        APP,
+        "        Some(s) => if List.length(traditional_of(s)) > 1 { traditional_of(s) } else { none },",
+        "        Some(s) => if List.length(traditional_of(s)) > 1 { none } else { none },",
+    ),
+    (
+        "a Chinese word read twice is shown twice",
+        APP,
+        "fn more_chinese(into: List<ChineseWord>, more: List<ChineseWord>) -> List<ChineseWord> {\n    List.fold(more, into, (out, w) => if List.any(out, s => s.id == w.id) { out } else { List.concat(out, [w]) })",
+        "fn more_chinese(into: List<ChineseWord>, more: List<ChineseWord>) -> List<ChineseWord> {\n    List.concat(into, more)",
+    ),
+    (
+        "a simplified form is equivalent whatever its card teaches",
+        APP,
+        '            if source_concept != "" & source_concept == target_concept { Some(target) } else { None }',
+        '            if source_concept != "" { Some(target) } else { None }',
+    ),
+    (
+        "a concept keeps its case and spaces",
+        APP,
+        "    spaced(String.to_lower(learner(gloss)))",
+        "    learner(gloss)",
+    ),
+    (
+        "an equivalent form's words are not merged",
+        APP,
+        "        Some(t) => if t == canonical { merged_form(into, r) } else { into },",
+        "        Some(_) => into,",
+    ),
+    (
+        "a traditional form is not Hong Kong's",
+        APP,
+        '        if x.character != "" & traditional_role { add_role(t3, x.character, "hong-kong") } else { t3 }',
+        "        t3",
+    ),
+    (
+        "a simplified form is written as a traditional one",
+        APP,
+        '            if has_role(roles, "hong-kong") & List.length(roles) == 1 { "zh-HK" } else { if has_role(roles, "simplified") & !has_role(roles, "traditional") { "zh-Hans" } else { "zh-Hant" } }',
+        '            if has_role(roles, "hong-kong") & List.length(roles) == 1 { "zh-HK" } else { "zh-Hant" }',
+    ),
+    (
+        "a form without a card has no meaning",
+        APP,
+        "        meaning: if carded != \"\" { carded } else { gloss_of(glosses, r.character) },",
+        "        meaning: carded,",
+    ),
+    (
+        "a component gloss keeps its source marker",
+        APP,
+        "        Some(g) => learner(g.gloss),",
+        "        Some(g) => g.gloss,",
+    ),
+    (
+        "the batched read reads nothing",
+        LAYER,
+        "                    out.push(read_one(&r, &subdirectory, &file)?);",
+        "                    out.push(Val::Option(None));",
+    ),
+    (
+        "the app's glosses are read from another file",
+        LAYER,
+        '    let path = app.join("static/game_data/component_glosses.json");',
+        '    let path = app.join("static/game_data/component_uses.json");',
     ),
     (
         "the host does not choose the kiokun layer",

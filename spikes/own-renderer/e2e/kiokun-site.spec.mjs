@@ -25,6 +25,11 @@ async function shows人(page) {
   await expect(page.locator("#headword")).toHaveText("人");
   // The character header: the learner gloss, the levels, the readings.
   await expect(page.locator("#entry-gloss")).toHaveText("person");
+  // One written form, with every role it has.
+  await expect(page.locator("#character-header .character-specimen")).toHaveText("人");
+  await expect(page.locator("#character-header .form-roles [aria-hidden=true]")).toHaveText(
+    "Trad · HK · Simp · JP · KR",
+  );
   await expect(page.locator("#character-header .level-badge.hsk")).toHaveText("HSK 1");
   await expect(page.locator("#character-header .level-badge.jlpt")).toHaveText("N4");
   await expect(page.locator("#character-header .text-pinyin")).toHaveText("rén");

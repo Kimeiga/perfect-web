@@ -22,7 +22,11 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 /// What a node grants the program: reading entries, and nothing else.
-pub(crate) const GRANTS: &[&str] = &["database.read<Entry>", "database.read<Label>"];
+pub(crate) const GRANTS: &[&str] = &[
+    "database.read<Entry>",
+    "database.read<Label>",
+    "database.read<CharGloss>",
+];
 
 /// The sample the repository carries (ADR-0037): 28 files of one shard.
 fn sample() -> PathBuf {
@@ -31,37 +35,61 @@ fn sample() -> PathBuf {
 
 pub(crate) struct KiokunData {
     root: PathBuf,
-    /// kiokun.com's labels for JMdict's codes, each a `Label`, read once.
-    labels: Arc<Vec<Val>>,
+    app: Arc<App>,
+}
+
+/// **kiokun.com's own data, as its app keeps it**, read once: its labels for
+/// JMdict's codes, each a `Label`, and its component glosses by character.
+#[derive(Default)]
+pub(crate) struct App {
+    labels: Vec<Val>,
+    glosses: BTreeMap<String, String>,
+}
+
+/// The app's data at `app`, the checkout's `sveltekit-app`: an error where a
+/// table is missing, not an empty table.
+pub(crate) fn app_of(app: &Path) -> Result<App, String> {
+    Ok(App {
+        labels: labels_of(app)?,
+        glosses: glosses_of(app)?,
+    })
+}
+
+/// **kiokun.com's component glosses** (`static/game_data/component_glosses.json`):
+/// a character's learner gloss, by character.
+pub(crate) fn glosses_of(app: &Path) -> Result<BTreeMap<String, String>, String> {
+    let path = app.join("static/game_data/component_glosses.json");
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 impl KiokunData {
     /// The files `KIOKUN_DATA` names, or the repository's sample; and the
     /// labels of the app `KIOKUN_APP` names, the checkout's `sveltekit-app`
     /// (docs/PARALLEL.md, "W6's inventory, answered", Q3), or none. An app
-    /// named without its label table is an error, not an empty table.
+    /// named without its tables is an error, not empty tables.
     pub(crate) fn new() -> Result<KiokunData, String> {
         let root = std::env::var_os("KIOKUN_DATA")
             .map(PathBuf::from)
             .unwrap_or_else(sample);
-        let labels = match std::env::var_os("KIOKUN_APP") {
-            Some(app) => labels_of(&PathBuf::from(app))?,
-            None => Vec::new(),
+        let app = match std::env::var_os("KIOKUN_APP") {
+            Some(app) => app_of(&PathBuf::from(app))?,
+            None => App::default(),
         };
         Ok(KiokunData {
             root,
-            labels: Arc::new(labels),
+            app: Arc::new(app),
         })
     }
 
     #[cfg(test)]
     pub(crate) fn at(root: PathBuf, app: Option<&Path>) -> KiokunData {
-        let labels = app
-            .map(|a| labels_of(a).expect("the labels"))
+        let app = app
+            .map(|a| app_of(a).expect("the app's data"))
             .unwrap_or_default();
         KiokunData {
             root,
-            labels: Arc::new(labels),
+            app: Arc::new(app),
         }
     }
 }
@@ -323,6 +351,19 @@ pub(crate) fn entry(json: &serde_json::Value) -> Val {
             "mnemonic",
             optional(json.get("semantic_mnemonic"), mnemonic),
         ),
+        (
+            "variants",
+            Val::List(
+                list(json, "semantic_mnemonic_variants")
+                    .filter(|c| !c.is_null())
+                    .map(mnemonic)
+                    .collect(),
+            ),
+        ),
+        (
+            "simplified-form-of",
+            Val::String(text(json, "simplified_form_of")),
+        ),
     ])
 }
 
@@ -339,6 +380,10 @@ fn maybe_int(v: Option<&serde_json::Value>) -> Val {
 /// `ChineseChar { gloss, frequencies, old, cantonese, hsk }`.
 fn chinese_char(c: &serde_json::Value) -> Val {
     record(vec![
+        ("character", Val::String(text(c, "char"))),
+        ("simplified", strings(c, "simpVariants")),
+        ("traditional", strings(c, "tradVariants")),
+        ("hong-kong", Val::String(text(c, "hkChar"))),
         ("gloss", Val::String(text(c, "gloss"))),
         ("frequencies", texts(c, "pinyinFrequencies", "pinyin")),
         ("old", texts(c, "oldPronunciations", "pinyin")),
@@ -370,6 +415,7 @@ fn japanese_char(j: &serde_json::Value) -> Val {
     let meaning = j.get("readingMeaning").cloned().unwrap_or_default();
     let groups = meaning.get("groups").filter(|g| g.is_array());
     record(vec![
+        ("literal", Val::String(text(j, "literal"))),
         (
             "jlpt",
             maybe_int(j.get("misc").and_then(|m| m.get("jlptLevel"))),
@@ -389,12 +435,17 @@ fn japanese_char(j: &serde_json::Value) -> Val {
 
 /// `KoreanChar { readings }`: its readings' hangul.
 fn korean_char(k: &serde_json::Value) -> Val {
-    record(vec![("readings", texts(k, "readings", "hangul"))])
+    record(vec![
+        ("character", Val::String(text(k, "character"))),
+        ("hanja", Val::String(text(k, "hanjaForm"))),
+        ("readings", texts(k, "readings", "hangul")),
+    ])
 }
 
-/// `Mnemonic { keyword, meaning, lexical }`.
+/// A card: `Card { character, keyword, meaning, lexical }`.
 fn mnemonic(m: &serde_json::Value) -> Val {
     record(vec![
+        ("character", Val::String(text(m, "character"))),
         ("keyword", Val::String(text(m, "mnemonic_keyword"))),
         ("meaning", Val::String(text(m, "meaning"))),
         ("lexical", Val::String(text(m, "lexical_gloss"))),
@@ -424,12 +475,66 @@ pub(crate) fn read(
         .map_err(|e| format!("{}: not JSON: {e}", rel.display()))
 }
 
-fn reads_of(root: PathBuf, labels: Arc<Vec<Val>>) -> data::Ops {
+/// One file read, as `entries#read` answers it.
+fn read_one(root: &Path, subdirectory: &str, file: &str) -> Result<Val, String> {
+    let found = read(root, subdirectory, file)?;
+    Ok(Val::Option(found.map(|j| Box::new(entry(&j)))))
+}
+
+/// A `Place { subdirectory, file }`'s two fields.
+fn place_fields(v: &Val) -> Result<(String, String), String> {
+    let Val::Record(fields) = v else {
+        return Err(format!("a place is a record, not {v:?}"));
+    };
+    let field = |name: &str| match fields.iter().find(|(k, _)| k == name) {
+        Some((_, Val::String(s))) => Ok(s.clone()),
+        other => Err(format!("a place's {name} is {other:?}")),
+    };
+    Ok((field("subdirectory")?, field("file")?))
+}
+
+fn reads_of(root: PathBuf, app: Arc<App>) -> data::Ops {
     let mut ops: data::Ops = BTreeMap::new();
+    let a = app.clone();
+    ops.insert(
+        "kiokun:data/support#glosses".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::List(characters)] => Ok(vec![Val::List(
+                characters
+                    .iter()
+                    .filter_map(|c| match c {
+                        Val::String(c) => a.glosses.get(c).map(|g| {
+                            record(vec![
+                                ("character", Val::String(c.clone())),
+                                ("gloss", Val::String(g.clone())),
+                            ])
+                        }),
+                        _ => None,
+                    })
+                    .collect(),
+            )]),
+            other => Err(format!("support#glosses received {other:?}")),
+        }),
+    );
+    let r = root.clone();
+    ops.insert(
+        "kiokun:data/entries#read-all".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::List(places)] => {
+                let mut out = Vec::with_capacity(places.len());
+                for p in places {
+                    let (subdirectory, file) = place_fields(p)?;
+                    out.push(read_one(&r, &subdirectory, &file)?);
+                }
+                Ok(vec![Val::List(out)])
+            }
+            other => Err(format!("entries#read-all received {other:?}")),
+        }),
+    );
     ops.insert(
         "kiokun:data/labels#japanese".to_string(),
         Arc::new(move |args: &[Val]| match args {
-            [] => Ok(vec![Val::List(labels.as_ref().clone())]),
+            [] => Ok(vec![Val::List(app.labels.clone())]),
             other => Err(format!("labels#japanese received {other:?}")),
         }),
     );
@@ -461,11 +566,11 @@ impl data::Staged for Nothing {
 
 impl data::DataLayer for KiokunData {
     fn reads(&self, _session: &str, _stopped: Option<Stopped>) -> data::Ops {
-        reads_of(self.root.clone(), self.labels.clone())
+        reads_of(self.root.clone(), self.app.clone())
     }
 
     fn begin<'a>(&'a self, _session: &str) -> Box<dyn data::Staged + 'a> {
-        Box::new(Nothing(reads_of(self.root.clone(), self.labels.clone())))
+        Box::new(Nothing(reads_of(self.root.clone(), self.app.clone())))
     }
 
     fn grants(&self) -> Vec<&'static str> {

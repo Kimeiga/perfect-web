@@ -24,7 +24,7 @@ import shards
 // the one version the deployment opened; there are no transactions, since
 // nothing commits; and nothing tells a change, since none is made.
 source KiokunEntries
-    holds        Entry, Label
+    holds        Entry, Label, CharGloss
     transactions none
     reads        strong
     changes      none
@@ -105,9 +105,14 @@ type JapaneseName = JapaneseName {
 }
 
 // The character an entry is, as Chinese sources give it (`chinese_char`):
-// its learner gloss, its Mandarin readings by frequency, its readings in
-// older sources, its Cantonese readings, and its HSK level where it has one.
+// the character itself, its simplified, traditional and Hong Kong forms, its
+// learner gloss, its Mandarin readings by frequency, its readings in older
+// sources, its Cantonese readings, and its HSK level where it has one.
 type ChineseChar = ChineseChar {
+    character: String,
+    simplified: List<String>,
+    traditional: List<String>,
+    hong_kong: String,
     gloss: String,
     frequencies: List<String>,
     old: List<String>,
@@ -130,21 +135,26 @@ type ReadingGroup = ReadingGroup {
 // level, and its readings, in groups where the file has `groups` and in the
 // older flat list where it does not.
 type JapaneseChar = JapaneseChar {
+    literal: String,
     jlpt: Option<Int>,
     grouped: Bool,
     groups: List<ReadingGroup>,
     readings: List<KanjiReading>,
 }
 
-// The character as the hanja table gives it (`korean_char`): its hangul
-// readings.
+// The character as the hanja table gives it (`korean_char`): the
+// character, its hanja form, and its hangul readings.
 type KoreanChar = KoreanChar {
+    character: String,
+    hanja: String,
     readings: List<String>,
 }
 
-// The character's mnemonic card (`semantic_mnemonic`): the keyword it is
-// remembered by, its meaning, and its dictionary meanings.
-type Mnemonic = Mnemonic {
+// A mnemonic card (`semantic_mnemonic`, `semantic_mnemonic_variants`): the
+// character it teaches, the keyword it is remembered by, its meaning, and
+// its dictionary meanings.
+type Card = Card {
+    character: String,
     keyword: String,
     meaning: String,
     lexical: String,
@@ -161,7 +171,9 @@ type Entry = Entry {
     chinese_char: Option<ChineseChar>,
     japanese_char: Option<JapaneseChar>,
     korean_char: Option<KoreanChar>,
-    mnemonic: Option<Mnemonic>,
+    mnemonic: Option<Card>,
+    variants: List<Card>,
+    simplified_form_of: String,
 }
 
 // One of kiokun.com's labels for JMdict's codes
@@ -173,8 +185,26 @@ type Label = Label {
     text: String,
 }
 
+// `Moved` is a word whose page is another's: kiokun.com answers 308 to the
+// one traditional form a simplified character equals in meaning
+// (`[word]/+page.ts:419-425`). The page answers it once the integrator's
+// page redirect lands; until then the query does not return it.
 type KiokunError =
     | NotFound
+    | Moved(String)
+
+// Where a word's file is: its subdirectory and its escaped name.
+type Place = Place {
+    subdirectory: String,
+    file: String,
+}
+
+// One character's gloss from kiokun.com's component glosses
+// (`static/game_data/component_glosses.json`, read through `KIOKUN_APP`).
+type CharGloss = CharGloss {
+    character: String,
+    gloss: String,
+}
 
 // The file `subdirectory/file.json.deflate`, as the data layer reads it, or
 // none where there is no such file. The layer refuses a name that is not one
@@ -187,6 +217,15 @@ fn read_entry(subdirectory: String, file: String) -> Option<Entry> !{ database.r
 // shown as it is, as kiokun.com shows a code its table lacks.
 fn read_labels() -> List<Label> !{ database.read<Label> }
     host "kiokun:data/labels#japanese"
+
+// The files at `places`, each read as `read_entry` reads one, in order.
+fn read_entries(places: List<Place>) -> List<Option<Entry>> !{ database.read<Entry> }
+    host "kiokun:data/entries#read-all"
+
+// The glosses kiokun.com's component table has for `characters`, or none
+// where the deployment names no app.
+fn read_glosses(characters: List<String>) -> List<CharGloss> !{ database.read<CharGloss> }
+    host "kiokun:data/support#glosses"
 
 // ---------------------------------------------------------------------------
 // Finding a word's file.
@@ -641,6 +680,7 @@ fn header_readings(e: Entry) -> List<HeaderReading> {
 // it is remembered by a keyword; the readings.
 type Header = Header {
     shown: Bool,
+    forms: List<ShownForm>,
     gloss: String,
     hsk: String,
     jlpt: String,
@@ -648,7 +688,7 @@ type Header = Header {
     readings: List<HeaderReading>,
 }
 
-fn header(e: Entry) -> Header {
+fn header(e: Entry, forms: List<Form>) -> Header {
     let hsk = match e.chinese_char {
         Some(c) => match c.hsk {
             Some(n) => if n != 0 { "HSK {n}" } else { "" },
@@ -677,11 +717,646 @@ fn header(e: Entry) -> Header {
     }
     Header {
         shown: has_chinese | has_japanese,
+        forms: forms_shown(forms, learner_gloss(e)),
         gloss: learner_gloss(e),
         hsk: hsk,
         jlpt: jlpt,
         lexical: lexical,
         readings: header_readings(e),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The loader (`[word]/+page.ts`): a stub's mnemonic kept, every traditional
+// variant's Chinese words, and the related forms, read and merged.
+
+// Unicode's `Script=Han`, as `/^\p{Script=Han}$/u` tests it in a browser
+// (`character-forms.ts:90-96`): the ranges Node 22's regular expressions
+// give (Unicode 16.0, ICU 77.1), in decimal.
+fn is_han_script(c: Int) -> Bool {
+    (c >= 11904 & c <= 11929) | (c >= 11931 & c <= 12019) | (c >= 12032 & c <= 12245) | c == 12293 | c == 12295 | (c >= 12321 & c <= 12329) | (c >= 12344 & c <= 12347) | (c >= 13312 & c <= 19903) | (c >= 19968 & c <= 40959) | (c >= 63744 & c <= 64109) | (c >= 64112 & c <= 64217) | (c >= 94178 & c <= 94179) | (c >= 94192 & c <= 94193) | (c >= 131072 & c <= 173791) | (c >= 173824 & c <= 177977) | (c >= 177984 & c <= 178205) | (c >= 178208 & c <= 183969) | (c >= 183984 & c <= 191456) | (c >= 191472 & c <= 192093) | (c >= 194560 & c <= 195101) | (c >= 196608 & c <= 201546) | (c >= 201552 & c <= 205743)
+}
+
+// One Han character (`isHanCharacterForm`).
+fn is_han_form(text: String) -> Bool {
+    let points = String.codepoints(text)
+    List.length(points) == 1 & List.all(points, is_han_script)
+}
+
+fn one_character(text: String) -> Bool {
+    List.length(String.codepoints(text)) == 1
+}
+
+// Runs of white space as one space (`/\s+/g`, ' '): each code point Unicode
+// calls White_Space, as `String.trim` reads it.
+fn spaced(text: String) -> String {
+    let none: List<Int> = []
+    let points = List.fold(String.codepoints(text), none, (out, c) => if String.trim(String.from_codepoints([c])) == "" {
+        match List.get(out, List.length(out) - 1) {
+            Some(last) => if last == 32 { out } else { List.concat(out, [32]) },
+            None => [32],
+        }
+    } else {
+        List.concat(out, [c])
+    })
+    String.from_codepoints(points)
+}
+
+// `normalizedConcept` (`character-forms.ts:114-119`): the learner gloss,
+// lower-cased, its spaces collapsed. Its NFKC step is not taken: Pleris has
+// no Unicode normalization (the ADR's Not claimed).
+fn concept(gloss: String) -> String {
+    spaced(String.to_lower(learner(gloss)))
+}
+
+// `mnemonicCardsForEntry` (`character-forms.ts:121-132`): the card, then its
+// variants, each character once, none without a character.
+fn cards_of(e: Entry) -> List<Card> {
+    let none: List<Card> = []
+    let all = match e.mnemonic {
+        Some(m) => List.concat([m], e.variants),
+        None => e.variants,
+    }
+    List.fold(all, none, (out, c) => if c.character == "" | List.any(out, s => s.character == c.character) { out } else { List.concat(out, [c]) })
+}
+
+fn meaning_of(cards: List<Card>, character: String) -> String {
+    match List.find(cards, c => c.character == character) {
+        Some(c) => c.meaning,
+        None => "",
+    }
+}
+
+fn chinese_character(e: Entry) -> String {
+    match e.chinese_char {
+        Some(c) => c.character,
+        None => "",
+    }
+}
+
+fn traditional_of(e: Entry) -> List<String> {
+    let none: List<String> = []
+    match e.chinese_char {
+        Some(c) => c.traditional,
+        None => none,
+    }
+}
+
+fn simplified_of(e: Entry) -> List<String> {
+    let none: List<String> = []
+    match e.chinese_char {
+        Some(c) => c.simplified,
+        None => none,
+    }
+}
+
+// `equivalentTraditionalTarget` (`character-forms.ts:154-183`): the one
+// traditional form a merged simplified entry equals in meaning, where both
+// are one character and their cards teach one concept; else none. 后/後 and
+// 制/製 keep their own pages.
+fn equivalent_target(e: Entry) -> Option<String> {
+    let redirected = match e.redirect {
+        Some(_) => true,
+        None => false,
+    }
+    let source = if chinese_character(e) != "" { chinese_character(e) } else { e.key }
+    let target = e.simplified_form_of
+    let traditional = List.filter(traditional_of(e), v => v != "" & v != source)
+    let cards = cards_of(e)
+    let source_concept = concept(meaning_of(cards, source))
+    let target_concept = concept(meaning_of(cards, target))
+    if redirected | target == "" | !one_character(source) | !one_character(target) | source == target {
+        None
+    } else {
+        if List.length(traditional) != 1 | !List.any(traditional, v => v == target) {
+            None
+        } else {
+            if source_concept != "" & source_concept == target_concept { Some(target) } else { None }
+        }
+    }
+}
+
+// `mergeSemanticMnemonicVariants` (`+page.ts:136-150`): the cards other than
+// the primary, each character once.
+fn other_cards(cards: List<Card>, primary: Option<Card>) -> List<Card> {
+    let none: List<Card> = []
+    let first = match primary {
+        Some(p) => p.character,
+        None => "",
+    }
+    let seeded = match primary {
+        Some(p) => [p],
+        None => none,
+    }
+    let kept = List.fold(cards, seeded, (out, c) => if List.any(out, s => s.character == c.character) { out } else { List.concat(out, [c]) })
+    match primary {
+        Some(_) => List.filter(kept, c => c.character != first),
+        None => kept,
+    }
+}
+
+fn with_card(e: Entry, card: Option<Card>, variants: List<Card>) -> Entry {
+    Entry {
+        key: e.key,
+        redirect: e.redirect,
+        chinese: e.chinese,
+        japanese: e.japanese,
+        korean: e.korean,
+        names: e.names,
+        chinese_char: e.chinese_char,
+        japanese_char: e.japanese_char,
+        korean_char: e.korean_char,
+        mnemonic: card,
+        variants: variants,
+        simplified_form_of: e.simplified_form_of,
+    }
+}
+
+// A stub followed to its target (`+page.ts:438-462`): the stub's card stays
+// the primary, and the variants are the target's card and variants and the
+// stub's, each once.
+fn followed_from(target: Entry, stub: Entry) -> Entry {
+    let primary = match stub.mnemonic {
+        Some(m) => Some(m),
+        None => target.mnemonic,
+    }
+    let target_cards = match target.mnemonic {
+        Some(m) => List.concat([m], target.variants),
+        None => target.variants,
+    }
+    with_card(target, primary, other_cards(List.concat(target_cards, stub.variants), primary))
+}
+
+// Records not yet in `into` by id, appended (`mergeUniqueBy`).
+fn more_chinese(into: List<ChineseWord>, more: List<ChineseWord>) -> List<ChineseWord> {
+    List.fold(more, into, (out, w) => if List.any(out, s => s.id == w.id) { out } else { List.concat(out, [w]) })
+}
+
+fn more_japanese(into: List<JapaneseWord>, more: List<JapaneseWord>) -> List<JapaneseWord> {
+    List.fold(more, into, (out, w) => if List.any(out, s => s.id == w.id) { out } else { List.concat(out, [w]) })
+}
+
+fn more_korean(into: List<KoreanWord>, more: List<KoreanWord>) -> List<KoreanWord> {
+    List.fold(more, into, (out, w) => if List.any(out, s => s.id == w.id) { out } else { List.concat(out, [w]) })
+}
+
+fn more_names(into: List<JapaneseName>, more: List<JapaneseName>) -> List<JapaneseName> {
+    List.fold(more, into, (out, w) => if List.any(out, s => s.id == w.id) { out } else { List.concat(out, [w]) })
+}
+
+fn with_chinese(e: Entry, chinese: List<ChineseWord>) -> Entry {
+    Entry {
+        key: e.key,
+        redirect: e.redirect,
+        chinese: chinese,
+        japanese: e.japanese,
+        korean: e.korean,
+        names: e.names,
+        chinese_char: e.chinese_char,
+        japanese_char: e.japanese_char,
+        korean_char: e.korean_char,
+        mnemonic: e.mnemonic,
+        variants: e.variants,
+        simplified_form_of: e.simplified_form_of,
+    }
+}
+
+// `mergeEquivalentFormData` (`+page.ts:116-150`): an equivalent written
+// form's words, names and cards, on the canonical page.
+fn merged_form(into: Entry, related: Entry) -> Entry {
+    let related_cards = match related.mnemonic {
+        Some(m) => List.concat(into.variants, List.concat([m], related.variants)),
+        None => List.concat(into.variants, related.variants),
+    }
+    Entry {
+        key: into.key,
+        redirect: into.redirect,
+        chinese: more_chinese(into.chinese, related.chinese),
+        japanese: more_japanese(into.japanese, related.japanese),
+        korean: more_korean(into.korean, related.korean),
+        names: more_names(into.names, related.names),
+        chinese_char: into.chinese_char,
+        japanese_char: into.japanese_char,
+        korean_char: into.korean_char,
+        mnemonic: into.mnemonic,
+        variants: other_cards(related_cards, into.mnemonic),
+        simplified_form_of: into.simplified_form_of,
+    }
+}
+
+// Each word once, in order, without the empty ones.
+fn words_once(words: List<String>) -> List<String> {
+    distinct(words)
+}
+
+// The traditional variants a stub's Chinese words are read from
+// (`+page.ts:464-492`): where the stub names more than one.
+fn variant_words(stub: Option<Entry>) -> List<String> {
+    let none: List<String> = []
+    match stub {
+        Some(s) => if List.length(traditional_of(s)) > 1 { traditional_of(s) } else { none },
+        None => none,
+    }
+}
+
+// The related forms read (`loadRelatedCharacterForms`, `+page.ts:236-280`):
+// the canonical character's simplified variants, the form it is the
+// simplified form of, and the stub's key, each once and not the canonical
+// character, at most twelve.
+fn related_words(data: Entry, stub: Option<Entry>) -> List<String> {
+    let canonical = if chinese_character(data) != "" { chinese_character(data) } else { data.key }
+    let stub_key = match stub {
+        Some(s) => s.key,
+        None => "",
+    }
+    let all = List.concat(List.concat(simplified_of(data), [data.simplified_form_of]), [stub_key])
+    List.take(List.filter(words_once(all), w => w != canonical), 12)
+}
+
+fn place_of(word: String) -> Place {
+    Place { subdirectory: shards.subdirectory(word), file: file_name(word) }
+}
+
+// The words whose files the page reads besides its own: the variants, then
+// the related forms.
+fn extra_words(data: Entry, stub: Option<Entry>) -> List<String> {
+    List.concat(variant_words(stub), related_words(data, stub))
+}
+
+// One word asked for, and what its file held.
+type Read = Read {
+    word: String,
+    entry: Option<Entry>,
+}
+
+// Each word beside what was read for it, in order.
+fn reads_of(words: List<String>, read: List<Option<Entry>>) -> List<Read> {
+    let none: List<Read> = []
+    List.fold(words, none, (out, w) => List.concat(out, [Read {
+        word: w,
+        entry: match List.get(read, List.length(out)) {
+            Some(e) => e,
+            None => None,
+        },
+    }]))
+}
+
+// The entry `word`'s file holds, where it records `word`.
+fn read_of(reads: List<Read>, word: String) -> Option<Entry> {
+    match List.find(reads, r => r.word == word) {
+        Some(r) => recorded(r.entry, word),
+        None => None,
+    }
+}
+
+// A related form's entry: the stub where it is the stub, else what was read.
+fn related_entry(stub: Option<Entry>, reads: List<Read>, word: String) -> Option<Entry> {
+    match stub {
+        Some(s) => if s.key == word { Some(s) } else { read_of(reads, word) },
+        None => read_of(reads, word),
+    }
+}
+
+// The related entries, each once, none the page's own.
+fn with_related(out: List<Entry>, entry: Option<Entry>, own: String) -> List<Entry> {
+    match entry {
+        Some(e) => if e.key == own | List.any(out, r => r.key == e.key) { out } else { List.concat(out, [e]) },
+        None => out,
+    }
+}
+
+// What a related form tells the header (`relatedCharacterFormContext`).
+type Context = Context {
+    key: String,
+    simplified_form_of: String,
+    character: String,
+    simplified: List<String>,
+    traditional: List<String>,
+    hong_kong: String,
+    japanese: String,
+    korean: String,
+    hanja: String,
+}
+
+fn context_of(e: Entry) -> Context {
+    Context {
+        key: e.key,
+        simplified_form_of: e.simplified_form_of,
+        character: chinese_character(e),
+        simplified: simplified_of(e),
+        traditional: traditional_of(e),
+        hong_kong: match e.chinese_char {
+            Some(c) => c.hong_kong,
+            None => "",
+        },
+        japanese: match e.japanese_char {
+            Some(j) => j.literal,
+            None => "",
+        },
+        korean: match e.korean_char {
+            Some(k) => k.character,
+            None => "",
+        },
+        hanja: match e.korean_char {
+            Some(k) => k.hanja,
+            None => "",
+        },
+    }
+}
+
+// The page's entry, as the loader leaves it, the stub it came from, and the
+// related forms' contexts.
+type Loaded = Loaded {
+    data: Entry,
+    stub: Option<Entry>,
+    contexts: List<Context>,
+}
+
+// The variants' Chinese words merged, then each related form: its context
+// kept once, and its data merged where it is an equivalent form of the
+// canonical character (`+page.ts:464-492`, `:236-280`).
+fn loaded(data: Entry, stub: Option<Entry>, words: List<String>, read: List<Option<Entry>>) -> Loaded {
+    let reads = reads_of(words, read)
+    let variants = List.fold(variant_words(stub), data.chinese, (out, v) => match read_of(reads, v) {
+        Some(e) => more_chinese(out, e.chinese),
+        None => out,
+    })
+    let merged = with_chinese(data, variants)
+    let canonical = if chinese_character(merged) != "" { chinese_character(merged) } else { merged.key }
+    let none: List<Entry> = []
+    let related = List.fold(related_words(data, stub), none, (out, w) => with_related(out, related_entry(stub, reads, w), merged.key))
+    let final = List.fold(related, merged, (into, r) => match equivalent_target(r) {
+        Some(t) => if t == canonical { merged_form(into, r) } else { into },
+        None => into,
+    })
+    Loaded { data: final, stub: stub, contexts: List.map(related, context_of) }
+}
+
+// ---------------------------------------------------------------------------
+// The header's written forms (`buildCharacterHeaderForms`,
+// `character-forms.ts:205-351`).
+
+type Roles = Roles {
+    character: String,
+    roles: List<String>,
+}
+
+// `role` added to `character`'s roles, the character added in order where it
+// is a Han character not yet listed.
+fn add_role(table: List<Roles>, character: String, role: String) -> List<Roles> {
+    if !is_han_form(character) {
+        table
+    } else {
+        if List.any(table, r => r.character == character) {
+            List.map(table, r => if r.character == character & role != "" & !List.any(r.roles, x => x == role) {
+                Roles { character: r.character, roles: List.concat(r.roles, [role]) }
+            } else {
+                r
+            })
+        } else {
+            List.concat(table, [Roles { character: character, roles: if role == "" { [] } else { [role] } }])
+        }
+    }
+}
+
+fn add_roles(table: List<Roles>, characters: List<String>, role: String) -> List<Roles> {
+    List.fold(characters, table, (t, c) => add_role(t, c, role))
+}
+
+// `addContext` (`character-forms.ts:217-262`).
+fn add_context(table: List<Roles>, x: Context) -> List<Roles> {
+    let different = List.any(x.simplified, c => c != x.character)
+    let mapped = List.length(x.traditional) > 0
+    let merged = x.simplified_form_of != ""
+    let traditional_role = !mapped | List.any(x.traditional, c => c == x.character) | merged
+    let simplified_role = !different | List.any(x.simplified, c => c == x.character) | mapped
+    let t1 = if x.character != "" & traditional_role { add_role(table, x.character, "traditional") } else { table }
+    let t2 = if x.character != "" & simplified_role { add_role(t1, x.character, "simplified") } else { t1 }
+    let t3 = add_roles(add_roles(t2, x.traditional, "traditional"), x.simplified, "simplified")
+    let t4 = if x.hong_kong != "" {
+        add_role(t3, x.hong_kong, "hong-kong")
+    } else {
+        if x.character != "" & traditional_role { add_role(t3, x.character, "hong-kong") } else { t3 }
+    }
+    add_role(add_role(add_role(t4, x.japanese, "japanese"), x.korean, "korean"), x.hanja, "korean")
+}
+
+fn role_rank(role: String) -> Int {
+    match role {
+        "traditional" => 0,
+        "hong-kong" => 1,
+        "simplified" => 2,
+        "japanese" => 3,
+        "korean" => 4,
+        _ => 5,
+    }
+}
+
+fn by_role(a: String, b: String) -> Int {
+    role_rank(a) - role_rank(b)
+}
+
+fn role_label(role: String) -> String {
+    match role {
+        "traditional" => "Traditional",
+        "simplified" => "Simplified",
+        "hong-kong" => "Hong Kong",
+        "japanese" => "Japanese",
+        "korean" => "Korean",
+        other => other,
+    }
+}
+
+// `ROLE_SHORT` (`[word]/+page.svelte`).
+fn role_short(role: String) -> String {
+    match role {
+        "traditional" => "Trad",
+        "simplified" => "Simp",
+        "hong-kong" => "HK",
+        "japanese" => "JP",
+        "korean" => "KR",
+        other => other,
+    }
+}
+
+fn has_role(roles: List<String>, role: String) -> Bool {
+    List.any(roles, r => r == role)
+}
+
+// `languageTagForRoles` (`character-forms.ts:279-287`).
+fn language_tag(roles: List<String>) -> String {
+    if has_role(roles, "japanese") & !has_role(roles, "traditional") & !has_role(roles, "simplified") {
+        "ja"
+    } else {
+        if has_role(roles, "korean") & List.length(roles) == 1 {
+            "ko"
+        } else {
+            if has_role(roles, "hong-kong") & List.length(roles) == 1 { "zh-HK" } else { if has_role(roles, "simplified") & !has_role(roles, "traditional") { "zh-Hans" } else { "zh-Hant" } }
+        }
+    }
+}
+
+// One written form as the header shows it.
+type Form = Form {
+    id: String,
+    character: String,
+    label: String,
+    short: String,
+    meaning: String,
+    lang: String,
+}
+
+// The characters kiokun.com asks the component glosses for that can be a
+// form (`collectSupportKeys`, `word-character-learning.ts:155-196`): the
+// word's own, the entry's and the stub's forms, and the cards'.
+fn support_characters(word: String, data: Entry, stub: Option<Entry>, cards: List<Card>) -> List<String> {
+    let none: List<String> = []
+    let glyphs = List.map(List.filter(String.codepoints(word), c => String.trim(String.from_codepoints([c])) != ""), c => String.from_codepoints([c]))
+    let own = context_of(data)
+    let redirect = match data.redirect {
+        Some(r) => r,
+        None => "",
+    }
+    let from_stub = match stub {
+        Some(s) => List.concat(List.concat([s.key, chinese_character(s)], simplified_of(s)), traditional_of(s)),
+        None => none,
+    }
+    let entry = List.concat(List.concat([data.key, redirect, own.character, own.hong_kong], own.simplified), List.concat(own.traditional, [own.japanese, own.korean, own.hanja]))
+    distinct(List.concat(List.concat(glyphs, entry), List.concat(from_stub, List.map(cards, c => c.character))))
+}
+
+fn gloss_of(glosses: List<CharGloss>, character: String) -> String {
+    match List.find(glosses, g => g.character == character) {
+        Some(g) => learner(g.gloss),
+        None => "",
+    }
+}
+
+// `collectMnemonicCards` (`word-character-learning.ts:237-255`): the
+// entry's card and variants, then the stub's, each character once.
+fn header_cards(data: Entry, stub: Option<Entry>) -> List<Card> {
+    let none: List<Card> = []
+    let own = match data.mnemonic {
+        Some(m) => List.concat([m], data.variants),
+        None => data.variants,
+    }
+    let from_stub = match stub {
+        Some(s) => match s.mnemonic {
+            Some(m) => List.concat([m], s.variants),
+            None => s.variants,
+        },
+        None => none,
+    }
+    List.fold(List.concat(own, from_stub), none, (out, c) => if List.any(out, s => s.character == c.character) { out } else { List.concat(out, [c]) })
+}
+
+fn forms_of(word: String, l: Loaded, glosses: List<CharGloss>) -> List<Form> {
+    let cards = header_cards(l.data, l.stub)
+    let none: List<Roles> = []
+    let primary = add_context(none, context_of(l.data))
+    let every = List.fold(l.contexts, primary, add_context)
+    let listed = add_roles(add_roles(every, [chinese_character(l.data)], ""), List.map(cards, c => c.character), "")
+    let table = if one_character(word) { add_role(listed, word, "") } else { listed }
+    let shown: List<Form> = []
+    List.fold(table, shown, (out, r) => List.concat(out, [form_of(r, primary, cards, glosses, List.length(out))]))
+}
+
+// A form's roles are the ones the page's own entry gives it, where it gives
+// any, else every context's, in `ROLE_ORDER`; its meaning is its card's,
+// else its component gloss (`withCharacterFormGlosses`).
+fn form_of(r: Roles, primary: List<Roles>, cards: List<Card>, glosses: List<CharGloss>, n: Int) -> Form {
+    let own = match List.find(primary, p => p.character == r.character) {
+        Some(p) => if List.length(p.roles) > 0 { p.roles } else { r.roles },
+        None => r.roles,
+    }
+    let roles = List.sort_by(own, by_role)
+    let carded = learner(meaning_of(cards, r.character))
+    Form {
+        id: "form:{n}",
+        character: r.character,
+        label: if List.length(roles) > 0 { String.join(List.map(roles, role_label), " / ") } else { "Related form" },
+        short: if List.length(roles) > 0 { String.join(List.map(roles, role_short), " · ") } else { "Form" },
+        meaning: if carded != "" { carded } else { gloss_of(glosses, r.character) },
+        lang: language_tag(roles),
+    }
+}
+
+// A form's meaning is shown where it has one, and, where it is the only
+// form, where it is not the headline's concept
+// (`shouldShowCharacterFormMeaning`).
+type ShownForm = ShownForm {
+    id: String,
+    character: String,
+    label: String,
+    short: String,
+    meaning: String,
+    lang: String,
+    aria: String,
+    title: String,
+}
+
+fn forms_shown(forms: List<Form>, gloss: String) -> List<ShownForm> {
+    let many = List.length(forms) > 1
+    List.map(forms, f => ShownForm {
+        id: f.id,
+        character: f.character,
+        label: f.label,
+        short: f.short,
+        meaning: if f.meaning == "" { "" } else { if many | concept(f.meaning) != concept(gloss) { f.meaning } else { "" } },
+        lang: f.lang,
+        aria: "{f.character}: {f.label}",
+        title: "Learner meaning for {f.character}",
+    })
+}
+
+// The entry a stub names, where the word's file is a stub.
+fn target_of(first: Option<Entry>) -> Option<String> {
+    match first {
+        Some(f) => f.redirect,
+        None => None,
+    }
+}
+
+// The page's entry: a stub's target with the stub's card kept, else the
+// stub where its target is not found, else the word's own entry
+// (`+page.ts:438-462`).
+fn data_of(first: Option<Entry>, followed: Option<Entry>) -> Option<Entry> {
+    match first {
+        Some(f) => match f.redirect {
+            Some(_) => match followed {
+                Some(t) => Some(followed_from(t, f)),
+                None => Some(f),
+            },
+            None => Some(f),
+        },
+        None => None,
+    }
+}
+
+// The stub the page came from, where it came from one.
+fn stub_of(first: Option<Entry>) -> Option<Entry> {
+    match first {
+        Some(f) => match f.redirect {
+            Some(_) => Some(f),
+            None => None,
+        },
+        None => None,
+    }
+}
+
+fn words_for(data: Option<Entry>, stub: Option<Entry>) -> List<String> {
+    let none: List<String> = []
+    match data {
+        Some(d) => extra_words(d, stub),
+        None => none,
+    }
+}
+
+fn characters_for(word: String, page: Option<Loaded>) -> List<String> {
+    let none: List<String> = []
+    match page {
+        Some(l) => support_characters(word, l.data, l.stub, header_cards(l.data, l.stub)),
+        None => none,
     }
 }
 
@@ -696,11 +1371,12 @@ type WordShown = WordShown {
     names: List<ShownName>,
 }
 
-fn shown(word: String, e: Entry, labels: List<Label>) -> WordShown {
+fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>) -> WordShown {
     let none: List<ShownChinese> = []
+    let e = l.data
     WordShown {
         word: word,
-        header: header(e),
+        header: header(e, forms_of(word, l, glosses)),
         chinese: List.fold(e.chinese, none, (out, w) => List.concat(out, chinese_shown(w, word))),
         japanese: List.map(e.japanese, w => japanese_shown(w, labels)),
         korean: List.map(e.korean, korean_shown),
@@ -724,14 +1400,23 @@ public query Word(word: String) -> Result<WordShown, KiokunError>
     // among the component's imports (the compiler's `host_calls` reads the
     // declaration's body alone).
     let labels = read_labels()
-    match recorded(read_entry(shards.subdirectory(word), file_name(word)), word) {
-        Some(e) => match e.redirect {
-            Some(target) => match recorded(read_entry(shards.subdirectory(target), file_name(target)), target) {
-                Some(t) => Ok(shown(word, t, labels)),
-                None => Ok(shown(word, e, labels)),
-            },
-            None => Ok(shown(word, e, labels)),
-        },
+    let first = recorded(read_entry(shards.subdirectory(word), file_name(word)), word)
+    let target = target_of(first)
+    let followed = match target {
+        Some(t) => recorded(read_entry(shards.subdirectory(t), file_name(t)), t),
+        None => None,
+    }
+    let data = data_of(first, followed)
+    let stub = stub_of(first)
+    let words = words_for(data, stub)
+    let read = read_entries(List.map(words, place_of))
+    let page = match data {
+        Some(d) => Some(loaded(d, stub, words, read)),
+        None => None,
+    }
+    let glosses = read_glosses(characters_for(word, page))
+    match page {
+        Some(l) => Ok(shown(word, l, labels, glosses)),
         None => Err(NotFound),
     }
 }
@@ -753,6 +1438,22 @@ page WordPage(word: String) {
             <h1 id="headword">{page.word}</h1>
             {#if page.header.shown}
                 <div id="character-header" class="character-identity-grid">
+                    {#if page.header.forms}
+                        <div class="character-form-list">
+                            {#each page.header.forms as f (f.id)}
+                                <div class="character-form">
+                                    <div class="character-specimen" aria-label={f.aria}>
+                                        <div lang={f.lang}>{f.character}</div>
+                                    </div>
+                                    <div class="form-roles" title={f.label}>
+                                        <span class="visually-hidden">{f.label}</span>
+                                        <span aria-hidden="true">{f.short}</span>
+                                    </div>
+                                    {#if f.meaning}<div class="form-meaning" title={f.title}>{f.meaning}</div>{/if}
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
                     {#if page.header.gloss}
                         <div class="character-summary">
                             <div class="character-title-row">
