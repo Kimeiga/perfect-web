@@ -5411,3 +5411,18 @@ e14-derived-outside:
        python3 scripts/derived_outside_mutations.py; \
      } > docs/evidence/E14/derived-outside.txt
     @grep -E "^test result|^Ran |^OK|^FAILED|mutants killed|panicked at" docs/evidence/E14/derived-outside.txt
+
+# ADR-YYYY: a commit tells the pages that ask, and tells them at once. The
+# development server's tests, and the mutation controls.
+e14-tell-at-once:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-YYYY - a commit tells the pages that ask, and tells them at once"; echo; \
+       echo "produced by: just e14-tell-at-once"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the development server (readers told at once; a document passed by, told as its page asks)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_reader_is_told_while a_document_no_page_asks_for a_telling_that_panics a_burst 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/tell_at_once_mutations.py)"; echo; \
+       python3 scripts/tell_at_once_mutations.py; \
+     } > docs/evidence/E14/tell-at-once.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/tell-at-once.txt

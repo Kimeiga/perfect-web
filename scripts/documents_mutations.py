@@ -45,15 +45,16 @@ MUTANTS = [
         "a change reaches only the session's latest document",
         "cargo",
         SERVER,
-        "        let documents = documents_of(&self.pending.lock().expect(\"pending\"), session);\n"
-        "        let mut read = Vec::new();\n",
-        "        let documents: Vec<Doc> =\n"
-        "            documents_of(&self.pending.lock().expect(\"pending\"), session)\n"
+        # Re-anchored by ADR-YYYY: a telling takes the documents whose pages
+        # ask.
+        "            documents_of(&queue, session)\n"
+        "                .into_iter()\n"
+        "                .filter(|d| which(d))\n",
+        "            documents_of(&queue, session)\n"
         "                .into_iter()\n"
         "                .rev()\n"
         "                .take(1)\n"
-        "                .collect();\n"
-        "        let mut read = Vec::new();\n",
+        "                .filter(|d| which(d))\n",
     ),
     (
         "a keyed read goes to the session's latest document",

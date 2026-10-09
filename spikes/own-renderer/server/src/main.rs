@@ -125,10 +125,27 @@ struct Subscriber {
     /// more" kept its twenty rows on CI with the read applied and the stream
     /// never seen to end, and nothing said where the frames were.
     trail: std::collections::VecDeque<String>,
+    /// **A telling passed it by** (ADR-YYYY): no page of it had asked for
+    /// [`LIVE`], so what changed was not derived for it then; it is, when
+    /// it next asks.
+    stale: bool,
 }
 
 /// How many notes a document's trail keeps.
 const TRAIL: usize = 400;
+
+/// **How long since a document's page last asked, at most, for a telling
+/// to derive it** (ADR-YYYY). A page asks without pause: a stream holds two
+/// seconds and is opened again at once, a long poll one. Until ADR-YYYY a
+/// commit derived every document of every session that read what it
+/// dropped, one session after another, those of pages closed up to
+/// [`IDLE`] before among them: on CI a reader's change waited behind 47 of
+/// them, five seconds, and "a follow reaches another reader" failed.
+const LIVE: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// **How many sessions a commit tells at once** (ADR-YYYY), each in its own
+/// hold: one reader's telling no longer waits for another's.
+const TELLERS: usize = 8;
 
 /// **A session, as a record names it**: a hash of its id, which is its
 /// cookie and never written where another session can read it.
@@ -217,7 +234,13 @@ impl Subscriber {
                 "{} ms subscribed at {cursor}",
                 uptime_ms()
             )]),
+            stale: false,
         }
+    }
+
+    /// **Has a page of it asked within [`LIVE`]?** (ADR-YYYY)
+    fn live(&self, now: std::time::Instant) -> bool {
+        now.saturating_duration_since(self.seen) < LIVE
     }
 
     /// A note on its trail, the oldest let go past [`TRAIL`].
@@ -2590,8 +2613,28 @@ impl Server {
                 others.iter().map(|s| masked(s)).collect::<Vec<_>>()
             ));
         }
-        for other in others {
-            self.tell(&other);
+        // At once, each session in its own hold (ADR-YYYY): until then one
+        // after another, and a reader whose session came late in the order
+        // waited for every one before it.
+        let others: Vec<String> = others.into_iter().collect();
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let tellers = TELLERS.min(others.len());
+        if tellers <= 1 {
+            for other in &others {
+                self.tell(other);
+            }
+        } else {
+            std::thread::scope(|scope| {
+                for _ in 0..tellers {
+                    scope.spawn(|| {
+                        while let Some(other) =
+                            others.get(next.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+                        {
+                            self.tell(other);
+                        }
+                    });
+                }
+            });
         }
         // And each document that reads an entry made again (ADR-0277).
         let made = std::mem::take(&mut *self.made.lock().expect("made"));
@@ -3172,9 +3215,31 @@ impl Server {
             .get(session)
             .map(|q| q.iter().cloned().collect())
             .unwrap_or_default();
-        let documents = documents_of(&self.pending.lock().expect("pending"), session);
+        // Only a document whose page asks is derived now (ADR-YYYY); one no
+        // page has asked for in [`LIVE`] is derived when one asks.
+        let documents: Vec<Doc> = {
+            let mut queue = self.pending.lock().expect("pending");
+            let now = std::time::Instant::now();
+            documents_of(&queue, session)
+                .into_iter()
+                .filter(|d| which(d))
+                .filter(|d| match queue.get_mut(d) {
+                    Some(waiting) if waiting.live(now) => true,
+                    Some(waiting) => {
+                        if !waiting.stale {
+                            waiting.stale = true;
+                            waiting.note(format_args!(
+                                "passed by, no page asking: derived when one asks"
+                            ));
+                        }
+                        false
+                    }
+                    None => false,
+                })
+                .collect()
+        };
         let mut read = Vec::new();
-        for doc in documents.into_iter().filter(|d| which(d)) {
+        for doc in documents {
             let params = self.params_of(&doc);
             // Each by its own page's plan (ADR-0190): the store's, or a cart
             // page's, which reads the same cart.
@@ -3836,6 +3901,37 @@ impl Server {
         if let Some(hook) = hook {
             hook(self, doc);
         }
+    }
+
+    /// **A document a telling passed by, told as its page asks**
+    /// (ADR-YYYY): derived against what it shows, in the session's hold, as
+    /// a telling would have, before the page is given its frames.
+    fn told_as_it_asks(&self, doc: &Doc) {
+        let stale = self
+            .pending
+            .lock()
+            .expect("pending")
+            .get_mut(doc)
+            .is_some_and(|waiting| {
+                // Asking now: live for the telling below.
+                waiting.seen = std::time::Instant::now();
+                std::mem::take(&mut waiting.stale)
+            });
+        if !stale {
+            return;
+        }
+        let session = &doc.0;
+        let lock = self.one_at_a_time(session);
+        let _one = lock.lock().expect("one change of a session at a time");
+        self.clock.advance(1);
+        let version = Version(self.clock.now());
+        self.send_documents_where(
+            session,
+            |d| d == doc,
+            &session_documents(session),
+            version,
+            false,
+        );
     }
 
     /// A note on [`Server::tellings`], the oldest let go past 300.
@@ -7333,6 +7429,8 @@ fn stream_frames(
     // next asks: its change reaches it within one subscription.
     server.drain(session);
     let doc: Doc = (session.to_string(), document);
+    // What a telling passed by while no page of it asked (ADR-YYYY).
+    server.told_as_it_asks(&doc);
 
     // One route, two adapters. The frames are the same either way — see
     // `e2e/transport.spec.mjs`, which runs the whole subscription twice.
@@ -11322,6 +11420,122 @@ public query Store(",
         );
         let set = format!("{:?}", sets_of(&s, &theirs).pop().expect("a patch set"));
         assert!(set.contains("First"), "told: {set}");
+    }
+
+    /// When a document was told, from its trail: the milliseconds of its
+    /// first telling's note.
+    fn told_ms(s: &Server, doc: &Doc) -> u128 {
+        s.pending.lock().expect("pending")[doc]
+            .trail
+            .iter()
+            .find(|note| note.contains(" told at "))
+            .and_then(|note| note.split(" ms ").next()?.parse().ok())
+            .unwrap_or_else(|| panic!("{doc:?} was not told"))
+    }
+
+    /// **A reader is told while another's telling takes its time**
+    /// (ADR-YYYY): a commit tells the sessions that read what it dropped at
+    /// once. One after another, the second waited for the first: on CI a
+    /// reader's change waited behind 47 tellings.
+    #[test]
+    fn a_reader_is_told_while_another_readers_telling_takes_its_time() {
+        let s = served_feed();
+        for session in ["a", "b", "c"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let (slow, quick) = {
+            let pending = s.pending.lock().expect("pending");
+            (latest(&pending, "b"), latest(&pending, "c"))
+        };
+        let target = slow.clone();
+        *s.deriving_hook.lock().expect("deriving") =
+            Some(Arc::new(move |_: &Server, doc: &Doc| {
+                if *doc == target {
+                    std::thread::sleep(std::time::Duration::from_millis(400));
+                }
+            }));
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        // "b" comes first in the order, and takes its time.
+        assert!(
+            told_ms(&s, &quick) < told_ms(&s, &slow),
+            "c told at {} ms, b at {} ms",
+            told_ms(&s, &quick),
+            told_ms(&s, &slow)
+        );
+        let set = format!("{:?}", sets_of(&s, &quick).pop().expect("a patch set"));
+        assert!(set.contains("First"), "told: {set}");
+    }
+
+    /// **A document no page asks for is told when one asks** (ADR-YYYY):
+    /// a telling passes it by, and its page, asking again, is given what
+    /// changed, derived against what it shows.
+    #[test]
+    fn a_document_no_page_asks_for_is_told_when_one_asks() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        s.pending
+            .lock()
+            .expect("pending")
+            .get_mut(&theirs)
+            .expect("subscribed")
+            .seen = std::time::Instant::now()
+            .checked_sub(LIVE + std::time::Duration::from_millis(1))
+            .expect("an instant");
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        assert!(
+            sets_of(&s, &theirs).is_empty(),
+            "passed by: nothing derived for it"
+        );
+        // Its page asks, as a page does, and is answered what changed.
+        let asked = get_as(&s, "b", &format!("/stream?doc={0}&since={0}", theirs.1));
+        assert!(asked.contains("First"), "told as it asks: {asked}");
+        // Asked again, nothing more: it was told once.
+        s.told_as_it_asks(&theirs);
+        assert_eq!(sets_of(&s, &theirs).len(), 1);
+    }
+
+    /// One GET of `path` by `session`, through the server's own handling,
+    /// and the whole answer.
+    fn get_as(s: &Server, session: &str, path: &str) -> String {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let at = listener.local_addr().expect("address");
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let (stream, _) = listener.accept().expect("accept");
+                handle(s, stream);
+            });
+            let mut client = std::net::TcpStream::connect(at).expect("connect");
+            client
+                .write_all(
+                    format!(
+                        "GET {path} HTTP/1.1\r\nHost: t\r\nCookie: pw-session={session}\r\n\r\n"
+                    )
+                    .as_bytes(),
+                )
+                .expect("request");
+            let mut answer = String::new();
+            let _ = std::io::Read::read_to_string(&mut client, &mut answer);
+            answer
+        })
     }
 
     /// **A document's trail says what happened to its frames** (ADR-XXXX):
