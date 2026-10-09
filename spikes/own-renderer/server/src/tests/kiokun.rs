@@ -7,7 +7,9 @@
 use super::*;
 
 /// kiokun's program, `change` applied to its `app.pw`, built as `pw build`
-/// builds it: its directory, and the build in it.
+/// builds it: its directory, and the build in it. The program is compiled
+/// once per test process for each distinct source (`BUILDS`), and written
+/// into this test's own directory.
 fn built_kiokun_with(change: fn(&str) -> String) -> (tempfile::TempDir, std::path::PathBuf) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let dir = tempfile::TempDir::with_prefix("pw-kiokun-").expect("a temporary directory");
@@ -28,25 +30,103 @@ fn built_kiokun_with(change: fn(&str) -> String) -> (tempfile::TempDir, std::pat
     // kiokun's shard rule, in Pleris since ADR-0041, and the record it names.
     paths.push(root.join("examples/kiokun/Shards.pw"));
     paths.push(root.join("examples/kiokun/dictionary.pw"));
-    let units: Vec<pw_core::check::Unit> = paths
+    let sources: Vec<(String, String)> = paths
         .into_iter()
         .map(|p| {
             let mut src = std::fs::read_to_string(&p).expect("read");
             if p.ends_with("examples/kiokun-site/app.pw") {
                 src = change(&src);
             }
-            pw_core::check::Unit {
-                hir: pw_core::lower::lower_file(&src, &pw_syntax::parse_tree(&src).green),
-                path: p.display().to_string(),
-                src,
-            }
+            (p.display().to_string(), src)
         })
         .collect();
-    let build = pw_core::build::build(&units).expect("kiokun builds");
-    assert!(build.refusals().is_empty(), "{:?}", build.refusals());
+    let key = {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        sources.hash(&mut h);
+        h.finish()
+    };
+    let cell = BUILDS
+        .get_or_init(Default::default)
+        .lock()
+        .expect("the builds")
+        .entry(key)
+        .or_default()
+        .clone();
+    let files = cell
+        .get_or_init(|| {
+            let units: Vec<pw_core::check::Unit> = sources
+                .iter()
+                .map(|(path, src)| pw_core::check::Unit {
+                    hir: pw_core::lower::lower_file(src, &pw_syntax::parse_tree(src).green),
+                    path: path.clone(),
+                    src: src.clone(),
+                })
+                .collect();
+            Arc::new(compiled(&units))
+        })
+        .clone();
     let out = dir.path().join("build");
-    build.write(&out).expect("the build is written");
+    std::fs::create_dir_all(&out).expect("the build's directory");
+    for (rel, bytes) in files.iter() {
+        match bytes {
+            None => std::fs::create_dir_all(out.join(rel)).expect("a directory"),
+            Some(b) => std::fs::write(out.join(rel), b).expect("a built file"),
+        }
+    }
     (dir, out)
+}
+
+/// A build's files: each path relative to the build's directory, with its
+/// bytes, or `None` for a directory.
+type Files = Vec<(std::path::PathBuf, Option<Vec<u8>>)>;
+
+/// **Each distinct program is compiled once per test process** (the
+/// integrator's ruling of 2026-10-09 on e14-kiokun-word's time): the
+/// build's files, as bytes, keyed by a hash of the sources compiled. Each
+/// test still writes them into its own `TempDir` (ADR-0158), so nothing on
+/// disk outlives its test; the cache holds bytes, not a `Build`. The map's
+/// lock is held only to find or insert a key's cell, and each key compiles
+/// in its own cell, so two programs do not wait for each other.
+static BUILDS: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u64, Cell>>> =
+    std::sync::OnceLock::new();
+
+/// One program's files, compiled by the first test to ask for them.
+type Cell = Arc<std::sync::OnceLock<Arc<Files>>>;
+
+/// Every file and directory under `dir`, relative to `base`, in name order.
+fn files_under(base: &std::path::Path, dir: &std::path::Path, out: &mut Files) {
+    let mut entries: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
+        .expect("the build's directory")
+        .map(|e| e.expect("an entry").path())
+        .collect();
+    entries.sort();
+    for path in entries {
+        let rel = path
+            .strip_prefix(base)
+            .expect("under the build")
+            .to_path_buf();
+        if path.is_dir() {
+            out.push((rel, None));
+            files_under(base, &path, out);
+        } else {
+            out.push((rel, Some(std::fs::read(&path).expect("a built file"))));
+        }
+    }
+}
+
+/// `units` built as `pw build` builds them, its files read back from a
+/// scratch directory dropped right after.
+fn compiled(units: &[pw_core::check::Unit]) -> Files {
+    let build = pw_core::build::build(units).expect("kiokun builds");
+    assert!(build.refusals().is_empty(), "{:?}", build.refusals());
+    let scratch =
+        tempfile::TempDir::with_prefix("pw-kiokun-build-").expect("a temporary directory");
+    let out = scratch.path().join("build");
+    build.write(&out).expect("the build is written");
+    let mut files = Files::new();
+    files_under(&out, &out, &mut files);
+    files
 }
 
 fn served_kiokun() -> Served {
