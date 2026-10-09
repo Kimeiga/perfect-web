@@ -8127,10 +8127,15 @@ public query Store(",
             let cookie = session
                 .map(|id| format!("Cookie: pw-session={id}\r\n"))
                 .unwrap_or_default();
+            // Started before the request is written: the server starts
+            // nothing before it reads the request, so a part it sends after
+            // a delay is never measured sooner than the delay. Started after,
+            // a recommendation delayed 600 ms was measured at 599.75 ms on CI
+            // (run 37899457744), the server's clock ahead of this one.
+            let started = std::time::Instant::now();
             client
                 .write_all(format!("GET {path} HTTP/1.1\r\nHost: t\r\n{cookie}\r\n").as_bytes())
                 .expect("request");
-            let started = std::time::Instant::now();
             let mut chunks = Vec::new();
             let mut buf = [0u8; 65536];
             loop {

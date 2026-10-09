@@ -1,14 +1,15 @@
 ADR-0234 - a view's instance given a speculated value is rendered again with it
 
 produced by: just e14-speculated-instances
-commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
+commit: 4236e3242f43cb48ffb4912b2b8497a72aca0a9b
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37918808029 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the module (compiler/pw-core/tests/speculated_instances.rs)
 
 test an_instance_the_module_would_not_reach_is_refused_by_name ... ok
 test an_instance_given_a_speculated_value_is_a_region ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
 
 == mutation controls (scripts/speculated_instances_mutations.py)
 
@@ -17,3 +18,4 @@ a view given a speculated value is no region [cargo]: KILLED (2 of 2 tests fail)
 a view is given what the browser does not hold [cargo]: KILLED (1 of 2 tests fail)
 a view given one inside a block no region renders is compiled [cargo]: KILLED (1 of 2 tests fail)
 3 of 3 mutants killed
+memory bound: no process was stopped

@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-09, three findings fixed, and three recipes recorded for the
+first time** (`track/arrival-clock`). **Corrected:** ADR-0257's `just
+e14-follows`, ADR-0268's `just e14-keepalive` and ADR-0275's `just
+e14-waiting-rows` were cited with their mutants killed, and no evidence of
+any of them was ever on `master`; CI recorded all three in run 37918808029
+(12 of 12, 8 of 8 and 7 of 7). Fixed: ADR-0290's plan crashed on a push
+that touches no recipe, taking the longest of no shards, so every such push
+failed its plan job (d81b8af's did): it plans no shard now. A part sent
+after a delay was measured 0.25 ms early on CI, the test's clock started
+after its request was written: it starts before. And the feed's "a follow
+shows before the server answers" ended with its unfollow unanswered; it
+waits for the answer. One test and one mutant (`just e14-dealt-by-time`, 9
+of 9). Named at the merge: WebKit's "Load more", and five recipes' baselines
+red on it and on "a follow reaches another reader" (open, NEXT), whose
+evidence is not taken.
+
 **ADR-0294, 2026-10-09: a list renders in its length** (W6's finding on
 kiokun's sample). さえこ's 128 names took 215 ms to render, and the curve
 was quadratic: 32 names 16.7 ms, 64 57.7 ms, 128 218 ms. Each item's scope
