@@ -58,8 +58,8 @@ MUTANTS = [
     (
         "kiokun's placeholder definition is shown",
         APP,
-        '    let kept = List.filter(w.definitions, d => d != "" & d != "Sentence")',
-        '    let kept = List.filter(w.definitions, d => d != "")',
+        '    let kept = List.filter(w.senses, s => s.text != "" & s.text != "Sentence")',
+        '    let kept = List.filter(w.senses, s => s.text != "")',
     ),
     (
         "one sense is numbered as many are",
@@ -338,6 +338,72 @@ MUTANTS = [
         '    let suffix = String.join(List.take(List.filter(forms, f => f != word), 0), "・")',
     ),
     (
+        "a pitch shard hashes code points",
+        APP,
+        "    if c > 65535 { [55296 + (c - 65536) / 1024, 56320 + (c - 65536) % 1024] } else { [c] }",
+        "    [c]",
+    ),
+    (
+        "a reading's own accent is never read",
+        APP,
+        "    match List.find(readings, r => r.reading == reading) {",
+        "    match List.find(readings, r => false) {",
+    ),
+    (
+        "a small kana is a mora of its own",
+        APP,
+        "            Some(next) => if small_kana(next) {",
+        "            Some(next) => if false {",
+    ),
+    (
+        "a fall after the last mora is 中高",
+        APP,
+        '    if accent == 0 { "平板" } else { if accent == 1 { "頭高" } else { if accent == count { "尾高" } else { "中高" } } }',
+        '    if accent == 0 { "平板" } else { if accent == 1 { "頭高" } else { "中高" } }',
+    ),
+    (
+        "the morae after the fall stay high",
+        APP,
+        "(a > 1 & List.length(out) > 0 & List.length(out) < a)",
+        "(a > 1 & List.length(out) > 0)",
+    ),
+    (
+        "a word's readings are read in sorted order",
+        LAYER,
+        "                Ok(Readings(out))",
+        "                out.sort_by(|a, b| a.0.cmp(&b.0));\n                Ok(Readings(out))",
+    ),
+    (
+        "a null accent is 0",
+        LAYER,
+        "                    out.push((reading, accent.and_then(|a| a.as_i64())));",
+        "                    out.push((reading, accent.map(|_| 0)));",
+    ),
+    (
+        "a Chinese example is written in its traditional form",
+        APP,
+        'Example { text: if e.simp != "" { e.simp } else { e.trad }, translation: e.en }',
+        "Example { text: e.trad, translation: e.en }",
+    ),
+    (
+        "two examples are shown before the disclosure",
+        APP,
+        "        first: List.take(all, 1),",
+        "        first: List.take(all, 2),",
+    ),
+    (
+        "an example without a text is shown",
+        APP,
+        '    let usable = List.filter(items, e => e.text != "")',
+        "    let usable = items",
+    ),
+    (
+        "a Japanese sentence's `land` is not read",
+        APP,
+        'List.find(e.sentences, t => t.land == "jpn" | t.lang == "jpn")',
+        'List.find(e.sentences, t => t.lang == "jpn")',
+    ),
+    (
         "the host does not choose the kiokun layer",
         HOST,
         '            .any(|i| i.interface.starts_with("kiokun:"))',
@@ -345,7 +411,25 @@ MUTANTS = [
     ),
 ]
 
-TESTS = [["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "kiokun"]]
+# Four test threads, not one per core: each kiokun test compiles the
+# program into its own TempDir (ADR-0158), so at full parallelism the
+# process peaked at 3.49 GB measured alone and crossed ADR-0292's
+# 4 GiB bound in the baseline run. With four threads it peaks at
+# 2.26 GB (measured with /usr/bin/time -l, 2026-10-09), at about
+# twice the time.
+TESTS = [
+    [
+        "cargo",
+        "test",
+        "--quiet",
+        "--locked",
+        "-p",
+        "pw-dev-server",
+        "--",
+        "kiokun",
+        "--test-threads=4",
+    ]
+]
 
 
 def run_tests():

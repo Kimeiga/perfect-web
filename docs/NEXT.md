@@ -697,6 +697,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
              engines. The integrator's own items here (1, 4, 5, 6) come
              before kiokun's and the infrastructure follow-ups (the owner,
              2026-10-09);
+          3a. **`private` means two things** (W8's finding, 2026-10-09): the
+             user's scope (resume, boundary, the checks) and "not importable"
+             (resolve, PW0023). W8 adds `user`, importable and the user's, as
+             `session` is the session's; whether `private` goes on implying
+             the user's scope or becomes "not importable" alone is the
+             integrator's ruling, a change to every program that says it
+             (the feed's notifications and messages);
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled;
           5. **idempotency committed with the writes** (PW0348, ADR-0246's

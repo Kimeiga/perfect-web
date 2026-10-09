@@ -42,6 +42,8 @@ async function shows人(page) {
   await expect(page.locator("#japanese .common").first()).toHaveText("★");
   await expect(page.locator("#korean .korean-word-text").first()).toHaveText("인");
   await expect(page.locator("#korean .korean-hanja").first()).toHaveText("[人]");
+  // A Japanese sense's example, and its translation.
+  await expect(page.locator("#japanese .sense-example-source").first()).not.toBeEmpty();
   await expect(page.locator("#names-heading")).toHaveText("Japanese Names");
   expect(await page.locator("#names .name-entry").count()).toBeGreaterThan(0);
 }
