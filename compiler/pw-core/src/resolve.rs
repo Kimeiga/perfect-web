@@ -99,7 +99,9 @@ impl Namespace {
             // a page or another materialization. It was a fragment of the
             // page, beside the views, until a materialization had a value.
             | DeclKind::Materialize => Namespace::Term,
-            DeclKind::View | DeclKind::Component | DeclKind::Page => Namespace::Ui,
+            DeclKind::View | DeclKind::Component | DeclKind::Page | DeclKind::Layout => {
+                Namespace::Ui
+            }
             DeclKind::Event => Namespace::Event,
             DeclKind::Effect => Namespace::Effect,
             // A source is named by nothing a program writes (ADR-0207), and

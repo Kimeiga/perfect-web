@@ -266,7 +266,7 @@ fn explain_with(
                     s.push_str(&key_audit(graph, &path));
                 }
             }
-            DeclKind::View | DeclKind::Component | DeclKind::Page => {
+            DeclKind::View | DeclKind::Component | DeclKind::Page | DeclKind::Layout => {
                 let noun = noun_of(d.kind);
                 let _ = writeln!(s, "{noun:<12} {name}");
                 for p in &d.policies {
@@ -325,6 +325,7 @@ fn explain_with(
                 | DeclKind::View
                 | DeclKind::Component
                 | DeclKind::Page
+                | DeclKind::Layout
         ) {
             for p in &d.policies {
                 let _ = writeln!(s, "             {:<14} {}", p.name, p.value);
@@ -424,6 +425,7 @@ fn noun_of(kind: pw_core::hir::DeclKind) -> &'static str {
         View => "view",
         Component => "component",
         Page => "page",
+        Layout => "layout",
         _ => "declaration",
     }
 }

@@ -108,6 +108,7 @@ fn noun_of(kind: DeclKind) -> &'static str {
         DeclKind::View => "view",
         DeclKind::Component => "component",
         DeclKind::Page => "page",
+        DeclKind::Layout => "layout",
         DeclKind::Task => "task",
         DeclKind::Event => "event",
         DeclKind::Source => "source",

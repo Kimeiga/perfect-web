@@ -318,6 +318,24 @@ command place_order()
     Orders.place(current_session())
 }
 
+// **What every page of the store is shown in** (ADR-XXXX): the way home,
+// and the session's cart, its count told as the cart changes, whichever page
+// is open. Its own markup and bindings, the same on every page that names it;
+// read again with every document, so a page gone to after a change shows it.
+session layout StoreLayout {
+    let cart = query Cart(current_session())
+
+    view {
+        <header>
+            <nav aria-label="Store">
+                <a href="/">Stores</a>
+                <a id="header-cart" href="/cart">Cart <span id="header-cart-count">{cart.line_count}</span></a>
+            </nav>
+        </header>
+        <slot />
+    }
+}
+
 // Private to the session that reads it (ADR-0172): its cart's lines are the
 // session's, and its handlers capture them, so a resume manifest must say to
 // whom what it carries is private. `cache private` alone names no one.
@@ -326,6 +344,7 @@ session page StorePage(id: StoreId) {
     // and an id that names no store is not found (ADR-0163).
     route        "/stores/{id}"
     not_found_on StoreError.NotFound
+    layout       StoreLayout
     placement    origin
     cache        private
 
@@ -484,6 +503,7 @@ session page StorePage(id: StoreId) {
 // store's route.
 session page CartPage() {
     route     "/cart"
+    layout    StoreLayout
     placement origin
     cache     private
 
@@ -576,6 +596,7 @@ session page CartPage() {
 // them. A store list is the first of a delivery site's pages.
 session page HomePage() {
     route     "/"
+    layout    StoreLayout
     placement origin
     cache     private
 
@@ -606,6 +627,7 @@ session page HomePage() {
 // page while it is open, and a screen reader says it.
 session page OrderPage() {
     route     "/order"
+    layout    StoreLayout
     placement origin
     cache     private
 

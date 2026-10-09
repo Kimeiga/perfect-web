@@ -49,6 +49,16 @@ pub fn render_module(
         ) {
             continue;
         }
+        // A page shown in its layout (ADR-XXXX) is composed by the build,
+        // which this adapter does not run: rendered alone, it would lose the
+        // layout's markup, and say nothing of it.
+        if decl.policy("layout").is_some() {
+            out.skipped.push(Skipped {
+                name: decl.name.clone(),
+                reason: "a page shown in its layout is composed by the build".to_string(),
+            });
+            continue;
+        }
         match render_decl(hir, decl, source_name, signals) {
             Ok(text) => out.files.push((format!("{}.marko", decl.name), text)),
             Err(reason) => out.skipped.push(Skipped {

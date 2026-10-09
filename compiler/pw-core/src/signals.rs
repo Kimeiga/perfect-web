@@ -121,7 +121,8 @@ fn check_body(
     // binding, and the query. The browser reads the binding again, for the
     // new key, when the signal changes.
     let mut keys: BTreeMap<ExprId, (String, DefId)> = BTreeMap::new();
-    if decl.kind == DeclKind::Page {
+    // A layout's too (ADR-XXXX): its bindings are its pages'.
+    if matches!(decl.kind, DeclKind::Page | DeclKind::Layout) {
         for (binding, query, args) in crate::page_values::query_bindings(sigs.workspace(), at, body)
         {
             for arg in args {
@@ -1154,7 +1155,10 @@ fn provided(
     provision: &Provision,
     out: &mut Vec<Diagnostic>,
 ) {
-    let ui = matches!(decl.kind, DeclKind::Page | DeclKind::View);
+    let ui = matches!(
+        decl.kind,
+        DeclKind::Page | DeclKind::View | DeclKind::Layout
+    );
     let mut given: BTreeMap<DefId, ExprId> = BTreeMap::new();
     for id in &body.provides {
         let Expr::Binary { lhs, .. } = body.expr(*id) else {
@@ -1216,8 +1220,10 @@ fn provided(
         }
     }
 
-    // A page provides what it, and every view it uses, needs.
-    if decl.kind != DeclKind::Page {
+    // A page provides what it, and every view it uses, needs; and a layout
+    // what it and its views need (ADR-XXXX), since nothing is provided
+    // around it.
+    if !matches!(decl.kind, DeclKind::Page | DeclKind::Layout) {
         return;
     }
     let name = |d: DefId| {

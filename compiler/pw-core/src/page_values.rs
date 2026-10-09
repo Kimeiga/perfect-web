@@ -710,6 +710,11 @@ pub struct PageValues {
     /// what it reads changes, as it sets a text part.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<u32>,
+    /// **The layout the page is shown in** (ADR-XXXX): its path, its own
+    /// markup's schema, and how many parts and elements it numbers first. A
+    /// navigation between two pages that record the same keeps it in place.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<crate::template_ir::PageLayout>,
 }
 
 /// **A row's read through a member function** (ADR-0169): `{item.price.display}`
@@ -1247,7 +1252,7 @@ fn plan(
             _ => None,
         })
         .collect();
-    let found = query_bindings(ws, unit, body);
+    let mut found = query_bindings(ws, unit, body);
     // The error that means the page is not found (ADR-0163), PW0342's to
     // hold to the page's queries.
     let not_found = crate::routes::not_found_case(ws, sigs, unit, decl)
@@ -1309,6 +1314,63 @@ fn plan(
         });
     }
 
+    // **Its layout's bindings** (ADR-XXXX), read once for each document as
+    // the page's are, each under the name the layout's markup is lowered
+    // with (`cart~StoreLayout`). A key is the request's reader or the
+    // layout's own signal: a layout is given nothing by its page. Neither
+    // means the page is not found or is elsewhere: those are the page's
+    // clauses, over its own queries.
+    if let Some(def) = crate::layouts::of(hirs, ws, unit, decl) {
+        let lhir = hirs[def.unit];
+        let ldecl = lhir.decl(DeclId(def.decl));
+        let lbody = lhir.body(
+            ldecl
+                .body
+                .ok_or_else(|| format!("the layout `{}` has no body", ldecl.name))?,
+        );
+        let own: BTreeSet<String> = signals_of(lbody).into_iter().map(|(n, ..)| n).collect();
+        let mut planned = Vec::new();
+        for (name, resource, keys) in query_bindings(ws, def.unit, lbody) {
+            let mut args = Vec::new();
+            let mut keyed_by = Vec::new();
+            for k in &keys {
+                args.push(match lbody.expr(*k) {
+                    Expr::Name(n) if own.contains(n) => {
+                        let named = crate::layouts::bound(&ldecl.name, n);
+                        keyed_by.push(named.clone());
+                        named
+                    }
+                    Expr::Call { callee, args } if args.is_empty() => {
+                        format!("{}()", crate::infer::path_of(lbody, *callee))
+                    }
+                    _ => {
+                        return Err(format!(
+                            "the layout `{}`'s `{name}`'s key is neither an invocation-context \
+                             call nor the layout's signal",
+                            ldecl.name
+                        ));
+                    }
+                });
+            }
+            let query = crate::resolve::declaration(hirs, resource)
+                .ok_or_else(|| format!("`{name}`'s query is declared nowhere"))?;
+            let named = crate::layouts::bound(&ldecl.name, &name);
+            planned.push(Binding {
+                binding: named.clone(),
+                resource: component_id_of(hirs, resource)
+                    .ok_or_else(|| format!("`{name}`'s query has no component"))?,
+                args,
+                policy: policy_of(query),
+                signals: keyed_by,
+                not_found: Vec::new(),
+                redirect: None,
+            });
+            found.push((named, resource, keys));
+        }
+        // Before the page's: the layout's markup is rendered first.
+        bindings.splice(0..0, planned);
+    }
+
     let mut live = Vec::new();
     let mut parts = Vec::new();
     let mut members = BTreeSet::new();
@@ -1326,6 +1388,7 @@ fn plan(
         holes,
         reads: others,
         instances,
+        layout,
         ..
     } = crate::template_ir::lowered(hirs, ws, sigs, captures, unit, id)
         .ok_or_else(|| format!("`{}` has no template", decl.name))?;
@@ -1840,6 +1903,7 @@ fn plan(
             derived: derived_values,
             captures,
             title,
+            layout,
         },
         members,
         computed,

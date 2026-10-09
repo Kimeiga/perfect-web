@@ -68,8 +68,9 @@ test.describe("the document the server produced", () => {
     // ordered (ADR-0178): its block, 2 in each of three instances = 6. And
     // the menu grouped by category (ADR-0181): the coffee category's
     // instance 2, its heading 2, and its items' own loop 2 = 6. And the menu
-    // counted, which the host keeps (ADR-0277): its line 2. 72 in all.
-    expect(shape.anchors).toBe(72);
+    // counted, which the host keeps (ADR-0277): its line 2. And the count of
+    // the cart in the layout the page is shown in (ADR-XXXX): 2. 74 in all.
+    expect(shape.anchors).toBe(74);
     // Three Add buttons and one Clear button. The Clear button exists so that
     // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`. And
     // the cart's empty message, whose `hidden` reads the cart (ADR-0172).
@@ -161,9 +162,11 @@ test.describe("the update touches only what changed", () => {
     // and `pw_document` must spell it the same way or a patch finds nothing.
     const at = (id) => `${pw.parts.schema}/|${id}`;
     // The cart's parts, each what reads the cart (ADR-0172): its count, its
-    // subtotal, its first line, its empty message hidden, its fees shown.
+    // subtotal, its first line, its empty message hidden, its fees shown;
+    // and the count the page's layout shows of it (ADR-XXXX).
     expect([...pw.updated].sort(), "exactly the cart's parts").toEqual(
       [
+        at(part("text", "cart~StoreLayout.line_count")),
         at(part("text", "cart.line_count")),
         at(part("text", "cart.subtotal.display")),
         `${at(part("each", "cart.lines"))}:insert_before`,

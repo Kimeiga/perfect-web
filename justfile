@@ -5496,3 +5496,28 @@ e14-tell-at-once:
        python3 scripts/tell_at_once_mutations.py; \
      } > docs/evidence/E14/tell-at-once.txt
     @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/tell-at-once.txt
+
+# ADR-XXXX: a page is shown in its layout, which the pages that name it
+# share. The compiler's tests, the host's, the store's pages in three
+# engines, and the mutation controls.
+e14-layouts:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a page is shown in its layout"; echo; \
+       echo "produced by: just e14-layouts"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the layout, composed into each page (compiler/pw-core/tests/layouts.rs)"; echo; \
+       cargo test --locked -p pw-core --test layouts 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the store's pages, served in their layout"; echo; \
+       cargo test --locked -p pw-dev-server -- a_store_page_is_shown_in_its_layout_and_its_count_is_told 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the store's pages in three engines (e2e/layouts.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/layouts.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/layouts_mutations.py)"; echo; \
+       python3 scripts/layouts_mutations.py; \
+     } > docs/evidence/E14/layouts.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/layouts.txt

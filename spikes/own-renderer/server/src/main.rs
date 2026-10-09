@@ -3156,15 +3156,25 @@ impl Server {
         );
         let plan = self.plan_of(&page);
         let mut out = BTreeMap::new();
+        // **One query with one key is read once for its document**
+        // (ADR-XXXX): a page and its layout that each bind `Cart` of the
+        // session's read it once, and show one value of it.
+        let mut read: Vec<(&str, Vec<Val>, Val)> = Vec::new();
         for b in plan["bindings"].as_array().into_iter().flatten() {
             if !wanted(b["binding"].as_str().unwrap_or_default()) {
                 continue;
             }
             let args = self.args_of(plan, session, document, b, keys)?;
-            out.insert(
-                b["binding"].as_str().unwrap_or_default().to_string(),
-                self.fetch_binding(session, b, &args)?,
-            );
+            let resource = b["resource"].as_str().unwrap_or_default();
+            let value = match read.iter().find(|(r, a, _)| *r == resource && *a == args) {
+                Some((_, _, v)) => v.clone(),
+                None => {
+                    let v = self.fetch_binding(session, b, &args)?;
+                    read.push((resource, args, v.clone()));
+                    v
+                }
+            };
+            out.insert(b["binding"].as_str().unwrap_or_default().to_string(), value);
         }
         Ok(out)
     }
@@ -11354,8 +11364,10 @@ public query Store(",
     #[test]
     fn a_command_drops_the_entry_it_invalidates_and_no_other() {
         let mut s = rendering_server();
+        // The cart's every binding, the page's and its layout's (ADR-XXXX):
+        // a query's policy is its declaration's.
         for b in s.plan["bindings"].as_array_mut().expect("bindings") {
-            if b["binding"] == "cart" {
+            if b["resource"] == "store.page.Cart" {
                 b["policy"]["freshness_ms"] = serde_json::json!(60_000);
             }
         }
@@ -13938,6 +13950,49 @@ public query Store(",
             .collect()
     }
 
+    /// **A page is shown in its layout** (ADR-XXXX): the store's four pages
+    /// in `StoreLayout`, its header the same markup on each, the page's own
+    /// in its slot; and its count told as the cart changes on a page that
+    /// reads no cart of its own, the order's, as any part's value is
+    /// (ADR-0219).
+    #[test]
+    fn a_store_page_is_shown_in_its_layout_and_its_count_is_told() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let page = |path: &str| -> String {
+            fetched_as(&s, path, Some("a"))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        let header = |html: &str| -> String {
+            html.split_once("<header>")
+                .and_then(|(_, rest)| rest.split_once("</header>"))
+                .map(|(h, _)| h.to_string())
+                .unwrap_or_default()
+        };
+        let shared = header(&page("/"));
+        assert!(shared.contains("id=\"header-cart-count\""), "{shared}");
+        for path in ["/", "/stores/47", "/cart", "/order"] {
+            let html = page(path);
+            assert!(html.starts_with("HTTP/1.1 200"), "{path}: {html}");
+            assert_eq!(header(&html), shared, "{path}");
+            // The page's own markup is in the slot, after the header.
+            let (before, rest) = html.split_once("<!--pw-slot-->").expect("a slot");
+            let (inside, _) = rest.split_once("<!--/pw-slot-->").expect("closed");
+            assert!(before.contains("</header>"), "{path}: {before}");
+            assert!(inside.contains("<main"), "{path}: {inside}");
+        }
+        // The order's page reads only its order; its layout reads the cart.
+        let _ = s
+            .serve_document_settled("a", ORDER_PAGE, &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        s.command(ADD, "a", &add_shown("espresso", 2), false)
+            .expect("added");
+        let told: String = sets_of(&s, &doc).iter().map(written).collect();
+        assert_eq!(told, "2", "the header's count, and nothing else");
+    }
+
     /// **What a handler at the top of the page captures is set again when it
     /// changes** (ADR-0217, ADR-0210's urgent defect 2). A button on the
     /// cart's page that captures the cart: after a line is added, the patch
@@ -15287,8 +15342,9 @@ public query Store(",
         assert_eq!(slot(&whole, "Recommendations"), "Cortado Cold Brew");
         // Each arm with the comment after it (ADR-0223).
         assert!(
-            // ADR-0277: the menu counted is a part of the page's, before them.
-            whole.ends_with("</template><!--/pw-31--></body>\n</html>\n"),
+            // ADR-0277: the menu counted is a part of the page's, before
+            // them; and ADR-XXXX: the layout's count is part 0, before all.
+            whole.ends_with("</template><!--/pw-32--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the

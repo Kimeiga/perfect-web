@@ -120,8 +120,9 @@ test.describe("the behavioural half", () => {
           window.__mutations.push({
             type: r.type,
             where: target?.id || target?.tagName || "?",
-            // Inside the cart's section, whose parts read the cart (ADR-0172).
-            cart: !!target?.closest("section[aria-labelledby='cart-heading']"),
+            // Inside the cart's section, whose parts read the cart (ADR-0172),
+            // or the layout's count of it (ADR-XXXX).
+            cart: !!target?.closest("section[aria-labelledby='cart-heading'], #header-cart"),
             added: r.addedNodes.length,
             removed: r.removedNodes.length,
           });

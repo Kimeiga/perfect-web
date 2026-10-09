@@ -601,6 +601,36 @@ struct Indexer {
     /// The name each `{#each}` around the node binds its item to, outermost
     /// first: a value computed from the innermost's is the row's (ADR-0228).
     loops: Vec<String>,
+    /// **The layout being lowered around a page** (ADR-XXXX): the file and
+    /// the declaration whose `<slot />` is the page's place.
+    layout: Option<(usize, DeclId)>,
+    /// Where its `<slot />` was written: the page's markup goes there.
+    slot: Option<Slot>,
+}
+
+/// **Where a layout's `<slot />` is** (ADR-XXXX): the index in the
+/// template's chunks the page's markup is placed at, and how many elements
+/// enclose it, which the page's own nest inside (ADR-0203).
+#[derive(Debug, Clone, Copy)]
+struct Slot {
+    at: usize,
+    elements: u32,
+}
+
+/// **The layout a page is shown in** (ADR-XXXX), as its plan records it:
+/// what a navigation compares, to keep the layout in place.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PageLayout {
+    /// `Module.Name`.
+    pub path: String,
+    /// Its own markup's schema, its slot empty: the same on every page that
+    /// names it, and another where its markup changed.
+    pub schema: String,
+    /// How many parts it numbers, first: its parts are `0..parts` on every
+    /// page that names it.
+    pub parts: u32,
+    /// And elements: `0..elements`.
+    pub elements: u32,
 }
 
 impl Indexer {
@@ -1004,6 +1034,26 @@ pub fn build_with(hirs: &[&Hir], sigs: &Signatures, handlers: &Handlers) -> Vec<
     out
 }
 
+/// **Each layout, lowered alone** (ADR-XXXX): its markup, its slot empty.
+/// Not a template the build writes (a layout is rendered in each page that
+/// names it), but one the build refuses as it refuses a page's: a part the
+/// renderer cannot render in a layout no page names yet is still a defect.
+pub fn layouts(hirs: &[&Hir], sigs: &Signatures, handlers: &Handlers) -> Vec<Template> {
+    let ws = Workspace::build(hirs);
+    let mut out = Vec::new();
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind != crate::hir::DeclKind::Layout {
+                continue;
+            }
+            if let Some(l) = lowered(hirs, &ws, sigs, handlers, unit, id) {
+                out.push(l.template);
+            }
+        }
+    }
+    out
+}
+
 /// Each instance's template, by path, in `chunks` at any depth.
 fn instance_paths(chunks: &[Chunk], out: &mut BTreeSet<String>) {
     for c in chunks {
@@ -1093,6 +1143,8 @@ pub struct Lowered {
     pub instances: Vec<Instance>,
     /// The most elements any of its parts nests in (ADR-0203).
     pub deepest: u32,
+    /// **The layout it is shown in** (ADR-XXXX), for a page that names one.
+    pub layout: Option<PageLayout>,
 }
 
 /// **One renderable declaration's template, and its text holes** (ADR-0122),
@@ -1158,6 +1210,29 @@ pub fn lowered(
         provided,
         signals,
     };
+    // A layout alone, as the build checks one no page names: its markup,
+    // its slot empty, its values named as a page names them (ADR-XXXX).
+    if decl.kind == crate::hir::DeclKind::Layout {
+        let def = DefId { unit, decl: id.0 };
+        ix.instances.clear();
+        let layout = lower_layout(hirs, ws, sigs, handlers, def, &mut ix, &mut chunks);
+        let chunks = coalesce(chunks);
+        return Some(Lowered {
+            template: Template {
+                path: ix.template.clone(),
+                name: decl.name.clone(),
+                schema: schema_of(&[], &chunks),
+                params: Vec::new(),
+                chunks,
+            },
+            holes: ix.holes,
+            reads: ix.reads,
+            views: ix.views,
+            instances: ix.instances,
+            deepest: ix.deepest,
+            layout,
+        });
+    }
     // A page's title is lowered after the rest of its view, wherever it is
     // written, so writing one moves no other part's number (ADR-0183).
     // Its metadata after its title, for the same reason (ADR-0186).
@@ -1167,8 +1242,35 @@ pub fn lowered(
         .partition(|r| page && (is_title(body, *r) || is_meta(body, *r)));
     let (titles, metas): (Vec<NodeId>, Vec<NodeId>) =
         head.into_iter().partition(|r| is_title(body, *r));
+    // **The layout the page is shown in** (ADR-XXXX): its markup lowered
+    // first, so its parts and elements are numbered the same on every page
+    // that names it, and the page's own after them, placed in its slot.
+    let layout = page
+        .then(|| crate::layouts::of(hirs, ws, unit, decl))
+        .flatten()
+        .and_then(|def| lower_layout(hirs, ws, sigs, handlers, def, &mut ix, &mut chunks));
+    let slot = ix.slot.take();
+    let mut own = Vec::new();
+    if let Some(s) = slot {
+        ix.elements = s.elements;
+    }
     for root in rest {
-        lower_node(body, root, &ctx, &mut ix, &mut chunks);
+        lower_node(body, root, &ctx, &mut ix, &mut own);
+    }
+    ix.elements = 0;
+    match (slot, &layout) {
+        (Some(s), _) => {
+            chunks.splice(s.at..s.at, own);
+        }
+        // Refused at check (PW5045): a layout that shows no page.
+        (None, Some(l)) => chunks.push(Chunk::Dynamic(Part::Blocked {
+            reason: format!(
+                "the layout `{}` has no `<slot />` to show the page in",
+                l.path
+            ),
+            at: "layout".to_string(),
+        })),
+        (None, None) => chunks.extend(own),
     }
     for title in titles {
         chunks.push(Chunk::Dynamic(lower_title(body, title, &ctx, &mut ix)));
@@ -1196,6 +1298,96 @@ pub fn lowered(
         views: ix.views,
         instances: ix.instances,
         deepest: ix.deepest,
+        layout,
+    })
+}
+
+/// **A page's layout, lowered into its template first** (ADR-XXXX), as a
+/// view used in it is (ADR-0136): its bindings and its signals the page's,
+/// each under the name [`crate::layouts::bound`] gives it, which no source
+/// writes; its handlers the page's; its computed parts named by the layout,
+/// not the page. Its `<slot />` is recorded in `ix`, for the page's markup.
+fn lower_layout(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    sigs: &Signatures,
+    handlers: &Handlers,
+    def: DefId,
+    ix: &mut Indexer,
+    out: &mut Vec<Chunk>,
+) -> Option<PageLayout> {
+    let hir = hirs.get(def.unit)?;
+    let id = DeclId(def.decl);
+    let decl = hir.decl(id);
+    let body = hir.body(decl.body?);
+    let module = hir.module_of(id).unwrap_or_default();
+    let path = if module.is_empty() {
+        decl.name.clone()
+    } else {
+        format!("{module}.{}", decl.name)
+    };
+    let mut names = BTreeMap::new();
+    for (name, _, _) in crate::page_values::query_bindings(ws, def.unit, body) {
+        names.insert(name.clone(), crate::layouts::bound(&decl.name, &name));
+    }
+    let mut provided = BTreeMap::new();
+    let mut signals = BTreeSet::new();
+    for (name, init, declared) in crate::page_values::signals_of(body) {
+        let fresh = crate::layouts::bound(&decl.name, &name);
+        if let Expr::Let { ty: Some(t), .. } = body.expr(declared) {
+            ix.instances.push(Instance {
+                name: fresh.clone(),
+                origin: (def.unit, id),
+                init,
+                ty: InstanceType::Written(*t),
+                within: Vec::new(),
+            });
+        }
+        names.insert(name.clone(), fresh);
+        signals.insert(name);
+    }
+    for (name, signal, value) in provides_of(hirs, ws, def.unit, body) {
+        let fresh = crate::layouts::bound(&decl.name, &name);
+        ix.instances.push(Instance {
+            name: fresh.clone(),
+            origin: (def.unit, id),
+            init: value,
+            ty: InstanceType::Declared(signal),
+            within: Vec::new(),
+        });
+        names.insert(name.clone(), fresh.clone());
+        provided.insert(signal, fresh);
+        signals.insert(name);
+    }
+    // Its handlers are in the page's document (ADR-0136's rule for a view).
+    if !ix.views.contains(&def) {
+        ix.views.push(def);
+    }
+    let ctx = Lowering {
+        handlers,
+        hirs,
+        ws,
+        types: std::rc::Rc::new(crate::infer::Types::of_decl(sigs, hir, id, body)),
+        sigs,
+        unit: def.unit,
+        decl: id,
+        names,
+        provided,
+        signals,
+    };
+    let page = std::mem::replace(&mut ix.template, path.clone());
+    ix.layout = Some((def.unit, id));
+    let start = out.len();
+    for root in roots_of(body) {
+        lower_node(body, root, &ctx, ix, out);
+    }
+    ix.layout = None;
+    ix.template = page;
+    Some(PageLayout {
+        path,
+        schema: schema_of(&[], &coalesce(out[start..].to_vec())),
+        parts: ix.next_part,
+        elements: ix.next_element,
     })
 }
 
@@ -1565,7 +1757,7 @@ fn named_call(body: &Body, e: crate::hir::ExprId) -> Option<String> {
     }
 }
 
-fn roots_of(body: &Body) -> Vec<NodeId> {
+pub(crate) fn roots_of(body: &Body) -> Vec<NodeId> {
     let mut roots = Vec::new();
     for e in body.walk() {
         if let Expr::Template { roots: r, .. } = body.expr(e) {
@@ -1951,6 +2143,35 @@ fn lower_element(
         children,
         self_closing,
     } = el;
+    // **A layout's `<slot />`** (ADR-XXXX): where the page that names the
+    // layout is shown. Only the layout's own, at the top of its view, once,
+    // and empty (PW5044): the page's markup is lowered after the layout's,
+    // and placed here, between two markers a navigation finds.
+    if tag == "slot" {
+        let own = ix.layout == Some((ctx.unit, ctx.decl));
+        if own
+            && ix.depth == 0
+            && ix.frames == 0
+            && ix.slot.is_none()
+            && attrs.is_empty()
+            && children.is_empty()
+        {
+            out.push(Chunk::Static(crate::layouts::SLOT_START.to_string()));
+            ix.slot = Some(Slot {
+                at: out.len(),
+                elements: ix.elements,
+            });
+            out.push(Chunk::Static(crate::layouts::SLOT_END.to_string()));
+        } else {
+            out.push(Chunk::Dynamic(Part::Blocked {
+                reason: "a `<slot />` is its layout's, once, at the top of its view, and \
+                         empty (PW5044)"
+                    .to_string(),
+                at: "<slot>".to_string(),
+            }));
+        }
+        return;
+    }
     // A region showing its query's state (ADR-0148). Until 2026-10-03 it
     // was refused here, and only the Marko adapter rendered one (ADR-0075).
     if tag == "stream" {

@@ -57,6 +57,10 @@ pub const DECL_STARTERS: &[&str] = &[
     "view",
     "component",
     "page",
+    // A page's layout: the markup and the bindings the pages that name it
+    // share, the page shown in its `<slot />`. A declaration only where a
+    // name follows: `layout.measure` is an effect's path.
+    "layout",
     "query",
     "command",
     "subscription",
@@ -91,7 +95,7 @@ pub const VOID_ELEMENTS: &[&str] = &[
     "track", "wbr",
 ];
 
-pub const UI_NOUNS: &[&str] = &["view", "component", "page"];
+pub const UI_NOUNS: &[&str] = &["view", "component", "page", "layout"];
 
 /// Statement keywords that may appear inside a body and take a
 /// `kw [name] [(args)] [-> Type] [{ block }]` shape.
@@ -283,6 +287,10 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     // ADR-0295: the declared error that means a page's address is another
     // address of the page, answered 308 or 307 there.
     "redirect_on",
+    // The layout a page is shown in: `layout StoreLayout`. A clause only
+    // where a name follows on its line (`at_policy_head`): `layout.measure`
+    // is an effect's path, and a body may begin with one.
+    "layout",
     "privacy",
     "storage",
     "offline",
@@ -2386,15 +2394,24 @@ impl<'a> P<'a> {
     ///
     /// The `( .. ) {` form is unambiguous in either position, because a
     /// declaration's body never follows a parameter list at a policy head.
+    /// **A head the parser knows, here.** `layout` is one only where a name
+    /// follows it on its line, `layout StoreLayout`: the word is also an
+    /// effect family's, and `layout.measure` written first in a body is not
+    /// a clause.
+    fn at_policy_head(&self) -> bool {
+        self.at(Kind::Ident)
+            && POLICY_KEYWORDS.contains(&self.cur_text())
+            && (self.cur_text() != "layout"
+                || (self.nth_is(1, Kind::Ident) && !self.nth_starts_line(1)))
+    }
+
     fn policies(&mut self, in_block: bool) {
-        let known = self.at(Kind::Ident) && POLICY_KEYWORDS.contains(&self.cur_text());
+        let known = self.at_policy_head();
         if !known && !self.at_unknown_policy() {
             return;
         }
         self.start(K::PolicyList);
-        while (self.at(Kind::Ident) && POLICY_KEYWORDS.contains(&self.cur_text()))
-            || self.at_unknown_policy()
-        {
+        while self.at_policy_head() || self.at_unknown_policy() {
             // Recorded as what it is. `Policy` for a head the parser knows,
             // `UnknownPolicy` for one it does not — never nothing.
             let unknown = !POLICY_KEYWORDS.contains(&self.cur_text());
@@ -2801,7 +2818,13 @@ impl<'a> P<'a> {
         let after_vis = if vis { self.nth(1) } else { self.nth(0) };
         let after_vis_text = &self.src[after_vis.span.clone()];
 
-        if after_vis.kind == Kind::Ident && UI_NOUNS.contains(&after_vis_text) {
+        // `layout` is a declaration only where a name follows it: the word is
+        // also an effect family's (`layout.measure`).
+        let named = self.nth(if vis { 2 } else { 1 }).kind == Kind::Ident;
+        if after_vis.kind == Kind::Ident
+            && UI_NOUNS.contains(&after_vis_text)
+            && (after_vis_text != "layout" || named)
+        {
             self.start(K::UiDecl);
             if vis {
                 self.bump();

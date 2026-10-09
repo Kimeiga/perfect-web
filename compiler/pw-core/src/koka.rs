@@ -181,7 +181,9 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
         }
 
         DeclKind::Opaque => Err("an opaque type is erased by Koka (E0 finding F-4)"),
-        DeclKind::View | DeclKind::Component | DeclKind::Page => Err("a UI declaration"),
+        DeclKind::View | DeclKind::Component | DeclKind::Page | DeclKind::Layout => {
+            Err("a UI declaration")
+        }
         DeclKind::Query | DeclKind::Command | DeclKind::Subscription => {
             Err("a data operation carries policies Koka cannot express")
         }

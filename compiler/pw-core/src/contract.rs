@@ -855,6 +855,7 @@ fn component_kind(kind: DeclKind) -> Option<&'static str> {
         DeclKind::Query => "query",
         DeclKind::Command => "command",
         DeclKind::Page => "page",
+        DeclKind::Layout => "layout",
         DeclKind::Component => "component",
         DeclKind::View => "view",
         _ => return None,

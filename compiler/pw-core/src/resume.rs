@@ -469,7 +469,7 @@ pub(crate) fn capture_names_and_types(
 /// Unmarked is `Public`, which is R-030's case: a `view` with no visibility
 /// renders into the shared shell, and a session value in that shell is served
 /// to whoever the shell is served to.
-fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::Label> {
+pub(crate) fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::Label> {
     // A declared principal. `session`, `user` and `organization` each name WHO
     // the scope belongs to, which is what a flow relation needs.
     let by_visibility = match decl.visibility.as_deref() {

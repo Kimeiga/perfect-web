@@ -280,27 +280,7 @@ impl Graph {
                 // Local before imported, across all three, for the same reason
                 // `resolve_in` prefers local within one: a declaration in this
                 // module is what the author meant.
-                let resolve = |name: &str| -> Option<String> {
-                    use crate::resolve::{Namespace, Resolution};
-                    const USABLE: [Namespace; 3] =
-                        [Namespace::Term, Namespace::Ui, Namespace::Event];
-                    let mut imported = None;
-                    for ns in USABLE {
-                        match ws.resolve_in(unit, ns, name) {
-                            Resolution::Local(d) => return by_def.get(&d).cloned(),
-                            Resolution::Imported { def, .. } if imported.is_none() => {
-                                imported = by_def.get(&def).cloned();
-                            }
-                            // Ambiguous resolves to NOTHING, not to one of the
-                            // candidates. Two imports offering one name means
-                            // the program does not say which, and picking
-                            // either decides an invalidation boundary by
-                            // accident.
-                            _ => {}
-                        }
-                    }
-                    imported
-                };
+                let resolve = |name: &str| resolve_from(ws, &by_def, unit, name);
 
                 for (policy, kind) in [
                     ("depends_on", EdgeKind::Reads),
@@ -333,6 +313,20 @@ impl Graph {
                 {
                     for (name, key) in queried(hir.body(body_id)) {
                         g.push_edge(&from, &name, EdgeKind::Reads, key, resolve(&name));
+                    }
+                }
+                // **A page reads what its layout reads** (ADR-XXXX): the
+                // layout's markup is rendered into the page's document, and
+                // its bindings are the page's, each resolved where the layout
+                // is written.
+                if decl.kind == DeclKind::Page
+                    && let Some(layout) = crate::layouts::of(hirs, ws, unit, decl)
+                    && let Some(body_id) =
+                        hirs[layout.unit].decl(crate::hir::DeclId(layout.decl)).body
+                {
+                    for (name, key) in queried(hirs[layout.unit].body(body_id)) {
+                        let target = resolve_from(ws, &by_def, layout.unit, &name);
+                        g.push_edge(&from, &name, EdgeKind::Reads, key, target);
                     }
                 }
             }
@@ -664,6 +658,35 @@ fn node_kind(decl: &Decl) -> Option<NodeKind> {
         DeclKind::Page => NodeKind::Page,
         _ => return None,
     })
+}
+
+/// **What a name an edge is written with resolves to, from `unit`**: a
+/// query, a materialization, an event, a command or a page, never a type;
+/// local before imported (`Graph::build`).
+fn resolve_from(
+    ws: &crate::resolve::Workspace,
+    by_def: &std::collections::BTreeMap<crate::resolve::DefId, String>,
+    unit: usize,
+    name: &str,
+) -> Option<String> {
+    use crate::resolve::{Namespace, Resolution};
+    const USABLE: [Namespace; 3] = [Namespace::Term, Namespace::Ui, Namespace::Event];
+    let mut imported = None;
+    for ns in USABLE {
+        match ws.resolve_in(unit, ns, name) {
+            Resolution::Local(d) => return by_def.get(&d).cloned(),
+            Resolution::Imported { def, .. } if imported.is_none() => {
+                imported = by_def.get(&def).cloned();
+            }
+            // Ambiguous resolves to NOTHING, not to one of the
+            // candidates. Two imports offering one name means
+            // the program does not say which, and picking
+            // either decides an invalidation boundary by
+            // accident.
+            _ => {}
+        }
+    }
+    imported
 }
 
 /// The dimensions a materialization declares `included_in_key`.

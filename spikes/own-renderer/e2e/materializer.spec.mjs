@@ -28,10 +28,12 @@ test("a regeneration that fails is tried again, and the page hears the change, a
   await page.getByRole("button", { name: "Add Espresso" }).click();
   await expect(page.locator("#cart-count")).toHaveText("1");
   // The server's value reaches the page and reconciles the press.
-  await expect.poll(() => logged(page, "reconciled cart"), { timeout: 10_000 }).toBe(1);
+  // The page's own binding of it, counted alone: its layout's count is
+  // another binding of the cart, reconciled beside it (ADR-XXXX).
+  await expect.poll(() => logged(page, "reconciled cart at"), { timeout: 10_000 }).toBe(1);
   // And the next change, as any change does.
   await page.getByRole("button", { name: "Add Cortado" }).click();
-  await expect.poll(() => logged(page, "reconciled cart"), { timeout: 10_000 }).toBe(2);
+  await expect.poll(() => logged(page, "reconciled cart at"), { timeout: 10_000 }).toBe(2);
   await expect(page.locator("#cart-lines li")).toHaveCount(2);
   await expect(page.locator("#cart-count")).toHaveText("2");
   expect(await refused(page)).toBe(0);
