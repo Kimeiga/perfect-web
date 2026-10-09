@@ -2,7 +2,7 @@
 
 Status: proposed by track `kiokun` (W6, `track/kiokun`), the second
 milestone of step 1, the word page (docs/PARALLEL.md, "W6's inventory,
-answered"). Builds on the word page's first milestone (ADR-XXXX, kiokun's
+answered"). Builds on the word page's first milestone (ADR-0286, kiokun's
 word page on the development server). Date: 2026-10-09. Milestone: E14.
 
 ## Context
@@ -17,7 +17,7 @@ word page on the development server). Date: 2026-10-09. Milestone: E14.
   keys use `_` (`adj_na`), none uses `-`, and the entries carry JMdict's `-`
   (`adj-na`), so kiokun.com shows `adj-na`. The integrator ruled on
   2026-10-09 that the rewrite shows the label the table means (the word page
-  ADR's Differences, 4).
+  ADR's Differences, 4; ADR-0286).
 - **The character header** is `[word]/+page.svelte`'s block under "Character
   Header": the written forms, the learner gloss with its levels, the
   mnemonic keyword's line, a taxonomy breadcrumb, sense highlights, the
@@ -81,8 +81,7 @@ word page on the development server). Date: 2026-10-09. Milestone: E14.
 
 ## Differences from kiokun.com
 
-Added to the word page's list (ADR-XXXX, the word page on the development
-server):
+Added to the word page's list (ADR-0286):
 
 5. **A label the table means is shown** where kiokun.com shows the raw code
    (`adj-na`): the integrator's ruling of 2026-10-09.
