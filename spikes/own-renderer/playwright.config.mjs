@@ -118,6 +118,10 @@ export const NOTIFICATIONS_PORTS = Object.fromEntries(
 // them. One per engine, because a message is its users' on a host. Served
 // only when the feed is built.
 export const MESSAGES_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 100 + i]));
+// The kiokun track's hosts (docs/PARALLEL.md, W6's plan): kiokun.com in
+// Pleris, one per engine, beside the slice's single host at KIOKUN_PORT.
+// Registered before any suite serves on them, so no other track takes them.
+export const KIOKUN_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 120 + i]));
 // A build serves the runtime it was built with. One built before the runtime
 // changed runs the old runtime against the new server, and fails for a reason
 // that is no test's: `dist-keyed` did, once each page's subscription named
