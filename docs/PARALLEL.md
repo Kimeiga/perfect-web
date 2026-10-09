@@ -317,10 +317,10 @@ Each a decision for a track, with its date; a track's ADR records it too.
     integrator's soft navigation, which is the runtime's; the integrator's
     accounts in the store wait for its merge, since they change its
     tables.
-  - **W6, kiokun.com in Pleris**, after W5 (the owner's production target,
-    relayed 2026-10-08; NEXT): parity with the live site, on a preview
-    origin, with no deploy, cutover or DNS change without the owner's go.
-    Its rulings are written here before it launches.
+  - **W6, kiokun.com in Pleris**, beside W5, as the owner chose (the
+    owner's production target, relayed 2026-10-08; NEXT): parity with the
+    live site, served here first, with no deploy, cutover or DNS change
+    without the owner's go. Its rulings are below.
   - **W7, search and filters**, after W6: run in the database or a
     declared search source; no search engine is built here.
   - **W8, ratings and reviews**, after W7 and the integrator's accounts: a
@@ -426,3 +426,43 @@ Each a decision for a track, with its date; a track's ADR records it too.
     good. Every event a commit stages is consumed once delivered. Tested
     in both layers: after orders are placed and delivered, the outbox
     holds nothing.
+- **2026-10-08, kiokun.com in Pleris (W6's plan), launched beside W5.** Two
+  workers at once is the owner's choice (relayed 2026-10-08), at the cost of
+  usage, and no more than two. Track `kiokun`, branch `track/kiokun`, from
+  the kiokun slice (ADR-0037, ADR-0041; `examples/kiokun/`). Its ADRs are
+  `ADR-XXXX`, numbered at the merge. Its recipes live in `just/kiokun.just`.
+  Its code block is **PW60** (`Owner::Kiokun => "PW60"`). Its hosts are at
+  PORT+120..122 (`KIOKUN_PORTS`), and its Playwright runs use PORT=7241 (W5
+  has 7141).
+  - **The data** is read through `KIOKUN_DATA`, the kiokun-data checkout's
+    `output_dictionary` (1,485,890 raw-DEFLATE JSON files, 6.4 GB), as `just
+    e10-kiokun` reads it. It is never copied here, and nothing is written
+    into that checkout. A rule of kiokun's (a file name's escape, the shard
+    rule, the search index's rows) is read from the builder's source,
+    `src/main.rs` and `src/search_index_builder.rs`, before it is inferred
+    from the output.
+  - **First, the parity inventory.** It covers every route and feature of
+    the SvelteKit site (`sveltekit-app/src/routes`: `[word]`, `api`,
+    `blog`, `category`, `courses`, `custom-words`, `drill`, `frequency`,
+    `game`, `homophones` and the rest). Each is marked built in Pleris,
+    partial or missing, with what it needs of the language or the platform.
+    The inventory is a document and the track's first ADR. The gaps are
+    then built in the order the integrator rules from it.
+  - **What a gap needs of the language, the runtime or the host goes to
+    the integrator as a question.** It is not built around them in the
+    track's files. The integrator rules on it, and usually builds it, as
+    notifications' typed principal was.
+  - **Parity is measured** against the SvelteKit app run here on the same
+    data, where it runs with what is installed. Installing its packages is
+    a download and waits for the owner. The live site is read only for a
+    small sample, and gently.
+  - **Served here first.** Any deployment waits for the owner's explicit
+    go, asked in the integrator's session: a preview origin among them, a
+    DNS change and a cutover. The track holds no credentials for any host.
+  - **What needs the owner's local data is local.** A run over the whole
+    dictionary is recorded on this machine, and its recipe says so (charter
+    §13.5's split, as `LOCAL_ONLY`'s). What a committed sample can show,
+    as `scripts/kiokun_sample.py` makes one, runs on CI.
+  - **In order**: the inventory and its ADR; then the gaps in the order the
+    integrator gives; each with its tests, its browser suite in three
+    engines, its mutation controls and its recipe.

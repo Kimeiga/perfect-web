@@ -625,10 +625,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
           evidence there is. Its conditions: parity with the live site,
           measured; served first on a preview origin beside the live site;
           and no production cutover, DNS change or deploy without the
-          owner's explicit go, asked when it is reached. It is the worker
-          track after W5, W6, so DoorDash's tracks after it are W7, search
-          and filters, and W8, ratings and reviews. It decides which of
-          these come first, each its own ADR:
+          owner's explicit go, asked when it is reached. It is W6, the
+          worker track beside W5, as the owner chose (two workers at once,
+          relayed 2026-10-08), so DoorDash's tracks after them are W7,
+          search and filters, and W8, ratings and reviews. It decides which
+          of these come first, each its own ADR:
           - **developer experience**: docs and a tutorial for a developer
             from outside; editor support, a language server (diagnostics as
             one types, completion, go-to-definition) on the check's ~37 ms;
