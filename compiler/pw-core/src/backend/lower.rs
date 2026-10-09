@@ -2165,7 +2165,9 @@ impl<'a> Lower<'a> {
                 modifiers,
                 args,
                 ..
-            } if self.handler && keyword == "navigate" => self.navigate(body, modifiers, args, span),
+            } if self.handler && keyword == "navigate" => {
+                self.navigate(body, modifiers, args, span)
+            }
             other => Lowering::Unsupported {
                 construct: construct_name(other),
                 span,

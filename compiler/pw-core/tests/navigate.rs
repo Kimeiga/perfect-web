@@ -97,17 +97,15 @@ fn navigation_codes(handler: &str) -> Vec<String> {
 
 #[test]
 fn a_navigation_names_a_page() {
-    let refused = navigation_codes(
-        "match add(1) { Ok(_) => navigate Nowhere(), Err(_) => note = \"no\" }",
-    );
+    let refused =
+        navigation_codes("match add(1) { Ok(_) => navigate Nowhere(), Err(_) => note = \"no\" }");
     assert!(
         refused.len() == 1 && refused[0].starts_with("PW5042") && refused[0].contains("nothing"),
         "{refused:?}"
     );
     // A command is no page.
-    let command = navigation_codes(
-        "match add(1) { Ok(_) => navigate count(1), Err(_) => note = \"no\" }",
-    );
+    let command =
+        navigation_codes("match add(1) { Ok(_) => navigate count(1), Err(_) => note = \"no\" }");
     assert!(
         command.len() == 1 && command[0].contains("names a command"),
         "{command:?}"
@@ -123,25 +121,17 @@ fn a_navigation_names_a_page() {
 
 #[test]
 fn its_arguments_are_the_pages_parameters() {
-    let none = navigation_codes(
-        "match add(1) { Ok(_) => navigate R(), Err(_) => note = \"no\" }",
-    );
-    assert!(
-        none.len() == 1 && none[0].starts_with("PW0604"),
-        "{none:?}"
-    );
-    let a_number = navigation_codes(
-        "match add(1) { Ok(_) => navigate R(1), Err(_) => note = \"no\" }",
-    );
+    let none = navigation_codes("match add(1) { Ok(_) => navigate R(), Err(_) => note = \"no\" }");
+    assert!(none.len() == 1 && none[0].starts_with("PW0604"), "{none:?}");
+    let a_number =
+        navigation_codes("match add(1) { Ok(_) => navigate R(1), Err(_) => note = \"no\" }");
     assert!(
         a_number.len() == 1 && a_number[0].starts_with("PW0605"),
         "{a_number:?}"
     );
     // The control: its parameter, text.
     assert_eq!(
-        navigation_codes(
-            "match add(1) { Ok(_) => navigate R(\"a b\"), Err(_) => note = \"no\" }"
-        ),
+        navigation_codes("match add(1) { Ok(_) => navigate R(\"a b\"), Err(_) => note = \"no\" }"),
         Vec::<String>::new()
     );
 }
@@ -265,9 +255,7 @@ fn ran(source: &str, answer: &str) -> serde_json::Value {
 
 #[test]
 fn the_module_goes_to_the_page_after_the_answer_and_only_on_ok() {
-    let source = module(
-        "match add(1) { Ok(_) => navigate R(\"a b\"), Err(_) => note = \"no\" }",
-    );
+    let source = module("match add(1) { Ok(_) => navigate R(\"a b\"), Err(_) => note = \"no\" }");
     // The page's route, and its parameter's value by name: the runtime fills
     // and encodes the segment.
     assert!(
@@ -284,7 +272,10 @@ fn the_module_goes_to_the_page_after_the_answer_and_only_on_ok() {
     );
     // Answered its declared error: the `Err` arm runs, and nothing goes.
     assert_eq!(
-        ran(&source, r#"{"$case":"err","value":{"$case":"unavailable"}}"#),
+        ran(
+            &source,
+            r#"{"$case":"err","value":{"$case":"unavailable"}}"#
+        ),
         serde_json::json!([["command", "t.add", [1]], ["set", "note", "no"]])
     );
 }
@@ -292,7 +283,10 @@ fn the_module_goes_to_the_page_after_the_answer_and_only_on_ok() {
 #[test]
 fn a_page_with_no_parameters_is_given_none() {
     let source = module("match add(1) { Ok(_) => navigate Q(), Err(_) => note = \"no\" }");
-    assert!(source.contains("await context.navigate(\"/q\", {});"), "{source}");
+    assert!(
+        source.contains("await context.navigate(\"/q\", {});"),
+        "{source}"
+    );
     assert_eq!(
         ran(&source, r#"{"$case":"ok"}"#),
         serde_json::json!([["command", "t.add", [1]], ["navigate", "/q", {}]])

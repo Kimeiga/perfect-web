@@ -603,7 +603,9 @@ fn navigations(
         let written: Vec<ExprId> = body
             .walk()
             .into_iter()
-            .filter(|e| matches!(body.expr(*e), Expr::Keyword { keyword, .. } if keyword == "navigate"))
+            .filter(
+                |e| matches!(body.expr(*e), Expr::Keyword { keyword, .. } if keyword == "navigate"),
+            )
             .collect();
         if written.is_empty() {
             continue;

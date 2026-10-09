@@ -1549,7 +1549,10 @@ impl<'p> Emitter<'p> {
                     true => "{}".to_string(),
                     false => format!("{{ {} }}", given.join(", ")),
                 };
-                self.line(&format!("await context.navigate({}, {given});", json(route)));
+                self.line(&format!(
+                    "await context.navigate({}, {given});",
+                    json(route)
+                ));
                 self.line(&format!("const {r} = undefined;"));
             }
             // A page's signal (ADR-0130), through the handler's context, as

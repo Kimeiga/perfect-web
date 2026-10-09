@@ -1359,7 +1359,9 @@ impl<'a> Typer<'a> {
                 }
             }
             // A navigation produces nothing (ADR-0280): the page goes.
-            Expr::Keyword { keyword, .. } if keyword == "navigate" => Ty::Primitive(Primitive::Unit),
+            Expr::Keyword { keyword, .. } if keyword == "navigate" => {
+                Ty::Primitive(Primitive::Unit)
+            }
             Expr::Binary { op, lhs, rhs } => match op {
                 BinOp::Cmp(_) | BinOp::And | BinOp::Or => Ty::Primitive(Primitive::Bool),
                 BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
