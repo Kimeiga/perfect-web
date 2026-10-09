@@ -55,14 +55,17 @@ MUTANTS = [
     (
         "a secret a query uses is its value",
         CHECK,
-        "                    .filter(|r| !matches!(r, Restriction::Secret(_)))\n",
-        "                    .filter(|_| true)\n",
+        # Re-anchored by ADR-0282: what a value holds, its secrets left out
+        # but those it answers.
+        "        without_secrets(&self.observed(def)).join(&answered)\n",
+        "        self.observed(def).join(&answered)\n",
     ),
     (
         "the contract reads declared labels only",
         CONTRACT,
-        "        crate::check::Reads::of(hirs, sigs, &inference).labels();\n",
-        "        hirs.iter().enumerate().flat_map(|(unit, hir)| hir.all_decls().filter_map(|(id, d)| { let l = crate::check::label_of(d); (!l.is_public()).then(|| (crate::resolve::DefId { unit, decl: id.0 }, l)) }).collect::<Vec<_>>()).collect();\n",
+        # Re-anchored by ADR-0282, where the contract keeps its `Reads`.
+        "    let labels: BTreeMap<crate::resolve::DefId, Label> = reads.labels();\n",
+        "    let labels: BTreeMap<crate::resolve::DefId, Label> = hirs.iter().enumerate().flat_map(|(unit, hir)| hir.all_decls().filter_map(|(id, d)| { let l = crate::check::label_of(d); (!l.is_public()).then(|| (crate::resolve::DefId { unit, decl: id.0 }, l)) }).collect::<Vec<_>>()).collect();\n",
     ),
 ]
 

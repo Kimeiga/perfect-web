@@ -580,6 +580,15 @@ awaited in order. What remains:
   binding named `line` beside the cart's `{#each cart.lines as line}` was
   read for `line.name` inside the loop, and the build refused. The checker
   accepts the shadowing; the binding is named `summary`.
+- **A placement names one world** (ADR-0282): a declaration's `placement`
+  listing several worlds is read as no pin, and no program writes one.
+- **A fragment's placement is read by no runtime** (ADR-0282): the
+  materializer keeps it and never reads it, so a fragment runs where the
+  host runs it, at the origin; the checker holds what a program declares
+  to what it holds, and no work moves to the edge.
+- **A secret laundered through a materialization's body** (ADR-0282):
+  ADR-0129's summaries follow functions, queries, commands, subscriptions
+  and resources, and not a materialization's body.
 - **A source's guarantees are held to the database the feed opens**
   (ADR-0207, ADR-0246): the host measures a PostgreSQL feed's isolation and
   whether it may write, and refuses to serve on a shortfall. The store's

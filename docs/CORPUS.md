@@ -836,3 +836,28 @@ Generality at open:        44/44 invariants generality-tested
 |---|---|---|
 | R-059 | added: `{#if post.likes}` over an `Int` (`PW0609`) | new category |
 | `operand_type` | a GENERAL witness, a view's boolean attribute given a record, and a NEIGHBOUR one, a count compared, a list and a string tested non-empty, and a `Bool` | new invariant |
+
+## C18: a secret a query answers, and placement reading what a declaration holds, 2026-10-08
+
+Opened because the specification changed: a secret a declaration answers
+is held where one it only uses is not, a materialization reads what it
+depends on, and placement reads what a declaration holds, as the cache
+rules read it, in the checker and the contract alike.
+[ADR-0282](DECISIONS/ADR-0282-what-a-value-holds-is-one-label.md) is the
+decision. Three of the four findings of 2026-10-03 it fixes became exhibits.
+No invariant is retired, no `@expect-error` line of an earlier fixture
+changed, and no fixture moved.
+
+```text
+Corpus version:            C18
+Accepted programs:         32
+Rejected programs:         62
+Charter categories:        32/32 accepted, 62/62 rejected
+Generality at open:        44/44 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| R-060 | added: a `public query` answering `Secret<Payments>`, kept in a `partition public` fragment (`PW5101`) | new category |
+| R-061 | added: a fragment of the session's cart placed at build (`PW5002`) | new category |
+| R-062 | added: a page placed at build reading the session through a query of its own (`PW5002`) | new category |

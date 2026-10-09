@@ -85,3 +85,11 @@ Reads are followed through declarations the unit resolves. A read through a
 function *value*, such as a callback, carries its label by ADR-0079, not by
 this derivation. Label polymorphism in signatures stays the open ruling
 ADR-0085 names.
+
+## Amended by ADR-0282 (2026-10-08)
+
+Decision 5 left every secret out of a resource's value label. A secret a
+query *answers*, by its result type or by what its body's value carries, is
+now held; one it only *uses*, as a key to fetch something public, is not
+(ADR-0085). A `public query` answering `Secret<Payments>`, kept by a shared
+fragment at the edge, checked clean until then.

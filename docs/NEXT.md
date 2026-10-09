@@ -442,8 +442,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              browser's decision holds them to the same constants
              (`pw-resume-wasm`), so ADR-0132's checks of a document's schema
              and its privacy scope pass for any page, a private cart's
-             among them; and, open, first, ahead of features, **four
-             soundness findings of 2026-10-03** (the session "Project
+             among them; and ~~**four soundness findings of 2026-10-03**~~
+             (ADR-0282, `just e14-held-labels`: one label for what a value
+             holds; the session "Project
              readiness for kiokun.com rewrite", at `29ebcf9`; its message
              expired unread), each reproduced at `d346c43` on 2026-10-08:
              1. a secret kept in a cached fragment: a `public query`

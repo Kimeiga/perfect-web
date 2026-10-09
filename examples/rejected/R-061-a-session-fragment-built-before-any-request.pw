@@ -1,0 +1,28 @@
+// @corpus: rejected
+// @id: R-061
+// @category: a fragment of a session's data, built before any request
+// @rule: PW5002
+// @invariant: no_feasible_placement
+// @charter: §7.3, §7.8, §9.3
+// @milestone: 6
+// @expect-error: `CartFragment` cannot run in any world: it holds Session<SessionId>
+//
+// Found on 2026-10-03 and refused since ADR-0282. A fragment placed at build
+// is made before any request, so no session exists to read. Until 2026-10-08
+// a materialization's `depends_on` fed the graph alone, and placement saw
+// nothing it held: a page placed at build reading the same cart was refused,
+// and this fragment checked clean.
+
+module store.fragments
+
+import Resources.{ Cart }
+import context.{ current_session }
+
+materialize CartFragment() {
+    // ERROR: the build world holds no session's value.
+    placement      build
+    depends_on     Cart(current_session())
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+}

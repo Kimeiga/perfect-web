@@ -5294,3 +5294,20 @@ e14-materializations-kept:
        CARGO_INCREMENTAL=0 python3 scripts/materializations_kept_mutations.py; \
      } > docs/evidence/E14/materializations-kept.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/materializations-kept.txt
+
+# ADR-0282: what a value holds is one label. The compiler's tests, the
+# rejected corpus's exhibits through `checking_source`, and the mutation
+# controls.
+e14-held-labels:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0282 - what a value holds is one label"; echo; \
+       echo "produced by: just e14-held-labels"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (held_where_it_runs.rs, reads_through_calls.rs, checking_source.rs)"; echo; \
+       cargo test --locked -p pw-core --test held_where_it_runs --test reads_through_calls --test checking_source 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/held_labels_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/held_labels_mutations.py; \
+     } > docs/evidence/E14/held-labels.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/held-labels.txt
+
