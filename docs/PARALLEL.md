@@ -575,3 +575,7 @@ Each a decision for a track, with its date; a track's ADR records it too.
     as Q1's rendering difference is; the comparison counts every other
     difference as a defect. The owner was told; the live site is theirs to
     fix.
+  - **Merged 2026-10-09** as ADR-0285 (the inventory) and ADR-0286 (the
+    word page), from `d19850f`, after the fix (a 503 before, a 404 now) and
+    green runs (verify 37886442522, every engine). Next, 1b: Japanese
+    labels through `KIOKUN_APP` with Q4's lookup, and the character header.

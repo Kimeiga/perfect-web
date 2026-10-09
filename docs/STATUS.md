@@ -23,6 +23,21 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0285 and ADR-0286, 2026-10-09: kiokun.com in Pleris, its inventory
+and its word page** (track `kiokun`, W6, merged from `d19850f`). Every
+route and feature of kiokun.com's SvelteKit app is inventoried, built,
+partial or missing, and held to the app: 102 routes and 63 features. Step 1
+began with the word page: `examples/kiokun-site`, a third program on the
+development server, reads kiokun's entries through a read-only layer, finds
+a word's file by kiokun's own shard rule and escape, follows a stub one hop,
+and shows each language's words as kiokun.com's page does, server-rendered
+and working with script off. A word too long for a file name was a 503, and
+is a 404 (fixed before the merge). Found on the way: kiokun.com's own label
+table never matches JMdict's codes, so 53 labels show as codes on the live
+site; the rewrite does not copy it, and the owner was told. Its two compiler
+findings became ADR-0283 and ADR-0284. Ten server tests, fifteen browser
+tests in three engines, 15 of 15 mutants killed on CI (run 37886442522).
+
 **ADR-0282, 2026-10-08: what a value holds is one label** (four soundness
 findings of 2026-10-03, reproduced at `d346c43`; amends ADR-0118, corrects
 ADR-0128). A secret a query answered, kept by a shared fragment at the edge,

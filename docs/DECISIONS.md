@@ -2316,3 +2316,17 @@ what a value holds is one label (amends ADR-0118, corrects ADR-0128).
   declaration holds, as the cache rules read it, in the checker and the
   contract alike; and a placement refusal names the label that rules each
   world out. Four soundness findings of 2026-10-03, each fixed.
+[ADR-0285](DECISIONS/ADR-0285-kiokun-parity-inventory.md):
+kiokun.com's parity inventory, every route marked (track `kiokun`, W6).
+- Every route and feature of kiokun.com's SvelteKit app is a row, marked
+  built, partial or missing, held to the app by `scripts/kiokun_inventory.py`:
+  102 routes (0 built, 4 partial, 98 missing) and 63 features; the gaps by
+  kind, and the order the integrator ruled.
+[ADR-0286](DECISIONS/ADR-0286-kiokun-word-page-on-the-development-server.md):
+kiokun's word page, a third program on the development server (track
+`kiokun`, W6).
+- `examples/kiokun-site` serves kiokun's entry for a word as kiokun.com's
+  page shows it, from a read-only layer over kiokun's own files; Pleris finds
+  the file (the shard rule, kiokun's escape) and answers only for the word it
+  records; a stub is followed one hop; what kiokun.com does not show is not
+  shown; differences from kiokun.com are stated, its label bug not copied.

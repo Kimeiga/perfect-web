@@ -21,6 +21,7 @@
 //! PW56xx   the uploads track's (ADR-0253): typed uploads and blob storage
 //! PW57xx   the notifications track's (ADR-0253): the typed principal, notifications
 //! PW58xx   the messages track's (ADR-0253): direct messages
+//! PW60xx   the kiokun track's (ADR-0253): kiokun.com in Pleris
 //! ```
 //!
 //! A parallel track registers its codes in its own block, with its own
@@ -102,6 +103,9 @@ pub enum Owner {
     /// ADR-0253: the messages track's codes, PW58xx: direct messages, a
     /// conversation read from each side, and who may message whom.
     Messages,
+    /// ADR-0253: the kiokun track's codes, PW60xx: kiokun.com, the owner's
+    /// dictionary, rewritten in Pleris (docs/PARALLEL.md, W6's plan).
+    Kiokun,
 }
 
 impl fmt::Display for Code {
@@ -854,6 +858,7 @@ impl Owner {
             Owner::Uploads => "PW56",
             Owner::Notifications => "PW57",
             Owner::Messages => "PW58",
+            Owner::Kiokun => "PW60",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -915,6 +920,7 @@ mod tests {
                 (Owner::Uploads, "PW56"),
                 (Owner::Notifications, "PW57"),
                 (Owner::Messages, "PW58"),
+                (Owner::Kiokun, "PW60"),
             ] {
                 assert!(
                     !c.id.starts_with(block) || c.owner == owner,

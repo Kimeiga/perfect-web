@@ -591,6 +591,13 @@ awaited in order. What remains:
 - **A secret laundered through a materialization's body** (ADR-0282):
   ADR-0129's summaries follow functions, queries, commands, subscriptions
   and resources, and not a materialization's body.
+- **kiokun's word page is its words sections** (ADR-0286): Japanese labels
+  are shown as JMdict's codes until the label table is read; the character
+  header, examples, pitch, mnemonics, components, contains and appears in,
+  the canonical redirect, variant merge, related forms and the SEO head are
+  still to come; the route is `/word/{word}` until `/_pw/` lands; the tests
+  run on the repository's sample, and no page was rendered beside
+  kiokun.com's yet.
 - **A source's guarantees are held to the database the feed opens**
   (ADR-0207, ADR-0246): the host measures a PostgreSQL feed's isolation and
   whether it may write, and refuses to serve on a shortfall. The store's

@@ -714,7 +714,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           (`/Users/haki/code/kiokun-data`: `sveltekit-app/`, the Rust
           builder, and the 1.49 million files of `output_dictionary`),
           rewritten in Pleris and served, from the kiokun slice (ADR-0037,
-          ADR-0041). Real users, data, devices and deploys are the strongest
+          ADR-0041). Its inventory and its word page are merged (ADR-0285,
+          ADR-0286, 2026-10-09); next, Japanese labels through `KIOKUN_APP`
+          and the character header, then `/{word}` once `/_pw/` lands. Real
+          users, data, devices and deploys are the strongest
           evidence there is. Its conditions: parity with the live site,
           measured; served first on a preview origin beside the live site;
           and no production cutover, DNS change or deploy without the
