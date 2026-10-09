@@ -93,7 +93,12 @@ def main() -> int:
         gh("run", "download", args.run, "--dir", tmp, "--pattern", "evidence-*")
         staged: dict[pathlib.Path, bytes] = {}
         refused = []
-        for shard in sorted(pathlib.Path(tmp).glob("evidence-*")):
+        # Each shard's directory, or the download's own where it had one
+        # (`ci_summary.shards_of`).
+        shards = sorted(pathlib.Path(tmp).glob("evidence-*")) or (
+            [pathlib.Path(tmp)] if (pathlib.Path(tmp) / "evidence").is_dir() else []
+        )
+        for shard in shards:
             runner = (shard / "runner.txt").read_text().strip() if (shard / "runner.txt").exists() else "a GitHub-hosted runner"
             for f in sorted((shard / "evidence").rglob("*")):
                 if not f.is_file():
