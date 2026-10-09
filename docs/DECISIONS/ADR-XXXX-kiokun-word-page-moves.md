@@ -55,7 +55,7 @@ integrator's rulings for track `kiokun` (docs/PARALLEL.md). Date:
 
 ## Differences from kiokun.com
 
-Numbered after ADR-XXXX (examples and pitch accent)'s 19.
+Numbered after ADR-0299's 19.
 
 20. **A conjugated form is not moved to its dictionary form.** kiokun.com
     answers 307 to the deinflected form, with `from`, `conj` and `alt` in
@@ -75,8 +75,31 @@ Numbered after ADR-XXXX (examples and pitch accent)'s 19.
    movers' deciding fields.
 3. **ADR-0295's tests pinned text that 1d had changed.** A clean textual
    merge left all five failing on this track; the pinned strings were
-   updated, and `e14-redirects` was recorded again (ADR-XXXX, examples and
-   pitch accent).
+   updated, and `e14-redirects` was recorded again (ADR-0299).
+4. **`e14-kiokun-word` took 4 h 01 m on CI** (verify 37961821792, a shard
+   of its own; the job's limit is 345 min), about 220 s a mutant: each
+   mutant runs every kiokun test, and each test compiled the program
+   into its own `TempDir`. On the integrator's ruling, each distinct
+   program is now compiled once per test process. Its files are kept as
+   bytes, keyed by a hash of the sources compiled, and written into each
+   test's own `TempDir`, so nothing on disk outlives its test (ADR-0158).
+   `Build::write` writes only paths relative to its directory, and no
+   build id, so the bytes are the same files.
+   - Measured back to back with `/usr/bin/time -l`, 30 tests, 12 cores at
+     a load near 16:
+
+     | | one thread per core | four threads |
+     |---|---|---|
+     | before | 92.8 s, 3.61 GB, 487 CPU-s | 138.7 s, 2.09 GB, 437 CPU-s |
+     | after | 76.0 s, 2.71 GB, 261 CPU-s | 99.0 s, 2.39 GB, 251 CPU-s |
+
+   - One test's own time is about 7.1 s to compile and 7.7 s for the
+     server to load the components (Wasmtime compiling them in a debug
+     build); the cache removes the first.
+   - `scripts/kiokun_word_mutations.py` runs one test thread per core
+     again: 2.71 GB is 1.6 GB under ADR-0292's bound.
+   - CI runs on four cores, where CPU time decides, so the shard should
+     take about half its time.
 
 ## Acceptance
 
