@@ -442,7 +442,31 @@ E14 comes before E11-E13. Its plan, controls and task list are
              browser's decision holds them to the same constants
              (`pw-resume-wasm`), so ADR-0132's checks of a document's schema
              and its privacy scope pass for any page, a private cart's
-             among them.
+             among them; and, open, first, ahead of features, **four
+             soundness findings of 2026-10-03** (the session "Project
+             readiness for kiokun.com rewrite", at `29ebcf9`; its message
+             expired unread), each reproduced at `d346c43` on 2026-10-08:
+             1. a secret kept in a cached fragment: a `public query`
+                answering `Secret<Payments>`, kept by a `partition public`
+                materialization placed at the edge or in the browser, checks
+                clean, where the same value rendered by a shared page is
+                refused (PW5001, PW5003). ADR-0118 left a secret out of a
+                fragment's value label, and no other rule took it up;
+             2. a fragment built before any request from a session's data:
+                `placement build` with `depends_on Cart(current_session())`
+                checks clean, where a build-placed page reading it is
+                refused (PW5002). Nothing compares a fragment's placement
+                with what its dependencies hold;
+             3. placement and caching read different labels: a build-placed
+                page reading the session through a query of its own
+                (`query MyCart() { Carts.current(current_session()) }`)
+                checks clean, and reading `Cart(current_session())` itself is
+                refused. Since ADR-0128 the cache rules see the session
+                either way; placement does not, in the checker or the
+                contract;
+             4. a placement diagnostic cut short: PW5002 says "cannot run in
+                any world: it requires" and nothing after it, where a label
+                alone, not an effect, rules out every world.
              Further grammar and clause defects go under 0047-a below,
              unless the feed, the next Twitter item or soundness needs one;
           2. ~~map keys (0057-a)~~ (ADR-0248, `just e14-map-keys`) and ~~`let
@@ -579,11 +603,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
             built and tested on both layers. Its rulings are PARALLEL.md's
             (2026-10-08), the first a finding: ADR-0193 rules that an order
             is the cart's lines, and the store keeps its status alone;
-          - **W6, search and filters**: stores and dishes, by name and
+          - **W6 is kiokun.com's**, beside this app (below);
+          - **W7, search and filters**: stores and dishes, by name and
             cuisine, run in the database or a declared search source, its
             guarantees stated as ADR-0207 states a source's; no search engine
             is built here;
-          - **W7, ratings and reviews** of orders and stores, after
+          - **W8, ratings and reviews** of orders and stores, after
             accounts.
 
           Not claimed: a live courier map (ADR-0075 refuses a mounted
@@ -591,6 +616,56 @@ E14 comes before E11-E13. Its plan, controls and task list are
           (DashPass); currencies other than USD; and courier dispatch,
           routing and fraud, the backend's services, outside the app layer
           (the owner's scope);
+        - **beside it, kiokun.com, Pleris's production target** (the owner,
+          relayed 2026-10-08): the owner's site, SvelteKit today
+          (`/Users/haki/code/kiokun-data`: `sveltekit-app/`, the Rust
+          builder, and the 1.49 million files of `output_dictionary`),
+          rewritten in Pleris and served, from the kiokun slice (ADR-0037,
+          ADR-0041). Real users, data, devices and deploys are the strongest
+          evidence there is. Its conditions: parity with the live site,
+          measured; served first on a preview origin beside the live site;
+          and no production cutover, DNS change or deploy without the
+          owner's explicit go, asked when it is reached. It is the worker
+          track after W5, W6, so DoorDash's tracks after it are W7, search
+          and filters, and W8, ratings and reviews. It decides which of
+          these come first, each its own ADR:
+          - **developer experience**: docs and a tutorial for a developer
+            from outside; editor support, a language server (diagnostics as
+            one types, completion, go-to-definition) on the check's ~37 ms;
+            `pw new`, live reload, and debugging that traces which query or
+            command caused what; and error messages read by a fresh reader;
+          - **the production path**: a deployment, a container image or a
+            host target; observability (charter §10.5: causal traces carrying
+            the semantic ids); a real sign-in provider, **Google** (the
+            owner's choice, relayed 2026-10-08), through a generic OIDC
+            relying party behind ADR-0258's `identity::Provider`: discovery,
+            the JWKS fetched and cached, and the ID token's signature,
+            issuer, audience, expiry and nonce checked, with PKCE as built;
+            tested in CI against a local fake provider, no real account in
+            any test; Google's specifics (its discovery URL, its issuer's
+            forms, the `hd` and `email_verified` claims) verified against
+            Google's own Identity documentation. Then migrations across live
+            deploys, secrets management, rate limiting and backups; then
+            E11, E12 and E15;
+          - **trust**: mechanised proofs of the core privacy and affine
+            rules (Lean or Coq, over a core calculus, scoped first, being
+            large); fuzzing the compiler, the host and the browser protocol;
+            an external security audit when it is ready; and real
+            accessibility testing (axe-core in the suite, VoiceOver and NVDA
+            runs, real mobile browsers), since the capability matrix finds
+            accessibility narrow;
+          - **interop**: existing JavaScript libraries and components used
+            behind a capability and privacy boundary (ADR-0075's mounted
+            resources), which the Docs app's editor and maps need first; and
+            adoption one route at a time, from an existing Next.js or
+            SvelteKit app (charter P9), kiokun's SvelteKit app the natural
+            first.
+
+          The owner's own steps, asked when each is reached: any crate or
+          npm download (a JWT or JOSE library among them); creating Google
+          Cloud's OAuth client, in the owner's own account; where the client
+          secret is kept, which is never committed; and anything deployed or
+          outward-facing;
         - **then the evidence that answers "is Pleris perfect?"** (the
           owner, relayed 2026-10-08): the reference apps prove breadth, and
           these the claim. In this order, ahead of the next app, so that

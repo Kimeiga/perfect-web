@@ -47,7 +47,7 @@ Checked against `master` at `73e462b` (2026-10-08), ADR-0001 to ADR-0279.
 
 | Capability | ADRs | What works | What does not |
 |---|---|---|---|
-| Accounts | 0258, 0263, 0264, 0265, 0270 | Pleris is the relying party (PKCE, CSRF); a typed principal. | A development provider only, on loopback; no OIDC discovery, JWKS or ID-token check; sessions in memory; no email or recovery. |
+| Accounts | 0258, 0263, 0264, 0265, 0270 | Pleris is the relying party (PKCE, CSRF); a typed principal. | A development provider only, on loopback; no OIDC discovery, JWKS or ID-token check; sessions in memory; no email or recovery. Google is the owner's choice of first real provider, through a generic OIDC relying party (NEXT, the production path). |
 | Forms | 0142, 0143, 0221, 0227, 0265 | `bind:value` for a `String`, a textarea, labels, routes checked. | No checkbox or `<select>` binding; a form as one typed record waits (0131); nothing multi-step. |
 | Multi-tenancy | 0107, 0128, 0263, 0264 | A tenant in a cache key; an `Organization` label. | `current_organization()` is bound to `pw:host/organization#read`, which no host answers; no tenant model. |
 | Database independence | 0005, 0019, 0207, 0218, 0246 | The feed in memory and on PostgreSQL behind one seam; a source states its guarantees. | The store is in memory only; each data layer is written by hand in Rust; one host. |

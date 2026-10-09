@@ -317,9 +317,13 @@ Each a decision for a track, with its date; a track's ADR records it too.
     integrator's soft navigation, which is the runtime's; the integrator's
     accounts in the store wait for its merge, since they change its
     tables.
-  - **W6, search and filters**, after W5: run in the database or a
+  - **W6, kiokun.com in Pleris**, after W5 (the owner's production target,
+    relayed 2026-10-08; NEXT): parity with the live site, on a preview
+    origin, with no deploy, cutover or DNS change without the owner's go.
+    Its rulings are written here before it launches.
+  - **W7, search and filters**, after W6: run in the database or a
     declared search source; no search engine is built here.
-  - **W7, ratings and reviews**, after W6 and the integrator's accounts: a
+  - **W8, ratings and reviews**, after W7 and the integrator's accounts: a
     review is a user's.
   - **The integrator's**: the soft navigation, the store's accounts,
     delivery addresses, store hours, and checkout with payment, the last
