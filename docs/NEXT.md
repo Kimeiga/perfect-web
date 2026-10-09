@@ -499,6 +499,24 @@ E14 comes before E11-E13. Its plan, controls and task list are
              handler, allows `build`. A handler runs in the browser, and a
              command it sends at the command's own placement: the
              DoorDash menu's static pages with an Add button need this;
+             and, found 2026-10-09 in CI itself, open: **the WebKit
+             "Load more" failure's cause**, reproduced here with the
+             server's records (3 of 120, six workers): every commit's
+             telling derived every open document of every session inside
+             the host's one `pending` lock, 50 to 200 ms a hold, back to
+             back, and the page's stream waited up to 1.6 s a pass; the fix,
+             each change derived outside the lock and pushed only where the
+             document still shows what it was derived against, is in CI on
+             `track/stream-records` (its first WebKit job passed);
+             **`e14-graphs-on-the-wire` takes CI's runner down** a few
+             minutes in, every time it runs there (the nightly of
+             2026-10-08, navigate's verify twice), and passes here (19 of 19,
+             2.2 GB at most): a heartbeat in `ci_recipes.py`
+             (`track/one-shard`) will show what it does when the runner
+             dies; **a run of one recipe shard reported none**
+             (`download-artifact` extracts a lone match into its path), so
+             its summary failed: fixed on `track/one-shard`; and
+             `e14-contract` exited 1 in that nightly, not yet looked at;
              and, open, next, the integrator's, **the host's paths
              reserved under `/_pw/`** (W6's question, PARALLEL.md
              2026-10-08): the runtime's files and its root endpoints moved
