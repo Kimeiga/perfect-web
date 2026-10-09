@@ -77,6 +77,21 @@ Date: 2026-10-09. Milestone: E14.
    (2026-10-09), with the label table's.
 2. **The oracle found nothing to name** for the Japanese examples: 1,082
    sampled words, the same.
+3. **The word page's tests outgrew ADR-0292's bound at one thread per
+   core.** After master was merged, the bound stopped the mutation
+   baseline (`pw_dev_server` held more than 4 GiB). Each kiokun test
+   compiles the program into its own `TempDir` (ADR-0158), and they run
+   at once. Measured alone with `/usr/bin/time -l`, the test process peaks
+   at 3.49 GB at one thread per core (60 s) and at 2.26 GB on four threads
+   (110 s). `scripts/kiokun_word_mutations.py` runs its tests on four
+   threads. A build cached in a static was refused: a static never drops,
+   so its `TempDir` would never be removed (ADR-0158), and it would only
+   move the cost. The integrator accepted it (2026-10-09).
+4. **A mutant survived a test made stronger for another.** Making the
+   pitch file's order differ from its sorted order made the first
+   reading's accent ひと's own, so "a reading's own accent is never read"
+   survived. にん is now in the file with an accent of its own, and the
+   script, run whole, kills both.
 
 ## Differences from kiokun.com
 
@@ -127,10 +142,8 @@ Added to ADR-0286's list:
   off.
 - **Mutation controls**: 64 in `scripts/kiokun_word_mutations.py`, 11 of them
   this milestone's (7 pitch, 4 examples); the Korean placeholder's
-  re-anchored on the senses. The script's tests now run on four threads:
-  at one per core the test process peaked at 3.49 GB measured alone, and
-  ADR-0292's 4 GiB bound stopped the baseline after master was merged.
-  On four threads it peaks at 2.26 GB.
+  re-anchored on the senses; the script's tests run on four threads
+  (Found 3).
 
 ## Not claimed
 
