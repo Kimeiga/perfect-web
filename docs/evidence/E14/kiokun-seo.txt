@@ -1,0 +1,15 @@
+The word page's head, against kiokun.com's own buildDictionarySeo
+
+produced by: just e14-kiokun-seo (local: reads a kiokun-data checkout)
+commit: f88f6dc7147fed449b0851766779b9aa9c8f5ed3
+kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf (seo.ts e44beb37791e, character-forms.ts 459012aa4f0f)
+node: v22.21.1
+
+== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/seo.mjs)
+
+read 5938 entries; 5513 answered
+
+== the rewrite's, compared
+
+compared: 5513 words; differences: 0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 325 filtered out; finished in 10.20s
