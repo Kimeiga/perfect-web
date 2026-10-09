@@ -60,13 +60,11 @@ MUTANTS = [
         "        without_secrets(&self.observed(def)).join(&answered)\n",
         "        self.observed(def).join(&answered)\n",
     ),
-    (
-        "the contract reads declared labels only",
-        CONTRACT,
-        # Re-anchored by ADR-0282, where the contract keeps its `Reads`.
-        "    let labels: BTreeMap<crate::resolve::DefId, Label> = reads.labels();\n",
-        "    let labels: BTreeMap<crate::resolve::DefId, Label> = hirs.iter().enumerate().flat_map(|(unit, hir)| hir.all_decls().filter_map(|(id, d)| { let l = crate::check::label_of(d); (!l.is_public()).then(|| (crate::resolve::DefId { unit, decl: id.0 }, l)) }).collect::<Vec<_>>()).collect();\n",
-    ),
+    # "the contract reads declared labels only" is retired, equivalent since
+    # ADR-0282: the contract's demand joins `Reads::holds`, whose declared
+    # fixed point covers every label `labels()` names, so the map it replaced
+    # changes no placement. `held_labels_mutations.py`'s "the contract reads
+    # the keywords alone" undoes what is left of it, and is killed.
 ]
 
 TESTS = [

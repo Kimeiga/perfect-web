@@ -88,8 +88,18 @@ Milestone: E14. Amends ADR-0118 (its fifth decision) and corrects ADR-0128.
 - **The rejected corpus gains three exhibits** (C18): the secret kept in a
   shared fragment, the fragment of a session built at build, and the
   session read through a page's own query at build.
-- **`scripts/held_labels_mutations.py`**: each piece undone fails the tests.
-  Its own run is here; the scripts this touches run on CI (ADR-0281).
+- **`scripts/held_labels_mutations.py`, 8 of 8 killed** here; the scripts
+  this touches run on CI (ADR-0281). CI's first verification (run
+  37881657135) found two survivors in `reads_through_calls_mutations.py`,
+  both made by this ruling's second path to a label:
+  - "a read's declared label is not joined" survived because its tests
+    carried the session in a parameter's type, which `holds` reads
+    directly. A test now reads a session its keyword alone declares,
+    through a relay, and kills it (5 of 5);
+  - "the contract reads declared labels only" is retired, equivalent: the
+    contract's demand joins `Reads::holds`, whose declared fixed point
+    covers every label the replaced map named. This script's "the contract
+    reads the keywords alone" undoes what is left, and is killed.
 
 ## Not claimed
 

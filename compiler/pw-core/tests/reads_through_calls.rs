@@ -263,6 +263,23 @@ fn a_shared_page_reads_through_a_public_query() {
 }
 
 #[test]
+fn a_session_its_keyword_alone_declares_is_read_through_a_relay() {
+    // ADR-0282: a query whose session is in its keyword and nowhere in its
+    // types. Only a read's declared label reaches it: since what a value
+    // holds joins its parameters' and results' labels too, a session typed
+    // in a parameter would be seen without that join.
+    assert_eq!(
+        reported(&format!(
+            "{IMPORTS}session query Mine() -> Int\n    freshness      0.seconds\n    \
+             consistency    snapshot\n{{\n    0\n}}\n\n{}{}",
+            query("Relay", "", "Int", "query Mine()"),
+            page("shared")
+        )),
+        ["PW5001 `ShopPage` is Session<SessionId> and declares a shared cache"],
+    );
+}
+
+#[test]
 fn a_contract_is_as_private_as_what_its_component_reads() {
     use pw_core::contract::contracts;
     use pw_core::hir::Hir;
