@@ -468,7 +468,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
                 any world: it requires" and nothing after it, where a label
                 alone, not an effect, rules out every world;
 
-             and, open, next, **a refusal is never silent** (the owner's,
+             and, open, next, the integrator's, **the host's paths
+             reserved under `/_pw/`** (W6's question, PARALLEL.md
+             2026-10-08): the runtime's files and its root endpoints moved
+             there, a page's route refused that begins with it, then
+             `/command/…` and the test controls, and among declared routes a
+             literal segment over a parameter; kiokun's `/{word}` waits on
+             it; then, **a refusal is never silent** (the owner's,
              using the feed by hand, relayed 2026-10-08 23:30). Signed out,
              a reader types into the home page's composer and presses Post:
              the post shows, then goes, with no word. The server refuses it

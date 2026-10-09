@@ -522,3 +522,24 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - **Corrections taken**: the local-data citation (above), and
     KNOWN_LIMITATIONS' pitch line, which now names kiokun.com's own pitch
     files.
+- **2026-10-08, W6's routing question: the host's paths are reserved.**
+  kiokun.com's words are at `/<word>`, so its page's route is `/{word}`. The
+  development server matches its own endpoints before pages, and a page
+  before a file, so that route would answer `/pw-runtime.mjs` and the
+  runtime would never load. Ruled (b), as Next.js reserves `/_next/`,
+  SvelteKit `/_app/` and Nuxt `/_nuxt/`:
+  - **The host's own paths move under `/_pw/`**: the runtime's files and
+    its protocol endpoints at the root (`/pw-read`, `/stream`,
+    `/pw-handlers`). A page's route may not begin with `/_pw/`, refused at
+    compile time. `/command/…` and the store's test controls follow in a
+    second step, the rule refusing a page's route under them until then.
+  - **Among declared routes, a literal segment beats a parameter at the same
+    place** (`/sign-in` over `/{word}`), as routers do, and the routes check
+    says so.
+  - **Built by the integrator**, being the host's and the runtime's, after
+    ADR-0282 lands. W6 builds its program and read-only layer meanwhile;
+    its `TRACK SEAM (kiokun)` choosing `KiokunData` in `from_build_with` is
+    accepted.
+  - **Not (a)**, a file the build put at `dist`'s top winning over pages,
+    which ties the URL space to whatever a build emits. **Not (c)**, the
+    words at `/w/{word}`, which breaks every link to kiokun.com.
