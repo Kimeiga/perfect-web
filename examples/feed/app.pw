@@ -587,7 +587,11 @@ session page Home() {
                     <button type="submit">Attach</button>
                 </form>
             {/if}
-            <form on:submit|prevent={() => match post_text(draft) {
+            <!-- A signed-in reader's (ADR-XXXX): a reader signed out is given no
+                 composer to be refused at. Hidden, not in a block: a bound draft in
+                 a block a query decides is not rendered again (ADR-0137), as the
+                 conversation's composer is (ADR-0279). -->
+            <form hidden={!me.signed_in} on:submit|prevent={() => match post_text(draft) {
                 Some(text) => if List.length(staged) > 0 {
                     match alt_text(alt) {
                         Some(words) => match post_image(text, words) {

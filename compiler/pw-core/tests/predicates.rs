@@ -122,6 +122,10 @@ fn a_predicate_says_what_a_reader_is_told() {
             Some("Sign in"),
             "`predicate SignedIn`: its words are one string: `says \"Sign in to post.\"`",
         ),
+        (
+            Some("\"Sign in\" \"to post\""),
+            "`predicate SignedIn`: its words are one string: `says \"Sign in to post.\"`",
+        ),
         (Some("\"\""), "`predicate SignedIn`: its words are empty"),
         (Some("\"   \""), "`predicate SignedIn`: its words are empty"),
         (
@@ -153,5 +157,22 @@ fn says_is_a_predicates_alone() {
             .iter()
             .any(|d| d.contains("says") && d.contains("a predicate")),
         "{found:#?}"
+    );
+}
+
+#[test]
+fn a_predicate_is_declared_once_in_a_program() {
+    // A host tells a refusal by it in one set of words: a second module's
+    // declaration of the name is refused, at the second.
+    let one = format!("module d\n\n{SIGNED_IN}");
+    let two = format!("module e\n\n{SIGNED_IN}");
+    let found: Vec<String> = reported_in(&[("d.pw", &one), ("e.pw", &two)])
+        .into_iter()
+        .filter(|d| d.starts_with("PW0351 "))
+        .collect();
+    assert_eq!(
+        found,
+        ["PW0351 `predicate SignedIn` is declared in `d` already: a refusal by it is told \
+          in one set of words"]
     );
 }

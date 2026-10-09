@@ -120,5 +120,9 @@ test("a page still stale after being read again is not read again", async ({ pag
     "data-pw-handler-error",
     "reload-loop",
   );
+  // Told beside it (ADR-XXXX), never reloaded on its own.
+  await expect(page.locator("#menu .pw-refusal").first()).toHaveText(
+    "This page is out of date. Reload it to go on.",
+  );
   await expect(page.locator("#cart-count")).toHaveText("0");
 });

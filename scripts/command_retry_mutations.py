@@ -80,11 +80,13 @@ MUTANTS = [
         "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n",
     ),
     (
+        # Re-anchored by ADR-XXXX: a request with no answer is thrown as
+        # unreachable, which the press tells.
         "nothing is sent again",
         "browser",
         RUNTIME,
-        "      if (!retry || attempt >= retry.max) throw error;\n",
-        "      throw error;\n",
+        "      if (!retry || attempt >= retry.max) throw new Unreachable(component, error);\n",
+        "      throw new Unreachable(component, error);\n",
     ),
     (
         "an answer is sent again",
@@ -95,11 +97,12 @@ MUTANTS = [
         "      body = await response.text();\n",
     ),
     (
+        # Re-anchored by ADR-XXXX.
         "there is no bound",
         "browser",
         RUNTIME,
-        "      if (!retry || attempt >= retry.max) throw error;\n",
-        "      if (!retry) throw error;\n",
+        "      if (!retry || attempt >= retry.max) throw new Unreachable(component, error);\n",
+        "      if (!retry) throw new Unreachable(component, error);\n",
     ),
     (
         "a request is sent again under another interaction",

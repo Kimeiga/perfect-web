@@ -187,16 +187,20 @@ fn a_value_the_template_computes_is_lifted_and_planned() {
     let chunks = format!("{:?}", template.chunks);
     assert!(chunks.contains("\"#feed.app.PostPage~1\""), "{chunks}");
     assert!(chunks.contains("\"#feed.app.PostPage~2\""), "{chunks}");
-    // Control: the home page's host computes nothing. What it computes is
-    // from its draft, a signal, which the browser computes (ADR-0227).
+    // Control: the home page's host computes one value, whether its
+    // composer is hidden, from its reader (ADR-XXXX). What else it computes
+    // is from its draft, a signal, which the browser computes (ADR-0227).
     let home = plan_of(&b, "feed.app.Home");
-    assert!(
-        home.parts
-            .iter()
-            .chain(&home.derived)
-            .all(|p| !p.steps.iter().any(|s| matches!(s, Step::Derived(_)))),
-        "the home page's host computes nothing: {:?}",
-        home.parts
+    let computed: Vec<_> = home
+        .parts
+        .iter()
+        .chain(&home.derived)
+        .filter(|p| p.steps.iter().any(|s| matches!(s, Step::Derived(_))))
+        .collect();
+    assert_eq!(
+        computed.iter().map(|p| p.binding.as_str()).collect::<Vec<_>>(),
+        ["me"],
+        "the home page's host computes one value, from its reader: {computed:?}"
     );
 }
 

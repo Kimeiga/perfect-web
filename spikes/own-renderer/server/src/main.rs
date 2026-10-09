@@ -7531,11 +7531,13 @@ fn signal_document(
     // No `<` in a script element's text (ADR-0097).
     let json =
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
+    // Where a failed press is said (ADR-XXXX), from the first byte.
+    let announcer = pw_render::ANNOUNCER;
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{}</title>\n{metadata}</head>\n<body>\n{body}\n\
-         <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
+         {announcer}\n<script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         pw_render::escape::text(title)
     )
@@ -7753,11 +7755,13 @@ fn document(
         "" => String::new(),
         css => format!("<style>{css}</style>\n"),
     };
+    // Where a failed press is said (ADR-XXXX), from the first byte.
+    let announcer = pw_render::ANNOUNCER;
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{title}</title>\n{metadata}{style}</head>\n<body>\n{body}\n\
-         <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
+         {announcer}\n<script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         title = pw_render::escape::text(title)
     )
@@ -13948,6 +13952,23 @@ public query Store(",
             !body.contains("<meta") && !body.contains("<title"),
             "{body}"
         );
+    }
+
+    /// **A page that binds no query holds the announcer too** (ADR-XXXX):
+    /// once, empty, before the runtime that says what a failed press is told.
+    #[test]
+    fn a_signal_page_holds_its_announcer() {
+        let template = Template {
+            path: "t.P".into(),
+            name: "P".into(),
+            params: vec![],
+            schema: "s".into(),
+            chunks: vec![],
+        };
+        let page = signal_document("<main></main>", "P", "", &template, &serde_json::json!({}), &[]);
+        assert_eq!(page.matches(pw_render::ANNOUNCER).count(), 1, "{page}");
+        let (before, _) = page.split_once("id=\"pw-parts\"").expect("a parts manifest");
+        assert!(before.contains(pw_render::ANNOUNCER), "{page}");
     }
 
     /// **A title that changed is set as text** (ADR-0183), at the title's

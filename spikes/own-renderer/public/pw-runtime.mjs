@@ -577,13 +577,19 @@ async function command(component, args, interaction, retry) {
       if (response.ok) body = await response.text();
     } catch (error) {
       if (keepalive) keptAlive -= bytes;
-      if (!retry || attempt >= retry.max) throw error;
+      if (!retry || attempt >= retry.max) throw new Unreachable(component, error);
       log.push(`resent ${component}: no answer (${error.message ?? error})`);
       await new Promise((resolve) => setTimeout(resolve, resendDelay(retry, attempt)));
       continue;
     }
     if (keepalive) keptAlive -= bytes;
     if (!response.ok) {
+      // **Refused by its `requires`** (ADR-XXXX): the predicate and the words
+      // a reader is told, which the host that refused sends.
+      if (response.status === 403) {
+        const refusal = await response.json().catch(() => null);
+        if (refusal?.refused) throw new Refused(component, refusal.refused, refusal.says ?? "");
+      }
       throw new Error(`command ${component} refused: HTTP ${response.status}`);
     }
     return JSON.parse(body);
@@ -1624,6 +1630,108 @@ addEventListener("pagehide", () => {
 /** Each event part's decision, asked once (E7-L): before anything binds. */
 const verdicts = new Map();
 
+// --- what a failed press is told -----------------------------------------
+//
+// **A refusal is told where the press was** (ADR-XXXX). Until 2026-10-09 a
+// press a command's `requires` refused failed silently: the speculation was
+// taken back, `data-pw-handler-error` set, a line logged, and the reader told
+// nothing, the dead button this project exists to remove (the owner's
+// finding, the feed's composer signed out). The words go beside the control,
+// which its `aria-describedby` names, and to the page's announcer, a
+// `role="status"` the host serves empty from the page's first byte, so a
+// screen reader says them without the focus moving (WCAG 2.2 SC 4.1.3,
+// ARIA22). Focus, the control and what was typed stay as they are.
+
+/** A command its `requires` refused: the predicate, and its words. */
+class Refused extends Error {
+  constructor(component, predicate, says) {
+    super(`command ${component} refused by ${predicate}`);
+    this.predicate = predicate;
+    this.says = says;
+  }
+}
+
+/** A command no answer came for, its retries spent. */
+class Unreachable extends Error {
+  constructor(component, cause) {
+    super(`command ${component} could not be sent: ${cause?.message ?? cause}`);
+  }
+}
+
+/** The platform's words, where no predicate's apply. */
+const PLATFORM_SAYS = {
+  unreachable: "This could not be sent. Check the connection and try again.",
+  stale: "This page is out of date. Reload it to go on.",
+  failed: "This did not work. Try again.",
+};
+
+let announcer = null;
+
+/** The page's announcer: the one the host served (`pw_render::ANNOUNCER`),
+ * the same node from the first byte, or, from a host that served none, one
+ * added once, before anything is said. */
+function announcerOf() {
+  announcer ??= document.querySelector(".pw-announcer[role=status]");
+  if (!announcer) {
+    announcer = document.createElement("div");
+    announcer.setAttribute("role", "status");
+    announcer.className = "pw-announcer";
+    // Seen by no one, said to whoever reads the page by ear.
+    announcer.style.cssText =
+      "position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;" +
+      "overflow:hidden;clip-path:inset(50%);white-space:nowrap";
+    document.body.append(announcer);
+  }
+  return announcer;
+}
+
+/** Each control's message, beside it. */
+const messages = new WeakMap();
+let told = 0;
+/** The announcer's words waiting to be written. */
+let saying = 0;
+
+/** Tell `words` where `el` was pressed, as `kind`, and say them. */
+function tell(el, words, kind) {
+  let message = messages.get(el);
+  if (!message?.isConnected) {
+    message = document.createElement("span");
+    message.className = "pw-refusal";
+    message.id = `pw-said-${++told}`;
+    el.after(message);
+    messages.set(el, message);
+  }
+  message.textContent = words;
+  const described = (el.getAttribute("aria-describedby") ?? "").split(" ").filter(Boolean);
+  if (!described.includes(message.id)) {
+    el.setAttribute("aria-describedby", [...described, message.id].join(" "));
+  }
+  el.dataset.pwHandlerError = kind;
+  // Emptied, then written: the same words told twice are said twice. Words
+  // told before the last were written are not said at all: the last are.
+  const status = announcerOf();
+  status.textContent = "";
+  clearTimeout(saying);
+  saying = setTimeout(() => {
+    status.textContent = words;
+  }, 50);
+  log.push(`told ${kind}: ${words}`);
+}
+
+/** What `el`'s last press was told, taken back: it is pressed again. */
+function untell(el) {
+  const message = messages.get(el);
+  if (message) {
+    message.textContent = "";
+    const described = (el.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .filter((id) => id && id !== message.id);
+    if (described.length) el.setAttribute("aria-describedby", described.join(" "));
+    else el.removeAttribute("aria-describedby");
+  }
+  delete el.dataset.pwHandlerError;
+}
+
 /** The recoveries a press performs by reading the document again: each is
  * the region, the slot or the interaction as the build serving the page
  * renders it now. A reload never replays the press: a mutation the user did
@@ -1651,7 +1759,7 @@ function recoverOnPress(part, owners, verdict) {
     el.addEventListener(listens, (e) => {
       const asks = verdict.recovery === "require-user-confirmation";
       if (!RELOADING.has(verdict.recovery) && !asks) {
-        el.dataset.pwHandlerError = verdict.recovery;
+        tell(el, PLATFORM_SAYS.stale, verdict.recovery);
         log.push(`press on refused ${part.id}: ${verdict.recovery}, nothing to do`);
         return;
       }
@@ -1665,7 +1773,7 @@ function recoverOnPress(part, owners, verdict) {
         last = Number(sessionStorage.getItem(key) ?? 0);
       } catch {}
       if (Date.now() - last < 10_000) {
-        el.dataset.pwHandlerError = "reload-loop";
+        tell(el, PLATFORM_SAYS.stale, "reload-loop");
         log.push(`press on refused ${part.id}: read again already; not again`);
         return;
       }
@@ -1802,6 +1910,8 @@ function bindEvent(template, part) {
       if (modifiers.includes("prevent")) e.preventDefault();
       if (modifiers.includes("stop")) e.stopPropagation();
       lastActed = el;
+      // What its last press was told, taken back (ADR-XXXX).
+      untell(el);
       const record = eventRecord(event, e);
       // Which instance each signal the handler names is, for this use of
       // its view (ADR-0144). Read at the press: the element is the one the
@@ -1888,7 +1998,15 @@ function bindEvent(template, part) {
         // user's only way to find out.
         loaded.delete(part.value);
         attempts.set(part.value, (attempts.get(part.value) ?? 0) + 1);
-        el.dataset.pwHandlerError = "1";
+        // Told where the press was (ADR-XXXX): a refusal in its predicate's
+        // words, anything else in the platform's.
+        if (error instanceof Refused) {
+          tell(el, error.says || PLATFORM_SAYS.failed, `refused:${error.predicate}`);
+        } else if (error instanceof Unreachable) {
+          tell(el, PLATFORM_SAYS.unreachable, "unreachable");
+        } else {
+          tell(el, PLATFORM_SAYS.failed, "failed");
+        }
         log.push(`handler ${part.value} failed: ${error.message ?? error}`);
         window.__pw.handlerErrors = (window.__pw.handlerErrors ?? 0) + 1;
       }
@@ -1910,6 +2028,9 @@ async function attach() {
 
   // One traversal, before anything else. Every later lookup is a map hit.
   const indexed = buildIndex();
+  // The announcer a failed press is said by, there before anything is
+  // (ADR-XXXX): a live region added with its words is not reliably said.
+  announcerOf();
   log.push(`indexed ${indexed} address(es)`);
   for (const p of parts.parts ?? []) {
     if (p.kind === "stream" && streamPending(String(p.id))) pendingAtIndex.add(String(p.id));

@@ -5163,6 +5163,35 @@ e14-keepalive:
      } > docs/evidence/E14/keepalive.txt
     @grep -E "passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/keepalive.txt
 
+# ADR-XXXX: a refusal is told where the press was. The checker's tests, the
+# host's, the browser's in three engines, and the mutation controls.
+e14-refusal:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @BUILD_ONLY=1 bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a refusal is told where the press was"; echo; \
+       echo "produced by: just e14-refusal"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== a predicate says what a refusal by it is told (compiler/pw-core, PW0351)"; echo; \
+       cargo test --locked -p pw-core --test predicates 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host answers a refusal with its words, kept with its press; a page holds its announcer"; echo; \
+       cargo test --locked -p pw-dev-server -- sign_in:: a_signal_page_holds_its_announcer 2>&1 \
+         | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== told where the press was, in three engines (e2e/identity.spec.mjs; recovery, lazy-handler, accessibility)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/identity.spec.mjs --reporter=line 2>&1; \
+          pnpm exec playwright test e2e/recovery.spec.mjs -g "still stale" --reporter=line 2>&1; \
+          pnpm exec playwright test e2e/lazy-handler.spec.mjs -g "fails to load" --reporter=line 2>&1; \
+          pnpm exec playwright test e2e/accessibility.spec.mjs -g "announcer|same node from the start" --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/refusal_mutations.py)"; echo; \
+       python3 scripts/refusal_mutations.py; \
+     } > docs/evidence/E14/refusal.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/refusal.txt
+
 # ADR-0269: a resource is held by what takes it apart. The checker's tests,
 # and the mutation controls.
 e14-matched-resources:

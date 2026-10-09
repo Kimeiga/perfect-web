@@ -118,7 +118,7 @@ test("the store keeps every rule as it is served, and after each kind of change"
   await stock(request, "cold-brew", false);
   try {
     await press(page, "Add Cold Brew");
-    await expect(page.getByRole("status")).toHaveText("That item just sold out.");
+    await expect(page.locator("#cart-notice")).toHaveText("That item just sold out.");
     expect(await audit(page), "an add refused").toEqual([]);
   } finally {
     await stock(request, "cold-brew", true);
@@ -332,7 +332,7 @@ test("the tree a screen reader reads is the page's", async ({ page, request }) =
   await stock(request, "cold-brew", false);
   try {
     await press(page, "Add Cold Brew");
-    await expect(page.getByRole("status")).toHaveText("That item just sold out.");
+    await expect(page.locator("#cart-notice")).toHaveText("That item just sold out.");
   } finally {
     await stock(request, "cold-brew", true);
   }
@@ -414,6 +414,18 @@ test("each control is pressed with Enter and with Space", async ({ page }) => {
   await expect(lines(page)).toHaveCount(0);
 });
 
+test("the page's announcer is in it from the first byte, empty", async ({ request }) => {
+  // Where a failed press is said (ADR-XXXX), served before the runtime, in
+  // the page a build renders and in the page a host does.
+  for (const path of ["/StorePage.html", "/stores/47"]) {
+    const served = await (await request.get(path)).text();
+    const found = served.match(/<div role="status" class="pw-announcer"[^>]*>(.*?)<\/div>/gs) ?? [];
+    expect(found, path).toHaveLength(1);
+    expect(found[0], path).toMatch(/><\/div>$/);
+    expect(served.indexOf(found[0]), path).toBeLessThan(served.indexOf('id="pw-parts"'));
+  }
+});
+
 test("a live region is the same node from the start, and says each change once", async ({
   page,
   request,
@@ -438,15 +450,16 @@ test("a live region is the same node from the start, and says each change once",
     window.__live = { live, found, said };
     return found.map((r) => r.getAttribute("aria-label") || r.id || r.localName);
   });
-  // The estimate, the cart's count, and what the cart last had to say.
-  expect(regions).toHaveLength(3);
+  // The estimate, the cart's count, what the cart last had to say, and the
+  // page's announcer, where a failed press is said (ADR-XXXX).
+  expect(regions).toHaveLength(4);
 
   await slots(page);
   await press(page, "Add Espresso");
   await stock(request, "cold-brew", false);
   try {
     await press(page, "Add Cold Brew");
-    await expect(page.getByRole("status")).toHaveText("That item just sold out.");
+    await expect(page.locator("#cart-notice")).toHaveText("That item just sold out.");
   } finally {
     await stock(request, "cold-brew", true);
   }
@@ -479,6 +492,9 @@ test("a live region is the same node from the start, and says each change once",
     ["Delivery in 25 to 35 min"],
     ["Items in cart: 1", "Items in cart: 2", "Items in cart: 1"],
     ["That item just sold out."],
+    // The announcer: no press failed, nothing said. The refused Add is the
+    // store's own notice to tell, as its program declares it (ADR-0157).
+    [],
   ]);
 });
 
@@ -504,7 +520,7 @@ test("a change writes only what it changes", async ({ page, request }) => {
   await stock(request, "cold-brew", false);
   try {
     await press(page, "Add Cold Brew");
-    await expect(page.getByRole("status")).toHaveText("That item just sold out.");
+    await expect(page.locator("#cart-notice")).toHaveText("That item just sold out.");
   } finally {
     await stock(request, "cold-brew", true);
   }

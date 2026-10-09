@@ -464,6 +464,20 @@ fn a_refused_press_sent_again_is_refused_again() {
     assert_eq!(body_of(&first), body_of(&again));
 }
 
+/// **A page holds its announcer from the first byte** (ADR-XXXX): where a
+/// failed press is said, once, empty, before the runtime that says it. A
+/// live region added with its words is not reliably said (ADR-0182).
+#[test]
+fn a_page_holds_its_announcer_from_the_first_byte() {
+    let s = feed_with(Arc::new(TestProvider::default()));
+    let answer = get(&s, "/", "pw-session=s-reader");
+    let html = answer.split_once("\r\n\r\n").map_or("", |(_, body)| body);
+    assert!(html.starts_with("<!doctype html>"), "{answer}");
+    assert_eq!(html.matches(pw_render::ANNOUNCER).count(), 1, "{html}");
+    let (before, _) = html.split_once("id=\"pw-parts\"").expect("a parts manifest");
+    assert!(before.contains(pw_render::ANNOUNCER), "{html}");
+}
+
 /// **A program is not served by a deployment that cannot evaluate a
 /// predicate it requires or declares** (ADR-XXXX): each press of its
 /// commands would be answered with nothing to tell.

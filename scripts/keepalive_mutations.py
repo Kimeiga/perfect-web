@@ -50,11 +50,13 @@ MUTANTS = [
         "    if (!response.ok) {\n",
     ),
     (
+        # Re-anchored by ADR-XXXX: a request with no answer is thrown as
+        # unreachable.
         "a failed request stays counted",
         RUNTIME,
         "      if (keepalive) keptAlive -= bytes;\n"
-        "      if (!retry || attempt >= retry.max) throw error;\n",
-        "      if (!retry || attempt >= retry.max) throw error;\n",
+        "      if (!retry || attempt >= retry.max) throw new Unreachable(component, error);\n",
+        "      if (!retry || attempt >= retry.max) throw new Unreachable(component, error);\n",
     ),
     (
         "a body is counted in characters",
