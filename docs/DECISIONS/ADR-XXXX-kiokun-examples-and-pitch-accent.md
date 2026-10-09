@@ -71,7 +71,10 @@ Date: 2026-10-09. Milestone: E14.
    code points (kiokun-data `src/main.rs`); the pitch shards by one over
    UTF-16 units (`PitchAccent.svelte`'s `charCodeAt`). For a word past
    U+FFFF the two differ, and a test holds the pitch rule to the shard its
-   own hash names, with the other shard's data as the control.
+   own hash names, with the other shard's data as the control. This is
+   kiokun.com's own inconsistency, held as it is: the rewrite reads its
+   data where kiokun.com wrote it. The integrator passes it to the owner
+   (2026-10-09), with the label table's.
 2. **The oracle found nothing to name** for the Japanese examples: 1,082
    sampled words, the same.
 

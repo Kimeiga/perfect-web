@@ -1447,12 +1447,12 @@ fn a_japanese_word_shows_its_pitch_accent() {
         &pitch_shard_of("今日"),
         r#"{"今日":{"きょう":1}}"#,
     );
-    // じん is not there: the first reading's, in the file's order (`にん`
-    // before `ひと`, though `ひと` sorts first).
+    // じん is not there: the first reading's, in the file's order (`ひと`
+    // before `にん`, though `にん` sorts first).
     write_pitch(
         app.path(),
         &pitch_shard_of("人"),
-        r#"{"人":{"にん":1,"ひと":0}}"#,
+        r#"{"人":{"ひと":0,"にん":1}}"#,
     );
     write_pitch(app.path(), &pitch_shard_of("無"), r#"{"無":{"む":null}}"#);
     let mut s = served_kiokun();
@@ -1464,7 +1464,7 @@ fn a_japanese_word_shows_its_pitch_accent() {
     assert_eq!(pitch("話"), ["は^な^し 尾高"]);
     assert_eq!(pitch("弟"), ["お^とうと 中高"]);
     assert_eq!(pitch("今日"), ["^きょう 頭高"]);
-    assert_eq!(pitch("人"), ["ひ^と 平板", "^じん 頭高"]);
+    assert_eq!(pitch("人"), ["ひ^と 平板", "じ^ん 平板"]);
     assert_eq!(pitch("無"), [""]);
     assert_eq!(pitch("空"), [""]);
 }
