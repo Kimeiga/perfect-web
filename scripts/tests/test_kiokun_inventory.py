@@ -111,6 +111,8 @@ class Recipe(unittest.TestCase):
         self.assertIn("e14-kiokun-inventory", plan.LOCAL_ONLY)
         # And the sample of the whole dictionary, which reads it too.
         self.assertIn("e14-kiokun-sample", plan.LOCAL_ONLY)
+        # And the page head against kiokun.com's own code, copied from it.
+        self.assertIn("e14-kiokun-seo", plan.LOCAL_ONLY)
         recipes = (SCRIPTS.parent / "just" / "kiokun.just").read_text()
         self.assertIn("\ne14-kiokun-inventory:\n", recipes)
 

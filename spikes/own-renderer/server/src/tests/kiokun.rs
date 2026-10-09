@@ -983,3 +983,145 @@ fn a_sample_of_the_whole_dictionary_is_served_and_timed() {
     }
     assert!(defects.is_empty(), "{} page(s) not served", defects.len());
 }
+
+/// The content of the head's `<meta>` whose `attribute` is `value`.
+fn meta(html: &str, attribute: &str, value: &str) -> String {
+    let at = html
+        .find(&format!("{attribute}=\"{value}\""))
+        .unwrap_or_else(|| panic!("no meta {value}: {html}"));
+    let tag = &html[html[..at].rfind('<').expect("its tag")..];
+    let tag = &tag[..tag.find('>').expect("its end")];
+    let content = &tag[tag.find("content=\"").expect("its content") + 9..];
+    content[..content.find('"').expect("its end")].to_string()
+}
+
+fn title(html: &str) -> String {
+    let start = html.find("<title>").expect("a title") + 7;
+    html[start..start + html[start..].find("</title>").expect("its end")].to_string()
+}
+
+/// **The page's description of itself** (`buildDictionarySeo`): 人's title
+/// is the word and its first three meanings, the learner gloss first, and
+/// its description says so; Open Graph and Twitter repeat them.
+#[test]
+fn the_page_describes_itself_as_kiokun_com_does() {
+    let s = served_kiokun();
+    let page = fetched(&s, &path_of("人"));
+    assert_eq!(title(&page), "人 — person, man, people | Kiokun");
+    let described = "人 means person, man, people. Character readings, definitions, examples, \
+                     and learning tools across Chinese, Japanese, and Korean.";
+    assert_eq!(meta(&page, "name", "description"), described);
+    assert_eq!(
+        meta(&page, "property", "og:title"),
+        "人 — person, man, people | Kiokun"
+    );
+    assert_eq!(meta(&page, "property", "og:description"), described);
+    assert_eq!(
+        meta(&page, "name", "twitter:title"),
+        "人 — person, man, people | Kiokun"
+    );
+    assert_eq!(meta(&page, "name", "robots"), "index, follow");
+    // A stub's title names its other forms: 谚 (諺).
+    let stub = fetched(&s, &path_of("谚"));
+    assert!(title(&stub).starts_with("谚 (諺) — "), "{}", title(&stub));
+}
+
+/// **The definitions it names, as `definitionFragments` makes them**: tags
+/// out, split at `;` and `；`, a leading `2)` off, a classifier and a
+/// one-letter piece left out; and a title past 68 UTF-16 units cut to 67,
+/// trimmed, with `…`.
+#[test]
+fn the_description_takes_kiokuns_fragments_and_length() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "卯",
+        r#"{"key":"卯","chinese_char":{"char":"卯"},
+            "chinese_words":[{"_id":"1","simp":"卯","trad":"卯","items":[{"pinyin":"mǎo",
+              "definitions":["x","CL:個","<b>bold</b>  one; 2) two；three"]}]}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "辰",
+        r#"{"key":"辰","chinese_char":{"char":"辰","gloss":"a gloss long enough that the title it heads runs past the limit"}}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    assert_eq!(
+        title(&fetched(&s, &path_of("卯"))),
+        "卯 — bold one, two, three | Kiokun"
+    );
+    let whole = "辰 — a gloss long enough that the title it heads runs past the limit | Kiokun";
+    let cut: Vec<u16> = whole.encode_utf16().take(67).collect();
+    let expected = format!("{}…", String::from_utf16_lossy(&cut).trim_end());
+    assert_eq!(title(&fetched(&s, &path_of("辰"))), expected);
+    // A character past U+FFFF is two units, as JavaScript counts it.
+    write_entry(
+        dir.path(),
+        "𠀀",
+        r#"{"key":"𠀀","chinese_char":{"char":"𠀀","gloss":"a gloss long enough that the title it heads runs past the limit"}}"#,
+    );
+    let whole = "𠀀 — a gloss long enough that the title it heads runs past the limit | Kiokun";
+    let cut: Vec<u16> = whole.encode_utf16().take(67).collect();
+    let expected = format!("{}…", String::from_utf16_lossy(&cut).trim_end());
+    assert_eq!(title(&fetched(&s, &path_of("𠀀"))), expected);
+}
+
+/// HTML's five escapes read back.
+fn unescaped(text: &str) -> String {
+    text.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&#x27;", "'")
+        .replace("&amp;", "&")
+}
+
+/// **The page head against kiokun.com's own `buildDictionarySeo`** (local:
+/// `just e14-kiokun-seo` runs kiokun.com's `seo.ts`, copied from
+/// `KIOKUN_APP`, over a sample of `KIOKUN_DATA`, and names the answers in
+/// `KIOKUN_SEO_ORACLE`). Each word's title and description, as served, are
+/// compared with kiokun.com's; each that differs is named.
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-seo`"]
+fn the_page_head_matches_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_SEO_ORACLE").expect("KIOKUN_SEO_ORACLE");
+    let answers: BTreeMap<String, serde_json::Value> =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let mut differ: Vec<String> = Vec::new();
+    for (word, answer) in &answers {
+        let page = fetched(&s, &path_of(word));
+        let (want_title, want_description) = (
+            answer["title"].as_str().unwrap_or_default(),
+            answer["description"].as_str().unwrap_or_default(),
+        );
+        if !page.starts_with("HTTP/1.1 200") {
+            differ.push(format!(
+                "{word}: {}",
+                page.lines().next().unwrap_or_default()
+            ));
+            continue;
+        }
+        let got_title = unescaped(&title(&page));
+        let got_description = unescaped(&meta(&page, "name", "description"));
+        if got_title != want_title {
+            differ.push(format!(
+                "{word}: title\n  kiokun.com: {want_title}\n  rewrite:    {got_title}"
+            ));
+        }
+        if got_description != want_description {
+            differ.push(format!(
+                "{word}: description\n  kiokun.com: {want_description}\n  rewrite:    {got_description}"
+            ));
+        }
+    }
+    println!(
+        "compared: {} words; differences: {}",
+        answers.len(),
+        differ.len()
+    );
+    for d in differ.iter().take(30) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} difference(s)", differ.len());
+}
