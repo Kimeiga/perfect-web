@@ -33,8 +33,10 @@ STORE = ROOT / "examples/store/app.pw"
 # The view from the store's description to its items'.
 # Re-anchored by ADR-0180, whose estimate is a range, and ADR-0181, whose
 # menu is grouped by category.
+# Re-anchored by ADR-0277: the menu counted, a line after the store's own.
 BOTH_DESCRIPTIONS = (
     "            <p id=\"store-description\">{store.description}</p>\n"
+    "            <p id=\"menu-line\">{summary}</p>\n"
     "\n"
     "            <section aria-label=\"Delivery\" aria-live=\"polite\">\n"
     "                <stream query={Estimate(current_session())}>\n"
@@ -131,9 +133,13 @@ MUTANTS = [
         "webkit",
         STORE,
         BOTH_DESCRIPTIONS,
+        # And the line of the menu counted (ADR-0277), which says more of the
+        # store too: without it the store says as little as it did.
         BOTH_DESCRIPTIONS.replace(
             "            <p id=\"store-description\">{store.description}</p>\n", ""
-        ).replace("                                    <p>{item.description}</p>\n", ""),
+        )
+        .replace("            <p id=\"menu-line\">{summary}</p>\n", "")
+        .replace("                                    <p>{item.description}</p>\n", ""),
     ),
 ]
 

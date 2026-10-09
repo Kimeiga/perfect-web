@@ -48,6 +48,27 @@ fn the_compilers_contracts_deserialize_with_every_field_populated() {
         // not authority this one holds.
         for i in &c.imports {
             match i.kind {
+                // A READ names none either (ADR-0277): a materialization's read
+                // of a resource is a dependency on it, as a component import
+                // is, which the platform answers. It names what it reads, one
+                // of the program's components.
+                ImportKind::HostCapability if i.reads.is_some() => {
+                    assert!(
+                        i.capability.is_empty(),
+                        "{}: read {} claims capability `{}`",
+                        c.component_id,
+                        i.key(),
+                        i.capability
+                    );
+                    assert!(
+                        all.iter()
+                            .any(|d| Some(&d.component_id) == i.reads.as_ref()),
+                        "{}: read {} reads {:?}, which is no component",
+                        c.component_id,
+                        i.key(),
+                        i.reads
+                    );
+                }
                 ImportKind::HostCapability => {
                     assert!(
                         !i.capability.is_empty(),

@@ -13,6 +13,7 @@
       { "id": "cold-brew", "store_id": "47", "name": "Cold Brew", "description": "Steeped for eighteen hours and served over ice.", "price": { "minor_units": 475 }, "price.display": "$4.75", "available": true, "category": { "id": "coffee", "name": "Coffee" } }
     ] }
   ],
+  "summary": "3 items in 1 section",
   "cart.line_count": 0,
   "cart.lines": [],
   "cart.subtotal.display": "$0.00"

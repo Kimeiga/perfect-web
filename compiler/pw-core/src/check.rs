@@ -108,7 +108,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(sessions_stay_on_the_server(&workspace, &sigs, i, &u.hir));
         // ADR-0212: a `query` reads a query or a resource, and a
         // `subscription` a subscription.
-        per_unit.extend(reads_name_their_kind(&workspace, &sigs, i, &u.hir));
+        per_unit.extend(reads_name_their_kind(&workspace, &hirs, &sigs, i, &u.hir));
         per_unit.extend(dependencies_stated_once(&u.hir));
         // ADR-0148: a streamed query is read by a `<stream>`, which shows
         // each state its query can be in.
@@ -2179,6 +2179,7 @@ fn built_pages_read_no_parameter(hir: &Hir) -> Vec<Diagnostic> {
 /// a freshness, a key and a cache the function never declared.
 fn reads_name_their_kind(
     ws: &crate::resolve::Workspace,
+    hirs: &[&Hir],
     sigs: &Signatures,
     unit: usize,
     hir: &Hir,
@@ -2222,20 +2223,35 @@ fn reads_name_their_kind(
                 continue;
             }
             // **A materialization that derives its value is read as a query
-            // is** (ADR-0273), by another that derives its own. One that
-            // derives none is a fragment the host renders, and a page reads
-            // one once the host serves it.
+            // is** (ADR-0273), by another that derives its own, and by a page,
+            // which the host serves its kept value (ADR-0277): a public one,
+            // kept for every reader. One that derives none is a fragment the
+            // host renders.
             if kind == DeclKind::Materialize && keyword == "query" {
                 let derives = sigs.by_def(def).is_some_and(|s| s.returns.is_some());
                 let deriving = decl.kind == DeclKind::Materialize && decl.ret.is_some();
-                if derives && deriving {
+                let page = decl.kind == DeclKind::Page;
+                let public = hirs
+                    .get(def.unit)
+                    .map(|h| h.decl(crate::hir::DeclId(def.decl)))
+                    .and_then(|m| m.policy("partition"))
+                    .is_some_and(|p| p.value.trim() == "public");
+                if derives && (deriving || (page && public)) {
                     continue;
                 }
-                let (message, repair) = if derives {
+                let (message, repair) = if derives && page {
+                    (
+                        format!(
+                            "`query {name}` reads a materialization private to its reader, \
+                             which a page does not read yet: the host keeps a public one"
+                        ),
+                        format!("make `{name}` `partition public`, or read the queries it reads"),
+                    )
+                } else if derives {
                     (
                         format!(
                             "`query {name}` reads a materialization, which {} does not read: \
-                             the host serves none yet",
+                             a page reads one, or a materialization that derives its own",
                             described(decl.kind)
                         ),
                         "read the queries it reads".to_string(),

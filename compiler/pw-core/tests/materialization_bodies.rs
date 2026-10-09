@@ -165,18 +165,36 @@ fn a_fragment_the_host_renders_is_no_value_to_read() {
     );
 }
 
+/// **A page reads a public one, which the host keeps** (ADR-0277), as it
+/// reads a query. Until ADR-0277 a page reading one was refused, the host
+/// serving none.
 #[test]
-fn a_page_reads_one_once_the_host_serves_it() {
+fn a_page_reads_a_public_one_the_host_keeps() {
     let page = "page Sized(id: StoreId) {\n    route \"/sized/{id}\"\n\n    \
                 let size = query MenuSize(id)\n\n    view {\n        <title>Sized</title>\n        \
                 <main><p>{size.items}</p></main>\n    }\n}\n";
-    let found = reported(&module(&format!(
-        "{}{page}",
-        derived("MenuSize", "MenuCount", "", SIZED)
-    )));
+    let public = derived("MenuSize", "MenuCount", "", SIZED);
+    assert_eq!(
+        reported(&module(&format!("{public}{page}"))),
+        Vec::<String>::new()
+    );
+    // The controls: a private one, which the host keeps for no reader yet,
+    let private = public.replace("partition      public", "partition      private");
+    assert_ne!(private, public);
+    let found = reported(&module(&format!("{private}{page}")));
     assert!(
         found.iter().any(|d| d.starts_with("PW5108")
-            && d.contains("which a page does not read: the host serves none yet")),
+            && d.contains("`query MenuSize` reads a materialization private to its reader")),
+        "{found:#?}"
+    );
+    // and a query, which reads what a materialization reads, not what it
+    // derives (ADR-0210).
+    let query = "public query Twice(id: StoreId) -> Int\n    freshness 30.seconds\n    \
+                 cache shared\n{\n    let size = query MenuSize(id)\n    size.items\n}\n\n";
+    let found = reported(&module(&format!("{public}{query}")));
+    assert!(
+        found.iter().any(|d| d.starts_with("PW5108")
+            && d.contains("which a query does not read: a page reads one")),
         "{found:#?}"
     );
 }

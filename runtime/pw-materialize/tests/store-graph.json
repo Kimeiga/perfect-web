@@ -173,6 +173,38 @@
       ]
     },
     {
+      "path": "store.page.MenuLine",
+      "name": "MenuLine",
+      "node": "materialization",
+      "placement": null,
+      "partition": "public",
+      "regenerate": "on_invalidation",
+      "stampede": "single_flight",
+      "fallback": "last_known_good",
+      "varies_by": [
+        "privacy_partition"
+      ],
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "store.page.MenuSize",
+      "name": "MenuSize",
+      "node": "materialization",
+      "placement": null,
+      "partition": "public",
+      "regenerate": "on_invalidation",
+      "stampede": "single_flight",
+      "fallback": "last_known_good",
+      "varies_by": [
+        "privacy_partition"
+      ],
+      "params": [
+        "id"
+      ]
+    },
+    {
       "path": "store.page.Order",
       "name": "Order",
       "node": "resource",
@@ -394,6 +426,39 @@
       ]
     },
     {
+      "from": "store.page.MenuLine",
+      "to": "store.page.MenuSize",
+      "kind": "reads",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.page.MenuSize",
+      "to": "Events.InventoryChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id",
+        "_"
+      ]
+    },
+    {
+      "from": "store.page.MenuSize",
+      "to": "Events.MenuChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.page.MenuSize",
+      "to": "store.page.Menu",
+      "kind": "reads",
+      "key": [
+        "id"
+      ]
+    },
+    {
       "from": "store.page.Order",
       "to": "Events.OrderChanged",
       "kind": "invalidated_by",
@@ -428,6 +493,14 @@
     {
       "from": "store.page.StorePage",
       "to": "store.page.Menu",
+      "kind": "reads",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.page.StorePage",
+      "to": "store.page.MenuLine",
       "kind": "reads",
       "key": [
         "id"

@@ -535,6 +535,8 @@ mod store;
 mod uploads;
 // TRACK SEAM (notifications): the typed principal, and notifications.
 mod notifications;
+// ADR-0277: a materialization kept, and served.
+mod materializations;
 
 struct Server {
     /// The templates the compiler emitted, deserialized once.
@@ -556,6 +558,14 @@ struct Server {
     clock: Clock,
     /// The one materializer. Versions come from here and from nowhere else.
     materializer: Materializer,
+    /// **Each kept materialization's entry, by its path and its key's text,
+    /// and the arguments it was derived with** (ADR-0277): what an event
+    /// may reach, and is made again with.
+    kept: Mutex<materializations::Kept>,
+    /// **Each entry an event made again, not yet told** (ADR-0277): by its
+    /// path and its arguments, so each document reading it, and no other,
+    /// is told.
+    made: Mutex<Vec<(String, Vec<Val>)>>,
     /// **Each session's committed interactions**, most recent last
     /// (ADR-0172): what a value of its cart includes, which a page drops its
     /// speculations by. As many as are kept for idempotency.
@@ -899,6 +909,10 @@ fn components() -> BTreeMap<String, Loaded> {
         "domain.count",
         "domain.total",
         "domain.subtotal",
+        // The menu counted, and the line the store's page shows from it
+        // (ADR-0277).
+        "store.page.MenuSize",
+        "store.page.MenuLine",
     ] {
         let path = dir.join(format!("{id}.wasm"));
         let bytes = std::fs::read(&path).unwrap_or_else(|e| {
@@ -1203,6 +1217,21 @@ impl Server {
         let materializer = Materializer::new(clock.clone(), BUILD);
         materializer.declare("store.page.Cart", FragmentPolicy::default());
         materializer.declare("store.page.Menu", FragmentPolicy::default());
+        // **Each materialization that derives its value** (ADR-0277), by the
+        // policy it declares: what it serves where it could not be made, and
+        // whether readers asking at once wait for one making.
+        for node in graph.nodes.iter().filter(|n| n.node == "materialization") {
+            materializer.declare(
+                &node.path,
+                FragmentPolicy {
+                    fallback: match node.fallback.as_deref() {
+                        Some("last_known_good") => pw_materialize::Fallback::LastKnownGood,
+                        _ => pw_materialize::Fallback::None,
+                    },
+                    single_flight: node.stampede.as_deref() == Some("single_flight"),
+                },
+            );
+        }
         // TRACK SEAM (identity): the layer maps a session to its principal's
         // user through the identity's principals.
         let identity = identity::Identity::default();
@@ -1213,6 +1242,8 @@ impl Server {
             store,
             clock,
             materializer,
+            kept: Mutex::new(BTreeMap::new()),
+            made: Mutex::new(Vec::new()),
             graph,
             applied: Mutex::new(BTreeMap::new()),
             sessions: Mutex::new(BTreeMap::new()),
@@ -1912,6 +1943,11 @@ impl Server {
         args: &[Val],
     ) -> Result<Val, Unread> {
         let resource = binding["resource"].as_str().unwrap_or_default();
+        // **A materialization's value, kept** (ADR-0277): read as a query's,
+        // and answered from the materializer.
+        if self.derives(resource) {
+            return self.materialized(resource, args).map_err(Unread::Failed);
+        }
         let answer = self.fetch_answer(session, binding, args)?;
         // A declared error the page says means it is not found (ADR-0163),
         // told from every other failure.
@@ -2127,9 +2163,271 @@ impl Server {
                 reached.extend(drop_entries(&e.from, &args));
             }
         }
+        // **And each kept materialization they reach, made again** (ADR-0277),
+        // each document that reads it told when the telling runs.
+        let made = self.regenerate_reached(events);
+        self.made.lock().expect("made").extend(made);
         reached.sort();
         reached.dedup();
         reached
+    }
+
+    /// **Whether `resource` is a materialization that derives its value**
+    /// (ADR-0277): one the graph names, whose body this build compiled.
+    fn derives(&self, resource: &str) -> bool {
+        self.graph
+            .node(resource)
+            .is_some_and(|n| n.node == "materialization")
+            && self.components.contains_key(resource)
+    }
+
+    /// The materializer's key for `path`'s entry at `args`, each by its text
+    /// in a key (ADR-0277).
+    fn kept_key(path: &str, args: &[Val]) -> EntryKey {
+        let texts: Vec<String> = args.iter().map(materializations::key_text).collect();
+        let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
+        EntryKey::new(path, &texts)
+    }
+
+    /// **A materialization's value** (ADR-0277): its entry, current; made
+    /// now where it has none or it is out of date, once for every reader
+    /// asking at once; and where it could not be made, the last good one,
+    /// where its `fallback` keeps it.
+    fn materialized(&self, path: &str, args: &[Val]) -> Result<Val, String> {
+        let key = Self::kept_key(path, args);
+        if let pw_materialize::Read::Fresh(body) = self.materializer.read(&key) {
+            return materializations::decode_text(&body);
+        }
+        self.regenerate_kept(path, args, None);
+        match self.materializer.read(&key) {
+            pw_materialize::Read::Fresh(body) | pw_materialize::Read::LastKnownGood(body) => {
+                materializations::decode_text(&body)
+            }
+            _ => Err(format!(
+                "`{path}` could not be derived, and keeps no last good value"
+            )),
+        }
+    }
+
+    /// **A materialization's entry made again** (ADR-0277): its value
+    /// derived, encoded so it reads back whole, a new version. Kept among the
+    /// entries an event may reach, by its arguments.
+    fn regenerate_kept(
+        &self,
+        path: &str,
+        args: &[Val],
+        because: Option<i64>,
+    ) -> pw_materialize::Regenerated {
+        let key = Self::kept_key(path, args);
+        let texts: Vec<String> = args.iter().map(materializations::key_text).collect();
+        self.kept
+            .lock()
+            .expect("kept")
+            .insert((path.to_string(), texts), args.to_vec());
+        self.clock.advance(1);
+        self.materializer.regenerate(&key, because, || {
+            // A test's fault for the materialization (ADR-0277), by its path,
+            // which holds until it is taken away: each making of it fails.
+            if self
+                .materializer_faults
+                .lock()
+                .expect("materializer faults")
+                .contains(path)
+            {
+                return Err("the materializer failed".to_string());
+            }
+            let value = self.derive_value(path, args)?;
+            materializations::encode_text(&value)
+        })
+    }
+
+    /// **A materialization's value, derived now** (ADR-0277): its body run,
+    /// each read it asks answered from what it reads. A body reads only by
+    /// asking, and asks the same of the same answers, so where it asks one
+    /// not yet answered the host answers it and runs the body again with what
+    /// it has learned, until it asks nothing more: each read once, answered
+    /// from what the resource is now.
+    fn derive_value(&self, path: &str, args: &[Val]) -> Result<Val, String> {
+        let contract = self
+            .contracts
+            .iter()
+            .find(|c| c.component_id == path)
+            .ok_or_else(|| format!("no contract for `{path}`"))?;
+        // Each read the body may ask, by its import, and what it reads.
+        let reads: BTreeMap<String, String> = contract
+            .imports
+            .iter()
+            .filter_map(|i| Some((i.key(), i.reads.clone()?)))
+            .collect();
+        let answers: Arc<Mutex<BTreeMap<String, Val>>> = Arc::default();
+        let asked: Arc<Mutex<materializations::Asked>> = Arc::default();
+        // Each run learns one answer at least, and a body asks a bounded
+        // number of questions: past this bound it is asking without end.
+        for _ in 0..=64 {
+            let mut host: BTreeMap<String, HostFn> = BTreeMap::new();
+            for import in reads.keys() {
+                let (answers, asked, import) = (answers.clone(), asked.clone(), import.clone());
+                host.insert(
+                    import.clone(),
+                    Arc::new(move |given: &[Val]| {
+                        let question = materializations::asked(&import, given)?;
+                        if let Some(v) = answers.lock().expect("answers").get(&question) {
+                            return Ok(vec![v.clone()]);
+                        }
+                        *asked.lock().expect("asked") = Some((import.clone(), given.to_vec()));
+                        Err(format!("`{import}` is asked, and not yet answered"))
+                    }),
+                );
+            }
+            match self.run(path, "", &host, args) {
+                Ok(out) => {
+                    return out
+                        .into_iter()
+                        .next()
+                        .ok_or_else(|| format!("`{path}` returned nothing"));
+                }
+                Err(e) => {
+                    let Some((import, given)) = asked.lock().expect("asked").take() else {
+                        return Err(e);
+                    };
+                    let resource = reads
+                        .get(&import)
+                        .ok_or_else(|| format!("`{import}` reads nothing this build knows"))?;
+                    let value = self.read_value(resource, &given)?;
+                    answers
+                        .lock()
+                        .expect("answers")
+                        .insert(materializations::asked(&import, &given)?, value);
+                }
+            }
+        }
+        Err(format!("`{path}` asked more than 64 questions"))
+    }
+
+    /// **What a materialization's read answers** (ADR-0277): another's kept
+    /// value, or a query's answer, its `Ok` value. A query's error answers
+    /// none, and the regeneration fails, which `fallback` decides.
+    fn read_value(&self, resource: &str, given: &[Val]) -> Result<Val, String> {
+        if self.derives(resource) {
+            return self.materialized(resource, given);
+        }
+        // Through the query's kept answer, where a page reads it and so its
+        // policy is known: a change reads it once, for the page and for what
+        // derives from it. One no page reads is read where it is.
+        let policy = std::iter::once(&self.plan)
+            .chain(self.plans.values())
+            .flat_map(|plan| {
+                ["bindings", "streams"]
+                    .into_iter()
+                    .flat_map(move |k| plan[k].as_array().into_iter().flatten())
+            })
+            .find(|b| b["resource"] == resource)
+            .map(|b| b["policy"].clone());
+        let answer = match policy {
+            Some(policy) => self.fetch_answer(
+                "",
+                &serde_json::json!({ "resource": resource, "policy": policy }),
+                given,
+            )?,
+            None => self.answer_within(resource, "", given, None)?,
+        };
+        match answer {
+            Val::Result(Ok(Some(v))) => Ok(*v),
+            Val::Result(Err(_)) => Err(format!("`{resource}` answered an error")),
+            Val::Result(Ok(None)) => Err(format!("`{resource}` answered no value")),
+            v => Ok(v),
+        }
+    }
+
+    /// **Each kept materialization an event reaches, made again in its
+    /// chain's order** (ADR-0277): by its own `invalidates_on`, or through
+    /// what it reads (ADR-0102). Every one is out of date before any is
+    /// made, and each is made after every one it reads, so none is built
+    /// from one not yet made again. Each entry made with another value, in
+    /// that order, for the documents that read it to be told.
+    fn regenerate_reached(&self, events: &[(String, Vec<Val>)]) -> Vec<(String, Vec<Val>)> {
+        let kept: Vec<(String, Vec<String>, Vec<Val>)> = self
+            .kept
+            .lock()
+            .expect("kept")
+            .iter()
+            .map(|((path, key), args)| (path.clone(), key.clone(), args.clone()))
+            .collect();
+        let reached: Vec<(String, Vec<Val>)> = kept
+            .into_iter()
+            .filter(|(path, key, _)| {
+                events.iter().any(|(event, values)| {
+                    let values: Vec<String> =
+                        values.iter().map(materializations::key_text).collect();
+                    self.graph.reaches(path, event, &values, key)
+                })
+            })
+            .map(|(path, _, args)| (path, args))
+            .collect();
+        for (path, args) in &reached {
+            self.materializer.invalidate(&Self::kept_key(path, args), 0);
+        }
+        let paths: Vec<String> = reached.iter().map(|(p, _)| p.clone()).collect();
+        let mut made = Vec::new();
+        for path in self.graph.in_dependency_order(&paths) {
+            for (_, args) in reached.iter().filter(|(p, _)| *p == path) {
+                let key = Self::kept_key(&path, args);
+                let was = self.materializer.entry(&key).map(|e| e.body);
+                self.regenerate_kept(&path, args, None);
+                // Told only where its value changed: a rename leaves the menu
+                // counted as it was, and its readers are told nothing.
+                if self.materializer.entry(&key).map(|e| e.body) != was {
+                    made.push((path.clone(), args.clone()));
+                }
+            }
+        }
+        made
+    }
+
+    /// **Each open document that reads an entry made again, told**
+    /// (ADR-0277): read again and sent what changed, it alone of its
+    /// session's, since another of them may read the entry at another key,
+    /// or none of it.
+    fn tell_kept(&self, made: &[(String, Vec<Val>)]) {
+        if made.is_empty() {
+            return;
+        }
+        let open: Vec<Doc> = self
+            .pending
+            .lock()
+            .expect("pending")
+            .keys()
+            .cloned()
+            .collect();
+        let mut readers: BTreeMap<String, std::collections::BTreeSet<u64>> = BTreeMap::new();
+        for doc in open {
+            let plan = self.plan_of(&self.page_of(&doc));
+            let reads = plan["bindings"].as_array().into_iter().flatten().any(|b| {
+                let resource = b["resource"].as_str().unwrap_or_default();
+                made.iter().any(|(path, args)| {
+                    path == resource
+                        && self
+                            .args_of(plan, &doc.0, Some(doc.1), b, &Keys::Shown)
+                            .is_ok_and(|given| given == *args)
+                })
+            });
+            if reads {
+                readers.entry(doc.0.clone()).or_default().insert(doc.1);
+            }
+        }
+        for (session, documents) in readers {
+            let lock = self.one_at_a_time(&session);
+            let _one = lock.lock().expect("one change of a session at a time");
+            self.clock.advance(1);
+            let version = Version(self.clock.now());
+            self.send_documents_where(
+                &session,
+                |doc| documents.contains(&doc.1),
+                &session_documents(&session),
+                version,
+                false,
+            );
+        }
     }
 
     /// **What commits dropped, told to every other session that reads it**
@@ -2149,6 +2447,9 @@ impl Server {
         for other in others {
             self.tell(&other);
         }
+        // And each document that reads an entry made again (ADR-0277).
+        let made = std::mem::take(&mut *self.made.lock().expect("made"));
+        self.tell_kept(&made);
     }
 
     /// **`other`'s open documents read again and sent what changed**
@@ -2692,6 +2993,19 @@ impl Server {
         version: Version,
         speculated: bool,
     ) {
+        self.send_documents_where(session, |_| true, entry, version, speculated);
+    }
+
+    /// [`Server::send_documents`], of the session's documents `which` takes
+    /// (ADR-0277).
+    fn send_documents_where(
+        &self,
+        session: &str,
+        which: impl Fn(&Doc) -> bool,
+        entry: &ResourceEntryId,
+        version: Version,
+        speculated: bool,
+    ) {
         // What each of the session's pages shows now, from its queries
         // (ADR-0145), each read for its own document (ADR-0161), outside the
         // table.
@@ -2707,7 +3021,7 @@ impl Server {
             .unwrap_or_default();
         let documents = documents_of(&self.pending.lock().expect("pending"), session);
         let mut read = Vec::new();
-        for doc in documents {
+        for doc in documents.into_iter().filter(|d| which(d)) {
             let params = self.params_of(&doc);
             // Each by its own page's plan (ADR-0190): the store's, or a cart
             // page's, which reads the same cart.
@@ -3061,7 +3375,14 @@ impl Server {
         if std::env::var("PW_TRACE").is_ok() {
             eprintln!("broadcast {:?} to {} document(s)", op, queue.len());
         }
-        self.tell_menu(&mut queue, STORE_ID, &items, patches)
+        let told = self.tell_menu(&mut queue, STORE_ID, &items, patches);
+        // **Each document that reads an entry the change made again**
+        // (ADR-0277), once the subscriber table is given up: the menu's own
+        // pages are sent its patches above, as ever.
+        drop(queue);
+        let made = std::mem::take(&mut *self.made.lock().expect("made"));
+        self.tell_kept(&made);
+        told
     }
 
     /// **A store's menu fragment rendered again from `items`, and the pages
@@ -10375,6 +10696,9 @@ public query Store(",
     // PostgreSQL where a database is named.
     mod notifications;
 
+    /// A materialization kept, and served (ADR-0277).
+    mod materializations;
+
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
     /// to the session's document. Until ADR-0218 the host served the store
@@ -11890,7 +12214,12 @@ public query Store(",
             IDLE.as_secs()
         );
         assert_eq!((frames, subscribers), (0, 0));
-        assert_eq!(entries, 1, "the shared menu, and no visitor's cart");
+        // The menu counted and its line (ADR-0277) are every reader's, kept
+        // as the menu is.
+        assert_eq!(
+            entries, 3,
+            "the shared menu, its count and its line, and no visitor's cart"
+        );
 
         // A visitor who comes back is served a whole document: their cart
         // entry is regenerated from state, not lost.
@@ -13001,7 +13330,7 @@ public query Store(",
         })
         .expect("inserted");
         let ops = operations_for(&s, "a", document);
-        assert_eq!(ops.len(), 3, "{ops:?}");
+        assert_eq!(ops.len(), 4, "{ops:?}");
         // The espresso, sold out, rendered again where it is: first.
         assert_eq!(
             ops[0].operation,
@@ -13023,7 +13352,19 @@ public query Store(",
         };
         assert_eq!(instance.as_ref(), Some(&menu_instance(&s, "espresso")));
         assert!(html.contains("Flat White"), "{html}");
-        assert!(ops.iter().all(|o| o.target == coffees_at(&s)), "{ops:?}");
+        assert!(
+            ops[..3].iter().all(|o| o.target == coffees_at(&s)),
+            "{ops:?}"
+        );
+        // And the menu counted, made again with the insert, after its list:
+        // the page that reads it is told its text (ADR-0277).
+        assert_eq!(
+            ops[3].operation,
+            PatchOp::ReplaceText {
+                text: "4 items in 1 section".to_string()
+            },
+            "{ops:?}"
+        );
     }
 
     /// **A stock change is `InventoryChanged`, not `MenuChanged`** (ADR-0178):
@@ -13615,7 +13956,8 @@ public query Store(",
         assert_eq!(slot(&whole, "Recommendations"), "Cortado Cold Brew");
         // Each arm with the comment after it (ADR-0223).
         assert!(
-            whole.ends_with("</template><!--/pw-30--></body>\n</html>\n"),
+            // ADR-0277: the menu counted is a part of the page's, before them.
+            whole.ends_with("</template><!--/pw-31--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the

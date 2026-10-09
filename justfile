@@ -369,14 +369,15 @@ e9-values:
      } > docs/evidence/E9/value-relations.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E9/value-relations.txt
 
-# E10-I steps 4-6 — the store's commands, compiled to Wasm components. Wrapped
+# E10-I steps 4-6 — the store's commands, compiled to Wasm components, and
+# since ADR-0277 the materializations its page reads. Wrapped
 # by upstream `wit-component`, checked by `wit-component`'s decoder against the
 # world each contract fixed. Named by component id, which is how the host and
 # the dev server find them; held to the compiler's current output by `pw-core`'s
 # `evidence_is_current`.
 e10-component:
     @mkdir -p docs/evidence/E10
-    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart domain.line_count domain.display domain.count domain.total domain.subtotal; do \
+    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart domain.line_count domain.display domain.count domain.total domain.subtotal store.page.MenuSize store.page.MenuLine; do \
       cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
         --out "docs/evidence/E10/$id.wasm" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
@@ -384,11 +385,13 @@ e10-component:
     done
     @# The store page's plan (ADR-0125): what the development server's tests
     @# run the page by. Written by `pw build`, which is the one place it is made.
+    @# The other pages' plans are not kept: nothing reads them from here, and
+    @# `evidence_is_current` holds this one alone to the compiler.
     @out="$(mktemp -d)"; cargo run --quiet --locked -p pw-cli -- build --out "$out" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
         examples/lib/*.pw examples/store/*.pw > /dev/null; \
       mkdir -p docs/evidence/E10/pages; \
-      cp "$out"/pages/*.json docs/evidence/E10/pages/; rm -rf "$out"
+      cp "$out"/pages/store.page.StorePage.json docs/evidence/E10/pages/; rm -rf "$out"
 
 # E10-I — a Pleris-compiled command, executed through the E8 host, with the
 # Rust closure path deleted. The compiled components, the host running them
@@ -5263,3 +5266,30 @@ e14-fmt-meaning:
        CARGO_INCREMENTAL=0 python3 scripts/fmt_meaning_mutations.py; \
      } > docs/evidence/E14/fmt-meaning.txt
     @grep -E "^test result|already formatted|need formatting|mutants killed|^---- |panicked at" docs/evidence/E14/fmt-meaning.txt
+
+# ADR-0277: a materialization is kept, and a page reads it. The compiler's,
+# the materializer's and the server's tests, the store's chain in three
+# engines (e2e/materialized.spec.mjs), and the mutation controls.
+e14-materializations-kept:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0277 - a materialization is kept, and a page reads it"; echo; \
+       echo "produced by: just e14-materializations-kept"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/materializations_kept.rs, materialization_bodies.rs)"; echo; \
+       cargo test --locked -p pw-core --test materializations_kept --test materialization_bodies 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the chain's order (runtime/pw-materialize/tests/chain_order.rs)"; echo; \
+       cargo test --locked -p pw-materialize --test chain_order 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the server (materializations.rs, tests/materializations.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- materializations 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the store's chain in three engines (e2e/materialized.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/materialized.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/materializations_kept_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/materializations_kept_mutations.py; \
+     } > docs/evidence/E14/materializations-kept.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/materializations-kept.txt

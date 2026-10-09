@@ -2277,3 +2277,11 @@ a row shown before the server answers waits.
   a value's gaps, it would change; `} else {` and a clause's continued
   value indent as the tree says; and the feed, the store, the demo and the
   generality cases are held to `pw fmt --check`.
+[ADR-0277](DECISIONS/ADR-0277-a-materialization-is-kept-and-a-page-reads-it.md):
+a materialization is kept, and a page reads it.
+- One that derives its value is a component; each `query R(..)` it reads is
+  the platform's read, `pw:host/reads#<R>`, a dependency with no capability,
+  answered by the host from R, the body asked again for each read it lacks.
+  The host keeps its value as the materializer's entry, makes a chain again
+  in its order when an event reaches it, and tells each document that reads
+  an entry made again at its key; a page reads a public one as a query.

@@ -80,6 +80,16 @@ interface store-page-menu-api {
     menu: func(arg0: domain-store-id) -> result<list<domain-menu-section>, domain-store-error>;
 }
 
+interface store-page-menu-line-api {
+    use pw:types/types.{domain-store-id};
+    menu-line: func(arg0: domain-store-id) -> string;
+}
+
+interface store-page-menu-size-api {
+    use pw:types/types.{domain-store-id, store-page-menu-count};
+    menu-size: func(arg0: domain-store-id) -> store-page-menu-count;
+}
+
 interface store-page-order-api {
     use pw:types/types.{capability-session-id, domain-order-status, domain-tracking-error};
     order: func(arg0: capability-session-id) -> result<option<domain-order-status>, domain-tracking-error>;
@@ -209,6 +219,18 @@ world store-page-menu {
     export store-page-menu-api;
 }
 
+world store-page-menu-line {
+    import pw:host/reads;
+    import store-page-menu-size-api;
+    export store-page-menu-line-api;
+}
+
+world store-page-menu-size {
+    import pw:host/reads;
+    import store-page-menu-api;
+    export store-page-menu-size-api;
+}
+
 world store-page-order {
     import store:data/orders;
     export store-page-order-api;
@@ -244,6 +266,7 @@ world store-page-store-page {
     import store-page-estimate-api;
     import store-page-increase-in-cart-api;
     import store-page-menu-api;
+    import store-page-menu-line-api;
     import store-page-recommendations-api;
     import store-page-remove-from-cart-api;
     import store-page-store-api;
@@ -394,6 +417,10 @@ package pw:types {
             none-available,
             timeout,
         }
+        record store-page-menu-count {
+            sections: s64,
+            items: s64,
+        }
     }
 }
 
@@ -407,6 +434,11 @@ package pw:host {
         use pw:types/types.{capability-session-id};
         cart-changed: func(arg0: capability-session-id);
         order-changed: func(arg0: capability-session-id);
+    }
+    interface reads {
+        use pw:types/types.{domain-menu-section, domain-store-id, store-page-menu-count};
+        store-page-menu-size: func(arg0: domain-store-id) -> store-page-menu-count;
+        store-page-menu: func(arg0: domain-store-id) -> list<domain-menu-section>;
     }
     interface session {
         use pw:types/types.{capability-session-id};

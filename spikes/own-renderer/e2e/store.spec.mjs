@@ -67,8 +67,9 @@ test.describe("the document the server produced", () => {
     // subtotal 2, its fees note's block 2 = 6. And whether each item can be
     // ordered (ADR-0178): its block, 2 in each of three instances = 6. And
     // the menu grouped by category (ADR-0181): the coffee category's
-    // instance 2, its heading 2, and its items' own loop 2 = 6. 70 in all.
-    expect(shape.anchors).toBe(70);
+    // instance 2, its heading 2, and its items' own loop 2 = 6. And the menu
+    // counted, which the host keeps (ADR-0277): its line 2. 72 in all.
+    expect(shape.anchors).toBe(72);
     // Three Add buttons and one Clear button. The Clear button exists so that
     // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`. And
     // the cart's empty message, whose `hidden` reads the cart (ADR-0172).

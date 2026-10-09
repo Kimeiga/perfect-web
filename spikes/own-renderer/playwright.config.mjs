@@ -65,6 +65,9 @@ const MUTATING = [
   // ADR-0182: an item sold out, and the menu's changes, which the
   // accessibility audit reads the page after, are one per server.
   "accessibility",
+  // ADR-0277: the menu a test adds to and takes from, which its count and
+  // line are made again from, is one per server.
+  "materialized",
 ];
 
 export const MUTABLE_PORTS = Object.fromEntries(

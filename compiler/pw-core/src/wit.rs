@@ -887,6 +887,50 @@ pub fn package(
             }
         }
     }
+    // **The reads' functions** (ADR-0277): each resource a materialization
+    // reads, taking its parameters and answering its value, the `Ok` of a
+    // `Result` it answers.
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (decl_id, _) in hir.all_decls() {
+            let Some(sig) = sigs.by_def(DefId {
+                unit,
+                decl: decl_id.0,
+            }) else {
+                continue;
+            };
+            let id = crate::backend::read_binding(&sig.path);
+            if !wanted.contains(&format!("{}#{}", id.interface, id.name)) {
+                continue;
+            }
+            let Some((pkg, iface)) = id.interface.split_once('/') else {
+                continue;
+            };
+            let returns = sig.returns.as_ref().map(|r| match r.resolved() {
+                Some(t) if t.as_builtin() == Some(crate::resolved::Builtin::Result) => t
+                    .args()
+                    .first()
+                    .map(|ok| crate::resolved::TypeResolution::Resolved(ok.clone()))
+                    .unwrap_or_else(|| r.clone()),
+                _ => r.clone(),
+            });
+            let answering = Interface {
+                params: sig.params.clone(),
+                returns,
+            };
+            let (text, used) = wit_func(&id.name, &answering, &types)?;
+            host_uses.extend(used.iter().cloned());
+            let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
+                name: pkg.to_string(),
+                interfaces: BTreeMap::new(),
+            });
+            let slot = entry
+                .interfaces
+                .entry(iface.to_string())
+                .or_insert_with(|| (BTreeSet::new(), Vec::new()));
+            slot.0.extend(used);
+            slot.1.push(text);
+        }
+    }
     for h in hosts.values_mut() {
         for (_, funcs) in h.interfaces.values_mut() {
             funcs.sort();

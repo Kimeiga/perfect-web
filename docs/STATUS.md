@@ -41,6 +41,27 @@ refused without the name's label too, for running where a secret decides it
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
 
+**ADR-0277, 2026-10-08: a materialization is kept, and a page reads it**
+(ruling 10's last piece, second part). A materialization that derives its
+value is a component now: each `query R(..)` its body reads is the
+platform's read of R, `pw:host/reads`, a dependency the contract names and
+no capability. The host answers a read from R, a query through its kept
+answer or a materialization from its entry, and runs the body again for
+each read it lacks, until it asks for nothing more. Its value is the
+materializer's entry, encoded to read back whole. An event that reaches
+one, by its own `invalidates_on` or through what it reads, makes the chain
+again, the dependency before what reads it, each once; each open document
+that reads an entry made again with another value, at its key, is told,
+and no other. What could not be made again is served its last good value.
+The store's page shows "3 items in 1 section", `MenuLine(id)` from
+`MenuSize(id)` from the menu, live as the menu changes, in three engines. A
+page reads a public one alone; a private one waits for a partition by
+principal. 21 of 21 mutants killed (`just e14-materializations-kept`). The
+first run killed 19: the test of a document that reads another key held
+only that it was sent no operation, and a document read again whose page
+did not change is sent none either. It holds now that the document is not
+told.
+
 **ADR-0276, 2026-10-08: `pw fmt` changes no program's meaning** (found
 formatting the feed; amends ADR-0013). `pw fmt` wrote the feed's `max_bytes
 5_000_000` as `5 _000_000`, which `pw check` refuses, and `-1` in a clause

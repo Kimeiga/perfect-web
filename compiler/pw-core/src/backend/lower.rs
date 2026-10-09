@@ -270,6 +270,51 @@ fn host_imports(cx: &Context<'_>, p: &Program) -> Vec<CallableImport> {
             }
         }
     }
+    // **And the reads' functions** (ADR-0277): one for each resource a
+    // materialization's body reads, taking its parameters and answering its
+    // value, the platform's to answer, under no authority of the reader's: R
+    // holds its own.
+    for (unit, hir) in cx.hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            let def = crate::resolve::DefId { unit, decl: id.0 };
+            let Some(signature) = cx.sigs.by_def(def) else {
+                continue;
+            };
+            let import = crate::backend::read_binding(&signature.path);
+            if !wanted.contains(&import) {
+                continue;
+            }
+            let params: Option<Vec<Type>> = signature
+                .params
+                .iter()
+                .map(
+                    |p| match ty_resolved(cx.sigs, p.as_ref()?.resolved()?, &decl.name_span) {
+                        Lowering::Lowered(t) => Some(t),
+                        _ => None,
+                    },
+                )
+                .collect();
+            let result = signature
+                .returns
+                .as_ref()
+                .and_then(|r| r.resolved())
+                .and_then(|r| match ty_resolved(cx.sigs, r, &decl.name_span) {
+                    Lowering::Lowered(Type::Result(ok, _)) => Some(*ok),
+                    Lowering::Lowered(t) => Some(t),
+                    _ => None,
+                });
+            let (Some(params), Some(result)) = (params, result) else {
+                continue;
+            };
+            out.push(CallableImport {
+                id: import,
+                callee: def,
+                binding: crate::backend::ir::ImportBinding::PlatformHost,
+                signature: crate::backend::ir::BackendSignature { params, result },
+                required_capabilities: Vec::new(),
+            });
+        }
+    }
     out.sort_by(|a, b| a.id.cmp(&b.id));
     out.dedup_by(|a, b| a.id == b.id);
     out
@@ -331,6 +376,7 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         captured: BTreeMap::new(),
         handler: false,
         signals: BTreeMap::new(),
+        reads: decl.kind == DeclKind::Materialize,
     };
 
     // Parameters first, so a body naming one finds it.
@@ -573,6 +619,7 @@ pub fn handler(
         captured: BTreeMap::new(),
         handler: true,
         signals: BTreeMap::new(),
+        reads: false,
     };
     // The page's signals, each by the type its declaration writes
     // (ADR-0130). A signal is a `let` of the page's body, so the lexical
@@ -779,6 +826,7 @@ pub fn pure_expr_as(
         captured: BTreeMap::new(),
         handler: false,
         signals: BTreeMap::new(),
+        reads: false,
     };
     let mut params = Vec::new();
     for (name, ty) in inputs {
@@ -983,6 +1031,7 @@ fn lower_internal(
         captured: BTreeMap::new(),
         handler: false,
         signals: BTreeMap::new(),
+        reads: false,
     };
     let mut params = Vec::new();
     for (index, p) in decl.params.iter().enumerate() {
@@ -1078,6 +1127,7 @@ fn lower_closure(
         captured: BTreeMap::new(),
         handler: false,
         signals: BTreeMap::new(),
+        reads: false,
     };
     let mut values = Vec::new();
     for (name, ty) in captures.into_iter().chain(params) {
@@ -1150,7 +1200,10 @@ pub fn program_by_declaration(
     for (unit, hir) in cx.hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             let member = members.contains(&DefId { unit, decl: id.0 });
-            if !member && !matches!(decl.kind, DeclKind::Command | DeclKind::Query) {
+            // And each materialization that derives its value (ADR-0277), a
+            // component the host runs to keep it.
+            let derives = decl.kind == DeclKind::Materialize && decl.ret.is_some();
+            if !member && !derives && !matches!(decl.kind, DeclKind::Command | DeclKind::Query) {
                 continue;
             }
             match function(cx, unit, decl, hir.decl_span(id)) {
@@ -1340,6 +1393,9 @@ struct Lower<'a> {
     /// their types: a read of one is `Instr::SignalGet`, an assignment to one
     /// `Instr::SignalSet`. Empty outside a handler.
     signals: BTreeMap<String, Type>,
+    /// **A materialization's body is being lowered** (ADR-0277): a `query
+    /// R(..)` in it is a read the host answers, `pw:host/reads`.
+    reads: bool,
 }
 
 /// **Instantiate a declared type against the type a value has** (ADR-0050):
@@ -1673,6 +1729,100 @@ impl<'a> Lower<'a> {
         Lowering::Lowered(())
     }
 
+    /// **A read in a materialization's body** (ADR-0277): `query R(args)`, a
+    /// call of the platform's read of R, given R's parameters and answering
+    /// R's value, its `Ok` where R answers a `Result`. The host answers it from
+    /// R; where R answers an error the regeneration fails, and the
+    /// materialization's `fallback` decides what is served.
+    fn query_read(
+        &mut self,
+        body: &Body,
+        modifiers: &[String],
+        args: &[ExprId],
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let blocked = |why: String| Lowering::Blocked {
+            why,
+            span: span.clone(),
+        };
+        let Some(name) = modifiers.first() else {
+            return blocked("a read names no resource".to_string());
+        };
+        let resolution = match name.contains('.') {
+            true => self.cx.ws.resolve_path(self.unit, name),
+            false => self.cx.ws.resolve_in(self.unit, Namespace::Term, name),
+        };
+        let (Resolution::Local(def) | Resolution::Imported { def, .. }) = resolution else {
+            return blocked(format!("`{name}` does not resolve"));
+        };
+        let Some(sig) = self.cx.sigs.by_def(def) else {
+            return blocked(format!("`{name}` has no signature"));
+        };
+        if sig.params.len() != args.len() {
+            return blocked(format!(
+                "`{name}` takes {} values, and is given {}",
+                sig.params.len(),
+                args.len()
+            ));
+        }
+        let mut values = Vec::new();
+        for (arg, declared) in args.iter().zip(&sig.params) {
+            let Some(declared) = declared.as_ref() else {
+                return blocked(format!("a parameter of `{name}` has no type"));
+            };
+            let ty = match self.ty(declared, &span) {
+                Lowering::Lowered(t) => t,
+                other => return other.map(|_| unreachable!()),
+            };
+            match self.expr(body, *arg, Some(&ty)) {
+                Lowering::Lowered(v) => values.push(v),
+                other => return other,
+            }
+        }
+        let Some(returns) = sig.returns.as_ref() else {
+            return blocked(format!("`{name}` declares no type"));
+        };
+        let ty = match self.ty(returns, &span) {
+            Lowering::Lowered(Type::Result(ok, _)) => *ok,
+            Lowering::Lowered(t) => t,
+            other => return other.map(|_| unreachable!()),
+        };
+        // A map or set it answers is sorted as a host's answer is (ADR-0057).
+        let check = match &ty {
+            Type::Map(..) => Some(Intrinsic::MapCheck),
+            Type::Set(..) => Some(Intrinsic::SetCheck),
+            t if holds_collection(self.cx, t, &mut Vec::new()) => {
+                return Lowering::Unsupported {
+                    construct: "a map or set inside a read's answer",
+                    span,
+                    reason: "only a map or set that is itself the answer is checked when it \
+                             arrives (ADR-0057)"
+                        .to_string(),
+                };
+            }
+            _ => None,
+        };
+        let result = self.fresh();
+        let read = self.push(Instr::ImportCall {
+            result,
+            import: crate::backend::read_binding(&sig.path),
+            args: values,
+            ty: ty.clone(),
+        });
+        match check {
+            Some(op) => {
+                let checked = self.fresh();
+                Lowering::Lowered(self.push(Instr::Intrinsic {
+                    result: checked,
+                    op,
+                    args: vec![read],
+                    ty,
+                }))
+            }
+            None => Lowering::Lowered(read),
+        }
+    }
+
     /// Lower one expression. `expected` is the type its context fixes, if any:
     /// the declaration's result, a parameter's type, the arms' common type.
     /// It is how `None` knows what it is `None` of.
@@ -1928,6 +2078,13 @@ impl<'a> Lower<'a> {
                 fields,
             } => self.record(body, name, fields, expected, span),
             Expr::List { items } => self.list(body, items, expected, span),
+            // **A read in a materialization's body** (ADR-0277).
+            Expr::Keyword {
+                keyword,
+                modifiers,
+                args,
+                ..
+            } if self.reads && keyword == "query" => self.query_read(body, modifiers, args, span),
             other => Lowering::Unsupported {
                 construct: construct_name(other),
                 span,

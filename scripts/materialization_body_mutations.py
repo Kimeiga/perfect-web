@@ -59,8 +59,9 @@ MUTANTS = [
     (
         "one that derives its value reads none that derives its own",
         CHECK,
-        "                if derives && deriving {\n",
-        "                if derives && deriving && false {\n",
+        # Re-anchored by ADR-0277, whose page reads a public one.
+        "                if derives && (deriving || (page && public)) {\n",
+        "                if derives && (deriving && false || (page && public)) {\n",
     ),
     (
         "a fragment the host renders is read as a value",

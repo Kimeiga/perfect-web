@@ -23,6 +23,7 @@
 
 module store.page
 
+import List
 import Stores
 import Carts
 import Menus
@@ -99,6 +100,49 @@ public query Store(id: StoreId) -> Result<Store, StoreError>
     fallback      last_known_good
 {
     Stores.get(id)
+}
+
+// **The menu, counted** (ADR-0277): its sections and its items, derived
+// from the menu and kept, every reader's. A change to the store's menu or its
+// stock regenerates it, once, and the store's page shows it.
+type MenuCount = MenuCount { sections: Int, items: Int }
+
+materialize MenuSize(id: StoreId) -> MenuCount {
+    partition      public
+    invalidates_on MenuChanged(id), InventoryChanged(id, _)
+    regenerate     on_invalidation
+    stampede       single_flight
+    fallback       last_known_good
+
+    let menu = query Menu(id)
+    MenuCount {
+        sections: List.length(menu),
+        items: List.fold(menu, 0, (n, section) => n + List.length(section.items)),
+    }
+}
+
+// **What the store's page says of its menu** (ADR-0277): a materialization
+// that reads another, so a change regenerates the count before the line, and
+// the line is never built from the count before it.
+materialize MenuLine(id: StoreId) -> String {
+    partition  public
+    regenerate on_invalidation
+    stampede   single_flight
+    fallback   last_known_good
+
+    let size = query MenuSize(id)
+    let items = counted(size.items, "item", "items")
+    let sections = counted(size.sections, "section", "sections")
+    "{items} in {sections}"
+}
+
+// **A count, in words**: "1 item", "3 sections".
+fn counted(n: Int, one: String, many: String) -> String !{} {
+    if n == 1 {
+        "1 {one}"
+    } else {
+        "{n} {many}"
+    }
 }
 
 // Every store, the same for everybody: public, and cached `shared`
@@ -287,6 +331,7 @@ session page StorePage(id: StoreId) {
 
     let store = query Store(id)
     let menu = query Menu(id)
+    let summary = query MenuLine(id)
     let cart = query Cart(current_session())
     // What the cart last had to say: a refusal of an add or a clear.
     signal notice: String = ""
@@ -307,6 +352,7 @@ session page StorePage(id: StoreId) {
         <main>
             <h1 id="store-name">{store.name}</h1>
             <p id="store-description">{store.description}</p>
+            <p id="menu-line">{summary}</p>
 
             <section aria-label="Delivery" aria-live="polite">
                 <stream query={Estimate(current_session())}>

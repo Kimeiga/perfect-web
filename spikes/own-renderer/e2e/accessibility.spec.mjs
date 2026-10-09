@@ -289,6 +289,7 @@ test("the tree a screen reader reads is the page's", async ({ page, request }) =
       - /children: deep-equal
       - heading "Blue Bottle" [level=1]
       - paragraph: Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning.
+      - paragraph: 3 items in 1 section
       - region "Delivery":
         - paragraph: Delivery in 25 to 35 min
       - region "Menu":

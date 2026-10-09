@@ -77,6 +77,11 @@ fn the_store_builds_every_artifact_from_source() {
             // The store's slots, since ADR-0165: each stream's query.
             "store.page.Estimate",
             "store.page.Menu",
+            // The menu counted, and the line the page shows from it: each a
+            // materialization that derives its value, a component the host
+            // runs to keep it (ADR-0277).
+            "store.page.MenuLine",
+            "store.page.MenuSize",
             // A session's order (ADR-0193).
             "store.page.Order",
             "store.page.Recommendations",
@@ -92,7 +97,7 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.place_order",
             "store.page.remove_from_cart",
         ],
-        "every command and query the page reaches, compiled and audited"
+        "every command, query and materialization the page reaches, compiled and audited"
     );
     for (id, x) in &b.components {
         if let Built::Component { compiled, audited } = x {

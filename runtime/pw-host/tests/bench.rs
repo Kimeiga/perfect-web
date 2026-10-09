@@ -179,6 +179,7 @@ fn a_hand_written_rust_guest_through_the_host() {
                     event: None,
                     invalidates: None,
                     every: Vec::new(),
+                    reads: None,
                     interface: interface.into(),
                     name: name.into(),
                     capability: "store.read".into(),

@@ -52,6 +52,25 @@
       ]
     },
     {
+      "binding": "summary",
+      "resource": "store.page.MenuLine",
+      "args": [
+        "id"
+      ],
+      "policy": {
+        "cache": "none",
+        "privacy": "public",
+        "freshness_ms": 0,
+        "timeout_ms": null,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0
+        ],
+        "fallback": "last_known_good"
+      }
+    },
+    {
       "binding": "cart",
       "resource": "store.page.Cart",
       "args": [
@@ -93,7 +112,13 @@
       ]
     },
     {
-      "part": 14,
+      "part": 2,
+      "path": "summary",
+      "binding": "summary",
+      "steps": []
+    },
+    {
+      "part": 15,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -103,7 +128,7 @@
       ]
     },
     {
-      "part": 26,
+      "part": 27,
       "path": "cart.subtotal.display",
       "binding": "cart",
       "steps": [
@@ -128,18 +153,18 @@
   ],
   "live": [
     {
-      "part": 28,
+      "part": 29,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
     }
   ],
   "blocks": [
-    27
+    28
   ],
   "streams": [
     {
-      "part": 2,
+      "part": 3,
       "resource": "store.page.Estimate",
       "args": [
         "current_session()"
@@ -159,7 +184,7 @@
       "streamed": true
     },
     {
-      "part": 30,
+      "part": 31,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -221,7 +246,7 @@
     }
   ],
   "attributes": [
-    15
+    16
   ],
-  "title": 33
+  "title": 34
 }

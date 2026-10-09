@@ -567,7 +567,8 @@ pub fn compile_all(units: &[crate::check::Unit]) -> Result<Vec<(String, Built)>,
                     Some(
                         crate::hir::DeclKind::Command
                         | crate::hir::DeclKind::Query
-                        | crate::hir::DeclKind::Fn,
+                        | crate::hir::DeclKind::Fn
+                        | crate::hir::DeclKind::Materialize,
                     ),
                 ) => Built::Refused(format!("did not lower: {}", p.refused(world.declaration))),
                 (None, Some(kind)) => Built::NoBody { kind },

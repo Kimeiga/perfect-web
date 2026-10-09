@@ -456,8 +456,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
              unfollow, `/following`, and a user's page with follower
              counts, on queries); then materializations made real: ~~a body
              and a type~~ (ADR-0273, `just e14-materialization-bodies`: held
-             to its type, its reads its edges), a generator, a page reading
-             one, and a chain rebuilt in order;
+             to its type, its reads its edges), ~~a generator, a page reading
+             one, and a chain rebuilt in order~~ (ADR-0277, `just
+             e14-materializations-kept`: the store's menu counted, live).
+             What it leaves, in order: a private materialization, kept per
+             principal, and a timeline kept per reader on it; the store's
+             `MenuFragment` made a value the page renders; `regenerate
+             on_read`; incremental maintenance;
           4. ~~**track `identity`, W1**~~ (ADR-0258, `just e14-identity`:
              accounts and sign-in, Pleris the relying party and the
              provider the deployment's). What it leaves, in order: ~~a
@@ -484,7 +489,22 @@ E14 comes before E11-E13. Its plan, controls and task list are
              counts; sending shown before the server answers; live to both;
              to someone who follows you or has messaged you, by X's rule;
              and a third user held to seeing none of it by page, by
-             `/pw-read`, by cache and by stream;
+             `/pw-read`, by cache and by stream; then, the integrator's,
+             **a handler navigates after its command commits** (the owner's
+             brief, 2026-10-08, from a Next.js bug: a save, then a soft
+             navigation to a page the Router Cache served from before the
+             save). `navigate Page(args)` in a handler's arm, a page by name
+             with its arguments checked, as a link is (PW5009); only after
+             the commit, never on a speculation or a refusal, whose `Err`
+             arm runs and whose speculation is taken back; the destination
+             read at that commit or later, its basis carried across the
+             navigation (ADR-0224's rule), with no cache-busting parameter
+             and no reload; a press while it is pending given one defined
+             order, tested both ways; the parts the pages share kept in
+             place; three engines with ADR-0268's wait, and mutation
+             controls for each (navigating before the commit, a
+             destination read before it, a press racing it, navigating on
+             a refusal). The ruling is researched and written when built;
           7. ~~**track `uploads`, W2**~~ (ADR-0260, `just e14-uploads`: an
              image on a post, a typed upload served safely). What it leaves,
              in order: ~~a deleted post's image no longer served, and its

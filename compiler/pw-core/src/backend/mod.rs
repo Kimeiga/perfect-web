@@ -161,6 +161,21 @@ pub fn invalidated_query(
 /// query's whole path, since two modules' queries may share a name.
 pub const INVALIDATIONS_INTERFACE: &str = "pw:host/invalidations";
 
+/// **The platform's reads** (ADR-0277): each resource a materialization's
+/// body reads, `query R(..)`, is a function of it, taking R's parameters and
+/// answering R's value, its `Ok` where R answers a `Result`, by R's whole
+/// path. The host answers it from R: a query run, or a materialization's
+/// kept entry, regenerated first where it is not current.
+pub const READS_INTERFACE: &str = "pw:host/reads";
+
+/// The reads' function for the resource `path` (ADR-0277).
+pub fn read_binding(path: &str) -> ir::ImportId {
+    ir::ImportId {
+        interface: READS_INTERFACE.to_string(),
+        name: crate::wit::ident(path),
+    }
+}
+
 /// The invalidations' function for the query `path` (ADR-0209), given the
 /// value at each of its parameters but those `every` lists, which its key
 /// writes `_` (ADR-0256): `feed-app-timeline-EVERY-1` takes a session, and

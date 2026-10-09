@@ -256,6 +256,59 @@ impl Graph {
             .unwrap_or_default()
     }
 
+    /// **The order a chain is regenerated in** (ADR-0277): each of `paths`
+    /// after every one of them it reads, through any number of reads, so none
+    /// is built from one not yet regenerated. Paths that read none of the
+    /// others keep their order by path. A cycle of reads is refused where it
+    /// is written (PW5109); here it would leave its members in path order.
+    pub fn in_dependency_order(&self, paths: &[String]) -> Vec<String> {
+        let mut pending: Vec<String> = paths.to_vec();
+        pending.sort();
+        pending.dedup();
+        // What each reads among the others, through any number of reads.
+        let reads: Vec<(String, Vec<String>)> = pending
+            .iter()
+            .map(|p| {
+                let mut seen: Vec<String> = Vec::new();
+                let mut next = vec![p.clone()];
+                while let Some(at) = next.pop() {
+                    for e in self
+                        .edges
+                        .iter()
+                        .filter(|e| e.kind == EdgeKind::Reads && e.from == at)
+                    {
+                        if !seen.contains(&e.to) && e.to != *p {
+                            seen.push(e.to.clone());
+                            next.push(e.to.clone());
+                        }
+                    }
+                }
+                let among: Vec<String> = seen.into_iter().filter(|r| pending.contains(r)).collect();
+                (p.clone(), among)
+            })
+            .collect();
+        let mut out: Vec<String> = Vec::new();
+        while out.len() < pending.len() {
+            let ready = reads
+                .iter()
+                .find(|(p, among)| !out.contains(p) && among.iter().all(|r| out.contains(r)));
+            match ready {
+                Some((p, _)) => out.push(p.clone()),
+                // A cycle: the rest in path order.
+                None => {
+                    out.extend(
+                        pending
+                            .iter()
+                            .filter(|p| !out.contains(p))
+                            .cloned()
+                            .collect::<Vec<_>>(),
+                    );
+                }
+            }
+        }
+        out
+    }
+
     /// Every materialization in the graph.
     pub fn fragments(&self) -> Vec<&Node> {
         self.nodes

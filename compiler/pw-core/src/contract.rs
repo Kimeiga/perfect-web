@@ -316,6 +316,11 @@ pub struct Import {
     /// drops every entry at them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub every: Vec<usize>,
+    /// **The resource whose value this import answers** (ADR-0277), by its
+    /// path, `store.page.Menu`: a materialization's read, which the host
+    /// answers from that resource.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reads: Option<String>,
 }
 
 /// **One place a value from outside must hold an invariant** (ADR-0179):
@@ -985,6 +990,7 @@ fn host_calls(
             event: (decl.kind == crate::hir::DeclKind::Event).then(|| signature.path.clone()),
             invalidates: None,
             every: Vec::new(),
+            reads: None,
         });
     }
     // **And the invalidations' function for each entry it invalidates**
@@ -1030,7 +1036,69 @@ fn host_calls(
             event: None,
             invalidates: Some(signature.path.clone()),
             every,
+            reads: None,
         });
+    }
+    // **And the reads' function for each resource a materialization's body
+    // reads** (ADR-0277): its parameters, answering its value, the platform's
+    // to answer from it, under no authority of the reader's: what it reads
+    // holds its own, as a page's dependency does.
+    let decl = hir.decl(id);
+    if decl.kind == crate::hir::DeclKind::Materialize && decl.ret.is_some() {
+        for (name, _) in crate::graph::queried(body) {
+            let ws = sigs.workspace();
+            let found = match name.contains('.') {
+                true => ws.resolve_path(unit, &name),
+                false => ws.resolve_in(unit, crate::resolve::Namespace::Term, &name),
+            };
+            let (crate::resolve::Resolution::Local(def)
+            | crate::resolve::Resolution::Imported { def, .. }) = found
+            else {
+                continue;
+            };
+            let Some(signature) = sigs.by_def(def) else {
+                continue;
+            };
+            let Some(params) = signature
+                .params
+                .iter()
+                .map(|p| sigs.stable_type(p.as_ref()?.resolved()?))
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            // Its value: the `Ok` of a `Result` it answers.
+            let Some(result) = signature
+                .returns
+                .as_ref()
+                .and_then(|r| r.resolved())
+                .and_then(|r| match r.as_builtin() {
+                    Some(crate::resolved::Builtin::Result) => r.args().first(),
+                    _ => Some(r),
+                })
+                .and_then(|r| sigs.stable_type(r))
+            else {
+                continue;
+            };
+            let import = crate::backend::read_binding(&signature.path);
+            if !seen.insert((import.interface.clone(), import.name.clone())) {
+                continue;
+            }
+            out.push(Import {
+                interface: import.interface,
+                name: import.name,
+                capability: String::new(),
+                capabilities: Vec::new(),
+                signature: Some(Signature { params, result }),
+                owner: Ownership::Platform,
+                kind: ImportKind::HostCapability,
+                bounded: Vec::new(),
+                event: None,
+                invalidates: None,
+                every: Vec::new(),
+                reads: Some(signature.path.clone()),
+            });
+        }
     }
     out
 }
@@ -1119,6 +1187,7 @@ fn component_calls(
                 event: None,
                 invalidates: None,
                 every: Vec::new(),
+                reads: None,
             });
         }
     }
@@ -1187,7 +1256,10 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
         .enumerate()
         .flat_map(|(unit, hir)| {
             hir.all_decls()
-                .filter(|(_, d)| component_kind(d.kind).is_some())
+                .filter(|(_, d)| {
+                    component_kind(d.kind).is_some()
+                        || (d.kind == DeclKind::Materialize && d.ret.is_some())
+                })
                 .map(|(id, d)| {
                     (
                         crate::resolve::DefId { unit, decl: id.0 },
@@ -1218,7 +1290,13 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // Components are the things a host runs: the units with behaviour.
             // A type or an import declaration has no authority to describe.
             let member = members.contains(&crate::resolve::DefId { unit, decl: id.0 });
-            let Some(kind) = component_kind(decl.kind).or(member.then_some("function")) else {
+            // A materialization that derives its value is a component the host
+            // runs to keep it (ADR-0277).
+            let derives = decl.kind == DeclKind::Materialize && decl.ret.is_some();
+            let Some(kind) = component_kind(decl.kind)
+                .or(derives.then_some("materialization"))
+                .or(member.then_some("function"))
+            else {
                 continue;
             };
 

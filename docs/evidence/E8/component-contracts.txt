@@ -56,17 +56,63 @@ store.page.Cart  abi 37cb9e8b9dc1738c
   host      store:data/carts#current  (database.read<Carts>)
   exports   query Cart
 
+store.page.CartPage  abi f00a4fe14eeded6f
+  runs at   origin
+  needs     session.read
+  component pw:app/store.page.Cart#Cart
+  component pw:app/store.page.Order#Order
+  component pw:app/store.page.clear_cart#clear_cart
+  component pw:app/store.page.decrease_in_cart#decrease_in_cart
+  component pw:app/store.page.increase_in_cart#increase_in_cart
+  component pw:app/store.page.place_order#place_order
+  component pw:app/store.page.remove_from_cart#remove_from_cart
+  host      pw:host/session#read  (session.read)
+  exports   page CartPage
+
 store.page.Estimate  abi 415fdfe738cf5f70
   runs at   origin
   needs     database.read<Estimates>
   host      store:data/estimates#current  (database.read<Estimates>)
   exports   query Estimate
 
+store.page.HomePage  abi 2c950586f6696763
+  runs at   origin
+  needs     session.read
+  component pw:app/store.page.Cart#Cart
+  component pw:app/store.page.StoreList#StoreList
+  host      pw:host/session#read  (session.read)
+  exports   page HomePage
+
 store.page.Menu  abi 60058db28f2ab607
   runs at   origin
   needs     database.read<Menus>
   host      store:data/menus#sections  (database.read<Menus>)
   exports   query Menu
+
+store.page.MenuLine  abi 5ec433c9716c4bd5
+  runs at   build, browser, edge, origin
+  component pw:app/store.page.MenuSize#MenuSize
+  host      pw:host/reads#store-page-menu-size  ()
+  exports   materialization MenuLine
+
+store.page.MenuSize  abi 4d20ba93682c9f9f
+  runs at   build, browser, edge, origin
+  component pw:app/store.page.Menu#Menu
+  host      pw:host/reads#store-page-menu  ()
+  exports   materialization MenuSize
+
+store.page.Order  abi 6def0e0e60df40e2
+  runs at   origin
+  needs     database.read<Orders>
+  host      store:data/orders#current  (database.read<Orders>)
+  exports   query Order
+
+store.page.OrderPage  abi ba1334c5a2f7dee7
+  runs at   origin
+  needs     session.read
+  component pw:app/store.page.Order#Order
+  host      pw:host/session#read  (session.read)
+  exports   page OrderPage
 
 store.page.Recommendations  abi 362c2dcd203e1e3f
   runs at   browser, edge, origin
@@ -80,12 +126,19 @@ store.page.Store  abi 4aedcc2febb0861f
   host      store:data/stores#get  (database.read<Stores>)
   exports   query Store
 
+store.page.StoreList  abi 7fad5df1af8cdb8f
+  runs at   origin
+  needs     database.read<Stores>
+  host      store:data/stores#list  (database.read<Stores>)
+  exports   query StoreList
+
 store.page.StorePage  abi d803b26130c7cf49
   runs at   origin
   needs     session.read
   component pw:app/store.page.Cart#Cart
   component pw:app/store.page.Estimate#Estimate
   component pw:app/store.page.Menu#Menu
+  component pw:app/store.page.MenuLine#MenuLine
   component pw:app/store.page.Recommendations#Recommendations
   component pw:app/store.page.Store#Store
   component pw:app/store.page.add_to_cart#add_to_cart
@@ -96,50 +149,80 @@ store.page.StorePage  abi d803b26130c7cf49
   host      pw:host/session#read  (session.read)
   exports   page StorePage
 
-store.page.add_to_cart  abi b0847bb334f1be0e
+store.page.add_to_cart  abi e39ed9ad14de8346
   runs at   origin
   needs     database.read<Menus>
   needs     database.write<Carts>
+  needs     outbox.write
   needs     session.read
+  host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/outbox#cart-changed  (outbox.write)
   host      pw:host/session#read  (session.read)
   host      store:data/carts#add  (database.write<Carts>)
   host      store:data/menus#is-available  (database.read<Menus>)
   exports   command add_to_cart
   requires  SignedIn
 
-store.page.clear_cart  abi bade60abc3477904
+store.page.clear_cart  abi 01a95bd54db3e938
   runs at   origin
   needs     database.write<Carts>
+  needs     outbox.write
   needs     session.read
+  host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/outbox#cart-changed  (outbox.write)
   host      pw:host/session#read  (session.read)
   host      store:data/carts#clear  (database.write<Carts>)
   exports   command clear_cart
   requires  SignedIn
 
-store.page.decrease_in_cart  abi 8ad56a870ecb332a
+store.page.decrease_in_cart  abi a36b2242c3929e82
   runs at   origin
   needs     database.write<Carts>
+  needs     outbox.write
   needs     session.read
+  host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/outbox#cart-changed  (outbox.write)
   host      pw:host/session#read  (session.read)
   host      store:data/carts#decrease  (database.write<Carts>)
   exports   command decrease_in_cart
   requires  SignedIn
 
-store.page.increase_in_cart  abi 69261a5c0182c363
+store.page.increase_in_cart  abi 0408ccf9c5cd1849
   runs at   origin
   needs     database.read<Menus>
   needs     database.write<Carts>
+  needs     outbox.write
   needs     session.read
+  host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/outbox#cart-changed  (outbox.write)
   host      pw:host/session#read  (session.read)
   host      store:data/carts#add  (database.write<Carts>)
   host      store:data/menus#is-available  (database.read<Menus>)
   exports   command increase_in_cart
   requires  SignedIn
 
-store.page.remove_from_cart  abi 800206716105eda8
+store.page.place_order  abi fb6bec6c5ebf1383
   runs at   origin
   needs     database.write<Carts>
+  needs     database.write<Orders>
+  needs     outbox.write
   needs     session.read
+  host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/invalidations#store-page-order  (outbox.write)
+  host      pw:host/outbox#cart-changed  (outbox.write)
+  host      pw:host/outbox#order-changed  (outbox.write)
+  host      pw:host/session#read  (session.read)
+  host      store:data/orders#place  (database.write<Orders>)
+  exports   command place_order
+  requires  SignedIn
+
+store.page.remove_from_cart  abi e413a06821dd64ec
+  runs at   origin
+  needs     database.write<Carts>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/outbox#cart-changed  (outbox.write)
   host      pw:host/session#read  (session.read)
   host      store:data/carts#remove  (database.write<Carts>)
   exports   command remove_from_cart

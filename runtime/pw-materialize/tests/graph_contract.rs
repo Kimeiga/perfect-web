@@ -41,7 +41,13 @@ fn the_menu_fragment_listens_for_the_events_the_source_declares() {
     let listening = g.fragments_listening_for("Events.MenuChanged");
     assert_eq!(
         listening,
-        vec!["store.menu_fragment.MenuFragment".to_string()],
+        vec![
+            "store.menu_fragment.MenuFragment".to_string(),
+            // And the menu counted (ADR-0277), which declares it too. The line
+            // the page shows from it declares none: the count's change reaches
+            // it through its read (ADR-0102).
+            "store.page.MenuSize".to_string(),
+        ],
         "the fragment `examples/store/menu.pw` declares"
     );
 

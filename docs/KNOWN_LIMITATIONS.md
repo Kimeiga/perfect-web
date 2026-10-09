@@ -563,14 +563,21 @@ awaited in order. What remains:
   no other language, no push and no email. The feed still reads its
   timelines and relations by the session through `identified_by`, and a
   stream reads no `current_user()`.
-- **A materialization is checked, and does not run** (ADR-0255,
-  ADR-0273). One may read another, a cycle of them is refused (PW5109), and
-  an event reaching one reaches what reads it. One that declares its type
-  derives it in its body, held to it, reading what it depends on; but no
-  generator is compiled, no host serves one, and no page reads one; which
-  entry of a chain is rebuilt first is not decided. One that declares no
-  type is a fragment the host renders, the store's wired by hand. The
-  follows timeline is built on queries meanwhile.
+- **A materialization is kept public, and made again whole** (ADR-0255,
+  ADR-0273, ADR-0277). One that derives its value is compiled, kept as the
+  materializer's entry, made again in its chain's order when an event
+  reaches it, and read by a page; but only a public one (`partition
+  public`): one kept per session or user waits for a partition by
+  principal, and the follows timeline is built on queries meanwhile. Each
+  making recomputes its body whole, asking it again for each read it
+  lacks; `regenerate on_read` is not run. One that declares no type is a
+  fragment the host renders, the store's still wired by hand.
+- **A loop's name that shadows a page's binding is read as the binding**
+  (found 2026-10-08, ADR-0277). The page plan types a read by its root's
+  name among the page's bindings before its loops: on the store's page, a
+  binding named `line` beside the cart's `{#each cart.lines as line}` was
+  read for `line.name` inside the loop, and the build refused. The checker
+  accepts the shadowing; the binding is named `summary`.
 - **A source's guarantees are held to the database the feed opens**
   (ADR-0207, ADR-0246): the host measures a PostgreSQL feed's isolation and
   whether it may write, and refuses to serve on a shortfall. The store's

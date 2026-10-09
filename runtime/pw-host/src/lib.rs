@@ -130,6 +130,10 @@ pub struct Import {
     /// name, ADR-0018.
     #[serde(default)]
     pub every: Vec<usize>,
+    /// **The resource whose value it answers** (ADR-0277), by its path: a
+    /// materialization's read. Mirrored by field name, ADR-0018.
+    #[serde(default)]
+    pub reads: Option<String>,
 }
 
 /// **One place a value from outside must hold an invariant** (ADR-0179), as
@@ -830,11 +834,19 @@ impl Granted {
 /// Derived from the contract's imports filtered by what was granted, so a host
 /// cannot install an interface for a capability the decision refused, and
 /// cannot install one the node happens to have.
+///
+/// **A read is linked with no grant** (ADR-0277): a materialization's read of
+/// a resource's value is a dependency, not authority, as a page's reading of
+/// a query is. The resource holds its own authority, which its component is
+/// admitted for when the host runs it to answer.
 pub fn linkable(contract: &ComponentContract, granted: &Granted) -> Vec<String> {
     let mut out: Vec<String> = contract
         .imports
         .iter()
-        .filter(|i| granted.handle(&i.capability).is_some())
+        .filter(|i| {
+            granted.handle(&i.capability).is_some()
+                || (i.reads.is_some() && i.capability.is_empty())
+        })
         .map(Import::key)
         .collect();
     out.sort();

@@ -813,6 +813,127 @@
     ]
   },
   {
+    "component_id": "store.page.MenuLine",
+    "capability_mapping": 1,
+    "abi_schema": "5ec433c9716c4bd5",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.page.MenuSize",
+        "name": "MenuSize",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:host/reads",
+        "name": "store-page-menu-size",
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "store.page.MenuCount"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "reads": "store.page.MenuSize"
+      }
+    ],
+    "exports": [
+      {
+        "name": "MenuLine",
+        "kind": "materialization",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-menu-line-api@0.1.0",
+          "function": "menu-line"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.MenuSize",
+    "capability_mapping": 1,
+    "abi_schema": "4d20ba93682c9f9f",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.page.Menu",
+        "name": "Menu",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:host/reads",
+        "name": "store-page-menu",
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.MenuSection"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "reads": "store.page.Menu"
+      }
+    ],
+    "exports": [
+      {
+        "name": "MenuSize",
+        "kind": "materialization",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-menu-size-api@0.1.0",
+          "function": "menu-size"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.Order",
     "capability_mapping": 1,
     "abi_schema": "6def0e0e60df40e2",
@@ -1223,6 +1344,12 @@
       {
         "interface": "pw:app/store.page.Menu",
         "name": "Menu",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.MenuLine",
+        "name": "MenuLine",
         "owner": "external",
         "kind": "component"
       },
