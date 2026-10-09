@@ -101,6 +101,21 @@ test.afterEach(async ({ page }, testInfo) => {
     body: JSON.stringify(said, null, 2),
     contentType: "application/json",
   });
+  // And the server's: what happened to the document's frames, and each
+  // long hold of its table. With the runtime's record alone (run
+  // 37877464406), the read was applied and the stream never seen to end,
+  // and nothing said where the frames were.
+  const doc = [...(said.network ?? []).join("\n").matchAll(/stream\?doc=(\d+)/g)].at(-1)?.[1];
+  if (doc) {
+    const server = await page.request
+      .get(`/bench/records?doc=${doc}`)
+      .then((r) => r.json())
+      .catch((e) => ({ unavailable: String(e) }));
+    await testInfo.attach("server", {
+      body: JSON.stringify(server, null, 2),
+      contentType: "application/json",
+    });
+  }
 });
 
 /** The home page, its handlers attached. */
@@ -446,7 +461,9 @@ test("Load more shows the next page, and a post after it is shown over it", asyn
     await held;
     await route.continue();
   });
-  const text = `After more in ${testInfo.project.name}, ${Date.now()}`;
+  // Unique among repeats: two run at once wrote one text, and a test read
+  // the other's post as its own.
+  const text = `After more in ${testInfo.project.name}, ${Date.now()} ${testInfo.repeatEachIndex}`;
   await page.getByLabel("What's happening?").fill(text);
   await page.getByRole("button", { name: "Post" }).click();
   await expect(rows.first()).toContainText(text);
