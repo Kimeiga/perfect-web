@@ -47,7 +47,8 @@ test.describe.configure({ mode: "serial" });
 // `/stream` and `/pw-read` was asked, answered and ended, a stream's
 // cursors and a read's answer. Recorded beside the page, not in it.
 const network = new WeakMap();
-test.beforeEach(async ({ page }) => {
+/** Record what the network sees of `page`'s subscription and reads. */
+function watch(page) {
   const seen = [];
   network.set(page, seen);
   const started = Date.now();
@@ -75,7 +76,8 @@ test.beforeEach(async ({ page }) => {
           : body.slice(0, 80);
     seen.push(`${ended} ended ${named(r.url())}: ${said}`);
   });
-});
+}
+test.beforeEach(async ({ page }) => watch(page));
 
 // What the page's runtime said, beside a failure and its trace: its log,
 // its transport, how often it asked again, the versions it holds and
@@ -84,8 +86,13 @@ test.beforeEach(async ({ page }) => {
 // and the page kept its twenty rows. With the runtime's (run 37707617400),
 // the read was applied, `{"applied":1}`, one stream was asked and none
 // after it, and the runtime logged no failure.
-test.afterEach(async ({ page }, testInfo) => {
-  if (testInfo.status === testInfo.expectedStatus) return;
+/**
+ * Attach what `page`'s runtime and the server said of its document, each
+ * named with `name`: a test of several pages records each (run 37893301747:
+ * a follow's second reader was told nothing, and only the first page's
+ * record could be attached).
+ */
+async function record(page, testInfo, name = "") {
   const said = await page
     .evaluate(() => ({
       log: window.__pw?.log ?? null,
@@ -97,7 +104,7 @@ test.afterEach(async ({ page }, testInfo) => {
     }))
     .catch((e) => ({ unavailable: String(e) }));
   said.network = network.get(page) ?? null;
-  await testInfo.attach("runtime", {
+  await testInfo.attach(`runtime${name}`, {
     body: JSON.stringify(said, null, 2),
     contentType: "application/json",
   });
@@ -111,11 +118,15 @@ test.afterEach(async ({ page }, testInfo) => {
       .get(`/bench/records?doc=${doc}`)
       .then((r) => r.json())
       .catch((e) => ({ unavailable: String(e) }));
-    await testInfo.attach("server", {
+    await testInfo.attach(`server${name}`, {
       body: JSON.stringify(server, null, 2),
       contentType: "application/json",
     });
   }
+}
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  await record(page, testInfo);
 });
 
 /** The home page, its handlers attached. */
@@ -671,22 +682,32 @@ test("a follow shows before the server answers, and is the server's after", asyn
   await expect(page.locator("#follow")).toHaveCount(1);
 });
 
-test("a follow reaches another reader of the page without a reload", async ({ browser }) => {
+test("a follow reaches another reader of the page without a reload", async ({ browser }, testInfo) => {
   // Two readers, each a session of its own.
   const [one, two] = await Promise.all([browser.newContext(), browser.newContext()]);
   const [a, b] = await Promise.all([one.newPage(), two.newPage()]);
-  await profile(a, "u-grace");
-  await profile(b, "u-grace");
-  await b.evaluate(() => {
-    window.__unreloaded = true;
-  });
-  const before = await followers(b);
-  await a.locator("#follow").click();
-  await expect(b.locator("#follow-counts")).toHaveText(new RegExp(`^${before + 1} follower`));
-  expect(await unreloaded(b)).toBe(true);
-  await a.locator("#unfollow").click();
-  await expect(b.locator("#follow-counts")).toHaveText(new RegExp(`^${before} follower`));
-  await Promise.all([one.close(), two.close()]);
+  watch(a);
+  watch(b);
+  try {
+    await profile(a, "u-grace");
+    await profile(b, "u-grace");
+    await b.evaluate(() => {
+      window.__unreloaded = true;
+    });
+    const before = await followers(b);
+    await a.locator("#follow").click();
+    await expect(b.locator("#follow-counts")).toHaveText(new RegExp(`^${before + 1} follower`));
+    expect(await unreloaded(b)).toBe(true);
+    await a.locator("#unfollow").click();
+    await expect(b.locator("#follow-counts")).toHaveText(new RegExp(`^${before} follower`));
+  } catch (failed) {
+    // Each reader's record: the default page is none of theirs.
+    await record(a, testInfo, " (the reader who follows)");
+    await record(b, testInfo, " (the reader told)");
+    throw failed;
+  } finally {
+    await Promise.all([one.close(), two.close()]);
+  }
 });
 
 test("your own page says it is yours", async ({ page }, testInfo) => {
