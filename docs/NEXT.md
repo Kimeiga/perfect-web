@@ -467,7 +467,37 @@ E14 comes before E11-E13. Its plan, controls and task list are
                 contract;
              4. a placement diagnostic cut short: PW5002 says "cannot run in
                 any world: it requires" and nothing after it, where a label
-                alone, not an effect, rules out every world.
+                alone, not an effect, rules out every world;
+
+             and, open, next, **a refusal is never silent** (the owner's,
+             using the feed by hand, relayed 2026-10-08 23:30). Signed out,
+             a reader types into the home page's composer and presses Post:
+             the post shows, then goes, with no word. The server refuses it
+             (`requires SignedIn`, 403) and the speculation is taken back,
+             so the safety net holds, but the press fails silently, the
+             dead button this project exists to remove. In order, each its
+             own ADR where it rules:
+             1. the feed's composer is a signed-in reader's, hidden from
+                one signed out as W4 hid the conversation's (ADR-0279). It
+                sits outside `{#if me.signed_in}` because a bound draft in
+                a block a query decides is not rendered again (ADR-0137);
+             2. a refusal shown by the runtime (W1's queued item, raised):
+                a command refused by its `requires` (403, its predicate) is
+                told to the reader where the press was, in an accessible
+                status, in the predicate's own words, which the predicate
+                declares; a stale tab's among them. Never only
+                `data-pw-handler-error` and a log line;
+             3. the compiler holds what the page can tell: a control whose
+                handler sends a command `requires P` is rendered only where
+                the page shows `P` holds, through the predicate's declared
+                witness on the page's principal (ADR-0270), or it is
+                refused; and speculation is never made for a press the page
+                knows will be refused. Ruled with research, the witness's
+                form first.
+
+             And for the tests: a kept-alive `/command` request is not
+             listed among the page's resource-timing entries, so no
+             browser test relies on them for one.
              Further grammar and clause defects go under 0047-a below,
              unless the feed, the next Twitter item or soundness needs one;
           2. ~~map keys (0057-a)~~ (ADR-0248, `just e14-map-keys`) and ~~`let
