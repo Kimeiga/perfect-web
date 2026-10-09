@@ -1,13 +1,13 @@
 kiokun.com's parity inventory, held to the SvelteKit app it inventories
 
 produced by: just e14-kiokun-inventory (local: reads a kiokun-data checkout)
-commit: a95802db7e3a937eeecfbebebeff3545bb7ff21d
+commit: 3debcd387e81316fbe1babd1992e9f56dff689f5
 python: Python 3.12.8
 
 == the inventory against the app (scripts/kiokun_inventory.py)
 
 the app: /Users/haki/code/kiokun-data/output_dictionary/../sveltekit-app at abf71a89af1111f4039578cd1fde58e06f14c4bf + uncommitted changes to 11 file(s)
-the inventory: ADR-XXXX-kiokun-parity-inventory.md
+the inventory: ADR-0285-kiokun-parity-inventory.md
 routes: 102 (49 pages, 53 endpoints)
 marked: 0 built, 4 partial, 98 missing
 features: 63, marked 4 built, 11 partial, 48 missing
