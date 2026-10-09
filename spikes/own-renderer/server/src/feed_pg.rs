@@ -46,6 +46,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0006_notifications",
         include_str!("../migrations/feed/0006_notifications.sql"),
     ),
+    // Track `messages` (ADR-0279): a message, and each reader's mark.
+    (
+        "0007_messages",
+        include_str!("../migrations/feed/0007_messages.sql"),
+    ),
 ];
 
 /// **How a command's transaction is opened.** The layer sets serializable on
@@ -465,6 +470,53 @@ fn reads_through(
                     .map_err(pg)
             })?]),
             other => Err(format!("posts#author received {other:?}")),
+        }),
+    );
+    // Track `messages` (ADR-0279): a reader's conversation, their list and
+    // count, each by the reader's handle, and who may message whom: in the
+    // command's transaction where a command reads it.
+    let r = run.clone();
+    ops.insert(
+        "feed:data/messages#conversation".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(reader), Val::String(with), Val::S64(limit)] => Ok(vec![r(&mut |c| {
+                crate::messages::pg::conversation(c, reader, with, *limit).map_err(pg)
+            })?]),
+            other => Err(format!("messages#conversation received {other:?}")),
+        }),
+    );
+    let r = run.clone();
+    ops.insert(
+        "feed:data/messages#list".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(reader)] => Ok(vec![r(&mut |c| {
+                crate::messages::pg::list(c, reader).map_err(pg)
+            })?]),
+            other => Err(format!("messages#list received {other:?}")),
+        }),
+    );
+    let r = run.clone();
+    ops.insert(
+        "feed:data/messages#unread".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(reader)] => Ok(vec![r(&mut |c| {
+                crate::messages::pg::unread(c, reader)
+                    .map(Val::S64)
+                    .map_err(pg)
+            })?]),
+            other => Err(format!("messages#unread received {other:?}")),
+        }),
+    );
+    let r = run.clone();
+    ops.insert(
+        crate::messages::MAY.to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(from), Val::String(to)] => Ok(vec![r(&mut |c| {
+                crate::messages::pg::may(c, from, to)
+                    .map(Val::Bool)
+                    .map_err(pg)
+            })?]),
+            other => Err(format!("messages#may received {other:?}")),
         }),
     );
     let (r, p) = (run, principals.clone());
@@ -1105,6 +1157,34 @@ impl crate::data::DataLayer for FeedPg {
                     }
                     other => Err(format!("posts#delete received {other:?}")),
                 }
+            }),
+        );
+        // Track `messages` (ADR-0279): a message from the session's user,
+        // written by the author a post is, and the sender's side read to it,
+        // in the command's transaction. Who may is `requires
+        // MayMessage(to)`'s, evaluated in this transaction before the command
+        // runs.
+        let p = principals.clone();
+        write(
+            "feed:data/messages#send",
+            Arc::new(move |c: &mut Client, args: &[Val]| match args {
+                [Val::String(session), Val::String(to), Val::String(text)] => {
+                    let from = author(c, &p, session)?;
+                    let sent = crate::messages::pg::send(c, &from, to, text).map_err(pg)?;
+                    Ok((ok(sent), true))
+                }
+                other => Err(format!("messages#send received {other:?}")),
+            }),
+        );
+        // Track `messages`: a reader's conversation, read.
+        write(
+            "feed:data/messages#read",
+            Arc::new(|c: &mut Client, args: &[Val]| match args {
+                [Val::String(reader), Val::String(with)] => {
+                    let read = crate::messages::pg::read(c, reader, with).map_err(pg)?;
+                    Ok((ok(Val::S64(read)), true))
+                }
+                other => Err(format!("messages#read received {other:?}")),
             }),
         );
         let (p, l) = (principals, leases.clone());

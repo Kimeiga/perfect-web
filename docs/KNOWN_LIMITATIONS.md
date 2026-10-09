@@ -255,8 +255,10 @@ refused by name:
   A function a template calls can map a state to nothing with a catch-all,
   and the template shows what it returns.
 - **A command a page sends is keyed by its interaction** (ADR-0154), and the
-  runtime still sends each request once: with every one keyed it could retry
-  safely, as RFC 9110 then allows, and does not yet.
+  runtime sends a request again only where no answer came, as its command's
+  `retry` declares and at most that many times (ADR-0173); a command with
+  no `retry` is sent once. (This entry said it sent each once until
+  2026-10-08, after ADR-0173 had made it resend.)
 - **A key a page changes** (ADR-0152):
   - **Only a page's own `let` query is keyed by a signal.** A view's signal,
     and a `<stream>`'s query, are not.

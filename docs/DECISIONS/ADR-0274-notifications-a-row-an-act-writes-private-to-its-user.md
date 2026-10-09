@@ -1,6 +1,7 @@
 # ADR-0274: notifications, a row a like, a reply or a follow writes, private to its user
 
-Status: proposed by track `notifications` (W3, `track/notifications`), under
+Status: accepted at its merge, 2026-10-08, under the owner's delegation of
+2026-10-02; proposed by track `notifications` (W3, `track/notifications`), under
 the integrator's rulings of 2026-10-07 (docs/PARALLEL.md, "notifications
 (W3)"), on the typed principal of the ADR beside it ("the reader's user is
 the host's, and a listener's handle binds a user's id"). Date: 2026-10-08.

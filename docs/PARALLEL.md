@@ -301,3 +301,168 @@ Each a decision for a track, with its date; a track's ADR records it too.
     then the pages; then live delivery and the third-user tests; then the
     browser suite in three engines and the mutation controls,
     `e14-messages`.
+- **2026-10-08, at messages' merge (ADR-0279).** W4 merged from its tip,
+  `87dbea0`, rebased on ADR-0277 and ADR-0278; numbered ADR-0279 at the
+  merge, as ADR-0274 was. Its finding, the database job past its limit,
+  became ADR-0278, under which its recipe ran in a shard of its own. Its
+  verification was red only on WebKit's "Load more", NEXT's open item.
+  Blocking is the integrator's next of its leftovers.
+- **2026-10-08, the DoorDash customer app's tracks (the owner's target,
+  relayed 2026-10-08).** One worker at a time beside the integrator, each
+  launched here when the slot frees, with its own rulings then; the order
+  and why are NEXT's:
+  - **W5, the store's data on PostgreSQL**, after W4's merge: the store
+    behind the DataLayer seam as the feed is (ADR-0246), with its
+    guarantees stated as ADR-0207 states a source's. Disjoint from the
+    integrator's soft navigation, which is the runtime's; the integrator's
+    accounts in the store wait for its merge, since they change its
+    tables.
+  - **W6, kiokun.com in Pleris**, beside W5, as the owner chose (the
+    owner's production target, relayed 2026-10-08; NEXT): parity with the
+    live site, served here first, with no deploy, cutover or DNS change
+    without the owner's go. Its rulings are below.
+  - **W7, search and filters**, after W6: run in the database or a
+    declared search source; no search engine is built here.
+  - **W8, ratings and reviews**, after W7 and the integrator's accounts: a
+    review is a user's.
+  - **The integrator's**: the soft navigation, the store's accounts,
+    delivery addresses, store hours, and checkout with payment, the last
+    the integrator's because a payment capability is `secret<Payments>`
+    and any crate it needs waits for the owner's approval.
+- **2026-10-08, the store on PostgreSQL (W5's plan).** Track `store-pg`,
+  branch `track/store-pg`, the store's data behind the DataLayer seam on
+  PostgreSQL as the feed's is (ADR-0246), so that each DoorDash gap after it
+  is built and tested on both layers. Its own ADR, `ADR-XXXX`, numbered at
+  the merge. The rulings, from a map of the store's data (2026-10-08):
+  - **Found, first: an order keeps its lines.** ADR-0193 rules that an
+    order is the cart's lines and a status, but `orders#place` keeps the
+    status alone, and the lines go with the emptied cart. Fix it in memory
+    first, with its test, then carry it to PostgreSQL.
+  - **All of the store's state through the seam**, in both layers. Today
+    much of it bypasses the seam:
+    - the menus: store 47's is written by `broadcast_menu` and a test
+      route, and store 48's and the catalogue are code;
+    - the stock, the recommender and the estimates, the notice, the
+      preparation time and the categories, each written by a `/bench`
+      route.
+
+    Each becomes a write the layer stages and commits, its events in the
+    same transaction. A route that changes data is a command's path, not a
+    direct write. The fault hooks stay test controls, which the layer
+    applies.
+  - **Delivery: a session's cart reaches its pages on PostgreSQL too.** The
+    host redraws a session's cart from the materializer's SQLite outbox
+    (`drain_held`). A layer whose commit keeps its own outbox writes nothing
+    there, and the cart would never be sent. W5 makes the events its commit
+    delivers reach the materializer as the feed's do, and tests a cart
+    change reaching an open page on PostgreSQL.
+  - **Its own schema, migrations and lock** (`migrations/store/`, its own
+    version table and advisory lock), never the feed's. Every command runs
+    serializable, and `provides()` measures it as the feed's does.
+  - **Its guarantees.** The store's `source StoreData`
+    (`examples/lib/StoreData.pw`) is held to the database it opens. Its
+    comment, "one SQLite database", is corrected. The grants no source
+    holds (`Notices`, `Kitchen`, `Categories`) are held by a source or
+    stated.
+  - **Tests on both layers.** A store test that reads the in-memory
+    layer's internals (`cart_value`'s `self.store.carts`,
+    `materializer.state("cart:..")`, `s.store.orders`, and the rest) reads
+    through the layer instead, so that it runs on both. The server's store
+    tests run on PostgreSQL, each in a schema of its own, as the feed's do.
+    Among them, on PostgreSQL:
+    - a refused commit commits neither its state nor its event;
+    - eight sessions adding five times each commit all forty;
+    - a retried interaction runs its command once.
+
+    Then parity in memory and on PostgreSQL, and the negative controls.
+    The browser suite stays in memory, as the feed's does.
+  - **Its recipe and mutation controls**: `e14-store-postgres`, in
+    `NEEDS_DATABASE`. The thirteen scripts whose anchors are in `store.rs`
+    are re-anchored and run whole. Its own controls include a commit
+    without its events, an order without its lines, the outbox not read
+    back, and the isolation not measured.
+  - **Not claimed**, inherited from ADR-0246: a second host; idempotency
+    committed with the writes (PW0348), queued before checkout as the
+    integrator's; a measured serialization failure; and the browser suite
+    on PostgreSQL.
+  - **Disjoint from the integrator's work**: the soft navigation is the
+    runtime's, and ADR-0280 changes the store's page and `store-ir.json`
+    only, where a rebase meets it. The integrator's accounts in the store
+    wait for this track's merge.
+- **2026-10-08, W5's five design points (answered the same day).**
+  1. **`commit_staged`, one commit path** for commands and the store's
+     routes that change data: accepted. A layer that keeps its own outbox
+     and has the session's entry (the store on PostgreSQL) records what its
+     commit read back into the materializer after the commit. That record
+     is the rows and the events in one materializer transaction, the shape
+     the in-memory path commits, so `drain_held`, `committed_basis` and the
+     cart's entry are as they are in memory. PostgreSQL stays the authority.
+     A record that fails after the commit is logged, and the command is
+     answered committed. Tested: a cart changed on PostgreSQL reaches the
+     session's open page.
+  2. **A route that changes data stages a store-only operation** through
+     `data.begin` and commits it with the route's declared events in one
+     transaction: accepted as "a command's path". The merchant's side is
+     out of scope, so these are the host's operations, not the program's
+     commands. Tested: a program that names one of them is not linked to
+     it, since no grant gives it. The fault hooks stay test controls in
+     `store::Faults`.
+  3. **`StoreLayer` beside an unchanged `DataLayer`**, and
+     `PW_STORE_DATABASE_URL`: accepted, with one change. The store's
+     connections set `search_path` to the store's schema alone, never the
+     feed's. Its own `outbox`, its own migration table and its own advisory
+     lock live there, so no unqualified name can reach the feed's tables.
+  4. **`feed_pg.rs`'s helpers made `pub(crate)`**, visibility only:
+     accepted. If a shared helper changes behaviour later, the feed's
+     mutation scripts run whole.
+  5. **The whole server suite on both layers**
+     (`PW_STORE_TEST_LAYER=postgres`, each server in a schema of its own,
+     dropped with it): accepted, as the stronger evidence. `just ci` runs
+     it in memory; `e14-store-postgres` runs it both ways, on CI in its own
+     shard.
+  - **Its finding, W5's to fix**, since it lies in the commit path it
+    factors: `place_order`'s `OrderChanged` is never consumed from the
+    materializer's outbox in memory, so each order placed leaves a row for
+    good. Every event a commit stages is consumed once delivered. Tested
+    in both layers: after orders are placed and delivered, the outbox
+    holds nothing.
+- **2026-10-08, kiokun.com in Pleris (W6's plan), launched beside W5.** Two
+  workers at once is the owner's choice (relayed 2026-10-08), at the cost of
+  usage, and no more than two. Track `kiokun`, branch `track/kiokun`, from
+  the kiokun slice (ADR-0037, ADR-0041; `examples/kiokun/`). Its ADRs are
+  `ADR-XXXX`, numbered at the merge. Its recipes live in `just/kiokun.just`.
+  Its code block is **PW60** (`Owner::Kiokun => "PW60"`). Its hosts are at
+  PORT+120..122 (`KIOKUN_PORTS`), and its Playwright runs use PORT=7241 (W5
+  has 7141).
+  - **The data** is read through `KIOKUN_DATA`, the kiokun-data checkout's
+    `output_dictionary` (1,485,890 raw-DEFLATE JSON files, 6.4 GB), as `just
+    e10-kiokun` reads it. It is never copied here, and nothing is written
+    into that checkout. A rule of kiokun's (a file name's escape, the shard
+    rule, the search index's rows) is read from the builder's source,
+    `src/main.rs` and `src/search_index_builder.rs`, before it is inferred
+    from the output.
+  - **First, the parity inventory.** It covers every route and feature of
+    the SvelteKit site (`sveltekit-app/src/routes`: `[word]`, `api`,
+    `blog`, `category`, `courses`, `custom-words`, `drill`, `frequency`,
+    `game`, `homophones` and the rest). Each is marked built in Pleris,
+    partial or missing, with what it needs of the language or the platform.
+    The inventory is a document and the track's first ADR. The gaps are
+    then built in the order the integrator rules from it.
+  - **What a gap needs of the language, the runtime or the host goes to
+    the integrator as a question.** It is not built around them in the
+    track's files. The integrator rules on it, and usually builds it, as
+    notifications' typed principal was.
+  - **Parity is measured** against the SvelteKit app run here on the same
+    data, where it runs with what is installed. Installing its packages is
+    a download and waits for the owner. The live site is read only for a
+    small sample, and gently.
+  - **Served here first.** Any deployment waits for the owner's explicit
+    go, asked in the integrator's session: a preview origin among them, a
+    DNS change and a cutover. The track holds no credentials for any host.
+  - **What needs the owner's local data is local.** A run over the whole
+    dictionary is recorded on this machine, and its recipe says so (charter
+    §13.5's split, as `LOCAL_ONLY`'s). What a committed sample can show,
+    as `scripts/kiokun_sample.py` makes one, runs on CI.
+  - **In order**: the inventory and its ADR; then the gaps in the order the
+    integrator gives; each with its tests, its browser suite in three
+    engines, its mutation controls and its recipe.

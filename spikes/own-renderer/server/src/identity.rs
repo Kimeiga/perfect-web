@@ -707,6 +707,8 @@ impl Identity {
     ///   the command's own operations (`feed:data/posts#thread`), so within
     ///   the command's transaction: the post it deletes is the post it was
     ///   shown to own.
+    /// - TRACK SEAM (messages): `MayMessage(to)`: the session's principal may
+    ///   message `to` (`messages.rs`), read the same way.
     pub fn requires(
         &self,
         predicate: &str,
@@ -750,6 +752,10 @@ impl Identity {
                     other => Err(format!("posts#thread answered {other:?}")),
                 }
             }
+            // TRACK SEAM (messages): `MayMessage(to)`, the session's principal
+            // may message `to`, read through the command's own operations, so
+            // within its transaction, as `OwnsPost(post)` is.
+            "MayMessage" => crate::messages::may_message(self.principals.of(session), bound, host),
             other => Err(format!(
                 "the development deployment has no authorization predicate `{other}`"
             )),

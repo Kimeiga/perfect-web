@@ -1,0 +1,67 @@
+ADR-XXXX - direct messages: a conversation read from each side
+
+produced by: just e14-messages
+commit: aceea044654f0dc439daa621119666d3a3613101
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+postgres: 18.6 (Homebrew)
+
+== the server (messages.rs, tests/messages.rs)
+
+test messages::tests::who_may_message_whom_is_xs_rule ... ok
+test messages::tests::sending_marks_the_senders_side_read_and_not_the_recipients ... ok
+test messages::tests::a_readers_list_is_theirs_newest_first_and_counts_each_conversation ... ok
+test messages::tests::a_conversation_shows_the_newest_messages_oldest_first ... ok
+test tests::messages::a_message_drops_both_users_entries_alone ... ok
+test tests::messages::a_message_reaches_both_users_sessions_and_no_third_users ... ok
+test tests::messages::on_postgres_reading_a_conversation_reaches_each_of_the_readers_sessions ... ok
+test tests::messages::on_postgres_a_third_user_signed_in_and_not_sees_none_of_it ... ok
+test tests::messages::a_third_user_signed_in_and_not_sees_none_of_it ... ok
+test tests::messages::a_message_is_shown_on_both_sides_and_counted_for_its_recipient ... ok
+test tests::messages::a_messages_text_is_held_to_its_length_where_it_arrives ... ok
+test tests::messages::a_follow_opens_the_composer_of_the_open_conversation ... ok
+test tests::messages::on_postgres_a_message_drops_both_users_entries_alone ... ok
+test tests::messages::on_postgres_a_message_reaches_both_users_sessions_and_no_third_users ... ok
+test tests::messages::on_postgres_a_follow_opens_the_composer_of_the_open_conversation ... ok
+test tests::messages::on_postgres_a_message_is_shown_on_both_sides_and_counted_for_its_recipient ... ok
+test tests::messages::reading_a_conversation_reaches_each_of_the_readers_sessions ... ok
+test tests::messages::who_may_message_whom_is_xs_rule ... ok
+test tests::messages::on_postgres_who_may_message_whom_is_xs_rule ... ok
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 283 filtered out; finished in 17.55s
+
+== the browser in three engines (e2e/messages.spec.mjs)
+
+  9 passed (1.2m)
+
+== mutation controls (scripts/messages_mutations.py)
+
+baseline (server): 19 passed, 0 failed
+baseline (browser): 9 passed, 0 failed
+baseline (postgres): 7 passed, 0 failed
+a third user sees a conversation: its rows are anyone's with either user: KILLED (2 of 19 tests fail)
+another user's conversations are listed: KILLED (3 of 19 tests fail)
+another user's messages are counted unread: KILLED (5 of 19 tests fail)
+the conversation is cached shared, every reader's: KILLED (15 of 19 tests fail)
+MayMessage inverted: KILLED (13 of 19 tests fail)
+MayMessage skipped: anyone messages anyone: KILLED (2 of 19 tests fail)
+being followed is not leave: following someone is: KILLED (9 of 19 tests fail)
+messaging yourself allowed: KILLED (2 of 19 tests fail)
+the recipient's sessions are not told: the count listens for what the reader sends alone: KILLED (2 of 19 tests fail)
+the recipient's open conversation is not told: KILLED (2 of 19 tests fail)
+a follow does not open the composer: the conversation listens for no follow: KILLED (15 of 19 tests fail)
+sending does not mark the sender's side read: KILLED (3 of 19 tests fail)
+reading a conversation reads nothing: KILLED (2 of 19 tests fail)
+reading reaches no other session: it invalidates nothing: KILLED (15 of 19 tests fail)
+a message writes a notification: KILLED (1 of 19 tests fail)
+on PostgreSQL, following someone is leave to message them: KILLED (7 of 7 tests fail)
+on PostgreSQL, sending does not mark the sender's side read: KILLED (2 of 7 tests fail)
+on PostgreSQL, a third user sees a conversation: KILLED (2 of 7 tests fail)
+in the browser, a third user sees a conversation: KILLED (3 of 9 tests fail)
+in the browser, the composer is shown where its reader may not send: KILLED (3 of 6 tests fail)
+in the browser, MayMessage skipped: KILLED (3 of 6 tests fail)
+in the browser, a message shown before the server answers does not wait: KILLED (3 of 3 tests fail)
+in the browser, no row waits (waiting_rows' mutant): KILLED (3 of 3 tests fail)
+in the browser, a reply waits, and nothing else (waiting_rows' mutant): KILLED (3 of 3 tests fail)
+in the browser, a row the server made waits too (waiting_rows' mutant): KILLED (3 of 3 tests fail)
+25 of 25 mutants killed

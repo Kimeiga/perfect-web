@@ -17,6 +17,7 @@ export PATH := toolchain_bin + ":" + env_var('PATH')
 import 'just/identity.just'
 import 'just/uploads.just'
 import 'just/notifications.just'
+import 'just/messages.just'
 
 default:
     @just --list
