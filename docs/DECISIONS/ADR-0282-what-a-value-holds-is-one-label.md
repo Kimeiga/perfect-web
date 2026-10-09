@@ -100,6 +100,10 @@ Milestone: E14. Amends ADR-0118 (its fifth decision) and corrects ADR-0128.
     contract's demand joins `Reads::holds`, whose declared fixed point
     covers every label the replaced map named. This script's "the contract
     reads the keywords alone" undoes what is left, and is killed.
+- **CI's second verification, run 37884174635, passed** at `e8bb7ec`:
+  every shard and every engine. Its six files are fetched into
+  `docs/evidence/` (`just evidence-fetch 37884174635`), among them
+  `E14/held-labels.txt` (8 of 8) and `E10/reads-through-calls.txt` (5 of 5).
 
 ## Not claimed
 
