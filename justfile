@@ -113,7 +113,7 @@ test-unit:
 test-compile:
     # ADR-0276: the reference apps, the demo and the generality cases too;
     # `examples/history` keeps the sources as they were.
-    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw
+    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw examples/kiokun-site/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw
     cargo run --quiet -p corpus-check -- examples
     # The accepted corpus as the ONE program it is: the shared library plus
     # every accepted file. Feeding it the rejected files too would ask the
@@ -127,6 +127,8 @@ test-compile:
     # The kiokun slice (E10): a second application, and the first to use the
     # platform package without the store's domain.
     cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw
+    # kiokun.com in Pleris (track `kiokun`), beside the slice's shard rule.
+    cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/Shards.pw examples/kiokun/dictionary.pw examples/kiokun-site/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
 # E7V — the resume-version deployment matrix. Every row of the architect's
@@ -5263,7 +5265,7 @@ e14-fmt-meaning:
        echo; echo "== a number's grouped digits (compiler/pw-core/tests/backend_lowering.rs)"; echo; \
        cargo test --locked -p pw-core --test backend_lowering 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== every program held to pw fmt --check"; echo; \
-       cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw 2>&1; \
+       cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw examples/kiokun-site/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw 2>&1; \
        echo; echo "== mutation controls (scripts/fmt_meaning_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/fmt_meaning_mutations.py; \
      } > docs/evidence/E14/fmt-meaning.txt

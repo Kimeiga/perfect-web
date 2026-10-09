@@ -539,6 +539,8 @@ mod notifications;
 mod materializations;
 // TRACK SEAM (messages): direct messages.
 mod messages;
+// TRACK SEAM (kiokun): kiokun's dictionary, read (docs/PARALLEL.md, W6).
+mod kiokun;
 
 struct Server {
     /// The templates the compiler emitted, deserialized once.
@@ -1079,6 +1081,14 @@ impl Server {
             .any(|i| i.interface.starts_with("feed:"))
         {
             feed.unwrap_or_else(|| Arc::new(feed::FeedData::new()))
+        } else if contracts
+            .iter()
+            .flat_map(|c| &c.imports)
+            .any(|i| i.interface.starts_with("kiokun:"))
+        {
+            // TRACK SEAM (kiokun): kiokun's files, read-only, where the
+            // program imports `kiokun:data/…` (docs/PARALLEL.md, W6, Q2).
+            Arc::new(kiokun::KiokunData::new())
         } else {
             store.clone()
         };
@@ -10704,6 +10714,10 @@ public query Store(",
     // TRACK SEAM (messages): direct messages, in memory and on PostgreSQL
     // where a database is named.
     mod messages;
+
+    // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
+    // files (docs/PARALLEL.md, W6).
+    mod kiokun;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent

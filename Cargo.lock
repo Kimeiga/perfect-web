@@ -1261,6 +1261,7 @@ dependencies = [
  "argon2",
  "base64",
  "getrandom 0.4.3",
+ "miniz_oxide",
  "postgres",
  "pw-core",
  "pw-document",
