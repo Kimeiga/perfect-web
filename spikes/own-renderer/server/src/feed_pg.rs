@@ -65,7 +65,7 @@ pub(crate) enum Isolation {
 
 /// A database error, as one line: its SQLSTATE and message where the server
 /// sent one.
-fn pg(e: postgres::Error) -> String {
+pub(crate) fn pg(e: postgres::Error) -> String {
     match e.as_db_error() {
         Some(db) => format!("PostgreSQL {}: {}", db.code().code(), db.message()),
         None => format!("PostgreSQL: {e}"),
@@ -73,7 +73,7 @@ fn pg(e: postgres::Error) -> String {
 }
 
 /// An identifier, quoted.
-fn ident(name: &str) -> String {
+pub(crate) fn ident(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }
 
@@ -663,7 +663,7 @@ fn migrate(c: &mut Client) -> Result<(), String> {
 /// `String`, an `Int` or a `Bool`, which key an entry, and an invalidated
 /// entry's `_`, every value at its position, as `null` (ADR-0256). Anything
 /// else keys none and is refused, as the host's own outbox refuses it.
-fn json_of(name: &str, values: &[Option<Val>]) -> Result<String, String> {
+pub(crate) fn json_of(name: &str, values: &[Option<Val>]) -> Result<String, String> {
     let values = values
         .iter()
         .map(|v| match v {
@@ -812,7 +812,7 @@ fn names_blob(c: &mut Client, key: &str) -> Result<bool, postgres::Error> {
 
 /// **What the outbox committed, read back and consumed**: what is delivered
 /// is what was committed, and nothing else.
-fn delivered(c: &mut Client, ids: &[i64]) -> Result<Outboxed, String> {
+pub(crate) fn delivered(c: &mut Client, ids: &[i64]) -> Result<Outboxed, String> {
     let rows = c
         .query(
             "DELETE FROM outbox WHERE id = ANY($1) RETURNING id, kind, name, args::text",
