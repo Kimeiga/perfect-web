@@ -716,7 +716,34 @@ E14 comes before E11-E13. Its plan, controls and task list are
           3. **a multi-tenant SaaS admin** (item 22's): organizations and
              roles, data tables, charts, i18n, background jobs and email,
              webhooks, and an audit log;
-          4. **the app on three kinds of database** (item 22's third);
+          4. **the app on three kinds of database** (item 22's third), on
+             the databases the owner approved (relayed 2026-10-08), chosen to
+             differ most from PostgreSQL, the strong reference (ADR-0246,
+             W5). One app on each, behind the DataLayer seam, its `source`
+             stating what the database gives (ADR-0207), and each layer's
+             `provides()` measuring what the opened database gives, never
+             assuming it. Each database's guarantees verified against its
+             own documentation when it is reached:
+             - **SQLite, libSQL or Cloudflare D1**: a single writer, in one
+               file or at the edge;
+             - **MongoDB or Firestore**: documents, multi-document
+               transactions with their limits, and change streams or live
+               listeners where an outbox beside the data would be. Proven:
+               `emits` delivered from the change feed, as ruling 11 says for
+               a source without transactions;
+             - **Cassandra or ScyllaDB**: eventual consistency, and no
+               transaction across partitions. The decisive test: the
+               compiler refuses the cart's `transaction serializable` and
+               `read_your_writes` against this source, while the parts of
+               the app whose declarations it can satisfy build and run;
+             - optionally **CockroachDB**: PostgreSQL's wire protocol,
+               serializable by default, the cheapest way to show several
+               regions, perhaps sharing most of the PostgreSQL layer.
+
+             Each crate, npm package or server download, and running any of
+             these servers locally, waits for the owner's approval, asked
+             when it is reached; containers in CI are preferred, and nothing
+             is installed on the owner's machine without asking;
         - then what ruling 0073-a still refuses (several values, a page's
           parameter, the browser's values inside a block, instances), and
           everything below;

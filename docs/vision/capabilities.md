@@ -135,7 +135,9 @@ In the owner's order (NEXT):
    - webhooks;
    - an audit log.
 6. **The app on three kinds of database**: database independence, past
-   SQL.
+   SQL. The owner approved its databases (NEXT): SQLite, libSQL or D1;
+   MongoDB or Firestore; Cassandra or ScyllaDB; and, optionally,
+   CockroachDB.
 
 **Rows no planned app covers yet**: video and media; experiments, flags and
 analytics; AI token streaming; and a second host. They decide the app after
