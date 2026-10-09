@@ -5346,3 +5346,19 @@ e14-handlers-where-they-run:
        CARGO_INCREMENTAL=0 python3 scripts/handlers_where_they_run_mutations.py; \
      } > docs/evidence/E14/handlers-where-they-run.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/handlers-where-they-run.txt
+
+# ADR-XXXX: a mutation script's processes are bounded in memory. The bound's
+# tests and `mutation_baseline`'s, which starts it, and the mutation
+# controls.
+e14-mutation-bound:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a mutation script's processes are bounded in memory"; echo; \
+       echo "produced by: just e14-mutation-bound"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "python: $(python3 --version)"; echo "platform: $(uname -sm)"; echo; \
+       echo "== the bound (scripts/tests/test_mutation_bound.py, test_mutation_baseline.py)"; echo; \
+       python3 -m unittest -v scripts/tests/test_mutation_bound.py scripts/tests/test_mutation_baseline.py 2>&1 | grep -E ' \.\.\. |^Ran |^OK|^FAILED'; \
+       echo; echo "== mutation controls (scripts/mutation_bound_mutations.py)"; echo; \
+       python3 scripts/mutation_bound_mutations.py; \
+     } > docs/evidence/E14/mutation-bound.txt
+    @grep -E "^Ran |^OK|^FAILED|mutants killed" docs/evidence/E14/mutation-bound.txt

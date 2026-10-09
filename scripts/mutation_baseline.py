@@ -20,12 +20,21 @@ It keeps what `subprocess.Popen.communicate` returns, which
 `subprocess.run` calls. A script imports it in `main()`, not at its top, so
 that loading a script to read its mutants (`ci_plan.py`,
 `mutation_anchors.py`) needs nothing beside it.
+
+Imported, it also bounds in memory every process the script starts from
+then on (`mutation_bound.py`, 2026-10-09): a mutant's test that holds more
+than the bound is stopped, and the script's output says so.
 """
 
 import collections
 import re
 import subprocess
 import sys
+
+import mutation_bound
+
+# Every process the script starts from here on, bounded in memory.
+mutation_bound.start()
 
 # How many commands are kept: a baseline's, and whatever ran since.
 KEPT = 64
