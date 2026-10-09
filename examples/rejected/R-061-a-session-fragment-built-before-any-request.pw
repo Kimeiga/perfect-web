@@ -20,9 +20,9 @@ import context.{ current_session }
 
 materialize CartFragment() {
     // ERROR: the build world holds no session's value.
-    placement      build
-    depends_on     Cart(current_session())
-    regenerate     on_invalidation
-    stampede       single_flight
-    fallback       last_known_good
+    placement  build
+    depends_on Cart(current_session())
+    regenerate on_invalidation
+    stampede   single_flight
+    fallback   last_known_good
 }

@@ -24,7 +24,7 @@ query MyCart() -> Result<Cart, CartError> {
 }
 
 page BuiltViaHelper() {
-    route "/built-helper"
+    route     "/built-helper"
     // ERROR: the build world holds no session's value.
     placement build
     let cart = query MyCart()
