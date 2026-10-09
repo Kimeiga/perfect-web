@@ -103,6 +103,9 @@ pub enum Owner {
     /// ADR-0253: the messages track's codes, PW58xx: direct messages, a
     /// conversation read from each side, and who may message whom.
     Messages,
+    /// ADR-0253: the store-on-PostgreSQL track's codes, PW59xx: the store's
+    /// data behind the DataLayer seam on a database of its own.
+    StorePg,
     /// ADR-0253: the kiokun track's codes, PW60xx: kiokun.com, the owner's
     /// dictionary, rewritten in Pleris (docs/PARALLEL.md, W6's plan).
     Kiokun,
@@ -858,6 +861,7 @@ impl Owner {
             Owner::Uploads => "PW56",
             Owner::Notifications => "PW57",
             Owner::Messages => "PW58",
+            Owner::StorePg => "PW59",
             Owner::Kiokun => "PW60",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
@@ -920,6 +924,7 @@ mod tests {
                 (Owner::Uploads, "PW56"),
                 (Owner::Notifications, "PW57"),
                 (Owner::Messages, "PW58"),
+                (Owner::StorePg, "PW59"),
                 (Owner::Kiokun, "PW60"),
             ] {
                 assert!(
