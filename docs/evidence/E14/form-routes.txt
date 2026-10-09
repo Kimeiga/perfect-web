@@ -1,0 +1,34 @@
+ADR-0265 - a form goes where something answers it
+
+produced by: just e14-form-routes
+commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the checker (compiler/pw-core/tests/form_routes.rs)
+
+test a_form_that_sends_a_file_is_the_uploads_to_check ... ok
+test a_link_reaches_what_answers_a_get ... ok
+test a_form_is_sent_where_its_method_is_answered ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+== the host's routes (spikes/own-renderer/server/src/tests/sign_in.rs)
+
+test tests::sign_in::the_relying_party_answers_the_routes_the_compiler_knows ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 331 filtered out; finished in 6.84s
+
+== mutation controls (scripts/form_route_mutations.py)
+
+baseline: 4 passed, 0 failed
+a form is not checked: KILLED (1 of 4 tests fail)
+a form's method is not read: KILLED (2 of 4 tests fail)
+a form states `post` where it states none: KILLED (1 of 4 tests fail)
+a form's method is read in its case: KILLED (2 of 4 tests fail)
+a link reaches pages alone: KILLED (2 of 4 tests fail)
+the relying party's routes are not answered: KILLED (3 of 4 tests fail)
+what an upload serves is not answered: KILLED (1 of 4 tests fail)
+a page answers a post: KILLED (1 of 4 tests fail)
+a form that sends a file is checked here too: KILLED (1 of 4 tests fail)
+the development server's identity signs out on a get: KILLED (1 of 4 tests fail)
+10 of 10 mutants killed
+memory bound: no process was stopped

@@ -1,0 +1,45 @@
+ADR-0255 - a materialization may read another
+
+produced by: just e14-materialization-chains
+commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the checker (compiler/pw-core/tests/materialization_chains.rs)
+
+test a_clause_naming_no_resource_is_refused ... ok
+test a_materialization_may_read_another ... ok
+test a_reader_declared_before_what_it_reads_reads_it_too ... ok
+test the_key_audit_counts_what_a_materialization_read_separates ... ok
+test a_materialization_that_reads_itself_is_refused ... ok
+test a_shared_materialization_reads_no_private_one ... ok
+test what_a_materialization_reads_itself_passes_to_its_readers ... ok
+test what_it_gives_the_one_it_reads_is_checked ... ok
+test a_write_reaches_what_reads_a_materialization_it_changes ... ok
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+
+== the runtime's reads (runtime/pw-materialize/tests/reads.rs)
+
+test a_node_read_twice_is_followed_at_each_key ... ok
+test an_event_reaches_what_reads_a_materialization_it_reaches ... ok
+test a_key_the_reader_does_not_supply_reaches_every_entry ... ok
+test a_reader_of_what_the_event_does_not_reach_is_untouched ... ok
+test an_event_reaches_what_reads_its_listener ... ok
+test reads_that_form_a_cycle_end ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+== mutation controls (scripts/materialization_chains_mutations.py)
+
+baseline: 9 passed, 0 failed
+a materialization is no read: KILLED (5 of 9 tests fail)
+a materialization read is looked up among resources only: KILLED (1 of 9 tests fail)
+a cycle is not refused: KILLED (1 of 9 tests fail)
+a cycle is refused by each member: KILLED (1 of 9 tests fail)
+a shared materialization may read a private one: KILLED (1 of 9 tests fail)
+a clause naming no node is taken as it is: KILLED (1 of 9 tests fail)
+the key audit skips a materialization read: KILLED (1 of 9 tests fail)
+a materialization read's dimensions are not counted: KILLED (1 of 9 tests fail)
+what a materialization reads is not the reader's: KILLED (3 of 9 tests fail)
+one round reads what a reader declared first reads: KILLED (1 of 9 tests fail)
+10 of 10 mutants killed
+memory bound: no process was stopped

@@ -450,7 +450,20 @@ E14 comes before E11-E13. Its plan, controls and task list are
              browser's decision holds them to the same constants
              (`pw-resume-wasm`), so ADR-0132's checks of a document's schema
              and its privacy scope pass for any page, a private cart's
-             among them; and ~~**four soundness findings of 2026-10-03**~~
+             among them. **The build id is a constant too** (`BUILD`,
+             `"B1"`, read 2026-10-09), so the mixed-build check compares a
+             constant with itself; only the handler's identity is the
+             build's. ADR-0132 deferred both "until a page other than the
+             store's needs it", and the feed's and kiokun's pages do. The
+             integrator's, after the refusal and stream-records merges:
+             the build's id derived from what it built; `/pw-handlers`
+             answering it and each page's document schema, from the build
+             the runtime was served with (ADR-0132's rule: never from the
+             document); each document's manifest naming its own; the
+             decision refusing a document of another build or another
+             schema (codes 10 and 6), each with its recovery; the scope's
+             meaning ruled with it (a session document's scope, and what a
+             runtime knows of its session without reading its cookie); and ~~**four soundness findings of 2026-10-03**~~
              (ADR-0282, `just e14-held-labels`: one label for what a value
              holds; the session "Project
              readiness for kiokun.com rewrite", at `29ebcf9`; its message

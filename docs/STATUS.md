@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-09, every recipe's evidence is in the repository** (an audit,
+after six were found missing at today's merges). **Corrected:** nineteen
+more recipes their ADRs cite had no evidence on `master`, from ADR-0240 to
+ADR-0273 (`e14-clauses-read-once`, `-transition-values`, `-each-heads`,
+`-statements-separated`, `-let-discard`, `-resource-clauses`,
+`-returned-labels`, `-member-resolution`, `-materialization-chains`,
+`-every-entry`, `-arrival`, `-handles`, `-session-to-browser`,
+`-form-routes`, `-wide-parameters`, `-matched-resources`, `-trap-causes`,
+`-telling`, `-materialization-bodies`): their runs were cited and their
+evidence never fetched, before ADR-0281's merge flow fetched it. All
+nineteen were run again on `master` at `29cae71` (run 37933879838), every
+mutant killed, and recorded. `scripts/evidence_present.py` names any
+recipe whose evidence file is missing, and `master`'s CI fails on one
+(`scripts/tests/test_evidence_present.py`); a branch's new recipe is
+recorded at its merge.
+
 **2026-10-09, navigate merged (ADR-0280, below), and two more recipes
 recorded for the first time.** **Corrected:** ADR-0248's `just
 e14-map-keys` and ADR-0272's `just e14-stream-boot` were cited and never

@@ -1,0 +1,27 @@
+ADR-0264 - a session's handle never reaches the browser
+
+produced by: just e14-session-to-browser
+commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the checker (compiler/pw-core/tests/session_to_browser.rs)
+
+test a_views_prop_holding_a_sessions_handle_is_refused_where_it_is_given ... ok
+test nothing_markup_prints_holds_a_sessions_handle ... ok
+test no_answer_holds_a_sessions_handle ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+== mutation controls (scripts/session_mutations.py)
+
+baseline: 3 passed, 0 failed
+a query's answer may hold a session's handle: KILLED (1 of 3 tests fail)
+a command's answer may hold a session's handle: KILLED (1 of 3 tests fail)
+a printed hole may hold a session's handle: KILLED (1 of 3 tests fail)
+an attribute's value may hold a session's handle: KILLED (2 of 3 tests fail)
+a string's holes may hold a session's handle: KILLED (1 of 3 tests fail)
+a session's handle in an answer's argument is not found: KILLED (1 of 3 tests fail)
+a session's handle in a record's field is not found: KILLED (1 of 3 tests fail)
+a printed value that is a session's handle is not one: KILLED (2 of 3 tests fail)
+8 of 8 mutants killed
+memory bound: no process was stopped
