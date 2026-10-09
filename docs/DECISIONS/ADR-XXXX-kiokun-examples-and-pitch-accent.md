@@ -3,7 +3,7 @@
 Status: proposed by track `kiokun` (W6, `track/kiokun`), the word page's
 1d (step 1), its sections without long lists. Contains and Appears in wait
 for the renderer's shared scopes (the integrator's order of 2026-10-09).
-Builds on ADR-0286, ADR-0288, ADR-0289 and the page head's ADR (ADR-XXXX).
+Builds on ADR-0286, ADR-0288, ADR-0289 and the page head's ADR (ADR-0293).
 Date: 2026-10-09. Milestone: E14.
 
 ## Context
