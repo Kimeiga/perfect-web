@@ -2292,3 +2292,12 @@ ADR-0249).
   which the `recipes` job's matrix starts only for it; the database job is
   gone; such shards count among a run's 17 (a track's 9), leaving at least
   one for the rest.
+[ADR-0279](DECISIONS/ADR-0279-direct-messages-a-conversation-read-from-each-side.md):
+direct messages, a conversation read from each side (track `messages`, W4).
+- A conversation is read through private queries keyed by the reader's
+  handle and the other's id, so no label names two principals; X's rule
+  decides who may message whom (`MayMessage`); a message is a row in the
+  command's transaction, in both of the feed's layers (migration 0007),
+  shown before the server answers and waiting by ADR-0275's rule; a third
+  user, signed in or not, sees none of it, by page, `/pw-read`, cache and
+  stream.

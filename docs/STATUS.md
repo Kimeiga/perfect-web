@@ -23,6 +23,19 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0279, 2026-10-08: direct messages, a conversation read from each
+side** (track `messages`, W4, merged from `87dbea0`). A conversation is
+private to its two users without a label naming two principals: each reads
+it from their own side, through a private query keyed by their own handle
+and the other's id, and only the host makes a handle. X's rule decides who
+may message whom, `MayMessage(to)`: one may message someone who follows
+them, or who has messaged them. A message is a row written in its command's
+transaction, in both of the feed's layers (migration 0007), shown before
+the server answers and waiting by ADR-0275's rule. A third user, signed in
+or not, sees none of it, by page, by `/pw-read`, by cache and by stream.
+19 server tests (7 on PostgreSQL), the browser in three engines, and 25 of
+25 mutants killed (`just e14-messages`), on CI in a shard of its own.
+
 **ADR-0278, 2026-10-08: a recipe run against a database is a shard of its
 own** (found by the messages track; amends ADR-0246 and ADR-0249). The
 database job ran its recipes in series on one PostgreSQL, and the messages

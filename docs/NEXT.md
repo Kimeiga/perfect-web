@@ -486,8 +486,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
              reading again only that user's open pages; `identified_by`
              gone, the feed's reads by session moved to `current_user()`;
              and a stream's `current_user()`;
-          6. **direct messages, track `messages`, W4** (docs/PARALLEL.md,
-             under the integrator's rulings there): a conversation private
+          6. ~~**direct messages, track `messages`, W4**~~ (ADR-0279, `just
+             e14-messages`, merged 2026-10-08; docs/PARALLEL.md, under the
+             integrator's rulings there). What it leaves, in order:
+             blocking, the integrator's; and telling by principal, which
+             would read again only the two users' pages. As ruled: a
+             conversation private
              to its two users, read from each side by a private query keyed
              by the reader's handle and the other's id; a list with unread
              counts; sending shown before the server answers; live to both;

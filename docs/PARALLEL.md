@@ -301,3 +301,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
     then the pages; then live delivery and the third-user tests; then the
     browser suite in three engines and the mutation controls,
     `e14-messages`.
+- **2026-10-08, at messages' merge (ADR-0279).** W4 merged from its tip,
+  `87dbea0`, rebased on ADR-0277 and ADR-0278; numbered ADR-0279 at the
+  merge, as ADR-0274 was. Its finding, the database job past its limit,
+  became ADR-0278, under which its recipe ran in a shard of its own. Its
+  verification was red only on WebKit's "Load more", NEXT's open item.
+  Blocking is the integrator's next of its leftovers.
