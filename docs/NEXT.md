@@ -697,6 +697,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
              engines. The integrator's own items here (1, 4, 5, 6) come
              before kiokun's and the infrastructure follow-ups (the owner,
              2026-10-09);
+          3a. **`private` means two things** (W8's finding, 2026-10-09): the
+             user's scope (resume, boundary, the checks) and "not importable"
+             (resolve, PW0023). W8 adds `user`, importable and the user's, as
+             `session` is the session's; whether `private` goes on implying
+             the user's scope or becomes "not importable" alone is the
+             integrator's ruling, a change to every program that says it
+             (the feed's notifications and messages);
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled;
           5. **idempotency committed with the writes** (PW0348, ADR-0246's
@@ -712,6 +719,20 @@ E14 comes before E11-E13. Its plan, controls and task list are
              charged at most once, under `secret<Payments>`; a Stripe
              adapter in test mode only with the owner's approval of each
              crate, and with test keys only.
+
+          The infrastructure follow-ups, after these (the owner's order of
+          2026-10-09):
+          - **the server's components compiled once a process** (W6's
+            finding, 2026-10-09): a kiokun test's server load is 7.7 s, 7.1
+            of them Wasmtime compiling the program's components in a debug
+            build (`pw-host`'s `Component::new`), once a server, and every
+            server test pays it. To measure, then rule: a per-process cache
+            of compiled components in `pw-host`, keyed by a hash of each
+            component's bytes, one `Engine`; and an opt-level for
+            `cranelift-codegen` and `regalloc2` in the dev profile, against
+            what it adds to a cold build and to `target/`;
+          - **a recipe not yet measured is planned at its kind's upper
+            quartile** (done, ADR-0290's amendment of 2026-10-09).
 
           The worker tracks, one at a time beside the integrator (the
           owner's budget rule), each launched under docs/PARALLEL.md when

@@ -2382,8 +2382,10 @@ a verification run is dealt by the seconds its recipes last took (amends
 ADR-0249 and ADR-0278).
 - A recipe's cost is the seconds it last took to its end on CI, kept in
   `scripts/ci_seconds.json` by every evidence fetch (`--times-only` from any
-  completed run); one not yet measured costs its mutants at the measured
-  median. Each recipe, the longest first, goes to the shard where it ends
+  completed run); one not yet measured costs its mutants at the upper
+  quartile of the measured recipes of its kind, browser, host or core
+  (amended 2026-10-09: `e14-refusal`, planned at the median, ran its shard
+  out of time). Each recipe, the longest first, goes to the shard where it ends
   soonest, what it adds to that shard's setup counted; one that needs less
   may run where more is set up. The recipes run against a database keep
   shards of their own, as many as end the run soonest.
@@ -2458,3 +2460,13 @@ the store's data behind the seam, in memory and on PostgreSQL (track
   both. Found: an order dropped its lines, `OrderChanged` was never consumed
   in memory, a menu change's event was committed nowhere, `/bench/stock`
   set a stock no menu knew, and store 48's items were answered not found.
+[ADR-0299](DECISIONS/ADR-0299-kiokun-examples-and-pitch-accent.md):
+kiokun's examples and pitch accent (track `kiokun`, W6).
+- A sense's examples as kiokun.com's `SenseExampleList` shows them, the
+  first shown and the rest behind a disclosure; a word's pitch accent from
+  kiokun.com's own pitch files, its morae high and low and its pattern
+  named, each rule named for the function it is read from. The Japanese
+  examples are held to kiokun.com's own code over every 256th entry (an
+  oracle run locally, its CI fixture committed). Found: kiokun.com hashes
+  its entries' files over code points and its pitch files over UTF-16
+  units, which differ past U+FFFF.

@@ -113,7 +113,8 @@ fn kiokun_is_served_by_the_host_its_entries_read_from_kiokuns_files() {
         vec![
             "database.read<Entry>",
             "database.read<Label>",
-            "database.read<CharGloss>"
+            "database.read<CharGloss>",
+            "database.read<PitchReading>"
         ]
     );
     assert!(s.data.operations().contains("kiokun:data/entries#read"));
@@ -1185,4 +1186,320 @@ fn the_page_head_matches_kiokuns_answers_for_the_sample() {
     let s = served_kiokun_on(&sample());
     let (_, differ) = held_to_oracle(&s, oracle);
     assert!(differ.is_empty(), "{differ:#?}");
+}
+
+/// Each example a section shows, in order: its text and its translation,
+/// joined by ` / `.
+fn examples_in(section: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = section;
+    while let Some(at) = rest.find("class=\"sense-example\"") {
+        rest = &rest[at + 1..];
+        let source = text_of_class(rest, "class=\"sense-example-source\"");
+        let end = rest.find("class=\"sense-example\"").unwrap_or(rest.len());
+        let this = &rest[..end];
+        let translation = this
+            .find("class=\"sense-example-translation\"")
+            .map(|t| text_of_class(&this[t..], "class=\"sense-example-translation\""))
+            .unwrap_or_default();
+        out.push(format!("{source} / {translation}"));
+    }
+    out
+}
+
+/// **A sense's examples** (`SenseExampleList.svelte`): those with a text;
+/// the first shown, and the rest behind a disclosure that counts them; a
+/// Chinese sense's from the record for its text, written in its simplified
+/// form; a Korean sense's and a Korean word's own; each with its
+/// translation where it has one.
+#[test]
+fn a_senses_examples_are_shown_first_and_the_rest_disclosed() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "例",
+        r#"{"key":"例",
+            "chinese_words":[{"_id":"1","simp":"例","trad":"例","items":[{"pinyin":"lì",
+              "definitions":["example","rule"],
+              "definitionExamples":[
+                {"definition":"example","examples":[
+                  {"simp":"举例","trad":"舉例","en":"to give an example"},
+                  {"simp":"","trad":"例外","en":"an exception"},
+                  {"simp":"","trad":"","en":"no text"}]},
+                {"definition":"another","examples":[{"simp":"不","en":"not shown"}]}]}]}],
+            "korean_words":[{"id":"k","hangul":"례","definitions":[
+                {"text":"example","examples":[{"korean":"예를 들면","translation":"for example"}]}],
+              "examples":[{"korean":"례","translation":""}]}]}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    let page = fetched(&s, &path_of("例"));
+    let chinese = section(&page, "chinese");
+    assert_eq!(
+        examples_in(chinese),
+        ["举例 / to give an example", "例外 / an exception"]
+    );
+    assert!(visible(chinese).contains("Examples"), "{chinese}");
+    assert!(
+        chinese.contains("Show 1 more examples for this definition"),
+        "{chinese}"
+    );
+    assert!(!chinese.contains("not shown"), "{chinese}");
+    let korean = section(&page, "korean");
+    assert_eq!(examples_in(korean), ["예를 들면 / for example", "례 / "]);
+    assert!(visible(korean).contains("Example"), "{korean}");
+}
+
+/// **A Japanese sense's examples** (`japaneseExamplesForSense`): its
+/// Japanese sentence, by `lang` or `land`, with its English; one without a
+/// Japanese text is left out.
+#[test]
+fn a_japanese_senses_examples_are_its_japanese_sentences() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "見",
+        r#"{"key":"見","japanese_words":[{"id":"j","kanji":[{"text":"見","tags":[],"common":true}],
+            "kana":[{"text":"み","tags":[],"common":true}],
+            "sense":[{"gloss":[{"text":"look"}],"info":[],"partOfSpeech":[],"field":[],"misc":[],"dialect":[],
+              "examples":[
+                {"sentences":[{"lang":"jpn","text":"見て"},{"lang":"eng","text":"Look."}]},
+                {"sentences":[{"land":"jpn","text":"見た"}]},
+                {"sentences":[{"lang":"eng","text":"English alone"}]}]}]}]}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    let japanese = section(&fetched(&s, &path_of("見")), "japanese").to_string();
+    assert_eq!(examples_in(&japanese), ["見て / Look.", "見た / "]);
+}
+
+/// **The Japanese examples against kiokun.com's answers**: each word's
+/// examples, as its Japanese section shows them in order, beside the
+/// oracle's. No difference is named for them; each is listed.
+fn examples_held_to_oracle(s: &Server, oracle: &serde_json::Value) -> Vec<String> {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut differ: Vec<String> = Vec::new();
+    for (word, answer) in answers {
+        let want: Vec<String> = answer
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|e| e.as_str().unwrap_or_default().to_string())
+            .collect();
+        let page = fetched(s, &path_of(word));
+        if !page.starts_with("HTTP/1.1 200") {
+            differ.push(format!(
+                "{word}: {}",
+                page.lines().next().unwrap_or_default()
+            ));
+            continue;
+        }
+        let got: Vec<String> = if want.is_empty() && !page.contains("<section id=\"japanese\"") {
+            Vec::new()
+        } else {
+            examples_in(section(&page, "japanese"))
+                .iter()
+                .map(|e| unescaped(e))
+                .collect()
+        };
+        if got != want {
+            differ.push(format!(
+                "{word}:\n  kiokun.com: {want:?}\n  rewrite:    {got:?}"
+            ));
+        }
+    }
+    differ
+}
+
+/// **The Japanese examples against kiokun.com's own
+/// `japaneseExamplesForSense`** (local: `just e14-kiokun-examples` runs it,
+/// copied from `KIOKUN_APP`, over a stated sample of `KIOKUN_DATA`, and names
+/// its answers in `KIOKUN_EXAMPLES_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-examples`"]
+fn the_japanese_examples_match_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_EXAMPLES_ORACLE").expect("KIOKUN_EXAMPLES_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let differ = examples_held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} words (stride {}, {} entries read)",
+        oracle["answered"], oracle["stride"], oracle["read"]
+    );
+    println!("named differences: {{}}");
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(30) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
+}
+
+/// **The Japanese examples against kiokun.com's answers for the
+/// repository's sample** (`kiokun-oracle/examples-sample.json`, written by
+/// `just e14-kiokun-examples`): what CI holds.
+#[test]
+fn the_japanese_examples_match_kiokuns_answers_for_the_sample() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../kiokun-oracle/examples-sample.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the fixture")).expect("JSON");
+    assert!(
+        fixture["kiokun_commit"]
+            .as_str()
+            .is_some_and(|c| c.len() == 40),
+        "{fixture}"
+    );
+    let oracle = &fixture["oracle"];
+    assert!(
+        oracle["answered"].as_u64().unwrap_or_default() > 0,
+        "{fixture}"
+    );
+    let s = served_kiokun_on(&sample());
+    let differ = examples_held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+}
+
+/// The pitch shard a word is in, as `PitchAccent.svelte` hashes it: over
+/// UTF-16 units, the reference the program's rule is held to.
+fn pitch_shard_of(word: &str) -> String {
+    let h = word
+        .encode_utf16()
+        .fold(0u32, |h, u| h.wrapping_mul(31).wrapping_add(u32::from(u)));
+    format!("{:02x}", h & 0xff)
+}
+
+/// Writes `json` as pitch shard `shard` of `app`.
+fn write_pitch(app: &std::path::Path, shard: &str, json: &str) {
+    std::fs::create_dir_all(app.join("static/pitch")).expect("the pitch directory");
+    std::fs::write(app.join(format!("static/pitch/{shard}.json")), json).expect("written");
+}
+
+/// The pitch a Japanese word shows: each mora, `^` where it is high, and the
+/// pattern's name; "" where it shows none.
+fn pitches_in(section: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = section;
+    while let Some(at) = rest.find("class=\"pronunciation-slot\"") {
+        rest = &rest[at + 1..];
+        let end = rest
+            .find("class=\"pronunciation-slot\"")
+            .unwrap_or(rest.len());
+        let this = &rest[..end];
+        let Some(display) = this.find("class=\"pitch-display\"") else {
+            out.push(String::new());
+            continue;
+        };
+        let mut shown = String::new();
+        let mut morae = &this[display..];
+        while let Some(m) = morae.find("class=\"pitch-mora") {
+            let high = morae[m..].starts_with("class=\"pitch-mora high\"");
+            let text = text_of_class(&morae[m..], "class=\"pitch-mora");
+            shown.push_str(&if high { format!("^{text}") } else { text });
+            morae = &morae[m + 1..];
+        }
+        shown.push(' ');
+        shown.push_str(&text_of_class(this, "class=\"pitch-label\""));
+        out.push(shown);
+    }
+    out
+}
+
+/// **Pitch accent** (`PitchAccent.svelte`), from kiokun.com's pitch data
+/// through `KIOKUN_APP`: the accent of the word's reading where the data has
+/// it, else of its first reading, in the data's order; each mora high or
+/// low by the accent; the pattern named 平板, 頭高, 中高 or 尾高; a small kana
+/// joined to the mora before it; nothing where the accent is `null` or the
+/// word is not in the data.
+#[test]
+fn a_japanese_word_shows_its_pitch_accent() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    let word = |key: &str, words: &str| format!(r#"{{"key":"{key}","japanese_words":[{words}]}}"#);
+    let jword = |id: &str, kanji: &str, kana: &str| {
+        format!(
+            r#"{{"id":"{id}","kanji":[{{"text":"{kanji}","tags":[],"common":false}}],"kana":[{{"text":"{kana}","tags":[],"common":false}}],"sense":[]}}"#
+        )
+    };
+    write_entry(dir.path(), "話", &word("話", &jword("1", "話", "はなし")));
+    write_entry(dir.path(), "弟", &word("弟", &jword("2", "弟", "おとうと")));
+    write_entry(
+        dir.path(),
+        "今日",
+        &word("今日", &jword("3", "今日", "きょう")),
+    );
+    write_entry(
+        dir.path(),
+        "人",
+        &word(
+            "人",
+            &format!(
+                "{},{},{}",
+                jword("4", "人", "ひと"),
+                jword("5", "人", "じん"),
+                jword("8", "人", "にん")
+            ),
+        ),
+    );
+    write_entry(dir.path(), "無", &word("無", &jword("6", "無", "む")));
+    write_entry(dir.path(), "空", &word("空", &jword("7", "空", "そら")));
+    let app = app_with("{}", "{}");
+    write_pitch(app.path(), &pitch_shard_of("話"), r#"{"話":{"はなし":3}}"#);
+    write_pitch(
+        app.path(),
+        &pitch_shard_of("弟"),
+        r#"{"弟":{"おとうと":2}}"#,
+    );
+    write_pitch(
+        app.path(),
+        &pitch_shard_of("今日"),
+        r#"{"今日":{"きょう":1}}"#,
+    );
+    // じん is not there: the first reading's, in the file's order (`ひと`
+    // before `にん`, though `にん` sorts first). にん is, with its own.
+    write_pitch(
+        app.path(),
+        &pitch_shard_of("人"),
+        r#"{"人":{"ひと":0,"にん":1}}"#,
+    );
+    write_pitch(app.path(), &pitch_shard_of("無"), r#"{"無":{"む":null}}"#);
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        Some(app.path()),
+    ));
+    let pitch = |w: &str| pitches_in(section(&fetched(&s, &path_of(w)), "japanese"));
+    assert_eq!(pitch("話"), ["は^な^し 尾高"]);
+    assert_eq!(pitch("弟"), ["お^とうと 中高"]);
+    assert_eq!(pitch("今日"), ["^きょう 頭高"]);
+    assert_eq!(pitch("人"), ["ひ^と 平板", "じ^ん 平板", "^にん 頭高"]);
+    assert_eq!(pitch("無"), [""]);
+    assert_eq!(pitch("空"), [""]);
+}
+
+/// **A pitch shard is the hash over UTF-16 units**, not the entries' shard
+/// rule over code points: a word past U+FFFF is in another shard by each.
+#[test]
+fn a_pitch_shard_is_its_words_hash_over_utf16_units() {
+    let word = "𠀋";
+    let by_points = format!(
+        "{:02x}",
+        word.chars()
+            .fold(0u32, |h, c| h.wrapping_mul(31).wrapping_add(u32::from(c)))
+            & 0xff
+    );
+    assert_ne!(pitch_shard_of(word), by_points);
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        word,
+        r#"{"key":"𠀋","japanese_words":[{"id":"1","kanji":[{"text":"𠀋","tags":[],"common":false}],"kana":[{"text":"じょう","tags":[],"common":false}],"sense":[]}]}"#,
+    );
+    let app = app_with("{}", "{}");
+    write_pitch(app.path(), &pitch_shard_of(word), r#"{"𠀋":{"じょう":0}}"#);
+    write_pitch(app.path(), &by_points, r#"{"𠀋":{"じょう":1}}"#);
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        Some(app.path()),
+    ));
+    let page = fetched(&s, &path_of(word));
+    assert_eq!(pitches_in(section(&page, "japanese")), ["じょ^う 平板"]);
 }

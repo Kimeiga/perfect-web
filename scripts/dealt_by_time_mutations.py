@@ -4,8 +4,10 @@ seconds its recipes last took.
 
 Each mutant undoes one piece: the plan's costs read from the seconds kept,
 a shard's setup counted where a recipe is dealt, the unmeasured estimated
-at the measured median, the database recipes' shards chosen by when the
-run ends (and the fewest of those that end it as soon), and the fetch
+at the upper quartile of its kind (the amendment of 2026-10-09: not the
+median, not every recipe's, its scripts read for its kind, the host's
+tests a kind of their own), the database recipes' shards chosen by when
+the run ends (and the fewest of those that end it as soon), and the fetch
 keeping only a recipe that ran to its end, over the others kept. At least
 one test of `scripts/tests/test_ci_scripts.py` must then fail.
 
@@ -40,8 +42,33 @@ MUTANTS = [
     (
         "a recipe not yet measured is estimated at the rate where none is",
         PLAN,
-        "    rate = rates[len(rates) // 2] if rates else RATE\n",
-        "    rate = RATE\n",
+        "        return rs[(3 * len(rs)) // 4] if rs else RATE\n",
+        "        return RATE\n",
+    ),
+    # Its amendment of 2026-10-09: the upper quartile of its kind.
+    (
+        "a recipe not yet measured is estimated at the median",
+        PLAN,
+        "        return rs[(3 * len(rs)) // 4] if rs else RATE\n",
+        "        return rs[len(rs) // 2] if rs else RATE\n",
+    ),
+    (
+        "a recipe not yet measured is estimated at every recipe's rate",
+        PLAN,
+        "        rs = sorted(rates.get(k) or every)\n",
+        "        rs = sorted(every)\n",
+    ),
+    (
+        "a script a recipe runs is not read for its kind",
+        PLAN,
+        "            texts.append((ROOT / \"scripts\" / script).read_text())\n",
+        "            pass\n",
+    ),
+    (
+        "the host's tests are taken for a type check's",
+        PLAN,
+        '    if "pw-dev-server" in text:\n        return "host"\n',
+        "",
     ),
     (
         "the recipes run against a database take a shard each",

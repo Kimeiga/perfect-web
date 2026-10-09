@@ -58,7 +58,7 @@ fn served_with(change: fn(&str) -> String) -> Served {
 }
 
 /// The word query's answer, as written in `app.pw`.
-const ANSWER: &str = "    match page {\n        Some(l) => Ok(shown(word, l, labels, glosses)),\n        None => Err(NotFound),\n    }\n";
+const ANSWER: &str = "    match page {\n        Some(l) => Ok(shown(word, l, labels, glosses, pitches)),\n        None => Err(NotFound),\n    }\n";
 
 /// The query answering `Moved` for the words the tests choose: `old` is
 /// 魚's, `same` its own, and `dots` an address no segment can carry.
@@ -70,7 +70,7 @@ fn moving(app: &str) -> String {
          if word == \"same\" {\n            Err(Moved(\"same\"))\n        } else {\n            \
          if word == \"dots\" {\n                Err(Moved(\"..\"))\n            } else {\n\
          \x20               match page {\n                    \
-         Some(l) => Ok(shown(word, l, labels, glosses)),\n                    \
+         Some(l) => Ok(shown(word, l, labels, glosses, pitches)),\n                    \
          None => Err(NotFound),\n                }\n            }\n        }\n    }\n",
     )
 }

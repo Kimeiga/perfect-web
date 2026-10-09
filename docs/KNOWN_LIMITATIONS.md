@@ -619,9 +619,9 @@ awaited in order. What remains:
   handler's work is held where it runs. No program places a page with frame
   phases anywhere but the browser.
 - **kiokun's word page is its words, its labels, its character header,
-  its written forms and its head's title and description** (ADR-0286,
-  ADR-0288, ADR-0289, ADR-0293): examples, pitch, the mnemonic's text and
-  components, contains and appears in (a list renders in its length since
+  its written forms, its head's title and description, its examples and its
+  pitch accent** (ADR-0286, ADR-0288, ADR-0289, ADR-0293, ADR-0299): the
+  mnemonic's text and components, contains and appears in (a list renders in its length since
   ADR-0294; re-timed when W6 records the sample again), and the canonical
   redirect (`KiokunError.Moved` is declared, and a page can answer it since
   ADR-0295; kiokun's query does not return it yet) are still to come; the head has no canonical link, `og:url`

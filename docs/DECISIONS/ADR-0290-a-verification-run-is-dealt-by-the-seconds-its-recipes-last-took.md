@@ -94,3 +94,36 @@ ADR-0281). Amends ADR-0249's shards of a kind and ADR-0278's shard each.
 - **More shards**: 17 recipe shards and the three browser jobs are the Free
   plan's 20 at once.
 - **Any recipe in a database's shard**: see decision 3.
+
+## Amended, 2026-10-09: a recipe not yet measured, at its kind's upper quartile
+
+Found by `e14-refusal`'s first run (verify 37942903849): planned at the
+median, 24 s a mutant, 31 units, about 12 minutes, it took about 420 s a
+mutant. It was dealt after three other recipes, one of which, `e14-not-found`,
+took 7,012 s where 4,260 were kept, and the shard reached its 345-minute
+bound with 27 of the 30 mutants killed and none surviving. The run was lost
+whole for want of a better first guess.
+
+What a unit costs, over the 233 recipes kept that day, spans two orders of
+magnitude: a median of 25 s, an upper quartile of 109, 407 at the ninetieth
+percentile and 1,040 at most. By what a recipe's work runs, its kind: 144
+`core` recipes, median 14 s a unit and upper quartile 27; 25 `host`
+recipes, 287 and 483; 64 `browser` recipes, 142 and 408.
+
+- **A recipe not yet measured costs its units at the upper quartile of the
+  measured recipes of its kind** (`ci_plan.kind`): `browser` where it, or a
+  mutation script it runs, drives Playwright; `host` where they run the
+  development server's tests; `core` otherwise. Where none of its kind is
+  measured, every recipe's upper quartile; where none is, `RATE`.
+- **The upper quartile, not the median**, since the two errors do not cost
+  the same: a recipe planned short runs its shard past the bound and the
+  run is made again whole, hours; one planned long ends its shard early.
+  `e14-refusal` at its kind's quartile is 31 × 408 s, 3.5 hours, what it
+  took.
+- **Not the alternative this ADR refused**, mutants weighed by kind for
+  every recipe: a measured recipe still costs the seconds it last took, and
+  the kinds' rates are read from the kept seconds at each plan, not fitted
+  to one night.
+
+`scripts/tests/test_ci_scripts.py`:
+`test_a_recipe_not_yet_measured_costs_what_its_kind_does`.
