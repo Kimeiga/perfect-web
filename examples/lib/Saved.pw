@@ -1,0 +1,31 @@
+// @corpus: fixture
+// @id: LIB-Saved
+// @category: a user's saved items, read from another module
+// @charter: §7.8, §15.6
+// @milestone: E14
+//
+// **A `user` query, imported** (track `store-accounts`, ADR-XXXX): a reader's
+// saved items are their user's, keyed by the reader's handle, and declared
+// `user`, which is `session`'s peer: the user's, and importable, where
+// `private` is the user's and is not. A-033 reads it on a `user page` of its
+// own module; R-064 captures it into the public shell, and is refused.
+
+module Saved
+
+import capability.{ User, UserId }
+import domain.{ MenuItemId }
+
+// The items a reader saved, and how many: an ordinary record, the user's
+// because only the user's query makes one.
+type SavedItems = SavedItems {
+    items: List<MenuItemId>,
+    count: Int,
+}
+
+user query SavedFor(reader: User<UserId>) -> SavedItems
+    freshness 0.seconds
+    cache     private
+    key       reader
+{
+    todo
+}

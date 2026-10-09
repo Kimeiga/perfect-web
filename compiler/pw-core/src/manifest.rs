@@ -236,7 +236,8 @@ fn manifest_of(decl: &Decl) -> (Manifest, Vec<Unparsed>) {
 
     let privacy = match decl.visibility.as_deref() {
         Some("session") => Privacy::Session,
-        Some("private") => Privacy::Private,
+        // `user` is the user's as `private` is (track `store-accounts`).
+        Some("private") | Some("user") => Privacy::Private,
         _ => Privacy::Public,
     };
 

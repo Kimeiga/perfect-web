@@ -450,6 +450,28 @@ impl<'a> P<'a> {
     fn at_kw(&self, kw: &str) -> bool {
         self.cur() == Kind::Ident && self.cur_text() == kw
     }
+
+    /// **At a declaration's visibility** (track `store-accounts`, ADR-XXXX):
+    /// `public`, `session` or `private`, reserved; or `user`, a visibility
+    /// only where a declaration's keyword follows it, so a field, a parameter
+    /// or a binding named `user` is still a name.
+    fn at_visibility(&self) -> bool {
+        if self.at_kw("public") || self.at_kw("session") || self.at_kw("private") {
+            return true;
+        }
+        if !self.at_kw("user") {
+            return false;
+        }
+        let next = self.nth(1);
+        let text = &self.src[next.span.clone()];
+        next.kind == Kind::Ident
+            && (UI_NOUNS.contains(&text)
+                || RESOURCE_NOUNS.contains(&text)
+                || matches!(
+                    text,
+                    "type" | "opaque" | "fn" | "let" | "prelude" | "effect"
+                ))
+    }
     fn nth_is(&self, n: usize, k: Kind) -> bool {
         self.nth(n).kind == k
     }
@@ -2600,7 +2622,7 @@ impl<'a> P<'a> {
         // resource nouns. `private type Secretive` parsed as TWO declarations —
         // a bare word and an unqualified type — so the type looked public and a
         // module could import it.
-        let vis_prefix = (self.at_kw("public") || self.at_kw("session") || self.at_kw("private"))
+        let vis_prefix = self.at_visibility()
             && matches!(
                 &self.src[self.nth(1).span.clone()],
                 "type" | "opaque" | "fn" | "let"
@@ -2797,7 +2819,7 @@ impl<'a> P<'a> {
             return true;
         }
 
-        let vis = self.at_kw("public") || self.at_kw("session") || self.at_kw("private");
+        let vis = self.at_visibility();
         let after_vis = if vis { self.nth(1) } else { self.nth(0) };
         let after_vis_text = &self.src[after_vis.span.clone()];
 

@@ -1,0 +1,33 @@
+// @corpus: rejected
+// @id: R-064
+// @category: a user's query's record captured into a public page's manifest
+// @rule: PW5007
+// @invariant: private_in_resume_manifest
+// @charter: §8.5, §7.8
+// @milestone: 14
+// @expect-error: resume manifest for `SavedShell` would contain a `User<UserId>` value
+//
+// R-030 at the user's level, through a `user` query (track `store-accounts`,
+// ADR-XXXX): imported from another module, as A-033's is, and read on a page
+// that declares no principal and is cached by no one. Its manifest ships with
+// the public shell, so a user's record may not be in it.
+
+module saved.shell
+
+import Saved.{ SavedFor }
+import context.{ current_user }
+
+page SavedShell() {
+    route "/saved/shell"
+
+    let saved = query SavedFor(current_user())
+    signal kept: Int = 0
+
+    view {
+        <title>Saved</title>
+        <main>
+            <!-- ERROR: capturing the user's record into the public manifest. -->
+            <button type="button" on:press={resumable(captures = { saved }) => kept = saved.count}>Keep</button>
+        </main>
+    }
+}

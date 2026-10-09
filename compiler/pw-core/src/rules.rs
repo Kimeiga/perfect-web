@@ -87,7 +87,7 @@ fn privacy_label(v: &str) -> &'static str {
     match v {
         "public" => "Public",
         "session" => "Session<SessionId>",
-        "private" => "User<UserId>",
+        "private" | "user" => "User<UserId>",
         _ => "unlabelled",
     }
 }
@@ -257,7 +257,7 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
     // and an unlabelled declaration is public to the manifest.
     if let Some(f) = policy(policies, "fallback")
         && f.value.trim() == "last_known_good"
-        && (matches!(visibility, "session" | "private")
+        && (matches!(visibility, "session" | "private" | "user")
             || policy(policies, "cache").is_some_and(|c| c.value.trim() == "private"))
     {
         out.push(

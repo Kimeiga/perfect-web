@@ -64,6 +64,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "a form control's value where HTML reads it",
     // ADR-0226, corpus C16: a value the template computes.
     "a value the template computes",
+    // ADR-XXXX (track `store-accounts`), corpus C19: a `user` query, imported.
+    "a user's query read on a user's page of another module",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -154,6 +156,10 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a secret a query answers, kept in a shared fragment",
     "a fragment of a session's data, built before any request",
     "a session read through a query of a built page's own",
+    // ADR-XXXX (track `store-accounts`), corpus C19: PW5007, a `private`
+    // query's record the user's.
+    "a private query's record captured into a public manifest from a view's parameter",
+    "a user's query's record captured into a public page's manifest",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

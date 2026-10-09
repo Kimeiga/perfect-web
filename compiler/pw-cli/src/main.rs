@@ -240,7 +240,7 @@ fn explain_with(
                 let label = match d.visibility.as_deref() {
                     Some("public") => "Public",
                     Some("session") => "Session<SessionId>",
-                    Some("private") => "User<UserId>",
+                    Some("private") | Some("user") => "User<UserId>",
                     _ => "(unspecified)",
                 };
                 let _ = writeln!(s, "             privacy: {label}");
@@ -249,7 +249,10 @@ fn explain_with(
                 }
                 if let Some(c) = d.policies.iter().find(|p| p.name == "cache")
                     && c.value.starts_with("shared")
-                    && matches!(d.visibility.as_deref(), Some("session") | Some("private"))
+                    && matches!(
+                        d.visibility.as_deref(),
+                        Some("session") | Some("private") | Some("user")
+                    )
                 {
                     let _ = writeln!(
                         s,

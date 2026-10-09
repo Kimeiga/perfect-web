@@ -395,7 +395,8 @@ impl Workspace {
                     };
                     // Visibility. A type is importable unless the declaring
                     // module marked it `private`; `session` is a privacy label
-                    // on values, not a module-visibility keyword.
+                    // on values, not a module-visibility keyword, and `user`
+                    // is its peer, the user's (track `store-accounts`).
                     let decl = declaration(units, def);
                     if decl.is_some_and(|d| d.visibility.as_deref() == Some("private")) {
                         errors.push(ResolveError {

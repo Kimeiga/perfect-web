@@ -143,7 +143,7 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
                 .find(|t| {
                     !matches!(
                         t.as_str(),
-                        "public" | "session" | "private" | "internal" | "local"
+                        "public" | "session" | "private" | "user" | "internal" | "local"
                     )
                 })
                 .unwrap_or_default();
@@ -1887,10 +1887,12 @@ fn imported_names(node: &SyntaxNode) -> Vec<String> {
 /// The visibility keyword a declaration opens with, if any.
 ///
 /// The grammar keeps it as a bare token, so it is the declaration's first
-/// significant token when it is one of the three.
+/// significant token when it is one of the four. `user` (track
+/// `store-accounts`) is the grammar's only where a declaration's keyword
+/// follows it, so as a declaration's first token it is its visibility.
 fn visibility_of(node: &SyntaxNode) -> Option<String> {
     let first = own_tokens(node).first()?.text().to_string();
-    matches!(first.as_str(), "public" | "session" | "private").then_some(first)
+    matches!(first.as_str(), "public" | "session" | "private" | "user").then_some(first)
 }
 
 /// Convert a remaining source-text type slot through the authoritative parser.

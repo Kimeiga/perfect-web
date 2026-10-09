@@ -1,0 +1,33 @@
+// @corpus: accepted
+// @id: A-033
+// @category: a user's query read on a user's page of another module
+// @charter: §7.8, §8.5
+// @milestone: 14
+//
+// A `user` query is its user's, and is imported as a `session` one is
+// (track `store-accounts`, ADR-XXXX). Read on a page declared `user`, its
+// record may be captured by the page's handler: the manifest ships with a
+// document private to that user, and holds nothing of anyone else's.
+
+module saved.page
+
+import Saved.{ SavedFor }
+import context.{ current_user }
+
+user page SavedPage() {
+    route "/saved"
+    cache private
+
+    let saved = query SavedFor(current_user())
+    // How many the reader last kept.
+    signal kept: Int = 0
+
+    view {
+        <title>Your saved items</title>
+        <main>
+            <h1>Your saved items</h1>
+            <p>You saved {saved.count}.</p>
+            <button type="button" on:press={resumable(captures = { saved }) => kept = saved.count}>Keep</button>
+        </main>
+    }
+}

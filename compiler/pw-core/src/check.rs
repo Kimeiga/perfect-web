@@ -7588,7 +7588,8 @@ pub(crate) fn label_of(decl: &Decl) -> Label {
     // the developer must be shown.
     match decl.visibility.as_deref() {
         Some("session") => Label::session("SessionId"),
-        Some("private") => Label::user("UserId"),
+        // `user`, importable, and `private`, not: each the user's.
+        Some("private") | Some("user") => Label::user("UserId"),
         _ => Label::public(),
     }
 }
