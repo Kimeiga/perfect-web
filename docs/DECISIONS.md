@@ -2449,3 +2449,22 @@ a commit tells the pages that ask, and tells them at once (the feed's
   time, each in its own hold. A commit had told every session one after
   another, the documents of pages closed up to two minutes before among
   them.
+[ADR-0298](DECISIONS/ADR-0298-the-store-on-postgresql.md):
+the store's data behind the seam, in memory and on PostgreSQL (track
+`store-pg`, W5).
+- The store's operations run through its data layer, in memory or on
+  PostgreSQL (`PW_STORE_DATABASE_URL`), with its guarantees stated as a
+  source's (ADR-0207), so each DoorDash gap after it is built and tested on
+  both. Found: an order dropped its lines, `OrderChanged` was never consumed
+  in memory, a menu change's event was committed nowhere, `/bench/stock`
+  set a stock no menu knew, and store 48's items were answered not found.
+[ADR-0299](DECISIONS/ADR-0299-kiokun-examples-and-pitch-accent.md):
+kiokun's examples and pitch accent (track `kiokun`, W6).
+- A sense's examples as kiokun.com's `SenseExampleList` shows them, the
+  first shown and the rest behind a disclosure; a word's pitch accent from
+  kiokun.com's own pitch files, its morae high and low and its pattern
+  named, each rule named for the function it is read from. The Japanese
+  examples are held to kiokun.com's own code over every 256th entry (an
+  oracle run locally, its CI fixture committed). Found: kiokun.com hashes
+  its entries' files over code points and its pitch files over UTF-16
+  units, which differ past U+FFFF.

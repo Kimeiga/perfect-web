@@ -23,6 +23,34 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0299, 2026-10-09: kiokun's examples and pitch accent** (track
+`kiokun`, W6, merged from `7e3cb51`). The word page shows each sense's
+examples as kiokun.com does, the first and the rest behind a disclosure
+that needs no script, and each word's pitch accent from kiokun.com's own
+pitch files: morae high and low, and the pattern 平板, 頭高, 中高 or 尾高.
+The Japanese examples are held to kiokun.com's own `japaneseExamplesForSense`
+over 1,082 sampled words with nothing to name; the Chinese and Korean
+examples and the pitch rules, which live inside Svelte components, are held
+by hand-written cases. Found: kiokun.com places its entries by a hash over
+code points and its pitch files by one over UTF-16 units, held as it is; and
+the word page's tests outgrew the 4 GiB bound at one thread per core, run
+on four. 28 server tests, 64 of 64 mutants killed on CI (run 37961821792,
+beside WebKit's "Load more", fixed on master since).
+
+**ADR-0298, 2026-10-09: the store's data behind the seam, in memory and
+on PostgreSQL** (track `store-pg`, W5, merged from `d043fa6`). The store's
+operations run through its data layer as the feed's do (ADR-0246), on
+either layer, its guarantees stated as a source's (ADR-0207). Five
+findings fixed on the way: an order dropped its lines (ADR-0193's ruling);
+`OrderChanged` was never consumed from the materializer's outbox in
+memory, each order leaving a row for good; a menu change's event was
+committed nowhere; `/bench/stock` set a stock no menu knew; and store 48's
+items were answered not found. The host's 332 tests pass with the store on
+PostgreSQL and again in memory, 12 of the layer's own, 12 of 12 mutants
+killed, and every re-anchored script's recipe green on CI (run
+37932273524, 29 recipes, beside WebKit's "Load more", fixed on master since
+by ADR-0296). The DoorDash track (W8) builds on it.
+
 **ADR-0296 and ADR-0297, 2026-10-09: a change is derived outside the
 table, and a commit tells the pages that ask, at once** (CI's two
 findings: WebKit's "Load more", failing on every branch, and the feed's "a

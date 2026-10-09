@@ -72,15 +72,21 @@ MUTANTS = [
         "every store is recommended store 47's menu",
         "server",
         STORE_DATA,
-        "                (None, id) if store_named(id).is_some() => recommended_from(&second_menu()),\n",
-        "                (None, id) if store_named(id).is_some() => recommended_from(&suggested_from),\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                    None => match menu_of(r, store)? {\n",
+        "                    None => match menu_of(r, STORE_ID)? {\n",
     ),
     (
         "the recommendations are drawn from the menu as it was",
         "server",
         STORE_DATA,
-        "        let suggested_from = self.menu.lock().expect(\"menu\").clone();\n",
-        "        let suggested_from = default_menu();\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                        Some(menu) => recommended_from(\n"
+        "                            &menu\n",
+        "                        Some(_) => recommended_from(\n"
+        "                            &State::seed().menus[store.as_str()]\n",
     ),
     (
         "the estimate is not said to a screen reader",

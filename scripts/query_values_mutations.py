@@ -73,8 +73,11 @@ MUTANTS = [
         "the order interface answers no order",
         "server",
         STORE_DATA,
-        "                let status = order.clone().map(|case| Box::new(Val::Variant(case, None)));\n",
-        "                let status = order.clone().map(|case| Box::new(Val::Variant(case, None))).filter(|_| false);\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                    .map(|o| Box::new(Val::Variant(o.status, None)));\n",
+        "                    .map(|o| Box::new(Val::Variant(o.status, None)))\n"
+        "                    .filter(|_| false);\n",
     ),
     (
         "a no-session block is rendered",

@@ -697,6 +697,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
              engines. The integrator's own items here (1, 4, 5, 6) come
              before kiokun's and the infrastructure follow-ups (the owner,
              2026-10-09);
+          3a. **`private` means two things** (W8's finding, 2026-10-09): the
+             user's scope (resume, boundary, the checks) and "not importable"
+             (resolve, PW0023). W8 adds `user`, importable and the user's, as
+             `session` is the session's; whether `private` goes on implying
+             the user's scope or becomes "not importable" alone is the
+             integrator's ruling, a change to every program that says it
+             (the feed's notifications and messages);
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled;
           5. **idempotency committed with the writes** (PW0348, ADR-0246's
@@ -716,12 +723,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
           The worker tracks, one at a time beside the integrator (the
           owner's budget rule), each launched under docs/PARALLEL.md when
           the slot frees:
-          - **W5, the store's data on PostgreSQL**, behind the DataLayer
-            seam as the feed's is (ADR-0246), its guarantees stated as
-            ADR-0207 states a source's. First, so that each later gap is
-            built and tested on both layers. Its rulings are PARALLEL.md's
-            (2026-10-08), the first a finding: ADR-0193 rules that an order
-            is the cart's lines, and the store keeps its status alone;
+          - ~~**W5, the store's data on PostgreSQL**~~ (ADR-0298, `just
+            e14-store-postgres`, merged 2026-10-09): behind the DataLayer
+            seam as the feed's is, on both layers, with five findings fixed
+            on the way;
+          - **W8, the DoorDash track** (PARALLEL.md, 2026-10-09: accounts in
+            the store, delivery addresses, the owner's Next.js bug as its
+            acceptance), in the slot W5 frees, before W7;
           - **W6 is kiokun.com's**, beside this app (below);
           - **W7, TodoMVC** (the owner, relayed 2026-10-08: "something
             people are familiar with"), the next slot free, since it pays

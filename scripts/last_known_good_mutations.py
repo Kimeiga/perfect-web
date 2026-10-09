@@ -113,8 +113,10 @@ MUTANTS = [
         "the store's origin does not fail",
         "server",
         STORE_DATA,
-        "                if store_fails.swap(false, std::sync::atomic::Ordering::SeqCst) {\n",
-        "                if false && store_fails.swap(false, std::sync::atomic::Ordering::SeqCst) {\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                if store_fails.swap(false, Ordering::SeqCst) {\n",
+        "                if false && store_fails.swap(false, Ordering::SeqCst) {\n",
     ),
 ]
 

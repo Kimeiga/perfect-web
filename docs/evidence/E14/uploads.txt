@@ -1,19 +1,28 @@
 ADR-0260 (track uploads) - an image on a post: a typed upload, a deployment's blob storage, served safely
 
 produced by: just e14-uploads
-commit: 1ac6fb60141f3d9a44c3cb4681b2cb1dc33327d0 + uncommitted changes
+commit: d043fa6ff49de0ce18e5046773c3fc49f7d0560b
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37932273524 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
-postgres: 18.6 (Homebrew)
+postgres: 18.6 (Debian 18.6-1.pgdg13+2)
 
 == the server (uploads.rs, uploads/sniff.rs, uploads/multipart.rs, blob.rs, tests/uploads.rs)
 
-test blob::tests::a_key_is_the_sha256_of_the_bytes ... ok
 test blob::tests::a_key_is_64_lowercase_hex_digits_and_nothing_else ... ok
-test blob::tests::a_blob_changed_where_it_is_kept_is_not_given_out ... ok
 test blob::tests::a_blob_in_memory_is_kept_by_its_key_once_and_forgotten ... ok
+test blob::tests::a_key_is_the_sha256_of_the_bytes ... ok
 test blob::tests::a_blob_is_kept_by_its_key_once_and_forgotten ... ok
+test blob::tests::a_blob_changed_where_it_is_kept_is_not_given_out ... ok
+test tests::uploads::an_attached_image_removed_is_forgotten ... ok
+test tests::uploads::an_image_attached_is_posted_with_its_post_and_served ... ok
+test tests::uploads::a_command_that_does_not_commit_gives_its_claim_back ... ok
+test tests::uploads::a_deleted_posts_image_is_not_served_and_its_blob_is_collected ... ok
+test tests::uploads::an_upload_is_read_within_its_own_limits_not_a_commands ... ok
+test tests::uploads::on_postgres_an_attached_image_removed_is_forgotten ... ok
+test tests::uploads::on_postgres_a_deleted_posts_image_is_not_served_and_its_blob_is_collected ... ok
+test tests::uploads::on_postgres_an_image_is_kept_with_its_post ... ok
 test tests::uploads::on_postgres_posting_an_image_with_none_attached_commits_nothing ... ok
 test uploads::multipart::tests::a_boundary_is_the_media_types_parameter ... ok
 test uploads::multipart::tests::a_forms_parts_are_its_fields ... ok
@@ -42,42 +51,34 @@ test uploads::tests::a_lease_nothing_claims_ends_when_its_time_does ... ok
 test uploads::tests::a_refusal_goes_back_to_this_origin_alone ... ok
 test uploads::tests::a_request_without_a_session_length_or_origin_is_refused ... ok
 test uploads::tests::a_second_upload_ends_the_first_lease_and_its_blob ... ok
-test uploads::tests::a_user_attaches_within_an_hours_budget ... ok
+test tests::uploads::one_signed_out_attaches_nothing ... ok
 test uploads::tests::an_image_is_leased_to_its_session_and_shown_to_it_alone ... ok
 test uploads::tests::nothing_is_claimed_where_nothing_is_declared ... ok
 test uploads::tests::the_dimensions_are_held ... ok
 test uploads::tests::the_kind_is_sniffed_and_never_the_senders ... ok
-test tests::uploads::what_is_not_an_image_is_refused_whatever_it_is_called ... ok
 test uploads::tests::the_size_is_held_before_and_after_the_body_is_read ... ok
-test tests::uploads::an_image_attached_is_posted_with_its_post_and_served ... ok
-test tests::uploads::an_attached_image_removed_is_forgotten ... ok
-test tests::uploads::on_postgres_a_deleted_posts_image_is_not_served_and_its_blob_is_collected ... ok
-test tests::uploads::on_postgres_an_attached_image_removed_is_forgotten ... ok
-test tests::uploads::on_postgres_an_image_is_kept_with_its_post ... ok
-test tests::uploads::an_upload_is_read_within_its_own_limits_not_a_commands ... ok
-test tests::uploads::one_signed_out_attaches_nothing ... ok
-test tests::uploads::a_command_that_does_not_commit_gives_its_claim_back ... ok
-test tests::uploads::a_deleted_posts_image_is_not_served_and_its_blob_is_collected ... ok
+test uploads::tests::a_user_attaches_within_an_hours_budget ... ok
 test tests::uploads::posting_an_image_with_none_attached_commits_nothing ... ok
-test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 202 filtered out; finished in 5.47s
+test tests::uploads::what_is_not_an_image_is_refused_whatever_it_is_called ... ok
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 296 filtered out; finished in 30.71s
 
 == the declaration and its checks (compiler/pw-core/tests/uploads.rs)
 
-test its_types_are_a_closed_set ... ok
-test two_uploads_are_at_two_paths ... ok
 test an_upload_that_states_its_limits_checks ... ok
-test its_clauses_are_an_uploads_alone ... ok
 test a_build_writes_each_upload_for_its_host ... ok
-test its_paths_are_literal_paths ... ok
-test its_paths_are_no_pages ... ok
-test every_clause_is_stated ... ok
+test its_clauses_are_an_uploads_alone ... ok
 test a_form_that_sends_a_file_posts_it_to_an_upload ... ok
 test a_limit_is_a_literal_count ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+test every_clause_is_stated ... ok
+test its_paths_are_literal_paths ... ok
+test its_types_are_a_closed_set ... ok
+test two_uploads_are_at_two_paths ... ok
+test its_paths_are_no_pages ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
 
 == an image on a post in three engines (e2e/uploads.spec.mjs)
 
-  15 passed (34.1s)
+  15 passed (1.5m)
 
 == mutation controls (scripts/uploads_mutations.py)
 
@@ -92,7 +93,7 @@ the size limit raised after the body is read: KILLED (2 of 60 tests fail)
 the width and height are not checked: KILLED (3 of 60 tests fail)
 a JPEG's Exif turn is ignored: KILLED (2 of 60 tests fail)
 a deployment may raise a program's limit: KILLED (1 of 60 tests fail)
-a key need not be 64 hex digits: a path built from what a sender wrote: KILLED (2 of 60 tests fail)
+a key need not be 64 hex digits: a path built from what a sender wrote: KILLED (1 of 60 tests fail)
 nosniff dropped: KILLED (4 of 60 tests fail)
 the sandbox dropped: KILLED (3 of 60 tests fail)
 a committed image is not kept by caches as immutable: KILLED (3 of 60 tests fail)
@@ -118,3 +119,4 @@ PW5602: an upload's route may be a page's: KILLED (1 of 60 tests fail)
 PW5601: a limit above what a host reads whole: KILLED (1 of 60 tests fail)
 an image's width and height are left out of the timeline's markup: KILLED (17 of 65 tests fail)
 33 of 33 mutants killed
+memory bound: no process was stopped

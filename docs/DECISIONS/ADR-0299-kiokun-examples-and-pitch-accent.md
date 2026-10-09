@@ -1,6 +1,7 @@
-# ADR-XXXX: kiokun's examples and pitch accent
+# ADR-0299: kiokun's examples and pitch accent
 
-Status: proposed by track `kiokun` (W6, `track/kiokun`), the word page's
+Status: accepted at its merge, 2026-10-09, under the owner's delegation of
+2026-10-02; proposed by track `kiokun` (W6, `track/kiokun`), the word page's
 1d (step 1), its sections without long lists. Contains and Appears in wait
 for the renderer's shared scopes (the integrator's order of 2026-10-09).
 Builds on ADR-0286, ADR-0288, ADR-0289 and the page head's ADR (ADR-0293).

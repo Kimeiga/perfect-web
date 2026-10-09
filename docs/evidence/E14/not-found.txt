@@ -1,8 +1,8 @@
 ADR-0163 - a page says when it is absent
 
 produced by: just e14-not-found
-commit: 1759043f085600066bbdc6f81cd719578a049263
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37912147550 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: d043fa6ff49de0ce18e5046773c3fc49f7d0560b
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37932273524 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
@@ -24,16 +24,16 @@ pw check: 53 file(s), no diagnostics
 
 test tests::a_store_that_is_not_there_is_not_found ... ok
 test tests::each_store_is_served_at_its_route ... ok
-test result: ok. 327 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 613.69s
+test result: ok. 344 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 470.81s
 
 == a store that is not there, three engines (e2e/stores.spec.mjs)
 
-  24 passed (2.4m)
+  24 passed (1.5m)
 
 == mutation controls (scripts/not_found_mutations.py)
 
 baseline (compiler): 6 passed, 0 failed
-baseline (server): 327 passed, 0 failed
+baseline (server): 344 passed, 0 failed
 baseline (browser): 8 passed, 0 failed
 the clause is let be on a declaration that is no page [compiler]: KILLED (1 of 6 tests fail)
 the type is looked for among terms [compiler]: KILLED (5 of 6 tests fail)
@@ -45,12 +45,12 @@ a query that answers no Result is taken to fail [compiler]: KILLED (1 of 6 tests
 the plan names the case as Pleris spells it [compiler]: KILLED (1 of 6 tests fail)
 the plan marks every binding [compiler]: KILLED (1 of 6 tests fail)
 the parser does not know the clause [compiler]: KILLED (6 of 6 tests fail)
-the plan does not write the case [server]: KILLED (7 of 327 tests fail)
-a declared case is a failure like any other [server]: KILLED (7 of 327 tests fail)
-any declared error is not found [server]: KILLED (5 of 327 tests fail)
-the failure loses its kind on the way up [server]: KILLED (10 of 327 tests fail)
-a page that is not found is answered as one that failed [server]: KILLED (5 of 327 tests fail)
-every response says OK [server]: KILLED (8 of 327 tests fail)
+the plan does not write the case [server]: KILLED (7 of 344 tests fail)
+a declared case is a failure like any other [server]: KILLED (7 of 344 tests fail)
+any declared error is not found [server]: KILLED (5 of 344 tests fail)
+the failure loses its kind on the way up [server]: KILLED (10 of 344 tests fail)
+a page that is not found is answered as one that failed [server]: KILLED (5 of 344 tests fail)
+every response says OK [server]: KILLED (8 of 344 tests fail)
 the not-found page has no heading [browser]: KILLED (1 of 4 tests fail)
 17 of 17 mutants killed
 memory bound: no process was stopped

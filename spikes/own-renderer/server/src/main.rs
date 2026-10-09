@@ -520,11 +520,8 @@ struct Recommender {
     /// `declared`: the query's declared error, `NoneAvailable`. `host`: the
     /// call itself fails, as a source that is down does.
     fail: Option<String>,
-    /// What it recommends, `(id, name)`, for any store a test asks about.
-    /// `None`: each store's own menu, after its first item, two of them
-    /// (ADR-0165), so what it suggests is what the store sells, and changes
-    /// when its menu does.
-    items: Option<Vec<(String, String)>>,
+    // What it recommends is the store's data (track `store-pg`): curated
+    // through `store:host/recommendations#curate`.
     /// **Held until a test releases it** (ADR-0223), then answered after
     /// `delay_ms`. A test that needs its page seen before the answer holds
     /// the recommender rather than outwaiting a delay, which a loaded machine
@@ -537,7 +534,6 @@ impl Default for Recommender {
         Recommender {
             delay_ms: 1200,
             fail: None,
-            items: None,
             gate: None,
         }
     }
@@ -623,10 +619,9 @@ struct Estimator {
     /// `declared`: the query's declared error. Anything else: the call itself
     /// fails, as an estimator that is down does.
     fail: Option<String>,
-    /// The least minutes a delivery takes, and the most (ADR-0180): 10 more
-    /// unless a test says.
-    minutes: i64,
-    max_minutes: Option<i64>,
+    // What it estimates, the least minutes a delivery takes and the most
+    // (ADR-0180), is the store's data (track `store-pg`): set through
+    // `store:host/estimates#set`.
 }
 
 impl Default for Estimator {
@@ -634,8 +629,6 @@ impl Default for Estimator {
         Estimator {
             delay_ms: 400,
             fail: None,
-            minutes: 25,
-            max_minutes: None,
         }
     }
 }
@@ -651,6 +644,8 @@ mod identity;
 // TRACK SEAM (identity): the development identity provider.
 mod accounts;
 mod store;
+// Track `store-pg`: the store's data in PostgreSQL.
+mod store_pg;
 mod uploads;
 // TRACK SEAM (notifications): the typed principal, and notifications.
 mod notifications;
@@ -668,10 +663,11 @@ struct Server {
     /// which the deployment supplies. A query reads through it and a command
     /// stages its writes in it.
     data: Arc<dyn data::DataLayer>,
-    /// **The store's data** (ADR-0218), which its own test controls and
-    /// shared fragment still reach directly: `data` when the program is the
-    /// store, and empty otherwise.
-    store: Arc<store::StoreData>,
+    /// **The store's data layer** (ADR-0218, track `store-pg`): `data` when
+    /// the program is the store, and an empty one otherwise. What changes
+    /// its data is staged through `data`, as a command is; what reaches it
+    /// directly is its test controls, its [`store::Faults`].
+    store: Arc<dyn store::StoreLayer>,
     /// The materializer's clock, advanced once per regeneration.
     ///
     /// A version is `Entry.generated_at`, which is a clock reading — so a clock
@@ -1018,10 +1014,6 @@ struct Line {
 /// A cart's lines, as the data layer holds them.
 type Lines = Vec<Line>;
 
-/// **What a new line records of its item**, by the item's id: its name and
-/// its price in cents, as the stores' menus have them now (ADR-0172).
-type Catalog = BTreeMap<String, (String, i64)>;
-
 /// One compiled component: ready to run, and what its artifact imports.
 struct Loaded {
     prepared: pw_host::engine::Prepared,
@@ -1130,7 +1122,7 @@ fn contracts() -> Vec<ComponentContract> {
 /// components.
 #[cfg(test)]
 fn dev_topology() -> Topology {
-    topology_for(store::StoreData::grants())
+    topology_for(store::grants())
 }
 
 /// **The development origin, granting the platform's operations and a data
@@ -1175,10 +1167,24 @@ impl Server {
     /// opened (ADR-0246): PostgreSQL where it names one, the in-memory layer
     /// otherwise. Either is held to what the program's sources state before
     /// anything is served.
+    #[cfg(test)]
     fn from_build_with(
         dist: std::path::PathBuf,
         build: std::path::PathBuf,
         feed: Option<Arc<dyn data::DataLayer>>,
+    ) -> Result<Server, String> {
+        Server::from_build_layers(dist, build, feed, None)
+    }
+
+    /// [`Server::from_build_with`], and the store's data in the layer the
+    /// deployment opened (track `store-pg`): PostgreSQL where it names one,
+    /// the in-memory layer otherwise (and, for the server's tests, the layer
+    /// [`store::layer_for_tests`] says).
+    fn from_build_layers(
+        dist: std::path::PathBuf,
+        build: std::path::PathBuf,
+        feed: Option<Arc<dyn data::DataLayer>>,
+        store: Option<Arc<dyn store::StoreLayer>>,
     ) -> Result<Server, String> {
         let read = |rel: &str| {
             std::fs::read_to_string(build.join(rel))
@@ -1210,13 +1216,15 @@ impl Server {
         // TRACK SEAM (uploads, ADR-0253): the uploads the program declares
         // (`uploads.json`), their blobs where the deployment keeps them.
         let uploads = uploads::Uploads::from_build(&build, &uploads::blob_root(&dist))?;
-        let store = Arc::new(store::StoreData::new());
-        let data: Arc<dyn data::DataLayer> = if contracts
+        let (store, data): (Arc<dyn store::StoreLayer>, Arc<dyn data::DataLayer>) = if contracts
             .iter()
             .flat_map(|c| &c.imports)
             .any(|i| i.interface.starts_with("feed:"))
         {
-            feed.unwrap_or_else(|| Arc::new(feed::FeedData::new()))
+            (
+                Arc::new(store::StoreData::new()),
+                feed.unwrap_or_else(|| Arc::new(feed::FeedData::new())),
+            )
         } else if contracts
             .iter()
             .flat_map(|c| &c.imports)
@@ -1224,9 +1232,16 @@ impl Server {
         {
             // TRACK SEAM (kiokun): kiokun's files, read-only, where the
             // program imports `kiokun:data/…` (docs/PARALLEL.md, W6, Q2).
-            Arc::new(kiokun::KiokunData::new()?)
+            (
+                Arc::new(store::StoreData::new()),
+                Arc::new(kiokun::KiokunData::new()?),
+            )
         } else {
-            store.clone()
+            #[cfg(test)]
+            let store = store.unwrap_or_else(store::layer_for_tests);
+            #[cfg(not(test))]
+            let store = store.unwrap_or_else(|| Arc::new(store::StoreData::new()));
+            (store.clone(), store)
         };
         // TRACK SEAM (uploads, ADR-0253): the layer commits a post's image
         // from the uploads' leases, in the post's own transaction.
@@ -1298,6 +1313,16 @@ impl Server {
                 if i.kind != pw_host::ImportKind::HostCapability || i.interface.starts_with("pw:") {
                     continue;
                 }
+                // **The host's own operations are no program's** (track
+                // `store-pg`): a route that changes the store's data stages
+                // them, and no grant gives a program one.
+                if i.key().starts_with(store::HOST_OPS) {
+                    return Err(format!(
+                        "`{}` imports `{}`, an operation the host keeps for its own routes",
+                        c.component_id,
+                        i.key()
+                    ));
+                }
                 if !supplied.contains(&i.key()) {
                     return Err(format!(
                         "`{}` imports `{}`, which the data layer does not supply",
@@ -1337,7 +1362,7 @@ impl Server {
 
     #[cfg(test)]
     fn with(dist: std::path::PathBuf, topology: Topology, built: Built) -> Server {
-        let store = Arc::new(store::StoreData::new());
+        let store = store::layer_for_tests();
         let data: Arc<dyn data::DataLayer> = store.clone();
         Server::with_layer(dist, topology, built, store, data)
     }
@@ -1356,7 +1381,7 @@ impl Server {
             plan,
             plans,
         }: Built,
-        store: Arc<store::StoreData>,
+        store: Arc<dyn store::StoreLayer>,
         data: Arc<dyn data::DataLayer>,
     ) -> Server {
         let speculations = speculation_manifests(&artifacts);
@@ -1484,15 +1509,127 @@ impl Server {
 
     /// How many items the data layer holds for the session: the tests' view
     /// of the state. The page's count is `domain.line_count`'s (ADR-0125).
+    /// Read through the layer, as a query reads it, so that a test reads
+    /// the same on every layer (track `store-pg`).
     #[cfg(test)]
     fn cart_value(&self, session: &str) -> i64 {
-        self.store
-            .carts
-            .lock()
-            .expect("carts")
-            .get(session)
-            .map(|lines| lines.iter().map(|l| l.quantity).sum())
-            .unwrap_or(0)
+        self.cart_lines(session).iter().map(|(_, q)| q).sum()
+    }
+
+    /// **The session's cart, read through the layer** (track `store-pg`):
+    /// each line's item and quantity, in order.
+    #[cfg(test)]
+    fn cart_lines(&self, session: &str) -> Vec<(String, i64)> {
+        let read = self.layer_read(session, "store:data/carts#current", session);
+        match read {
+            Val::Result(Ok(Some(cart))) => lines_of(&cart),
+            other => panic!("carts#current answered {other:?}"),
+        }
+    }
+
+    /// **Each line's name and price, as the layer answers them** (ADR-0172,
+    /// track `store-pg`).
+    #[cfg(test)]
+    fn cart_priced(&self, session: &str) -> Vec<(String, i64)> {
+        let Val::Result(Ok(Some(cart))) =
+            self.layer_read(session, "store:data/carts#current", session)
+        else {
+            panic!("no cart");
+        };
+        let Some(Val::List(lines)) = val_at(&cart, &["lines"]) else {
+            panic!("no lines: {cart:?}");
+        };
+        lines
+            .iter()
+            .map(|l| {
+                match (
+                    val_at(l, &["name"]),
+                    val_at(l, &["unit-price", "minor-units"]),
+                ) {
+                    (Some(Val::String(name)), Some(Val::S64(price))) => (name.clone(), *price),
+                    other => panic!("no line: {other:?}"),
+                }
+            })
+            .collect()
+    }
+
+    /// **The session's order, read through the layer** (ADR-0193, track
+    /// `store-pg`): its status's case and the lines it was placed with, or
+    /// none before one is placed.
+    #[cfg(test)]
+    fn order_of(&self, session: &str) -> Option<(String, Vec<(String, i64)>)> {
+        let status = match self.layer_read(session, "store:data/orders#current", session) {
+            Val::Result(Ok(Some(v))) => match *v {
+                Val::Option(None) => return None,
+                Val::Option(Some(case)) => match *case {
+                    Val::Variant(case, _) => case,
+                    other => panic!("orders#current answered {other:?}"),
+                },
+                other => panic!("orders#current answered {other:?}"),
+            },
+            other => panic!("orders#current answered {other:?}"),
+        };
+        let lines = match self.layer_read(session, "store:data/orders#placed", session) {
+            Val::Option(Some(cart)) => lines_of(&cart),
+            Val::Option(None) => Vec::new(),
+            other => panic!("orders#placed answered {other:?}"),
+        };
+        Some((status, lines))
+    }
+
+    /// **A change to the store's data at its source, untold** (track
+    /// `store-pg`): the host's own operation `op`, written through the
+    /// layer and committed with no event, as a change the program is not
+    /// told of is. What a test arranges where it once wrote the in-memory
+    /// layer's fields.
+    #[cfg(test)]
+    fn untold(&self, session: &str, op: &str, args: &[Val]) {
+        self.store_write(session, op, args, &[], |_| {})
+            .unwrap_or_else(|why| panic!("{op}: {why}"));
+    }
+
+    /// The session's order set at the source, untold (E14, T04).
+    #[cfg(test)]
+    fn order_set_untold(&self, session: &str, status: &str) {
+        self.untold(
+            session,
+            "store:host/orders#set-status",
+            &[
+                Val::String(session.into()),
+                Val::Option(Some(Box::new(Val::String(status.into())))),
+            ],
+        );
+    }
+
+    /// An item sold out at the source, or back, untold (charter §15.5).
+    #[cfg(test)]
+    fn stock_untold(&self, item: &str, available: bool) {
+        self.untold(
+            "",
+            "store:host/menus#stock",
+            &[Val::String(item.into()), Val::Bool(available)],
+        );
+    }
+
+    /// Store 47's menu changed at its source, untold (ADR-0178).
+    #[cfg(test)]
+    fn menu_untold(&self, op: MenuOp) {
+        let mut args = vec![Val::String(STORE_ID.into())];
+        args.extend(op.to_vals());
+        self.untold("", "store:host/menus#change", &args);
+    }
+
+    /// One read of the data layer's, by its key, for `session`, passed
+    /// `arg`.
+    #[cfg(test)]
+    fn layer_read(&self, session: &str, op: &str, arg: &str) -> Val {
+        let ops = self.data.reads(session, None);
+        let read = ops
+            .get(op)
+            .unwrap_or_else(|| panic!("the layer has no `{op}`"));
+        let mut out = read(&[Val::String(arg.to_string())]).expect(op);
+        assert_eq!(out.len(), 1, "{op}: {out:?}");
+        out.remove(0)
     }
 
     /// **The platform's outbox, for one command** (ADR-0208, ADR-0209): each
@@ -1684,6 +1821,7 @@ impl Server {
     ) -> Result<(), String> {
         // The store's test fault, for this command alone (ADR-0174).
         self.store
+            .faults()
             .fail_next
             .store(fail, std::sync::atomic::Ordering::SeqCst);
         let answered = self.command_answered(component_id, session, args, None)?;
@@ -1751,6 +1889,9 @@ impl Server {
         {
             let mut staging = self.data.begin(session);
             let mut host = staging.ops();
+            // The host's own operations are its routes', never a
+            // component's (track `store-pg`).
+            host.retain(|key, _| !key.starts_with(store::HOST_OPS));
             host.insert(
                 "pw:host/session#read".to_string(),
                 Self::session_operation(session),
@@ -1777,7 +1918,13 @@ impl Server {
                 };
                 return Ok((answered, Vec::new()));
             }
-            let Some(rows) = staging.rows() else {
+            let (emitted, invalidated) = {
+                let staged = staged_events.lock().expect("staged");
+                (staged.events.clone(), staged.invalidated.clone())
+            };
+            let Some(((emitted, invalidated), ids)) =
+                self.commit_staged(&mut *staging, &emitted, &invalidated)?
+            else {
                 // Nothing was written, so there is nothing to commit.
                 let answered = Answered {
                     committed: true,
@@ -1786,34 +1933,6 @@ impl Server {
                 };
                 return Ok((answered, Vec::new()));
             };
-            let (emitted, invalidated) = {
-                let staged = staged_events.lock().expect("staged");
-                (staged.events.clone(), staged.invalidated.clone())
-            };
-            let events = emitted
-                .iter()
-                .map(|(event, values)| outboxed(event, values))
-                .collect::<Result<Vec<_>, String>>()?;
-            // A layer that keeps its own outbox commits the writes and the
-            // events in its own transaction, and what it committed is what
-            // is delivered, read back from its outbox (ADR-0246). Refused,
-            // nothing of the command is kept, and no one is told.
-            let (emitted, invalidated) = match staging.commit(&emitted, &invalidated)? {
-                Some(committed) => committed,
-                None => {
-                    // The state the data layer staged and the outbox's
-                    // events, in one transaction (ADR-0019, ADR-0208).
-                    self.materializer.command(|tx| {
-                        for (key, value) in &rows {
-                            Materializer::set_state(tx, key, value);
-                        }
-                        Ok::<_, String>(events)
-                    })?;
-                    (emitted, invalidated)
-                }
-            };
-            // What was staged is the data layer's from now on.
-            staging.publish();
             // What the cart's values include from now on, by the interaction
             // that committed it (ADR-0172), recorded with the commit.
             if let Some(interaction) = interaction {
@@ -1839,12 +1958,198 @@ impl Server {
                 let version = Version(self.clock.now());
                 self.send_documents(session, &session_documents(session), version, false);
             }
+            // Delivered: every event the commit staged is consumed, the
+            // order's among them, which no entry drained above names (track
+            // `store-pg`). Until 2026-10-08 each order placed left its
+            // `OrderChanged` in the materializer's outbox for good.
+            self.materializer.delivered(&ids);
             let answered = Answered {
                 committed: true,
                 result,
                 why: None,
             };
             Ok((answered, reached))
+        }
+    }
+
+    /// **A command's writes and its events, committed** (ADR-0019, ADR-0208,
+    /// ADR-0246; track `store-pg`): the one commit path, a program's
+    /// command's and a route's that changes the store's data. `None` where
+    /// nothing was written, and nothing commits.
+    ///
+    /// A layer that keeps its own outbox commits the writes and the events
+    /// in its own transaction, and what it committed is what is delivered,
+    /// read back from its outbox (ADR-0246); refused, nothing of the
+    /// command is kept, and no one is told. A layer that keeps the session's
+    /// entry (the store on PostgreSQL) then has its commit recorded in the
+    /// materializer: the rows and the events it read back, in one
+    /// materializer transaction, as the in-memory layer's commit is
+    /// written, so the session's entry moves as it does in memory. The
+    /// database stays the authority: a record that fails after it committed
+    /// is said, and the command is answered committed.
+    ///
+    /// Returns what is delivered, and the materializer's ids for its events,
+    /// which are consumed once delivered ([`Materializer::delivered`]).
+    fn commit_staged(
+        &self,
+        staging: &mut dyn data::Staged,
+        emitted: &[data::Handed],
+        invalidated: &[data::Dropped],
+    ) -> Result<Option<(data::Outboxed, Vec<i64>)>, String> {
+        let Some(rows) = staging.rows() else {
+            return Ok(None);
+        };
+        let events = emitted
+            .iter()
+            .map(|(event, values)| outboxed(event, values))
+            .collect::<Result<Vec<_>, String>>()?;
+        let (delivered, ids) = match staging.commit(emitted, invalidated)? {
+            Some(committed) => {
+                let mut ids = Vec::new();
+                if self.data.session_entry() {
+                    let recorded = committed
+                        .0
+                        .iter()
+                        .map(|(event, values)| outboxed(event, values))
+                        .collect::<Result<Vec<_>, String>>()
+                        .and_then(|events| {
+                            self.materializer.command(|tx| {
+                                for (key, value) in &rows {
+                                    Materializer::set_state(tx, key, value);
+                                }
+                                Ok::<_, String>(events)
+                            })
+                        });
+                    match recorded {
+                        Ok(recorded) => ids = recorded,
+                        Err(why) => eprintln!(
+                            "pw dev server: a commit was not recorded in the materializer: {why}"
+                        ),
+                    }
+                }
+                (committed, ids)
+            }
+            None => {
+                // The state the data layer staged and the outbox's events, in
+                // one transaction (ADR-0019, ADR-0208).
+                let ids = self.materializer.command(|tx| {
+                    for (key, value) in &rows {
+                        Materializer::set_state(tx, key, value);
+                    }
+                    Ok::<_, String>(events)
+                })?;
+                ((emitted.to_vec(), invalidated.to_vec()), ids)
+            }
+        };
+        // What was staged is the data layer's from now on.
+        staging.publish();
+        Ok(Some((delivered, ids)))
+    }
+
+    /// **A route's change to the store's data, committed as a command's is**
+    /// (track `store-pg`): the host's own operation `op`, staged through the
+    /// layer in a command's transaction for `session`, and committed with
+    /// `events` in it. `deliver` is handed what committed, once the staging
+    /// is given up, and the events are consumed after it.
+    ///
+    /// The operation's answer, `Ok` with its value where it has one; `Err`
+    /// where it refused, or the commit was, and nothing is kept.
+    fn store_write(
+        &self,
+        session: &str,
+        op: &str,
+        args: &[Val],
+        events: &[data::Handed],
+        deliver: impl FnOnce(&[data::Handed]),
+    ) -> Result<Option<Val>, String> {
+        let mut staging = self.data.begin(session);
+        let ops = staging.ops();
+        let run = ops
+            .get(op)
+            .ok_or_else(|| format!("the data layer has no `{op}`"))?;
+        let answer = match run(args)?.as_slice() {
+            [Val::Result(Ok(answer))] => answer.as_deref().cloned(),
+            [Val::Result(Err(why))] => {
+                return Err(match why.as_deref() {
+                    Some(Val::String(why)) => why.clone(),
+                    other => format!("{op} refused: {other:?}"),
+                });
+            }
+            other => return Err(format!("{op} answered {other:?}")),
+        };
+        let Some(((delivered, _), ids)) = self.commit_staged(&mut *staging, events, &[])? else {
+            return Ok(answer);
+        };
+        drop(staging);
+        deliver(&delivered);
+        self.materializer.delivered(&ids);
+        Ok(answer)
+    }
+
+    /// **What the recommender suggests, curated** (ADR-0148, track
+    /// `store-pg`), for every store, or drawn from each store's menu again
+    /// where `items` is none: the store's data, written through the layer.
+    fn curate(&self, items: Option<&[(String, String)]>) -> Result<(), String> {
+        let items = Val::Option(items.map(|items| {
+            Box::new(Val::List(
+                items
+                    .iter()
+                    .map(|(id, name)| {
+                        Val::Record(vec![
+                            ("id".into(), Val::String(id.clone())),
+                            ("name".into(), Val::String(name.clone())),
+                        ])
+                    })
+                    .collect(),
+            ))
+        }));
+        self.store_write(
+            "",
+            "store:host/recommendations#curate",
+            &[items],
+            &[],
+            |_| {},
+        )
+        .map(|_| ())
+    }
+
+    /// **What a session's estimator estimates** (E14, T10; ADR-0180, track
+    /// `store-pg`): the least minutes and, where said, the most, written
+    /// through the layer.
+    fn set_estimate(&self, session: &str, minutes: i64, max: Option<i64>) -> Result<(), String> {
+        self.store_write(
+            session,
+            "store:host/estimates#set",
+            &[
+                Val::String(session.to_string()),
+                Val::S64(minutes),
+                Val::Option(max.map(|m| Box::new(Val::S64(m)))),
+            ],
+            &[],
+            |_| {},
+        )
+        .map(|_| ())
+    }
+
+    /// **A store's items' ids, in its order**, read through the layer
+    /// (track `store-pg`).
+    fn menu_ids(&self, store: &str) -> Result<Vec<String>, String> {
+        let ops = self.data.reads("", None);
+        let read = ops
+            .get("store:data/menus#for-store")
+            .ok_or("the data layer has no `menus#for-store`")?;
+        match read(&[Val::String(store.to_string())])?.as_slice() {
+            [Val::Result(Ok(Some(menu)))] => match menu.as_ref() {
+                Val::List(items) => Ok(items
+                    .iter()
+                    .filter_map(|i| match val_at(i, &["id"]) {
+                        Some(Val::String(id)) => Some(id.clone()),
+                        _ => None,
+                    })
+                    .collect()),
+                other => Err(format!("menus#for-store answered {other:?}")),
+            },
+            other => Err(format!("menus#for-store answered {other:?}")),
         }
     }
 
@@ -3602,13 +3907,6 @@ impl Server {
             Some(rows) => rows,
             None => self.menu_rows(STORE_ID)?,
         };
-        {
-            // Refusals happen before anything is regenerated: a rejected
-            // operation must leave no version behind, or the page would be
-            // told to catch up to a change that did not happen.
-            let mut items = self.store.menu.lock().expect("menu");
-            op.apply(&mut items)?;
-        }
         // The deployment's menu changed, which is `MenuChanged(47)`: it drops
         // what the program says depends on it, the entries of each query
         // that declares `invalidates_on MenuChanged(id)` for this store, and
@@ -3616,15 +3914,35 @@ impl Server {
         // store's kept `Menu` was dropped here, by the query's name.
         // A stock change is `InventoryChanged(47, item)` (ADR-0178), which
         // the store's `Menu` and its fragment listen for.
-        let event = match &op {
-            MenuOp::Stock { id } => {
-                pw_materialize::Event::new("Events.InventoryChanged", &[STORE_ID, id.as_str()])
-            }
-            _ => pw_materialize::Event::new("Events.MenuChanged", &[STORE_ID]),
-        };
         // The store's ids are `String`s (`domain.pw`), as they key here.
-        let values = event.args.iter().map(|a| Val::String(a.clone())).collect();
-        self.invalidate_queries("", &[], &[(event.name.clone(), values)]);
+        let event = match &op {
+            MenuOp::Stock { id, .. } => (
+                "Events.InventoryChanged".to_string(),
+                vec![Val::String(STORE_ID.into()), Val::String(id.clone())],
+            ),
+            _ => (
+                "Events.MenuChanged".to_string(),
+                vec![Val::String(STORE_ID.into())],
+            ),
+        };
+        // **The change, written through the store's data layer with its
+        // event, in one transaction** (track `store-pg`), as a command's
+        // writes are. Refusals happen before anything is regenerated: a
+        // rejected operation commits nothing and leaves no version behind,
+        // or the page would be told to catch up to a change that did not
+        // happen. Until 2026-10-08 the change was made to the server's own
+        // list, and its event was committed nowhere.
+        let mut args = vec![Val::String(STORE_ID.into())];
+        args.extend(op.to_vals());
+        self.store_write(
+            "",
+            "store:host/menus#change",
+            &args,
+            std::slice::from_ref(&event),
+            |delivered| {
+                self.invalidate_queries("", &[], delivered);
+            },
+        )?;
 
         // The menu E7-P changes is store 47's (ADR-0162), read again with
         // the change.
@@ -5441,6 +5759,9 @@ enum MenuOp {
     /// as they were.
     Stock {
         id: String,
+        /// Whether it can be ordered now, written with the change (track
+        /// `store-pg`).
+        available: bool,
     },
 }
 
@@ -5499,7 +5820,7 @@ impl MenuOp {
                 let at = Self::position(items, id)?;
                 items[at].1 = name.clone();
             }
-            MenuOp::Stock { id } => {
+            MenuOp::Stock { id, .. } => {
                 Self::position(items, id)?;
             }
         }
@@ -5535,6 +5856,24 @@ fn cart_value(lines: &[Line]) -> Val {
                 .collect(),
         ),
     )])
+}
+
+/// **A cart's lines, as `(item, quantity)`**, from a cart's value: what a
+/// test compares (track `store-pg`).
+#[cfg(test)]
+fn lines_of(cart: &Val) -> Vec<(String, i64)> {
+    let Some(Val::List(lines)) = val_at(cart, &["lines"]) else {
+        panic!("no cart: {cart:?}");
+    };
+    lines
+        .iter()
+        .map(
+            |line| match (val_at(line, &["item-id"]), val_at(line, &["quantity"])) {
+                (Some(Val::String(item)), Some(Val::S64(q))) => (item.clone(), *q),
+                other => panic!("no line: {other:?}"),
+            },
+        )
+        .collect()
 }
 
 /// **A binding's policy, as `pw-resource`'s manifest** (ADR-0127).
@@ -5770,32 +6109,8 @@ fn item_category(store: &str, id: &str) -> (&'static str, &'static str) {
     }
 }
 
-/// A store's name, by its id: the stores this server holds.
-/// **A store, as the data layer holds it** (ADR-0125, ADR-0192): what
-/// `stores#get` answers for one, and `stores#list` for each.
-fn store_record(id: &str) -> Val {
-    Val::Record(vec![
-        ("id".into(), Val::String(id.to_string())),
-        (
-            "name".into(),
-            Val::String(store_named(id).unwrap_or_default().into()),
-        ),
-        // A program whose `Store` declares none is not given it (ADR-0166):
-        // the benchmark's.
-        (
-            "description".into(),
-            Val::String(store_description(id).into()),
-        ),
-        (
-            "hours".into(),
-            Val::Record(vec![
-                ("opens-minute".into(), Val::S64(7 * 60)),
-                ("closes-minute".into(), Val::S64(19 * 60)),
-            ]),
-        ),
-    ])
-}
-
+/// A store's name, by its id: the stores this server holds, as they are
+/// first (`store.rs`'s seed).
 fn store_named(id: &str) -> Option<&'static str> {
     match id {
         STORE_ID => Some(STORE_NAME),
@@ -6228,7 +6543,22 @@ fn main() {
         },
         _ => None,
     };
-    let server = match Server::from_build_with(dist.into(), build.into(), feed) {
+    // **The store's data in PostgreSQL** (track `store-pg`), where the
+    // deployment names a database, in its own schema, `pw_store`; in memory
+    // otherwise. Its command's isolation is set as the feed's is.
+    let store = match std::env::var("PW_STORE_DATABASE_URL") {
+        Ok(url) if !url.is_empty() => {
+            match store_pg::StorePg::open_with(&url, store_pg::SCHEMA, isolation) {
+                Ok(layer) => Some(Arc::new(layer) as Arc<dyn store::StoreLayer>),
+                Err(e) => {
+                    eprintln!("pw dev server: PW_STORE_DATABASE_URL: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => None,
+    };
+    let server = match Server::from_build_layers(dist.into(), build.into(), feed, store) {
         Ok(s) => Arc::new(s),
         Err(e) => {
             eprintln!("pw dev server: {e}\nrun spikes/own-renderer/run.sh, which runs `pw build`");
@@ -6491,15 +6821,27 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .find_map(|p| p.strip_prefix("status="))
                 .filter(|s| !s.is_empty())
                 .map(str::to_string);
-            let mut orders = server.store.orders.lock().expect("orders");
-            match status {
-                Some(s) => orders.insert(session.clone(), s),
-                None => orders.remove(&session),
-            };
-            drop(orders);
-            // And the session's open pages told (ADR-0193).
-            server.session_changed(&session, "Events.OrderChanged", &order_entry(&session));
-            respond_json(&mut stream, 200, &session, fresh, "{}");
+            // Through the store's data layer, with its event, in one
+            // transaction (track `store-pg`). The order moved along keeps
+            // its lines (ADR-0193); one the kitchen sets with none placed
+            // has none.
+            let event = (
+                "Events.OrderChanged".to_string(),
+                vec![Val::String(session.clone())],
+            );
+            let status = Val::Option(status.map(|s| Box::new(Val::String(s))));
+            let written = server.store_write(
+                &session,
+                "store:host/orders#set-status",
+                &[Val::String(session.clone()), status],
+                std::slice::from_ref(&event),
+                // And the session's open pages told (ADR-0193).
+                |_| server.session_changed(&session, "Events.OrderChanged", &order_entry(&session)),
+            );
+            match written {
+                Ok(_) => respond_json(&mut stream, 200, &session, fresh, "{}"),
+                Err(why) => refused_json(&mut stream, &session, fresh, why),
+            }
         }
         // The recommender a test sets (ADR-0148): how long it takes, how it
         // fails (`declared` or `host`), and what it recommends, `id:Name`
@@ -6520,19 +6862,28 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 set.gate = Some(Arc::new(Gate::default()));
             }
             set.fail = q("fail").filter(|f| !f.is_empty());
-            if let Some(items) = q("items") {
-                set.items = Some(
-                    items
-                        .split(',')
-                        .filter_map(|pair| pair.split_once(':'))
-                        .map(|(id, name)| (id.to_string(), name.to_string()))
-                        .collect(),
-                );
+            // What it recommends is the store's data, curated through the
+            // layer (track `store-pg`); none curated draws from each store's
+            // menu again.
+            let items: Option<Vec<(String, String)>> = q("items").map(|items| {
+                items
+                    .split(',')
+                    .filter_map(|pair| pair.split_once(':'))
+                    .map(|(id, name)| (id.to_string(), name.to_string()))
+                    .collect()
+            });
+            if let Err(why) = server.curate(items.as_deref()) {
+                return refused_json(&mut stream, &session, fresh, why);
             }
             // A read held as it was is let go (ADR-0223): a test that set the
             // recommender again has done with it.
             let was = std::mem::replace(
-                &mut *server.store.recommender.lock().expect("recommender"),
+                &mut *server
+                    .store
+                    .faults()
+                    .recommender
+                    .lock()
+                    .expect("recommender"),
                 set,
             );
             if let Some(gate) = was.gate {
@@ -6574,7 +6925,14 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // **The recommender's held reads, let go** (ADR-0223), its settings
         // kept.
         ("POST", "/bench/recommendations/release") => {
-            if let Some(gate) = &server.store.recommender.lock().expect("recommender").gate {
+            if let Some(gate) = &server
+                .store
+                .faults()
+                .recommender
+                .lock()
+                .expect("recommender")
+                .gate
+            {
                 gate.open();
             }
             respond_json(&mut stream, 200, &session, fresh, "{}");
@@ -6624,8 +6982,17 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .find_map(|p| p.strip_prefix("text="))
                 .and_then(percent_decoded)
                 .unwrap_or_default();
-            *server.store.notice.lock().expect("notice") = text;
-            respond_json(&mut stream, 200, &session, fresh, "{}");
+            // Through the layer (track `store-pg`), and still nothing told.
+            match server.store_write(
+                &session,
+                "store:host/notices#post",
+                &[Val::String(STORE_ID.into()), Val::String(text)],
+                &[],
+                |_| {},
+            ) {
+                Ok(_) => respond_json(&mut stream, 200, &session, fresh, "{}"),
+                Err(why) => refused_json(&mut stream, &session, fresh, why),
+            }
         }
         // **A binding read again, for the key the browser asks for**
         // (ADR-0152): `?binding=..&seq=..&doc=..&key=<JSON>`. The patch set
@@ -6689,20 +7056,29 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             let Some(item) = param("item") else {
                 return respond_json(&mut stream, 400, &session, fresh, "{}");
             };
-            let mut sold_out = server.store.sold_out.lock().expect("sold out");
-            if param("available").as_deref() == Some("false") {
-                sold_out.insert(item.clone());
+            let available = param("available").as_deref() != Some("false");
+            // Told (ADR-0178): `InventoryChanged(47, item)`, written with
+            // the change, and every page that shows the store sees the item
+            // as it is now. Untold, it is §15.5's forced stale item: a page
+            // shows what it was, and the command that adds it refuses it
+            // (ADR-0157). Either way through the layer (track `store-pg`).
+            let changed = if param("tell").as_deref() == Some("true") {
+                server.broadcast_menu(MenuOp::Stock {
+                    id: item,
+                    available,
+                })
             } else {
-                sold_out.remove(&item);
-            }
-            drop(sold_out);
-            // Told (ADR-0178): `InventoryChanged(47, item)`, and every page
-            // that shows the store sees the item as it is now. Untold, it is
-            // §15.5's forced stale item: a page shows what it was, and the
-            // command that adds it refuses it (ADR-0157).
-            if param("tell").as_deref() == Some("true")
-                && let Err(e) = server.broadcast_menu(MenuOp::Stock { id: item })
-            {
+                server
+                    .store_write(
+                        &session,
+                        "store:host/menus#stock",
+                        &[Val::String(item), Val::Bool(available)],
+                        &[],
+                        |_| {},
+                    )
+                    .map(|_| ())
+            };
+            if let Err(e) = changed {
                 let why = serde_json::Value::String(e);
                 respond_json(
                     &mut stream,
@@ -6724,7 +7100,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                     .find_map(|p| p.strip_prefix(&format!("{name}=") as &str))
                     .and_then(percent_decoded)
             };
-            *server.store.categories.lock().expect("categories") = Categories {
+            *server.store.faults().categories.lock().expect("categories") = Categories {
                 slow: param("slow"),
                 delay_ms: param("delay").and_then(|d| d.parse().ok()).unwrap_or(0),
             };
@@ -6738,10 +7114,17 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .find_map(|p| p.strip_prefix("minutes="))
                 .and_then(|m| m.parse::<i64>().ok())
             {
-                Some(minutes) => {
-                    *server.store.prep_minutes.lock().expect("prep minutes") = minutes;
-                    respond_json(&mut stream, 200, &session, fresh, "{}");
-                }
+                // Through the layer (track `store-pg`), and nothing told.
+                Some(minutes) => match server.store_write(
+                    &session,
+                    "store:host/kitchen#set-prep",
+                    &[Val::String(STORE_ID.into()), Val::S64(minutes)],
+                    &[],
+                    |_| {},
+                ) {
+                    Ok(_) => respond_json(&mut stream, 200, &session, fresh, "{}"),
+                    Err(why) => refused_json(&mut stream, &session, fresh, why),
+                },
                 None => respond_json(&mut stream, 400, &session, fresh, "{}"),
             }
         }
@@ -6755,6 +7138,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 "prep": count("store:data/kitchen#prep-minutes"),
                 "category": count("store:data/menus#in-category"),
                 "category_stopped": server.store
+                    .faults()
                     .category_stopped
                     .load(std::sync::atomic::Ordering::SeqCst),
                 // The store's origin, asked (ADR-0177).
@@ -6777,6 +7161,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             if query.split('&').any(|p| p == "fail=next") {
                 server
                     .store
+                    .faults()
                     .store_fails_next
                     .store(true, std::sync::atomic::Ordering::SeqCst);
                 // The store page's plan and every page's: a server built
@@ -6804,6 +7189,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .unwrap_or(0);
             server
                 .store
+                .faults()
                 .store_delay_ms
                 .store(delay, std::sync::atomic::Ordering::SeqCst);
             let resources: std::collections::BTreeSet<String> = std::iter::once(&server.plan)
@@ -6832,6 +7218,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .unwrap_or(0);
             server
                 .store
+                .faults()
                 .cart_faults
                 .lock()
                 .expect("cart faults")
@@ -6851,7 +7238,12 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // page's press met.
         ("POST", "/bench/fail") => {
             let next = query.split('&').find_map(|p| p.strip_prefix("next="));
-            let mut faults = server.store.cart_faults.lock().expect("cart faults");
+            let mut faults = server
+                .store
+                .faults()
+                .cart_faults
+                .lock()
+                .expect("cart faults");
             let mine = faults.entry(session.clone()).or_default();
             match next {
                 Some("write") => mine.fail_write = true,
@@ -6959,12 +7351,18 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 set.delay_ms = ms;
             }
             set.fail = q("fail").filter(|f| !f.is_empty());
-            if let Some(m) = q("minutes").and_then(|v| v.parse().ok()) {
-                set.minutes = m;
+            // What it estimates is the session's data, through the layer
+            // (track `store-pg`); its delay and failure are test controls.
+            let minutes = q("minutes")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(store::DEFAULT_ESTIMATE.0);
+            let max = q("max").and_then(|v| v.parse().ok());
+            if let Err(why) = server.set_estimate(&session, minutes, max) {
+                return refused_json(&mut stream, &session, fresh, why);
             }
-            set.max_minutes = q("max").and_then(|v| v.parse().ok());
             server
                 .store
+                .faults()
                 .estimators
                 .lock()
                 .expect("estimators")
@@ -7207,8 +7605,11 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             respond_json(&mut stream, 200, &session, fresh, &body.to_string());
         }
         ("GET", "/menu") => {
-            let items = server.store.menu.lock().expect("menu");
-            let ids: Vec<String> = items.iter().map(|(k, _)| format!("\"{k}\"")).collect();
+            // Store 47's menu, read through the layer (track `store-pg`).
+            let ids: Vec<String> = match server.menu_ids(STORE_ID) {
+                Ok(ids) => ids.iter().map(|k| format!("\"{k}\"")).collect(),
+                Err(why) => return refused_json(&mut stream, &session, fresh, why),
+            };
             respond_json(
                 &mut stream,
                 200,
@@ -7231,16 +7632,24 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0);
             if items > 0 {
-                let mut menu = server.store.menu.lock().expect("menu");
-                if menu.len() != items {
-                    *menu = (0..items)
-                        .map(|i| (format!("item-{i}"), format!("Item {i}")))
-                        .collect();
-                    drop(menu);
-                    server
-                        .materializer
-                        .invalidate(&server.menu_key(STORE_ID), 0);
-                    server.queries.invalidate("store.page.Menu");
+                // Through the layer (track `store-pg`): a menu that long
+                // already is not written.
+                let replaced = server.store_write(
+                    &session,
+                    "store:host/menus#replace",
+                    &[Val::String(STORE_ID.into()), Val::S64(items as i64)],
+                    &[],
+                    |_| {},
+                );
+                match replaced {
+                    Ok(Some(Val::Bool(true))) => {
+                        server
+                            .materializer
+                            .invalidate(&server.menu_key(STORE_ID), 0);
+                        server.queries.invalidate("store.page.Menu");
+                    }
+                    Ok(_) => {}
+                    Err(why) => return refused_json(&mut stream, &session, fresh, why),
                 }
             }
             let page = server.store_page().to_string();
@@ -8229,6 +8638,19 @@ fn session_of(headers: &str) -> String {
         .unwrap_or_else(identity::new_session_id)
 }
 
+/// **A change to the store's data refused** (track `store-pg`): 409, and
+/// why. Nothing of it was kept.
+fn refused_json(stream: &mut TcpStream, session: &str, fresh: bool, why: String) {
+    let why = serde_json::Value::String(why);
+    respond_json(
+        stream,
+        409,
+        session,
+        fresh,
+        &format!("{{\"refused\":{why}}}"),
+    );
+}
+
 fn respond_json(stream: &mut TcpStream, code: u16, session: &str, fresh: bool, body: &str) {
     respond(
         stream,
@@ -8510,11 +8932,7 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         let s = orders_server();
         let (none, _) = s.serve_document("a");
         assert!(visible(&none).contains("No order yet."), "{none}");
-        s.store
-            .orders
-            .lock()
-            .expect("orders")
-            .insert("a".into(), "preparing".into());
+        s.order_set_untold("a", "preparing");
         let (preparing, _) = s.serve_document("a");
         assert!(
             visible(&preparing).contains("Your order is being prepared."),
@@ -8530,11 +8948,7 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         let s = orders_server();
         // A status the program's type does not have: the component's types
         // refuse what the host gives, and the query fails.
-        s.store
-            .orders
-            .lock()
-            .expect("orders")
-            .insert("a".into(), "ready".into());
+        s.order_set_untold("a", "ready");
         let refused = s
             .serve_document_with_entries("a")
             .expect_err("a page that cannot be shown");
@@ -8548,11 +8962,7 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
     fn a_served_page_whose_values_fail_is_told_to_read_itself_again() {
         let s = orders_server();
         s.serve_document("a");
-        s.store
-            .orders
-            .lock()
-            .expect("orders")
-            .insert("a".into(), "ready".into());
+        s.order_set_untold("a", "ready");
         s.command(ADD, "a", &add("espresso", 1), false)
             .expect("the command commits");
         let queue = s.pending.lock().expect("pending");
@@ -8683,7 +9093,7 @@ public query Store(",
     }
 
     fn recommend(s: &Server, delay_ms: u64, fail: Option<&str>) {
-        *s.store.recommender.lock().expect("recommender") = Recommender {
+        *s.store.faults().recommender.lock().expect("recommender") = Recommender {
             delay_ms,
             fail: fail.map(str::to_string),
             ..Recommender::default()
@@ -8820,15 +9230,20 @@ public query Store(",
         include_str!("../../../../benchmarks/tasks/T10-estimate-states/reference/pleris.patch");
 
     fn estimate(s: &Server, session: &str, fail: Option<&str>, minutes: i64) {
-        s.store.estimators.lock().expect("estimators").insert(
-            session.to_string(),
-            Estimator {
-                delay_ms: 0,
-                fail: fail.map(str::to_string),
-                minutes,
-                max_minutes: None,
-            },
-        );
+        s.store
+            .faults()
+            .estimators
+            .lock()
+            .expect("estimators")
+            .insert(
+                session.to_string(),
+                Estimator {
+                    delay_ms: 0,
+                    fail: fail.map(str::to_string),
+                },
+            );
+        // What it estimates is the session's data (track `store-pg`).
+        s.set_estimate(session, minutes, None).expect("estimated");
     }
 
     fn page_as(s: &Server, session: &str) -> String {
@@ -8887,11 +9302,9 @@ public query Store(",
         let s = served_from(|app| app.to_string(), None);
         let (before, _) = s.serve_document("a");
         assert!(visible(&before).contains("Cortado"), "{before}");
-        s.store
-            .menu
-            .lock()
-            .expect("menu")
-            .retain(|(id, _)| id != "cortado");
+        s.menu_untold(MenuOp::Remove {
+            id: "cortado".into(),
+        });
         // The query's freshness spent: its value is read again.
         s.queries.invalidate("store.page.Menu");
         let (after, _) = s.serve_document("b");
@@ -8935,7 +9348,14 @@ public query Store(",
         assert_eq!(notice_calls(&s), 1);
         // Posted at the source, and nothing is told: the kept answer is
         // served, and the board is not asked again.
-        *s.store.notice.lock().expect("notice") = "Closing early".to_string();
+        s.untold(
+            "",
+            "store:host/notices#post",
+            &[
+                Val::String(STORE_ID.into()),
+                Val::String("Closing early".into()),
+            ],
+        );
         let (kept, _) = s.serve_document("b");
         assert!(visible(&kept).contains("Open until 7 pm"), "{kept}");
         assert_eq!(notice_calls(&s), 1);
@@ -8970,14 +9390,7 @@ public query Store(",
             );
             assert!(why.contains(&format!("{forged}")), "{why}");
         }
-        let lines = s
-            .store
-            .carts
-            .lock()
-            .expect("carts")
-            .get("a")
-            .cloned()
-            .unwrap_or_default();
+        let lines = s.cart_lines("a");
         assert!(lines.is_empty(), "the cart holds {:?}", lines.len());
         // A quantity the type holds is added, as before.
         let added = s
@@ -9009,13 +9422,13 @@ public query Store(",
             )
             .expect("a well-formed request");
         assert!(added.committed);
-        s.store
-            .carts
-            .lock()
-            .expect("carts")
-            .get_mut("a")
-            .expect("a cart")[0]
-            .quantity = 0;
+        // Around the program, as a row can be. A database that holds the
+        // invariant itself refuses the row (PostgreSQL's
+        // `cart_lines_quantity_check`), and there is nothing to read.
+        if let Err(refused) = s.store.line_around("a", 0, 0) {
+            assert!(refused.contains("cart_lines_quantity_check"), "{refused}");
+            return;
+        }
         let why = match s.serve_store_document("a", STORE_ID) {
             Err(Unread::Failed(why)) => why,
             other => panic!("served from a line of 0: {other:?}"),
@@ -9036,11 +9449,7 @@ public query Store(",
         // given the same answer.
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         s.serve_document("a");
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
+        s.stock_untold("cortado", false);
         let cortado = [shown("cortado"), serde_json::json!(1)];
         let refused = s
             .command_answer(ADD, "a", &cortado, Some("press-1"))
@@ -9063,7 +9472,7 @@ public query Store(",
             .expect("a well-formed request");
         assert_eq!(again, refused, "a retry is given the first answer");
         // Back in stock, the next press adds.
-        s.store.sold_out.lock().expect("sold out").clear();
+        s.stock_untold("cortado", true);
         let added = s
             .command_answer(ADD, "a", &cortado, Some("press-2"))
             .expect("a well-formed request");
@@ -9194,7 +9603,7 @@ public query Store(",
     /// read took, what came of each, and how many reads of a category were
     /// stopped.
     fn hot_then_cold(s: &Server) -> (Timed, Timed, u64) {
-        *s.store.categories.lock().expect("categories") = Categories {
+        *s.store.faults().categories.lock().expect("categories") = Categories {
             slow: Some("hot".to_string()),
             delay_ms: 1_000,
         };
@@ -9212,6 +9621,7 @@ public query Store(",
         });
         let stopped = s
             .store
+            .faults()
             .category_stopped
             .load(std::sync::atomic::Ordering::SeqCst);
         (hot, cold, stopped)
@@ -9269,7 +9679,7 @@ public query Store(",
             s.read_keyed("b", "browsing", 1, b, &category("hot"), STAYED),
             Ok(KeyOutcome::Applied)
         );
-        *s.store.categories.lock().expect("categories") = Categories {
+        *s.store.faults().categories.lock().expect("categories") = Categories {
             slow: Some("hot".to_string()),
             delay_ms: 1_000,
         };
@@ -9293,6 +9703,7 @@ public query Store(",
         // not told to read itself again.
         assert_eq!(
             s.store
+                .faults()
                 .category_stopped
                 .load(std::sync::atomic::Ordering::SeqCst),
             0
@@ -9313,7 +9724,7 @@ public query Store(",
     #[test]
     fn a_browser_that_leaves_lets_go_of_its_read() {
         let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_CANCEL]);
-        *s.store.categories.lock().expect("categories") = Categories {
+        *s.store.faults().categories.lock().expect("categories") = Categories {
             slow: Some("hot".to_string()),
             delay_ms: 1_000,
         };
@@ -9325,6 +9736,7 @@ public query Store(",
         assert!(started.elapsed() < std::time::Duration::from_millis(700));
         assert_eq!(
             s.store
+                .faults()
                 .category_stopped
                 .load(std::sync::atomic::Ordering::SeqCst),
             1
@@ -10067,29 +10479,15 @@ public query Store(",
             .expect("runs");
         s.command(ADD, "session-9", &add_shown("cortado", 1), false)
             .expect("runs");
-        let lines = s
-            .store
-            .carts
-            .lock()
-            .unwrap()
-            .get("session-9")
-            .cloned()
-            .unwrap();
         assert_eq!(
-            lines
-                .iter()
-                .map(|l| (l.item.as_str(), l.quantity))
-                .collect::<Vec<_>>(),
-            [("cortado", 3), ("espresso", 1)]
+            s.cart_lines("session-9"),
+            [("cortado".to_string(), 3), ("espresso".to_string(), 1)]
         );
         // Each recorded with its item's name and price when it was made
-        // (ADR-0172).
+        // (ADR-0172), as the layer answers it.
         assert_eq!(
-            lines
-                .iter()
-                .map(|l| (l.name.as_str(), l.price))
-                .collect::<Vec<_>>(),
-            [("Cortado", 425), ("Espresso", 350)]
+            s.cart_priced("session-9"),
+            [("Cortado".to_string(), 425), ("Espresso".to_string(), 350)]
         );
         assert_eq!(s.cart_value("session-9"), 4);
         assert_eq!(
@@ -10102,13 +10500,7 @@ public query Store(",
     /// A session's lines as the data layer holds them: each item and how
     /// many.
     fn quantities(s: &Server, session: &str) -> Vec<(String, i64)> {
-        s.store
-            .carts
-            .lock()
-            .unwrap()
-            .get(session)
-            .map(|lines| lines.iter().map(|l| (l.item.clone(), l.quantity)).collect())
-            .unwrap_or_default()
+        s.cart_lines(session)
     }
 
     /// **A line's −, + and Remove reach the data layer through their
@@ -10148,7 +10540,7 @@ public query Store(",
         // by name, as an add is, and nothing is written.
         s.command(ADD, "session-9", &add_shown("cortado", 1), false)
             .expect("runs");
-        s.store.sold_out.lock().unwrap().insert("cortado".into());
+        s.stock_untold("cortado", false);
         let refused = s
             .command(INCREASE, "session-9", &item("cortado"), false)
             .expect_err("sold out");
@@ -10195,6 +10587,7 @@ public query Store(",
     fn a_one_shot_write_error_fails_the_next_write_once() {
         let s = rendering_server();
         s.store
+            .faults()
             .cart_faults
             .lock()
             .unwrap()
@@ -10222,6 +10615,7 @@ public query Store(",
         // A page of the session's, served: its entry is made.
         s.serve_document_with_entries("session-9").expect("served");
         s.store
+            .faults()
             .cart_faults
             .lock()
             .unwrap()
@@ -10252,6 +10646,7 @@ public query Store(",
         // The shared queries, read and kept.
         timed("warm");
         s.store
+            .faults()
             .cart_faults
             .lock()
             .unwrap()
@@ -10262,6 +10657,7 @@ public query Store(",
         assert!(timed("quick") < second, "not another's");
 
         s.store
+            .faults()
             .store_delay_ms
             .store(1000, std::sync::atomic::Ordering::SeqCst);
         assert!(
@@ -10271,6 +10667,7 @@ public query Store(",
         s.query_clock.0.advance(30_001);
         assert!(timed("quick") >= second, "read again, and slow");
         s.store
+            .faults()
             .store_delay_ms
             .store(0, std::sync::atomic::Ordering::SeqCst);
         s.query_clock.0.advance(30_001);
@@ -10564,6 +10961,7 @@ public query Store(",
         // A session's cart, whose read fails: not served from anything kept.
         s.serve_document_with_entries("fourth").expect("served");
         s.store
+            .faults()
             .cart_faults
             .lock()
             .unwrap()
@@ -10610,12 +11008,7 @@ public query Store(",
             false,
         )
         .expect("runs");
-        let recorded = |s: &Server| {
-            s.store.carts.lock().unwrap()["session-9"]
-                .iter()
-                .map(|l| (l.name.clone(), l.price))
-                .collect::<Vec<_>>()
-        };
+        let recorded = |s: &Server| s.cart_priced("session-9");
         assert_eq!(recorded(&s), [("Cortado".to_string(), 425)]);
         // An item no store has is not available: refused by name, before
         // anything is written.
@@ -11234,6 +11627,10 @@ public query Store(",
     // TRACK SEAM (messages): direct messages, in memory and on PostgreSQL
     // where a database is named.
     mod messages;
+
+    /// Track `store-pg`: the store on PostgreSQL, the tests that look at the
+    /// database itself, which skip without one.
+    mod store_pg;
 
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
@@ -13599,20 +13996,20 @@ public query Store(",
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         s.command(ADD, "a", &add_shown("espresso", 2), false)
             .expect("added");
+        s.command(ADD, "a", &add_shown("cortado", 1), false)
+            .expect("added");
         s.command(PLACE, "a", &[], false).expect("placed");
+        // The order is the cart's lines and a status (ADR-0193). Until
+        // 2026-10-08 it kept the status alone, and its lines went with the
+        // emptied cart.
         assert_eq!(
-            s.store
-                .orders
-                .lock()
-                .expect("orders")
-                .get("a")
-                .map(String::as_str),
-            Some("placed")
+            s.order_of("a"),
+            Some((
+                "placed".to_string(),
+                vec![("espresso".to_string(), 2), ("cortado".to_string(), 1)]
+            ))
         );
-        assert!(
-            s.store.carts.lock().expect("carts")["a"].is_empty(),
-            "the cart is empty after"
-        );
+        assert!(s.cart_lines("a").is_empty(), "the cart is empty after");
         let last = sets_of(&s, &doc).pop().expect("a patch set");
         assert!(
             written(&last).contains("Placed: the store has your order."),
@@ -13643,7 +14040,7 @@ public query Store(",
             "{:?}",
             answered.result
         );
-        assert!(s.store.orders.lock().expect("orders").get("a").is_none());
+        assert_eq!(s.order_of("a"), None);
     }
 
     /// **The store moving an order along reaches the page open on it**
@@ -13683,6 +14080,11 @@ public query Store(",
             .filter(|(_, f)| matches!(f, StreamFrame::EntryValue { .. }))
             .count();
         assert_eq!(values, 0, "the cart's value went with the order's change");
+        // Moved along, it keeps the lines it was placed with (ADR-0193).
+        assert_eq!(
+            s.order_of("a"),
+            Some(("delivered".to_string(), vec![("espresso".to_string(), 1)]))
+        );
     }
 
     #[test]
@@ -13692,6 +14094,64 @@ public query Store(",
             |app| app.to_string(),
             &[],
         ));
+    }
+
+    /// **Every event a commit stages is consumed once it is delivered**
+    /// (track `store-pg`), on whichever layer the store is: after orders are
+    /// placed and moved along, the materializer's outbox holds nothing.
+    /// Until 2026-10-08 each `OrderChanged` was kept for good, since no entry
+    /// a drain names reaches it.
+    #[test]
+    fn every_event_a_commit_stages_is_consumed_once_delivered() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        s.serve_document_settled("a", ORDER_PAGE, &Params::new(), &[])
+            .expect("served");
+        for round in 0..3 {
+            s.command(ADD, "a", &add_shown("espresso", 1), false)
+                .expect("added");
+            s.command(PLACE, "a", &[], false).expect("placed");
+            let answer = posted(&s, "/bench/order?status=preparing", "a", "", "");
+            assert!(answer.starts_with("HTTP/1.1 200"), "{round}: {answer}");
+        }
+        s.broadcast_menu(MenuOp::Rename {
+            id: "cortado".into(),
+            name: "Gibraltar".into(),
+        })
+        .expect("renamed");
+        assert_eq!(s.order_of("a").map(|o| o.0).as_deref(), Some("preparing"));
+        assert_eq!(
+            s.materializer.retained_events(),
+            0,
+            "the outbox holds nothing"
+        );
+    }
+
+    /// **A program that names one of the host's own operations is refused**
+    /// (track `store-pg`): the routes that change the store's data stage
+    /// `store:host/…` through the layer, and no grant gives a program one,
+    /// whatever capability it declares for it.
+    #[test]
+    fn a_program_naming_a_host_operation_is_refused() {
+        let (_dir, out) = built_from_patches_in(
+            "examples",
+            |app| {
+                format!(
+                    "{app}\nfn post_notice(id: StoreId) -> Int !{{ database.read<Stores> }}\n    \
+                     host \"store:host/notices#post\"\n\npublic query Posting(id: StoreId) -> \
+                     Int\n    freshness 0.seconds\n    cache shared\n    concurrency one_per_key\n    \
+                     on_key_change cancel\n    timeout 2.seconds\n{{\n    post_notice(id)\n}}\n"
+                )
+            },
+            &[],
+        );
+        let Err(why) = Server::from_build(out.clone(), out) else {
+            panic!("served");
+        };
+        assert!(
+            why.contains("store:host/notices#post")
+                && why.contains("an operation the host keeps for its own routes"),
+            "{why}"
+        );
     }
 
     /// **The stores, as the home page** (ADR-0192): at `/`, each store this
@@ -14028,11 +14488,7 @@ public query Store(",
     #[test]
     fn a_sold_out_item_is_shown_so_and_has_no_add() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
+        s.stock_untold("cortado", false);
         let (html, _) = s.serve_store_document("a", STORE_ID).expect("served");
         let said = visible(&html)
             .split_whitespace()
@@ -14058,13 +14514,9 @@ public query Store(",
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
         let (_, other) = s.serve_store_document("b", "48").expect("served");
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
         s.broadcast_menu(MenuOp::Stock {
             id: "cortado".to_string(),
+            available: false,
         })
         .expect("told");
         let ops = operations_for(&s, "a", document);
@@ -14093,9 +14545,9 @@ public query Store(",
         assert!(visible(&now).contains("Sold out"), "{now}");
         assert!(operations_for(&s, "c", later).is_empty());
 
-        s.store.sold_out.lock().expect("sold out").clear();
         s.broadcast_menu(MenuOp::Stock {
             id: "cortado".to_string(),
+            available: true,
         })
         .expect("told");
         let back = operations_for(&s, "c", later);
@@ -14109,7 +14561,8 @@ public query Store(",
         // An item no store has is refused, and nothing is sent.
         assert!(
             s.broadcast_menu(MenuOp::Stock {
-                id: "matcha".to_string()
+                id: "matcha".to_string(),
+                available: false,
             })
             .is_err()
         );
@@ -14126,11 +14579,7 @@ public query Store(",
     fn an_untold_stock_change_reaches_the_open_pages_when_the_menu_is_read_again() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
+        s.stock_untold("cortado", false);
         let (stale, _) = s.serve_store_document("b", STORE_ID).expect("served");
         assert!(stale.contains("aria-label=\"Add Cortado\""), "{stale}");
         assert!(operations_for(&s, "a", document).is_empty());
@@ -14159,11 +14608,7 @@ public query Store(",
     fn a_change_sends_what_changed_unannounced_with_it() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cold-brew".to_string());
+        s.stock_untold("cold-brew", false);
         s.broadcast_menu(MenuOp::Rename {
             id: "espresso".to_string(),
             name: "Espresso Doppio".to_string(),
@@ -14207,11 +14652,7 @@ public query Store(",
     fn an_insert_and_what_changed_with_it_are_derived_from_the_menu() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("espresso".to_string());
+        s.stock_untold("espresso", false);
         s.broadcast_menu(MenuOp::Insert {
             id: "flat-white".to_string(),
             name: "Flat White".to_string(),
@@ -14278,13 +14719,9 @@ public query Store(",
         let menus = || calls(&s, "store:data/menus#sections");
         page("a");
         let (asked, read) = (asks(), menus());
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
         s.broadcast_menu(MenuOp::Stock {
             id: "cortado".to_string(),
+            available: false,
         })
         .expect("told");
         let shown = page("b");
@@ -14303,11 +14740,7 @@ public query Store(",
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
         let version = s.menu_version(STORE_ID);
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
+        s.stock_untold("cortado", false);
         s.queries.invalidate("store.page.Menu");
         // Read, not served: no refresh before it.
         let read = s.render_store("b");
@@ -14508,15 +14941,19 @@ public query Store(",
         };
         estimate(&s, "a", None, 20);
         assert_eq!(slot(&page("a"), "Delivery"), "Delivery in 20 to 30 min");
-        s.store.estimators.lock().expect("estimators").insert(
-            "b".to_string(),
-            Estimator {
-                delay_ms: 0,
-                fail: None,
-                minutes: 15,
-                max_minutes: Some(45),
-            },
-        );
+        s.store
+            .faults()
+            .estimators
+            .lock()
+            .expect("estimators")
+            .insert(
+                "b".to_string(),
+                Estimator {
+                    delay_ms: 0,
+                    fail: None,
+                },
+            );
+        s.set_estimate("b", 15, Some(45)).expect("estimated");
         assert_eq!(slot(&page("b"), "Delivery"), "Delivery in 15 to 45 min");
         estimate(&s, "c", None, 0);
         let refused = page("c");
@@ -14804,15 +15241,19 @@ public query Store(",
     fn the_store_sends_its_slots_after_its_own_content() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         recommend(&s, 600, None);
-        s.store.estimators.lock().expect("estimators").insert(
-            "a".to_string(),
-            Estimator {
-                delay_ms: 200,
-                fail: None,
-                minutes: 30,
-                max_minutes: None,
-            },
-        );
+        s.store
+            .faults()
+            .estimators
+            .lock()
+            .expect("estimators")
+            .insert(
+                "a".to_string(),
+                Estimator {
+                    delay_ms: 200,
+                    fail: None,
+                },
+            );
+        s.set_estimate("a", 30, None).expect("estimated");
         let chunks = fetched_as(&s, "/stores/47", Some("a"));
         let at =
             |text: &str| arrived(&chunks, text).unwrap_or_else(|| panic!("never sent: {text}"));
