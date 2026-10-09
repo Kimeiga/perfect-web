@@ -5393,3 +5393,21 @@ e14-shared-scopes:
        CARGO_INCREMENTAL=0 python3 scripts/shared_scopes_mutations.py; \
      } > docs/evidence/E14/shared-scopes.txt
     @grep -E "^test result|mutants killed|^---- |panicked at|ratio" docs/evidence/E14/shared-scopes.txt
+
+# ADR-XXXX: a change is derived outside the table, and what reaches a
+# document is recorded. The development server's tests, the baseline's
+# records, and the mutation controls.
+e14-derived-outside:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a change is derived outside the table, and what reaches a document is recorded"; echo; \
+       echo "produced by: just e14-derived-outside"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "python: $(python3 --version)"; echo; \
+       echo "== the development server (the table while a change derives, the attempts, the trail)"; echo; \
+       cargo test --locked -p pw-dev-server -- the_table_is_free a_document_changed a_documents_trail 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== a red baseline's records (scripts/tests/test_mutation_baseline.py)"; echo; \
+       python3 -m unittest -v scripts/tests/test_mutation_baseline.py 2>&1 | grep -E ' \.\.\. |^Ran |^OK|^FAILED'; \
+       echo; echo "== mutation controls (scripts/derived_outside_mutations.py)"; echo; \
+       python3 scripts/derived_outside_mutations.py; \
+     } > docs/evidence/E14/derived-outside.txt
+    @grep -E "^test result|^Ran |^OK|^FAILED|mutants killed|panicked at" docs/evidence/E14/derived-outside.txt

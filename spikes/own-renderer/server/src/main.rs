@@ -11266,6 +11266,63 @@ public query Store(",
         assert!(set.contains("First"), "told: {set}");
     }
 
+    /// **A document's trail says what happened to its frames** (ADR-XXXX):
+    /// each frame pushed, and the telling that pushed it, kept with the
+    /// document and answered to its own session alone (`/bench/records`).
+    #[test]
+    fn a_documents_trail_says_what_happened_to_its_frames() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        let trail = s.pending.lock().expect("pending")[&theirs]
+            .trail
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n");
+        for said in ["subscribed at", "told at", "pushed a change as", "pushed a patch set as"] {
+            assert!(trail.contains(said), "{said}: {trail}");
+        }
+        // Over HTTP: the session's own document's, and no other's.
+        let asked = |session: &str| {
+            let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+            let at = listener.local_addr().expect("address");
+            std::thread::scope(|scope| {
+                scope.spawn(|| {
+                    let (stream, _) = listener.accept().expect("accept");
+                    handle(&s, stream);
+                });
+                let mut client = std::net::TcpStream::connect(at).expect("connect");
+                client
+                    .write_all(
+                        format!(
+                            "GET /bench/records?doc={} HTTP/1.1\r\nHost: t\r\n\
+                             Cookie: pw-session={session}\r\n\r\n",
+                            theirs.1
+                        )
+                        .as_bytes(),
+                    )
+                    .expect("request");
+                let mut answer = String::new();
+                let _ = std::io::Read::read_to_string(&mut client, &mut answer);
+                answer
+            })
+        };
+        assert!(asked("b").contains("pushed a patch set as"), "{}", asked("b"));
+        assert!(!asked("a").contains("pushed"), "{}", asked("a"));
+    }
+
     /// **A telling that panics does not silence the reader** (ADR-0271): the
     /// next commit tells it, as one more would have.
     #[test]
