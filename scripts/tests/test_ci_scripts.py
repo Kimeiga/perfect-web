@@ -19,6 +19,7 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
@@ -229,6 +230,21 @@ class Recipes(unittest.TestCase):
             ["docs/evidence/b.txt", "docs/evidence/c.txt"],
         )
 
+
+    def test_a_heartbeat_says_what_a_recipe_is_doing_until_it_ends(self) -> None:
+        # A runner that dies mid-recipe keeps what reached the job's log.
+        import contextlib, io, threading
+        stop = threading.Event()
+        said = io.StringIO()
+        with contextlib.redirect_stdout(said):
+            beat = threading.Thread(target=recipes.heartbeat, args=("e14-x", stop, 0.05))
+            beat.start()
+            time.sleep(0.3)
+            stop.set()
+            beat.join()
+        lines = [l for l in said.getvalue().splitlines() if l.startswith("  [e14-x, ")]
+        self.assertTrue(lines, said.getvalue())
+        self.assertIn("evidence", lines[-1])
 
 class Prune(unittest.TestCase):
     def test_what_builds_leave_is_freed_and_the_newest_binary_kept(self) -> None:

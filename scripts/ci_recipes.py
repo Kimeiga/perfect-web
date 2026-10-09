@@ -30,6 +30,7 @@ import pathlib
 import re
 import shutil
 import subprocess
+import threading
 import sys
 import time
 
@@ -77,13 +78,65 @@ def free() -> str:
     return f"{usage.free / 2**30:.1f} GiB"
 
 
+def available() -> str:
+    """The memory left, as the kernel says it, where it says it."""
+    meminfo = pathlib.Path("/proc/meminfo")
+    if not meminfo.exists():
+        return "memory unknown"
+    for line in meminfo.read_text().splitlines():
+        if line.startswith("MemAvailable:"):
+            return f"{int(line.split()[1]) / 2**20:.1f} GiB available"
+    return "memory unknown"
+
+
+def largest(n: int = 3) -> str:
+    """The `n` processes holding the most memory, by name and size."""
+    ps = subprocess.run(["ps", "-eo", "rss=,comm="], capture_output=True, text=True).stdout
+    rows = sorted((line.split(None, 1) for line in ps.splitlines() if line.strip()),
+                  key=lambda r: -int(r[0]))[:n]
+    return ", ".join(f"{name.strip()} {int(rss) / 2**20:.1f} GiB" for rss, name in rows)
+
+
+def newest_line(since: float) -> str:
+    """The last line of the evidence file written most recently, since
+    `since`: how far a recipe has got, in its own words."""
+    files = [p for p in (ROOT / "docs" / "evidence").rglob("*.txt") if p.stat().st_mtime >= since]
+    if not files:
+        return "no evidence written yet"
+    path = max(files, key=lambda p: p.stat().st_mtime)
+    lines = path.read_text(errors="replace").strip().splitlines()
+    return f"{path.relative_to(ROOT)}: {lines[-1][:160] if lines else ''}"
+
+
+def heartbeat(recipe: str, stop: threading.Event, every: float = 30.0) -> None:
+    """**What a recipe is doing, every `every` seconds, into the job's log**:
+    its memory, the largest processes and its evidence's last line. A recipe
+    writes its record to a file the runner uploads at the end, so a runner
+    that dies mid-recipe left nothing to say where: `e14-graphs-on-the-wire`
+    took three runners down a few minutes in (2026-10-08 and -09)."""
+    start, wall = time.monotonic(), time.time()
+    while not stop.wait(every):
+        print(
+            f"  [{recipe}, {time.monotonic() - start:.0f}s] {available()}; "
+            f"{largest()}; {newest_line(wall)}",
+            flush=True,
+        )
+
+
 def run(recipe: str, out: pathlib.Path) -> dict:
     before = snapshot()
     start = time.monotonic()
-    with open(out / "logs" / f"{recipe}.log", "w") as log:
-        status = subprocess.run(
-            ["just", recipe], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT
-        ).returncode
+    stop = threading.Event()
+    beat = threading.Thread(target=heartbeat, args=(recipe, stop), daemon=True)
+    beat.start()
+    try:
+        with open(out / "logs" / f"{recipe}.log", "w") as log:
+            status = subprocess.run(
+                ["just", recipe], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT
+            ).returncode
+    finally:
+        stop.set()
+        beat.join()
     seconds = round(time.monotonic() - start, 1)
     wrote = written(before, snapshot())
     for path in wrote:
