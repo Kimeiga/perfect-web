@@ -1,15 +1,16 @@
 ADR-0208 - a command computes its events, and the outbox commits them with its writes
 
 produced by: just e14-command-events
-commit: 4310769be543b572da4cad5644b55f101cb803d1
+commit: d043fa6ff49de0ce18e5046773c3fc49f7d0560b
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37932273524 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the command's component (compiler/pw-conformance/tests/events.rs)
 
-test its_contract_imports_the_outbox_for_each_event_and_requires_it ... ok
 test a_command_that_emits_nothing_imports_no_outbox ... ok
+test its_contract_imports_the_outbox_for_each_event_and_requires_it ... ok
 test a_command_computes_its_events_from_what_it_was_given ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
 
 == the outbox's values (runtime/pw-materialize/tests/outbox_values.rs)
 
@@ -18,20 +19,21 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 == the server's commits
 
-test tests::a_command_whose_events_cannot_be_kept_is_not_run ... ok
 test tests::a_command_commits_the_events_it_computes ... ok
+test tests::a_command_whose_events_cannot_be_kept_is_not_run ... ok
 test tests::a_command_that_emits_nothing_tells_nothing ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 145 filtered out; finished in 2.45s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 343 filtered out; finished in 4.03s
 
 == the store's artifacts, as the compiler emits them
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.42s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.05s
 
 == mutation controls (scripts/committed_events_mutations.py)
 
-baseline: 148 passed, 0 failed
-`CartChanged` is committed whatever is computed: KILLED (1 of 148 tests fail)
-the outbox keeps nothing a command hands it: KILLED (36 of 148 tests fail)
-an `Int` is not its text: KILLED (1 of 148 tests fail)
-a `Bool` is not its text: KILLED (1 of 148 tests fail)
+baseline: 344 passed, 0 failed
+`CartChanged` is committed whatever is computed: KILLED (1 of 344 tests fail)
+the outbox keeps nothing a command hands it: KILLED (47 of 344 tests fail)
+an `Int` is not its text: KILLED (1 of 344 tests fail)
+a `Bool` is not its text: KILLED (1 of 344 tests fail)
 4 of 4 mutants killed
+memory bound: no process was stopped

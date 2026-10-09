@@ -27,7 +27,13 @@ SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 STORE = ROOT / "examples/store/app.pw"
 
 # Re-anchored by ADR-0178, whose stock change is an event of its own.
-EVENT = "        self.invalidate_queries(\"\", &[], &[(event.name.clone(), values)]);\n"
+# Re-anchored by track store-pg: the change is written through the layer
+# with its event, and what committed is delivered.
+EVENT = (
+    "            |delivered| {\n"
+    "                self.invalidate_queries(\"\", &[], delivered);\n"
+    "            },\n"
+)
 
 # (what, file, anchor, replacement)
 MUTANTS = [
@@ -35,27 +41,33 @@ MUTANTS = [
         "a menu change drops every store's menu, by the query's name",
         SERVER,
         EVENT,
-        "        self.queries.invalidate(\"store.page.Menu\");\n",
+        "            |_| {\n"
+        "                self.queries.invalidate(\"store.page.Menu\");\n"
+        "            },\n",
     ),
     (
         "a menu change drops nothing",
         SERVER,
         EVENT,
-        "",
+        "            |_| {},\n",
     ),
     (
         "the event names no store",
         SERVER,
-        # Re-anchored by ADR-0178.
-        "            _ => pw_materialize::Event::new(\"Events.MenuChanged\", &[STORE_ID]),\n",
-        "            _ => pw_materialize::Event::new(\"Events.MenuChanged\", &[]),\n",
+        # Re-anchored by ADR-0178, and by track store-pg.
+        "                \"Events.MenuChanged\".to_string(),\n"
+        "                vec![Val::String(STORE_ID.into())],\n",
+        "                \"Events.MenuChanged\".to_string(),\n"
+        "                vec![],\n",
     ),
     (
         "the event is another store's",
         SERVER,
-        # Re-anchored by ADR-0178.
-        "            _ => pw_materialize::Event::new(\"Events.MenuChanged\", &[STORE_ID]),\n",
-        "            _ => pw_materialize::Event::new(\"Events.MenuChanged\", &[SECOND_STORE.0]),\n",
+        # Re-anchored by ADR-0178, and by track store-pg.
+        "                \"Events.MenuChanged\".to_string(),\n"
+        "                vec![Val::String(STORE_ID.into())],\n",
+        "                \"Events.MenuChanged\".to_string(),\n"
+        "                vec![Val::String(SECOND_STORE.0.into())],\n",
     ),
     (
         "the store's menu declares no invalidation",

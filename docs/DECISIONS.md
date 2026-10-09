@@ -2449,3 +2449,12 @@ a commit tells the pages that ask, and tells them at once (the feed's
   time, each in its own hold. A commit had told every session one after
   another, the documents of pages closed up to two minutes before among
   them.
+[ADR-0298](DECISIONS/ADR-0298-the-store-on-postgresql.md):
+the store's data behind the seam, in memory and on PostgreSQL (track
+`store-pg`, W5).
+- The store's operations run through its data layer, in memory or on
+  PostgreSQL (`PW_STORE_DATABASE_URL`), with its guarantees stated as a
+  source's (ADR-0207), so each DoorDash gap after it is built and tested on
+  both. Found: an order dropped its lines, `OrderChanged` was never consumed
+  in memory, a menu change's event was committed nowhere, `/bench/stock`
+  set a stock no menu knew, and store 48's items were answered not found.

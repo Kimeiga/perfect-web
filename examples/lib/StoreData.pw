@@ -5,12 +5,21 @@
 // @milestone: E14
 //
 // ADR-0207: a data source states what it guarantees, and nothing asks it for
-// more. The store's data is one SQLite database the host opens (ADR-0005):
-// - its transactions are serializable, SQLite's isolation between
-//   connections;
-// - a read is of its latest commit, one writer at a time;
+// more. The store's data is in the database its deployment opens (track
+// `store-pg`): the host's memory by default, or PostgreSQL where
+// `PW_STORE_DATABASE_URL` names one. The host measures what the database it
+// opened provides, and serves nothing it falls short of (ADR-0246):
+// - its transactions are serializable: each command one at a time under the
+//   in-memory layer's lock, or PostgreSQL's serializable, set on each;
+// - a read is of its latest commit;
 // - it tells no change itself: the program's own events tell them, written
-//   with each command's writes in the outbox (ADR-0019).
+//   with each command's writes in the outbox (ADR-0019, ADR-0208).
+//
+// The benchmark's tasks add three resources no source holds: `Notices`
+// (T09), `Kitchen` (T02) and `Categories` (T07), each in a module of its
+// own that this one cannot import. They are in the same database, and the
+// host holds a resource no source holds to its own database's guarantees
+// (ADR-0207): serializable, strong, no feed, what this source states.
 
 module StoreData
 

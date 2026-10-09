@@ -23,6 +23,20 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0298, 2026-10-09: the store's data behind the seam, in memory and
+on PostgreSQL** (track `store-pg`, W5, merged from `d043fa6`). The store's
+operations run through its data layer as the feed's do (ADR-0246), on
+either layer, its guarantees stated as a source's (ADR-0207). Five
+findings fixed on the way: an order dropped its lines (ADR-0193's ruling);
+`OrderChanged` was never consumed from the materializer's outbox in
+memory, each order leaving a row for good; a menu change's event was
+committed nowhere; `/bench/stock` set a stock no menu knew; and store 48's
+items were answered not found. The host's 332 tests pass with the store on
+PostgreSQL and again in memory, 12 of the layer's own, 12 of 12 mutants
+killed, and every re-anchored script's recipe green on CI (run
+37932273524, 29 recipes, beside WebKit's "Load more", fixed on master since
+by ADR-0296). The DoorDash track (W8) builds on it.
+
 **ADR-0296 and ADR-0297, 2026-10-09: a change is derived outside the
 table, and a commit tells the pages that ask, at once** (CI's two
 findings: WebKit's "Load more", failing on every branch, and the feed's "a

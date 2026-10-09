@@ -33,30 +33,36 @@ MUTANTS = [
     (
         "an empty cart places an order",
         STORE_DATA,
-        "            if lines.is_empty() {\n"
-        "                return Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(\n"
-        "                    \"nothing-to-order\".into(),\n",
-        "            if false {\n"
-        "                return Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(\n"
-        "                    \"nothing-to-order\".into(),\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                if lines.is_empty() {\n"
+        '                    return Ok(declared("nothing-to-order"));\n',
+        "                if false {\n"
+        '                    return Ok(declared("nothing-to-order"));\n',
     ),
     (
         "a placed order leaves the cart as it was",
         STORE_DATA,
-        "            *staged = Some(Lines::new());\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                r.set_cart(&this, &[])?;\n",
         "",
     ),
     (
         "a placed order is not recorded",
         STORE_DATA,
-        "        if let Some(status) = self.placed.lock().expect(\"placed\").take() {\n",
-        "        if let Some(status) = self.placed.lock().expect(\"placed\").take().filter(|_| false) {\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                r.place(&this, &lines)?;\n",
+        "",
     ),
     (
         "the store's change is not sent",
         SERVER,
-        "            server.session_changed(&session, \"Events.OrderChanged\", &order_entry(&session));\n",
-        "",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        '                |_| server.session_changed(&session, "Events.OrderChanged", &order_entry(&session)),\n',
+        "                |_| {},\n",
     ),
     (
         "the store's change is sent against the cart's entry",

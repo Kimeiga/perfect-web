@@ -3046,6 +3046,36 @@ e14-feed-postgres:
      } > docs/evidence/E14/feed-postgres.txt; \
      grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/feed-postgres.txt
 
+# Track store-pg: the store's data behind the DataLayer seam on PostgreSQL,
+# held to what its source states. Needs PW_STORE_DATABASE_URL, a throwaway
+# database (each test uses a schema of its own, `pw_store_test_...`, and drops
+# it); PW_FEED_DATABASE_URL stands in where it is not set, as on CI's
+# database shard. Skips without either, and writes no evidence. Runs the
+# server's whole suite twice: the store on PostgreSQL, and in memory.
+e14-store-postgres:
+    @url="${PW_STORE_DATABASE_URL:-${PW_FEED_DATABASE_URL:-}}"; \
+     if [ -z "$url" ]; then \
+       echo "e14-store-postgres: skipped, PW_STORE_DATABASE_URL is not set (a throwaway PostgreSQL database, e.g. postgresql://localhost/pw_store_test)"; \
+       exit 0; \
+     fi; \
+     export PW_STORE_DATABASE_URL="$url"; \
+     mkdir -p docs/evidence/E14; \
+     { echo "Track store-pg - the store's data on PostgreSQL, held to what its source states"; echo; \
+       echo "produced by: just e14-store-postgres"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "postgres: $(psql "$url" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)')"; echo; \
+       echo "== the store on PostgreSQL (spikes/own-renderer/server/src/tests/store_pg.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- tests::store_pg:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the server's whole suite, the store on PostgreSQL (PW_STORE_TEST_LAYER=postgres)"; echo; \
+       PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- --skip tests::store_pg:: 2>&1 | grep -E '^test result|^---- |panicked at'; \
+       echo; echo "== the server's whole suite, the store in memory"; echo; \
+       PW_STORE_TEST_LAYER=memory cargo test --locked -p pw-dev-server -- --skip tests::store_pg:: 2>&1 | grep -E '^test result|^---- |panicked at'; \
+       echo; echo "== mutation controls (scripts/store_postgres_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/store_postgres_mutations.py; \
+     } > docs/evidence/E14/store-postgres.txt; \
+     grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/store-postgres.txt
+
 # ADR-0219: what a commit drops reaches every session that reads it
 e14-cross-session:
     @mkdir -p docs/evidence/E14

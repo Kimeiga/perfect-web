@@ -721,3 +721,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
     of kiokun's canonical link, std `Json`, `/_pw/` and the
     infrastructure follow-ups, after the merges in CI (refusal,
     stream-records, W5).
+- **2026-10-09, W5's store-pg merged** as ADR-0298, from `d043fa6`
+  (master merged in at `67272f8`): verify 37932273524, 29 recipes green,
+  `e14-store-postgres` among them; it failed only in WebKit's "Load more",
+  fixed on `master` since (ADR-0296). Its slot frees: **W8, the DoorDash
+  track, launches next** (above), the coordinator's to start when the disk
+  allows.
