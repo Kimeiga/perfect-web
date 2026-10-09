@@ -465,9 +465,60 @@ Each a decision for a track, with its date; a track's ADR records it too.
     go, asked in the integrator's session: a preview origin among them, a
     DNS change and a cutover. The track holds no credentials for any host.
   - **What needs the owner's local data is local.** A run over the whole
-    dictionary is recorded on this machine, and its recipe says so (charter
-    §13.5's split, as `LOCAL_ONLY`'s). What a committed sample can show,
+    dictionary is recorded on this machine, and its recipe says so
+    (ADR-0281's fifth decision, as `LOCAL_ONLY`'s; this cited charter
+    §13.5, which is macOS's concerns, until W6 found it). What a committed
+    sample can show,
     as `scripts/kiokun_sample.py` makes one, runs on CI.
   - **In order**: the inventory and its ADR; then the gaps in the order the
     integrator gives; each with its tests, its browser suite in three
     engines, its mutation controls and its recipe.
+- **2026-10-08, W6's inventory, answered.** Its order is accepted:
+  (1) the word page from the entry; (2) the whole dictionary's search, held
+  to `/api/search` with Korean, then the reading index, homophones and
+  deinflection in Pleris; (3) the static-data pages; (4) accounts and the
+  user's data; (5) browser capabilities; (6) outside services.
+  - **Q1, rendering**: yes. Every page is rendered by the server and works
+    with scripts off, with script only where a feature needs it, as every
+    Pleris page is. Parity is by content and behaviour, not by rendering
+    strategy. The live site renders nothing without script (`ssr = false`),
+    a difference stated, not matched.
+  - **Q2, the host**: the development server, a third program beside the
+    store and the feed (ADR-0218: a host serves any program), with a
+    read-only kiokun data layer. The slice's GET-only host stays as
+    ADR-0037's and ADR-0041's evidence until the rewrite supersedes it.
+  - **Q3, the app's own data**: yes, read-only through `KIOKUN_APP` (the
+    checkout's `sveltekit-app`), as `KIOKUN_DATA` is. Nothing is copied here
+    and nothing is written there. The course modules are converted at build
+    time into a local cache git ignores, by a converter committed here: this
+    repository is public, and the owner's content stays out of it unless
+    the owner says otherwise.
+  - **Q4, the search index**: (b), the builder's current output loaded
+    into a declared search source, its guarantees stated as ADR-0207 states
+    a source's; W8's search for DoorDash builds on it. The committed
+    `output_search_index.sql` is older than the builder and lacks
+    `jyutping_search`, so the CSV is read. (c) would copy the builder's
+    rule into a second place, to drift; (a) stays the slice's until (b).
+  - **Q5, the clone**: yes. A copy-on-write clone of `sveltekit-app` in the
+    track's scratchpad, run there with what is installed, with no
+    credentials and no `.env`, reaching no production service (R2, OpenAI,
+    Workers AI, Google Input Tools). Only pages that need none are
+    measured, and nothing is written to the checkout.
+  - **Q6, browser capabilities**: each a platform operation the integrator
+    rules when (5) reaches it: speech synthesis, device storage (with the
+    Docs app's device-local storage), the clipboard, a canvas (ADR-0075's
+    mounted resources) and sharing.
+  - **Q7, outside services**: no capability yet for an outbound request
+    with a secret; the host has no outbound client (the capability matrix's
+    third-party row). Each service and its keys are the owner's to approve,
+    asked when (6) reaches them.
+  - **Q8, the slice's extras** (stroke count, grade, frequency rank, Korean
+    meanings and pronunciation): kiokun.com's page is the reference, so
+    parity matches it. Whether to keep the extras is the owner's call,
+    asked with the word page's first review; until then they are not shown.
+  - **The security findings** in kiokun.com's own source went to the owner
+    in the integrator's session (2026-10-08). None is fixed in kiokun-data
+    by this project, which writes nothing there.
+  - **Corrections taken**: the local-data citation (above), and
+    KNOWN_LIMITATIONS' pitch line, which now names kiokun.com's own pitch
+    files.

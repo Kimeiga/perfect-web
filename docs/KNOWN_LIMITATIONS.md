@@ -392,7 +392,9 @@ its logic in Pleris and its data layer in the host:
 - **Korean is looked up, not searched.** An entry shows its Korean words,
   Japanese names and character (ADR-0037, amended). The index has Chinese and
   Japanese rows; kiokun.com's Korean rows need its romanization and ranking
-  ported first. Pitch accent is not in kiokun's entries.
+  ported first. Pitch accent is not in kiokun's entries: kiokun.com shows it
+  from its app's own files (`sveltekit-app/static/pitch/`, 256 of them),
+  which the slice does not read (W6's inventory, 2026-10-08).
 - **A call is a fresh instance** (ADR-0032). Bulk work needs a query over a
   list, as `shards.Places` is: a call a word made the whole shard's load three
   times slower.
