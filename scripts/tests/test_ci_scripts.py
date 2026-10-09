@@ -231,6 +231,18 @@ class Recipes(unittest.TestCase):
         )
 
 
+    def test_a_failed_recipe_says_its_last_lines_in_the_jobs_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = pathlib.Path(tmp)
+            (out / "logs").mkdir()
+            (out / "logs" / "e14-x.log").write_text("".join(f"line {i}\n" for i in range(100)))
+            (out / "evidence" / "docs").mkdir(parents=True)
+            (out / "evidence" / "docs" / "x.txt").write_text("built\nError: no such module\n")
+            said = recipes.failed_tail("e14-x", out, ["docs/x.txt"], lines=5)
+        self.assertIn("| line 99", said)
+        self.assertNotIn("| line 94", said)
+        self.assertIn("| Error: no such module", said)
+
     def test_a_heartbeat_says_what_a_recipe_is_doing_until_it_ends(self) -> None:
         # A runner that dies mid-recipe keeps what reached the job's log.
         import contextlib, io, threading

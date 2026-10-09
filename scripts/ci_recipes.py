@@ -147,6 +147,22 @@ def run(recipe: str, out: pathlib.Path) -> dict:
     return {"recipe": recipe, "status": status, "seconds": seconds, "wrote": wrote, "free": free()}
 
 
+def failed_tail(recipe: str, out: pathlib.Path, wrote: list[str], lines: int = 40) -> str:
+    """**What a failed recipe said last**, its log's and each evidence file's
+    last `lines` lines, for the job's log: the runner uploads them only at
+    the end, and `e14-contract` failed in 27 s in a nightly whose runner
+    then died (2026-10-08), leaving nothing to read."""
+    parts = []
+    for name, path in [("log", out / "logs" / f"{recipe}.log")] + [
+        (w, out / "evidence" / w) for w in wrote
+    ]:
+        if path.exists():
+            tail = path.read_text(errors="replace").splitlines()[-lines:]
+            parts.append(f"  --- {recipe}: {name}, its last {len(tail)} lines")
+            parts.extend(f"  | {line}" for line in tail)
+    return "\n".join(parts)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True)
@@ -162,6 +178,8 @@ def main() -> int:
             f"{recipe}: exit {result['status']} in {result['seconds']}s, "
             f"wrote {len(result['wrote'])}, {result['free']} free"
         )
+        if result["status"] != 0:
+            print(failed_tail(recipe, out, result["wrote"]))
         sys.stdout.flush()
         (out / "results.json").write_text(json.dumps(results, indent=2) + "\n")
     return 0
