@@ -633,7 +633,10 @@ fn the_character_headers_rules_hold() {
     );
     let fourth = fetched(&s, &path_of("丁"));
     let chinese = section(&fourth, "chinese");
-    assert!(chinese.contains("<span class=\"chinese-word-text\">"), "{chinese}");
+    assert!(
+        chinese.contains("<span class=\"chinese-word-text\">"),
+        "{chinese}"
+    );
     assert!(visible(chinese).contains("丁"), "{chinese}");
     assert!(!rendered(&second).contains("mnemonic-keyword"), "{second}");
     let header = header_of(&second);
