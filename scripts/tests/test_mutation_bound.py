@@ -126,11 +126,7 @@ class Bound(unittest.TestCase):
         self.assertEqual(r.returncode, 128 + 9)
         self.assertEqual(len(watch.stopped), 1)
         self.assertGreater(watch.stopped[0][1], 128 * MiB)
-        self.assertRegex(
-            out.getvalue(),
-            r"\A  stopped `[^`]+`: it held more than 128 MiB, "
-            r"the most a process may hold here\n\Z",
-        )
+        self.assertRegex(out.getvalue(), r"\A  memory bound: stopped `[^`]+`, which held more than 128 MiB\n\Z")
 
     def test_a_process_within_the_bound_runs_to_its_end(self):
         watch, out = self.watch(512 * MiB)
@@ -159,10 +155,7 @@ class Bound(unittest.TestCase):
         self.assertEqual(killed, [12])
         self.assertEqual(set(processes.read), {11, 12})
         self.assertEqual(watch.stopped, [("p12", 300 * MiB)])
-        self.assertEqual(
-            out.getvalue(),
-            "  stopped `p12`: it held more than 100 MiB, the most a process may hold here\n",
-        )
+        self.assertEqual(out.getvalue(), "  memory bound: stopped `p12`, which held more than 100 MiB\n")
         # One at the bound is within it.
         self.assertNotIn(11, killed)
 
@@ -197,6 +190,72 @@ class Bound(unittest.TestCase):
         processes.table = {1: 0, 10: 1, 12: 10}
         watch.look()
         self.assertEqual(killed, [12, 12])
+
+    def test_a_stop_names_the_verdict_after_it_a_kind_of_its_own(self):
+        # The peer's point (2026-10-09): a kill by the bound is not a test's,
+        # and a suite whose kills were the bound's would look stronger than
+        # it is. Each verdict printed after a stop is named, apart.
+        processes = Fake({1: 0, 10: 1, 12: 10}, {12: 300 * MiB})
+        watch = bound.Watch(
+            bound=100 * MiB, out=io.StringIO(), root=10, platform=processes, kill=lambda pid, sig: None
+        )
+        out = io.StringIO()
+        lines = bound.Lines(out, watch)
+        lines.write("baseline: 3 passed, 0 failed\n")
+        # A line written in pieces is read when it ends.
+        lines.write("the first: KIL")
+        lines.write("LED (1 of 3 tests fail)\n")
+        watch.look()
+        print("the second: KILLED (1 of 3 tests fail)", file=lines)
+        lines.write("  a note: KILLED, indented, is no verdict\nthe third: SURVIVED\n")
+        # Passed on as written.
+        self.assertEqual(
+            out.getvalue(),
+            "baseline: 3 passed, 0 failed\nthe first: KILLED (1 of 3 tests fail)\n"
+            "the second: KILLED (1 of 3 tests fail)\n"
+            "  a note: KILLED, indented, is no verdict\nthe third: SURVIVED\n",
+        )
+        self.assertEqual(
+            watch.summary(),
+            "memory bound: a process was stopped in 1 of 3 mutants' runs, "
+            "each perhaps killed by the bound alone: the second",
+        )
+
+    def test_a_run_the_bound_did_not_touch_says_so(self):
+        watch = bound.Watch(out=io.StringIO(), platform=Fake({}, {}))
+        lines = bound.Lines(io.StringIO(), watch)
+        lines.write("baseline: 3 passed, 0 failed\nthe first: KILLED (1 of 3 tests fail)\n")
+        self.assertEqual(watch.summary(), "memory bound: no process was stopped")
+
+    def test_the_bounds_line_is_the_scripts_last(self):
+        # A script, as each is: `mutation_baseline` imported first, its
+        # verdicts printed; the first under a bound of 128 MiB stops a
+        # process it started.
+        code = (
+            "import subprocess, sys\n"
+            f"sys.path.insert(0, {str(SCRIPTS)!r})\n"
+            "import mutation_bound\n"
+            f"mutation_bound.start(bound={128 * MiB})\n"
+            "import mutation_baseline\n"
+            "print('baseline: 1 passed, 0 failed')\n"
+            f"subprocess.run({python(holding(512 * MiB))!r})\n"
+            "print('the first: KILLED (1 of 1 tests fail)')\n"
+            "print('the second: KILLED (1 of 1 tests fail)')\n"
+        )
+        out = subprocess.run([sys.executable, "-c", code, MARK], capture_output=True, text=True, timeout=60).stdout
+        lines = out.splitlines()
+        self.assertRegex(lines[1], r"^  memory bound: stopped `[^`]+`, which held more than 128 MiB$")
+        self.assertEqual(
+            lines[-1],
+            "memory bound: a process was stopped in 1 of 2 mutants' runs, "
+            "each perhaps killed by the bound alone: the first",
+        )
+        # And where nothing was stopped, the same line says so.
+        quiet = subprocess.run(
+            [sys.executable, "-c", f"import sys; sys.path.insert(0, {str(SCRIPTS)!r}); import mutation_baseline; print('a: SURVIVED')"],
+            capture_output=True, text=True, timeout=60,
+        ).stdout
+        self.assertEqual(quiet.splitlines()[-1], "memory bound: no process was stopped")
 
     def test_what_a_process_holds_counts_what_it_wrote(self):
         p = subprocess.Popen(

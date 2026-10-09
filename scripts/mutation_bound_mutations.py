@@ -7,7 +7,9 @@ watching what the script's processes started, saying each stop once, a
 process at the bound within it, the script and another's processes left
 unread, a second reading before a stop, a number used again watched again,
 the bound itself, a watch that fails saying so, the macOS footprint's place
-in its structure, and `mutation_baseline` starting the bound.
+in its structure, a kill by the bound named apart (after the verdict it may
+have decided, in the script's last line, and in the run's summary), and
+`mutation_baseline` starting the bound.
 
 The tests that watch real processes stop only processes they marked, so a
 mutant that watches every process stops none of the machine's. At least one test of
@@ -27,6 +29,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BOUND = ROOT / "scripts/mutation_bound.py"
 BASELINE = ROOT / "scripts/mutation_baseline.py"
+SUMMARY = ROOT / "scripts/ci_summary.py"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
@@ -97,6 +100,30 @@ MUTANTS = [
         '                "phys_footprint",\n                "resident_size",\n',
     ),
     (
+        "a stop is not named after the verdict it may have decided",
+        BOUND,
+        "                self.decided.append(what)\n",
+        "                pass\n",
+    ),
+    (
+        "a run the bound did not touch says nothing",
+        BOUND,
+        '                return "memory bound: no process was stopped"\n',
+        '                return ""\n',
+    ),
+    (
+        "an indented note is read as a verdict",
+        BOUND,
+        '    VERDICT = re.compile(r"^(?P<what>\\S.*?): (?:KILLED|SURVIVED)\\b")\n',
+        '    VERDICT = re.compile(r"^(?P<what>.*?): (?:KILLED|SURVIVED)\\b")\n',
+    ),
+    (
+        "the run's summary leaves out what the bound stopped",
+        SUMMARY,
+        "                    if line.startswith(BOUND) and line != UNTOUCHED\n",
+        "                    if False\n",
+    ),
+    (
         "a mutation script starts no bound",
         BASELINE,
         "mutation_bound.start()\n",
@@ -111,6 +138,7 @@ TESTS = [
         "unittest",
         "scripts/tests/test_mutation_bound.py",
         "scripts/tests/test_mutation_baseline.py",
+        "scripts/tests/test_ci_scripts.py",
     ]
 ]
 

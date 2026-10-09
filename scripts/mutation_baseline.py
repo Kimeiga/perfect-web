@@ -23,7 +23,8 @@ that loading a script to read its mutants (`ci_plan.py`,
 
 Imported, it also bounds in memory every process the script starts from
 then on (`mutation_bound.py`, 2026-10-09): a mutant's test that holds more
-than the bound is stopped, and the script's output says so.
+than the bound is stopped, the script's output says so, and its last line
+says what the bound did, a kind of kill apart from a test's.
 """
 
 import collections

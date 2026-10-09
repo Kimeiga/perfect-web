@@ -14,10 +14,22 @@ thread watches every process the script started and every process they
 started, twice a second. One holding more than `BOUND` is killed, and the
 script's output says so where it happened, before the mutant's verdict:
 
-      stopped `graphs`: it held more than 4 GiB, the most a process may hold here
+      memory bound: stopped `graphs`, which held more than 4 GiB
 
 Its command fails as a test that cannot finish fails, and the mutant counts
 as killed, as PIT counts a mutant's memory error and Stryker its timeout.
+
+**A kill by the bound is its own kind** (cargo-mutants reports a timeout
+apart from a test's kill, and a suite whose kills were the bound's would
+look stronger than it is). The script's output is read as it is written:
+each mutant's verdict line (`<what>: KILLED …` or `SURVIVED`) after a stop
+names that mutant as one the bound may have killed alone. The script's last
+line is the bound's, every run:
+
+    memory bound: no process was stopped
+    memory bound: a process was stopped in 1 of 19 mutants' runs, each perhaps killed by the bound alone: the renderer takes a node twice
+
+and `ci_summary.py` lists the second kind in the run's summary.
 
 Only the script's own processes are read, and one is stopped only where two
 readings agree that it is the script's: the list of processes, walked down
@@ -38,6 +50,7 @@ Nothing else these scripts run comes near it: in CI's heartbeat the largest
 other process was a `rustc` at 0.8 GiB.
 """
 
+import atexit
 import ctypes
 import os
 import re
@@ -266,6 +279,12 @@ class Watch:
         self.stopped = []
         self.done = threading.Event()
         self.seen = set()
+        # The mutants' verdicts printed, those printed after a stop, and the
+        # stops since the last verdict.
+        self.verdicts = 0
+        self.decided = []
+        self.since = 0
+        self.lock = threading.Lock()
 
     def say(self, line):
         out = self.out or sys.stdout
@@ -287,16 +306,52 @@ class Watch:
             if not descends(self.platform.parents(), pid, self.root):
                 continue
             name = plain(self.platform.name(pid))
+            # Counted and said before it is stopped: the mutant's verdict,
+            # which waits for it, comes after both.
+            with self.lock:
+                self.stopped.append((name, held))
+                self.since += 1
+            self.say(f"  memory bound: stopped `{name}`, which held more than {shown(self.bound)}")
             try:
                 self.kill(pid, signal.SIGKILL)
             except ProcessLookupError:
+                # It ended in the instant between: not stopped. A verdict
+                # already read stays named, on the side of the bound.
+                with self.lock:
+                    self.stopped.pop()
+                    self.since = max(0, self.since - 1)
+                self.say(f"  memory bound: `{name}` ended before it was stopped")
                 continue
             self.seen.add(pid)
-            self.stopped.append((name, held))
-            self.say(
-                f"  stopped `{name}`: it held more than {shown(self.bound)}, "
-                "the most a process may hold here"
+
+    def verdict(self, what, counted=True):
+        """A verdict the script printed, a mutant's or its baseline's: one
+        the bound may have decided where a process was stopped since the
+        last."""
+        with self.lock:
+            self.verdicts += counted
+            if self.since:
+                self.decided.append(what)
+                self.since = 0
+
+    def summary(self):
+        """What the bound did in the script's run, its last line."""
+        with self.lock:
+            if not self.stopped:
+                return "memory bound: no process was stopped"
+            if not self.verdicts:
+                names = ", ".join(f"`{n}`" for n, _ in self.stopped)
+                return f"memory bound: {len(self.stopped)} stopped, {names}"
+            mutants = [d for d in self.decided if d != "the baseline"]
+            line = (
+                f"memory bound: a process was stopped in {len(mutants)} of {self.verdicts} "
+                f"mutants' runs, each perhaps killed by the bound alone: {'; '.join(mutants) or 'none'}"
             )
+            if "the baseline" in self.decided:
+                line += "; and in the baseline's"
+            if self.since:
+                line += f"; and {self.since} after the last verdict"
+            return line
 
     def run(self):
         while not self.done.is_set():
@@ -311,9 +366,42 @@ class Watch:
         self.done.set()
 
 
+class Lines:
+    """The script's output, passed on as it is written, each line read as
+    it ends: a mutant's verdict, or the baseline's, told to `watch`."""
+
+    VERDICT = re.compile(r"^(?P<what>\S.*?): (?:KILLED|SURVIVED)\b")
+
+    def __init__(self, out, watch):
+        self._out = out
+        self._watch = watch
+        self._line = ""
+
+    def write(self, text):
+        written = self._out.write(text)
+        self._line += text
+        *ended, self._line = self._line.split("\n")
+        for line in ended:
+            if line.startswith("baseline"):
+                self._watch.verdict("the baseline", counted=False)
+                continue
+            m = self.VERDICT.match(line)
+            if m:
+                self._watch.verdict(m.group("what"))
+        return written
+
+    def flush(self):
+        return self._out.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._out, name)
+
+
 def start(**kw):
     """Watch this process's processes from now on: once, however often
-    this is called. None where the platform cannot be read, said."""
+    this is called. Reads the script's output for its verdicts, and says
+    what the bound did as the script's last line. None where the platform
+    cannot be read, said."""
     for thread in threading.enumerate():
         if thread.name == "mutation-bound" and thread.is_alive():
             return thread.watch
@@ -323,5 +411,7 @@ def start(**kw):
     watch = Watch(**kw)
     thread = threading.Thread(target=watch.run, name="mutation-bound", daemon=True)
     thread.watch = watch
+    sys.stdout = Lines(sys.stdout, watch)
+    atexit.register(lambda: watch.say(watch.summary()))
     thread.start()
     return watch

@@ -46,18 +46,37 @@ ADR-0281).
    where it happened, before the mutant's verdict:
 
    ```
-     stopped `graphs`: it held more than 4 GiB, the most a process may hold here
+     memory bound: stopped `graphs`, which held more than 4 GiB
    ```
 
    Its command fails as a test that cannot finish fails, and the mutant
    counts as killed. PIT counts a mutant's memory error as detected
    (`DetectionStatus.MEMORY_ERROR(true)`), and Stryker its timeout ("counted
    as detected").
-3. **What a process holds**: on Linux, `VmRSS` and `VmSwap`; on macOS, the
+3. **A kill by the bound is a kind of its own** (asked by the peer session,
+   2026-10-09). cargo-mutants reports a timeout apart from a test's kill,
+   and a suite whose kills were the bound's would look stronger than it is:
+   W4 and W6 state every mutant killed by a failing test. So:
+   - the script's output is read as it is written, and each mutant's
+     verdict line after a stop names that mutant;
+   - the script's last line is the bound's, in every run:
+
+     ```
+     memory bound: no process was stopped
+     memory bound: a process was stopped in 1 of 19 mutants' runs, each perhaps killed by the bound alone: the renderer takes a node twice
+     ```
+
+   - `ci_summary.py` lists the second kind apart in the run's summary,
+     failing nothing.
+
+   "Perhaps": the bound cannot see whether a test also failed. Under that
+   mutant, `graphs.rs`'s "held twice" fails at once, and its binary is
+   stopped before it reports.
+4. **What a process holds**: on Linux, `VmRSS` and `VmSwap`; on macOS, the
    physical footprint (`proc_pid_rusage`'s `ri_phys_footprint`), which
    counts what the kernel compressed (XNU's `task.c`), where the resident
    size does not.
-4. **Only the script's own processes are read**, and one is stopped only
+5. **Only the script's own processes are read**, and one is stopped only
    where two readings agree it is the script's: the list of processes
    walked down from the script, and the process's own line of parents, read
    again and walked up. A process another started is never stopped, though
@@ -65,10 +84,12 @@ ADR-0281).
 
 ## Acceptance
 
-- **`scripts/tests/test_mutation_bound.py`, 12 tests**, and one new in
-  `test_mutation_baseline.py`. Among them:
+- **`scripts/tests/test_mutation_bound.py`, 15 tests**, one new in
+  `test_mutation_baseline.py` and one in `test_ci_scripts.py`. Among them:
   - a process past the bound, started by a shell the test started, is
     stopped (exit 137) and said once;
+  - a stop names the verdict after it, and a script's last line is the
+    bound's, in a script run as each is; the run's summary lists it apart;
   - one within it runs to its end;
   - only the script's own processes are read;
   - one whose parents, read again, are another's is left alone;
@@ -76,7 +97,7 @@ ADR-0281).
   - the structures read on macOS are the SDK's (`<sys/proc_info.h>`,
     `<sys/resource.h>`);
   - importing `mutation_baseline` starts the bound.
-- **`scripts/mutation_bound_mutations.py`, 12 mutants**, 12 killed here.
+- **`scripts/mutation_bound_mutations.py`, 16 mutants**, 16 killed here.
   The tests that watch real processes stop only processes they marked, so a
   mutant that watches every process stops none of the machine's.
 - **The case itself.** On this Mac, "the renderer takes a node twice" under
