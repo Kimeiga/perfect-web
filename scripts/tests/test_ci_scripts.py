@@ -1,16 +1,19 @@
 """The verification run's scripts (ADR-0245), each on what it decides.
 
-- `ci_plan.py` deals recipes into shards, the costliest first, the same way
-  every time, leaves out the measurements of a machine, gives a recipe run
-  against a database a shard and a PostgreSQL of its own, and reaches from a
-  change to the mutation scripts it touches;
+- `ci_plan.py` deals recipes into shards, the longest first, each where it
+  ends soonest, its setup counted, by the seconds each last took, the same
+  way every time; leaves out the measurements of a machine; gives the
+  recipes run against a database shards and a PostgreSQL of their own, as
+  many as end the run soonest; and reaches from a change to the mutation
+  scripts it touches;
 - `ci_recipes.py` takes what a recipe wrote to be the files whose bytes
   changed while it ran, and frees what its builds leave;
 - `ci_summary.py` fails a run where a recipe failed, a mutant survived, or a
   shard reported nothing;
 - `evidence_fetch.py` names the run after a file's `commit:` line, and
   refuses a file of another commit, and a run that failed anywhere but in
-  the jobs it is told are known.
+  the jobs it is told are known; and keeps the seconds of each recipe that
+  ran to its end.
 """
 
 import importlib.util
@@ -38,9 +41,9 @@ fetch = load("evidence_fetch")
 
 
 class Plan(unittest.TestCase):
-    def test_the_costliest_go_first_each_to_the_least_loaded_shard(self) -> None:
+    def test_the_costliest_go_first_each_to_where_it_ends_soonest(self) -> None:
         costs = {"a": 10, "b": 6, "c": 5, "d": 1}
-        self.assertEqual(plan.deal(list(costs), costs, 2), [["a", "d"], ["b", "c"]])
+        self.assertEqual([r for r, _, _ in plan.deal(list(costs), costs, 2)], [["a", "d"], ["b", "c"]])
         self.assertEqual(
             plan.plan(list(costs), costs, 2),
             [
@@ -49,22 +52,30 @@ class Plan(unittest.TestCase):
             ],
         )
 
-    def test_a_kind_of_recipe_shares_its_shards_with_its_kind(self) -> None:
-        # ADR-0249: only a shard with a recipe that drives a browser installs
-        # one, and only one with a recipe that reads the build builds.
-        costs = {"p1": 6, "p2": 6, "b1": 4, "x1": 8, "x2": 8, "x3": 8}
-        need = {"p1": (True, True), "p2": (True, True), "b1": (False, True)}
-        shards = plan.plan(list(costs), costs, 4, need)
+    def test_a_recipe_needing_less_may_run_where_more_is_set_up(self) -> None:
+        # ADR-0249: a shard installs browsers, or builds, only for a recipe
+        # dealt it that needs them. ADR-XXXX: a recipe that needs neither
+        # runs in such a shard where it ends soonest there.
+        costs = {"x": 4000, "p": 1000, "y": 500}
+        need = {"p": (True, True)}
         self.assertEqual(
-            [(s["recipes"], s["browsers"], s["build"]) for s in shards],
-            [
-                (["p1", "p2"], True, True),
-                (["b1"], False, True),
-                (["x1", "x3"], False, False),
-                (["x2"], False, False),
-            ],
+            [(s["recipes"], s["browsers"], s["build"]) for s in plan.plan(list(costs), costs, 2, need)],
+            [(["x"], False, False), (["p", "y"], True, True)],
         )
-        self.assertEqual([s["index"] for s in shards], [0, 1, 2, 3])
+
+    def test_what_a_recipe_adds_to_a_shards_setup_counts(self) -> None:
+        # `q` would end sooner after `x`, but not with the browsers that
+        # shard would install for it.
+        costs = {"x": 1200, "b": 1000, "q": 100}
+        need = {"b": (True, True), "q": (True, True)}
+        dealt = plan.deal(list(costs), costs, 2, need)
+        self.assertEqual([(r, k) for r, k, _ in dealt], [(["x"], (False, False)), (["b", "q"], (True, True))])
+        setup = plan.SETUP
+        self.assertEqual([end for _, _, end in dealt], [setup[(False, False)] + 1200, setup[(True, True)] + 1100])
+        # Setting up a build, or browsers and a build, takes longer than a
+        # plain shard's setup.
+        self.assertLess(setup[(False, False)], setup[(False, True)])
+        self.assertLessEqual(setup[(False, True)], setup[(True, True)])
 
     def test_what_a_recipe_needs_is_read_from_its_lines(self) -> None:
         self.assertEqual(plan.needs("    pnpm exec playwright test e2e/feed.spec.mjs\n"), (True, True))
@@ -183,42 +194,93 @@ class Plan(unittest.TestCase):
             ['shards=[{"index": 0, "recipes": ["e14-identity"], "browsers": true, "build": true, "database": true}]'],
         )
 
-    def test_each_recipe_run_against_a_database_has_a_database_of_its_own(self) -> None:
-        # ADR-0278: in series on one database, four recipes outlasted their
-        # job's 120 minutes; each is a shard of its own, its PostgreSQL its
-        # own, within the run's shards, the others dealt into those left.
-        costs = {"a": 5, "b": 3, "d1": 9, "d2": 2, "d3": 1}
-        need = {"d1": (True, True)}
-        shards = plan.plan(list(costs), costs, 5, need, {"d1", "d2", "d3"})
+    def test_recipes_run_against_a_database_take_the_shards_that_end_the_run_soonest(self) -> None:
+        # ADR-0278: each shard of theirs has a PostgreSQL of its own, and
+        # no other recipe runs there. ADR-XXXX: they take as many shards as
+        # end the run soonest. Long, each its own.
+        db = {"d1", "d2", "d3"}
+        costs = {"a": 3000, "b": 3000, "d1": 3000, "d2": 3000, "d3": 3000}
+        shards = plan.plan(list(costs), costs, 5, {"d1": (True, True)}, db)
         self.assertEqual(
-            [(s["recipes"], s["browsers"], s["build"], s["database"]) for s in shards],
+            [(s["recipes"], s["browsers"], s["database"]) for s in shards],
             [
-                (["a"], False, False, False),
-                (["b"], False, False, False),
-                (["d1"], True, True, True),
-                (["d2"], False, False, True),
-                (["d3"], False, False, True),
+                (["a"], False, False),
+                (["b"], False, False),
+                (["d1"], True, True),
+                (["d2"], False, True),
+                (["d3"], False, True),
             ],
         )
         self.assertEqual([s["index"] for s in shards], [0, 1, 2, 3, 4])
 
-    def test_recipes_run_against_a_database_share_when_the_shards_run_out(self) -> None:
-        # Three shards, and others to deal: one is left for them, and the
-        # three on a database share two, dealt as any are.
-        costs = {"a": 5, "b": 3, "d1": 9, "d2": 2, "d3": 1}
-        shards = plan.plan(list(costs), costs, 3, {}, {"d1", "d2", "d3"})
+    def test_short_recipes_run_against_a_database_share_one(self) -> None:
+        db = {"d1", "d2", "d3"}
+        costs = {"a": 3000, "b": 3000, "d1": 300, "d2": 200, "d3": 100}
+        shards = plan.plan(list(costs), costs, 3, {}, db)
         self.assertEqual(
             [(s["recipes"], s["database"]) for s in shards],
-            [(["a", "b"], False), (["d1"], True), (["d2", "d3"], True)],
+            [(["a"], False), (["b"], False), (["d1", "d2", "d3"], True)],
         )
-        # With no others, every shard is theirs.
-        only = plan.plan(["d1", "d2", "d3"], costs, 3, {}, {"d1", "d2", "d3"})
-        self.assertEqual([s["recipes"] for s in only], [["d1"], ["d2"], ["d3"]])
+        # The fewest where more would end the run no sooner.
+        costs = {"d1": 3000, "d2": 100, "d3": 100}
+        self.assertEqual([s["recipes"] for s in plan.plan(list(costs), costs, 3, {}, db)], [["d1"], ["d2", "d3"]])
+        # With no others, every shard may be theirs.
+        costs = {"d1": 3000, "d2": 3000, "d3": 3000}
+        self.assertEqual([s["recipes"] for s in plan.plan(list(costs), costs, 3, {}, db)], [["d1"], ["d2"], ["d3"]])
+        # One shard asked for, and others to run: one for each.
+        self.assertEqual(len(plan.plan(["a", "d1"], costs, 1, {}, db)), 2)
 
     def test_a_recipes_cost_counts_the_mutants_it_plants(self) -> None:
         body = "    python3 scripts/statements_separated_mutations.py\n"
         self.assertGreater(plan.cost(body), 20)
         self.assertEqual(plan.cost("    cargo test\n"), 1)
+
+    def test_a_recipe_costs_the_seconds_it_last_took(self) -> None:
+        # ADR-XXXX: mutants foretold a recipe's time poorly (0.43, over the
+        # nightly of 2026-10-08), and two shards outlasted their job.
+        body = {n: "    cargo test\n" for n in ("a", "b", "c", "new")}
+        body["m"] = "    python3 scripts/statements_separated_mutations.py\n"
+        seconds = {"a": 10.4, "b": 30, "c": 20}
+        costs = plan.estimated(["a", "new", "m"], body, seconds)
+        self.assertEqual(costs["a"], 10)
+        # One not yet measured: itself and its mutants, each at the median
+        # of what a measured recipe took one.
+        self.assertEqual(costs["new"], 20)
+        self.assertEqual(costs["m"], 20 * plan.cost(body["m"]))
+        # Where none is measured, at `RATE`.
+        self.assertEqual(plan.estimated(["new"], body, {}), {"new": plan.RATE})
+
+    def test_a_run_is_planned_by_the_seconds_kept(self) -> None:
+        # Three recipes that set up nothing, in two shards: whichever took
+        # longest last is alone.
+        import contextlib
+        import io
+
+        names = ["e10-affine-bindings", "e10-attribute-case", "e10-built-pages"]
+        real, argv = plan.SECONDS, sys.argv
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                plan.SECONDS = pathlib.Path(d) / "seconds.json"
+                sys.argv = ["ci_plan.py", "--shards", "2", *names]
+                for longest in names:
+                    plan.SECONDS.write_text(json.dumps({n: 5000 if n == longest else 1000 for n in names}))
+                    out = io.StringIO()
+                    with contextlib.redirect_stdout(out):
+                        self.assertEqual(plan.main(), 0)
+                    shards = json.loads(out.getvalue().strip()[len("shards="):])
+                    self.assertEqual(shards[0]["recipes"], [longest])
+        finally:
+            plan.SECONDS, sys.argv = real, argv
+
+    def test_the_seconds_are_read_where_the_fetch_keeps_them(self) -> None:
+        self.assertEqual(plan.SECONDS, fetch.SECONDS)
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / "seconds.json"
+            self.assertEqual(plan.measured(path), {})
+            path.write_text('{"e14-a": 61}\n')
+            self.assertEqual(plan.measured(path), {"e14-a": 61.0})
+            path.write_text("not json")
+            self.assertEqual(plan.measured(path), {})
 
 
 class Recipes(unittest.TestCase):
@@ -335,6 +397,40 @@ class Fetch(unittest.TestCase):
         self.assertIn("in_progress", fetch.refusal({"status": "in_progress", "conclusion": None}, jobs, []))
         self.assertIsNone(fetch.refusal({"status": "completed", "conclusion": "success"}, jobs, []))
         self.assertIn("no job", fetch.refusal(run, [{"name": "recipes 0", "conclusion": "success"}], ["x"]))
+
+    def test_a_recipe_that_ran_to_its_end_has_its_seconds_kept(self) -> None:
+        # ADR-XXXX: the plan deals the next runs by them.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            for i, results in enumerate(
+                [
+                    [{"recipe": "e14-a", "status": 0, "seconds": 61.6}],
+                    # A recipe that failed took what it took to fail: not kept.
+                    [{"recipe": "e14-b", "status": 2, "seconds": 5.0}, {"recipe": "e14-d", "status": 0, "seconds": 7}],
+                ]
+            ):
+                (root / f"evidence-{i}").mkdir()
+                (root / f"evidence-{i}" / "results.json").write_text(json.dumps(results))
+            # A shard that stopped before its first recipe ended wrote none.
+            (root / "evidence-2").mkdir()
+            timed = fetch.timed(fetch.results_of(fetch.shard_dirs(root)))
+            self.assertEqual(timed, {"e14-a": 62, "e14-d": 7})
+            path = root / "seconds.json"
+            path.write_text('{"e14-a": 10, "e14-c": 30}\n')
+            self.assertEqual(fetch.remember(timed, path), 2)
+            # Each kept over its last; every other recipe's as it was.
+            self.assertEqual(json.loads(path.read_text()), {"e14-a": 62, "e14-c": 30, "e14-d": 7})
+            # A run of one shard, extracted into the download's own directory.
+            lone = root / "lone"
+            (lone / "evidence").mkdir(parents=True)
+            (lone / "results.json").write_text(json.dumps([{"recipe": "e14-x", "status": 0, "seconds": 1}]))
+            self.assertEqual(fetch.timed(fetch.results_of(fetch.shard_dirs(lone))), {"e14-x": 1})
+
+    def test_the_seconds_kept_are_each_a_recipes(self) -> None:
+        kept = json.loads(fetch.SECONDS.read_text())
+        self.assertGreater(len(kept), 100)
+        self.assertTrue(all(plan.EVIDENCE_RECIPE.match(r) and isinstance(s, int) and s >= 0 for r, s in kept.items()))
+        self.assertEqual(list(kept), sorted(kept))
 
 class Summary(unittest.TestCase):
     def run_summary(self, shards: list[list[dict]], files: dict[str, str], planned: int) -> int:
