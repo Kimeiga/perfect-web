@@ -409,6 +409,36 @@ MUTANTS = [
         '            .any(|i| i.interface.starts_with("kiokun:"))',
         '            .any(|i| i.interface.starts_with("kiokun-never:"))',
     ),
+    (
+        "a word's own file never moves it",
+        APP,
+        "    let moved = moved_from(first, word)\n",
+        "    let moved = moved_from(None, word)\n",
+    ),
+    (
+        "a word is moved to itself",
+        APP,
+        "            Some(t) => if t != word { Some(t) } else { None },\n",
+        "            Some(t) => Some(t),\n",
+    ),
+    (
+        "a move is temporary",
+        APP,
+        "    redirect_on  KiokunError.Moved permanent\n",
+        "    redirect_on  KiokunError.Moved temporary\n",
+    ),
+    (
+        "the page names no move",
+        APP,
+        "    redirect_on  KiokunError.Moved permanent\n",
+        "",
+    ),
+    (
+        "a character's own form counts among its traditional forms",
+        APP,
+        '    let traditional = List.filter(traditional_of(e), v => v != "" & v != source)\n',
+        '    let traditional = List.filter(traditional_of(e), v => v != "")\n',
+    ),
 ]
 
 # Four test threads, not one per core: each kiokun test compiles the

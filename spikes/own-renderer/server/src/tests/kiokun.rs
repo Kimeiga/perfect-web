@@ -863,6 +863,90 @@ fn an_equivalent_forms_words_are_shown_on_the_canonical_page() {
     assert!(!back.contains("surplus"), "{back}");
 }
 
+/// **A simplified form that equals its one traditional form in meaning is
+/// moved to that form's page, for good** (`[word]/+page.ts:415-425`,
+/// ADR-0295). The cases are kiokun's own entries' deciding fields:
+/// - 宁 is moved to 寧, the address's query kept, and 寧's page is shown,
+///   not moved again;
+/// - 余 is moved to 餘: its traditional forms are 余 and 餘, and its own is
+///   not counted;
+/// - 后 keeps its page, as 後 does: its card teaches another concept
+///   (kiokun.com keeps 后/後 apart);
+/// - 甲, whose file's character is 乙's and names 甲 as its traditional
+///   form, is not moved to itself (`canonicalTarget !== word`).
+#[test]
+fn an_equivalent_simplified_form_is_moved_to_its_traditional_page() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "宁",
+        r#"{"key":"宁","simplified_form_of":"寧","chinese_char":{"char":"宁","tradVariants":["寧"]},
+            "semantic_mnemonic":{"character":"宁","meaning":"calm"},
+            "semantic_mnemonic_variants":[{"character":"寧","meaning":"calm"}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "寧",
+        r#"{"key":"寧","chinese_char":{"char":"寧","simpVariants":["宁"]}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "余",
+        r#"{"key":"余","simplified_form_of":"餘","chinese_char":{"char":"余","tradVariants":["余","餘"],"simpVariants":["余"]},
+            "semantic_mnemonic":{"character":"余","meaning":"excess"},
+            "semantic_mnemonic_variants":[{"character":"餘","meaning":"excess"}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "餘",
+        r#"{"key":"餘","chinese_char":{"char":"餘","simpVariants":["余"]}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "後",
+        r#"{"key":"後","chinese_char":{"char":"後","simpVariants":["后"]}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "后",
+        r#"{"key":"后","simplified_form_of":"後","chinese_char":{"char":"后","tradVariants":["後"]},
+            "semantic_mnemonic":{"character":"后","meaning":"empress"},
+            "semantic_mnemonic_variants":[{"character":"後","meaning":"behind"}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "甲",
+        r#"{"key":"甲","simplified_form_of":"甲","chinese_char":{"char":"乙","tradVariants":["甲"]},
+            "semantic_mnemonic":{"character":"乙","meaning":"shell"},
+            "semantic_mnemonic_variants":[{"character":"甲","meaning":"shell"}]}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    let moved = fetched(&s, &path_of("宁"));
+    assert!(
+        moved.starts_with("HTTP/1.1 308 Permanent Redirect\r\n"),
+        "{moved}"
+    );
+    // 寧 is E5 AF A7 in UTF-8.
+    assert!(
+        moved.contains("\r\nlocation: /word/%E5%AF%A7\r\n"),
+        "{moved}"
+    );
+    let kept = fetched(&s, &format!("{}?q=1", path_of("宁")));
+    assert!(
+        kept.contains("\r\nlocation: /word/%E5%AF%A7?q=1\r\n"),
+        "{kept}"
+    );
+    let moved = fetched(&s, &path_of("余"));
+    assert!(
+        moved.contains("\r\nlocation: /word/%E9%A4%98\r\n"),
+        "{moved}"
+    );
+    for word in ["寧", "餘", "后", "後", "甲"] {
+        let page = fetched(&s, &path_of(word));
+        assert!(page.starts_with("HTTP/1.1 200 OK\r\n"), "{word}: {page}");
+    }
+}
+
 /// The value at fraction `q` of sorted `values` (nearest rank).
 fn quantile(sorted: &[f64], q: f64) -> f64 {
     if sorted.is_empty() {
@@ -880,8 +964,8 @@ fn quantile(sorted: &[f64], q: f64) -> f64 {
 /// time on a fresh connection: its status, and the time from the request to
 /// the response's last byte. Run in release by `just e14-kiokun-sample`.
 ///
-/// Every word a file records has a page: anything but 200 is a defect,
-/// named.
+/// Every word a file records has a page, or is moved to one (308):
+/// anything else is a defect, named.
 #[test]
 #[ignore = "reads a kiokun-data checkout named by KIOKUN_DATA; a measurement, run by `just e14-kiokun-sample`"]
 fn a_sample_of_the_whole_dictionary_is_served_and_timed() {
@@ -954,7 +1038,9 @@ fn a_sample_of_the_whole_dictionary_is_served_and_timed() {
         *statuses.entry(status.clone()).or_default() += 1;
         times.push(ms);
         slowest.push((ms, word.clone()));
-        if !status.starts_with("HTTP/1.1 200") {
+        // A move is kiokun.com's (ADR-0295), held to its own code by
+        // `just e14-kiokun-moves`.
+        if !status.starts_with("HTTP/1.1 200") && !status.starts_with("HTTP/1.1 308") {
             let body = page.split("\r\n\r\n").nth(1).unwrap_or_default();
             defects.push(format!(
                 "{word}: {status}: {}",
@@ -1355,6 +1441,96 @@ fn the_japanese_examples_match_kiokuns_answers_for_the_sample() {
     );
     let s = served_kiokun_on(&sample());
     let differ = examples_held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+}
+
+/// **The moves against kiokun.com's answers**: each word's response beside
+/// the oracle's, a 308 to the word it names, whose own page is shown, or
+/// the page itself. No difference is named for them; each is listed.
+fn moves_held_to_oracle(s: &Server, oracle: &serde_json::Value) -> Vec<String> {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut differ: Vec<String> = Vec::new();
+    for (word, answer) in answers {
+        let page = fetched(s, &path_of(word));
+        let head = page.split("\r\n\r\n").next().unwrap_or_default();
+        let status = head.lines().next().unwrap_or_default();
+        // A move's target is a page, not another move: no chain.
+        let held = match answer.as_str() {
+            Some(to) => {
+                status == "HTTP/1.1 308 Permanent Redirect"
+                    && head.contains(&format!("\r\nlocation: {}\r\n", path_of(to)))
+                    && fetched(s, &path_of(to)).starts_with("HTTP/1.1 200 OK\r\n")
+            }
+            None => status == "HTTP/1.1 200 OK",
+        };
+        if !held {
+            let location = head
+                .lines()
+                .find(|l| l.starts_with("location: "))
+                .unwrap_or_default();
+            differ.push(format!(
+                "{word}:\n  kiokun.com: {answer}\n  rewrite:    {status} {location}"
+            ));
+        }
+    }
+    differ
+}
+
+/// **The moves against kiokun.com's own `equivalentTraditionalTarget`**
+/// (local: `just e14-kiokun-moves` runs it, copied from `KIOKUN_APP`, over a
+/// stated sample of `KIOKUN_DATA`, and names its answers in
+/// `KIOKUN_MOVES_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-moves`"]
+fn the_moves_match_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_MOVES_ORACLE").expect("KIOKUN_MOVES_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let differ = moves_held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} words ({} candidates, {} controls, stride {}; {} one-character entries read); {} move",
+        oracle["answered"],
+        oracle["candidates"],
+        oracle["controls"],
+        oracle["stride"],
+        oracle["read"],
+        oracle["moved"]
+    );
+    println!("named differences: {{}}");
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(30) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
+}
+
+/// **The moves against kiokun.com's answers for the repository's sample**
+/// (`kiokun-oracle/moves-sample.json`, written by `just e14-kiokun-moves`):
+/// what CI holds. The sample moves nothing; 面 is the case that matters,
+/// the simplified form of 麵 with two traditional forms, one of them
+/// itself, and no card.
+#[test]
+fn the_moves_match_kiokuns_answers_for_the_sample() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../kiokun-oracle/moves-sample.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the fixture")).expect("JSON");
+    assert!(
+        fixture["kiokun_commit"]
+            .as_str()
+            .is_some_and(|c| c.len() == 40),
+        "{fixture}"
+    );
+    let oracle = &fixture["oracle"];
+    assert!(
+        oracle["answers"]
+            .as_object()
+            .is_some_and(|a| a.contains_key("面")),
+        "{fixture}"
+    );
+    let s = served_kiokun();
+    let differ = moves_held_to_oracle(&s, oracle);
     assert!(differ.is_empty(), "{differ:#?}");
 }
 
