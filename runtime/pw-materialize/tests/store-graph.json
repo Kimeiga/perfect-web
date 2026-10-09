@@ -51,6 +51,22 @@
       ]
     },
     {
+      "path": "Events.UserCartChanged",
+      "name": "UserCartChanged",
+      "node": "event",
+      "params": [
+        "user"
+      ]
+    },
+    {
+      "path": "Events.UserOrderChanged",
+      "name": "UserOrderChanged",
+      "node": "event",
+      "params": [
+        "user"
+      ]
+    },
+    {
       "path": "Resources.Cart",
       "name": "Cart",
       "node": "resource",
@@ -103,6 +119,19 @@
       ]
     },
     {
+      "path": "Saved.SavedFor",
+      "name": "SavedFor",
+      "node": "resource",
+      "partition": "private",
+      "privacy": "user",
+      "key": [
+        "reader"
+      ],
+      "params": [
+        "reader"
+      ]
+    },
+    {
       "path": "store.menu_fragment.MenuFragment",
       "name": "MenuFragment",
       "node": "materialization",
@@ -126,12 +155,12 @@
       "name": "Cart",
       "node": "resource",
       "partition": "private",
-      "privacy": "session",
+      "privacy": "user",
       "key": [
-        "session"
+        "reader"
       ],
       "params": [
-        "session"
+        "reader"
       ]
     },
     {
@@ -209,12 +238,12 @@
       "name": "Order",
       "node": "resource",
       "partition": "private",
-      "privacy": "session",
+      "privacy": "user",
       "key": [
-        "session"
+        "reader"
       ],
       "params": [
-        "session"
+        "reader"
       ]
     },
     {
@@ -372,10 +401,10 @@
     },
     {
       "from": "store.page.Cart",
-      "to": "Events.CartChanged",
+      "to": "Events.UserCartChanged",
       "kind": "invalidated_by",
       "key": [
-        "session"
+        "reader"
       ]
     },
     {
@@ -383,7 +412,7 @@
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -391,7 +420,7 @@
       "to": "store.page.Order",
       "kind": "reads",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -399,7 +428,7 @@
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -460,10 +489,10 @@
     },
     {
       "from": "store.page.Order",
-      "to": "Events.OrderChanged",
+      "to": "Events.UserOrderChanged",
       "kind": "invalidated_by",
       "key": [
-        "session"
+        "reader"
       ]
     },
     {
@@ -471,7 +500,7 @@
       "to": "store.page.Order",
       "kind": "reads",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -487,7 +516,7 @@
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -516,10 +545,10 @@
     },
     {
       "from": "store.page.add_to_cart",
-      "to": "Events.CartChanged",
+      "to": "Events.UserCartChanged",
       "kind": "emits",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -527,15 +556,15 @@
       "to": "store.page.Cart",
       "kind": "invalidates",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
       "from": "store.page.clear_cart",
-      "to": "Events.CartChanged",
+      "to": "Events.UserCartChanged",
       "kind": "emits",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -543,15 +572,15 @@
       "to": "store.page.Cart",
       "kind": "invalidates",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
       "from": "store.page.decrease_in_cart",
-      "to": "Events.CartChanged",
+      "to": "Events.UserCartChanged",
       "kind": "emits",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -559,15 +588,15 @@
       "to": "store.page.Cart",
       "kind": "invalidates",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
       "from": "store.page.increase_in_cart",
-      "to": "Events.CartChanged",
+      "to": "Events.UserCartChanged",
       "kind": "emits",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -575,23 +604,23 @@
       "to": "store.page.Cart",
       "kind": "invalidates",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
       "from": "store.page.place_order",
-      "to": "Events.CartChanged",
+      "to": "Events.UserCartChanged",
       "kind": "emits",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
       "from": "store.page.place_order",
-      "to": "Events.OrderChanged",
+      "to": "Events.UserOrderChanged",
       "kind": "emits",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -599,7 +628,7 @@
       "to": "store.page.Cart",
       "kind": "invalidates",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -607,15 +636,15 @@
       "to": "store.page.Order",
       "kind": "invalidates",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
       "from": "store.page.remove_from_cart",
-      "to": "Events.CartChanged",
+      "to": "Events.UserCartChanged",
       "kind": "emits",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     },
     {
@@ -623,7 +652,7 @@
       "to": "store.page.Cart",
       "kind": "invalidates",
       "key": [
-        "current_session()"
+        "current_user()"
       ]
     }
   ],

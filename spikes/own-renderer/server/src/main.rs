@@ -668,6 +668,11 @@ struct Server {
     /// its data is staged through `data`, as a command is; what reaches it
     /// directly is its test controls, its [`store::Faults`].
     store: Arc<dyn store::StoreLayer>,
+    /// **Whom the program's cart and order are** (track `store-accounts`):
+    /// `Some(true)` where it reads them by the reader's handle
+    /// (`Cart(current_user())`), `Some(false)` by the session (the benchmark's
+    /// copy of the store), and `None` where it reads no cart.
+    cart_by_reader: Option<bool>,
     /// The materializer's clock, advanced once per regeneration.
     ///
     /// A version is `Entry.generated_at`, which is a clock reading — so a clock
@@ -866,10 +871,14 @@ const INTERACTIONS_PER_SESSION: usize = 64;
 /// Built from the shape the compiler's bridge produces. The server does not
 /// invent it: `EntryIdentity` is the one answer to "which entry", and a second
 /// construction here would be the divergence the split exists to prevent.
-fn cart_identity(session: &str) -> EntryIdentity {
+/// **A session's cart's entry** (ADR-0172): in the session's partition, and
+/// keyed by the cart's owner as the program keys it (track `store-accounts`):
+/// the reader's user where it reads a cart by the reader's handle, so that
+/// the program's event naming the user reaches it, or the session.
+fn cart_identity(owner: &str, session: &str) -> EntryIdentity {
     EntryIdentity::new(
         "store.page.Cart",
-        &[session],
+        &[owner],
         Partition::Session {
             id: session.to_string(),
         },
@@ -891,8 +900,8 @@ fn store_params(id: &str) -> Params {
     BTreeMap::from([("id".to_string(), id.to_string())])
 }
 
-fn cart_entry(session: &str) -> ResourceEntryId {
-    ResourceEntryId::derive(&cart_identity(session), &IDENTITY)
+fn cart_entry(owner: &str, session: &str) -> ResourceEntryId {
+    ResourceEntryId::derive(&cart_identity(owner, session), &IDENTITY)
 }
 
 /// **A value a session's page speculates on, as the browser holds it**
@@ -971,11 +980,11 @@ fn session_documents(session: &str) -> ResourceEntryId {
 
 /// **A session's order's entry** (ADR-0193): what a change the store makes
 /// to it is sent against, as the cart's is.
-fn order_entry(session: &str) -> ResourceEntryId {
+fn order_entry(owner: &str, session: &str) -> ResourceEntryId {
     ResourceEntryId::derive(
         &EntryIdentity::new(
             "store.page.Order",
-            &[session],
+            &[owner],
             Partition::Session {
                 id: session.to_string(),
             },
@@ -1030,7 +1039,8 @@ fn components() -> BTreeMap<String, Loaded> {
         "store.page.Store",
         "store.page.Menu",
         "store.page.Cart",
-        "domain.line_count",
+        // A user's cart's count (track `store-accounts`).
+        "UserCarts.line_count",
         // What a menu's row reads its price through (ADR-0169).
         "domain.display",
         // A line's controls, and what the cart's lines read through
@@ -1040,7 +1050,7 @@ fn components() -> BTreeMap<String, Loaded> {
         "store.page.remove_from_cart",
         "domain.count",
         "domain.total",
-        "domain.subtotal",
+        "UserCarts.subtotal",
         // The menu counted, and the line the store's page shows from it
         // (ADR-0277).
         "store.page.MenuSize",
@@ -1409,7 +1419,19 @@ impl Server {
         // user through the identity's principals.
         let identity = identity::Identity::default();
         data.identified_by(identity.principals());
+        // TRACK SEAM (store-accounts): whom the program's cart is, by the
+        // key its pages read it with.
+        let cart_by_reader = std::iter::once(&plan)
+            .chain(plans.values())
+            .flat_map(|plan| plan["bindings"].as_array().into_iter().flatten())
+            .find(|b| b["resource"] == "store.page.Cart")
+            .map(|b| {
+                b["args"][0]
+                    .as_str()
+                    .is_some_and(notifications::is_current_user)
+            });
         Server {
+            cart_by_reader,
             templates,
             data,
             store,
@@ -1504,7 +1526,88 @@ impl Server {
 
     /// The storage key, derived from the same identity the wire id is.
     fn cart_key(&self, session: &str) -> EntryKey {
-        EntryKey::from_identity(&cart_identity(session))
+        EntryKey::from_identity(&cart_identity(&self.owner(session), session))
+    }
+
+    /// **Whom `session`'s cart and order are** (track `store-accounts`): its
+    /// reader's user, a signed-in principal's or the session's own guest
+    /// (ADR-0270), where the program reads them by the reader's handle; the
+    /// session itself where it reads them by the session.
+    fn owner(&self, session: &str) -> String {
+        match self.cart_by_reader {
+            Some(true) => notifications::user_of(&self.identity.principals(), session),
+            _ => session.to_string(),
+        }
+    }
+
+    /// The session's cart's entry, as its pages are sent it.
+    fn cart_entry(&self, session: &str) -> ResourceEntryId {
+        cart_entry(&self.owner(session), session)
+    }
+
+    /// The session's order's entry.
+    fn order_entry(&self, session: &str) -> ResourceEntryId {
+        order_entry(&self.owner(session), session)
+    }
+
+    /// **The event the program declares for its cart, and for its order**
+    /// (track `store-accounts`): a user's (`UserCartChanged`) where it reads
+    /// them by the reader's handle, else a session's.
+    fn cart_event(&self) -> &'static str {
+        match self.cart_by_reader {
+            Some(true) => "Events.UserCartChanged",
+            _ => "Events.CartChanged",
+        }
+    }
+
+    fn order_event(&self) -> &'static str {
+        match self.cart_by_reader {
+            Some(true) => "Events.UserOrderChanged",
+            _ => "Events.OrderChanged",
+        }
+    }
+
+    /// **A guest's cart joins its user's, at sign-in** (track
+    /// `store-accounts`, ADR-XXXX; docs/PARALLEL.md, Q2): one transaction of
+    /// the store's, the user's cart's event committed with it, and the user's
+    /// open pages told. A join that fails leaves the sign-in done and the
+    /// guest's lines where they were, and says so. A program that reads no
+    /// cart has none to join.
+    fn joined(&self, signed: &identity::SignedIn) {
+        let Some(by_reader) = self.cart_by_reader else {
+            return;
+        };
+        let guest = self.owner(signed.guest);
+        let user = if by_reader {
+            signed.principal.user.clone()
+        } else {
+            signed.session.to_string()
+        };
+        let event = (
+            self.cart_event().to_string(),
+            vec![Val::String(user.clone())],
+        );
+        let joined = self.store_write(
+            signed.session,
+            "store:host/carts#join",
+            &[Val::String(guest), Val::String(user)],
+            std::slice::from_ref(&event),
+            |delivered| {
+                let reached = self.invalidate_queries(signed.session, &[], delivered);
+                if reached.is_empty() {
+                    return;
+                }
+                self.telling
+                    .lock()
+                    .expect("telling")
+                    .push((signed.session.to_string(), reached));
+            },
+        );
+        if let Err(why) = joined {
+            eprintln!(
+                "pw dev server: a guest's cart did not join its user's at sign-in, and stays the guest's: {why}"
+            );
+        }
     }
 
     /// How many items the data layer holds for the session: the tests' view
@@ -1520,7 +1623,7 @@ impl Server {
     /// each line's item and quantity, in order.
     #[cfg(test)]
     fn cart_lines(&self, session: &str) -> Vec<(String, i64)> {
-        let read = self.layer_read(session, "store:data/carts#current", session);
+        let read = self.cart_read(session);
         match read {
             Val::Result(Ok(Some(cart))) => lines_of(&cart),
             other => panic!("carts#current answered {other:?}"),
@@ -1531,9 +1634,7 @@ impl Server {
     /// track `store-pg`).
     #[cfg(test)]
     fn cart_priced(&self, session: &str) -> Vec<(String, i64)> {
-        let Val::Result(Ok(Some(cart))) =
-            self.layer_read(session, "store:data/carts#current", session)
-        else {
+        let Val::Result(Ok(Some(cart))) = self.cart_read(session) else {
             panic!("no cart");
         };
         let Some(Val::List(lines)) = val_at(&cart, &["lines"]) else {
@@ -1558,7 +1659,15 @@ impl Server {
     /// none before one is placed.
     #[cfg(test)]
     fn order_of(&self, session: &str) -> Option<(String, Vec<(String, i64)>)> {
-        let status = match self.layer_read(session, "store:data/orders#current", session) {
+        let (current, placed) = match self.cart_by_reader {
+            Some(true) => (
+                "store:data/user-orders#current",
+                "store:data/user-orders#placed",
+            ),
+            _ => ("store:data/orders#current", "store:data/orders#placed"),
+        };
+        let owner = self.owner(session);
+        let status = match self.layer_read(session, current, &owner) {
             Val::Result(Ok(Some(v))) => match *v {
                 Val::Option(None) => return None,
                 Val::Option(Some(case)) => match *case {
@@ -1569,7 +1678,7 @@ impl Server {
             },
             other => panic!("orders#current answered {other:?}"),
         };
-        let lines = match self.layer_read(session, "store:data/orders#placed", session) {
+        let lines = match self.layer_read(session, placed, &owner) {
             Val::Option(Some(cart)) => lines_of(&cart),
             Val::Option(None) => Vec::new(),
             other => panic!("orders#placed answered {other:?}"),
@@ -1595,7 +1704,7 @@ impl Server {
             session,
             "store:host/orders#set-status",
             &[
-                Val::String(session.into()),
+                Val::String(self.owner(session)),
                 Val::Option(Some(Box::new(Val::String(status.into())))),
             ],
         );
@@ -1617,6 +1726,18 @@ impl Server {
         let mut args = vec![Val::String(STORE_ID.into())];
         args.extend(op.to_vals());
         self.untold("", "store:host/menus#change", &args);
+    }
+
+    /// **The session's cart, read through the layer as its pages read it**
+    /// (track `store-accounts`): its reader's, by the reader's handle, or the
+    /// session's.
+    #[cfg(test)]
+    fn cart_read(&self, session: &str) -> Val {
+        let op = match self.cart_by_reader {
+            Some(true) => "store:data/user-carts#current",
+            _ => "store:data/carts#current",
+        };
+        self.layer_read(session, op, &self.owner(session))
     }
 
     /// One read of the data layer's, by its key, for `session`, passed
@@ -2312,10 +2433,12 @@ impl Server {
         let _one = session_lock
             .lock()
             .expect("one change of a session at a time");
+        // The event names whom the change is (track `store-accounts`): the
+        // session's owner, its user where the program reads by the reader.
         self.invalidate_queries(
             session,
             &[],
-            &[(event.to_string(), vec![Val::String(session.into())])],
+            &[(event.to_string(), vec![Val::String(self.owner(session))])],
         );
         self.clock.advance(1);
         let version = Version(self.clock.now());
@@ -3494,7 +3617,12 @@ impl Server {
             return;
         }
 
-        self.send_documents(session, &cart_entry(session), self.version(session), true);
+        self.send_documents(
+            session,
+            &self.cart_entry(session),
+            self.version(session),
+            true,
+        );
     }
 
     /// **Each of a session's documents, read again and sent what changed**
@@ -4343,7 +4471,7 @@ impl Server {
             .query(
                 "store.page.Cart",
                 session,
-                &[Val::String(session.to_string())],
+                &[Val::String(self.owner(session))],
             )
             .unwrap_or_else(|e| panic!("the cart query failed: {e}"));
         val_to_json(&cart)
@@ -4358,7 +4486,9 @@ impl Server {
             .iter()
             .find(|b| {
                 b["resource"] == "store.page.Cart"
-                    && b["key"] == serde_json::json!(["current_session()"])
+                    && (b["key"] == serde_json::json!(["current_session()"])
+                        // Track `store-accounts`: or by its reader's handle.
+                        || b["key"] == serde_json::json!(["current_user()"]))
             })
             .and_then(|b| b["binding"].as_str().map(str::to_string))
     }
@@ -4464,7 +4594,7 @@ impl Server {
             out.insert(
                 binding,
                 serde_json::json!({
-                    "entry": cart_entry(session),
+                    "entry": self.cart_entry(session),
                     "version": self.version(session),
                     "value": self.cart_json(session),
                 }),
@@ -4510,7 +4640,7 @@ impl Server {
         } else {
             self.version(session)
         };
-        serde_json::json!([{ "entry": cart_entry(session), "version": version }])
+        serde_json::json!([{ "entry": self.cart_entry(session), "version": version }])
     }
 
     /// Every handler identity this build's templates name.
@@ -6695,6 +6825,9 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         &body,
         &mut stream,
         asked,
+        // TRACK SEAM (store-accounts): a guest signed in, its cart joining
+        // its user's before the sign-in is answered.
+        &|signed| server.joined(signed),
     ) {
         return;
     }
@@ -6825,18 +6958,27 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             // transaction (track `store-pg`). The order moved along keeps
             // its lines (ADR-0193); one the kitchen sets with none placed
             // has none.
+            // The order the session's reader reads (track `store-accounts`):
+            // its user's, where the program reads it by the reader's handle.
+            let owner = server.owner(&session);
             let event = (
-                "Events.OrderChanged".to_string(),
-                vec![Val::String(session.clone())],
+                server.order_event().to_string(),
+                vec![Val::String(owner.clone())],
             );
             let status = Val::Option(status.map(|s| Box::new(Val::String(s))));
             let written = server.store_write(
                 &session,
                 "store:host/orders#set-status",
-                &[Val::String(session.clone()), status],
+                &[Val::String(owner), status],
                 std::slice::from_ref(&event),
                 // And the session's open pages told (ADR-0193).
-                |_| server.session_changed(&session, "Events.OrderChanged", &order_entry(&session)),
+                |_| {
+                    server.session_changed(
+                        &session,
+                        server.order_event(),
+                        &server.order_entry(&session),
+                    )
+                },
             );
             match written {
                 Ok(_) => respond_json(&mut stream, 200, &session, fresh, "{}"),
@@ -9425,7 +9567,7 @@ public query Store(",
         // Around the program, as a row can be. A database that holds the
         // invariant itself refuses the row (PostgreSQL's
         // `cart_lines_quantity_check`), and there is nothing to read.
-        if let Err(refused) = s.store.line_around("a", 0, 0) {
+        if let Err(refused) = s.store.line_around(&s.owner("a"), 0, 0) {
             assert!(refused.contains("cart_lines_quantity_check"), "{refused}");
             return;
         }
@@ -11336,7 +11478,7 @@ public query Store(",
             "one Menu for both"
         );
         assert_eq!(
-            calls(&s, "store:data/carts#current"),
+            calls(&s, "store:data/user-carts#current"),
             2,
             "a Cart for each reader"
         );
@@ -11361,9 +11503,9 @@ public query Store(",
         }
         s.render_store("one");
         s.render_store("two");
-        assert_eq!(calls(&s, "store:data/carts#current"), 2);
+        assert_eq!(calls(&s, "store:data/user-carts#current"), 2);
         s.render_store("one");
-        assert_eq!(calls(&s, "store:data/carts#current"), 2, "kept");
+        assert_eq!(calls(&s, "store:data/user-carts#current"), 2, "kept");
 
         s.command(ADD, "one", &add_shown("espresso", 1), false)
             .expect("runs");
@@ -11372,12 +11514,16 @@ public query Store(",
             "one's own add is shown"
         );
         assert_eq!(
-            calls(&s, "store:data/carts#current"),
+            calls(&s, "store:data/user-carts#current"),
             3,
             "one's entry was dropped"
         );
         s.render_store("two");
-        assert_eq!(calls(&s, "store:data/carts#current"), 3, "two's was not");
+        assert_eq!(
+            calls(&s, "store:data/user-carts#current"),
+            3,
+            "two's was not"
+        );
     }
 
     /// **Commands that invalidate each other's reads all commit** (ADR-0127).
@@ -11631,6 +11777,10 @@ public query Store(",
     /// Track `store-pg`: the store on PostgreSQL, the tests that look at the
     /// database itself, which skip without one.
     mod store_pg;
+
+    // TRACK SEAM (store-accounts): a cart and an order a user's, on the
+    // layer the server's tests serve the store on.
+    mod store_accounts;
 
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
@@ -13256,7 +13406,21 @@ public query Store(",
             frames(&mine) > mine_before,
             "the session's own page is told"
         );
-        assert_eq!(frames(&theirs), theirs_before, "another's is not");
+        // Track `store-accounts`: a cart is its user's (`Cart(reader)`), so a
+        // change to one reaches every session that reads `Cart` until telling
+        // by principal lands (docs/PARALLEL.md, Q1): derived for another
+        // reader, and sent nothing of the change, a version alone.
+        let sent: Vec<(u64, StreamFrame)> =
+            s.pending.lock().expect("pending")[&theirs].frames[theirs_before..].to_vec();
+        for (_, frame) in &sent {
+            match frame {
+                StreamFrame::ResourceChanged { .. } => {}
+                StreamFrame::PatchSet(set) => {
+                    assert!(set.patches.is_empty(), "another's is sent {set:?}")
+                }
+                other => panic!("another's is sent {other:?}"),
+            }
+        }
     }
 
     /// **A build that imports what its data layer does not supply is refused
@@ -13284,7 +13448,7 @@ public query Store(",
 
     /// **A command commits the events it computes, and no others**
     /// (ADR-0104, ADR-0208). `add_to_cart` declares `emits
-    /// CartChanged(current_session())`: its component evaluates the key and
+    /// UserCartChanged(current_user())`: its component evaluates the key and
     /// hands the event to the platform's outbox, the one function of it its
     /// contract imports, and its cart's entry moves. The server reads no key.
     #[test]
@@ -13301,7 +13465,7 @@ public query Store(",
             .collect();
         assert_eq!(
             imported,
-            ["Events.CartChanged"],
+            ["Events.UserCartChanged"],
             "exactly the one it declares"
         );
         s.drain("session-7");
@@ -13327,7 +13491,7 @@ public query Store(",
             "examples",
             |app| {
                 // `add_to_cart`'s, the first command's.
-                let emits = "    emits         CartChanged(current_session())\n";
+                let emits = "    emits         UserCartChanged(current_user())\n";
                 assert!(app.contains(emits), "the store's add_to_cart emits");
                 app.replacen(emits, "", 1)
             },
@@ -13523,7 +13687,7 @@ public query Store(",
         let mut w = Subscriber::default();
         let notice = |n: u64| StreamFrame::ResourceChanged {
             protocol: CURRENT,
-            entry: cart_entry(&format!("session-{n}")),
+            entry: cart_entry(&format!("session-{n}"), &format!("session-{n}")),
             version: Version(n),
         };
         for n in 0..MAX_WAITING as u64 {
@@ -13593,6 +13757,10 @@ public query Store(",
     #[test]
     fn store_commands_carry_and_enforce_their_signed_in_precondition() {
         let mut s = server(dev_topology());
+        // Track `store-accounts` (ADR-XXXX): anyone fills a cart, a guest its
+        // session's guest's, so the cart's commands require no one; placing
+        // an order requires a reader signed in (`place_order`, whose
+        // component the committed evidence does not hold).
         for id in [ADD, CLEAR] {
             let contract = s
                 .contracts
@@ -13604,20 +13772,30 @@ public query Store(",
                 .as_ref()
                 .expect("compiled export")
                 .authorization;
-            assert_eq!(requirements.len(), 1, "{id}: {requirements:?}");
-            assert_eq!(requirements[0].predicate, "SignedIn");
-            assert!(requirements[0].arguments.is_empty());
+            assert!(requirements.is_empty(), "{id}: {requirements:?}");
         }
+        let place = s
+            .contracts
+            .iter()
+            .find(|c| c.component_id == "store.page.place_order")
+            .expect("place_order's contract");
+        let requirements = &place.exports[0]
+            .component
+            .as_ref()
+            .expect("compiled export")
+            .authorization;
+        assert_eq!(requirements.len(), 1, "{requirements:?}");
+        assert_eq!(requirements[0].predicate, "SignedIn");
+        assert!(requirements[0].arguments.is_empty());
 
-        // The development deployment knows SignedIn, so the ordinary demo
-        // principal may execute it.
         s.command(ADD, "signed-in-demo", &add_shown("espresso", 1), false)
-            .expect("SignedIn is explicitly approved");
+            .expect("anyone fills a cart");
 
         // A predicate the deployment does not know is denied before the
         // component or staged data layer can change state.
-        let requirement = &mut s
-            .contracts
+        let mut requirement = requirements[0].clone();
+        requirement.predicate = "OwnsOrder".to_string();
+        s.contracts
             .iter_mut()
             .find(|c| c.component_id == ADD)
             .expect("command contract")
@@ -13625,8 +13803,8 @@ public query Store(",
             .component
             .as_mut()
             .expect("compiled export")
-            .authorization[0];
-        requirement.predicate = "OwnsOrder".to_string();
+            .authorization
+            .push(requirement);
         let before = s.cart_value("signed-in-demo");
         let err = s
             .command(ADD, "signed-in-demo", &add_shown("cortado", 1), false)
@@ -14070,7 +14248,7 @@ public query Store(",
             assert!(written(&last).contains(said), "{status}: {last:?}");
             let basis = &last.basis.resources;
             assert_eq!(basis.len(), 1);
-            assert_eq!(basis[0].entry, order_entry("a"));
+            assert_eq!(basis[0].entry, s.order_entry("a"));
             versions.push(basis[0].version);
         }
         assert!(versions.windows(2).all(|w| w[0] < w[1]), "{versions:?}");

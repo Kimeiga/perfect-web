@@ -506,10 +506,12 @@ fn every_edge_in_the_store_program_can_be_bound() {
             Some(true),
             "an obligation is not a refusal"
         );
+        // A session's, or since track `store-accounts` (ADR-XXXX) a user's:
+        // the cart and the order are the reader's user's.
         assert!(
             e.obligations.iter().any(|o| {
                 let pw_host::Obligation::PreservePrincipal { principal, .. } = o;
-                principal.contains("Session")
+                principal.contains("Session") || principal.contains("User")
             }),
             "and it names the principal a binding must preserve: {e:?}"
         );

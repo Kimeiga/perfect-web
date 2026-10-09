@@ -1,0 +1,103 @@
+// @corpus: fixture
+// @id: LIB-UserCarts
+// @category: application service — a user's cart
+// @charter: §7.8, §15.1, §15.6
+// @milestone: E14
+//
+// **A cart is its user's** (track `store-accounts`, ADR-XXXX; docs/PARALLEL.md,
+// W8's plan, Q1): read and written by the reader's handle, `User<UserId>`,
+// which only the host makes (ADR-0263), from the session's principal, or the
+// session's own guest where no one signed in (ADR-0270). So a user's two
+// sessions hold one cart, and no program can name another user's.
+//
+// `Carts` keeps its session's operations: the corpus's witnesses and the
+// benchmark's copy of the store read a cart by its session, and the store's
+// data layer keys its rows by an opaque owner, a session's or a user's, so
+// both run on it. These are its operations by a user: their own interface,
+// `store:data/user-carts`, so that one build holds both without one WIT
+// function taking two types.
+//
+// **And its own record, `UserCart`.** A record's scope is the scopes of the
+// queries that produce it, joined (ADR-XXXX): `Cart` is produced by the
+// library's `session query Cart` (`Resources`), so a `Cart` a user's query
+// answered would hold the session's scope too, and no user's page could hold
+// it whole. A user's cart is a record of its own, whose only producer is the
+// user's query: its lines are `CartLine`s, as a session's are.
+module UserCarts
+
+import List
+import Carts
+import domain.{ CartLine, CartError, MenuItem, MenuItemId, Money, USD, PositiveInt, same_item, total }
+import capability.{ User, UserId }
+
+// **A user's cart**: its lines, as a session's `Cart` holds them.
+type UserCart = UserCart {
+    lines: List<CartLine>,
+}
+
+// **What a cart count shows**: the quantity across its lines, as `Cart`'s
+// `line_count` is.
+fn line_count(cart: UserCart) -> Int !{} {
+    List.fold(cart.lines, 0, fn(n, line) n + line.quantity.count)
+}
+
+// **What a cart's lines cost together**, before any fee, as `Cart`'s
+// `subtotal` is (ADR-0172).
+fn subtotal(cart: UserCart) -> Money<USD> !{} {
+    Money { minor_units: List.fold(cart.lines, 0, fn(n, line) n + total(line).minor_units) }
+}
+
+// The user's cart.
+fn current(reader: User<UserId>) -> Result<UserCart, CartError> !{ database.read<Carts> }
+    host "store:data/user-carts#current"
+
+// `quantity` more of `item`; a new line records the item as it is now
+// (ADR-0172).
+fn add(reader: User<UserId>, item: MenuItemId, quantity: PositiveInt) -> Result<UserCart, CartError> !{ database.write<Carts> }
+    host "store:data/user-carts#add"
+
+// One fewer of `item`; a line that holds one goes (ADR-0172).
+fn decrease(reader: User<UserId>, item: MenuItemId) -> Result<UserCart, CartError> !{ database.write<Carts> }
+    host "store:data/user-carts#decrease"
+
+// The line that holds `item`, gone (ADR-0172).
+fn remove(reader: User<UserId>, item: MenuItemId) -> Result<UserCart, CartError> !{ database.write<Carts> }
+    host "store:data/user-carts#remove"
+
+// Every line, gone.
+fn clear(reader: User<UserId>) -> Result<UserCart, CartError> !{ database.write<Carts> }
+    host "store:data/user-carts#clear"
+
+// **The optimistic transitions** (ADR-0025, ADR-0172), each `Carts`'s over a
+// user's cart: pure, run in the browser and taken back by restoring what
+// was held. Each line is changed by `Carts`' own `grown` and `shrunk`.
+
+// A new line made from the item as the page showed it, its name and its
+// price, or the line that holds it grown.
+fn with_line(cart: UserCart, item: MenuItem, quantity: PositiveInt) -> UserCart !{} {
+    let held = List.any(cart.lines, fn(line) same_item(line.item_id, item.id))
+    if held {
+        UserCart { lines: List.map(cart.lines, fn(line) Carts.grown(line, item.id, quantity)) }
+    } else {
+        UserCart {
+            lines: List.concat(cart.lines, [CartLine { item_id: item.id, name: item.name, quantity: quantity, unit_price: item.price }]),
+        }
+    }
+}
+
+// **One more of `item`**, on the line that holds it.
+fn with_more(cart: UserCart, item: MenuItemId) -> UserCart !{} {
+    UserCart { lines: List.map(cart.lines, fn(line) Carts.grown(line, item, PositiveInt(1))) }
+}
+
+// **One fewer of `item`**: the line that holds one goes, and one that holds
+// more holds one fewer.
+fn with_fewer(cart: UserCart, item: MenuItemId) -> UserCart !{} {
+    let kept = List.filter(cart.lines, fn(line) !(same_item(line.item_id, item) & line.quantity.count == 1))
+    UserCart { lines: List.map(kept, fn(line) Carts.shrunk(line, item)) }
+}
+
+// **The line that holds `item`, gone.**
+fn without(cart: UserCart, item: MenuItemId) -> UserCart !{} {
+    UserCart { lines: List.filter(cart.lines, fn(line) !same_item(line.item_id, item)) }
+}

@@ -32,6 +32,21 @@ interface resources-store-api {
     store: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
 }
 
+interface saved-saved-for-api {
+    use pw:types/types.{saved-saved-items, capability-user-id};
+    saved-for: func(arg0: capability-user-id) -> saved-saved-items;
+}
+
+interface user-carts-line-count-api {
+    use pw:types/types.{user-carts-user-cart};
+    line-count: func(arg0: user-carts-user-cart) -> s64;
+}
+
+interface user-carts-subtotal-api {
+    use pw:types/types.{user-carts-user-cart, domain-money};
+    subtotal: func(arg0: user-carts-user-cart) -> domain-money;
+}
+
 interface domain-count-api {
     use pw:types/types.{domain-positive-int};
     count: func(arg0: domain-positive-int) -> s64;
@@ -42,24 +57,14 @@ interface domain-display-api {
     display: func(arg0: domain-money) -> string;
 }
 
-interface domain-line-count-api {
-    use pw:types/types.{domain-cart};
-    line-count: func(arg0: domain-cart) -> s64;
-}
-
-interface domain-subtotal-api {
-    use pw:types/types.{domain-cart, domain-money};
-    subtotal: func(arg0: domain-cart) -> domain-money;
-}
-
 interface domain-total-api {
     use pw:types/types.{domain-cart-line, domain-money};
     total: func(arg0: domain-cart-line) -> domain-money;
 }
 
 interface store-page-cart-api {
-    use pw:types/types.{capability-session-id, domain-cart, domain-cart-error};
-    cart: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
+    use pw:types/types.{user-carts-user-cart, capability-user-id, domain-cart-error};
+    cart: func(arg0: capability-user-id) -> result<user-carts-user-cart, domain-cart-error>;
 }
 
 interface store-page-cart-page-api {
@@ -91,8 +96,8 @@ interface store-page-menu-size-api {
 }
 
 interface store-page-order-api {
-    use pw:types/types.{capability-session-id, domain-order-status, domain-tracking-error};
-    order: func(arg0: capability-session-id) -> result<option<domain-order-status>, domain-tracking-error>;
+    use pw:types/types.{capability-user-id, domain-order-status, domain-tracking-error};
+    order: func(arg0: capability-user-id) -> result<option<domain-order-status>, domain-tracking-error>;
 }
 
 interface store-page-order-page-api {
@@ -120,23 +125,23 @@ interface store-page-store-page-api {
 }
 
 interface store-page-add-to-cart-api {
-    use pw:types/types.{domain-cart, domain-cart-error, domain-menu-item, domain-positive-int};
-    add-to-cart: func(arg0: domain-menu-item, arg1: domain-positive-int) -> result<domain-cart, domain-cart-error>;
+    use pw:types/types.{user-carts-user-cart, domain-cart-error, domain-menu-item, domain-positive-int};
+    add-to-cart: func(arg0: domain-menu-item, arg1: domain-positive-int) -> result<user-carts-user-cart, domain-cart-error>;
 }
 
 interface store-page-clear-cart-api {
-    use pw:types/types.{domain-cart, domain-cart-error};
-    clear-cart: func() -> result<domain-cart, domain-cart-error>;
+    use pw:types/types.{user-carts-user-cart, domain-cart-error};
+    clear-cart: func() -> result<user-carts-user-cart, domain-cart-error>;
 }
 
 interface store-page-decrease-in-cart-api {
-    use pw:types/types.{domain-cart, domain-cart-error, domain-menu-item-id};
-    decrease-in-cart: func(arg0: domain-menu-item-id) -> result<domain-cart, domain-cart-error>;
+    use pw:types/types.{user-carts-user-cart, domain-cart-error, domain-menu-item-id};
+    decrease-in-cart: func(arg0: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
 }
 
 interface store-page-increase-in-cart-api {
-    use pw:types/types.{domain-cart, domain-cart-error, domain-menu-item-id};
-    increase-in-cart: func(arg0: domain-menu-item-id) -> result<domain-cart, domain-cart-error>;
+    use pw:types/types.{user-carts-user-cart, domain-cart-error, domain-menu-item-id};
+    increase-in-cart: func(arg0: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
 }
 
 interface store-page-place-order-api {
@@ -145,8 +150,8 @@ interface store-page-place-order-api {
 }
 
 interface store-page-remove-from-cart-api {
-    use pw:types/types.{domain-cart, domain-cart-error, domain-menu-item-id};
-    remove-from-cart: func(arg0: domain-menu-item-id) -> result<domain-cart, domain-cart-error>;
+    use pw:types/types.{user-carts-user-cart, domain-cart-error, domain-menu-item-id};
+    remove-from-cart: func(arg0: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
 }
 
 world resources-cart {
@@ -165,6 +170,18 @@ world resources-store {
     export resources-store-api;
 }
 
+world saved-saved-for {
+    export saved-saved-for-api;
+}
+
+world user-carts-line-count {
+    export user-carts-line-count-api;
+}
+
+world user-carts-subtotal {
+    export user-carts-subtotal-api;
+}
+
 world domain-count {
     export domain-count-api;
 }
@@ -173,25 +190,17 @@ world domain-display {
     export domain-display-api;
 }
 
-world domain-line-count {
-    export domain-line-count-api;
-}
-
-world domain-subtotal {
-    export domain-subtotal-api;
-}
-
 world domain-total {
     export domain-total-api;
 }
 
 world store-page-cart {
-    import store:data/carts;
+    import store:data/user-carts;
     export store-page-cart-api;
 }
 
 world store-page-cart-page {
-    import pw:host/session;
+    import pw:host/principal;
     import store-page-cart-api;
     import store-page-clear-cart-api;
     import store-page-decrease-in-cart-api;
@@ -208,7 +217,7 @@ world store-page-estimate {
 }
 
 world store-page-home-page {
-    import pw:host/session;
+    import pw:host/principal;
     import store-page-cart-api;
     import store-page-store-list-api;
     export store-page-home-page-api;
@@ -232,12 +241,12 @@ world store-page-menu-size {
 }
 
 world store-page-order {
-    import store:data/orders;
+    import store:data/user-orders;
     export store-page-order-api;
 }
 
 world store-page-order-page {
-    import pw:host/session;
+    import pw:host/principal;
     import store-page-order-api;
     export store-page-order-page-api;
 }
@@ -258,6 +267,7 @@ world store-page-store-list {
 }
 
 world store-page-store-page {
+    import pw:host/principal;
     import pw:host/session;
     import store-page-add-to-cart-api;
     import store-page-cart-api;
@@ -276,56 +286,57 @@ world store-page-store-page {
 world store-page-add-to-cart {
     import pw:host/invalidations;
     import pw:host/outbox;
-    import pw:host/session;
-    import store:data/carts;
+    import pw:host/principal;
     import store:data/menus;
+    import store:data/user-carts;
     export store-page-add-to-cart-api;
 }
 
 world store-page-clear-cart {
     import pw:host/invalidations;
     import pw:host/outbox;
-    import pw:host/session;
-    import store:data/carts;
+    import pw:host/principal;
+    import store:data/user-carts;
     export store-page-clear-cart-api;
 }
 
 world store-page-decrease-in-cart {
     import pw:host/invalidations;
     import pw:host/outbox;
-    import pw:host/session;
-    import store:data/carts;
+    import pw:host/principal;
+    import store:data/user-carts;
     export store-page-decrease-in-cart-api;
 }
 
 world store-page-increase-in-cart {
     import pw:host/invalidations;
     import pw:host/outbox;
-    import pw:host/session;
-    import store:data/carts;
+    import pw:host/principal;
     import store:data/menus;
+    import store:data/user-carts;
     export store-page-increase-in-cart-api;
 }
 
 world store-page-place-order {
     import pw:host/invalidations;
     import pw:host/outbox;
-    import pw:host/session;
-    import store:data/orders;
+    import pw:host/principal;
+    import store:data/user-orders;
     export store-page-place-order-api;
 }
 
 world store-page-remove-from-cart {
     import pw:host/invalidations;
     import pw:host/outbox;
-    import pw:host/session;
-    import store:data/carts;
+    import pw:host/principal;
+    import store:data/user-carts;
     export store-page-remove-from-cart-api;
 }
 
 package pw:types {
     interface types {
         type capability-session-id = string;
+        type capability-user-id = string;
         type clock-instant = s64;
         type domain-store-id = string;
         type domain-menu-item-id = string;
@@ -417,6 +428,13 @@ package pw:types {
             none-available,
             timeout,
         }
+        record saved-saved-items {
+            items: list<domain-menu-item-id>,
+            count: s64,
+        }
+        record user-carts-user-cart {
+            lines: list<domain-cart-line>,
+        }
         record store-page-menu-count {
             sections: s64,
             items: s64,
@@ -426,14 +444,18 @@ package pw:types {
 
 package pw:host {
     interface invalidations {
-        use pw:types/types.{capability-session-id};
-        store-page-cart: func(arg0: capability-session-id);
-        store-page-order: func(arg0: capability-session-id);
+        use pw:types/types.{capability-user-id};
+        store-page-cart: func(arg0: capability-user-id);
+        store-page-order: func(arg0: capability-user-id);
     }
     interface outbox {
-        use pw:types/types.{capability-session-id};
-        cart-changed: func(arg0: capability-session-id);
-        order-changed: func(arg0: capability-session-id);
+        use pw:types/types.{capability-user-id};
+        user-cart-changed: func(arg0: capability-user-id);
+        user-order-changed: func(arg0: capability-user-id);
+    }
+    interface principal {
+        use pw:types/types.{capability-user-id};
+        read: func() -> capability-user-id;
     }
     interface reads {
         use pw:types/types.{domain-menu-section, domain-store-id, store-page-menu-count};
@@ -447,14 +469,6 @@ package pw:host {
 }
 
 package store:data {
-    interface carts {
-        use pw:types/types.{capability-session-id, domain-cart, domain-cart-error, domain-menu-item-id, domain-positive-int};
-        add: func(arg0: capability-session-id, arg1: domain-menu-item-id, arg2: domain-positive-int) -> result<domain-cart, domain-cart-error>;
-        clear: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
-        current: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;
-        decrease: func(arg0: capability-session-id, arg1: domain-menu-item-id) -> result<domain-cart, domain-cart-error>;
-        remove: func(arg0: capability-session-id, arg1: domain-menu-item-id) -> result<domain-cart, domain-cart-error>;
-    }
     interface estimates {
         use pw:types/types.{capability-session-id, domain-delivery-estimate, domain-estimate-error};
         current: func(arg0: capability-session-id) -> result<domain-delivery-estimate, domain-estimate-error>;
@@ -464,11 +478,6 @@ package store:data {
         is-available: func(arg0: domain-menu-item-id) -> bool;
         sections: func(arg0: domain-store-id) -> result<list<domain-menu-section>, domain-store-error>;
     }
-    interface orders {
-        use pw:types/types.{capability-session-id, domain-order-error, domain-order-status, domain-tracking-error};
-        current: func(arg0: capability-session-id) -> result<option<domain-order-status>, domain-tracking-error>;
-        place: func(arg0: capability-session-id) -> result<domain-order-status, domain-order-error>;
-    }
     interface recommendations {
         use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};
         for-store: func(arg0: domain-store-id) -> result<list<domain-recommendation>, domain-recommendation-error>;
@@ -477,6 +486,19 @@ package store:data {
         use pw:types/types.{domain-store, domain-store-error, domain-store-id};
         %list: func() -> list<domain-store>;
         get: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
+    }
+    interface user-carts {
+        use pw:types/types.{user-carts-user-cart, capability-user-id, domain-cart-error, domain-menu-item-id, domain-positive-int};
+        add: func(arg0: capability-user-id, arg1: domain-menu-item-id, arg2: domain-positive-int) -> result<user-carts-user-cart, domain-cart-error>;
+        clear: func(arg0: capability-user-id) -> result<user-carts-user-cart, domain-cart-error>;
+        current: func(arg0: capability-user-id) -> result<user-carts-user-cart, domain-cart-error>;
+        decrease: func(arg0: capability-user-id, arg1: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
+        remove: func(arg0: capability-user-id, arg1: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
+    }
+    interface user-orders {
+        use pw:types/types.{capability-user-id, domain-order-error, domain-order-status, domain-tracking-error};
+        current: func(arg0: capability-user-id) -> result<option<domain-order-status>, domain-tracking-error>;
+        place: func(arg0: capability-user-id) -> result<domain-order-status, domain-order-error>;
     }
 }
 

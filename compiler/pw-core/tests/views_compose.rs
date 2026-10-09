@@ -125,10 +125,10 @@ fn page(used: &[&str], markup: &str) -> String {
     };
     format!(
         "module t\n\nimport store.page.{{ Store, Cart }}\nimport domain.{{ StoreId }}\n\
-         import context.{{ current_session }}\n{import}{items}\n\
+         import context.{{ current_user }}\n{import}{items}\n\
          page P(id: StoreId) {{\n    cache private\n\n    \
          let store = query Store(id)\n    let menu = query Items(id)\n    \
-         let cart = query Cart(current_session())\n\n    \
+         let cart = query Cart(current_user())\n\n    \
          view {{\n        <main>\n{markup}\n        </main>\n    }}\n}}\n",
         items = ITEMS
     )
@@ -358,9 +358,10 @@ fn a_page_plans_a_composed_view_as_its_own_markup() {
 /// The store's page, its cart's count and its Add buttons written `inline`,
 /// or as views from `ui`.
 fn cart_count_page(inline: bool) -> (String, String) {
+    // The store's cart is a user's, `UserCart`, since track `store-accounts`.
     let views = format!(
-        "{}\nimport domain.{{ Cart }}\n\n\
-         public view CartCount(c: Cart) !{{}} {{\n    <p id=\"cart-count\">{{c.line_count}}</p>\n}}\n\n\
+        "{}\nimport UserCarts.{{ UserCart }}\n\n\
+         public view CartCount(c: UserCart) !{{}} {{\n    <p id=\"cart-count\">{{c.line_count}}</p>\n}}\n\n\
          public view AddButton(entry: MenuItem) !{{}} {{\n    \
          <button type=\"button\" on:press={{() => {{ let _added = add_to_cart(entry, PositiveInt(1)) }}}}>Add</button>\n}}\n",
         ui("")
@@ -378,9 +379,9 @@ fn cart_count_page(inline: bool) -> (String, String) {
     };
     let page = format!(
         "module t\n\nimport store.page.{{ Cart }}\nimport domain.{{ StoreId }}\n\
-         import context.{{ current_session }}\n{imports}{items}\n\
+         import context.{{ current_user }}\n{imports}{items}\n\
          page P(id: StoreId) {{\n    cache private\n\n    \
-         let menu = query Items(id)\n    let cart = query Cart(current_session())\n\n    \
+         let menu = query Items(id)\n    let cart = query Cart(current_user())\n\n    \
          view {{\n        <main>\n            {count}\n            \
          <ul>{{#each menu as item (item.id)}}<li>{add}</li>{{/each}}</ul>\n        </main>\n    }}\n}}\n",
         items = ITEMS

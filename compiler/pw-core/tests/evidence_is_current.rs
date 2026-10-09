@@ -185,8 +185,9 @@ fn the_committed_components_are_what_the_compiler_builds_now() {
         "store.page.Store",
         "store.page.Menu",
         "store.page.Cart",
-        // The member function the page reads `cart.line_count` through.
-        "domain.line_count",
+        // The member function the page reads `cart.line_count` through: a
+        // user's cart's since track `store-accounts` (ADR-XXXX).
+        "UserCarts.line_count",
         // And the one a menu's row reads `item.price.display` through
         // (ADR-0169).
         "domain.display",
@@ -197,7 +198,7 @@ fn the_committed_components_are_what_the_compiler_builds_now() {
         "store.page.remove_from_cart",
         "domain.count",
         "domain.total",
-        "domain.subtotal",
+        "UserCarts.subtotal",
     ] {
         let fresh = pw_core::backend::component::compile(&units, id)
             .unwrap_or_else(|e| panic!("{id} compiles: {e}"));

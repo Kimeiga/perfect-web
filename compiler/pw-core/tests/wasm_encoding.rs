@@ -142,22 +142,23 @@ fn every_store_command_and_query_encodes_to_a_valid_core_module() {
 /// > `Carts.add` / `Carts.clear` — same capability, different signatures →
 /// > **two callable imports**, both valid.
 ///
-/// Their core arities are now the Canonical ABI's — `add` six (session, item
+/// Their core arities are now the Canonical ABI's — `add` six (reader, item
 /// and quantity flattened, plus the result pointer), `clear` three — read back
-/// from the bytes `wit-parser` shaped.
+/// from the bytes `wit-parser` shaped. A user's cart's, `UserCarts.add` and
+/// `UserCarts.clear`, since track `store-accounts`.
 #[test]
 fn one_capability_authorizes_two_callables_with_different_abis() {
     let (p, _) = store();
     let add = p
         .imports
         .iter()
-        .find(|i| i.id.qualified() == "store:data/carts#add")
-        .expect("Carts.add is an import");
+        .find(|i| i.id.qualified() == "store:data/user-carts#add")
+        .expect("UserCarts.add is an import");
     let clear = p
         .imports
         .iter()
-        .find(|i| i.id.qualified() == "store:data/carts#clear")
-        .expect("Carts.clear is an import");
+        .find(|i| i.id.qualified() == "store:data/user-carts#clear")
+        .expect("UserCarts.clear is an import");
     assert_ne!(add.signature, clear.signature, "different ABIs");
     let caps = |i: &pw_core::backend::ir::CallableImport| -> Vec<String> {
         i.required_capabilities.iter().map(|c| c.name()).collect()
@@ -175,11 +176,11 @@ fn one_capability_authorizes_two_callables_with_different_abis() {
         .component
         .core;
     assert_eq!(
-        imported_arities(&add_core).get("store:data/carts#add"),
+        imported_arities(&add_core).get("store:data/user-carts#add"),
         Some(&6)
     );
     assert_eq!(
-        imported_arities(&clear_core).get("store:data/carts#clear"),
+        imported_arities(&clear_core).get("store:data/user-carts#clear"),
         Some(&3)
     );
 }
@@ -193,16 +194,16 @@ fn one_capability_authorizes_two_callables_with_different_abis() {
 fn an_import_whose_declared_abi_disagrees_with_its_call_site_is_refused() {
     let units = units(&store_files());
     let compiled = component::compile(&units, "store.page.add_to_cart").expect("builds");
-    let original = "add: func(arg0: capability-session-id, arg1: domain-menu-item-id, arg2: \
-                    domain-positive-int) -> result<domain-cart, domain-cart-error>;";
+    let original = "add: func(arg0: capability-user-id, arg1: domain-menu-item-id, arg2: \
+                    domain-positive-int) -> result<user-carts-user-cart, domain-cart-error>;";
     assert!(
         compiled.wit.contains(original),
         "the mutation's anchor moved"
     );
     let mutated = compiled.wit.replace(
         original,
-        "add: func(arg0: capability-session-id, arg1: domain-menu-item-id) -> \
-         result<domain-cart, domain-cart-error>;",
+        "add: func(arg0: capability-user-id, arg1: domain-menu-item-id) -> \
+         result<user-carts-user-cart, domain-cart-error>;",
     );
 
     let (p, cs) = store();

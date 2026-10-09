@@ -394,6 +394,18 @@ pub fn authorization_url(
 
 /// Where a provider sends a browser back.
 pub const CALLBACK: &str = "/sign-in/callback";
+
+/// **A guest, signed in** (track `store-accounts`, ADR-XXXX; docs/PARALLEL.md,
+/// Q2): the session the browser came with, which no sign-in had opened, the
+/// session the sign-in opened in its place, and its principal. What a
+/// deployment is told once the principal is opened and before the sign-in is
+/// answered, so that what the guest held (a cart) is the user's before the
+/// browser asks for a page. The identity knows nothing of what it is.
+pub struct SignedIn<'a> {
+    pub guest: &'a str,
+    pub session: &'a str,
+    pub principal: &'a Principal,
+}
 /// How long a sign-in may be in flight.
 const SIGN_IN_LIFETIME: Duration = Duration::from_secs(600);
 
@@ -515,7 +527,8 @@ impl Identity {
 
     /// **A request the identity track answers**, before any other route.
     /// `true` when it answered on `stream`; `false` leaves the request to
-    /// the routes after it.
+    /// the routes after it. `on_sign_in` is told of a guest that signed in
+    /// ([`SignedIn`]), before the sign-in is answered.
     ///
     /// First, for every route, **a request that changes something is
     /// refused unless it comes from this origin** (charter §17.5's "CSRF for
@@ -533,6 +546,7 @@ impl Identity {
         body: &[u8],
         stream: &mut TcpStream,
         query: &str,
+        on_sign_in: &dyn Fn(&SignedIn),
     ) -> bool {
         if let Err(why) = same_origin(method, headers) {
             Reply::text(403, &why).write(stream, session, fresh);
@@ -541,7 +555,7 @@ impl Identity {
         let reply = match (method, route) {
             ("POST", "/sign-out") => Some(self.sign_out(session)),
             ("GET", "/sign-in") | ("GET", "/sign-up") => self.start(headers, route == "/sign-up"),
-            ("GET", CALLBACK) => self.callback(headers, session, query),
+            ("GET", CALLBACK) => self.callback(headers, session, query, on_sign_in),
             _ => self.served(method, route, query, body),
         };
         match reply {
@@ -613,7 +627,13 @@ impl Identity {
     /// session for the principal, the one the browser came with forgotten
     /// (OWASP: "renew the session ID after any privilege level change", the
     /// defence against session fixation).
-    fn callback(&self, headers: &str, session: &str, query: &str) -> Option<Reply> {
+    fn callback(
+        &self,
+        headers: &str,
+        session: &str,
+        query: &str,
+        on_sign_in: &dyn Fn(&SignedIn),
+    ) -> Option<Reply> {
         let mode = self.mode.read().expect("mode");
         let Mode::Accounts(accounts) = &*mode else {
             return None;
@@ -667,8 +687,21 @@ impl Identity {
             issuer: claims.iss,
         };
         let rotated = new_session_id();
+        // A guest's, where no sign-in opened the session it came with: a
+        // signed-in session that signs in again is signed out, and what it
+        // held is its user's, never the next one's.
+        let was_guest = self.principals.of(session).is_none_or(|p| p.is_guest());
         self.principals.close(session);
-        self.principals.open(&rotated, principal);
+        self.principals.open(&rotated, principal.clone());
+        // TRACK SEAM (store-accounts): the deployment told, before the
+        // browser is answered.
+        if was_guest && !session.is_empty() {
+            on_sign_in(&SignedIn {
+                guest: session,
+                session: &rotated,
+                principal: &principal,
+            });
+        }
         let secure = *SECURE_COOKIES.get().unwrap_or(&false);
         Some(Reply::redirect(
             "/",

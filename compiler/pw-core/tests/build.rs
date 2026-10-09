@@ -67,11 +67,13 @@ fn the_store_builds_every_artifact_from_source() {
             // of its own since ADR-0125: a line's count, a price as text
             // (ADR-0169), the cart's count, and a line's and the cart's
             // totals (ADR-0172).
+            // Track `store-accounts` (ADR-XXXX): a user's cart's count
+            // and its subtotal, its record's own.
+            "UserCarts.line_count",
+            "UserCarts.subtotal",
             "domain.count",
             "domain.display",
-            "domain.line_count",
-            // A cart's line and its cart, priced (ADR-0172).
-            "domain.subtotal",
+            // A cart's line, priced (ADR-0172).
             "domain.total",
             "store.page.Cart",
             // The store's slots, since ADR-0165: each stream's query.
@@ -125,7 +127,10 @@ fn the_store_builds_every_artifact_from_source() {
             "Resources.Cart",
             "Resources.Menu",
             "Resources.Order",
-            "Resources.Store"
+            "Resources.Store",
+            // The library's `user` query the corpus imports (track
+            // `store-accounts`, A-033 and R-064).
+            "Saved.SavedFor"
         ]
     );
 

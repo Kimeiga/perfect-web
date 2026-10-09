@@ -7,7 +7,8 @@
 // The demo both E4 item 1 and E5 item 2 are blocked on, and the point is the
 // SPLIT: one page, two queries, two cache partitions. The store's name and
 // menu are the same for everybody and are cached `shared`. The cart belongs to
-// one session and is cached `private`.
+// one reader, its user (a guest's is its session's guest's), and is cached
+// `private`.
 //
 // What makes this evidence rather than a screenshot: the page renders both,
 // and the compiler has already refused to let the private half into the shared
@@ -25,11 +26,11 @@ module store.page
 
 import List
 import Stores
-import Carts
 import Menus
 import Recommender
 import Estimates
-import Orders
+import UserCarts.{ UserCart }
+import UserOrders
 // The invocation context. `current_session()` was called and never imported
 // from E4 until 2026-08-10, and nothing said so: `unresolved_uses` examines
 // dotted paths whose head looks like a module, and a bare call to nothing
@@ -41,12 +42,12 @@ import Orders
 // `StorePage` now requires the session to RENDER, and the E8 evidence saying a
 // page renders without authority moved with it. That was the architect's
 // ruling and the reason the repair waited for a frozen matrix.
-import context.{ current_session }
-import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, MenuSection, InteractionId,
+import context.{ current_session, current_user }
+import domain.{ StoreId, Store, StoreError, CartError, MenuItem, MenuSection, InteractionId,
     MenuItemId, PositiveInt, Recommendation, RecommendationError, DeliveryEstimate,
     EstimateError, OrderStatus, OrderError, TrackingError }
-import capability.{ Session, SessionId }
-import Events.{ CartChanged, MenuChanged, InventoryChanged, OrderChanged }
+import capability.{ Session, SessionId, User, UserId }
+import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -157,14 +158,19 @@ public query StoreList() -> List<Store>
     Stores.list()
 }
 
-// Private. Scoped to one session, so `cache private` — and the label the
-// `session` modifier gives it is what makes putting it in the shared cache a
-// compile error rather than a leak nobody notices.
-session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
+// **The reader's own** (track `store-accounts`, ADR-XXXX): `user`, the
+// user's, and importable as a `session` query is. Keyed by
+// the reader's handle, which only the host makes (ADR-0263), from the
+// session's principal, or the session's own guest where no one signed in
+// (ADR-0270). So a user's sessions read one cart, and a guest's cart is its
+// session's guest's until the guest signs in, when it joins the user's.
+// `cache private`, and the handle's label is what makes putting it in the
+// shared cache a compile error rather than a leak nobody notices.
+user query Cart(reader: User<UserId>) -> Result<UserCart, CartError>
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
-    key            session
+    key            reader
     // Which event concerns this resource. `add_to_cart` declares `invalidates
     // Cart(..)` — that is the COMMAND saying which cache entry it drops — and
     // this is the RESOURCE saying which fact about the world it depends on.
@@ -176,12 +182,12 @@ session query Cart(session: Session<SessionId>) -> Result<Cart, CartError>
     // event was emitted, committed, drained, and matched no listener. Found by
     // wiring the real materializer to the browser, which is exactly what the
     // Node stand-in could not have found.
-    invalidates_on CartChanged(session)
+    invalidates_on UserCartChanged(reader)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
 {
-    Carts.current(session)
+    UserCarts.current(reader)
 }
 
 // **The session's delivery estimate** (charter §15.2, §15.3, ADR-0165): the
@@ -200,19 +206,20 @@ session query Estimate(session: Session<SessionId>) -> Result<DeliveryEstimate, 
     Estimates.current(session)
 }
 
-// **The session's order**, as the store last said of it (ADR-0193): the
-// session's alone, and read again whenever the store moves it along.
-session query Order(session: Session<SessionId>) -> Result<Option<OrderStatus>, TrackingError>
+// **The reader's order**, as the store last said of it (ADR-0193): the
+// user's alone, read by their handle as a notification is (ADR-0274,
+// ADR-XXXX), and read again whenever the store moves it along.
+user query Order(reader: User<UserId>) -> Result<Option<OrderStatus>, TrackingError>
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
-    key            session
-    invalidates_on OrderChanged(session)
+    key            reader
+    invalidates_on UserOrderChanged(reader)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
 {
-    Orders.current(session)
+    UserOrders.current(reader)
 }
 
 // The mutation, as charter §15.4 asks. Idempotent by interaction id, so a
@@ -224,66 +231,69 @@ session query Order(session: Session<SessionId>) -> Result<Option<OrderStatus>, 
 // It takes the item as the page showed it (ADR-0172): a new line is made from
 // its name and its price before the server answers. The command writes by the
 // item's id alone, and the data layer records the item's own name and price.
+//
+// **Anyone may fill a cart** (track `store-accounts`, ADR-XXXX): a reader
+// signed in fills their user's, and a guest its session's guest's, which joins
+// its user's when the guest signs in. So the cart's commands require no one
+// signed in; placing an order does. A press from a page shown to another
+// reader (a tab whose reader signed in or out in another) is refused by the
+// platform before any command runs (docs/PARALLEL.md, Q3).
 command add_to_cart(item: MenuItem, quantity: PositiveInt)
-    -> Result<Cart, CartError>
-    requires      SignedIn
+    -> Result<UserCart, CartError>
     idempotent_by InteractionId
     retry         transport_only(max = 2, jitter = true)
     transaction   serializable
-    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)
-    invalidates   Cart(current_session())
-    emits         CartChanged(current_session())
+    optimistic    Cart(current_user()) as cart => UserCarts.with_line(cart, item, quantity)
+    invalidates   Cart(current_user())
+    emits         UserCartChanged(current_user())
 {
     if !Menus.is_available(item.id) {
         return Err(CartError.ItemUnavailable(item.id))
     }
-    Carts.add(current_session(), item.id, quantity)
+    UserCarts.add(current_user(), item.id, quantity)
 }
 
 // **One more of a line's item** (charter §15.3, ADR-0172). A step, not a
 // quantity: two presses before the first answers are two. As `add_to_cart`,
 // the item's availability is read again inside it.
 command increase_in_cart(item: MenuItemId)
-    -> Result<Cart, CartError>
-    requires      SignedIn
+    -> Result<UserCart, CartError>
     idempotent_by InteractionId
     retry         transport_only(max = 2, jitter = true)
     transaction   serializable
-    optimistic    Cart(current_session()) as cart => Carts.with_more(cart, item)
-    invalidates   Cart(current_session())
-    emits         CartChanged(current_session())
+    optimistic    Cart(current_user()) as cart => UserCarts.with_more(cart, item)
+    invalidates   Cart(current_user())
+    emits         UserCartChanged(current_user())
 {
     if !Menus.is_available(item) {
         return Err(CartError.ItemUnavailable(item))
     }
-    Carts.add(current_session(), item, PositiveInt(1))
+    UserCarts.add(current_user(), item, PositiveInt(1))
 }
 
 // **One fewer of a line's item** (charter §15.3, ADR-0172): at one, the
 // line goes.
 command decrease_in_cart(item: MenuItemId)
-    -> Result<Cart, CartError>
-    requires      SignedIn
+    -> Result<UserCart, CartError>
     idempotent_by InteractionId
     retry         transport_only(max = 2, jitter = true)
-    optimistic    Cart(current_session()) as cart => Carts.with_fewer(cart, item)
-    invalidates   Cart(current_session())
-    emits         CartChanged(current_session())
+    optimistic    Cart(current_user()) as cart => UserCarts.with_fewer(cart, item)
+    invalidates   Cart(current_user())
+    emits         UserCartChanged(current_user())
 {
-    Carts.decrease(current_session(), item)
+    UserCarts.decrease(current_user(), item)
 }
 
 // **A line, gone** (charter §15.3, ADR-0172).
 command remove_from_cart(item: MenuItemId)
-    -> Result<Cart, CartError>
-    requires      SignedIn
+    -> Result<UserCart, CartError>
     idempotent_by InteractionId
     retry         transport_only(max = 2, jitter = true)
-    optimistic    Cart(current_session()) as cart => Carts.without(cart, item)
-    invalidates   Cart(current_session())
-    emits         CartChanged(current_session())
+    optimistic    Cart(current_user()) as cart => UserCarts.without(cart, item)
+    invalidates   Cart(current_user())
+    emits         UserCartChanged(current_user())
 {
-    Carts.remove(current_session(), item)
+    UserCarts.remove(current_user(), item)
 }
 
 // A SECOND handler on the same page, and the reason it exists is E7-L.
@@ -293,35 +303,37 @@ command remove_from_cart(item: MenuItemId)
 // pressing Add loads `add_to_cart` and leaves `clear_cart` unfetched — which is
 // the whole claim, and the one thing a single-handler demo cannot show.
 command clear_cart()
-    -> Result<Cart, CartError>
-    requires      SignedIn
+    -> Result<UserCart, CartError>
     idempotent_by InteractionId
     retry         transport_only(max = 2, jitter = true)
-    invalidates   Cart(current_session())
-    emits         CartChanged(current_session())
+    invalidates   Cart(current_user())
+    emits         UserCartChanged(current_user())
 {
-    Carts.clear(current_session())
+    UserCarts.clear(current_user())
 }
 
-// **The session's cart, placed as its order** (ADR-0193): the order is the
+// **The reader's cart, placed as their order** (ADR-0193): the order is the
 // cart's lines, and the cart is empty after, in one commit. An empty cart
-// places nothing, and says so.
+// places nothing, and says so. A guest signs in to order (track
+// `store-accounts`): an order is a user's, followed from any of their
+// sessions, and the guest's cart follows them in.
 command place_order()
     -> Result<OrderStatus, OrderError>
     requires      SignedIn
     idempotent_by InteractionId
     retry         transport_only(max = 2, jitter = true)
     transaction   serializable
-    invalidates   Cart(current_session()), Order(current_session())
-    emits         CartChanged(current_session()), OrderChanged(current_session())
+    invalidates   Cart(current_user()), Order(current_user())
+    emits         UserCartChanged(current_user()), UserOrderChanged(current_user())
 {
-    Orders.place(current_session())
+    UserOrders.place(current_user())
 }
 
-// Private to the session that reads it (ADR-0172): its cart's lines are the
-// session's, and its handlers capture them, so a resume manifest must say to
-// whom what it carries is private. `cache private` alone names no one.
-session page StorePage(id: StoreId) {
+// Private to the reader's user (ADR-0172; track `store-accounts`): its cart's
+// lines are the user's, and its handlers capture them, so a resume manifest
+// must say to whom what it carries is private. `cache private` alone names no
+// one; `user` names the user, as `session` named the session.
+user page StorePage(id: StoreId) {
     // Charter §15.3: the store's address, which gives its id (ADR-0160),
     // and an id that names no store is not found (ADR-0163).
     route        "/stores/{id}"
@@ -332,7 +344,7 @@ session page StorePage(id: StoreId) {
     let store = query Store(id)
     let menu = query Menu(id)
     let summary = query MenuLine(id)
-    let cart = query Cart(current_session())
+    let cart = query Cart(current_user())
     // What the cart last had to say: a refusal of an add or a clear.
     signal notice: String = ""
     // Charter §15.3's slots (ADR-0165), the estimate and the recommendations,
@@ -479,17 +491,17 @@ session page StorePage(id: StoreId) {
 // one's quantity changed or the line removed, and the cart cleared. The
 // store's page shows the same cart beside its menu, and a change made on
 // either reaches the other while both are open: each reads
-// `Cart(current_session())`, and the server derives what each shows from its
+// `Cart(current_user())`, and the server derives what each shows from its
 // own plan. Until 2026-10-04 a page that bound a query was served only at the
 // store's route.
-session page CartPage() {
+user page CartPage() {
     route     "/cart"
     placement origin
     cache     private
 
-    let cart = query Cart(current_session())
+    let cart = query Cart(current_user())
     // Its order, once it is placed (ADR-0193).
-    let order = query Order(current_session())
+    let order = query Order(current_user())
     // What the cart last had to say: a line that could not be changed.
     signal notice: String = ""
 
@@ -574,13 +586,13 @@ session page CartPage() {
 // **The stores, as the home page** (ADR-0192): each store by its name and
 // what it says of itself, linked to its page, and the session's cart beside
 // them. A store list is the first of a delivery site's pages.
-session page HomePage() {
+user page HomePage() {
     route     "/"
     placement origin
     cache     private
 
     let stores = query StoreList()
-    let cart = query Cart(current_session())
+    let cart = query Cart(current_user())
 
     view {
         <title>Stores</title>
@@ -604,12 +616,12 @@ session page HomePage() {
 // **The session's order, as the store moves it along** (ADR-0193): placed,
 // being prepared, on its way, delivered. What the store says next reaches the
 // page while it is open, and a screen reader says it.
-session page OrderPage() {
+user page OrderPage() {
     route     "/order"
     placement origin
     cache     private
 
-    let order = query Order(current_session())
+    let order = query Order(current_user())
 
     view {
         <title>Your order</title>

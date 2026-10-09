@@ -19,7 +19,7 @@
 module Events
 
 import domain.{ StoreId, MenuItemId }
-import capability.{ Session, SessionId }
+import capability.{ Session, SessionId, User, UserId }
 
 event StoreChanged(store: StoreId)
 
@@ -41,3 +41,13 @@ event PromotionChanged(store: StoreId)
 event CartChanged(session: Session<SessionId>)
 // A session's order, placed or moved along (ADR-0193).
 event OrderChanged(session: Session<SessionId>)
+
+// **A user's cart, changed** (track `store-accounts`, ADR-XXXX): it carries
+// the user's handle, which only the host makes, so a command emits it with
+// `current_user()` and a listener keyed by the reader's handle hears it, in
+// each of the user's sessions. `CartChanged` stays a session's, for the
+// corpus and the benchmark's copy of the store.
+event UserCartChanged(user: User<UserId>)
+
+// A user's order, placed or moved along (ADR-0193, ADR-XXXX).
+event UserOrderChanged(user: User<UserId>)

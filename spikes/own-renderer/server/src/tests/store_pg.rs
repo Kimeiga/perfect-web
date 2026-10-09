@@ -139,7 +139,7 @@ fn on_postgres_a_cart_change_commits_with_its_event_in_one_transaction() {
     let rows = sql
         .query(
             "SELECT s.name, s.committed_in = c.committed_in \
-             FROM outbox_seen s, cart_lines c WHERE c.session = 'a'",
+             FROM outbox_seen s, cart_lines c WHERE c.owner = 'u-a'",
             &[],
         )
         .expect("read");
@@ -149,7 +149,8 @@ fn on_postgres_a_cart_change_commits_with_its_event_in_one_transaction() {
     assert_eq!(
         seen,
         [
-            ("Events.CartChanged".to_string(), true),
+            // The reader's, session `a`'s guest's (track `store-accounts`).
+            ("Events.UserCartChanged".to_string(), true),
             ("store.page.Cart".to_string(), true)
         ],
         "written by the line's own transaction"
@@ -181,14 +182,14 @@ fn on_postgres_a_routes_change_commits_with_its_event_in_one_transaction() {
         .sql()
         .query(
             "SELECT s.name, s.committed_in = o.committed_in \
-             FROM outbox_seen s, orders o WHERE o.session = 'a'",
+             FROM outbox_seen s, orders o WHERE o.owner = 'u-a'",
             &[],
         )
         .expect("read");
     let seen: Vec<(String, bool)> = rows.iter().map(|r| (r.get(0), r.get(1))).collect();
     assert_eq!(
         seen,
-        [("Events.OrderChanged".to_string(), true)],
+        [("Events.UserOrderChanged".to_string(), true)],
         "the order's change and its event, one transaction"
     );
     assert_eq!(s.order_of("a").map(|o| o.0).as_deref(), Some("preparing"));
@@ -339,7 +340,7 @@ fn on_postgres_a_retried_interaction_runs_its_command_once() {
         "one transaction gave the outbox anything"
     );
     assert_eq!(
-        s.count("SELECT count(*) FROM outbox_seen WHERE name = 'Events.CartChanged'"),
+        s.count("SELECT count(*) FROM outbox_seen WHERE name = 'Events.UserCartChanged'"),
         1,
         "one event"
     );
@@ -367,8 +368,8 @@ fn on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_nothing() {
         .layer
         .sql()
         .query(
-            "SELECT o.session, l.item, l.quantity FROM order_lines l \
-             JOIN orders o ON o.id = l.order_id ORDER BY o.session, l.position",
+            "SELECT o.owner, l.item, l.quantity FROM order_lines l \
+             JOIN orders o ON o.id = l.order_id ORDER BY o.owner, l.position",
             &[],
         )
         .expect("read");
@@ -382,7 +383,8 @@ fn on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_nothing() {
             (session.to_string(), "cortado".to_string(), 1),
         ]
     };
-    assert_eq!(lines, [want("a"), want("b")].concat());
+    // Each the reader's, its session's guest's (track `store-accounts`).
+    assert_eq!(lines, [want("u-a"), want("u-b")].concat());
     assert_eq!(
         s.count("SELECT count(*) FROM cart_lines"),
         0,

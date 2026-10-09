@@ -223,18 +223,19 @@ fn an_optimistic_clause_has_a_target_a_binder_and_a_transition() {
     // Three pieces of meaning, each with a span in the FILE. A sub-parse starts
     // at zero, so without the shift a diagnostic would underline the first few
     // columns of the module declaration.
-    assert_eq!(&src[body.expr_span(target.root)], "Cart(current_session())");
+    // The reader's cart since track `store-accounts`.
+    assert_eq!(&src[body.expr_span(target.root)], "Cart(current_user())");
     assert_eq!(&src[transition.binders[0].1.clone()], "cart");
     assert_eq!(
         &src[body.expr_span(transition.root)],
-        "Carts.with_line(cart, item, quantity)"
+        "UserCarts.with_line(cart, item, quantity)"
     );
 
     // And the compiler binds nothing on its own: drop the binder and `cart` is
     // an unresolved name rather than something supplied by the keyword.
     let without = src.replace(
-        "Cart(current_session()) as cart =>",
-        "Cart(current_session()) as _c =>",
+        "Cart(current_user()) as cart =>",
+        "Cart(current_user()) as _c =>",
     );
     let out = pw_core::check::check_sources(&[("app.pw".to_string(), without)]);
     assert!(

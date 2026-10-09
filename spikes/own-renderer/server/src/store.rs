@@ -42,7 +42,7 @@ pub(crate) trait StoreLayer: crate::data::DataLayer {
     /// database's row can be: a test's, of what the store must refuse to
     /// show. A database that holds the invariant itself refuses it.
     #[cfg(test)]
-    fn line_around(&self, session: &str, at: usize, quantity: i64) -> Result<(), String>;
+    fn line_around(&self, owner: &str, at: usize, quantity: i64) -> Result<(), String>;
 }
 
 /// **The layer the server's tests serve the store on** (track `store-pg`):
@@ -187,16 +187,19 @@ pub(crate) trait Rows {
     /// **What a new line records of `item`** (ADR-0172): its name and price
     /// in the last store that lists it, and whether any store sells it now.
     fn catalog_item(&mut self, item: &str) -> Result<Option<(String, i64, bool)>, String>;
-    /// A session's cart.
-    fn cart(&mut self, session: &str) -> Result<Lines, String>;
-    fn set_cart(&mut self, session: &str, lines: &[Line]) -> Result<(), String>;
-    /// A session's order, its latest.
-    fn order(&mut self, session: &str) -> Result<Option<Order>, String>;
-    /// A session's order, placed with `lines`.
-    fn place(&mut self, session: &str, lines: &[Line]) -> Result<(), String>;
-    /// A session's order moved along, the lines it was placed with kept;
+    /// **An owner's cart** (track `store-accounts`): the owner is opaque, a
+    /// user's id where the program reads a cart by its reader's handle
+    /// (`store:data/user-carts`), or a session's where it reads one by the
+    /// session (`store:data/carts`, the benchmark's copy of the store).
+    fn cart(&mut self, owner: &str) -> Result<Lines, String>;
+    fn set_cart(&mut self, owner: &str, lines: &[Line]) -> Result<(), String>;
+    /// An owner's order, its latest.
+    fn order(&mut self, owner: &str) -> Result<Option<Order>, String>;
+    /// An owner's order, placed with `lines`.
+    fn place(&mut self, owner: &str, lines: &[Line]) -> Result<(), String>;
+    /// An owner's order moved along, the lines it was placed with kept;
     /// one set with none placed has none. `None` removes it.
-    fn set_status(&mut self, session: &str, status: Option<&str>) -> Result<(), String>;
+    fn set_status(&mut self, owner: &str, status: Option<&str>) -> Result<(), String>;
     fn notice(&mut self, store: &str) -> Result<Option<String>, String>;
     fn set_notice(&mut self, store: &str, text: &str) -> Result<(), String>;
     fn prep(&mut self, store: &str) -> Result<Option<i64>, String>;
@@ -357,6 +360,17 @@ fn own_session<'v>(op: &str, session: &str, args: &'v [Val]) -> Result<&'v [Val]
     Ok(&args[1..])
 }
 
+/// **The reader an operation by a user's handle was passed** (track
+/// `store-accounts`): the user's id, a handle on the wire (ADR-0270), which
+/// only the host makes (ADR-0263), so the program can pass no one else's.
+/// It is the owner of the rows the operation reads and writes.
+fn reader_of<'v>(op: &str, args: &'v [Val]) -> Result<(&'v str, &'v [Val]), String> {
+    match args.first() {
+        Some(Val::String(reader)) if !reader.is_empty() => Ok((reader, &args[1..])),
+        _ => Err(format!("{op} received {args:?}")),
+    }
+}
+
 /// **The session's cart operations, as its faults make them** (ADR-0174).
 /// A read waits the session's delay. The next write, and the next read,
 /// fail once each as a database that is down fails: the operation answers
@@ -373,37 +387,41 @@ pub(crate) fn faulted(
         ("remove", true),
         ("clear", true),
     ] {
-        let key = format!("store:data/carts#{name}");
-        let Some(op) = host.remove(&key) else {
-            continue;
-        };
-        let faults = cart_faults.clone();
-        let session = session.to_string();
-        host.insert(
-            key,
-            Arc::new(move |args: &[Val]| {
-                let delay = {
-                    let mut all = faults.lock().expect("cart faults");
-                    let mut mine = all.get_mut(&session);
-                    let failing = mine.as_deref_mut().is_some_and(|m| {
-                        std::mem::take(if writes {
-                            &mut m.fail_write
-                        } else {
-                            &mut m.fail_read
-                        })
-                    });
-                    if failing {
-                        return Err(format!("carts#{name}: the database is unavailable"));
+        for key in [
+            format!("store:data/carts#{name}"),
+            format!("store:data/user-carts#{name}"),
+        ] {
+            let Some(op) = host.remove(&key) else {
+                continue;
+            };
+            let faults = cart_faults.clone();
+            let session = session.to_string();
+            host.insert(
+                key,
+                Arc::new(move |args: &[Val]| {
+                    let delay = {
+                        let mut all = faults.lock().expect("cart faults");
+                        let mut mine = all.get_mut(&session);
+                        let failing = mine.as_deref_mut().is_some_and(|m| {
+                            std::mem::take(if writes {
+                                &mut m.fail_write
+                            } else {
+                                &mut m.fail_read
+                            })
+                        });
+                        if failing {
+                            return Err(format!("carts#{name}: the database is unavailable"));
+                        }
+                        mine.map(|m| if writes { 0 } else { m.delay_ms })
+                            .unwrap_or_default()
+                    };
+                    if delay > 0 {
+                        std::thread::sleep(std::time::Duration::from_millis(delay));
                     }
-                    mine.map(|m| if writes { 0 } else { m.delay_ms })
-                        .unwrap_or_default()
-                };
-                if delay > 0 {
-                    std::thread::sleep(std::time::Duration::from_millis(delay));
-                }
-                op(args)
-            }),
-        );
+                    op(args)
+                }),
+            );
+        }
     }
     host
 }
@@ -440,36 +458,67 @@ fn unfaulted(with: With, session: &str, faults: &Faults) -> Ops {
             w(&mut |r| Ok(ok(cart_value(&r.cart(&this)?))))
         }),
     );
-    // The session's order, as its status's case (E14, T04). A case the
-    // program's type does not have is refused by the component's types, as
-    // any value the host gives is.
-    let (this, w) = (session.to_string(), with.clone());
+    // **The reader's cart, by their handle** (track `store-accounts`): the
+    // user's, in every session of theirs.
+    let w = with.clone();
     ops.insert(
-        "store:data/orders#current".to_string(),
+        "store:data/user-carts#current".to_string(),
         Arc::new(move |args: &[Val]| {
-            own_session("orders#current", &this, args)?;
-            w(&mut |r| {
-                let status = r
-                    .order(&this)?
-                    .map(|o| Box::new(Val::Variant(o.status, None)));
-                Ok(ok(Val::Option(status)))
-            })
+            let (reader, rest) = reader_of("user-carts#current", args)?;
+            if !rest.is_empty() {
+                return Err(format!("user-carts#current received {args:?}"));
+            }
+            w(&mut |r| Ok(ok(cart_value(&r.cart(reader)?))))
         }),
     );
-    // **And the lines it was placed with** (ADR-0193), a cart's value, or
-    // none before one is placed. No program reads it yet; the store's tests
-    // read an order through it.
-    let (this, w) = (session.to_string(), with.clone());
-    ops.insert(
-        "store:data/orders#placed".to_string(),
-        Arc::new(move |args: &[Val]| {
-            own_session("orders#placed", &this, args)?;
-            w(&mut |r| {
-                let cart = r.order(&this)?.map(|o| Box::new(cart_value(&o.lines)));
-                Ok(vec![Val::Option(cart)])
-            })
-        }),
-    );
+    // The order, as its status's case (E14, T04). A case the program's
+    // type does not have is refused by the component's types, as any value
+    // the host gives is. **And the lines it was placed with** (ADR-0193), a
+    // cart's value, or none before one is placed: no program reads it yet,
+    // and the store's tests read an order through it.
+    //
+    // By the session (`store:data/orders`, the benchmark's copy of the store)
+    // and by the reader's handle (`store:data/user-orders`, track
+    // `store-accounts`): a user's order is read by its user alone, as a
+    // notification is (ADR-0274).
+    for (interface, by_reader) in [("orders", false), ("user-orders", true)] {
+        let (this, w) = (session.to_string(), with.clone());
+        ops.insert(
+            format!("store:data/{interface}#current"),
+            Arc::new(move |args: &[Val]| {
+                let op = format!("{interface}#current");
+                let owner = if by_reader {
+                    reader_of(&op, args)?.0
+                } else {
+                    own_session(&op, &this, args)?;
+                    this.as_str()
+                };
+                w(&mut |r| {
+                    let status = r
+                        .order(owner)?
+                        .map(|o| Box::new(Val::Variant(o.status, None)));
+                    Ok(ok(Val::Option(status)))
+                })
+            }),
+        );
+        let (this, w) = (session.to_string(), with.clone());
+        ops.insert(
+            format!("store:data/{interface}#placed"),
+            Arc::new(move |args: &[Val]| {
+                let op = format!("{interface}#placed");
+                let owner = if by_reader {
+                    reader_of(&op, args)?.0
+                } else {
+                    own_session(&op, &this, args)?;
+                    this.as_str()
+                };
+                w(&mut |r| {
+                    let cart = r.order(owner)?.map(|o| Box::new(cart_value(&o.lines)));
+                    Ok(vec![Val::Option(cart)])
+                })
+            }),
+        );
+    }
     // The session's delivery estimate (E14, T10), after the estimator's
     // delay: a slow source, which a streamed region does not wait for.
     let estimator = faults
@@ -728,27 +777,38 @@ pub(crate) fn writes(
     // operation the interface declares, whichever command is running; the
     // host links only those the component imports and was granted.
     type Change = fn(&mut dyn Rows, &mut Lines, &[Val]) -> Result<(), String>;
+    //
+    // Each by the session (`store:data/carts`, the benchmark's copy of the
+    // store) and by the reader's handle (`store:data/user-carts`, track
+    // `store-accounts`): the same change, to the rows of the owner each
+    // names.
     let mut cart = |name: &'static str, change: Change| {
-        let (this, w, written) = (session.to_string(), with.clone(), written.clone());
-        ops.insert(
-            format!("store:data/carts#{name}"),
-            Arc::new(move |args: &[Val]| {
-                let op = format!("carts#{name}");
-                let rest = own_session(&op, &this, args)?;
-                if fail {
-                    return Ok(declared("cart-expired"));
-                }
-                w(&mut |r| {
-                    let mut lines = r.cart(&this)?;
-                    change(r, &mut lines, rest)?;
-                    r.set_cart(&this, &lines)?;
-                    let mut written = written.lock().expect("written");
-                    written.wrote = true;
-                    written.cart_total = Some(lines.iter().map(|l| l.quantity).sum());
-                    Ok(ok(cart_value(&lines)))
-                })
-            }),
-        );
+        for (interface, by_reader) in [("carts", false), ("user-carts", true)] {
+            let (this, w, written) = (session.to_string(), with.clone(), written.clone());
+            ops.insert(
+                format!("store:data/{interface}#{name}"),
+                Arc::new(move |args: &[Val]| {
+                    let op = format!("{interface}#{name}");
+                    let (owner, rest) = if by_reader {
+                        reader_of(&op, args)?
+                    } else {
+                        (this.as_str(), own_session(&op, &this, args)?)
+                    };
+                    if fail {
+                        return Ok(declared("cart-expired"));
+                    }
+                    w(&mut |r| {
+                        let mut lines = r.cart(owner)?;
+                        change(r, &mut lines, rest)?;
+                        r.set_cart(owner, &lines)?;
+                        let mut written = written.lock().expect("written");
+                        written.wrote = true;
+                        written.cart_total = Some(lines.iter().map(|l| l.quantity).sum());
+                        Ok(ok(cart_value(&lines)))
+                    })
+                }),
+            );
+        }
     };
     cart("add", |r, lines, args| {
         let [Val::String(item), Val::S64(quantity)] = args else {
@@ -807,28 +867,38 @@ pub(crate) fn writes(
     // is emptied, in the command's own transaction. An empty cart places
     // nothing, and says so. Until 2026-10-08 the order kept its status
     // alone, and its lines went with the emptied cart.
-    let (this, w, placed) = (session.to_string(), with.clone(), written.clone());
-    ops.insert(
-        "store:data/orders#place".to_string(),
-        Arc::new(move |args: &[Val]| {
-            let rest = own_session("orders#place", &this, args)?;
-            if !rest.is_empty() {
-                return Err(format!("orders#place received {args:?}"));
-            }
-            w(&mut |r| {
-                let lines = r.cart(&this)?;
-                if lines.is_empty() {
-                    return Ok(declared("nothing-to-order"));
+    //
+    // By the session, and by the reader's handle (track `store-accounts`):
+    // a user's order is placed from the user's cart.
+    for (interface, by_reader) in [("orders", false), ("user-orders", true)] {
+        let (this, w, placed) = (session.to_string(), with.clone(), written.clone());
+        ops.insert(
+            format!("store:data/{interface}#place"),
+            Arc::new(move |args: &[Val]| {
+                let op = format!("{interface}#place");
+                let (owner, rest) = if by_reader {
+                    reader_of(&op, args)?
+                } else {
+                    (this.as_str(), own_session(&op, &this, args)?)
+                };
+                if !rest.is_empty() {
+                    return Err(format!("{op} received {args:?}"));
                 }
-                r.place(&this, &lines)?;
-                r.set_cart(&this, &[])?;
-                let mut written = placed.lock().expect("written");
-                written.wrote = true;
-                written.cart_total = Some(0);
-                Ok(ok(Val::Variant("placed".into(), None)))
-            })
-        }),
-    );
+                w(&mut |r| {
+                    let lines = r.cart(owner)?;
+                    if lines.is_empty() {
+                        return Ok(declared("nothing-to-order"));
+                    }
+                    r.place(owner, &lines)?;
+                    r.set_cart(owner, &[])?;
+                    let mut written = placed.lock().expect("written");
+                    written.wrote = true;
+                    written.cart_total = Some(0);
+                    Ok(ok(Val::Variant("placed".into(), None)))
+                })
+            }),
+        );
+    }
     // Whether an item can be ordered now (charter §15.4), read inside the
     // command that adds it. One no store's menu has is not (ADR-0172): a page
     // sends the item it showed, and a request can name any.
@@ -934,22 +1004,45 @@ fn host_writes(with: With, session: &str, written: Arc<Mutex<Written>>) -> Ops {
         }
         other => Err(format!("menus#replace received {other:?}")),
     });
-    // **The kitchen moves the session's order along** (E14, T04; ADR-0193),
-    // or removes it.
-    write("orders#set-status", |r, this, args| {
-        let rest = own_session("orders#set-status", this, args)?;
-        match rest {
-            [Val::Option(status)] => {
-                let status = match status.as_deref() {
-                    Some(Val::String(s)) => Some(s.as_str()),
-                    None => None,
-                    Some(other) => return Err(format!("orders#set-status received {other:?}")),
-                };
-                r.set_status(this, status)?;
-                Ok(Ok(None))
-            }
-            other => Err(format!("orders#set-status received {other:?}")),
+    // **The kitchen moves an owner's order along** (E14, T04; ADR-0193),
+    // or removes it: the owner the program reads its order by, the user's id
+    // or the session (track `store-accounts`), as the host's route names it.
+    write("orders#set-status", |r, _, args| match args {
+        [Val::String(owner), Val::Option(status)] if !owner.is_empty() => {
+            let status = match status.as_deref() {
+                Some(Val::String(s)) => Some(s.as_str()),
+                None => None,
+                Some(other) => return Err(format!("orders#set-status received {other:?}")),
+            };
+            r.set_status(owner, status)?;
+            Ok(Ok(None))
         }
+        other => Err(format!("orders#set-status received {other:?}")),
+    });
+    // **A guest's cart joins its user's at sign-in** (track `store-accounts`,
+    // ADR-XXXX; docs/PARALLEL.md, Q2): each of the guest's lines added to the
+    // user's, the quantities of one item summed, a sum past what a line can
+    // hold (a bigint) refused rather than wrapped; the guest's cart emptied.
+    // `false` where the guest has nothing to join, and nothing commits: run
+    // again, a join finds nothing.
+    write("carts#join", |r, _, args| match args {
+        [Val::String(guest), Val::String(user)] if !guest.is_empty() && !user.is_empty() => {
+            if guest == user {
+                return Ok(Ok(Some(Val::Bool(false))));
+            }
+            let joining = r.cart(guest)?;
+            if joining.is_empty() {
+                return Ok(Ok(Some(Val::Bool(false))));
+            }
+            let mut lines = r.cart(user)?;
+            if let Err(why) = joined(&mut lines, &joining) {
+                return Ok(Err(why));
+            }
+            r.set_cart(user, &lines)?;
+            r.set_cart(guest, &[])?;
+            Ok(Ok(Some(Val::Bool(true))))
+        }
+        other => Err(format!("carts#join received {other:?}")),
     });
     // The store's staff post a notice (E14, T09).
     write("notices#post", |r, _, args| match args {
@@ -1007,6 +1100,31 @@ fn host_writes(with: With, session: &str, written: Arc<Mutex<Written>>) -> Ops {
         }
     });
     ops
+}
+
+/// **A guest's lines added to a user's** (track `store-accounts`, ADR-XXXX):
+/// in the guest's order, each item's quantities summed on the user's line
+/// that holds it, or the guest's line appended as it recorded the item
+/// (ADR-0172). A sum is a `PositiveInt` (ADR-0179), at least one, and a
+/// line holds at most what a bigint does: past it the join is refused, and
+/// nothing moves.
+pub(crate) fn joined(lines: &mut Lines, joining: &[Line]) -> Result<(), String> {
+    let mut out = lines.clone();
+    for line in joining {
+        match out.iter_mut().find(|l| l.item == line.item) {
+            Some(held) => {
+                held.quantity = held.quantity.checked_add(line.quantity).ok_or_else(|| {
+                    format!(
+                        "the cart cannot hold {} and {} more of `{}`",
+                        held.quantity, line.quantity, line.item
+                    )
+                })?;
+            }
+            None => out.push(line.clone()),
+        }
+    }
+    *lines = out;
+    Ok(())
 }
 
 impl MenuOp {
@@ -1149,12 +1267,15 @@ impl State {
     }
 }
 
-/// **The in-memory layer's rows, for one session** (track `store-pg`): its
-/// cart, and the rest of the store, as a read saw them or a command stages
-/// them. A command's are committed by [`Staging`]'s `publish`.
+/// **The in-memory layer's rows** (track `store-pg`): the carts, and the
+/// rest of the store, as a read saw them or a command stages them. A
+/// command's are committed by [`Staging`]'s `publish`. Track
+/// `store-accounts`: every owner's cart, as last committed, and the carts the
+/// command wrote, so that one command may write two owners' (a guest's cart
+/// joining its user's).
 struct MemRows {
-    session: String,
-    lines: Lines,
+    carts: Arc<BTreeMap<String, Lines>>,
+    staged: BTreeMap<String, Lines>,
     state: Arc<State>,
 }
 
@@ -1196,17 +1317,16 @@ impl Rows for MemRows {
         }
         Ok(found.map(|(name, price)| (name, price, can)))
     }
-    fn cart(&mut self, session: &str) -> Result<Lines, String> {
-        if session != self.session {
-            return Err("a cart is read for its own session".to_string());
-        }
-        Ok(self.lines.clone())
+    fn cart(&mut self, owner: &str) -> Result<Lines, String> {
+        Ok(self
+            .staged
+            .get(owner)
+            .or_else(|| self.carts.get(owner))
+            .cloned()
+            .unwrap_or_default())
     }
-    fn set_cart(&mut self, session: &str, lines: &[Line]) -> Result<(), String> {
-        if session != self.session {
-            return Err("a cart is written for its own session".to_string());
-        }
-        self.lines = lines.to_vec();
+    fn set_cart(&mut self, owner: &str, lines: &[Line]) -> Result<(), String> {
+        self.staged.insert(owner.to_string(), lines.to_vec());
         Ok(())
     }
     fn order(&mut self, session: &str) -> Result<Option<Order>, String> {
@@ -1279,12 +1399,14 @@ fn with_mem(rows: Arc<Mutex<MemRows>>) -> With {
 /// one the browser suite runs on.
 pub(crate) struct StoreData {
     faults: Faults,
-    /// Per-session cart lines — `(item, quantity)` — behind the
-    /// materializer's command boundary. This is the deployment's DATA LAYER:
-    /// `store:data/carts#add` is its operation, and the compiled command
-    /// calls it through the host. Its lock is held from a command's first
-    /// operation to its commit: one command at a time.
-    carts: Mutex<BTreeMap<String, Lines>>,
+    /// Each owner's cart lines (track `store-accounts`: a user's, or a
+    /// session's for a program that keys its cart by the session), behind
+    /// the materializer's command boundary. This is the deployment's DATA
+    /// LAYER: `store:data/user-carts#add` is its operation, and the compiled
+    /// command calls it through the host. Its lock is held from a command's
+    /// first operation to its commit: one command at a time. Behind an
+    /// `Arc`, so a read or a command takes every cart for the price of one.
+    carts: Mutex<Arc<BTreeMap<String, Lines>>>,
     /// **The rest of the store** (track `store-pg`): its stores and menus,
     /// the orders, the notice, the kitchen, the recommender's curation and
     /// the estimates. Written by a command's commit alone.
@@ -1301,7 +1423,7 @@ impl StoreData {
     pub(crate) fn new() -> StoreData {
         StoreData {
             faults: Faults::new(),
-            carts: Mutex::new(BTreeMap::new()),
+            carts: Mutex::new(Arc::new(BTreeMap::new())),
             state: Mutex::new(Arc::new(State::seed())),
         }
     }
@@ -1313,8 +1435,8 @@ impl StoreData {
     pub(crate) fn begin(&self, session: &str, fail: bool) -> Staging<'_> {
         let carts = self.carts.lock().expect("carts");
         let rows = Arc::new(Mutex::new(MemRows {
-            session: session.to_string(),
-            lines: carts.get(session).cloned().unwrap_or_default(),
+            carts: carts.clone(),
+            staged: BTreeMap::new(),
             state: self.state.lock().expect("state").clone(),
         }));
         let written: Arc<Mutex<Written>> = Arc::default();
@@ -1341,7 +1463,7 @@ pub(crate) struct Staging<'a> {
     store: &'a StoreData,
     session: String,
     /// Held from the call until the commit is published.
-    carts: std::sync::MutexGuard<'a, BTreeMap<String, Lines>>,
+    carts: std::sync::MutexGuard<'a, Arc<BTreeMap<String, Lines>>>,
     rows: Arc<Mutex<MemRows>>,
     written: Arc<Mutex<Written>>,
     ops: Ops,
@@ -1365,8 +1487,11 @@ impl crate::data::Staged for Staging<'_> {
             return;
         }
         let rows = self.rows.lock().expect("rows");
-        if written.cart_total.is_some() {
-            self.carts.insert(self.session.clone(), rows.lines.clone());
+        if !rows.staged.is_empty() {
+            let carts = Arc::make_mut(&mut self.carts);
+            for (owner, lines) in &rows.staged {
+                carts.insert(owner.clone(), lines.clone());
+            }
         }
         *self.store.state.lock().expect("state") = rows.state.clone();
     }
@@ -1377,14 +1502,8 @@ impl crate::data::DataLayer for StoreData {
         // What a query reads is the store as it is now: the session's cart,
         // and the rest, as their last commit left them.
         let rows = MemRows {
-            session: session.to_string(),
-            lines: self
-                .carts
-                .lock()
-                .expect("carts")
-                .get(session)
-                .cloned()
-                .unwrap_or_default(),
+            carts: self.carts.lock().expect("carts").clone(),
+            staged: BTreeMap::new(),
             state: self.state.lock().expect("state").clone(),
         };
         reads(
@@ -1423,13 +1542,52 @@ impl StoreLayer for StoreData {
     }
 
     #[cfg(test)]
-    fn line_around(&self, session: &str, at: usize, quantity: i64) -> Result<(), String> {
+    fn line_around(&self, owner: &str, at: usize, quantity: i64) -> Result<(), String> {
         let mut carts = self.carts.lock().expect("carts");
-        let line = carts
-            .get_mut(session)
+        let line = Arc::make_mut(&mut carts)
+            .get_mut(owner)
             .and_then(|lines| lines.get_mut(at))
             .ok_or("no such line")?;
         line.quantity = quantity;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod joins {
+    use super::*;
+
+    fn line(item: &str, quantity: i64) -> Line {
+        Line {
+            item: item.to_string(),
+            quantity,
+            name: format!("Name of {item}"),
+            price: 100,
+        }
+    }
+
+    /// **A guest's lines added to a user's** (track `store-accounts`): one
+    /// item's quantities summed on the user's line, a new item appended as
+    /// the guest's line recorded it, in the guest's order.
+    #[test]
+    fn a_guests_lines_are_summed_into_the_users_or_appended() {
+        let mut lines = vec![line("espresso", 1), line("latte", 2)];
+        let guest = [line("cortado", 1), line("espresso", 2)];
+        joined(&mut lines, &guest).expect("joined");
+        assert_eq!(
+            lines,
+            [line("espresso", 3), line("latte", 2), line("cortado", 1)]
+        );
+    }
+
+    /// **A sum past a bigint is refused, and nothing moves**: not wrapped,
+    /// and not half joined.
+    #[test]
+    fn a_sum_past_a_bigint_is_refused_and_nothing_moves() {
+        let mut lines = vec![line("latte", 1), line("espresso", i64::MAX)];
+        let guest = [line("cortado", 1), line("espresso", 1)];
+        let why = joined(&mut lines, &guest).expect_err("refused");
+        assert!(why.contains("espresso"), "{why}");
+        assert_eq!(lines, [line("latte", 1), line("espresso", i64::MAX)]);
     }
 }

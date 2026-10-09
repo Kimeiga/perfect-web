@@ -1,7 +1,7 @@
 //! **Optimistic transitions, compiled and run** (ADR-0122).
 //!
-//! The store's `add_to_cart` declares `optimistic Cart(current_session()) as
-//! cart => Carts.with_line(cart, item, quantity)`, checked since ADR-0025 and
+//! The store's `add_to_cart` declares `optimistic Cart(current_user()) as
+//! cart => UserCarts.with_line(cart, item, quantity)`, checked since ADR-0025 and
 //! executed by nothing until 2026-10-02; a line's −, + and Remove declare
 //! theirs (ADR-0172). These compile the store page's speculation module and
 //! run it under Node: each transition the source states, over the value the
@@ -105,7 +105,8 @@ fn the_stores_transitions_run_and_its_parts_read_the_result() {
     assert_eq!(m.bindings.len(), 1);
     assert_eq!(m.bindings[0].binding, "cart");
     assert_eq!(m.bindings[0].resource, "store.page.Cart");
-    assert_eq!(m.bindings[0].key, ["current_session()"]);
+    // The reader's user's cart since track `store-accounts`.
+    assert_eq!(m.bindings[0].key, ["current_user()"]);
 
     let temp = tempfile::TempDir::with_prefix("pw-speculation-").expect("a temporary directory");
     let dir = temp.path().to_path_buf();

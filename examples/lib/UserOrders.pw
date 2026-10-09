@@ -1,0 +1,26 @@
+// @corpus: fixture
+// @id: LIB-UserOrders
+// @category: application service — a user's order
+// @charter: §15, §15.6
+// @milestone: E14
+//
+// **An order is its user's** (track `store-accounts`, ADR-XXXX): placed from
+// the user's cart and read by the user's handle alone, as a notification is
+// (ADR-0274). `Orders` keeps its session's operations, for the benchmark's
+// copy of the store.
+module UserOrders
+
+import domain.{ OrderStatus, OrderError, TrackingError }
+import capability.{ User, UserId }
+// The resources these read and write, which their modules name.
+import Carts
+import Orders
+
+// The user's order, as the store last said; none before one is placed.
+fn current(reader: User<UserId>) -> Result<Option<OrderStatus>, TrackingError> !{ database.read<Orders> }
+    host "store:data/user-orders#current"
+
+// The user's cart, placed as their order: the order is the cart's lines,
+// and the cart is empty after. An empty cart places nothing.
+fn place(reader: User<UserId>) -> Result<OrderStatus, OrderError> !{ database.write<Orders>, database.write<Carts> }
+    host "store:data/user-orders#place"

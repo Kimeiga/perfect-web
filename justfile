@@ -19,6 +19,7 @@ import 'just/uploads.just'
 import 'just/notifications.just'
 import 'just/messages.just'
 import 'just/kiokun.just'
+import 'just/store-accounts.just'
 
 default:
     @just --list
@@ -381,7 +382,7 @@ e9-values:
 # `evidence_is_current`.
 e10-component:
     @mkdir -p docs/evidence/E10
-    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart domain.line_count domain.display domain.count domain.total domain.subtotal store.page.MenuSize store.page.MenuLine; do \
+    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart UserCarts.line_count domain.display domain.count domain.total UserCarts.subtotal store.page.MenuSize store.page.MenuLine; do \
       cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
         --out "docs/evidence/E10/$id.wasm" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
@@ -462,7 +463,7 @@ e10-build:
        cargo test --locked -p pw-core --test build 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; \
        echo "Since ADR-0125 the development server runs the store's queries and"; \
-       echo "domain.line_count by pages/store.page.StorePage.json. NOT CLAIMED: their"; \
+       echo "the cart's count (UserCarts.line_count since track store-accounts) by"; echo "pages/store.page.StorePage.json. NOT CLAIMED: their"; \
        echo "policies (freshness, cache, key, concurrency); E14-Q's second slice. The"; \
        echo "four Resources.* queries are 'todo' in the library, and nothing the store"; \
        echo "builds depends on them."; \

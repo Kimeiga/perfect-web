@@ -38,6 +38,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0002_seed",
         include_str!("../migrations/store/0002_seed.sql"),
     ),
+    // Track `store-accounts`: a cart and an order are their owner's.
+    (
+        "0003_owners",
+        include_str!("../migrations/store/0003_owners.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -298,29 +303,29 @@ impl Rows for PgRows<'_> {
         Ok(row.map(|r| (r.get(0), r.get(1), r.get(2))))
     }
 
-    fn cart(&mut self, session: &str) -> Result<Lines, String> {
+    fn cart(&mut self, owner: &str) -> Result<Lines, String> {
         let rows = self
             .0
             .query(
                 "SELECT item, name, quantity, price FROM cart_lines \
-                 WHERE session = $1 ORDER BY position",
-                &[&session],
+                 WHERE owner = $1 ORDER BY position",
+                &[&owner],
             )
             .map_err(pg)?;
         Ok(rows.iter().map(line_of).collect())
     }
 
-    fn set_cart(&mut self, session: &str, lines: &[Line]) -> Result<(), String> {
+    fn set_cart(&mut self, owner: &str, lines: &[Line]) -> Result<(), String> {
         self.0
-            .execute("DELETE FROM cart_lines WHERE session = $1", &[&session])
+            .execute("DELETE FROM cart_lines WHERE owner = $1", &[&owner])
             .map_err(pg)?;
         for (position, line) in lines.iter().enumerate() {
             self.0
                 .execute(
-                    "INSERT INTO cart_lines (session, position, item, name, quantity, price) \
+                    "INSERT INTO cart_lines (owner, position, item, name, quantity, price) \
                      VALUES ($1, $2, $3, $4, $5, $6)",
                     &[
-                        &session,
+                        &owner,
                         &(position as i32),
                         &line.item,
                         &line.name,
@@ -333,12 +338,12 @@ impl Rows for PgRows<'_> {
         Ok(())
     }
 
-    fn order(&mut self, session: &str) -> Result<Option<Order>, String> {
+    fn order(&mut self, owner: &str) -> Result<Option<Order>, String> {
         let Some(order) = self
             .0
             .query_opt(
-                "SELECT id, status FROM orders WHERE session = $1 ORDER BY id DESC LIMIT 1",
-                &[&session],
+                "SELECT id, status FROM orders WHERE owner = $1 ORDER BY id DESC LIMIT 1",
+                &[&owner],
             )
             .map_err(pg)?
         else {
@@ -359,12 +364,12 @@ impl Rows for PgRows<'_> {
         }))
     }
 
-    fn place(&mut self, session: &str, lines: &[Line]) -> Result<(), String> {
+    fn place(&mut self, owner: &str, lines: &[Line]) -> Result<(), String> {
         let id: i64 = self
             .0
             .query_one(
-                "INSERT INTO orders (session, status) VALUES ($1, 'placed') RETURNING id",
-                &[&session],
+                "INSERT INTO orders (owner, status) VALUES ($1, 'placed') RETURNING id",
+                &[&owner],
             )
             .map_err(pg)?
             .get(0);
@@ -387,11 +392,11 @@ impl Rows for PgRows<'_> {
         Ok(())
     }
 
-    fn set_status(&mut self, session: &str, status: Option<&str>) -> Result<(), String> {
+    fn set_status(&mut self, owner: &str, status: Option<&str>) -> Result<(), String> {
         let Some(status) = status else {
             return self
                 .0
-                .execute("DELETE FROM orders WHERE session = $1", &[&session])
+                .execute("DELETE FROM orders WHERE owner = $1", &[&owner])
                 .map(|_| ())
                 .map_err(pg);
         };
@@ -399,15 +404,15 @@ impl Rows for PgRows<'_> {
             .0
             .execute(
                 "UPDATE orders SET status = $2, committed_in = pg_current_xact_id() \
-                 WHERE id = (SELECT max(id) FROM orders WHERE session = $1)",
-                &[&session, &status],
+                 WHERE id = (SELECT max(id) FROM orders WHERE owner = $1)",
+                &[&owner, &status],
             )
             .map_err(pg)?;
         if moved == 0 {
             self.0
                 .execute(
-                    "INSERT INTO orders (session, status) VALUES ($1, $2)",
-                    &[&session, &status],
+                    "INSERT INTO orders (owner, status) VALUES ($1, $2)",
+                    &[&owner, &status],
                 )
                 .map_err(pg)?;
         }
@@ -815,12 +820,12 @@ impl crate::store::StoreLayer for StorePg {
     }
 
     #[cfg(test)]
-    fn line_around(&self, session: &str, at: usize, quantity: i64) -> Result<(), String> {
+    fn line_around(&self, owner: &str, at: usize, quantity: i64) -> Result<(), String> {
         let changed = self
             .sql()
             .execute(
-                "UPDATE cart_lines SET quantity = $3 WHERE session = $1 AND position = $2",
-                &[&session, &(at as i32), &quantity],
+                "UPDATE cart_lines SET quantity = $3 WHERE owner = $1 AND position = $2",
+                &[&owner, &(at as i32), &quantity],
             )
             .map_err(pg)?;
         if changed == 0 {

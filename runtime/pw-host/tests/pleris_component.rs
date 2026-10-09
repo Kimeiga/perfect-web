@@ -144,7 +144,7 @@ fn stocked(calls: &Calls, add_result: Val, available: bool) -> BTreeMap<String, 
         session_calls
             .lock()
             .unwrap()
-            .push(("pw:host/session#read".into(), args.to_vec()));
+            .push(("pw:host/principal#read".into(), args.to_vec()));
         Ok(vec![Val::String("session-7".into())])
     });
     let add_calls = calls.clone();
@@ -152,7 +152,7 @@ fn stocked(calls: &Calls, add_result: Val, available: bool) -> BTreeMap<String, 
         add_calls
             .lock()
             .unwrap()
-            .push(("store:data/carts#add".into(), args.to_vec()));
+            .push(("store:data/user-carts#add".into(), args.to_vec()));
         Ok(vec![add_result.clone()])
     });
     // The outbox, which the command hands its event to (ADR-0208).
@@ -161,7 +161,7 @@ fn stocked(calls: &Calls, add_result: Val, available: bool) -> BTreeMap<String, 
         outbox_calls
             .lock()
             .unwrap()
-            .push(("pw:host/outbox#cart-changed".into(), args.to_vec()));
+            .push(("pw:host/outbox#user-cart-changed".into(), args.to_vec()));
         Ok(Vec::new())
     });
     // And the invalidations, which it hands its cart's entry to (ADR-0209).
@@ -175,10 +175,10 @@ fn stocked(calls: &Calls, add_result: Val, available: bool) -> BTreeMap<String, 
     });
     BTreeMap::from([
         ("store:data/menus#is-available".to_string(), stock),
-        ("pw:host/session#read".to_string(), read),
+        ("pw:host/principal#read".to_string(), read),
         ("pw:host/invalidations#store-page-cart".to_string(), entry),
-        ("pw:host/outbox#cart-changed".to_string(), outbox),
-        ("store:data/carts#add".to_string(), add),
+        ("pw:host/outbox#user-cart-changed".to_string(), outbox),
+        ("store:data/user-carts#add".to_string(), add),
     ])
 }
 
@@ -241,10 +241,10 @@ fn the_artifact_imports_exactly_what_its_contract_allows() {
         actual,
         [
             "pw:host/invalidations#store-page-cart",
-            "pw:host/outbox#cart-changed",
-            "pw:host/session#read",
-            "store:data/carts#add",
+            "pw:host/outbox#user-cart-changed",
+            "pw:host/principal#read",
             "store:data/menus#is-available",
+            "store:data/user-carts#add",
         ]
     );
     let c = contract();
@@ -280,7 +280,20 @@ fn an_export_not_declared_by_the_contract_cannot_be_invoked() {
 
 #[test]
 fn requires_cannot_be_bypassed_by_the_raw_call_api() {
-    let c = contract();
+    // Track `store-accounts` (ADR-XXXX): anyone fills a cart, so the store's
+    // `add_to_cart` requires no one signed in. What a command requires is its
+    // contract's, which the host evaluates: given one here, the raw call
+    // cannot pass it.
+    let mut c = contract();
+    c.exports
+        .iter_mut()
+        .find_map(|e| e.component.as_mut())
+        .expect("the command's export")
+        .authorization
+        .push(
+            serde_json::from_value(serde_json::json!({ "predicate": "SignedIn", "arguments": [] }))
+                .expect("an authorization"),
+        );
     let bytes = component();
     let granted = admitted(&c, &bytes, &ALL).expect("admitted");
     let calls: Calls = Arc::default();
@@ -365,12 +378,12 @@ fn the_compiled_command_runs_through_the_host() {
     // the session, then called the data layer with it and with its own
     // arguments, in that order.
     assert_eq!(seen.len(), 7, "{seen:?}");
-    let session = || ("pw:host/session#read".to_string(), vec![]);
+    let session = || ("pw:host/principal#read".to_string(), vec![]);
     let given = |op: &str| (op.to_string(), vec![Val::String("session-7".into())]);
     assert_eq!(seen[0], session());
     assert_eq!(seen[1], given("pw:host/invalidations#store-page-cart"));
     assert_eq!(seen[2], session());
-    assert_eq!(seen[3], given("pw:host/outbox#cart-changed"));
+    assert_eq!(seen[3], given("pw:host/outbox#user-cart-changed"));
     assert_eq!(
         seen[4],
         (
@@ -382,7 +395,7 @@ fn the_compiled_command_runs_through_the_host() {
     assert_eq!(
         seen[6],
         (
-            "store:data/carts#add".to_string(),
+            "store:data/user-carts#add".to_string(),
             vec![
                 Val::String("session-7".into()),
                 Val::String("cortado".into()),
@@ -433,14 +446,14 @@ fn an_item_that_cannot_be_ordered_is_refused_before_anything_is_written() {
     assert_eq!(
         *calls.lock().unwrap(),
         [
-            ("pw:host/session#read".to_string(), vec![]),
+            ("pw:host/principal#read".to_string(), vec![]),
             (
                 "pw:host/invalidations#store-page-cart".to_string(),
                 vec![Val::String("session-7".into())]
             ),
-            ("pw:host/session#read".to_string(), vec![]),
+            ("pw:host/principal#read".to_string(), vec![]),
             (
-                "pw:host/outbox#cart-changed".to_string(),
+                "pw:host/outbox#user-cart-changed".to_string(),
                 vec![Val::String("session-7".into())]
             ),
             (
@@ -490,7 +503,7 @@ fn a_node_without_the_write_capability_does_not_admit_it() {
 #[test]
 fn an_ungranted_operation_is_refused_by_the_engine() {
     // The contract without the write: the host links only what is granted, so
-    // `carts#add` has no definition and the ENGINE refuses to instantiate —
+    // `user-carts#add` has no definition and the ENGINE refuses to instantiate —
     // in its own words, naming the interface.
     let mut c = contract();
     c.required_capabilities
@@ -511,7 +524,7 @@ fn an_ungranted_operation_is_refused_by_the_engine() {
     )
     .expect_err("the write is not linked");
     println!("ungranted write refused by the engine: {err}");
-    assert!(err.contains("store:data/carts"), "{err}");
+    assert!(err.contains("store:data/user-carts"), "{err}");
     assert!(calls.lock().unwrap().is_empty(), "nothing ran");
 }
 
@@ -522,7 +535,7 @@ fn a_granted_operation_the_host_does_not_implement_is_refused() {
     let granted = admitted(&c, &bytes, &ALL).expect("admitted");
     let calls: Calls = Arc::default();
     let mut ops = host(&calls, Val::Bool(false));
-    ops.remove("store:data/carts#add");
+    ops.remove("store:data/user-carts#add");
     let [interface, function] = export(&c);
     let err = authorized_call(
         &bytes,
@@ -729,7 +742,7 @@ fn a_data_layer_answer_that_breaks_an_invariant_is_the_commands_failure() {
     let why = run(0).expect_err("a line of 0 is no cart");
     assert!(
         why.contains(
-            "`store:data/carts#add` answered what breaks an invariant: value 1's \
+            "`store:data/user-carts#add` answered what breaks an invariant: value 1's \
                       `ok.lines[0].quantity` is 0, and `domain.PositiveInt` holds `value >= 1`"
         ),
         "{why}"

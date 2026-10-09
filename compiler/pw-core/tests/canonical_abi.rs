@@ -137,11 +137,13 @@ fn a_string_parameter_is_two_core_parameters_and_a_result_is_a_pointer() {
             .unwrap_or_else(|| panic!("no operation {k} in {:?}", flat.iter().map(|f| &f.0)))
     };
 
-    // `add: func(session: string, item: string, quantity: s64) -> string`
+    // `add: func(reader: string, item: string, quantity: s64) -> string`
     //   two strings  -> four core parameters
     //   one s64      -> one
     //   the result   -> a return pointer, and NO core result
-    let add = by("carts#add");
+    // (A user's cart since track `store-accounts`; a session's before, the
+    // same flattening.)
+    let add = by("user-carts#add");
     assert_eq!(add.params.len(), 6, "{:?}", add.params);
     assert!(add.results.is_empty(), "{:?}", add.results);
     assert!(add.retptr, "the result arrives through a pointer");
@@ -149,7 +151,7 @@ fn a_string_parameter_is_two_core_parameters_and_a_result_is_a_pointer() {
     // And the discriminator: an operation with no parameters at all still takes
     // one, because the return pointer is a parameter. A layer that thought
     // "no arguments" meant "no core parameters" would be wrong here.
-    let read = by("session#read");
+    let read = by("principal#read");
     assert_eq!(read.params.len(), 1, "{:?}", read.params);
     assert!(read.retptr);
 
@@ -191,9 +193,12 @@ fn the_emitted_interface_is_the_contracts_signature_and_the_core_cannot_tell() {
     let contract_sig = cs
         .iter()
         .flat_map(|c| &c.imports)
-        .find(|i| i.key() == "store:data/carts#current")
+        .find(|i| i.key() == "store:data/user-carts#current")
         .and_then(|i| i.signature.as_ref())
         .expect("the contract carries it");
+    // Track `store-accounts` (ADR-XXXX): the store reads a user's cart, by
+    // the reader's handle, `User<UserId>`, which the WIT sees as
+    // `capability-user-id`, as it saw a session's as `capability-session-id`.
     // The contract keeps the label: `Session<SessionId>` since 2026-09-24,
     // when the value relations refused `Carts.current(current_session())`
     // against a parameter declared as the unlabelled `SessionId`. The WIT
@@ -202,9 +207,9 @@ fn the_emitted_interface_is_the_contracts_signature_and_the_core_cannot_tell() {
     assert_eq!(
         contract_sig.params,
         vec![pw_core::resolved::StableTypeId::Declared {
-            path: "capability.Session".into(),
+            path: "capability.User".into(),
             args: vec![pw_core::resolved::StableTypeId::Declared {
-                path: "capability.SessionId".into(),
+                path: "capability.UserId".into(),
                 args: vec![]
             }]
         }]
@@ -215,7 +220,7 @@ fn the_emitted_interface_is_the_contracts_signature_and_the_core_cannot_tell() {
             ctor: "Result".into(),
             args: vec![
                 pw_core::resolved::StableTypeId::Declared {
-                    path: "domain.Cart".into(),
+                    path: "UserCarts.UserCart".into(),
                     args: vec![]
                 },
                 pw_core::resolved::StableTypeId::Declared {
@@ -227,7 +232,7 @@ fn the_emitted_interface_is_the_contracts_signature_and_the_core_cannot_tell() {
     );
     assert!(
         text.contains(
-            "current: func(arg0: capability-session-id) -> result<domain-cart, domain-cart-error>;"
+            "current: func(arg0: capability-user-id) -> result<user-carts-user-cart, domain-cart-error>;"
         ),
         "the emitted interface is that signature, not a second opinion about it"
     );
@@ -247,7 +252,7 @@ fn the_emitted_interface_is_the_contracts_signature_and_the_core_cannot_tell() {
             })
     };
     let exported = by("resources-cart-api#cart");
-    let imported = by("carts#current");
+    let imported = by("user-carts#current");
     assert_eq!(
         (&exported.params, &exported.results, exported.retptr),
         (&imported.params, &imported.results, imported.retptr),
@@ -296,6 +301,9 @@ fn the_compiler_can_render_every_host_operations_wit_from_its_declaration() {
         "store:data/carts#add",
         "store:data/carts#clear",
         "store:data/carts#current",
+        "store:data/user-carts#add",
+        "store:data/user-carts#clear",
+        "store:data/user-carts#current",
         "store:data/stores#get",
         "store:data/menus#for-store",
     ] {
@@ -309,10 +317,13 @@ fn the_compiler_can_render_every_host_operations_wit_from_its_declaration() {
     // And it is the CONTRACT's ABI, not the deployment's: a `result<…>` where
     // the published stand-in says `string`. The disagreement as the two texts
     // rather than as two type names.
-    let add = rendered["store:data/carts#add"].as_ref().expect("renders");
+    // The store's own since track `store-accounts`: a user's cart's.
+    let add = rendered["store:data/user-carts#add"]
+        .as_ref()
+        .expect("renders");
     assert!(
-        add.contains("result<domain-cart, domain-cart-error>"),
-        "the compiler's rendering of `carts#add` returns the declared result: {add}"
+        add.contains("result<user-carts-user-cart, domain-cart-error>"),
+        "the compiler's rendering of `user-carts#add` returns the declared result: {add}"
     );
     // And it is what the emitted package publishes, verbatim — one authority,
     // so the rendering and the artifact cannot drift.

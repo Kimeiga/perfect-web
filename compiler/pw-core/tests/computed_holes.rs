@@ -523,11 +523,12 @@ fn a_member_an_imported_module_lacks_does_not_resolve() {
     };
     assert_eq!(store(&|s| s.to_string()), Vec::<String>::new());
     assert_eq!(
+        // A user's cart's transitions since track `store-accounts`.
         store(&|s| s.replacen(
-            "Carts.with_line(cart, item, quantity)",
-            "Carts.nope(cart)",
+            "UserCarts.with_line(cart, item, quantity)",
+            "UserCarts.nope(cart)",
             1
         )),
-        ["PW0021 `Carts.nope` does not resolve"]
+        ["PW0021 `UserCarts.nope` does not resolve"]
     );
 }

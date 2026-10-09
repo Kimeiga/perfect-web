@@ -4,10 +4,10 @@
 //! showed it, each field by its Pleris name. The host reads each by the
 //! parameter types the artifact declares: a record field by field, a list
 //! element by element. The store's `add_to_cart` takes a record and no list,
-//! so the list is read here, through the compiled `domain.subtotal`, whose
-//! `Cart` holds its `lines`.
+//! so the list is read here, through the compiled `UserCarts.subtotal`, whose
+//! `UserCart` holds its `lines` (a user's cart since track `store-accounts`).
 //!
-//! The component is `docs/evidence/E10/domain.subtotal.wasm`, held to the
+//! The component is `docs/evidence/E10/UserCarts.subtotal.wasm`, held to the
 //! compiler's output by `pw-core`'s `evidence_is_current`.
 
 #![cfg(feature = "engine")]
@@ -21,7 +21,7 @@ fn root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-const ID: &str = "domain.subtotal";
+const ID: &str = "UserCarts.subtotal";
 
 fn component() -> Vec<u8> {
     let path = root().join(format!("docs/evidence/E10/{ID}.wasm"));

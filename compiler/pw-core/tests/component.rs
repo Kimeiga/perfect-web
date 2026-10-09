@@ -141,20 +141,21 @@ fn add_to_cart_compiles_to_a_component_an_independent_validator_accepts() {
 #[test]
 fn the_component_imports_exactly_the_operations_the_function_calls() {
     let (_, component) = add_to_cart();
-    // `store:data/carts` declares `add`, `clear` and `current`, and
-    // `store:data/menus` `for-store`, `is-available` and more. The command
-    // reads the session for its entry's and its event's keys, hands its cart's
-    // entry to the invalidations and `CartChanged` to the outbox (ADR-0208,
-    // ADR-0209), asks whether the item can be ordered (ADR-0157), and calls
-    // `add`: exactly those five.
+    // `store:data/user-carts` declares `add`, `clear`, `current` and more,
+    // and `store:data/menus` `for-store`, `is-available` and more. The
+    // command reads the reader for its entry's and its event's keys, hands
+    // its cart's entry to the invalidations and `UserCartChanged` to the
+    // outbox (ADR-0208, ADR-0209), asks whether the item can be ordered
+    // (ADR-0157), and calls `add`: exactly those five. (The reader's user
+    // since track `store-accounts`; the session before.)
     assert_eq!(
         component.imports,
         [
-            "pw:host/session#read",
+            "pw:host/principal#read",
             "pw:host/invalidations#store-page-cart",
-            "pw:host/outbox#cart-changed",
+            "pw:host/outbox#user-cart-changed",
             "store:data/menus#is-available",
-            "store:data/carts#add"
+            "store:data/user-carts#add"
         ],
         "the core module's own import list"
     );
@@ -165,28 +166,28 @@ fn the_component_has_exactly_the_types_its_world_fixed() {
     let (c, component) = add_to_cart();
     let compared = component::audit(&component.bytes, &c.wit, &component.world)
         .unwrap_or_else(|wrong| panic!("the component disagrees with its world: {wrong:#?}"));
-    // `menus#is-available`, `session#read`, `invalidations#store-page-cart`,
-    // `outbox#cart-changed`, `carts#add` and `add-to-cart`: an audit that
+    // `menus#is-available`, `principal#read`, `invalidations#store-page-cart`,
+    // `outbox#user-cart-changed`, `user-carts#add` and `add-to-cart`: an audit that
     // compared nothing would agree with anything.
     assert_eq!(compared, 6, "the audit compared {compared} functions");
 }
 
-/// The WIT with `carts#add` returning a store instead of a cart. At the core
+/// The WIT with `user-carts#add` returning a store instead of a cart. At the core
 /// level the two are identical — both results are returned through a pointer
 /// — which is exactly why the checks below must be component-level.
 fn with_add_returning_a_store(wit: &str) -> String {
-    let original = "add: func(arg0: capability-session-id, arg1: domain-menu-item-id, arg2: \
-                    domain-positive-int) -> result<domain-cart, domain-cart-error>;";
+    let original = "add: func(arg0: capability-user-id, arg1: domain-menu-item-id, arg2: \
+                    domain-positive-int) -> result<user-carts-user-cart, domain-cart-error>;";
     assert!(wit.contains(original), "the control's anchor moved");
     wit.replace(
         original,
-        "add: func(arg0: capability-session-id, arg1: domain-menu-item-id, arg2: \
+        "add: func(arg0: capability-user-id, arg1: domain-menu-item-id, arg2: \
          domain-positive-int) -> result<domain-store, domain-store-error>;",
     )
     .replace(
-        "use pw:types/types.{capability-session-id, domain-cart, domain-cart-error, \
+        "use pw:types/types.{user-carts-user-cart, capability-user-id, domain-cart-error, \
          domain-menu-item-id, domain-positive-int};",
-        "use pw:types/types.{capability-session-id, domain-cart, domain-cart-error, \
+        "use pw:types/types.{user-carts-user-cart, capability-user-id, domain-cart-error, \
          domain-menu-item-id, domain-positive-int, domain-store, domain-store-error};",
     )
 }
@@ -204,26 +205,26 @@ fn an_import_whose_component_type_differs_is_refused_though_its_core_type_does_n
         .iter()
         .find_map(|(k, i)| match i {
             wit_parser::WorldItem::Interface { id, .. }
-                if resolve.name_world_key(k) == "store:data/carts" =>
+                if resolve.name_world_key(k) == "store:data/user-carts" =>
             {
                 resolve.interfaces[*id].functions.get("add").cloned()
             }
             _ => None,
         })
-        .expect("carts#add");
+        .expect("user-carts#add");
     let (orig_resolve, orig_world) = component::world_of(&c.wit, &component.world).expect("WIT");
     let orig_add = orig_resolve.worlds[orig_world]
         .imports
         .iter()
         .find_map(|(k, i)| match i {
             wit_parser::WorldItem::Interface { id, .. }
-                if orig_resolve.name_world_key(k) == "store:data/carts" =>
+                if orig_resolve.name_world_key(k) == "store:data/user-carts" =>
             {
                 orig_resolve.interfaces[*id].functions.get("add").cloned()
             }
             _ => None,
         })
-        .expect("carts#add");
+        .expect("user-carts#add");
     assert_eq!(
         resolve.wasm_signature(wit_parser::abi::AbiVariant::GuestImport, &add),
         orig_resolve.wasm_signature(wit_parser::abi::AbiVariant::GuestImport, &orig_add),
@@ -251,9 +252,11 @@ fn an_import_whose_component_type_differs_is_refused_though_its_core_type_does_n
     // 2. The audit refuses the REAL artifact against the mutated world, and
     //    names the operation.
     let wrong = component::audit(&component.bytes, &mutated, &component.world)
-        .expect_err("the artifact's carts#add is not the mutated world's");
+        .expect_err("the artifact's user-carts#add is not the mutated world's");
     assert!(
-        wrong.iter().any(|w| w.contains("store:data/carts#add")),
+        wrong
+            .iter()
+            .any(|w| w.contains("store:data/user-carts#add")),
         "{wrong:#?}"
     );
 }
