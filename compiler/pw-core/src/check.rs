@@ -231,6 +231,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             out.extend(crate::uploads::check(&hirs, i));
             // ADR-0163: a page says when its address names nothing.
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
+            // ADR-XXXX: and when it is another address of the page.
+            out.extend(redirect_names_a_case(&u.hir, i, &sigs, &workspace));
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
             out.extend(check_unit_with(
                 &labels,
@@ -382,6 +384,156 @@ fn not_found_names_a_case(
                     decl.name
                 ),
                 "name an error a query the page reads declares",
+            ));
+        }
+    }
+    out
+}
+
+/// **A page says when its address is another address of the page**
+/// (ADR-XXXX, PW0350): `redirect_on Type.Case permanent` (or `temporary`) is
+/// a page's, names a case of a declared type that a query the page reads can
+/// answer, and is not the case its `not_found_on` names. The case carries
+/// one value, of the type of the one parameter the page's route carries,
+/// and the host answers 308 (or 307) to the route filled with it. Otherwise
+/// the clause would never fire, or the host could not say where the page is.
+fn redirect_names_a_case(
+    hir: &Hir,
+    unit: usize,
+    sigs: &Signatures,
+    ws: &crate::resolve::Workspace,
+) -> Vec<Diagnostic> {
+    let code = crate::codes::REDIRECT_NAMES_A_CASE;
+    let mut out = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        let Some(p) = decl.policy("redirect_on") else {
+            continue;
+        };
+        let value = p.value.trim();
+        let refused = |message: String, repair: &str| Diagnostic {
+            code: code.id,
+            invariant: code.invariant,
+            reason: "redirect_names_a_case",
+            detector: Detector::DeclarationRule,
+            severity: Severity::Error,
+            message,
+            primary_span: p.span.clone(),
+            related: vec![Related {
+                span: hir.decl_span(id),
+                label: format!("a policy of `{}`", decl.name),
+            }],
+            explanation: Some(
+                "A page whose address is another address of the page, as a dictionary's \
+                 simplified form is its traditional one's, answers a redirect there: 308 \
+                 where the move is permanent, 307 where it is not. Only the page can say \
+                 which of its queries' declared errors means that, and what it carries \
+                 must fill the page's route (ADR-XXXX)."
+                    .to_string(),
+            ),
+            repairs: vec![Repair {
+                description: repair.to_string(),
+                replacement: None,
+            }],
+        };
+        if decl.kind != DeclKind::Page {
+            out.push(refused(
+                format!(
+                    "`redirect_on {value}` is a page's: `{}` is not one",
+                    decl.name
+                ),
+                "move it to the page whose address it is about",
+            ));
+            continue;
+        }
+        let (ty, case, _) = match crate::routes::redirect_case(ws, sigs, unit, decl) {
+            Ok(Some(found)) => found,
+            Ok(None) => continue,
+            Err(why) => {
+                out.push(refused(
+                    format!("`redirect_on {value}`: {why}"),
+                    "name a case of a declared error and how it moves: \
+                     `KiokunError.Moved permanent`",
+                ));
+                continue;
+            }
+        };
+        if let Ok(Some((absent, absent_case))) = crate::routes::not_found_case(ws, sigs, unit, decl)
+            && absent == ty
+            && absent_case == case
+        {
+            out.push(refused(
+                format!(
+                    "`redirect_on {value}`: `{case}` is the case `not_found_on` names, and a \
+                     page that is absent is not elsewhere"
+                ),
+                "name the case that means the page is at another address",
+            ));
+            continue;
+        }
+        let Some(b) = decl.body else { continue };
+        let answers = crate::page_values::query_bindings(ws, unit, hir.body(b))
+            .iter()
+            .any(|(_, read, _)| crate::routes::error_of(sigs, *read) == Some(ty));
+        if !answers {
+            out.push(refused(
+                format!(
+                    "`redirect_on {value}`: no query `{}` reads can answer it",
+                    decl.name
+                ),
+                "name an error a query the page reads declares",
+            ));
+            continue;
+        }
+        // Where the host sends the reader: the page's route, its one `{name}`
+        // filled with what the case carries.
+        let holes = decl
+            .policy("route")
+            .map(|r| crate::routes::route_holes(&r.value))
+            .unwrap_or_default();
+        let [hole] = holes.as_slice() else {
+            out.push(refused(
+                format!(
+                    "`redirect_on {value}`: `{}`'s route carries {} parameters, and a \
+                     case carries one value to fill it",
+                    decl.name,
+                    holes.len()
+                ),
+                "give the page a route with one `{parameter}`",
+            ));
+            continue;
+        };
+        let carried = sigs
+            .type_decl(ty)
+            .and_then(|t| t.variants.as_ref())
+            .and_then(|cases| cases.iter().find(|(c, _)| *c == case))
+            .map(|(_, fields)| fields.as_slice())
+            .unwrap_or_default();
+        let page = crate::resolve::DefId { unit, decl: id.0 };
+        let parameter = sigs.by_def(page).and_then(|sig| {
+            let at = sig.names.iter().position(|n| n == hole)?;
+            sig.params.get(at)?.as_ref()?.resolved()
+        });
+        let fits = match (carried, parameter) {
+            ([one], Some(param)) => one.resolved().is_some_and(|t| t.same_as(param)),
+            _ => false,
+        };
+        if !fits {
+            out.push(refused(
+                format!(
+                    "`redirect_on {value}`: `{case}` carries {}, and `{}`'s route carries \
+                     one `{hole}`{}",
+                    match carried {
+                        [] => "nothing".to_string(),
+                        [one] => format!("a `{one}`"),
+                        many => format!("{} values", many.len()),
+                    },
+                    decl.name,
+                    match parameter {
+                        Some(t) => format!(", a `{}`", t.display_name()),
+                        None => String::new(),
+                    },
+                ),
+                "carry one value of the type of the route's parameter: `Moved(String)`",
             ));
         }
     }

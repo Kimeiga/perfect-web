@@ -54,6 +54,21 @@ pub struct Binding {
     /// and 503 for any other failure.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub not_found: Vec<String>,
+    /// **The declared error that means the page's address is another
+    /// address of the page** (ADR-XXXX): the page's `redirect_on`, for a
+    /// binding whose query can answer it. A host answers it 308, or 307,
+    /// to the page's route filled with what the case carries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub redirect: Option<Redirect>,
+}
+
+/// A page's `redirect_on`, as a host reads it (ADR-XXXX).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Redirect {
+    /// The case, by its WIT name: `moved`.
+    pub case: String,
+    /// 308 where the move is permanent, 307 where it is not.
+    pub permanent: bool,
 }
 
 /// A query's policies, as a host applies them (ADR-0127).
@@ -1238,6 +1253,11 @@ fn plan(
     let not_found = crate::routes::not_found_case(ws, sigs, unit, decl)
         .ok()
         .flatten();
+    // And the one that means its address is another of the page's
+    // (ADR-XXXX), PW0350's to hold.
+    let redirect = crate::routes::redirect_case(ws, sigs, unit, decl)
+        .ok()
+        .flatten();
     let mut bindings = Vec::new();
     for (name, resource, keys) in &found {
         let mut args = Vec::new();
@@ -1274,6 +1294,17 @@ fn plan(
                     vec![crate::wit::ident(case)]
                 }
                 _ => Vec::new(),
+            },
+            redirect: match &redirect {
+                Some((ty, case, permanent))
+                    if crate::routes::error_of(sigs, *resource) == Some(*ty) =>
+                {
+                    Some(Redirect {
+                        case: crate::wit::ident(case),
+                        permanent: *permanent,
+                    })
+                }
+                _ => None,
             },
         });
     }

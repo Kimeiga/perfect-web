@@ -5346,3 +5346,20 @@ e14-handlers-where-they-run:
        CARGO_INCREMENTAL=0 python3 scripts/handlers_where_they_run_mutations.py; \
      } > docs/evidence/E14/handlers-where-they-run.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/handlers-where-they-run.txt
+
+# ADR-XXXX: a page at another address of the page is moved there. The
+# compiler's tests, the development server's, and the mutation controls.
+e14-redirects:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a page at another address of the page is moved there"; echo; \
+       echo "produced by: just e14-redirects"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/redirects.rs, not_found.rs)"; echo; \
+       cargo test --locked -p pw-core --test redirects --test not_found 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the development server (spikes/own-renderer/server/src/tests/redirects.rs)"; echo; \
+       cargo test --locked -p pw-dev-server tests::redirects 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/redirects_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/redirects_mutations.py; \
+     } > docs/evidence/E14/redirects.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/redirects.txt

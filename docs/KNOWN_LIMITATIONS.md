@@ -614,6 +614,14 @@ awaited in order. What remains:
   still to come; the route is `/word/{word}` until `/_pw/` lands; the tests
   run on the repository's sample, and no page was rendered beside
   kiokun.com's yet.
+- **A page is moved only to another address of itself** (ADR-XXXX): a
+  `redirect_on` case fills the page's own route, of one parameter; a move to
+  another page, to a route of several parameters, or one that adds to the
+  query (kiokun.com's deinflection adds `from`, `conj` and `alt`) is not
+  expressed. A redirect is the document's: a keyed read whose query answers
+  the case in the browser fails as any read does. The development server
+  keeps no move; a deployment's cache policy for a permanent one is not
+  ruled.
 - **A source's guarantees are held to the database the feed opens**
   (ADR-0207, ADR-0246): the host measures a PostgreSQL feed's isolation and
   whether it may write, and refuses to serve on a shortfall. The store's
