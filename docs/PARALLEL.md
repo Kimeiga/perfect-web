@@ -690,7 +690,7 @@ Each a decision for a track, with its date; a track's ADR records it too.
     each item's bounds, ADR-0179); an order is read by its user alone, as a
     notification is (ADR-0274); a tab whose reader signed out elsewhere is
     refused at its next press, and told so (the refusal ruling, on
-    `track/refusals`, ADR-0296 when merged). Its tests: two users' carts
+    `track/refusals`, numbered at its merge). Its tests: two users' carts
     never share a line, in memory and on PostgreSQL; a guest's cart follows
     them in; an order is no other user's to read.
   - **Milestone 2, delivery addresses.** A user's saved addresses (add,
