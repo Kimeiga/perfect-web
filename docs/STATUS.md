@@ -23,6 +23,31 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0283 and ADR-0284, 2026-10-09: a component's contract is what its
+code does, and a value of any type is fixed by the call that meets it**
+(W6's two findings on kiokun's word page, and what probing them found). A
+query that read kiokun's entries through a function of its own checked
+clean, and `pw build` refused it: the contract read the declaration's body
+alone, where the backend compiles every function it reaches. Probing it
+found a query that read the database through a function passed by name, or
+inside a lambda handed to `List.map`, required no capability, and its
+contract allowed the browser and the build. Placement, the source checks
+and the contract counted calls alone, where the row check has counted
+function values and members since ADR-0078, and the contract deferred every
+lambda as a page's handler. Now a component imports what the functions
+compiled into it call, placement and the contract read what a body performs
+as the row check walks it, and only a handler's work is deferred; the
+store's contracts and worlds are unchanged.
+And `List.fold(xs, [], f)` checked clean however `f` built its list: the
+accumulator was bound to a list of anything whole, so an `Int` was returned
+as a `String`. Each part of any type now gets a variable of its own, which
+the function fixes: the checker refuses those folds, and the backend builds
+the seed at the fold's solved type. A cached query that read through a
+function value was no reader of what it read, so a write never invalidated
+it (PW5106); it is now. Eight tests of the contract and two of the fold, and
+12 of 12 mutants killed on CI, run 37888911377 (`just
+e14-what-a-component-does`).
+
 **ADR-0285 and ADR-0286, 2026-10-09: kiokun.com in Pleris, its inventory
 and its word page** (track `kiokun`, W6, merged from `d19850f`). Every
 route and feature of kiokun.com's SvelteKit app is inventoried, built,

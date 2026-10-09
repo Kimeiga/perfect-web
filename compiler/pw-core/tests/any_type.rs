@@ -213,3 +213,86 @@ fn an_early_return_is_any_success() {
         "PW0606",
     );
 }
+
+#[test]
+fn a_folds_accumulator_is_what_its_function_builds() {
+    // ADR-0284: the accumulator `[]` meets is a list of something its
+    // function fixes. It was bound to a list of anything whole, so the
+    // function's result fixed nothing and agreed with it, whatever it built.
+    refused(
+        &program(
+            "fn f(xs: List<String>) -> List<String> { List.fold(xs, [], (out, x) => List.concat(out, [1])) }",
+        ),
+        "PW0606",
+    );
+    // Through a binding, and out of it as an element.
+    refused(
+        &program(
+            "fn f(xs: List<String>) -> String {\n    let all = List.fold(xs, [], (out, x) => List.concat(out, [1]))\n    match List.get(all, 0) {\n        Some(n) => n,\n        None => \"\",\n    }\n}",
+        ),
+        "PW0606",
+    );
+    // `None` as a seed, the same.
+    refused(
+        &program(
+            "fn f(xs: List<String>) -> Option<String> { List.fold(xs, None, (best, x) => Some(1)) }",
+        ),
+        "PW0606",
+    );
+    // The controls: what the function builds is what the fold is.
+    agrees(&program(
+        "fn f(xs: List<String>) -> List<String> { List.fold(xs, [], (out, x) => List.concat(out, [x])) }",
+    ));
+    agrees(&program(
+        "fn f(xs: List<String>) -> Option<String> { List.fold(xs, None, (best, x) => Some(x)) }",
+    ));
+    // And a part nothing fixes still holds at every type.
+    agrees(&program(
+        "fn f(xs: List<String>) -> List<Int> { List.fold(xs, [], (out, x) => out) }",
+    ));
+}
+
+#[test]
+fn a_seed_its_context_does_not_type_is_built_at_the_folds_type() {
+    // ADR-0284: `let all = List.fold(xs, [], f)` expects nothing of `[]`,
+    // and the backend gives it the fold's type as the checker solved it. It
+    // refused it until then: "an empty list whose element type nothing
+    // fixes" (W6, on kiokun's word page).
+    let mut units: Vec<pw_core::check::Unit> = files(&["packages/pw-std"])
+        .into_iter()
+        .map(|(path, src)| pw_core::check::Unit {
+            hir: pw_core::lower::lower_file(&src, &pw_syntax::parse_tree(&src).green),
+            path,
+            src,
+        })
+        .collect();
+    let src = "module t\n\nimport List\n\ntype Numbered = Numbered {\n    id: String,\n    text: String,\n}\n\npublic query Numbering(items: List<String>) -> List<Numbered>\n    freshness   1.hours\n    consistency snapshot\n{\n    let all = List.fold(items, [], (out, t) => List.concat(out, [Numbered { id: \"{List.length(out)}\", text: t }]))\n    all\n}\n";
+    units.push(pw_core::check::Unit {
+        path: "t.pw".to_string(),
+        hir: pw_core::lower::lower_file(src, &pw_syntax::parse_tree(src).green),
+        src: src.to_string(),
+    });
+    let built = pw_core::build::build(&units).expect("it checks");
+    assert_eq!(built.refusals(), Vec::<String>::new());
+    // The control: a seed nothing types, which nothing fixes, is refused
+    // still, by the backend that cannot lay it out.
+    let unfixed = src.replace(
+        "let all = List.fold(items, [], (out, t) => List.concat(out, [Numbered { id: \"{List.length(out)}\", text: t }]))\n    all",
+        "let none = List.fold(items, [], (out, t) => out)\n    List.map(none, x => Numbered { id: \"\", text: \"\" })",
+    );
+    units.pop();
+    units.push(pw_core::check::Unit {
+        path: "t.pw".to_string(),
+        hir: pw_core::lower::lower_file(&unfixed, &pw_syntax::parse_tree(&unfixed).green),
+        src: unfixed.clone(),
+    });
+    let built = pw_core::build::build(&units).expect("it checks");
+    assert!(
+        built
+            .refusals()
+            .iter()
+            .any(|r| r.contains("an empty list whose element type nothing fixes")),
+        "{:?}",
+        built.refusals()
+    );
+}

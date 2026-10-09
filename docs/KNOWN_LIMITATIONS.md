@@ -591,6 +591,17 @@ awaited in order. What remains:
 - **A secret laundered through a materialization's body** (ADR-0282):
   ADR-0129's summaries follow functions, queries, commands, subscriptions
   and resources, and not a materialization's body.
+- **A call through a local is charged its namesake's effects** (ADR-0283):
+  the effect inference's call walk resolves a callee's name without its
+  scope, so a local `found` that shadows `fn found` is charged `fn found`'s
+  row. That over-states, which refuses work rather than grants authority.
+  The contract's imports read the scope, and import nothing of `fn found`.
+- **A component's imports mirror the backend's resolution** (ADR-0283):
+  they are not read off the lowered IR, which exists only for what the
+  backend lowers; the build's audit holds the two to each other.
+- **Only a fold's seed takes the checker's type in the backend**
+  (ADR-0284): another `[]` its context does not type, an argument to
+  `List.concat` first among them, is refused as before, and says why.
 - **kiokun's word page is its words sections** (ADR-0286): Japanese labels
   are shown as JMdict's codes until the label table is read; the character
   header, examples, pitch, mnemonics, components, contains and appears in,
