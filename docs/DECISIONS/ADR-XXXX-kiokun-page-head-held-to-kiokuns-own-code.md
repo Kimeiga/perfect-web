@@ -3,8 +3,8 @@
 Status: proposed by track `kiokun` (W6, `track/kiokun`), the word page's SEO
 head (step 1, milestone 1e in the integrator's order of 2026-10-09). It also
 records the sampled whole-dictionary timing run the integrator ordered
-first. Builds on ADR-0286 and the two milestones after it (ADR-XXXX,
-labels and character header; ADR-XXXX, loader merges and written forms).
+first. Builds on ADR-0286 and the two milestones after it (ADR-0288,
+labels and character header; ADR-0289, loader merges and written forms).
 Date: 2026-10-09. Milestone: E14.
 
 ## Context
