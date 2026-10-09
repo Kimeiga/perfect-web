@@ -58,7 +58,7 @@ Checked against `master` at `73e462b` (2026-10-08), ADR-0001 to ADR-0279.
 | Structured concurrency and affine resources | 0016, 0045, 0211, 0250, 0251, 0269 | Checked statically (PW20xx). | The `pw-tasks` runtime is not wired into the host. |
 | Time and the clock | 0180 | `Instant`; `clock.read` and `clock.wall` typed. | `clock.now()`'s body is `{ 0 }`, and no host answers it. |
 | Layout and frame phases | 0187; R-034, R-038, R-040, R-043 | Checked at compile time. | No frame scheduler in the runtime: no `requestAnimationFrame` or observers. |
-| Navigation | 0160, 0280 (in progress) | Links, each a document load, matched to routes (PW5009). | No client-side navigation; a handler navigating after its commit is ADR-0280, under way. |
+| Navigation | 0160, 0280 | Links, each a document load, matched to routes (PW5009); a handler going to a page once its command commits, the page's parameters typed, read after the commit (0280). | No client-side navigation: every navigation is a document load, so the parts two pages share are not kept in place (the next ruling). A link's arguments are untyped. |
 
 ## Missing
 
