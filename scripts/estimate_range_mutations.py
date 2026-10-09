@@ -34,21 +34,27 @@ MUTANTS = [
         "no range unless one is asked for",
         "server",
         STORE_DATA,
-        "                            Val::S64(estimator.max_minutes.unwrap_or(estimator.minutes + 10)),\n",
-        "                            Val::S64(estimator.max_minutes.unwrap_or(estimator.minutes)),\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        '                    ("max-minutes".into(), Val::S64(max.unwrap_or(minutes + 10))),\n',
+        '                    ("max-minutes".into(), Val::S64(max.unwrap_or(minutes))),\n',
     ),
     (
         "no `generated_at` is answered",
         "server",
         STORE_DATA,
-        '                        ("generated-at".into(), Val::S64(wall_millis())),\n',
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        '                    ("generated-at".into(), Val::S64(wall_millis())),\n',
         "",
     ),
     (
         "the benchmark's own `minutes` is no longer answered",
         "server",
         STORE_DATA,
-        '                        ("minutes".into(), Val::S64(estimator.minutes)),\n',
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        '                    ("minutes".into(), Val::S64(minutes)),\n',
         "",
     ),
     (
@@ -69,8 +75,10 @@ MUTANTS = [
         "the control's `max` is ignored",
         "browser",
         SERVER,
-        '            set.max_minutes = q("max").and_then(|v| v.parse().ok());\n',
-        "            set.max_minutes = None;\n",
+        # Re-anchored by track store-pg: the estimate is written through the
+        # layer.
+        '            let max = q("max").and_then(|v| v.parse().ok());\n',
+        "            let max: Option<i64> = None;\n",
     ),
 ]
 

@@ -36,52 +36,64 @@ MUTANTS = [
         "a fault is not consumed",
         "server",
         STORE_DATA,
-        "                            std::mem::take(if writes {\n",
-        "                            *(if writes {\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                        std::mem::take(if writes {\n",
+        "                        *(if writes {\n",
     ),
     (
         "another session's fault is taken",
         "server",
         STORE_DATA,
-        "                        let mut mine = all.get_mut(&session);\n",
-        "                        let mut mine = all.values_mut().next();\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                    let mut mine = all.get_mut(&session);\n",
+        "                    let mut mine = all.values_mut().next();\n",
     ),
     (
         "a write's fault is taken by a read",
         "server",
         STORE_DATA,
-        "                                &mut m.fail_write\n"
-        "                            } else {\n"
-        "                                &mut m.fail_read\n",
-        "                                &mut m.fail_read\n"
-        "                            } else {\n"
-        "                                &mut m.fail_write\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                            &mut m.fail_write\n"
+        "                        } else {\n"
+        "                            &mut m.fail_read\n",
+        "                            &mut m.fail_read\n"
+        "                        } else {\n"
+        "                            &mut m.fail_write\n",
     ),
     (
         "the cart's delay is not waited",
         "server",
         STORE_DATA,
-        "                    if delay > 0 {\n"
-        "                        std::thread::sleep(std::time::Duration::from_millis(delay));\n"
-        "                    }\n"
-        "                    op(args)\n",
-        "                    op(args)\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                if delay > 0 {\n"
+        "                    std::thread::sleep(std::time::Duration::from_millis(delay));\n"
+        "                }\n"
+        "                op(args)\n",
+        "                op(args)\n",
     ),
     (
         "every session waits a cart's delay",
         "server",
         STORE_DATA,
-        "                        mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
-        "                            .unwrap_or_default()\n",
-        "                        mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
-        "                            .unwrap_or(1000)\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                    mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
+        "                        .unwrap_or_default()\n",
+        "                    mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
+        "                        .unwrap_or(1000)\n",
     ),
     (
         "the store's delay is not waited",
         "server",
         STORE_DATA,
-        "                let delay = store_delay.load(std::sync::atomic::Ordering::SeqCst);\n",
-        "                let delay = store_delay.load(std::sync::atomic::Ordering::SeqCst) * 0;\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                let delay = store_delay.load(Ordering::SeqCst);\n",
+        "                let delay = store_delay.load(Ordering::SeqCst) * 0;\n",
     ),
     (
         "a drain reads the cart when nothing changed",

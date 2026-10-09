@@ -33,8 +33,10 @@ MUTANTS = [
     (
         "the host lists one store",
         STORE_DATA,
-        "                [STORE_ID, SECOND_STORE.0]\n",
-        "                [STORE_ID]\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "            [] => w(&mut |r| Ok(vec![Val::List(r.stores()?.iter().map(store_val).collect())])),\n",
+        "            [] => w(&mut |r| Ok(vec![Val::List(r.stores()?.iter().take(1).map(store_val).collect())])),\n",
     ),
 ]
 

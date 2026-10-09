@@ -87,8 +87,10 @@ MUTANTS = [
         "each item is a category of its own",
         "server",
         STORE_DATA,
-        "                    match grouped.iter_mut().find(|(c, ..)| *c == category) {\n",
-        "                    match grouped.iter_mut().find(|(c, ..)| *c == category).filter(|_| false) {\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "        match grouped.iter_mut().find(|(c, ..)| *c == item.category) {\n",
+        "        match grouped.iter_mut().find(|(c, ..)| *c == item.category).filter(|_| false) {\n",
     ),
     (
         "store 48's bakery is among its drinks",

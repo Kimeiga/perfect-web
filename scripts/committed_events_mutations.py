@@ -24,12 +24,22 @@ MUTANTS = [
     (
         "`CartChanged` is committed whatever is computed",
         SERVER,
-        "                Ok::<_, String>(events)\n",
-        "                let _ = events;\n"
-        "                Ok::<_, String>(vec![pw_materialize::Event::new(\n"
-        "                    &[\"Events\", \".CartChanged\"].concat(),\n"
-        "                    &[session],\n"
-        "                )])\n",
+        # Re-anchored by track store-pg: the in-memory commit is
+        # `commit_staged`'s, which names the session by its cart's row.
+        "                    Ok::<_, String>(events)\n"
+        "                })?;\n"
+        "                ((emitted.to_vec(), invalidated.to_vec()), ids)\n",
+        "                    let _ = events;\n"
+        "                    let session = rows\n"
+        "                        .first()\n"
+        "                        .map(|(k, _)| k.trim_start_matches(\"cart:\").to_string())\n"
+        "                        .unwrap_or_default();\n"
+        "                    Ok::<_, String>(vec![pw_materialize::Event::new(\n"
+        "                        &[\"Events\", \".CartChanged\"].concat(),\n"
+        "                        &[session.as_str()],\n"
+        "                    )])\n"
+        "                })?;\n"
+        "                ((emitted.to_vec(), invalidated.to_vec()), ids)\n",
     ),
     # ADR-0208: the command computes its events and hands them to the
     # outbox. ADR-0104's four controls of the server's key evaluation are
