@@ -405,3 +405,87 @@ page Checkout(id: StoreId) {
     assert!(!found.contains("PW5018"), "{found:?}");
     assert!(!found.contains("PW5007"), "{found:?}");
 }
+
+#[test]
+fn a_private_querys_record_is_its_users_and_no_public_manifest_holds_it() {
+    // R-063's fact (track `store-accounts`): a `private` query is a user's
+    // (ADR-0270), so a record only it produces is the user's, as a record
+    // only a `session query` produces is the session's (R-030). Until
+    // 2026-10-09 `private` gave the type no scope, and a view's parameter of
+    // it crossed into the public shell unrefused.
+    let refused = codes(&program(
+        "\
+private query Basket(s: SessionId) -> Result<Cart, CartError>
+    cache private
+{
+    todo
+}
+
+view Summary(cart: Cart) !{} {
+    <button on:press={resumable(captures = { cart }) => cart.line_count}>go</button>
+}
+",
+    ));
+    assert!(refused.contains("PW5007"), "{refused:?}");
+    // And a page that states the user's scope holds it.
+    let accepted = codes(&program(
+        "\
+private query Basket(s: SessionId) -> Result<Cart, CartError>
+    cache private
+{
+    todo
+}
+
+private page Checkout(cart: Cart) {
+    cache private
+    view { <button on:press={resumable(captures = { cart }) => cart.line_count}>go</button> }
+}
+",
+    ));
+    assert!(!accepted.contains("PW5007"), "{accepted:?}");
+    assert!(!accepted.contains("PW5018"), "{accepted:?}");
+}
+
+#[test]
+fn a_record_a_sessions_and_a_users_query_both_produce_holds_both_scopes() {
+    // Track `store-accounts`: the scopes of a type's producers are joined.
+    // Until 2026-10-09 the last producer written kept its scope alone, so
+    // which page could hold the record depended on the order of the units.
+    // Joined, neither a session's page nor a user's holds it, where each
+    // holds a record its own scope's query alone produces.
+    let session = "\
+session query Basket(s: SessionId) -> Result<Cart, CartError>
+    cache private
+{
+    todo
+}
+";
+    let user = "\
+private query Mine(s: SessionId) -> Result<Cart, CartError>
+    cache private
+{
+    todo
+}
+";
+    let page = |scope: &str| {
+        format!(
+            "{scope} page Checkout(cart: Cart) {{\n    cache private\n    view {{ <button on:press={{resumable(captures = {{ cart }}) => cart.line_count}}>go</button> }}\n}}\n"
+        )
+    };
+    for scope in ["session", "private"] {
+        // In either order: the join does not depend on which is written first.
+        for producers in [format!("{session}\n{user}"), format!("{user}\n{session}")] {
+            let found = codes(&program(&format!("{producers}\n{}", page(scope))));
+            assert!(
+                found.contains("PW5007"),
+                "a {scope} page holds a record both scopes' queries produce: {found:?}"
+            );
+        }
+    }
+    // The controls: each scope's page holds the record its own query alone
+    // produces.
+    let found = codes(&program(&format!("{session}\n{}", page("session"))));
+    assert!(!found.contains("PW5007"), "{found:?}");
+    let found = codes(&program(&format!("{user}\n{}", page("private"))));
+    assert!(!found.contains("PW5007"), "{found:?}");
+}

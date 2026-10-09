@@ -1,0 +1,49 @@
+// @corpus: rejected
+// @id: R-063
+// @category: a private query's record captured into a public manifest from a view's parameter
+// @rule: PW5007
+// @invariant: private_in_resume_manifest
+// @charter: §8.5, §7.8
+// @milestone: 14
+// @expect-error: resume manifest for `SavedSummary` would contain a `User<UserId>` value
+//
+// Found on 2026-10-09 (track `store-accounts`, ADR-XXXX), R-030 at the
+// user's level. A `private` query is its user's (ADR-0270), so a record only
+// it produces is the user's, as a record only a `session query` produces is
+// the session's. The view's parameter names no producer: the type is all that
+// says the value is private. Until 2026-10-09 `private` gave the type no
+// scope, and the capture crossed into the public shell unrefused.
+
+module saved.summary_view
+
+import capability.{ User, UserId }
+import domain.{ MenuItemId }
+
+// The user's saved items: an ordinary record, private because only the
+// user's query makes one.
+type Saved = Saved {
+    items: List<MenuItemId>,
+}
+
+private query SavedItems(reader: User<UserId>) -> Saved
+    freshness 0.seconds
+    cache     private
+    key       reader
+{
+    todo
+}
+
+// The callee takes the captured record, and is declared here so the witness
+// depends on no library signature.
+fn order_saved(saved: Saved) -> () !{} { todo }
+
+view SavedSummary(saved: Saved) !{} {
+    <section aria-label="Saved">
+        <button
+            // ERROR: capturing the user's record into the resume manifest.
+            on:press={resumable(captures = { saved }) => order_saved(saved)}
+        >
+            Order your saved items
+        </button>
+    </section>
+}

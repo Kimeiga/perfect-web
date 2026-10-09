@@ -59,8 +59,12 @@ pub struct TypeFacts {
     resources: BTreeMap<TypeKey, String>,
     /// Derived from the one signature privacy analysis, never authored here.
     declared_labels: BTreeMap<TypeKey, Label>,
-    /// Types produced only by a scoped declaration, with the scope.
-    scoped: BTreeMap<TypeKey, Restriction>,
+    /// Types produced by a scoped declaration, with the scope: every
+    /// scoped producer's, joined (track `store-accounts`, ADR-XXXX). Until
+    /// 2026-10-09 the last producer written kept its scope alone, so a type
+    /// one `session query` and one user's query both produce carried
+    /// whichever came later in the units' order.
+    scoped: BTreeMap<TypeKey, Label>,
 }
 
 impl TypeFacts {
@@ -105,9 +109,14 @@ impl TypeFacts {
                         f.resources.insert(ty.semantic_key(), sig.path.clone());
                     }
                 }
+                // `private` is a user's (ADR-0270), as the label a `private`
+                // declaration gives and resume.rs's `manifest_scope` read it.
+                // Until 2026-10-09 a type only `private` queries produce
+                // carried no scope here, so a view's parameter of it crossed
+                // into a public manifest unrefused (R-063).
                 let restriction = match d.visibility.as_deref() {
                     Some("session") => Restriction::Session("SessionId".into()),
-                    Some("user") => Restriction::User("UserId".into()),
+                    Some("user") | Some("private") => Restriction::User("UserId".into()),
                     Some("organization") => Restriction::Organization("OrganizationId".into()),
                     _ => continue,
                 };
@@ -117,7 +126,10 @@ impl TypeFacts {
                 } else {
                     result
                 };
-                f.scoped.insert(produced.semantic_key(), restriction);
+                // Joined with every other scoped producer's: a type a
+                // session's query and a user's both make holds either's.
+                let held = f.scoped.entry(produced.semantic_key()).or_default();
+                *held = held.join(&Label::of(restriction));
             }
         }
         f
@@ -150,7 +162,7 @@ impl TypeFacts {
             };
         };
         let mut resource = None;
-        let mut produced_scope = None;
+        let mut produced_scope: Option<Label> = None;
         let mut function = None;
         let mut carrier = None;
         // The one place this module takes a type name apart, for the same
@@ -163,10 +175,13 @@ impl TypeFacts {
                 resource = Some(p.clone());
                 carrier = Some(part.display_name());
             }
-            if produced_scope.is_none()
-                && let Some(s) = self.scoped.get(&key)
-            {
-                produced_scope = Some(s.clone());
+            // Every component's scope, joined: a pair of a session's record
+            // and a user's holds both.
+            if let Some(s) = self.scoped.get(&key) {
+                produced_scope = Some(match produced_scope.take() {
+                    Some(held) => held.join(s),
+                    None => s.clone(),
+                });
             }
             if function.is_none() && part.as_builtin() == Some(crate::resolved::Builtin::Function) {
                 function = Some(part.display_name());
@@ -196,7 +211,7 @@ impl TypeFacts {
         self.resources.get(&ty.semantic_key()).map(String::as_str)
     }
 
-    pub fn produced_scope(&self, ty: &ResolvedType) -> Option<&Restriction> {
+    pub fn produced_scope(&self, ty: &ResolvedType) -> Option<&Label> {
         self.scoped.get(&ty.semantic_key())
     }
 }
@@ -229,10 +244,11 @@ pub struct TransferProfile {
     /// A resource's value IS the thing held open. Encoding it is possible and
     /// meaningless, which is why this is not a serializability question.
     pub resource: Option<String>,
-    /// A restriction the type carries because only a scoped declaration
+    /// The restrictions the type carries because a scoped declaration
     /// produces it. `Cart` is an ordinary record and is session-scoped because
-    /// only a `session query` makes one.
-    pub produced_scope: Option<Restriction>,
+    /// a `session query` makes one; a type a session's and a user's query
+    /// both make carries both.
+    pub produced_scope: Option<Label>,
     /// The function type it is or holds, where it does (ADR-0086). A function
     /// is code, not data: nothing encodes it for the far side.
     pub function: Option<String>,
@@ -388,7 +404,7 @@ pub fn can_cross(profile: &TransferProfile, ctx: &BoundaryContext) -> Crossing {
     // value carrying `Secret<Payments>` by label AND a session scope by
     // producer reported one of them and let the other travel unexamined.
     let carried = match &profile.produced_scope {
-        Some(r) => ctx.label.join(&Label::of(r.clone())),
+        Some(scope) => ctx.label.join(scope),
         None => ctx.label.clone(),
     };
     if carried.is_public() {
@@ -599,7 +615,7 @@ mod tests {
         // declaration; it is session-scoped because only a `session query`
         // makes one. An analysis reading only the value's label passes this.
         let p = TransferProfile {
-            produced_scope: Some(Restriction::Session("SessionId".into())),
+            produced_scope: Some(Label::of(Restriction::Session("SessionId".into()))),
             ..named("Cart")
         };
         assert!(matches!(
@@ -628,7 +644,7 @@ mod tests {
         // other travel unexamined — so a destination admitting the session but
         // not the secret would have accepted it.
         let p = TransferProfile {
-            produced_scope: Some(Restriction::Session("SessionId".into())),
+            produced_scope: Some(Label::of(Restriction::Session("SessionId".into()))),
             ..named("Receipt")
         };
         let session_only = Label::session("SessionId");
@@ -654,6 +670,47 @@ mod tests {
             can_cross(
                 &p,
                 &ctx(Boundary::Resume, Label::secret("Payments"), Some(both))
+            ),
+            Crossing::Proven
+        );
+    }
+
+    #[test]
+    fn disagreeing_producers_scopes_are_joined_and_refuse_what_either_alone_would() {
+        // Track `store-accounts`: a type a session's query and a user's both
+        // produce carries both scopes, so a session's manifest and a user's
+        // each refuse it, where each holds the type its own scope alone makes.
+        let joined =
+            Label::session("SessionId").join(&Label::of(Restriction::User("UserId".into())));
+        let p = TransferProfile {
+            produced_scope: Some(joined.clone()),
+            ..named("Cart")
+        };
+        for dest in [
+            Label::session("SessionId"),
+            Label::of(Restriction::User("UserId".into())),
+        ] {
+            assert!(matches!(
+                can_cross(&p, &ctx(Boundary::Resume, Label::public(), Some(dest))),
+                Crossing::Violation(Violation::Private { .. })
+            ));
+        }
+        assert_eq!(
+            can_cross(&p, &ctx(Boundary::Resume, Label::public(), Some(joined))),
+            Crossing::Proven
+        );
+        let alone = TransferProfile {
+            produced_scope: Some(Label::session("SessionId")),
+            ..named("Cart")
+        };
+        assert_eq!(
+            can_cross(
+                &alone,
+                &ctx(
+                    Boundary::Resume,
+                    Label::public(),
+                    Some(Label::session("SessionId"))
+                )
             ),
             Crossing::Proven
         );
@@ -686,7 +743,7 @@ mod tests {
         // reporting both would send the reader two ways at once.
         let p = TransferProfile {
             resource: Some("db.begin".into()),
-            produced_scope: Some(Restriction::Session("SessionId".into())),
+            produced_scope: Some(Label::of(Restriction::Session("SessionId".into()))),
             ..named("OpenTransaction")
         };
         assert!(matches!(
