@@ -290,7 +290,8 @@ no kill of theirs was a port collision.
 - **The browser suite, the mutation controls and `just e14-messages`.**
 
 **Tests and mutants.** `docs/evidence/E14/messages.txt`, recorded by
-`just e14-messages` at d812952, PostgreSQL 18.6 named, `PORT=6300`:
+`just e14-messages` at aceea04 (on d371be2), PostgreSQL 18.6 named,
+`PORT=7141`:
 - the server's 19: 4 unit tests, 8 in memory and 7 on PostgreSQL;
 - the browser's 9 of 9 (3 tests in three engines);
 - **25 of 25 mutants killed**, each by a test, none by its not building:
@@ -307,12 +308,15 @@ no kill of theirs was a port collision.
   - and waiting_rows' three mutants of `waits`, on the conversation's
     pending message.
 
-The workspace's compiler tests (202 binaries) and the server's 294, with
-PostgreSQL's, passed after the rebase onto bba4ba4. `just ci`'s gates
-beyond the workspace tests passed locally: the evidence gates' 41, the
-mutation anchors (2007 mutants, each matching once), `cargo fmt --check`,
-clippy on the server, and `pw fmt --check` on the feed. CI's `ci` run
-37826466905 passed at b393cee.
+The same recording at d812952 (on bba4ba4, `PORT=6300`) killed the same 25,
+and CI's database job recorded it again at c675180, 25 of 25 (run
+37831080654's evidence artifact). The workspace's compiler tests (203
+binaries) and the server's 302, with PostgreSQL's, passed after the rebase
+onto d371be2. `just ci`'s gates beyond the workspace tests passed locally:
+the evidence gates, the mutation anchors (each matching once), `cargo fmt
+--check`, clippy on the server, `pw fmt --check` on the feed and the store,
+and `just audit`. CI's `ci` runs 37826466905 (b393cee) and 37831080722
+(c675180) passed.
 
 **Not claimed.** See Not claimed.
 
@@ -327,6 +331,8 @@ clippy on the server, and `pw fmt --check` on the feed. CI's `ci` run
   - the pending message seen waiting, and the program's mutants;
   - the port base, this ADR and the evidence.
 - **Rebased onto bba4ba4** (ADR-0276): the feed formatted, `10_000`.
+  Then onto d371be2 (ADR-0277, ADR-0278): the `mod messages;` lines beside
+  `mod materializations;`, and `NEEDS_DATABASE` under ADR-0278's comment.
 - **The four status documents are untouched**, as PARALLEL.md asks.
 - **Shared files**:
   - `compiler/pw-core/src/codes.rs`: `Owner::Messages`, PW58, no codes;
