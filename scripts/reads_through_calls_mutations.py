@@ -55,15 +55,16 @@ MUTANTS = [
     (
         "a secret a query uses is its value",
         CHECK,
-        "                    .filter(|r| !matches!(r, Restriction::Secret(_)))\n",
-        "                    .filter(|_| true)\n",
+        # Re-anchored by ADR-0282: what a value holds, its secrets left out
+        # but those it answers.
+        "        without_secrets(&self.observed(def)).join(&answered)\n",
+        "        self.observed(def).join(&answered)\n",
     ),
-    (
-        "the contract reads declared labels only",
-        CONTRACT,
-        "        crate::check::Reads::of(hirs, sigs, &inference).labels();\n",
-        "        hirs.iter().enumerate().flat_map(|(unit, hir)| hir.all_decls().filter_map(|(id, d)| { let l = crate::check::label_of(d); (!l.is_public()).then(|| (crate::resolve::DefId { unit, decl: id.0 }, l)) }).collect::<Vec<_>>()).collect();\n",
-    ),
+    # "the contract reads declared labels only" is retired, equivalent since
+    # ADR-0282: the contract's demand joins `Reads::holds`, whose declared
+    # fixed point covers every label `labels()` names, so the map it replaced
+    # changes no placement. `held_labels_mutations.py`'s "the contract reads
+    # the keywords alone" undoes what is left of it, and is killed.
 ]
 
 TESTS = [

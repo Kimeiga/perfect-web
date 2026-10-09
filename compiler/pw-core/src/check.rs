@@ -196,12 +196,15 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // And a declaration's label is joined with what it reads through what it
     // calls (ADR-0118): a `session query` read through a helper, or through a
     // public query, is read.
-    let reads = Reads::of(&hirs, &sigs, &inference);
+    //
+    // And what calling each declaration makes from its body (ADR-0129): the
+    // value labels a sink reads follow a call into its callee. Made first,
+    // since a secret a declaration answers, by its type or by what its body
+    // makes, is held where it runs and in what keeps it (ADR-0282).
+    let summaries = summaries(&hirs, &sigs);
+    let reads = Reads::of(&hirs, &sigs, &inference).answering(&summaries);
     let labels = reads.labels();
     let resources = reads.of_resources(&hirs);
-    // And what calling each declaration makes from its body (ADR-0129): the
-    // value labels a sink reads follow a call into its callee.
-    let summaries = summaries(&hirs, &sigs);
     // And what a view's handlers capture of what it is given (ADR-0136): a
     // page that uses the view writes it into its own document.
     let captured = crate::resume::captured_params(&hirs, &sigs);
@@ -7394,6 +7397,13 @@ fn privacy_and_placement(
     // needs `trace`, and a host must not be asked for database access because
     // an annotation permitted it.
     let effects: Vec<String> = inference.effective_effects(at, hir, id);
+    // **What it holds where it runs** (ADR-0282): the label the cache rules
+    // read, a secret it only uses left out and one it answers or reads kept.
+    // Until 2026-10-08 placement read the keywords of what a declaration
+    // reads alone: a page reading the session through a query of its own
+    // was public to placement and placed at build, and a fragment of a
+    // secret at the edge.
+    let label = label.join(&reads.holds(def));
     if effects.is_empty() && label.is_public() {
         return;
     }
@@ -7512,25 +7522,49 @@ fn privacy_and_placement(
         .or_else(|| decl.policy("placement").map(|p| p.span.clone()))
         .unwrap_or_else(|| hir.decl_span(decl_id_of(hir, decl)));
 
+    // **What rules each world out, as the solver found it** (ADR-0282): an
+    // effect a world cannot grant, as written, and a label a world may not
+    // hold. Until 2026-10-08 the message joined the effects alone, so a
+    // session's page placed at build said "it requires" and nothing after
+    // it, and a build page reading the session said it required
+    // `session.read`, which build grants.
+    let refused_an_effect = solution.ruled_out.iter().any(|r| {
+        matches!(
+            r.reason,
+            crate::placement::RuledOut::MissingCapability { .. }
+        )
+    });
+    let held: BTreeSet<String> = solution
+        .ruled_out
+        .iter()
+        .filter_map(|r| match &r.reason {
+            crate::placement::RuledOut::LabelNotPermitted { restriction } => {
+                Some(Label::of(restriction.clone()).to_string())
+            }
+            _ => None,
+        })
+        .collect();
+    let held: Vec<String> = held.into_iter().collect();
+    let because = match (refused_an_effect && !written.is_empty(), held.is_empty()) {
+        (true, false) => format!(
+            "it requires {}, and holds {}",
+            written.join(", "),
+            held.join(", ")
+        ),
+        (false, false) => format!("it holds {}", held.join(", ")),
+        (_, true) => format!("it requires {}", written.join(", ")),
+    };
     out.push(Diagnostic {
         code: "PW5002",
         invariant: "every declaration must have somewhere it can run",
         reason: "no_feasible_placement",
         detector: Detector::CapabilityAudit,
         severity: Severity::Error,
-        message: format!(
-            "`{}` cannot run in any world: it requires {}",
-            decl.name,
-            written.join(", ")
-        ),
+        message: format!("`{}` cannot run in any world: {because}", decl.name),
         primary_span: span,
         related: vec![Related {
             span: hir.decl_span(decl_id_of(hir, decl)),
-            label: if written.is_empty() {
-                format!("labelled {label}")
-            } else {
-                format!("requires {}", written.join(", "))
-            },
+            label: because.trim_start_matches("it ").to_string(),
         }],
         explanation: Some(format!(
             "Placement is derived from what a body does, not chosen. Each world \
@@ -7694,6 +7728,13 @@ pub(crate) struct Reads {
     /// its keyword says. Until 2026-10-02 nothing read a declaration's own
     /// parameters, and that query passed `cache shared` (T12).
     given: BTreeMap<crate::resolve::DefId, (Label, String)>,
+    /// **What each declaration reads** (ADR-0282): the declarations its body
+    /// calls and the queries it names, and a materialization's `depends_on`.
+    reading: BTreeMap<crate::resolve::DefId, Vec<crate::resolve::DefId>>,
+    /// **The secrets each declaration answers** (ADR-0282): its result
+    /// type's, and those its body's value carries (ADR-0129's summary). A
+    /// secret it only uses, as a key to fetch something public, is not one.
+    answered: BTreeMap<crate::resolve::DefId, Label>,
 }
 
 impl Reads {
@@ -7718,8 +7759,21 @@ impl Reads {
                 if decl.kind == DeclKind::Command {
                     continue;
                 }
-                if let Some(b) = decl.body {
-                    reading.push((def, reads_of(hir.body(b), inference, unit)));
+                let mut read = match decl.body {
+                    Some(b) => reads_of(hir.body(b), inference, unit),
+                    None => Vec::new(),
+                };
+                // **A materialization reads what it depends on** (ADR-0282):
+                // its value is made from them. Until 2026-10-08 its
+                // `depends_on` fed the graph alone, so a fragment of a
+                // session's cart placed at build, or of a secret placed at
+                // the edge, held nothing as placement read it.
+                if decl.kind == DeclKind::Materialize {
+                    read.extend(depends_on(decl, inference, unit));
+                }
+                if decl.body.is_some() || !read.is_empty() {
+                    me.reading.insert(def, read.clone());
+                    reading.push((def, read));
                 }
             }
         }
@@ -7751,6 +7805,44 @@ impl Reads {
 
     fn declared(&self, def: crate::resolve::DefId) -> Label {
         self.declared.get(&def).cloned().unwrap_or_default()
+    }
+
+    /// **The secrets each declaration answers** (ADR-0282), from its result
+    /// type and from what its body's value carries, `summaries` being
+    /// ADR-0129's. Called once the summaries are made.
+    pub(crate) fn answering(mut self, summaries: &BTreeMap<crate::resolve::DefId, Label>) -> Reads {
+        let mut answered: BTreeMap<crate::resolve::DefId, Label> = BTreeMap::new();
+        for (def, l) in self.results.iter().chain(summaries.iter()) {
+            let secret = only_secrets(l);
+            if !secret.is_public() {
+                let held = answered.entry(*def).or_default();
+                *held = held.join(&secret);
+            }
+        }
+        self.answered = answered;
+        self
+    }
+
+    /// **What `def`'s value holds** (ADR-0282): everything it observes but a
+    /// secret, and each secret it answers. A secret it only uses, as a key
+    /// to fetch something public, is not in it (ADR-0085). What keeps its
+    /// value reads it (PW5101).
+    pub(crate) fn answers(&self, def: crate::resolve::DefId) -> Label {
+        let answered = self.answered.get(&def).cloned().unwrap_or_default();
+        without_secrets(&self.observed(def)).join(&answered)
+    }
+
+    /// **What `def` holds where it runs** (ADR-0282): what its value holds,
+    /// and each secret what it reads answers it. Placement reads it, in the
+    /// checker and in the contract, as the cache rules read `observed`.
+    pub(crate) fn holds(&self, def: crate::resolve::DefId) -> Label {
+        let mut held = self.answers(def);
+        for r in self.reading.get(&def).into_iter().flatten() {
+            if let Some(a) = self.answered.get(r) {
+                held = held.join(a);
+            }
+        }
+        held
     }
 
     /// What reading `def` gives: its result's label, and what it reads to
@@ -7788,8 +7880,10 @@ impl Reads {
 
     /// Each resource's value label, by path, where it names a reader: its
     /// declared visibility and result, and what it reads (PW5101). A secret
-    /// is left out: a query that uses one to fetch public data makes a public
-    /// value (ADR-0085), and none of what is left can hold one.
+    /// it only uses is left out: a query that uses one to fetch public data
+    /// makes a public value (ADR-0085). A secret it answers is kept
+    /// (ADR-0282): until 2026-10-08 every secret was left out, and a `public
+    /// query` answering `Secret<Payments>` was kept in a shared fragment.
     pub(crate) fn of_resources(&self, hirs: &[&Hir]) -> BTreeMap<String, Label> {
         let mut out = BTreeMap::new();
         for (unit, hir) in hirs.iter().enumerate() {
@@ -7801,12 +7895,7 @@ impl Reads {
                     continue;
                 }
                 let def = crate::resolve::DefId { unit, decl: id.0 };
-                let label = self
-                    .declared(def)
-                    .join(&self.through(def))
-                    .restrictions()
-                    .filter(|r| !matches!(r, Restriction::Secret(_)))
-                    .fold(Label::public(), |l, r| l.join(&Label::of(r.clone())));
+                let label = self.answers(def);
                 if !label.is_public() {
                     out.insert(crate::graph::path_of(hir, id), label);
                 }
@@ -7814,6 +7903,34 @@ impl Reads {
         }
         out
     }
+}
+
+/// A label's secrets alone (ADR-0282).
+fn only_secrets(l: &Label) -> Label {
+    l.restrictions()
+        .filter(|r| matches!(r, Restriction::Secret(_)))
+        .fold(Label::public(), |l, r| l.join(&Label::of(r.clone())))
+}
+
+/// A label without its secrets (ADR-0085, ADR-0282).
+fn without_secrets(l: &Label) -> Label {
+    l.restrictions()
+        .filter(|r| !matches!(r, Restriction::Secret(_)))
+        .fold(Label::public(), |l, r| l.join(&Label::of(r.clone())))
+}
+
+/// **What a materialization depends on** (ADR-0282): each `depends_on` key,
+/// resolved as its unit resolves a call.
+fn depends_on(
+    decl: &Decl,
+    inference: &crate::effects::Inference<'_>,
+    at: usize,
+) -> Vec<crate::resolve::DefId> {
+    decl.policy("depends_on")
+        .into_iter()
+        .flat_map(|p| p.keys.iter())
+        .filter_map(|k| inference.called_from(at, &k.name))
+        .collect()
 }
 
 /// The declarations a body reads: what it calls, and the queries it names.

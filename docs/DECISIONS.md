@@ -2309,3 +2309,10 @@ a merge is held to CI's verification run.
   browser spec too; `evidence-fetch` brings the record into docs/evidence
   once the owner approves the download in the integrator's session; what CI
   cannot run stays local and says so.
+[ADR-0282](DECISIONS/ADR-0282-what-a-value-holds-is-one-label.md):
+what a value holds is one label (amends ADR-0118, corrects ADR-0128).
+- A secret a declaration answers is held, and one it only uses as a key is
+  not; a materialization reads what it depends on; placement reads what a
+  declaration holds, as the cache rules read it, in the checker and the
+  contract alike; and a placement refusal names the label that rules each
+  world out. Four soundness findings of 2026-10-03, each fixed.

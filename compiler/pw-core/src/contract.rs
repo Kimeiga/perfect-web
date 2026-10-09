@@ -1275,8 +1275,13 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     // drift: a declaration's own label, joined with what it reads through
     // what it calls (ADR-0118). Keyed by RESOLVED IDENTITY: `Cart` in one
     // module and `Cart` in another are two declarations with two labels.
-    let labels: BTreeMap<crate::resolve::DefId, Label> =
-        crate::check::Reads::of(hirs, sigs, &inference).labels();
+    //
+    // And what each holds where it runs (ADR-0282), as the checker's
+    // placement reads it: a secret it answers or reads, never one it only
+    // uses.
+    let reads = crate::check::Reads::of(hirs, sigs, &inference)
+        .answering(&crate::check::summaries(hirs, sigs));
+    let labels: BTreeMap<crate::resolve::DefId, Label> = reads.labels();
 
     // The functions a page's template reads as members (ADR-0125): a host
     // calls each to compute what the page shows, so each is a component with
@@ -1423,12 +1428,17 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // would have given the contract's placement a second channel from
             // policy values.
             //
-            // `check::body_label` is the checker's own derivation, called
-            // rather than repeated, so the artifact and the diagnostic cannot
-            // disagree about how private a component is.
+            // `check::declaration_label` and `Reads::holds` are the
+            // checker's own derivation, called rather than repeated, so the
+            // artifact and the diagnostic cannot disagree about how private
+            // a component is (ADR-0282: until 2026-10-08 the contract's page
+            // reading the session through a query of its own was allowed at
+            // build).
+            let def = crate::resolve::DefId { unit, decl: id.0 };
             let demand = Demand {
                 effects: effects.clone(),
-                label: crate::check::declaration_label(hir, &labels, &inference, unit, decl),
+                label: crate::check::declaration_label(hir, &labels, &inference, unit, decl)
+                    .join(&reads.holds(def)),
                 declared: crate::check::declared_world(hir, decl),
             };
             // A `Blocked` effect leaves this EMPTY, and empty is the contract's

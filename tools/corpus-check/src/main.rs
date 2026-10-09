@@ -150,6 +150,10 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a value the template computes that performs an effect",
     // ADR-0230, corpus C17: PW0609, revision 2 (ruling 0071-a).
     "a template condition that tests a number",
+    // ADR-0282, corpus C18: PW5101 and PW5002, three findings of 2026-10-03.
+    "a secret a query answers, kept in a shared fragment",
+    "a fragment of a session's data, built before any request",
+    "a session read through a query of a built page's own",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

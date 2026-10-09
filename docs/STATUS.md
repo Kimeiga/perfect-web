@@ -23,6 +23,21 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0282, 2026-10-08: what a value holds is one label** (four soundness
+findings of 2026-10-03, reproduced at `d346c43`; amends ADR-0118, corrects
+ADR-0128). A secret a query answered, kept by a shared fragment at the edge,
+checked clean; a fragment of a session's cart placed at build checked clean;
+a page placed at build that read the session through a query of its own
+checked clean; and PW5002 said "it requires" and nothing more. Three
+derivations of what a value holds fed different rules, and a fragment's
+`depends_on` fed the graph alone. Now a secret a declaration answers is
+held and one it only uses as a key is not, a materialization reads what it
+depends on, and placement reads what a declaration holds, as the cache rules
+read it, in the checker and the contract alike. ADR-0128 said effects keep a
+session off the build world; they do not, since `session.read` declares no
+placement, and only the label does. Six tests, three rejected exhibits (C18)
+and 8 of 8 mutants killed (`just e14-held-labels`).
+
 **ADR-0281, 2026-10-08: a merge is held to CI's verification run** (the
 owner's decision, relayed 2026-10-08). A merge waited on a local chain of
 every touched mutation script, 4.5 hours for ADR-0277's seventeen, while
