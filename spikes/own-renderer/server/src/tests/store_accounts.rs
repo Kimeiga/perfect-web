@@ -256,7 +256,10 @@ fn a_signed_in_sessions_cart_is_not_joined_to_the_next_user() {
     assert_eq!(s.cart_lines(&ada), [("espresso".to_string(), 1)]);
     // Ada, signed in, signs in again as ben: what her session held stays.
     let ben = signed_in(&s, &provider, &ada, "ben");
-    assert!(s.cart_lines(&ben).is_empty(), "ben is joined ada's session's cart");
+    assert!(
+        s.cart_lines(&ben).is_empty(),
+        "ben is joined ada's session's cart"
+    );
     assert_eq!(s.cart_lines(&ada), [("espresso".to_string(), 1)]);
 }
 
