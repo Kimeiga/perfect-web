@@ -267,6 +267,9 @@ codes! {
         "a command's record of an interaction commits with its writes";
     SOURCE_MALFORMED = "PW0349" / source_malformed / 1, DeclarationRules,
         "a source holds what the program's effects name, and each is held by one";
+    // ADR-XXXX: a refusal is told in the words of the predicate that refused.
+    PREDICATE_DECLARED = "PW0351" / predicate_declared / 1, DeclarationRules,
+        "a command's `requires` names declared predicates, each given its parameters by type, and each predicate says what a reader is told when it refuses";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
 

@@ -226,11 +226,16 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // parameters, and one route is one page's.
             out.extend(crate::routes::parameters_agree(&u.hir, i, &sigs));
             out.extend(crate::routes::declared_twice(&hirs, i));
+            // ADR-XXXX: a predicate is declared once, with one set of words.
+            out.extend(crate::predicates::declared_twice(&hirs, i));
             // Track `uploads` (ADR-0260): an upload's clauses, its paths, and
             // the forms that post a file.
             out.extend(crate::uploads::check(&hirs, i));
             // ADR-0163: a page says when its address names nothing.
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
+            // ADR-XXXX: a predicate a command requires is declared, with its
+            // words.
+            out.extend(crate::predicates::check(&u.hir, i, &sigs, &workspace));
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
             out.extend(check_unit_with(
                 &labels,
@@ -2813,6 +2818,7 @@ fn described(kind: DeclKind) -> &'static str {
         DeclKind::Event => "an event",
         DeclKind::Source => "a data source",
         DeclKind::Upload => "an upload",
+        DeclKind::Predicate => "a predicate",
         DeclKind::Effect => "an effect",
         DeclKind::Prelude => "a prelude",
         DeclKind::Fn => "a function",

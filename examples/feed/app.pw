@@ -337,6 +337,18 @@ public query Thread(id: PostId) -> Result<Post, FeedError>
     thread(id)
 }
 
+// **What a reader is told when a predicate refuses a press** (ADR-XXXX):
+// each in the feed's words, said where the press was. What each means is the
+// deployment's (ADR-0115); none says what the predicate read.
+predicate SignedIn
+    says "Sign in to post, reply, like or follow."
+
+predicate OwnsPost(post: PostId)
+    says "Only its author can delete a post."
+
+predicate MayMessage(to: UserId)
+    says "You can't send this person a message."
+
 command post(text: PostText) -> Result<Post, FeedError>
     requires      SignedIn
     idempotent_by InteractionId

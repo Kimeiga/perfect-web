@@ -156,6 +156,12 @@ struct Answered {
     committed: bool,
     result: Option<serde_json::Value>,
     why: Option<String>,
+    /// **The predicate its `requires` refused it by** (ADR-XXXX), kept with
+    /// the interaction, so a resent press is answered as the press was:
+    /// until ADR-XXXX the refusal lived only on the thread that ran
+    /// `requires`, and a resend, answered from what was kept, was answered
+    /// as a command that did not commit, with nothing to tell.
+    refused: Option<String>,
 }
 
 impl Answered {
@@ -164,7 +170,11 @@ impl Answered {
     /// one: a command declaring no `Result` answers `null`, which is an
     /// answer, and a command that trapped answers none.
     fn kept(&self) -> String {
-        let mut kept = serde_json::json!({ "committed": self.committed, "why": self.why });
+        let mut kept = serde_json::json!({
+            "committed": self.committed,
+            "why": self.why,
+            "refused": self.refused,
+        });
         if let Some(result) = &self.result {
             kept["result"] = result.clone();
         }
@@ -177,6 +187,7 @@ impl Answered {
             committed: v["committed"] == true,
             result: v.get("result").cloned(),
             why: v["why"].as_str().map(str::to_string),
+            refused: v["refused"].as_str().map(str::to_string),
         }
     }
 }
@@ -659,6 +670,10 @@ struct Server {
     /// meanwhile** (ADR-0271): one telling of a session at a time, and one
     /// more after it for every commit that came while it ran.
     told: Mutex<BTreeMap<String, bool>>,
+    /// **The words a program declares for its predicates** (ADR-XXXX,
+    /// `predicates.json`): what a reader is told when one refuses, in place
+    /// of the deployment's.
+    words: BTreeMap<String, String>,
     /// **The version each speculated value was last sent at** (ADR-0222), by
     /// session, page, binding and the page's parameters its key reads
     /// (ADR-0236): what a commit's answer names, so the page keeps its
@@ -1127,6 +1142,38 @@ impl Server {
                 short.join("; ")
             ));
         }
+        // **Every predicate the program requires, this deployment
+        // evaluates** (ADR-XXXX): one it cannot would answer each press of
+        // its commands with nothing to tell, so it is refused here, before
+        // anything is served. And the words the program declares for them.
+        let words: BTreeMap<String, String> =
+            match std::fs::read_to_string(build.join("predicates.json")) {
+                Ok(text) => {
+                    serde_json::from_str(&text).map_err(|e| format!("predicates.json: {e}"))?
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => BTreeMap::new(),
+                Err(e) => return Err(format!("predicates.json: {e}")),
+            };
+        let unknown: std::collections::BTreeSet<&str> = contracts
+            .iter()
+            .flat_map(|c| c.exports.iter())
+            .filter_map(|e| e.component.as_ref())
+            .flat_map(|e| e.authorization.iter())
+            .map(|a| a.predicate.as_str())
+            .chain(words.keys().map(String::as_str))
+            .filter(|p| identity::says(p).is_none())
+            .collect();
+        if !unknown.is_empty() {
+            return Err(format!(
+                "this deployment cannot evaluate the predicate{} the program requires: {}",
+                if unknown.len() == 1 { "" } else { "s" },
+                unknown
+                    .iter()
+                    .map(|p| format!("`{p}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
         // The page a document with none recorded is, where the layer has one.
         let plan = data
             .default_page()
@@ -1153,6 +1200,7 @@ impl Server {
         // the identity's principals say.
         uploads.identified_by(server.identity.principals());
         server.uploads = uploads;
+        server.words = words;
         // **What the program imports, its data layer supplies** (ADR-0218):
         // refused here, as uncompiled handlers are, rather than when a press
         // first reaches the operation.
@@ -1269,6 +1317,7 @@ impl Server {
             pages: Mutex::new(BTreeMap::new()),
             telling: Mutex::new(Vec::new()),
             told: Mutex::new(BTreeMap::new()),
+            words: BTreeMap::new(),
             speculated_versions: Mutex::new(BTreeMap::new()),
             split_fills: std::sync::atomic::AtomicU64::new(0),
             #[cfg(test)]
@@ -1625,6 +1674,7 @@ impl Server {
                     committed: false,
                     result,
                     why: None,
+                    refused: None,
                 };
                 return Ok((answered, Vec::new()));
             }
@@ -1634,6 +1684,7 @@ impl Server {
                     committed: true,
                     result,
                     why: None,
+                    refused: None,
                 };
                 return Ok((answered, Vec::new()));
             };
@@ -1694,6 +1745,7 @@ impl Server {
                 committed: true,
                 result,
                 why: None,
+                refused: None,
             };
             Ok((answered, reached))
         }
@@ -1756,13 +1808,21 @@ impl Server {
         // Typed by the export's parameters, and held to the invariants its
         // contract states (ADR-0179): a forged quantity of 0 is refused here.
         let args = loaded.prepared.arguments_for(&export, json)?;
-        let answered = |run: Result<Answered, String>| match run {
-            Ok(answered) => answered,
-            Err(why) => Answered {
-                committed: false,
-                result: None,
-                why: Some(why),
-            },
+        // With the predicate `requires` refused it by, where one did
+        // (ADR-XXXX): taken on the thread that ran it, as it ends, so it is
+        // kept with the interaction.
+        let answered = |run: Result<Answered, String>| {
+            let mut answered = match run {
+                Ok(answered) => answered,
+                Err(why) => Answered {
+                    committed: false,
+                    result: None,
+                    why: Some(why),
+                    refused: None,
+                },
+            };
+            answered.refused = identity::take_refusal();
+            answered
         };
         let Some(key_type) = &export.idempotent_by else {
             return Ok(answered(self.command_answered(
@@ -6058,9 +6118,27 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             if drop_at == Some(DropAt::After) {
                 return;
             }
-            // TRACK SEAM (identity): the refusal, where `requires` refused.
-            if let Some(predicate) = identity::take_refusal() {
-                let refused = serde_json::json!({ "committed": false, "refused": predicate });
+            // TRACK SEAM (identity): the refusal, where `requires` refused,
+            // kept with the interaction (ADR-XXXX), and what a reader is
+            // told of it: the program's words for the predicate where it
+            // declares them, the deployment's where it does not. Never
+            // what the predicate read.
+            if let Ok(Answered {
+                refused: Some(predicate),
+                ..
+            }) = &answer
+            {
+                let says = server
+                    .words
+                    .get(predicate)
+                    .map(String::as_str)
+                    .or_else(|| identity::says(predicate))
+                    .unwrap_or_default();
+                let refused = serde_json::json!({
+                    "committed": false,
+                    "refused": predicate,
+                    "says": says,
+                });
                 respond_json(&mut stream, 403, &session, fresh, &refused.to_string());
                 return;
             }
@@ -14269,6 +14347,7 @@ public query Store(",
                 committed: true,
                 result: Some(serde_json::json!({ "$case": "ok" })),
                 why: None,
+                refused: None,
             },
             Answered {
                 committed: false,
@@ -14277,18 +14356,21 @@ public query Store(",
                     "value": { "$case": "item-unavailable", "value": "cortado" }
                 })),
                 why: None,
+                refused: None,
             },
             // A command declaring no `Result`: answered, with nothing.
             Answered {
                 committed: true,
                 result: Some(serde_json::Value::Null),
                 why: None,
+                refused: None,
             },
             // A command that trapped: no answer at all.
             Answered {
                 committed: false,
                 result: None,
                 why: Some("trapped".to_string()),
+                refused: None,
             },
         ] {
             assert_eq!(Answered::from_kept(&answered.kept()), answered);

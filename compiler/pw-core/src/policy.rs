@@ -359,6 +359,9 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         // are served, its limits, and its kinds, a closed set each sniffed
         // from a file's bytes.
         "serves" => Domain::Str,
+        // A predicate's (ADR-XXXX): the words a refusal by it is told in, one
+        // string, held by `predicates::check`.
+        "says" => Domain::Str,
         "max_bytes" | "max_width" | "max_height" => Domain::Count,
         "types" => Domain::Words(UPLOAD_TYPES),
         "captures" => Domain::Word(&["serializable_only"]),
@@ -581,6 +584,7 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         "serves" | "max_bytes" | "types" | "max_width" | "max_height" => {
             (&[K::Upload], "an upload")
         }
+        "says" => (&[K::Predicate], "a predicate"),
         // A painter's, a replicated value's, a handler policy's: forms the
         // grammar keeps as `Other`.
         "draw" | "inputs" | "isolated" => (&[K::Other], "a painter"),

@@ -160,6 +160,10 @@ pub enum DeclKind {
     /// its `route`, served once committed under `serves`, and its limits.
     /// Named by nothing a program writes; `pw build` writes it for the host.
     Upload,
+    /// `predicate OwnsPost(post: PostId)  says "…"` (ADR-XXXX): a predicate a
+    /// command's `requires` names, its parameters, and the words a refusal
+    /// by it is told in. Its meaning is the deployment's (ADR-0115).
+    Predicate,
     /// `prelude Effect` — this module exports its declarations in one
     /// namespace to every unit in the program. The namespace is the `name`.
     Prelude,
