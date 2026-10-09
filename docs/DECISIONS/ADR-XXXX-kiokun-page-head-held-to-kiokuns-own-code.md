@@ -58,7 +58,22 @@ Date: 2026-10-09. Milestone: E14.
    repository (Q3), over every 256th entry its loader shows as it is (no
    stub, no character with simplified variants or a simplified-form-of,
    whose pages merge other entries). An ignored server test compares each
-   word's served title and description with its answer.
+   word's served title and description with its answer. It follows the
+   integrator's ruling on oracles (2026-10-09), now the track's standard for
+   every pure function of kiokun.com's the rewrite reimplements:
+   - the sample is stated (stride 256, its entries read and answered) and
+     the evidence names kiokun.com's commit, the copied files' digests and
+     Node's version, so a stale comparison shows;
+   - each deliberate difference is named in this ADR, and the harness marks
+     and counts each by name (`surrogate-pair cut`); any other difference
+     fails the run, and nothing is filtered silently;
+   - a copied module that imports what the harness did not copy is refused,
+     never stubbed;
+   - CI holds a committed fixture, `kiokun-oracle/seo-sample.json`: the
+     oracle's answers for the repository's sample (11 of its 28 entries),
+     written by the recipe with its command, kiokun.com's commit, this
+     repository's commit and Node's version. Answers are data, not
+     kiokun.com's code. A CI test holds the served head to them.
 4. **The layer decodes what the head reads**: a gloss's language, KANJIDIC's
    meanings by language (`groups[].meanings`), the hanja table's English
    meanings (`meaningsEn`).
@@ -115,15 +130,19 @@ Added to ADR-0286's list:
 
 ## Acceptance
 
-- **The server's tests, 22** (and two ignored, local): the earlier 20 and:
+- **The server's tests, 23** (and two ignored, local): the earlier 20, the
+  fixture's, and:
   - the page describes itself as kiokun.com's does: 人's title, description,
     Open Graph's and Twitter's, robots; a stub's title names its other form;
   - the description takes kiokun.com's fragments and length: tags out, both
     semicolons, a number off, a classifier and a one-letter piece left out;
     a long title cut at 67 UTF-16 units with `…`, a character past U+FFFF
     counted twice.
-- **The oracle** (`just e14-kiokun-seo`, local): 5,513 words compared, 0
-  differences (`docs/evidence/E14/kiokun-seo.txt`).
+- **The oracle** (`just e14-kiokun-seo`, local): 5,513 words compared, no
+  named difference met, 0 unnamed (`docs/evidence/E14/kiokun-seo.txt`).
+- **The CI fixture**: the served head of the repository's sample against
+  the oracle's answers for it, a CI test; `scripts/kiokun_oracle_fixture.py`
+  writes it, with two tests of its own.
 - **The sample** (`just e14-kiokun-sample`, local):
   `docs/evidence/E14/kiokun-sample.txt`.
 - **The browser**: the spec reads 人's title.

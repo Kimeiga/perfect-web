@@ -84,10 +84,14 @@ e14-kiokun-seo:
        node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/seo.mjs "$lib" "$KIOKUN_DATA" 256 "$lib/seo.json"; \
        echo; echo "== the rewrite's, compared"; echo; \
        KIOKUN_SEO_ORACLE="$lib/seo.json" cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::the_page_head_matches 2>&1 \
-         | grep -E '^(compared|difference|  kiokun|  rewrite)|test result|panicked'; \
+         | grep -E '^(compared|named|unnamed|difference|  kiokun|  rewrite)|test result|panicked'; \
+       echo; echo "== the CI fixture: kiokun.com's answers for the repository's sample"; echo; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/seo.mjs "$lib" examples/kiokun/data/han-1char-3 1 "$lib/sample.json"; \
+       python3 scripts/kiokun_oracle_fixture.py "$lib/sample.json" spikes/own-renderer/kiokun-oracle/seo-sample.json \
+         "just e14-kiokun-seo" "$(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD)" "$(git rev-parse HEAD)" "$(node --version)"; \
      } > docs/evidence/E14/kiokun-seo.txt; rm -rf "$lib"
     @cat docs/evidence/E14/kiokun-seo.txt
-    @grep -q "differences: 0" docs/evidence/E14/kiokun-seo.txt
+    @grep -q "unnamed differences: 0" docs/evidence/E14/kiokun-seo.txt
 
 # The word page (the track's step 1), served by the development server as a
 # third program beside the store and the feed (docs/PARALLEL.md, "W6's

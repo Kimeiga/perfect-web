@@ -1090,20 +1090,25 @@ fn unescaped(text: &str) -> String {
         .replace("&amp;", "&")
 }
 
-/// **The page head against kiokun.com's own `buildDictionarySeo`** (local:
-/// `just e14-kiokun-seo` runs kiokun.com's `seo.ts`, copied from
-/// `KIOKUN_APP`, over a sample of `KIOKUN_DATA`, and names the answers in
-/// `KIOKUN_SEO_ORACLE`). Each word's title and description, as served, are
-/// compared with kiokun.com's; each that differs is named.
-#[test]
-#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-seo`"]
-fn the_page_head_matches_kiokuns_own_on_a_sample() {
-    let path = std::env::var_os("KIOKUN_SEO_ORACLE").expect("KIOKUN_SEO_ORACLE");
-    let answers: BTreeMap<String, serde_json::Value> =
-        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
-    let s = served_kiokun();
+/// **The page head against kiokun.com's answers** (the integrator's ruling
+/// on oracles, 2026-10-09): each word's served title and description beside
+/// the oracle's. An answer the oracle marked with a named difference holds
+/// the rewrite's text for it, and is counted by its name; any other
+/// difference is named here and fails. Returns the count of each named
+/// difference and the differences found.
+fn held_to_oracle(
+    s: &Server,
+    oracle: &serde_json::Value,
+) -> (BTreeMap<String, usize>, Vec<String>) {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut named: BTreeMap<String, usize> = BTreeMap::new();
     let mut differ: Vec<String> = Vec::new();
-    for (word, answer) in &answers {
+    for (word, answer) in answers {
+        for name in answer["named"].as_array().into_iter().flatten() {
+            *named
+                .entry(name.as_str().unwrap_or_default().to_string())
+                .or_default() += 1;
+        }
         let page = fetched(&s, &path_of(word));
         let (want_title, want_description) = (
             answer["title"].as_str().unwrap_or_default(),
@@ -1129,13 +1134,55 @@ fn the_page_head_matches_kiokuns_own_on_a_sample() {
             ));
         }
     }
+    (named, differ)
+}
+
+/// **The page head against kiokun.com's own `buildDictionarySeo`** (local:
+/// `just e14-kiokun-seo` runs kiokun.com's `seo.ts`, copied from
+/// `KIOKUN_APP`, over a stated sample of `KIOKUN_DATA`, and names its
+/// answers in `KIOKUN_SEO_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-seo`"]
+fn the_page_head_matches_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_SEO_ORACLE").expect("KIOKUN_SEO_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let (named, differ) = held_to_oracle(&s, &oracle);
     println!(
-        "compared: {} words; differences: {}",
-        answers.len(),
-        differ.len()
+        "compared: {} words (stride {}, {} entries read)",
+        oracle["answered"], oracle["stride"], oracle["read"]
     );
+    println!("named differences: {named:?}");
+    println!("unnamed differences: {}", differ.len());
     for d in differ.iter().take(30) {
         println!("difference: {d}");
     }
-    assert!(differ.is_empty(), "{} difference(s)", differ.len());
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
+}
+
+/// **The page head against kiokun.com's answers for the repository's sample**
+/// (`spikes/own-renderer/kiokun-oracle/seo-sample.json`, written by `just
+/// e14-kiokun-seo` with its command and both commits): what CI holds, since
+/// it has neither kiokun.com's code nor the owner's data.
+#[test]
+fn the_page_head_matches_kiokuns_answers_for_the_sample() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../kiokun-oracle/seo-sample.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the fixture")).expect("JSON");
+    assert!(
+        fixture["kiokun_commit"]
+            .as_str()
+            .is_some_and(|c| c.len() == 40),
+        "{fixture}"
+    );
+    let oracle = &fixture["oracle"];
+    assert!(
+        oracle["answered"].as_u64().unwrap_or_default() > 0,
+        "{fixture}"
+    );
+    let s = served_kiokun_on(&sample());
+    let (_, differ) = held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
 }
