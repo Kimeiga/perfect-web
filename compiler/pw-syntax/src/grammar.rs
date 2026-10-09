@@ -277,6 +277,9 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     // ADR-0163: the declared error that means a page's address names
     // nothing, answered 404 rather than 503.
     "not_found_on",
+    // ADR-0295: the declared error that means a page's address is another
+    // address of the page, answered 308 or 307 there.
+    "redirect_on",
     "privacy",
     "storage",
     "offline",

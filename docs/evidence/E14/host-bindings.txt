@@ -1,0 +1,25 @@
+ADR-0262 - a host binding is an operation a host provides
+
+produced by: just e14-host-bindings
+commit: 1759043f085600066bbdc6f81cd719578a049263
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37912147550 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the checker (compiler/pw-core/tests/host_bindings.rs)
+
+test the_uploads_tracks_binding_with_no_interface_is_refused_where_it_is_written ... ok
+test a_malformed_binding_stops_the_build_at_check_and_never_reaches_wit ... ok
+test each_part_of_a_binding_is_a_wit_identifier ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s
+
+== mutation controls (scripts/host_binding_mutations.py)
+
+baseline: 3 passed, 0 failed
+a binding is any string again: KILLED (3 of 3 tests fail)
+a binding needs no interface: KILLED (2 of 3 tests fail)
+a binding needs no namespace: KILLED (1 of 3 tests fail)
+a word of an identifier may mix cases: KILLED (1 of 3 tests fail)
+an identifier may begin with what is not a letter: KILLED (1 of 3 tests fail)
+an identifier may hold an underscore: KILLED (1 of 3 tests fail)
+6 of 6 mutants killed
+memory bound: no process was stopped

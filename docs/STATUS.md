@@ -23,6 +23,20 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0295, 2026-10-09: a page at another address of the page is moved
+there** (track `kiokun`'s need: `KiokunError.Moved`, declared and never
+returned). A page declares the error that means its address is another of
+its own, and how it moves: `redirect_on KiokunError.Moved permanent`.
+PW0350 holds it to one value of the type of the one parameter the page's
+route carries, a case a query the page reads can answer, and not the case
+it is absent by. The host answers it 308, or 307, to the page's own route
+with that value, encoded as a link's hole is, the query kept and no origin
+named, so no `Host` header picks one; kept by no cache; a move to itself or
+to `..` is the program's fault, 500, never a loop. 7 compiler tests, 5 of
+the host's on kiokun's word page, 15 of 15 mutants killed on CI (run
+37912147550). **Corrected with it:** ADR-0262's `just e14-host-bindings`
+was cited and never recorded on `master`; that run records it, 6 of 6.
+
 **2026-10-09, three findings fixed, and three recipes recorded for the
 first time** (`track/arrival-clock`). **Corrected:** ADR-0257's `just
 e14-follows`, ADR-0268's `just e14-keepalive` and ADR-0275's `just
