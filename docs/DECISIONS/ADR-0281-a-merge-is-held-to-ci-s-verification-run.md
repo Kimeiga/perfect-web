@@ -49,6 +49,14 @@ Amends the integrator's practice under ADR-0245.
    - each recipe that names it in its own lines.
 4. **The record.** `just evidence-fetch <run>` copies a run's evidence into
    `docs/evidence/`, each file stamped with its run and its commit (ADR-0245).
+   - **A run that failed only where a failure is open in NEXT** is fetched
+     with `--known <job>` for each such job, which the merge names too
+     (amended 2026-10-09, when WebKit's "Load more" failed nearly every run).
+     A recipe shard is never known: its evidence is what the fetch copies.
+   - **A run of one shard is read where its evidence was put** (fixed
+     2026-10-09): `download-artifact` extracts a lone match into the path
+     itself, so the summary found no shard and failed every run that planned
+     one (W6's 1b, run 37889326640, passed its recipe and reported none).
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does

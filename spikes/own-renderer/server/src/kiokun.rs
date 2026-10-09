@@ -22,7 +22,11 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 /// What a node grants the program: reading entries, and nothing else.
-pub(crate) const GRANTS: &[&str] = &["database.read<Entry>"];
+pub(crate) const GRANTS: &[&str] = &[
+    "database.read<Entry>",
+    "database.read<Label>",
+    "database.read<CharGloss>",
+];
 
 /// The sample the repository carries (ADR-0037): 28 files of one shard.
 fn sample() -> PathBuf {
@@ -31,25 +35,101 @@ fn sample() -> PathBuf {
 
 pub(crate) struct KiokunData {
     root: PathBuf,
+    app: Arc<App>,
+}
+
+/// **kiokun.com's own data, as its app keeps it**, read once: its labels for
+/// JMdict's codes, each a `Label`, and its component glosses by character.
+#[derive(Default)]
+pub(crate) struct App {
+    labels: Vec<Val>,
+    glosses: BTreeMap<String, String>,
+}
+
+/// The app's data at `app`, the checkout's `sveltekit-app`: an error where a
+/// table is missing, not an empty table.
+pub(crate) fn app_of(app: &Path) -> Result<App, String> {
+    Ok(App {
+        labels: labels_of(app)?,
+        glosses: glosses_of(app)?,
+    })
+}
+
+/// **kiokun.com's component glosses** (`static/game_data/component_glosses.json`):
+/// a character's learner gloss, by character.
+pub(crate) fn glosses_of(app: &Path) -> Result<BTreeMap<String, String>, String> {
+    let path = app.join("static/game_data/component_glosses.json");
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 impl KiokunData {
-    /// The files `KIOKUN_DATA` names, or the repository's sample.
-    pub(crate) fn new() -> KiokunData {
+    /// The files `KIOKUN_DATA` names, or the repository's sample; and the
+    /// labels of the app `KIOKUN_APP` names, the checkout's `sveltekit-app`
+    /// (docs/PARALLEL.md, "W6's inventory, answered", Q3), or none. An app
+    /// named without its tables is an error, not empty tables.
+    pub(crate) fn new() -> Result<KiokunData, String> {
         let root = std::env::var_os("KIOKUN_DATA")
             .map(PathBuf::from)
             .unwrap_or_else(sample);
-        KiokunData { root }
+        let app = match std::env::var_os("KIOKUN_APP") {
+            Some(app) => app_of(&PathBuf::from(app))?,
+            None => App::default(),
+        };
+        Ok(KiokunData {
+            root,
+            app: Arc::new(app),
+        })
     }
 
     #[cfg(test)]
-    pub(crate) fn at(root: PathBuf) -> KiokunData {
-        KiokunData { root }
+    pub(crate) fn at(root: PathBuf, app: Option<&Path>) -> KiokunData {
+        let app = app
+            .map(|a| app_of(a).expect("the app's data"))
+            .unwrap_or_default();
+        KiokunData {
+            root,
+            app: Arc::new(app),
+        }
     }
 }
 
 /// The longest file name, in bytes, on macOS (APFS) and Linux (ext4).
 const NAME_MAX: usize = 255;
+
+/// The kinds of kiokun.com's label table, as `japaneseLabels.ts` reads them.
+const LABEL_KINDS: [&str; 5] = ["pos", "misc", "field", "dial", "head_info"];
+
+/// **kiokun.com's labels** (`src/lib/japanese-labels.json`, its `labels`):
+/// each kind's codes and texts, as the program's `Label`. A lookup reads a
+/// code's text, so their order is not kept.
+pub(crate) fn labels_of(app: &Path) -> Result<Vec<Val>, String> {
+    let path = app.join("src/lib/japanese-labels.json");
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let json: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut out = Vec::new();
+    for kind in LABEL_KINDS {
+        let Some(table) = json
+            .get("labels")
+            .and_then(|l| l.get(kind))
+            .and_then(|t| t.as_object())
+        else {
+            continue;
+        };
+        for (code, label) in table {
+            out.push(record(vec![
+                ("kind", Val::String(kind.to_string())),
+                ("code", Val::String(code.clone())),
+                (
+                    "text",
+                    Val::String(label.as_str().unwrap_or_default().to_string()),
+                ),
+            ]));
+        }
+    }
+    Ok(out)
+}
 
 /// **Is `subdirectory/file` one of kiokun's files, and nothing else?** Two
 /// lowercase hexadecimal digits, as the shard rule writes them, and one path
@@ -255,6 +335,120 @@ pub(crate) fn entry(json: &serde_json::Value) -> Val {
         ("japanese", Val::List(japanese)),
         ("korean", Val::List(korean)),
         ("names", Val::List(names)),
+        (
+            "chinese-char",
+            optional(json.get("chinese_char"), chinese_char),
+        ),
+        (
+            "japanese-char",
+            optional(json.get("japanese_char"), japanese_char),
+        ),
+        (
+            "korean-char",
+            optional(json.get("korean_char"), korean_char),
+        ),
+        (
+            "mnemonic",
+            optional(json.get("semantic_mnemonic"), mnemonic),
+        ),
+        (
+            "variants",
+            Val::List(
+                list(json, "semantic_mnemonic_variants")
+                    .filter(|c| !c.is_null())
+                    .map(mnemonic)
+                    .collect(),
+            ),
+        ),
+        (
+            "simplified-form-of",
+            Val::String(text(json, "simplified_form_of")),
+        ),
+    ])
+}
+
+/// A field the file may not have, or may have as `null`, as an `Option`.
+fn optional(v: Option<&serde_json::Value>, f: fn(&serde_json::Value) -> Val) -> Val {
+    Val::Option(v.filter(|v| !v.is_null()).map(|v| Box::new(f(v))))
+}
+
+/// A number the file may not have, as an `Option<Int>`.
+fn maybe_int(v: Option<&serde_json::Value>) -> Val {
+    Val::Option(v.and_then(|n| n.as_i64()).map(|n| Box::new(Val::S64(n))))
+}
+
+/// `ChineseChar { gloss, frequencies, old, cantonese, hsk }`.
+fn chinese_char(c: &serde_json::Value) -> Val {
+    record(vec![
+        ("character", Val::String(text(c, "char"))),
+        ("simplified", strings(c, "simpVariants")),
+        ("traditional", strings(c, "tradVariants")),
+        ("hong-kong", Val::String(text(c, "hkChar"))),
+        ("gloss", Val::String(text(c, "gloss"))),
+        ("frequencies", texts(c, "pinyinFrequencies", "pinyin")),
+        ("old", texts(c, "oldPronunciations", "pinyin")),
+        ("cantonese", strings(c, "cantonese")),
+        (
+            "hsk",
+            maybe_int(c.get("statistics").and_then(|s| s.get("hskLevel"))),
+        ),
+    ])
+}
+
+/// KANJIDIC's readings, each `KanjiReading { kind, value }`.
+fn kanji_readings(v: &serde_json::Value, key: &str) -> Val {
+    Val::List(
+        list(v, key)
+            .map(|r| {
+                record(vec![
+                    ("kind", Val::String(text(r, "type"))),
+                    ("value", Val::String(text(r, "value"))),
+                ])
+            })
+            .collect(),
+    )
+}
+
+/// `JapaneseChar { jlpt, grouped, groups, readings }`: `grouped` where the
+/// file's `readingMeaning` has `groups`, whatever they hold.
+fn japanese_char(j: &serde_json::Value) -> Val {
+    let meaning = j.get("readingMeaning").cloned().unwrap_or_default();
+    let groups = meaning.get("groups").filter(|g| g.is_array());
+    record(vec![
+        ("literal", Val::String(text(j, "literal"))),
+        (
+            "jlpt",
+            maybe_int(j.get("misc").and_then(|m| m.get("jlptLevel"))),
+        ),
+        ("grouped", Val::Bool(groups.is_some())),
+        (
+            "groups",
+            Val::List(
+                list(&meaning, "groups")
+                    .map(|g| record(vec![("readings", kanji_readings(g, "readings"))]))
+                    .collect(),
+            ),
+        ),
+        ("readings", kanji_readings(&meaning, "readings")),
+    ])
+}
+
+/// `KoreanChar { readings }`: its readings' hangul.
+fn korean_char(k: &serde_json::Value) -> Val {
+    record(vec![
+        ("character", Val::String(text(k, "character"))),
+        ("hanja", Val::String(text(k, "hanjaForm"))),
+        ("readings", texts(k, "readings", "hangul")),
+    ])
+}
+
+/// A card: `Card { character, keyword, meaning, lexical }`.
+fn mnemonic(m: &serde_json::Value) -> Val {
+    record(vec![
+        ("character", Val::String(text(m, "character"))),
+        ("keyword", Val::String(text(m, "mnemonic_keyword"))),
+        ("meaning", Val::String(text(m, "meaning"))),
+        ("lexical", Val::String(text(m, "lexical_gloss"))),
     ])
 }
 
@@ -281,8 +475,69 @@ pub(crate) fn read(
         .map_err(|e| format!("{}: not JSON: {e}", rel.display()))
 }
 
-fn reads_of(root: PathBuf) -> data::Ops {
+/// One file read, as `entries#read` answers it.
+fn read_one(root: &Path, subdirectory: &str, file: &str) -> Result<Val, String> {
+    let found = read(root, subdirectory, file)?;
+    Ok(Val::Option(found.map(|j| Box::new(entry(&j)))))
+}
+
+/// A `Place { subdirectory, file }`'s two fields.
+fn place_fields(v: &Val) -> Result<(String, String), String> {
+    let Val::Record(fields) = v else {
+        return Err(format!("a place is a record, not {v:?}"));
+    };
+    let field = |name: &str| match fields.iter().find(|(k, _)| k == name) {
+        Some((_, Val::String(s))) => Ok(s.clone()),
+        other => Err(format!("a place's {name} is {other:?}")),
+    };
+    Ok((field("subdirectory")?, field("file")?))
+}
+
+fn reads_of(root: PathBuf, app: Arc<App>) -> data::Ops {
     let mut ops: data::Ops = BTreeMap::new();
+    let a = app.clone();
+    ops.insert(
+        "kiokun:data/support#glosses".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::List(characters)] => Ok(vec![Val::List(
+                characters
+                    .iter()
+                    .filter_map(|c| match c {
+                        Val::String(c) => a.glosses.get(c).map(|g| {
+                            record(vec![
+                                ("character", Val::String(c.clone())),
+                                ("gloss", Val::String(g.clone())),
+                            ])
+                        }),
+                        _ => None,
+                    })
+                    .collect(),
+            )]),
+            other => Err(format!("support#glosses received {other:?}")),
+        }),
+    );
+    let r = root.clone();
+    ops.insert(
+        "kiokun:data/entries#read-all".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::List(places)] => {
+                let mut out = Vec::with_capacity(places.len());
+                for p in places {
+                    let (subdirectory, file) = place_fields(p)?;
+                    out.push(read_one(&r, &subdirectory, &file)?);
+                }
+                Ok(vec![Val::List(out)])
+            }
+            other => Err(format!("entries#read-all received {other:?}")),
+        }),
+    );
+    ops.insert(
+        "kiokun:data/labels#japanese".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [] => Ok(vec![Val::List(app.labels.clone())]),
+            other => Err(format!("labels#japanese received {other:?}")),
+        }),
+    );
     ops.insert(
         "kiokun:data/entries#read".to_string(),
         Arc::new(move |args: &[Val]| match args {
@@ -311,11 +566,11 @@ impl data::Staged for Nothing {
 
 impl data::DataLayer for KiokunData {
     fn reads(&self, _session: &str, _stopped: Option<Stopped>) -> data::Ops {
-        reads_of(self.root.clone())
+        reads_of(self.root.clone(), self.app.clone())
     }
 
     fn begin<'a>(&'a self, _session: &str) -> Box<dyn data::Staged + 'a> {
-        Box::new(Nothing(reads_of(self.root.clone())))
+        Box::new(Nothing(reads_of(self.root.clone(), self.app.clone())))
     }
 
     fn grants(&self) -> Vec<&'static str> {

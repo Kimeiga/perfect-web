@@ -1186,7 +1186,7 @@ impl Server {
         {
             // TRACK SEAM (kiokun): kiokun's files, read-only, where the
             // program imports `kiokun:data/…` (docs/PARALLEL.md, W6, Q2).
-            Arc::new(kiokun::KiokunData::new())
+            Arc::new(kiokun::KiokunData::new()?)
         } else {
             store.clone()
         };

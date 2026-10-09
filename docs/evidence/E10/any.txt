@@ -1,89 +1,118 @@
 ADR-0065 - a value that holds at every type
 
 produced by: just e10-any
-commit: 85899fce863aabb025cd58281a64ef9b520613df
+commit: ae555e9a08ef808665f519c4b10341c6b8d94133
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37888911377 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == None, [], Err, todo, a free parameter, a let mut (compiler/pw-core/tests/any_type.rs)
 
 test a_case_passed_as_a_function_keeps_its_link ... ok
-test todo_is_any_value ... ok
-test a_mutable_binding_is_one_type ... ok
 test a_generic_case_nothing_fixes_is_any_instance ... ok
-test an_early_return_is_any_success ... ok
 test a_failure_is_a_result_of_any_success ... ok
-test none_is_an_option_of_anything ... ok
-test a_value_of_any_type_fixes_no_variable ... ok
+test a_mutable_binding_is_one_type ... ok
 test a_parameter_no_field_mentions_is_any_type ... ok
+test a_folds_accumulator_is_what_its_function_builds ... ok
+test a_value_of_any_type_fixes_no_variable ... ok
+test an_early_return_is_any_success ... ok
+test todo_is_any_value ... ok
+test none_is_an_option_of_anything ... ok
 test an_empty_list_is_a_list_of_anything ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+test a_seed_its_context_does_not_type_is_built_at_the_folds_type ... ok
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
 
 == what the value relations decide: the store program
 
-42 file(s)
-  Arity       agree                            24
-  Argument    agree                            28
-  Field       agree                            11
-  Return      agree                            63
+44 file(s)
+  Arity       agree                            112
+  Argument    agree                            150
+  Field       agree                            34
+  Return      agree                            92
   Return      undecided: Unknown               1
-  Binding     agree                            1
-  Annotation  agree                            422
-  Operand     agree                            9
-  Assignment  agree                            1
-  Member      agree                            8
-  Case        agree                            5
+  Binding     agree                            3
+  Annotation  agree                            516
+  Operand     agree                            88
+  Assignment  agree                            24
+  Member      agree                            100
+  Case        agree                            7
+  Fields      agree                            12
+  Branches    agree                            9
+  Items       agree                            1
+  Literal     agree                            30
+  Handler     agree                            10
+  Truth       agree                            5
+  Text        agree                            54
+  Invariant   agree                            5
+  Transition  agree                            4
 
 == what the value relations decide: kiokun
 
 26 file(s)
-  Arity       agree                            76
+  Arity       agree                            74
   Argument    agree                            131
-  Field       agree                            32
-  Return      agree                            81
+  Field       agree                            30
+  Return      agree                            79
   Return      undecided: Unknown               1
   Binding     agree                            1
-  Annotation  agree                            396
-  Operand     agree                            156
+  Annotation  agree                            400
+  Operand     agree                            173
   Assignment  agree                            1
   Member      agree                            105
   Case        agree                            4
+  Fields      agree                            6
+  Branches    agree                            5
+  Items       agree                            1
+  Literal     agree                            79
+  Truth       agree                            8
+  Text        agree                            39
 
 == what the value relations decide: the accepted corpus as one program
 
-64 file(s)
-  Arity       agree                            62
-  Argument    agree                            86
-  Argument    undecided: Unknown               6
-  Field       agree                            18
-  Return      agree                            75
-  Return      undecided: Unknown               2
-  Binding     agree                            1
+74 file(s)
+  Arity       agree                            109
+  Argument    agree                            162
+  Argument    undecided: Unknown               5
+  Field       agree                            51
+  Return      agree                            103
+  Return      undecided: Unknown               1
+  Binding     agree                            2
   Binding     undecided: Unknown               3
-  Annotation  agree                            462
-  Operand     agree                            35
-  Operand     undecided: Unknown               4
+  Annotation  agree                            558
+  Operand     agree                            122
+  Operand     undecided: Unknown               3
   Assignment  agree                            2
-  Member      agree                            46
-  Member      undecided: Unknown               3
+  Member      agree                            106
+  Member      undecided: Unknown               2
   Case        agree                            7
+  Fields      agree                            18
+  Branches    agree                            11
+  Branches    undecided: Unknown               1
+  Items       agree                            3
+  Literal     agree                            43
+  Handler     agree                            2
+  Truth       agree                            3
+  Text        agree                            42
+  Text        undecided: Unknown               2
+  Invariant   agree                            4
+  Transition  agree                            1
 
 == mutation controls (scripts/any_type_mutations.py)
 
-baseline: 10 passed, 0 failed
-a value of any type is undecided: KILLED (7 of 10 tests fail)
-a variable a value of any type meets is bound to it: KILLED (1 of 10 tests fail)
-a variable only a value of any type meets is unknown: KILLED (3 of 10 tests fail)
-`None` is an option of something unstated: KILLED (1 of 10 tests fail)
-`todo` is unknown: KILLED (1 of 10 tests fail)
-`[]` is a list of something unstated: KILLED (2 of 10 tests fail)
-`Err`'s success is unstated: KILLED (1 of 10 tests fail)
-an early return's success is unstated: KILLED (1 of 10 tests fail)
-a call's construction leaves its unmentioned parameters unknown: KILLED (1 of 10 tests fail)
-a record built by field names leaves its unmentioned parameters unknown: KILLED (1 of 10 tests fail)
-a case without a payload leaves its parameters unknown: KILLED (1 of 10 tests fail)
-a `let mut` holds any type its first value holds at: KILLED (1 of 10 tests fail)
-an assignment does not complete a `let mut`'s type: KILLED (1 of 10 tests fail)
-a value of any type is no number: KILLED (1 of 10 tests fail)
+baseline: 12 passed, 0 failed
+a value of any type is undecided: KILLED (8 of 12 tests fail)
+a variable a value of any type meets is bound to it: KILLED (3 of 12 tests fail)
+a variable only a value of any type meets is unknown: KILLED (4 of 12 tests fail)
+`None` is an option of something unstated: KILLED (2 of 12 tests fail)
+`todo` is unknown: KILLED (1 of 12 tests fail)
+`[]` is a list of something unstated: KILLED (4 of 12 tests fail)
+`Err`'s success is unstated: KILLED (1 of 12 tests fail)
+an early return's success is unstated: KILLED (1 of 12 tests fail)
+a call's construction leaves its unmentioned parameters unknown: KILLED (1 of 12 tests fail)
+a record built by field names leaves its unmentioned parameters unknown: KILLED (1 of 12 tests fail)
+a case without a payload leaves its parameters unknown: KILLED (1 of 12 tests fail)
+a `let mut` holds any type its first value holds at: KILLED (1 of 12 tests fail)
+an assignment does not complete a `let mut`'s type: KILLED (1 of 12 tests fail)
+a value of any type is no number: KILLED (1 of 12 tests fail)
 14 of 14 mutants killed
 
 NOT CLAIMED: a generic function's result its arguments do not fix, which

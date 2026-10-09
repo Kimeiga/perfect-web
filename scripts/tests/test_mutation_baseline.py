@@ -9,11 +9,15 @@ import importlib.util
 import io
 import pathlib
 import re
+import os
 import subprocess
 import sys
+import threading
 import unittest
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
+# As a script run from `scripts/` finds what it imports beside it.
+sys.path.insert(0, str(SCRIPTS))
 
 
 def load(name: str):
@@ -175,6 +179,17 @@ class Heard(unittest.TestCase):
         for _ in range(baseline.KEPT + 3):
             subprocess.run(python("pass"))
         self.assertEqual(len(baseline.heard), baseline.KEPT)
+
+
+class Bounded(unittest.TestCase):
+    def test_imported_it_bounds_every_process_the_script_starts(self):
+        watching = [t for t in threading.enumerate() if t.name == "mutation-bound" and t.is_alive()]
+        self.assertEqual(len(watching), 1)
+        # Its own: the bound `mutation_baseline` started, of this process.
+        watch = watching[0].watch
+        self.assertIsInstance(watch, baseline.mutation_bound.Watch)
+        self.assertEqual(watch.root, os.getpid())
+        self.assertEqual(watch.bound, baseline.mutation_bound.BOUND)
 
 
 class EveryScript(unittest.TestCase):
