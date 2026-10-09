@@ -10,7 +10,8 @@
 # joined (tests/user_visibility.rs, tests/boundary_matrix.rs, boundary.rs's
 # own); the corpus (R-063, A-033, R-064); the server's (tests/store_accounts.rs
 # and store.rs's joins), in memory and with the store on PostgreSQL; identity's
-# sign-in, which tells the store of a guest signed in; and the mutation
+# sign-in, which tells the store of a guest signed in; telling by principal,
+# which the feed's notifications share; and the mutation
 # controls (scripts/store_accounts_mutations.py). It needs a throwaway
 # PostgreSQL database, PW_STORE_DATABASE_URL (or PW_FEED_DATABASE_URL), each
 # test in a schema of its own, as e14-store-postgres does.
@@ -21,6 +22,7 @@ e14-store-accounts:
        exit 0; \
      fi; \
      export PW_STORE_DATABASE_URL="$url"; \
+     export PW_FEED_DATABASE_URL="${PW_FEED_DATABASE_URL:-$url}"; \
      mkdir -p docs/evidence/E14; \
      { echo "Track store-accounts - a cart and an order a user's (milestone 1)"; echo; \
        echo "produced by: just e14-store-accounts"; \
@@ -34,7 +36,7 @@ e14-store-accounts:
        echo; echo "== the corpus (corpus-check; R-063, A-033, R-064)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        echo; echo "== the server, the store in memory (tests/store_accounts.rs, store.rs's joins, tests/sign_in.rs)"; echo; \
-       PW_STORE_TEST_LAYER=memory cargo test --locked -p pw-dev-server -- tests::store_accounts:: store::joins:: tests::sign_in:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       PW_STORE_TEST_LAYER=memory cargo test --locked -p pw-dev-server -- tests::store_accounts:: store::joins:: tests::sign_in:: tests::notifications:: a_sessions_own_change_reaches_no_other_session 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the server, the store on PostgreSQL (PW_STORE_TEST_LAYER=postgres)"; echo; \
        PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- tests::store_accounts:: store::joins:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== mutation controls (scripts/store_accounts_mutations.py)"; echo; \

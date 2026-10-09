@@ -380,6 +380,17 @@ fn reload_batch(cursor: u64) -> String {
 /// session had one subscriber, and serving a document cleared it.
 type Doc = (String, u64);
 
+/// **What a commit's drops reached that another session may hold**
+/// (ADR-0219): a query, by its path, and, where the entries dropped were a
+/// user's, whose (track `store-accounts`, telling by principal, ADR-XXXX).
+/// A private entry keyed by the reader's handle is that user's sessions'
+/// alone to be told of; any other a commit reaches is every reader's.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct Reached {
+    resource: String,
+    user: Option<String>,
+}
+
 /// What a test does between a keyed read and its apply (ADR-0224).
 #[cfg(test)]
 type KeyedFetched = Box<dyn FnOnce(&Server) + Send>;
@@ -786,7 +797,7 @@ struct Server {
     /// **What commits dropped that other sessions may hold** (ADR-0219),
     /// with the session that committed: told once the request that
     /// committed is answered (`tell_waiting`).
-    telling: Mutex<Vec<(String, Vec<String>)>>,
+    telling: Mutex<Vec<(String, Vec<Reached>)>>,
     /// **The sessions being told, and whether a commit reached one again
     /// meanwhile** (ADR-0271): one telling of a session at a time, and one
     /// more after it for every commit that came while it ran.
@@ -1996,7 +2007,7 @@ impl Server {
         session: &str,
         args: &[Val],
         interaction: Option<&str>,
-    ) -> Result<(Answered, Vec<String>), String> {
+    ) -> Result<(Answered, Vec<Reached>), String> {
         // The session's one change at a time, through its frames (ADR-0172).
         let session_lock = self.one_at_a_time(session);
         let _one = session_lock
@@ -2702,15 +2713,16 @@ impl Server {
         session: &str,
         invalidated: &[crate::data::Dropped],
         events: &[(String, Vec<Val>)],
-    ) -> Vec<String> {
+    ) -> Vec<Reached> {
         // A query's policy, which keys its entries: read by a `let`, or by a
         // stream, whose answer is kept too (ADR-0148). Until 2026-10-03 only
         // a `let`'s was found, so an event never reached a stream's kept
         // answer (ADR-0165).
         // On any page: until 2026-10-04 only the store's was read, and a
         // query another page binds kept its stale answer (ADR-0190). A
-        // query's policy is its own, wherever it is read.
-        let policy_of = |resource: &str| {
+        // query's policy is its own, wherever it is read. And the binding's
+        // arguments, as its plan writes them (track `store-accounts`).
+        let binding_of = |resource: &str| {
             std::iter::once(&self.plan)
                 .chain(self.plans.values())
                 .flat_map(|plan| {
@@ -2719,20 +2731,44 @@ impl Server {
                         .flat_map(move |k| plan[k].as_array().into_iter().flatten())
                 })
                 .find(|b| b["resource"] == resource)
-                .map(|b| b["policy"].clone())
+                .cloned()
         };
         // Each drop says whether another session may hold what it dropped:
         // a shared entry, or a private one no key position pins to this
         // session, by its id. An entry keyed by the session is its alone.
-        let drop_entries = |resource: &str, args: &[Option<Val>]| -> Option<String> {
+        // **And one keyed by a reader's handle is that user's** (track
+        // `store-accounts`, telling by principal): the user at the key
+        // position a binding fills with `current_user()`, where the drop
+        // names one. ADR-0270's superset told every reader of the query.
+        let drop_entries = |resource: &str, args: &[Option<Val>]| -> Option<Reached> {
             // No binding reads it, so nothing of it is kept.
-            let policy = policy_of(resource)?;
+            let binding = binding_of(resource)?;
+            let policy = binding["policy"].clone();
             self.queries
                 .invalidate_where(resource, |key| names_entry(&policy, args, key));
-            let pinned = key_positions(&policy)
+            let positions = key_positions(&policy);
+            let pinned = positions
                 .iter()
                 .any(|i| matches!(args.get(*i), Some(Some(Val::String(s))) if s == session));
-            (!entry_is_private(&policy) || !pinned).then(|| resource.to_string())
+            if entry_is_private(&policy) && pinned {
+                return None;
+            }
+            let user = positions
+                .iter()
+                .filter(|i| {
+                    binding["args"][**i]
+                        .as_str()
+                        .is_some_and(notifications::is_current_user)
+                })
+                .find_map(|i| match args.get(*i) {
+                    Some(Some(Val::String(user))) => Some(user.clone()),
+                    _ => None,
+                })
+                .filter(|_| entry_is_private(&policy));
+            Some(Reached {
+                resource: resource.to_string(),
+                user,
+            })
         };
         let mut reached = Vec::new();
         // Until ADR-0209 the server read each key's text, `current_session()`
@@ -3160,10 +3196,25 @@ impl Server {
     /// dropped** (ADR-0219): a post reaches every open timeline, not only
     /// its author's. Until ADR-0219 another reader saw a change when it
     /// next loaded the page.
-    fn others_reading(&self, session: &str, reached: &[String]) -> Vec<String> {
+    fn others_reading(&self, session: &str, reached: &[Reached]) -> Vec<String> {
         if reached.is_empty() {
             return Vec::new();
         }
+        // **Telling by principal** (track `store-accounts`): what a private
+        // entry keyed by a user reached is told to that user's sessions
+        // alone; what any other reached, to every reader of it.
+        let principals = self.identity.principals();
+        let reaches = |other: &str| -> Vec<String> {
+            reached
+                .iter()
+                .filter(|r| {
+                    r.user
+                        .as_deref()
+                        .is_none_or(|user| notifications::user_of(&principals, other) == user)
+                })
+                .map(|r| r.resource.clone())
+                .collect()
+        };
         // The open documents, read before their pages: no two of these
         // tables are held at once.
         let open: Vec<Doc> = self
@@ -3175,7 +3226,7 @@ impl Server {
             .collect();
         open.into_iter()
             .filter(|(s, _)| s != session)
-            .filter(|doc| self.reads_any(&self.page_of(doc), reached))
+            .filter(|doc| self.reads_any(&self.page_of(doc), &reaches(&doc.0)))
             .map(|(s, _)| s)
             .collect()
     }
@@ -13406,21 +13457,7 @@ public query Store(",
             frames(&mine) > mine_before,
             "the session's own page is told"
         );
-        // Track `store-accounts`: a cart is its user's (`Cart(reader)`), so a
-        // change to one reaches every session that reads `Cart` until telling
-        // by principal lands (docs/PARALLEL.md, Q1): derived for another
-        // reader, and sent nothing of the change, a version alone.
-        let sent: Vec<(u64, StreamFrame)> =
-            s.pending.lock().expect("pending")[&theirs].frames[theirs_before..].to_vec();
-        for (_, frame) in &sent {
-            match frame {
-                StreamFrame::ResourceChanged { .. } => {}
-                StreamFrame::PatchSet(set) => {
-                    assert!(set.patches.is_empty(), "another's is sent {set:?}")
-                }
-                other => panic!("another's is sent {other:?}"),
-            }
-        }
+        assert_eq!(frames(&theirs), theirs_before, "another's is not");
     }
 
     /// **A build that imports what its data layer does not supply is refused

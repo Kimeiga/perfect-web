@@ -94,8 +94,9 @@ MUTANTS = [
     (
         "a private drop is told to no other session",
         SERVER,
-        "            (!entry_is_private(&policy) || !pinned).then(|| resource.to_string())\n",
-        "            (!entry_is_private(&policy) || (!pinned && false)).then(|| resource.to_string())\n",
+        # Re-anchored by track store-accounts: a drop says whose it was.
+        "            if entry_is_private(&policy) && pinned {\n",
+        "            if entry_is_private(&policy) && (pinned || true) {\n",
     ),
     (
         "the cache keeps what it is told to drop",

@@ -31,20 +31,22 @@ MUTANTS = [
     (
         "a session's own entry reaches the others",
         SERVER,
-        "            (!entry_is_private(&policy) || !pinned).then(|| resource.to_string())\n",
-        "            Some(resource.to_string())\n",
+        # Re-anchored by track store-accounts: a drop says whose it was.
+        "            if entry_is_private(&policy) && pinned {\n",
+        "            if false && entry_is_private(&policy) && pinned {\n",
     ),
     (
         "a whole query's drop reaches no one",
         SERVER,
-        "            (!entry_is_private(&policy) || !pinned).then(|| resource.to_string())\n",
-        "            (args.iter().any(Option::is_some) && (!entry_is_private(&policy) || !pinned))\n"
-        "                .then(|| resource.to_string())\n",
+        # Re-anchored by track store-accounts: a drop says whose it was.
+        "            if entry_is_private(&policy) && pinned {\n",
+        "            if !args.iter().any(Option::is_some) || (entry_is_private(&policy) && pinned) {\n",
     ),
     (
         "every open page is read again",
         SERVER,
-        "            .filter(|doc| self.reads_any(&self.page_of(doc), reached))\n",
+        # Re-anchored by track store-accounts: a drop says whose it was.
+        "            .filter(|doc| self.reads_any(&self.page_of(doc), &reaches(&doc.0)))\n",
         "            .filter(|_| true)\n",
     ),
     (

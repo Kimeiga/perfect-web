@@ -19,7 +19,9 @@ Each mutant undoes one piece:
 - in the compiler, `private` giving a record no scope, and disagreeing
   producers keeping the last one's scope alone;
 - `user` not a visibility (the parse refuses `user query`), not lowered as
-  the declaration's visibility, and not importable.
+  the declaration's visibility, and not importable;
+- telling by principal undone: the key's user not read, so every reader of
+  the query is told, or the user's other sessions not told.
 
 The tests then fail: the store's accounts tests (tests/store_accounts.rs)
 and the join's unit tests, in memory and with the store on PostgreSQL
@@ -27,7 +29,8 @@ and the join's unit tests, in memory and with the store on PostgreSQL
 compiler's boundary tests (boundary_matrix.rs, boundary.rs's own).
 
 They need a database: `PW_STORE_DATABASE_URL`, a throwaway one, which each
-test uses in a schema of its own. Without it every PostgreSQL run would read
+test uses in a schema of its own (and `PW_FEED_DATABASE_URL`, the feed's,
+for the notifications' test on PostgreSQL; the recipe names one for both). Without it every PostgreSQL run would read
 the in-memory layer and no PostgreSQL mutant could mean anything, so this
 refuses to run.
 
@@ -155,6 +158,18 @@ MUTANTS = [
         "                f.scoped.insert(produced.semantic_key(), Label::of(restriction));\n",
     ),
     (
+        "the key's user is not read, and every reader is told",
+        SERVER,
+        "                .filter(|_| entry_is_private(&policy));\n",
+        "                .filter(|_| false);\n",
+    ),
+    (
+        "the user's other session is not told",
+        SERVER,
+        "                        .is_none_or(|user| notifications::user_of(&principals, other) == user)\n",
+        "                        .is_none_or(|_| false)\n",
+    ),
+    (
         "`user` is not a visibility",
         GRAMMAR,
         '        if !self.at_kw("user") {\n            return false;\n        }\n',
@@ -175,7 +190,14 @@ MUTANTS = [
 ]
 
 # The store's accounts tests, and the join's own, which run on either layer.
-STORE_TESTS = ["tests::store_accounts::", "store::joins::"]
+STORE_TESTS = [
+    "tests::store_accounts::",
+    "store::joins::",
+    # Telling by principal reaches the feed's notifications too.
+    "tests::notifications::reading_them_tells_no_other_users_page",
+    "tests::notifications::on_postgres_reading_them_tells_no_other_users_page",
+    "a_sessions_own_change_reaches_no_other_session",
+]
 
 CARGO = ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--"]
 

@@ -299,6 +299,51 @@ fn reading_them_reaches_each_of_the_readers_sessions() {
     read_everywhere(&served_feed());
 }
 
+/// **Telling by principal** (track `store-accounts`, ADR-XXXX): reading
+/// one's notifications drops the reader's entries alone, which are keyed by
+/// the reader's handle, so another user's open page is sent no frame at all,
+/// where ADR-0270's superset sent it a version with nothing in it: another
+/// user's activity, to every reader. The reader's other session is told.
+fn read_tells_no_one_else(s: &Server) {
+    people(s);
+    let post = posted(s, "s-alice-1", "Alice writes", "i-1");
+    run(s, "like", "s-bob", &[&post], "i-2");
+    for session in ["s-alice-2", "s-bob"] {
+        shown(s, session, HOME);
+    }
+    // What the post and the like reached, told first.
+    s.tell_waiting();
+    let docs: Vec<Doc> = {
+        let pending = s.pending.lock().expect("pending");
+        ["s-alice-2", "s-bob"]
+            .iter()
+            .map(|session| latest(&pending, session))
+            .collect()
+    };
+    let frames = |doc: &Doc| s.pending.lock().expect("pending")[doc].frames.len();
+    let before: Vec<usize> = docs.iter().map(frames).collect();
+    run(s, "mark_read", "s-alice-1", &[], "i-3");
+    s.tell_waiting();
+    assert!(
+        frames(&docs[0]) > before[0],
+        "alice's other session is told"
+    );
+    assert_eq!(frames(&docs[1]), before[1], "bob's page is sent no frame");
+}
+
+#[test]
+fn reading_them_tells_no_other_users_page() {
+    read_tells_no_one_else(&served_feed());
+}
+
+#[test]
+fn on_postgres_reading_them_tells_no_other_users_page() {
+    let Some(s) = on_postgres("notify_principal") else {
+        return;
+    };
+    read_tells_no_one_else(&s);
+}
+
 /// **Another user's session sees none of it, signed in and not**: by page,
 /// by `/pw-read`, by the cache every reader shares, and by session.
 fn none_of_it_elsewhere(s: &Server) {

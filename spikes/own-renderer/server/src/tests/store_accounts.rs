@@ -79,7 +79,9 @@ fn two_users_carts_never_share_a_line() {
 
 /// **A user's cart changed in one session reaches their other sessions'
 /// open pages** (ADR-0270's listener rule: `UserCartChanged(reader)` binds
-/// the user's id), and another user's page is sent nothing of it.
+/// the user's id), live, as a laptop and a phone; and **another user's open
+/// page is sent no frame at all** (telling by principal): until it, a
+/// version with nothing in it, another user's activity sent to every reader.
 #[test]
 fn a_users_cart_reaches_each_of_their_sessions_and_no_one_elses() {
     let provider = Arc::new(TestProvider::default());
@@ -95,6 +97,8 @@ fn a_users_cart_reaches_each_of_their_sessions_and_no_one_elses() {
         [&ada_again, &ben].map(|session| latest(&pending, session))
     };
     let before = docs.clone().map(|doc| sets_of(&s, &doc).len());
+    let frames = |doc: &Doc| s.pending.lock().expect("pending")[doc].frames.len();
+    let bens_frames = frames(&docs[1]);
     s.command(ADD, &ada, &add_shown("espresso", 1), false)
         .expect("ada adds");
     s.tell_waiting();
@@ -107,9 +111,71 @@ fn a_users_cart_reaches_each_of_their_sessions_and_no_one_elses() {
         told.iter().any(|w| w.contains("$3.50")),
         "ada's other session is told: {told:?}"
     );
-    for set in &sets_of(&s, &docs[1])[before[1]..] {
-        assert!(set.patches.is_empty(), "ben is sent ada's change: {set:?}");
+    assert_eq!(
+        sets_of(&s, &docs[1]).len(),
+        before[1],
+        "ben is sent no patch set"
+    );
+    assert_eq!(frames(&docs[1]), bens_frames, "ben is sent no frame at all");
+}
+
+/// **A shared entry still reaches every reader** (ADR-0219), a private one
+/// keyed by a user that user's sessions alone (telling by principal): store
+/// 48's menu dropped reaches every reader of `Menu`, its own page's reader
+/// and another's, where ada's cart dropped reaches ada's other session and
+/// not ben's.
+#[test]
+fn a_shared_entry_still_reaches_every_reader() {
+    let provider = Arc::new(TestProvider::default());
+    let s = store_with(provider.clone());
+    let ada = signed_in(&s, &provider, "came-ada", "ada");
+    let ada_again = signed_in(&s, &provider, "came-ada-2", "ada");
+    let ben = signed_in(&s, &provider, "came-ben", "ben");
+    for session in [&ada, &ada_again, &ben] {
+        s.serve_store_document(session, STORE_ID).expect("served");
     }
+    let menu = s.invalidate_queries(
+        &ada,
+        &[(
+            "store.page.Menu".to_string(),
+            vec![Some(Val::String("48".into()))],
+        )],
+        &[],
+    );
+    assert_eq!(
+        menu,
+        [Reached {
+            resource: "store.page.Menu".to_string(),
+            user: None
+        }],
+        "every reader's"
+    );
+    let mut told = s.others_reading(&ada, &menu);
+    told.sort();
+    let mut every = vec![ada_again.clone(), ben.clone()];
+    every.sort();
+    assert_eq!(told, every, "every other reader of the menu");
+    let cart = s.invalidate_queries(
+        &ada,
+        &[(
+            "store.page.Cart".to_string(),
+            vec![Some(Val::String("ada".into()))],
+        )],
+        &[],
+    );
+    assert_eq!(
+        cart,
+        [Reached {
+            resource: "store.page.Cart".to_string(),
+            user: Some("ada".to_string())
+        }],
+        "ada's"
+    );
+    assert_eq!(
+        s.others_reading(&ada, &cart),
+        [ada_again],
+        "ada's other session alone"
+    );
 }
 
 /// **A guest's cart follows them in** (docs/PARALLEL.md, Q2): at sign-in each
