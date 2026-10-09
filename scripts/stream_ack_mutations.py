@@ -31,8 +31,9 @@ MUTANTS = [
         "the stream does not acknowledge what the page sent",
         SERVER,
         # Re-anchored by ADR-0161: the document's own subscriber.
-        "        .or_insert_with(|| Subscriber::at(document))\n        .acknowledge(since);\n    let mut written = since;\n",
-        "        .or_insert_with(|| Subscriber::at(document));\n    let mut written = since;\n",
+        # And by the stream records' branch: noted on its trail.
+        "        waiting.acknowledge(since);\n        waiting.note(format_args!(\"stream opened since {since}\"));\n",
+        "        waiting.note(format_args!(\"stream opened since {since}\"));\n",
     ),
 ]
 

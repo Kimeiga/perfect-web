@@ -1,0 +1,74 @@
+ADR-0250 - let _ discards a value, and an acquisition is held or refused
+
+produced by: just e14-let-discard
+commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the parser (compiler/pw-syntax/src/grammar.rs)
+
+test grammar::tests::a_let_may_discard_its_value ... ok
+test grammar::tests::a_discard_is_neither_mutable_nor_a_use ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 90 filtered out; finished in 0.00s
+
+== the checker (compiler/pw-core/tests/let_discard.rs)
+
+test a_discard_is_no_value_to_read ... ok
+test a_discard_still_holds_its_annotation ... ok
+test a_binding_from_branches_is_typed_by_them ... ok
+test a_resource_a_statement_drops_is_refused ... ok
+test a_resource_given_to_a_call_that_does_not_release_it_is_refused ... ok
+test a_resource_kept_in_a_value_or_returned_by_a_function_value_is_refused ... ok
+test a_result_discarded_by_let_is_handled ... ok
+test a_resource_a_result_carries_is_held_with_a_question_mark ... ok
+test a_resources_acquire_clause_holds_its_value ... ok
+test a_declaration_gives_its_caller_what_it_declares ... ok
+test an_affine_resource_discarded_is_refused_as_never_consumed ... ok
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.64s
+
+== the Koka translation, and a handler (koka_backend.rs, handlers.rs)
+
+test a_discard_is_kokas_wildcard_val ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+test a_handler_that_discards_its_answer_with_underscore_sends_it ... ok
+test a_handler_that_discards_its_answer_by_name_sends_it ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.04s
+
+== the generality witnesses (examples/generality/affine_not_consumed_once)
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 69.73s
+
+== mutation controls (scripts/let_discard_mutations.py)
+
+baseline: 16 passed, 0 failed
+`let _` does not parse: KILLED (10 of 16 tests fail)
+`let mut _` is accepted: KILLED (1 of 16 tests fail)
+`use _` reads as two statements: KILLED (1 of 16 tests fail)
+`_` is lowered to no pattern: KILLED (4 of 16 tests fail)
+reading `_` is told to bind it: KILLED (1 of 16 tests fail)
+PW0618's repair names the discard by name: KILLED (1 of 16 tests fail)
+Koka refuses `_`: KILLED (1 of 16 tests fail)
+the backend refuses `_`: KILLED (1 of 16 tests fail)
+an acquisition nothing holds is not reported: KILLED (7 of 16 tests fail)
+`_` holds what it is given: KILLED (2 of 16 tests fail)
+a statement holds its value: KILLED (2 of 16 tests fail)
+an `acquire` clause holds nothing: KILLED (1 of 16 tests fail)
+a branch's value is not its construct's: KILLED (2 of 16 tests fail)
+a `?` keeps what it holds: KILLED (2 of 16 tests fail)
+a match holds what it matches: KILLED (1 of 16 tests fail)
+a function value's result is the caller's: KILLED (1 of 16 tests fail)
+a function value's `return` is the declaration's: KILLED (1 of 16 tests fail)
+every call releases what it is given: KILLED (1 of 16 tests fail)
+no call releases what it is given: KILLED (1 of 16 tests fail)
+`Some(..)` keeps nothing it is given: KILLED (3 of 16 tests fail)
+a body declaring `()` gives its caller its value: KILLED (1 of 16 tests fail)
+no declaration gives its caller its value: KILLED (3 of 16 tests fail)
+a `return`'s value is not the body's: KILLED (1 of 16 tests fail)
+a body declaring `()` moves a bound value to its caller: KILLED (1 of 16 tests fail)
+the repair names the function being checked: KILLED (1 of 16 tests fail)
+`e?` has no type: KILLED (1 of 16 tests fail)
+branches that agree have no type: KILLED (2 of 16 tests fail)
+arms that agree have no type: KILLED (1 of 16 tests fail)
+a block has no type: KILLED (2 of 16 tests fail)
+29 of 29 mutants killed
+memory bound: no process was stopped

@@ -63,12 +63,12 @@ MUTANTS = [
         "a change is sent to the store's documents alone",
         SERVER,
         # Re-anchored by ADR-0231: a document's parameters, not its store;
-        # and by ADR-0277, whose documents are those a telling takes.
-        "        for doc in documents.into_iter().filter(|d| which(d)) {\n"
+        # by ADR-0277, whose documents are those a telling takes; and by
+        # ADR-0297, which takes them before the loop.
+        "        for doc in documents {\n"
         "            let params = self.params_of(&doc);\n",
         "        for doc in documents\n"
         "            .into_iter()\n"
-        "            .filter(|d| which(d))\n"
         "            .filter(|d| self.page_of(d) == self.store_page())\n"
         "        {\n"
         "            let params = self.params_of(&doc);\n",

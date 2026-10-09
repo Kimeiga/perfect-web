@@ -118,6 +118,100 @@ struct Subscriber {
     /// session meanwhile. Not `last_seq`, which a document's cursor moves
     /// too: two documents read at once would each make the other read again.
     pushed: u64,
+    /// **What happened to its frames, the latest [`TRAIL`] notes**: each
+    /// pushed, each stream opened and how it ended, each batch written, and
+    /// each pass that waited for the table. A failing browser test attaches
+    /// it (`/bench/records`), beside the runtime's own record: WebKit's "Load
+    /// more" kept its twenty rows on CI with the read applied and the stream
+    /// never seen to end, and nothing said where the frames were.
+    trail: std::collections::VecDeque<String>,
+    /// **A telling passed it by** (ADR-0297): no page of it had asked for
+    /// [`LIVE`], so what changed was not derived for it then; it is, when
+    /// it next asks.
+    stale: bool,
+}
+
+/// How many notes a document's trail keeps.
+const TRAIL: usize = 400;
+
+/// **How long since a document's page last asked, at most, for a telling
+/// to derive it** (ADR-0297). A page asks without pause: a stream holds two
+/// seconds and is opened again at once, a long poll one. Until ADR-0297 a
+/// commit derived every document of every session that read what it
+/// dropped, one session after another, those of pages closed up to
+/// [`IDLE`] before among them: on CI a reader's change waited behind 47 of
+/// them, five seconds, and "a follow reaches another reader" failed.
+const LIVE: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// **How many sessions a commit tells at once** (ADR-0297), each in its own
+/// hold: one reader's telling no longer waits for another's.
+const TELLERS: usize = 8;
+
+/// **A session, as a record names it**: a hash of its id, which is its
+/// cookie and never written where another session can read it.
+fn masked(session: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    session.hash(&mut hasher);
+    format!("s{:08x}", hasher.finish() as u32)
+}
+
+/// **Milliseconds since this server started**, the clock its records read.
+fn uptime_ms() -> u128 {
+    static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    STARTED
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
+/// **A hold of the table, timed**: noted on [`Server::slow`] when it is
+/// let go past 50 ms. Declared after the guard it times, so it is dropped
+/// first.
+struct Held<'a> {
+    server: &'a Server,
+    site: &'static str,
+    at: std::time::Instant,
+}
+
+impl Drop for Held<'_> {
+    fn drop(&mut self) {
+        let ms = self.at.elapsed().as_millis();
+        if ms < 50 {
+            return;
+        }
+        let mut slow = self.server.slow.lock().expect("slow");
+        if slow.len() >= 200 {
+            slow.pop_front();
+        }
+        slow.push_back(format!(
+            "{} ms {} held the table {ms} ms",
+            uptime_ms(),
+            self.site
+        ));
+    }
+}
+
+/// **Is a document still showing what a change was derived against?**
+/// The same value, or none either time: each is replaced whole, never
+/// changed in place.
+fn same_shown(was: &Option<Arc<Shown>>, now: &Option<Arc<Shown>>) -> bool {
+    match (was, now) {
+        (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+/// A frame's kind, for a trail.
+fn frame_kind(frame: &StreamFrame) -> &'static str {
+    match frame {
+        StreamFrame::ResourceChanged { .. } => "a change",
+        StreamFrame::Patch(_) => "a patch",
+        StreamFrame::PatchSet(_) => "a patch set",
+        StreamFrame::Recovery { .. } => "a recovery",
+        StreamFrame::EntryValue { .. } => "an entry's value",
+    }
 }
 
 impl Default for Subscriber {
@@ -136,7 +230,25 @@ impl Subscriber {
             seen: std::time::Instant::now(),
             behind: false,
             pushed: 0,
+            trail: std::collections::VecDeque::from([format!(
+                "{} ms subscribed at {cursor}",
+                uptime_ms()
+            )]),
+            stale: false,
         }
+    }
+
+    /// **Has a page of it asked within [`LIVE`]?** (ADR-0297)
+    fn live(&self, now: std::time::Instant) -> bool {
+        now.saturating_duration_since(self.seen) < LIVE
+    }
+
+    /// A note on its trail, the oldest let go past [`TRAIL`].
+    fn note(&mut self, what: std::fmt::Arguments<'_>) {
+        if self.trail.len() >= TRAIL {
+            self.trail.pop_front();
+        }
+        self.trail.push_back(format!("{} ms {what}", uptime_ms()));
     }
 }
 
@@ -283,6 +395,10 @@ type Doc = (String, u64);
 #[cfg(test)]
 type KeyedFetched = Box<dyn FnOnce(&Server) + Send>;
 
+/// What a test does while a document's change is derived (ADR-0296).
+#[cfg(test)]
+type Deriving = Arc<dyn Fn(&Server, &Doc) + Send + Sync>;
+
 /// **A page's parameters**, as its address gives them (ADR-0162): `id`,
 /// from `/stores/{id}`.
 type Params = BTreeMap<String, String>;
@@ -325,9 +441,12 @@ impl Subscriber {
     fn push(&mut self, frame: StreamFrame) {
         self.pushed += 1;
         if self.behind {
+            self.note(format_args!("dropped {}, behind", frame_kind(&frame)));
             return;
         }
         self.last_seq += 1;
+        let seq = self.last_seq;
+        self.note(format_args!("pushed {} as {seq}", frame_kind(&frame)));
         if self.frames.len() >= MAX_WAITING {
             self.frames.clear();
             self.frames.push((
@@ -412,11 +531,8 @@ struct Recommender {
     /// `declared`: the query's declared error, `NoneAvailable`. `host`: the
     /// call itself fails, as a source that is down does.
     fail: Option<String>,
-    /// What it recommends, `(id, name)`, for any store a test asks about.
-    /// `None`: each store's own menu, after its first item, two of them
-    /// (ADR-0165), so what it suggests is what the store sells, and changes
-    /// when its menu does.
-    items: Option<Vec<(String, String)>>,
+    // What it recommends is the store's data (track `store-pg`): curated
+    // through `store:host/recommendations#curate`.
     /// **Held until a test releases it** (ADR-0223), then answered after
     /// `delay_ms`. A test that needs its page seen before the answer holds
     /// the recommender rather than outwaiting a delay, which a loaded machine
@@ -429,7 +545,6 @@ impl Default for Recommender {
         Recommender {
             delay_ms: 1200,
             fail: None,
-            items: None,
             gate: None,
         }
     }
@@ -515,10 +630,9 @@ struct Estimator {
     /// `declared`: the query's declared error. Anything else: the call itself
     /// fails, as an estimator that is down does.
     fail: Option<String>,
-    /// The least minutes a delivery takes, and the most (ADR-0180): 10 more
-    /// unless a test says.
-    minutes: i64,
-    max_minutes: Option<i64>,
+    // What it estimates, the least minutes a delivery takes and the most
+    // (ADR-0180), is the store's data (track `store-pg`): set through
+    // `store:host/estimates#set`.
 }
 
 impl Default for Estimator {
@@ -526,8 +640,6 @@ impl Default for Estimator {
         Estimator {
             delay_ms: 400,
             fail: None,
-            minutes: 25,
-            max_minutes: None,
         }
     }
 }
@@ -543,6 +655,8 @@ mod identity;
 // TRACK SEAM (identity): the development identity provider.
 mod accounts;
 mod store;
+// Track `store-pg`: the store's data in PostgreSQL.
+mod store_pg;
 mod uploads;
 // TRACK SEAM (notifications): the typed principal, and notifications.
 mod notifications;
@@ -560,10 +674,11 @@ struct Server {
     /// which the deployment supplies. A query reads through it and a command
     /// stages its writes in it.
     data: Arc<dyn data::DataLayer>,
-    /// **The store's data** (ADR-0218), which its own test controls and
-    /// shared fragment still reach directly: `data` when the program is the
-    /// store, and empty otherwise.
-    store: Arc<store::StoreData>,
+    /// **The store's data layer** (ADR-0218, track `store-pg`): `data` when
+    /// the program is the store, and an empty one otherwise. What changes
+    /// its data is staged through `data`, as a command is; what reaches it
+    /// directly is its test controls, its [`store::Faults`].
+    store: Arc<dyn store::StoreLayer>,
     /// The materializer's clock, advanced once per regeneration.
     ///
     /// A version is `Entry.generated_at`, which is a clock reading — so a clock
@@ -646,10 +761,22 @@ struct Server {
     calls: Arc<Mutex<BTreeMap<String, u64>>>,
     /// **Frames waiting for each document** (ADR-0161).
     pending: Mutex<BTreeMap<Doc, Subscriber>>,
+    /// **Each hold of `pending` past 50 ms, the latest 200**, at the places
+    /// that render or derive while they hold it: what a failing browser test
+    /// attaches beside a document's trail (`/bench/records`).
+    slow: Mutex<std::collections::VecDeque<String>>,
+    /// **What each telling did, the latest 300 notes** (ADR-0296): what a
+    /// commit queued for other sessions, whom each drain chose, and how each
+    /// telling of a session went. Sessions by a hash of their id, which is a
+    /// cookie (`masked`). "a follow reaches another reader" failed on CI
+    /// with its second reader never told, and nothing said why.
+    tellings: Mutex<std::collections::VecDeque<String>>,
     /// **What each document shows** (ADR-0145, ADR-0161), as it was served
     /// and then patched: what a change is derived against. Locked after
-    /// `pending` and `keyed`, never before.
-    shown: Mutex<BTreeMap<Doc, Shown>>,
+    /// `pending` and `keyed`, never before. Each value is replaced whole, so
+    /// a change derived outside the table against one is pushed only while
+    /// it is still the one shown (`Arc::ptr_eq`, ADR-0296).
+    shown: Mutex<BTreeMap<Doc, Arc<Shown>>>,
     /// **The next document's number** (ADR-0161), server-wide and from one,
     /// so a document's cursor is never zero.
     documents: std::sync::atomic::AtomicU64,
@@ -688,6 +815,11 @@ struct Server {
     /// once: a commit there is the race the apply is held against.
     #[cfg(test)]
     keyed_fetched: Mutex<Option<KeyedFetched>>,
+    /// **What a test does while a change is derived outside the table**
+    /// (ADR-0296), for each document derived: the table is free there, and
+    /// a change that reaches the document there is derived against again.
+    #[cfg(test)]
+    deriving_hook: Mutex<Option<Deriving>>,
     /// **What a test does after a telling's render, before it lets go**
     /// (ADR-0271), once: a commit there is the one the telling must tell
     /// after it, and a panic there must not silence the session.
@@ -897,10 +1029,6 @@ struct Line {
 /// A cart's lines, as the data layer holds them.
 type Lines = Vec<Line>;
 
-/// **What a new line records of its item**, by the item's id: its name and
-/// its price in cents, as the stores' menus have them now (ADR-0172).
-type Catalog = BTreeMap<String, (String, i64)>;
-
 /// One compiled component: ready to run, and what its artifact imports.
 struct Loaded {
     prepared: pw_host::engine::Prepared,
@@ -1009,7 +1137,7 @@ fn contracts() -> Vec<ComponentContract> {
 /// components.
 #[cfg(test)]
 fn dev_topology() -> Topology {
-    topology_for(store::StoreData::grants())
+    topology_for(store::grants())
 }
 
 /// **The development origin, granting the platform's operations and a data
@@ -1054,10 +1182,24 @@ impl Server {
     /// opened (ADR-0246): PostgreSQL where it names one, the in-memory layer
     /// otherwise. Either is held to what the program's sources state before
     /// anything is served.
+    #[cfg(test)]
     fn from_build_with(
         dist: std::path::PathBuf,
         build: std::path::PathBuf,
         feed: Option<Arc<dyn data::DataLayer>>,
+    ) -> Result<Server, String> {
+        Server::from_build_layers(dist, build, feed, None)
+    }
+
+    /// [`Server::from_build_with`], and the store's data in the layer the
+    /// deployment opened (track `store-pg`): PostgreSQL where it names one,
+    /// the in-memory layer otherwise (and, for the server's tests, the layer
+    /// [`store::layer_for_tests`] says).
+    fn from_build_layers(
+        dist: std::path::PathBuf,
+        build: std::path::PathBuf,
+        feed: Option<Arc<dyn data::DataLayer>>,
+        store: Option<Arc<dyn store::StoreLayer>>,
     ) -> Result<Server, String> {
         let read = |rel: &str| {
             std::fs::read_to_string(build.join(rel))
@@ -1089,13 +1231,15 @@ impl Server {
         // TRACK SEAM (uploads, ADR-0253): the uploads the program declares
         // (`uploads.json`), their blobs where the deployment keeps them.
         let uploads = uploads::Uploads::from_build(&build, &uploads::blob_root(&dist))?;
-        let store = Arc::new(store::StoreData::new());
-        let data: Arc<dyn data::DataLayer> = if contracts
+        let (store, data): (Arc<dyn store::StoreLayer>, Arc<dyn data::DataLayer>) = if contracts
             .iter()
             .flat_map(|c| &c.imports)
             .any(|i| i.interface.starts_with("feed:"))
         {
-            feed.unwrap_or_else(|| Arc::new(feed::FeedData::new()))
+            (
+                Arc::new(store::StoreData::new()),
+                feed.unwrap_or_else(|| Arc::new(feed::FeedData::new())),
+            )
         } else if contracts
             .iter()
             .flat_map(|c| &c.imports)
@@ -1103,9 +1247,16 @@ impl Server {
         {
             // TRACK SEAM (kiokun): kiokun's files, read-only, where the
             // program imports `kiokun:data/…` (docs/PARALLEL.md, W6, Q2).
-            Arc::new(kiokun::KiokunData::new()?)
+            (
+                Arc::new(store::StoreData::new()),
+                Arc::new(kiokun::KiokunData::new()?),
+            )
         } else {
-            store.clone()
+            #[cfg(test)]
+            let store = store.unwrap_or_else(store::layer_for_tests);
+            #[cfg(not(test))]
+            let store = store.unwrap_or_else(|| Arc::new(store::StoreData::new()));
+            (store.clone(), store)
         };
         // TRACK SEAM (uploads, ADR-0253): the layer commits a post's image
         // from the uploads' leases, in the post's own transaction.
@@ -1210,6 +1361,16 @@ impl Server {
                 if i.kind != pw_host::ImportKind::HostCapability || i.interface.starts_with("pw:") {
                     continue;
                 }
+                // **The host's own operations are no program's** (track
+                // `store-pg`): a route that changes the store's data stages
+                // them, and no grant gives a program one.
+                if i.key().starts_with(store::HOST_OPS) {
+                    return Err(format!(
+                        "`{}` imports `{}`, an operation the host keeps for its own routes",
+                        c.component_id,
+                        i.key()
+                    ));
+                }
                 if !supplied.contains(&i.key()) {
                     return Err(format!(
                         "`{}` imports `{}`, which the data layer does not supply",
@@ -1249,7 +1410,7 @@ impl Server {
 
     #[cfg(test)]
     fn with(dist: std::path::PathBuf, topology: Topology, built: Built) -> Server {
-        let store = Arc::new(store::StoreData::new());
+        let store = store::layer_for_tests();
         let data: Arc<dyn data::DataLayer> = store.clone();
         Server::with_layer(dist, topology, built, store, data)
     }
@@ -1268,7 +1429,7 @@ impl Server {
             plan,
             plans,
         }: Built,
-        store: Arc<store::StoreData>,
+        store: Arc<dyn store::StoreLayer>,
         data: Arc<dyn data::DataLayer>,
     ) -> Server {
         let speculations = speculation_manifests(&artifacts);
@@ -1311,6 +1472,8 @@ impl Server {
             dist,
             artifacts,
             pending: Mutex::new(BTreeMap::new()),
+            slow: Mutex::new(std::collections::VecDeque::new()),
+            tellings: Mutex::new(std::collections::VecDeque::new()),
             shown: Mutex::new(BTreeMap::new()),
             documents: std::sync::atomic::AtomicU64::new(1),
             params: Mutex::new(BTreeMap::new()),
@@ -1322,6 +1485,8 @@ impl Server {
             split_fills: std::sync::atomic::AtomicU64::new(0),
             #[cfg(test)]
             keyed_fetched: Mutex::new(None),
+            #[cfg(test)]
+            deriving_hook: Mutex::new(None),
             #[cfg(test)]
             told_rendered: Mutex::new(None),
             connection_faults: Mutex::new(BTreeMap::new()),
@@ -1393,15 +1558,127 @@ impl Server {
 
     /// How many items the data layer holds for the session: the tests' view
     /// of the state. The page's count is `domain.line_count`'s (ADR-0125).
+    /// Read through the layer, as a query reads it, so that a test reads
+    /// the same on every layer (track `store-pg`).
     #[cfg(test)]
     fn cart_value(&self, session: &str) -> i64 {
-        self.store
-            .carts
-            .lock()
-            .expect("carts")
-            .get(session)
-            .map(|lines| lines.iter().map(|l| l.quantity).sum())
-            .unwrap_or(0)
+        self.cart_lines(session).iter().map(|(_, q)| q).sum()
+    }
+
+    /// **The session's cart, read through the layer** (track `store-pg`):
+    /// each line's item and quantity, in order.
+    #[cfg(test)]
+    fn cart_lines(&self, session: &str) -> Vec<(String, i64)> {
+        let read = self.layer_read(session, "store:data/carts#current", session);
+        match read {
+            Val::Result(Ok(Some(cart))) => lines_of(&cart),
+            other => panic!("carts#current answered {other:?}"),
+        }
+    }
+
+    /// **Each line's name and price, as the layer answers them** (ADR-0172,
+    /// track `store-pg`).
+    #[cfg(test)]
+    fn cart_priced(&self, session: &str) -> Vec<(String, i64)> {
+        let Val::Result(Ok(Some(cart))) =
+            self.layer_read(session, "store:data/carts#current", session)
+        else {
+            panic!("no cart");
+        };
+        let Some(Val::List(lines)) = val_at(&cart, &["lines"]) else {
+            panic!("no lines: {cart:?}");
+        };
+        lines
+            .iter()
+            .map(|l| {
+                match (
+                    val_at(l, &["name"]),
+                    val_at(l, &["unit-price", "minor-units"]),
+                ) {
+                    (Some(Val::String(name)), Some(Val::S64(price))) => (name.clone(), *price),
+                    other => panic!("no line: {other:?}"),
+                }
+            })
+            .collect()
+    }
+
+    /// **The session's order, read through the layer** (ADR-0193, track
+    /// `store-pg`): its status's case and the lines it was placed with, or
+    /// none before one is placed.
+    #[cfg(test)]
+    fn order_of(&self, session: &str) -> Option<(String, Vec<(String, i64)>)> {
+        let status = match self.layer_read(session, "store:data/orders#current", session) {
+            Val::Result(Ok(Some(v))) => match *v {
+                Val::Option(None) => return None,
+                Val::Option(Some(case)) => match *case {
+                    Val::Variant(case, _) => case,
+                    other => panic!("orders#current answered {other:?}"),
+                },
+                other => panic!("orders#current answered {other:?}"),
+            },
+            other => panic!("orders#current answered {other:?}"),
+        };
+        let lines = match self.layer_read(session, "store:data/orders#placed", session) {
+            Val::Option(Some(cart)) => lines_of(&cart),
+            Val::Option(None) => Vec::new(),
+            other => panic!("orders#placed answered {other:?}"),
+        };
+        Some((status, lines))
+    }
+
+    /// **A change to the store's data at its source, untold** (track
+    /// `store-pg`): the host's own operation `op`, written through the
+    /// layer and committed with no event, as a change the program is not
+    /// told of is. What a test arranges where it once wrote the in-memory
+    /// layer's fields.
+    #[cfg(test)]
+    fn untold(&self, session: &str, op: &str, args: &[Val]) {
+        self.store_write(session, op, args, &[], |_| {})
+            .unwrap_or_else(|why| panic!("{op}: {why}"));
+    }
+
+    /// The session's order set at the source, untold (E14, T04).
+    #[cfg(test)]
+    fn order_set_untold(&self, session: &str, status: &str) {
+        self.untold(
+            session,
+            "store:host/orders#set-status",
+            &[
+                Val::String(session.into()),
+                Val::Option(Some(Box::new(Val::String(status.into())))),
+            ],
+        );
+    }
+
+    /// An item sold out at the source, or back, untold (charter §15.5).
+    #[cfg(test)]
+    fn stock_untold(&self, item: &str, available: bool) {
+        self.untold(
+            "",
+            "store:host/menus#stock",
+            &[Val::String(item.into()), Val::Bool(available)],
+        );
+    }
+
+    /// Store 47's menu changed at its source, untold (ADR-0178).
+    #[cfg(test)]
+    fn menu_untold(&self, op: MenuOp) {
+        let mut args = vec![Val::String(STORE_ID.into())];
+        args.extend(op.to_vals());
+        self.untold("", "store:host/menus#change", &args);
+    }
+
+    /// One read of the data layer's, by its key, for `session`, passed
+    /// `arg`.
+    #[cfg(test)]
+    fn layer_read(&self, session: &str, op: &str, arg: &str) -> Val {
+        let ops = self.data.reads(session, None);
+        let read = ops
+            .get(op)
+            .unwrap_or_else(|| panic!("the layer has no `{op}`"));
+        let mut out = read(&[Val::String(arg.to_string())]).expect(op);
+        assert_eq!(out.len(), 1, "{op}: {out:?}");
+        out.remove(0)
     }
 
     /// **The platform's outbox, for one command** (ADR-0208, ADR-0209): each
@@ -1593,6 +1870,7 @@ impl Server {
     ) -> Result<(), String> {
         // The store's test fault, for this command alone (ADR-0174).
         self.store
+            .faults()
             .fail_next
             .store(fail, std::sync::atomic::Ordering::SeqCst);
         let answered = self.command_answered(component_id, session, args, None)?;
@@ -1621,10 +1899,19 @@ impl Server {
         // the author is answered (ADR-0219), so a post's answer does not
         // wait on every reader.
         if !dropped.is_empty() {
+            self.telling_note(format_args!(
+                "{} committed {component_id}: queued for others {dropped:?}",
+                masked(session)
+            ));
             self.telling
                 .lock()
                 .expect("telling")
                 .push((session.to_string(), dropped));
+        } else {
+            self.telling_note(format_args!(
+                "{} ran {component_id}: dropped nothing another session holds",
+                masked(session)
+            ));
         }
         Ok(answered)
     }
@@ -1651,6 +1938,9 @@ impl Server {
         {
             let mut staging = self.data.begin(session);
             let mut host = staging.ops();
+            // The host's own operations are its routes', never a
+            // component's (track `store-pg`).
+            host.retain(|key, _| !key.starts_with(store::HOST_OPS));
             host.insert(
                 "pw:host/session#read".to_string(),
                 Self::session_operation(session),
@@ -1678,7 +1968,13 @@ impl Server {
                 };
                 return Ok((answered, Vec::new()));
             }
-            let Some(rows) = staging.rows() else {
+            let (emitted, invalidated) = {
+                let staged = staged_events.lock().expect("staged");
+                (staged.events.clone(), staged.invalidated.clone())
+            };
+            let Some(((emitted, invalidated), ids)) =
+                self.commit_staged(&mut *staging, &emitted, &invalidated)?
+            else {
                 // Nothing was written, so there is nothing to commit.
                 let answered = Answered {
                     committed: true,
@@ -1688,34 +1984,6 @@ impl Server {
                 };
                 return Ok((answered, Vec::new()));
             };
-            let (emitted, invalidated) = {
-                let staged = staged_events.lock().expect("staged");
-                (staged.events.clone(), staged.invalidated.clone())
-            };
-            let events = emitted
-                .iter()
-                .map(|(event, values)| outboxed(event, values))
-                .collect::<Result<Vec<_>, String>>()?;
-            // A layer that keeps its own outbox commits the writes and the
-            // events in its own transaction, and what it committed is what
-            // is delivered, read back from its outbox (ADR-0246). Refused,
-            // nothing of the command is kept, and no one is told.
-            let (emitted, invalidated) = match staging.commit(&emitted, &invalidated)? {
-                Some(committed) => committed,
-                None => {
-                    // The state the data layer staged and the outbox's
-                    // events, in one transaction (ADR-0019, ADR-0208).
-                    self.materializer.command(|tx| {
-                        for (key, value) in &rows {
-                            Materializer::set_state(tx, key, value);
-                        }
-                        Ok::<_, String>(events)
-                    })?;
-                    (emitted, invalidated)
-                }
-            };
-            // What was staged is the data layer's from now on.
-            staging.publish();
             // What the cart's values include from now on, by the interaction
             // that committed it (ADR-0172), recorded with the commit.
             if let Some(interaction) = interaction {
@@ -1741,6 +2009,11 @@ impl Server {
                 let version = Version(self.clock.now());
                 self.send_documents(session, &session_documents(session), version, false);
             }
+            // Delivered: every event the commit staged is consumed, the
+            // order's among them, which no entry drained above names (track
+            // `store-pg`). Until 2026-10-08 each order placed left its
+            // `OrderChanged` in the materializer's outbox for good.
+            self.materializer.delivered(&ids);
             let answered = Answered {
                 committed: true,
                 result,
@@ -1748,6 +2021,187 @@ impl Server {
                 refused: None,
             };
             Ok((answered, reached))
+        }
+    }
+
+    /// **A command's writes and its events, committed** (ADR-0019, ADR-0208,
+    /// ADR-0246; track `store-pg`): the one commit path, a program's
+    /// command's and a route's that changes the store's data. `None` where
+    /// nothing was written, and nothing commits.
+    ///
+    /// A layer that keeps its own outbox commits the writes and the events
+    /// in its own transaction, and what it committed is what is delivered,
+    /// read back from its outbox (ADR-0246); refused, nothing of the
+    /// command is kept, and no one is told. A layer that keeps the session's
+    /// entry (the store on PostgreSQL) then has its commit recorded in the
+    /// materializer: the rows and the events it read back, in one
+    /// materializer transaction, as the in-memory layer's commit is
+    /// written, so the session's entry moves as it does in memory. The
+    /// database stays the authority: a record that fails after it committed
+    /// is said, and the command is answered committed.
+    ///
+    /// Returns what is delivered, and the materializer's ids for its events,
+    /// which are consumed once delivered ([`Materializer::delivered`]).
+    fn commit_staged(
+        &self,
+        staging: &mut dyn data::Staged,
+        emitted: &[data::Handed],
+        invalidated: &[data::Dropped],
+    ) -> Result<Option<(data::Outboxed, Vec<i64>)>, String> {
+        let Some(rows) = staging.rows() else {
+            return Ok(None);
+        };
+        let events = emitted
+            .iter()
+            .map(|(event, values)| outboxed(event, values))
+            .collect::<Result<Vec<_>, String>>()?;
+        let (delivered, ids) = match staging.commit(emitted, invalidated)? {
+            Some(committed) => {
+                let mut ids = Vec::new();
+                if self.data.session_entry() {
+                    let recorded = committed
+                        .0
+                        .iter()
+                        .map(|(event, values)| outboxed(event, values))
+                        .collect::<Result<Vec<_>, String>>()
+                        .and_then(|events| {
+                            self.materializer.command(|tx| {
+                                for (key, value) in &rows {
+                                    Materializer::set_state(tx, key, value);
+                                }
+                                Ok::<_, String>(events)
+                            })
+                        });
+                    match recorded {
+                        Ok(recorded) => ids = recorded,
+                        Err(why) => eprintln!(
+                            "pw dev server: a commit was not recorded in the materializer: {why}"
+                        ),
+                    }
+                }
+                (committed, ids)
+            }
+            None => {
+                // The state the data layer staged and the outbox's events, in
+                // one transaction (ADR-0019, ADR-0208).
+                let ids = self.materializer.command(|tx| {
+                    for (key, value) in &rows {
+                        Materializer::set_state(tx, key, value);
+                    }
+                    Ok::<_, String>(events)
+                })?;
+                ((emitted.to_vec(), invalidated.to_vec()), ids)
+            }
+        };
+        // What was staged is the data layer's from now on.
+        staging.publish();
+        Ok(Some((delivered, ids)))
+    }
+
+    /// **A route's change to the store's data, committed as a command's is**
+    /// (track `store-pg`): the host's own operation `op`, staged through the
+    /// layer in a command's transaction for `session`, and committed with
+    /// `events` in it. `deliver` is handed what committed, once the staging
+    /// is given up, and the events are consumed after it.
+    ///
+    /// The operation's answer, `Ok` with its value where it has one; `Err`
+    /// where it refused, or the commit was, and nothing is kept.
+    fn store_write(
+        &self,
+        session: &str,
+        op: &str,
+        args: &[Val],
+        events: &[data::Handed],
+        deliver: impl FnOnce(&[data::Handed]),
+    ) -> Result<Option<Val>, String> {
+        let mut staging = self.data.begin(session);
+        let ops = staging.ops();
+        let run = ops
+            .get(op)
+            .ok_or_else(|| format!("the data layer has no `{op}`"))?;
+        let answer = match run(args)?.as_slice() {
+            [Val::Result(Ok(answer))] => answer.as_deref().cloned(),
+            [Val::Result(Err(why))] => {
+                return Err(match why.as_deref() {
+                    Some(Val::String(why)) => why.clone(),
+                    other => format!("{op} refused: {other:?}"),
+                });
+            }
+            other => return Err(format!("{op} answered {other:?}")),
+        };
+        let Some(((delivered, _), ids)) = self.commit_staged(&mut *staging, events, &[])? else {
+            return Ok(answer);
+        };
+        drop(staging);
+        deliver(&delivered);
+        self.materializer.delivered(&ids);
+        Ok(answer)
+    }
+
+    /// **What the recommender suggests, curated** (ADR-0148, track
+    /// `store-pg`), for every store, or drawn from each store's menu again
+    /// where `items` is none: the store's data, written through the layer.
+    fn curate(&self, items: Option<&[(String, String)]>) -> Result<(), String> {
+        let items = Val::Option(items.map(|items| {
+            Box::new(Val::List(
+                items
+                    .iter()
+                    .map(|(id, name)| {
+                        Val::Record(vec![
+                            ("id".into(), Val::String(id.clone())),
+                            ("name".into(), Val::String(name.clone())),
+                        ])
+                    })
+                    .collect(),
+            ))
+        }));
+        self.store_write(
+            "",
+            "store:host/recommendations#curate",
+            &[items],
+            &[],
+            |_| {},
+        )
+        .map(|_| ())
+    }
+
+    /// **What a session's estimator estimates** (E14, T10; ADR-0180, track
+    /// `store-pg`): the least minutes and, where said, the most, written
+    /// through the layer.
+    fn set_estimate(&self, session: &str, minutes: i64, max: Option<i64>) -> Result<(), String> {
+        self.store_write(
+            session,
+            "store:host/estimates#set",
+            &[
+                Val::String(session.to_string()),
+                Val::S64(minutes),
+                Val::Option(max.map(|m| Box::new(Val::S64(m)))),
+            ],
+            &[],
+            |_| {},
+        )
+        .map(|_| ())
+    }
+
+    /// **A store's items' ids, in its order**, read through the layer
+    /// (track `store-pg`).
+    fn menu_ids(&self, store: &str) -> Result<Vec<String>, String> {
+        let ops = self.data.reads("", None);
+        let read = ops
+            .get("store:data/menus#for-store")
+            .ok_or("the data layer has no `menus#for-store`")?;
+        match read(&[Val::String(store.to_string())])?.as_slice() {
+            [Val::Result(Ok(Some(menu)))] => match menu.as_ref() {
+                Val::List(items) => Ok(items
+                    .iter()
+                    .filter_map(|i| match val_at(i, &["id"]) {
+                        Some(Val::String(id)) => Some(id.clone()),
+                        _ => None,
+                    })
+                    .collect()),
+                other => Err(format!("menus#for-store answered {other:?}")),
+            },
+            other => Err(format!("menus#for-store answered {other:?}")),
         }
     }
 
@@ -2531,8 +2985,36 @@ impl Server {
             .iter()
             .flat_map(|(session, reached)| self.others_reading(session, reached))
             .collect();
-        for other in others {
-            self.tell(&other);
+        if !waiting.is_empty() {
+            self.telling_note(format_args!(
+                "took {} queued, from {:?}: telling {:?}",
+                waiting.len(),
+                waiting.iter().map(|(s, _)| masked(s)).collect::<Vec<_>>(),
+                others.iter().map(|s| masked(s)).collect::<Vec<_>>()
+            ));
+        }
+        // At once, each session in its own hold (ADR-0297): until then one
+        // after another, and a reader whose session came late in the order
+        // waited for every one before it.
+        let others: Vec<String> = others.into_iter().collect();
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let tellers = TELLERS.min(others.len());
+        if tellers <= 1 {
+            for other in &others {
+                self.tell(other);
+            }
+        } else {
+            std::thread::scope(|scope| {
+                for _ in 0..tellers {
+                    scope.spawn(|| {
+                        while let Some(other) =
+                            others.get(next.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+                        {
+                            self.tell(other);
+                        }
+                    });
+                }
+            });
         }
         // And each document that reads an entry made again (ADR-0277).
         let made = std::mem::take(&mut *self.made.lock().expect("made"));
@@ -2550,10 +3032,15 @@ impl Server {
             let mut told = self.told.lock().expect("told");
             if let Some(again) = told.get_mut(other) {
                 *again = true;
+                self.telling_note(format_args!(
+                    "{}: a telling runs; one more after it",
+                    masked(other)
+                ));
                 return;
             }
             told.insert(other.to_string(), false);
         }
+        self.telling_note(format_args!("{}: telling", masked(other)));
         // A telling that panics must not silence the session for good: the
         // next commit finds it not being told. One that ends lets go of it
         // where it sees no commit came, in the same hold, so none is lost
@@ -2598,6 +3085,8 @@ impl Server {
                 _ => {
                     told.remove(other);
                     unwound.ended = true;
+                    drop(told);
+                    self.telling_note(format_args!("{}: told", masked(other)));
                     break;
                 }
             }
@@ -3106,9 +3595,31 @@ impl Server {
             .get(session)
             .map(|q| q.iter().cloned().collect())
             .unwrap_or_default();
-        let documents = documents_of(&self.pending.lock().expect("pending"), session);
+        // Only a document whose page asks is derived now (ADR-0297); one no
+        // page has asked for in [`LIVE`] is derived when one asks.
+        let documents: Vec<Doc> = {
+            let mut queue = self.pending.lock().expect("pending");
+            let now = std::time::Instant::now();
+            documents_of(&queue, session)
+                .into_iter()
+                .filter(|d| which(d))
+                .filter(|d| match queue.get_mut(d) {
+                    Some(waiting) if waiting.live(now) => true,
+                    Some(waiting) => {
+                        if !waiting.stale {
+                            waiting.stale = true;
+                            waiting.note(format_args!(
+                                "passed by, no page asking: derived when one asks"
+                            ));
+                        }
+                        false
+                    }
+                    None => false,
+                })
+                .collect()
+        };
         let mut read = Vec::new();
-        for doc in documents.into_iter().filter(|d| which(d)) {
+        for doc in documents {
             let params = self.params_of(&doc);
             // Each by its own page's plan (ADR-0190): the store's, or a cart
             // page's, which reads the same cart.
@@ -3127,7 +3638,6 @@ impl Server {
         // subscription and a patch are logically separate — a server may
         // derive a patch from a change rather than must.
         let mut failed = Vec::new();
-        let mut queue = self.pending.lock().expect("pending");
         for (doc, page, params, bindings, now) in read {
             // And the value itself, to a page that speculates on it
             // (ADR-0122), from the snapshot the patches are derived from.
@@ -3142,60 +3652,104 @@ impl Server {
                 .filter(|_| speculated)
                 .and_then(|binding| bindings.get(&binding))
                 .map(val_to_json);
-            // Against what the document shows. With none served, none shows.
-            // And what changed of the values it speculates on (ADR-0222), in
-            // this hold.
-            let (patches, speculated) = {
+            let now = Arc::new(now);
+            // **Derived outside the table** (ADR-0296): against what the
+            // document shows, read in a moment of its own, and pushed only
+            // if the document still shows it; else derived again. Until
+            // ADR-0296 every document of the session was derived inside one
+            // hold of the table, 50 to 200 ms a telling under parallel load,
+            // back to back, and every stream and read on the host waited for
+            // it: WebKit's "Load more" saw its stream's passes wait up to 1.6 s
+            // each, and its read's rows never came. The last attempt is
+            // derived inside, so a document every telling changes is still
+            // told.
+            let mut attempt = 1;
+            loop {
+                let last = attempt >= DOCUMENT_ATTEMPTS;
+                let deriving = std::time::Instant::now();
+                let ahead = (!last).then(|| {
+                    let was = self.shown.lock().expect("shown").get(&doc).cloned();
+                    let derived = was.as_ref().map(|was| {
+                        #[cfg(test)]
+                        self.deriving(&doc);
+                        self.derive(&page, session, &params, &bindings, was, &now)
+                    });
+                    (was, derived)
+                });
+                let derived_ms = deriving.elapsed().as_millis();
+                let asked = std::time::Instant::now();
+                let mut queue = self.pending.lock().expect("pending");
+                let waited_ms = asked.elapsed().as_millis();
+                let _held = self.held("telling a session's documents");
+                // Against what the document shows. With none served, none
+                // shows. And what changed of the values it speculates on
+                // (ADR-0222), in this hold.
                 let mut shown = self.shown.lock().expect("shown");
-                match shown.get(&doc) {
-                    Some(was) => match self.derive(&page, session, &params, &bindings, was, &now) {
-                        Ok(patches) => {
-                            let speculated =
-                                self.speculated_frames(&doc, &page, was, &now, &applied);
-                            shown.insert(doc.clone(), now);
-                            (patches, speculated)
-                        }
-                        Err(why) => {
-                            failed.push((doc, why));
-                            continue;
-                        }
-                    },
-                    None => (Vec::new(), Vec::new()),
-                }
-            };
-            // A document forgotten while it was read is told nothing.
-            let Some(waiting) = queue.get_mut(&doc) else {
-                continue;
-            };
-            waiting.push(StreamFrame::ResourceChanged {
-                protocol: CURRENT,
-                entry: entry.clone(),
-                version,
-            });
-            // Sent with no patches too: the document reflects the new version
-            // when nothing it shows changed.
-            waiting.push(StreamFrame::PatchSet(PatchSet {
-                protocol: CURRENT,
-                basis: CausalBasis::of(entry.clone(), version),
-                patches,
-            }));
-            // In the same hold, so the value a page holds is always the one
-            // the patches it was sent were derived from.
-            for frame in speculated {
-                waiting.push(frame);
-            }
-            // In the same hold, so one change reaches a page whole.
-            if let Some(value) = value {
-                waiting.push(StreamFrame::EntryValue {
+                let current = shown.get(&doc).cloned();
+                let derived = match ahead {
+                    Some((was, derived)) if same_shown(&was, &current) => derived,
+                    // Something reached the document while this was derived.
+                    Some(_) => {
+                        drop(shown);
+                        drop(queue);
+                        attempt += 1;
+                        continue;
+                    }
+                    None => current
+                        .as_ref()
+                        .map(|was| self.derive(&page, session, &params, &bindings, was, &now)),
+                };
+                let (patches, speculated) = match (derived, &current) {
+                    (Some(Ok(patches)), Some(was)) => {
+                        let speculated = self.speculated_frames(&doc, &page, was, &now, &applied);
+                        shown.insert(doc.clone(), now.clone());
+                        (patches, speculated)
+                    }
+                    (Some(Err(why)), _) => {
+                        failed.push((doc.clone(), why));
+                        break;
+                    }
+                    _ => (Vec::new(), Vec::new()),
+                };
+                drop(shown);
+                // A document forgotten while it was read is told nothing.
+                let Some(waiting) = queue.get_mut(&doc) else {
+                    break;
+                };
+                waiting.note(format_args!(
+                    "told at {}: derived in {derived_ms} ms, waited {waited_ms} ms for the table, attempt {attempt}",
+                    version.0
+                ));
+                waiting.push(StreamFrame::ResourceChanged {
                     protocol: CURRENT,
                     entry: entry.clone(),
                     version,
-                    value,
-                    applied: applied.clone(),
                 });
+                // Sent with no patches too: the document reflects the new
+                // version when nothing it shows changed.
+                waiting.push(StreamFrame::PatchSet(PatchSet {
+                    protocol: CURRENT,
+                    basis: CausalBasis::of(entry.clone(), version),
+                    patches,
+                }));
+                // In the same hold, so the value a page holds is always the
+                // one the patches it was sent were derived from.
+                for frame in speculated {
+                    waiting.push(frame);
+                }
+                // In the same hold, so one change reaches a page whole.
+                if let Some(value) = value {
+                    waiting.push(StreamFrame::EntryValue {
+                        protocol: CURRENT,
+                        entry: entry.clone(),
+                        version,
+                        value,
+                        applied: applied.clone(),
+                    });
+                }
+                break;
             }
         }
-        drop(queue);
         for (doc, why) in failed {
             self.unshowable(&doc, &why);
         }
@@ -3413,13 +3967,6 @@ impl Server {
             Some(rows) => rows,
             None => self.menu_rows(STORE_ID)?,
         };
-        {
-            // Refusals happen before anything is regenerated: a rejected
-            // operation must leave no version behind, or the page would be
-            // told to catch up to a change that did not happen.
-            let mut items = self.store.menu.lock().expect("menu");
-            op.apply(&mut items)?;
-        }
         // The deployment's menu changed, which is `MenuChanged(47)`: it drops
         // what the program says depends on it, the entries of each query
         // that declares `invalidates_on MenuChanged(id)` for this store, and
@@ -3427,15 +3974,35 @@ impl Server {
         // store's kept `Menu` was dropped here, by the query's name.
         // A stock change is `InventoryChanged(47, item)` (ADR-0178), which
         // the store's `Menu` and its fragment listen for.
-        let event = match &op {
-            MenuOp::Stock { id } => {
-                pw_materialize::Event::new("Events.InventoryChanged", &[STORE_ID, id.as_str()])
-            }
-            _ => pw_materialize::Event::new("Events.MenuChanged", &[STORE_ID]),
-        };
         // The store's ids are `String`s (`domain.pw`), as they key here.
-        let values = event.args.iter().map(|a| Val::String(a.clone())).collect();
-        self.invalidate_queries("", &[], &[(event.name.clone(), values)]);
+        let event = match &op {
+            MenuOp::Stock { id, .. } => (
+                "Events.InventoryChanged".to_string(),
+                vec![Val::String(STORE_ID.into()), Val::String(id.clone())],
+            ),
+            _ => (
+                "Events.MenuChanged".to_string(),
+                vec![Val::String(STORE_ID.into())],
+            ),
+        };
+        // **The change, written through the store's data layer with its
+        // event, in one transaction** (track `store-pg`), as a command's
+        // writes are. Refusals happen before anything is regenerated: a
+        // rejected operation commits nothing and leaves no version behind,
+        // or the page would be told to catch up to a change that did not
+        // happen. Until 2026-10-08 the change was made to the server's own
+        // list, and its event was committed nowhere.
+        let mut args = vec![Val::String(STORE_ID.into())];
+        args.extend(op.to_vals());
+        self.store_write(
+            "",
+            "store:host/menus#change",
+            &args,
+            std::slice::from_ref(&event),
+            |delivered| {
+                self.invalidate_queries("", &[], delivered);
+            },
+        )?;
 
         // The menu E7-P changes is store 47's (ADR-0162), read again with
         // the change.
@@ -3700,6 +4267,7 @@ impl Server {
             // was before: nothing can reach the session between the read and
             // the install, so a page is always served.
             let mut queue = self.pending.lock().expect("pending");
+            let _held = self.held("a document's last attempt, read in the table");
             let read = self.render_document(&doc, settled)?;
             Ok(self
                 .installed(&mut queue, &doc, read, None)
@@ -3719,6 +4287,64 @@ impl Server {
     /// ADR-0161), and how many frames have reached it. Registered first, so a
     /// change that reaches the session while its document is read is pushed
     /// to it and counted, even for a session's first page.
+    /// What a test does while `doc`'s change is derived outside the table.
+    #[cfg(test)]
+    fn deriving(&self, doc: &Doc) {
+        let hook = self.deriving_hook.lock().expect("deriving").clone();
+        if let Some(hook) = hook {
+            hook(self, doc);
+        }
+    }
+
+    /// **A document a telling passed by, told as its page asks**
+    /// (ADR-0297): derived against what it shows, in the session's hold, as
+    /// a telling would have, before the page is given its frames.
+    fn told_as_it_asks(&self, doc: &Doc) {
+        let stale = self
+            .pending
+            .lock()
+            .expect("pending")
+            .get_mut(doc)
+            .is_some_and(|waiting| {
+                // Asking now: live for the telling below.
+                waiting.seen = std::time::Instant::now();
+                std::mem::take(&mut waiting.stale)
+            });
+        if !stale {
+            return;
+        }
+        let session = &doc.0;
+        let lock = self.one_at_a_time(session);
+        let _one = lock.lock().expect("one change of a session at a time");
+        self.clock.advance(1);
+        let version = Version(self.clock.now());
+        self.send_documents_where(
+            session,
+            |d| d == doc,
+            &session_documents(session),
+            version,
+            false,
+        );
+    }
+
+    /// A note on [`Server::tellings`], the oldest let go past 300.
+    fn telling_note(&self, what: std::fmt::Arguments<'_>) {
+        let mut tellings = self.tellings.lock().expect("tellings");
+        if tellings.len() >= 300 {
+            tellings.pop_front();
+        }
+        tellings.push_back(format!("{} ms {what}", uptime_ms()));
+    }
+
+    /// A hold of the table at `site`, from now, timed ([`Held`]).
+    fn held(&self, site: &'static str) -> Held<'_> {
+        Held {
+            server: self,
+            site,
+            at: std::time::Instant::now(),
+        }
+    }
+
     fn subscribed(&self, doc: &Doc) -> u64 {
         let mut queue = self.pending.lock().expect("pending");
         let waiting = queue
@@ -3754,7 +4380,10 @@ impl Server {
         waiting.seen = std::time::Instant::now();
         // What it speculates on, as it was read (ADR-0222).
         let entries = self.speculated_entries(doc, &self.page_of(doc), &shown);
-        self.shown.lock().expect("shown").insert(doc.clone(), shown);
+        self.shown
+            .lock()
+            .expect("shown")
+            .insert(doc.clone(), Arc::new(shown));
         // Its keyed reads start with it (ADR-0152).
         self.keyed
             .lock()
@@ -4304,6 +4933,7 @@ impl Server {
         if !self.keyed.lock().expect("keyed").contains_key(&doc) {
             return Ok(KeyOutcome::Superseded);
         }
+        let begun = std::time::Instant::now();
         let asked = Keys::Asked { binding, key };
         let args = self.args_of(plan, session, Some(document), b, &asked)?;
         let flight = self.answer_key(session, b, &args)?;
@@ -4415,6 +5045,7 @@ impl Server {
             break (value, held);
         };
         drop(hold);
+        let fetched_ms = begun.elapsed().as_millis();
 
         // What the page shows for the new key: this binding's value, and the
         // others as they are.
@@ -4432,27 +5063,59 @@ impl Server {
             .get(session)
             .map(|q| q.iter().cloned().collect())
             .unwrap_or_default();
-        let mut queue = self.pending.lock().expect("pending");
-        let mut keyed = self.keyed.lock().expect("keyed");
-        let Some(read) = keyed
-            .get_mut(&doc)
-            .and_then(|k| k.reads.get_mut(binding))
-            .filter(|r| r.latest == seq)
-        else {
-            return Ok(KeyOutcome::Superseded);
-        };
-        // And what the page speculates on, at the new key (ADR-0222): a
-        // speculation after it is shown over the list the page shows.
-        let (patches, speculated) = {
+        let now = Arc::new(now);
+        // **Derived outside the table** (ADR-0296), as a telling is: against
+        // what the document shows, read in a moment of its own, and applied
+        // only if it still shows it; the last attempt is derived inside.
+        let mut attempt = 1;
+        let (mut queue, mut keyed, patches, speculated) = loop {
+            let last = attempt >= DOCUMENT_ATTEMPTS;
+            let ahead = (!last).then(|| {
+                let was = self.shown.lock().expect("shown").get(&doc).cloned();
+                let derived = was.as_ref().map(|was| {
+                    #[cfg(test)]
+                    self.deriving(&doc);
+                    self.derive(&page, session, &params, &bindings, was, &now)
+                });
+                (was, derived)
+            });
+            let queue = self.pending.lock().expect("pending");
+            let keyed = self.keyed.lock().expect("keyed");
+            if !keyed
+                .get(&doc)
+                .and_then(|k| k.reads.get(binding))
+                .is_some_and(|r| r.latest == seq)
+            {
+                return Ok(KeyOutcome::Superseded);
+            }
+            // And what the page speculates on, at the new key (ADR-0222): a
+            // speculation after it is shown over the list the page shows.
             let mut shown = self.shown.lock().expect("shown");
-            let Some(was) = shown.get(&doc) else {
+            let current = shown.get(&doc).cloned();
+            let Some(was) = current.clone() else {
                 return Ok(KeyOutcome::Superseded);
             };
-            let patches = self.derive(&page, session, &params, &bindings, was, &now)?;
-            let speculated = self.speculated_frames(&doc, &page, was, &now, &applied);
-            shown.insert(doc.clone(), now);
-            (patches, speculated)
+            let patches = match ahead {
+                Some((before, Some(derived))) if same_shown(&before, &current) => derived?,
+                // Something reached the document while this was derived.
+                Some(_) => {
+                    drop(shown);
+                    drop(keyed);
+                    drop(queue);
+                    attempt += 1;
+                    continue;
+                }
+                None => self.derive(&page, session, &params, &bindings, &was, &now)?,
+            };
+            let speculated = self.speculated_frames(&doc, &page, &was, &now, &applied);
+            shown.insert(doc.clone(), now.clone());
+            break (queue, keyed, patches, speculated);
         };
+        let _held = self.held("a keyed read, applied");
+        let read = keyed
+            .get_mut(&doc)
+            .and_then(|k| k.reads.get_mut(binding))
+            .expect("the latest read, as checked in this hold");
         read.shown = key.clone();
         if read.hold.as_ref().is_some_and(|(n, _)| *n == seq) {
             read.hold = None;
@@ -4461,6 +5124,10 @@ impl Server {
         let Some(waiting) = queue.get_mut(&doc) else {
             return Ok(KeyOutcome::Superseded);
         };
+        waiting.note(format_args!(
+            "read {binding} #{seq} applied {} ms after it was asked, its value read in {fetched_ms} ms, attempt {attempt}",
+            begun.elapsed().as_millis()
+        ));
         waiting.push(StreamFrame::ResourceChanged {
             protocol: CURRENT,
             entry: entry.clone(),
@@ -5152,6 +5819,9 @@ enum MenuOp {
     /// as they were.
     Stock {
         id: String,
+        /// Whether it can be ordered now, written with the change (track
+        /// `store-pg`).
+        available: bool,
     },
 }
 
@@ -5210,7 +5880,7 @@ impl MenuOp {
                 let at = Self::position(items, id)?;
                 items[at].1 = name.clone();
             }
-            MenuOp::Stock { id } => {
+            MenuOp::Stock { id, .. } => {
                 Self::position(items, id)?;
             }
         }
@@ -5246,6 +5916,24 @@ fn cart_value(lines: &[Line]) -> Val {
                 .collect(),
         ),
     )])
+}
+
+/// **A cart's lines, as `(item, quantity)`**, from a cart's value: what a
+/// test compares (track `store-pg`).
+#[cfg(test)]
+fn lines_of(cart: &Val) -> Vec<(String, i64)> {
+    let Some(Val::List(lines)) = val_at(cart, &["lines"]) else {
+        panic!("no cart: {cart:?}");
+    };
+    lines
+        .iter()
+        .map(
+            |line| match (val_at(line, &["item-id"]), val_at(line, &["quantity"])) {
+                (Some(Val::String(item)), Some(Val::S64(q))) => (item.clone(), *q),
+                other => panic!("no line: {other:?}"),
+            },
+        )
+        .collect()
 }
 
 /// **A binding's policy, as `pw-resource`'s manifest** (ADR-0127).
@@ -5481,32 +6169,8 @@ fn item_category(store: &str, id: &str) -> (&'static str, &'static str) {
     }
 }
 
-/// A store's name, by its id: the stores this server holds.
-/// **A store, as the data layer holds it** (ADR-0125, ADR-0192): what
-/// `stores#get` answers for one, and `stores#list` for each.
-fn store_record(id: &str) -> Val {
-    Val::Record(vec![
-        ("id".into(), Val::String(id.to_string())),
-        (
-            "name".into(),
-            Val::String(store_named(id).unwrap_or_default().into()),
-        ),
-        // A program whose `Store` declares none is not given it (ADR-0166):
-        // the benchmark's.
-        (
-            "description".into(),
-            Val::String(store_description(id).into()),
-        ),
-        (
-            "hours".into(),
-            Val::Record(vec![
-                ("opens-minute".into(), Val::S64(7 * 60)),
-                ("closes-minute".into(), Val::S64(19 * 60)),
-            ]),
-        ),
-    ])
-}
-
+/// A store's name, by its id: the stores this server holds, as they are
+/// first (`store.rs`'s seed).
 fn store_named(id: &str) -> Option<&'static str> {
     match id {
         STORE_ID => Some(STORE_NAME),
@@ -5939,7 +6603,22 @@ fn main() {
         },
         _ => None,
     };
-    let server = match Server::from_build_with(dist.into(), build.into(), feed) {
+    // **The store's data in PostgreSQL** (track `store-pg`), where the
+    // deployment names a database, in its own schema, `pw_store`; in memory
+    // otherwise. Its command's isolation is set as the feed's is.
+    let store = match std::env::var("PW_STORE_DATABASE_URL") {
+        Ok(url) if !url.is_empty() => {
+            match store_pg::StorePg::open_with(&url, store_pg::SCHEMA, isolation) {
+                Ok(layer) => Some(Arc::new(layer) as Arc<dyn store::StoreLayer>),
+                Err(e) => {
+                    eprintln!("pw dev server: PW_STORE_DATABASE_URL: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => None,
+    };
+    let server = match Server::from_build_layers(dist.into(), build.into(), feed, store) {
         Ok(s) => Arc::new(s),
         Err(e) => {
             eprintln!("pw dev server: {e}\nrun spikes/own-renderer/run.sh, which runs `pw build`");
@@ -6220,15 +6899,27 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .find_map(|p| p.strip_prefix("status="))
                 .filter(|s| !s.is_empty())
                 .map(str::to_string);
-            let mut orders = server.store.orders.lock().expect("orders");
-            match status {
-                Some(s) => orders.insert(session.clone(), s),
-                None => orders.remove(&session),
-            };
-            drop(orders);
-            // And the session's open pages told (ADR-0193).
-            server.session_changed(&session, "Events.OrderChanged", &order_entry(&session));
-            respond_json(&mut stream, 200, &session, fresh, "{}");
+            // Through the store's data layer, with its event, in one
+            // transaction (track `store-pg`). The order moved along keeps
+            // its lines (ADR-0193); one the kitchen sets with none placed
+            // has none.
+            let event = (
+                "Events.OrderChanged".to_string(),
+                vec![Val::String(session.clone())],
+            );
+            let status = Val::Option(status.map(|s| Box::new(Val::String(s))));
+            let written = server.store_write(
+                &session,
+                "store:host/orders#set-status",
+                &[Val::String(session.clone()), status],
+                std::slice::from_ref(&event),
+                // And the session's open pages told (ADR-0193).
+                |_| server.session_changed(&session, "Events.OrderChanged", &order_entry(&session)),
+            );
+            match written {
+                Ok(_) => respond_json(&mut stream, 200, &session, fresh, "{}"),
+                Err(why) => refused_json(&mut stream, &session, fresh, why),
+            }
         }
         // The recommender a test sets (ADR-0148): how long it takes, how it
         // fails (`declared` or `host`), and what it recommends, `id:Name`
@@ -6249,19 +6940,28 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 set.gate = Some(Arc::new(Gate::default()));
             }
             set.fail = q("fail").filter(|f| !f.is_empty());
-            if let Some(items) = q("items") {
-                set.items = Some(
-                    items
-                        .split(',')
-                        .filter_map(|pair| pair.split_once(':'))
-                        .map(|(id, name)| (id.to_string(), name.to_string()))
-                        .collect(),
-                );
+            // What it recommends is the store's data, curated through the
+            // layer (track `store-pg`); none curated draws from each store's
+            // menu again.
+            let items: Option<Vec<(String, String)>> = q("items").map(|items| {
+                items
+                    .split(',')
+                    .filter_map(|pair| pair.split_once(':'))
+                    .map(|(id, name)| (id.to_string(), name.to_string()))
+                    .collect()
+            });
+            if let Err(why) = server.curate(items.as_deref()) {
+                return refused_json(&mut stream, &session, fresh, why);
             }
             // A read held as it was is let go (ADR-0223): a test that set the
             // recommender again has done with it.
             let was = std::mem::replace(
-                &mut *server.store.recommender.lock().expect("recommender"),
+                &mut *server
+                    .store
+                    .faults()
+                    .recommender
+                    .lock()
+                    .expect("recommender"),
                 set,
             );
             if let Some(gate) = was.gate {
@@ -6303,10 +7003,53 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // **The recommender's held reads, let go** (ADR-0223), its settings
         // kept.
         ("POST", "/bench/recommendations/release") => {
-            if let Some(gate) = &server.store.recommender.lock().expect("recommender").gate {
+            if let Some(gate) = &server
+                .store
+                .faults()
+                .recommender
+                .lock()
+                .expect("recommender")
+                .gate
+            {
                 gate.open();
             }
             respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
+        // **What happened to a document's frames** (the WebKit "Load more"
+        // flake, NEXT): its trail and the table's slow holds, for a failing
+        // browser test to attach beside the runtime's record. Only the
+        // session's own documents.
+        ("GET", "/bench/records") => {
+            let document = query
+                .split('&')
+                .find_map(|p| p.strip_prefix("doc="))
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(0);
+            let doc: Doc = (session.clone(), document);
+            let trail: Vec<String> = server
+                .pending
+                .lock()
+                .expect("pending")
+                .get(&doc)
+                .map(|w| w.trail.iter().cloned().collect())
+                .unwrap_or_default();
+            let slow: Vec<String> = server.slow.lock().expect("slow").iter().cloned().collect();
+            let tellings: Vec<String> = server
+                .tellings
+                .lock()
+                .expect("tellings")
+                .iter()
+                .cloned()
+                .collect();
+            let body = serde_json::json!({
+                "at": uptime_ms() as u64,
+                "doc": document,
+                "you": masked(&session),
+                "trail": trail,
+                "slow": slow,
+                "tellings": tellings,
+            });
+            respond_json(&mut stream, 200, &session, fresh, &body.to_string());
         }
         // The store's staff post a notice (E14, T09): at the source, and
         // nothing is told. What a page shows of it is the `Notice` query's
@@ -6317,8 +7060,17 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .find_map(|p| p.strip_prefix("text="))
                 .and_then(percent_decoded)
                 .unwrap_or_default();
-            *server.store.notice.lock().expect("notice") = text;
-            respond_json(&mut stream, 200, &session, fresh, "{}");
+            // Through the layer (track `store-pg`), and still nothing told.
+            match server.store_write(
+                &session,
+                "store:host/notices#post",
+                &[Val::String(STORE_ID.into()), Val::String(text)],
+                &[],
+                |_| {},
+            ) {
+                Ok(_) => respond_json(&mut stream, 200, &session, fresh, "{}"),
+                Err(why) => refused_json(&mut stream, &session, fresh, why),
+            }
         }
         // **A binding read again, for the key the browser asks for**
         // (ADR-0152): `?binding=..&seq=..&doc=..&key=<JSON>`. The patch set
@@ -6382,20 +7134,29 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             let Some(item) = param("item") else {
                 return respond_json(&mut stream, 400, &session, fresh, "{}");
             };
-            let mut sold_out = server.store.sold_out.lock().expect("sold out");
-            if param("available").as_deref() == Some("false") {
-                sold_out.insert(item.clone());
+            let available = param("available").as_deref() != Some("false");
+            // Told (ADR-0178): `InventoryChanged(47, item)`, written with
+            // the change, and every page that shows the store sees the item
+            // as it is now. Untold, it is §15.5's forced stale item: a page
+            // shows what it was, and the command that adds it refuses it
+            // (ADR-0157). Either way through the layer (track `store-pg`).
+            let changed = if param("tell").as_deref() == Some("true") {
+                server.broadcast_menu(MenuOp::Stock {
+                    id: item,
+                    available,
+                })
             } else {
-                sold_out.remove(&item);
-            }
-            drop(sold_out);
-            // Told (ADR-0178): `InventoryChanged(47, item)`, and every page
-            // that shows the store sees the item as it is now. Untold, it is
-            // §15.5's forced stale item: a page shows what it was, and the
-            // command that adds it refuses it (ADR-0157).
-            if param("tell").as_deref() == Some("true")
-                && let Err(e) = server.broadcast_menu(MenuOp::Stock { id: item })
-            {
+                server
+                    .store_write(
+                        &session,
+                        "store:host/menus#stock",
+                        &[Val::String(item), Val::Bool(available)],
+                        &[],
+                        |_| {},
+                    )
+                    .map(|_| ())
+            };
+            if let Err(e) = changed {
                 let why = serde_json::Value::String(e);
                 respond_json(
                     &mut stream,
@@ -6417,7 +7178,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                     .find_map(|p| p.strip_prefix(&format!("{name}=") as &str))
                     .and_then(percent_decoded)
             };
-            *server.store.categories.lock().expect("categories") = Categories {
+            *server.store.faults().categories.lock().expect("categories") = Categories {
                 slow: param("slow"),
                 delay_ms: param("delay").and_then(|d| d.parse().ok()).unwrap_or(0),
             };
@@ -6431,10 +7192,17 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .find_map(|p| p.strip_prefix("minutes="))
                 .and_then(|m| m.parse::<i64>().ok())
             {
-                Some(minutes) => {
-                    *server.store.prep_minutes.lock().expect("prep minutes") = minutes;
-                    respond_json(&mut stream, 200, &session, fresh, "{}");
-                }
+                // Through the layer (track `store-pg`), and nothing told.
+                Some(minutes) => match server.store_write(
+                    &session,
+                    "store:host/kitchen#set-prep",
+                    &[Val::String(STORE_ID.into()), Val::S64(minutes)],
+                    &[],
+                    |_| {},
+                ) {
+                    Ok(_) => respond_json(&mut stream, 200, &session, fresh, "{}"),
+                    Err(why) => refused_json(&mut stream, &session, fresh, why),
+                },
                 None => respond_json(&mut stream, 400, &session, fresh, "{}"),
             }
         }
@@ -6448,6 +7216,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 "prep": count("store:data/kitchen#prep-minutes"),
                 "category": count("store:data/menus#in-category"),
                 "category_stopped": server.store
+                    .faults()
                     .category_stopped
                     .load(std::sync::atomic::Ordering::SeqCst),
                 // The store's origin, asked (ADR-0177).
@@ -6470,6 +7239,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             if query.split('&').any(|p| p == "fail=next") {
                 server
                     .store
+                    .faults()
                     .store_fails_next
                     .store(true, std::sync::atomic::Ordering::SeqCst);
                 // The store page's plan and every page's: a server built
@@ -6497,6 +7267,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .unwrap_or(0);
             server
                 .store
+                .faults()
                 .store_delay_ms
                 .store(delay, std::sync::atomic::Ordering::SeqCst);
             let resources: std::collections::BTreeSet<String> = std::iter::once(&server.plan)
@@ -6525,6 +7296,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .unwrap_or(0);
             server
                 .store
+                .faults()
                 .cart_faults
                 .lock()
                 .expect("cart faults")
@@ -6544,7 +7316,12 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // page's press met.
         ("POST", "/bench/fail") => {
             let next = query.split('&').find_map(|p| p.strip_prefix("next="));
-            let mut faults = server.store.cart_faults.lock().expect("cart faults");
+            let mut faults = server
+                .store
+                .faults()
+                .cart_faults
+                .lock()
+                .expect("cart faults");
             let mine = faults.entry(session.clone()).or_default();
             match next {
                 Some("write") => mine.fail_write = true,
@@ -6652,12 +7429,18 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 set.delay_ms = ms;
             }
             set.fail = q("fail").filter(|f| !f.is_empty());
-            if let Some(m) = q("minutes").and_then(|v| v.parse().ok()) {
-                set.minutes = m;
+            // What it estimates is the session's data, through the layer
+            // (track `store-pg`); its delay and failure are test controls.
+            let minutes = q("minutes")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(store::DEFAULT_ESTIMATE.0);
+            let max = q("max").and_then(|v| v.parse().ok());
+            if let Err(why) = server.set_estimate(&session, minutes, max) {
+                return refused_json(&mut stream, &session, fresh, why);
             }
-            set.max_minutes = q("max").and_then(|v| v.parse().ok());
             server
                 .store
+                .faults()
                 .estimators
                 .lock()
                 .expect("estimators")
@@ -6900,8 +7683,11 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             respond_json(&mut stream, 200, &session, fresh, &body.to_string());
         }
         ("GET", "/menu") => {
-            let items = server.store.menu.lock().expect("menu");
-            let ids: Vec<String> = items.iter().map(|(k, _)| format!("\"{k}\"")).collect();
+            // Store 47's menu, read through the layer (track `store-pg`).
+            let ids: Vec<String> = match server.menu_ids(STORE_ID) {
+                Ok(ids) => ids.iter().map(|k| format!("\"{k}\"")).collect(),
+                Err(why) => return refused_json(&mut stream, &session, fresh, why),
+            };
             respond_json(
                 &mut stream,
                 200,
@@ -6924,16 +7710,24 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0);
             if items > 0 {
-                let mut menu = server.store.menu.lock().expect("menu");
-                if menu.len() != items {
-                    *menu = (0..items)
-                        .map(|i| (format!("item-{i}"), format!("Item {i}")))
-                        .collect();
-                    drop(menu);
-                    server
-                        .materializer
-                        .invalidate(&server.menu_key(STORE_ID), 0);
-                    server.queries.invalidate("store.page.Menu");
+                // Through the layer (track `store-pg`): a menu that long
+                // already is not written.
+                let replaced = server.store_write(
+                    &session,
+                    "store:host/menus#replace",
+                    &[Val::String(STORE_ID.into()), Val::S64(items as i64)],
+                    &[],
+                    |_| {},
+                );
+                match replaced {
+                    Ok(Some(Val::Bool(true))) => {
+                        server
+                            .materializer
+                            .invalidate(&server.menu_key(STORE_ID), 0);
+                        server.queries.invalidate("store.page.Menu");
+                    }
+                    Ok(_) => {}
+                    Err(why) => return refused_json(&mut stream, &session, fresh, why),
                 }
             }
             let page = server.store_page().to_string();
@@ -7039,30 +7833,43 @@ fn stream_open(
     // 2026-10-02 each pass below acknowledged what the pass before had
     // written, so a stream held for a page that had gone, reloaded or closed,
     // dropped what the page that replaced it was waiting for.
-    server
-        .pending
-        .lock()
-        .expect("pending")
-        .entry(doc.clone())
-        .or_insert_with(|| Subscriber::at(document))
-        .acknowledge(since);
+    {
+        let mut queue = server.pending.lock().expect("pending");
+        let waiting = queue
+            .entry(doc.clone())
+            .or_insert_with(|| Subscriber::at(document));
+        waiting.acknowledge(since);
+        waiting.note(format_args!("stream opened since {since}"));
+    }
     let mut written = since;
+    // How it ended, on its trail.
+    let ended = |why: std::fmt::Arguments<'_>| {
+        if let Some(waiting) = server.pending.lock().expect("pending").get_mut(&doc) {
+            waiting.note(why);
+        }
+    };
 
     // Bounded, like the long poll: a held connection is a held thread, and
     // three engine families times six workers is eighteen of them.
     let opened = std::time::Instant::now();
-    for _ in 0..80 {
+    for pass in 0..80 {
         // Cut off since it opened (ADR-0175): it ends, with no more bytes.
         if server.cut_off(session, opened) {
+            ended(format_args!("stream cut off at pass {pass}"));
             return;
         }
         let batch = {
+            let asked = std::time::Instant::now();
             let mut queue = server.pending.lock().expect("pending");
+            let waited = asked.elapsed().as_millis();
             let Some(waiting) = queue.get_mut(&doc) else {
                 // Forgotten while the stream was held: the next request
                 // is told to reload.
                 return;
             };
+            if waited >= 50 {
+                waiting.note(format_args!("pass {pass} waited {waited} ms for the table"));
+            }
             waiting.seen = std::time::Instant::now();
             let (cursor, frames) = waiting.after(written);
             if frames.is_empty() {
@@ -7083,12 +7890,18 @@ fn stream_open(
             // A write that never arrives therefore costs nothing.
             let line = format!("{{\"cursor\":{cursor},\"frames\":{frames}}}\n");
             if stream.write_all(line.as_bytes()).is_err() || stream.flush().is_err() {
+                ended(format_args!("stream write failed through {cursor}"));
                 return;
             }
+            ended(format_args!("wrote through {cursor}, {} bytes", line.len()));
             written = cursor;
         }
         std::thread::sleep(std::time::Duration::from_millis(25));
     }
+    ended(format_args!(
+        "stream ended after its passes, {} ms",
+        opened.elapsed().as_millis()
+    ));
 }
 
 fn stream_frames(
@@ -7124,6 +7937,8 @@ fn stream_frames(
     // next asks: its change reaches it within one subscription.
     server.drain(session);
     let doc: Doc = (session.to_string(), document);
+    // What a telling passed by while no page of it asked (ADR-0297).
+    server.told_as_it_asks(&doc);
 
     // One route, two adapters. The frames are the same either way — see
     // `e2e/transport.spec.mjs`, which runs the whole subscription twice.
@@ -7905,6 +8720,19 @@ fn session_of(headers: &str) -> String {
         .unwrap_or_else(identity::new_session_id)
 }
 
+/// **A change to the store's data refused** (track `store-pg`): 409, and
+/// why. Nothing of it was kept.
+fn refused_json(stream: &mut TcpStream, session: &str, fresh: bool, why: String) {
+    let why = serde_json::Value::String(why);
+    respond_json(
+        stream,
+        409,
+        session,
+        fresh,
+        &format!("{{\"refused\":{why}}}"),
+    );
+}
+
 fn respond_json(stream: &mut TcpStream, code: u16, session: &str, fresh: bool, body: &str) {
     respond(
         stream,
@@ -8186,11 +9014,7 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         let s = orders_server();
         let (none, _) = s.serve_document("a");
         assert!(visible(&none).contains("No order yet."), "{none}");
-        s.store
-            .orders
-            .lock()
-            .expect("orders")
-            .insert("a".into(), "preparing".into());
+        s.order_set_untold("a", "preparing");
         let (preparing, _) = s.serve_document("a");
         assert!(
             visible(&preparing).contains("Your order is being prepared."),
@@ -8206,11 +9030,7 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         let s = orders_server();
         // A status the program's type does not have: the component's types
         // refuse what the host gives, and the query fails.
-        s.store
-            .orders
-            .lock()
-            .expect("orders")
-            .insert("a".into(), "ready".into());
+        s.order_set_untold("a", "ready");
         let refused = s
             .serve_document_with_entries("a")
             .expect_err("a page that cannot be shown");
@@ -8224,11 +9044,7 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
     fn a_served_page_whose_values_fail_is_told_to_read_itself_again() {
         let s = orders_server();
         s.serve_document("a");
-        s.store
-            .orders
-            .lock()
-            .expect("orders")
-            .insert("a".into(), "ready".into());
+        s.order_set_untold("a", "ready");
         s.command(ADD, "a", &add("espresso", 1), false)
             .expect("the command commits");
         let queue = s.pending.lock().expect("pending");
@@ -8359,7 +9175,7 @@ public query Store(",
     }
 
     fn recommend(s: &Server, delay_ms: u64, fail: Option<&str>) {
-        *s.store.recommender.lock().expect("recommender") = Recommender {
+        *s.store.faults().recommender.lock().expect("recommender") = Recommender {
             delay_ms,
             fail: fail.map(str::to_string),
             ..Recommender::default()
@@ -8496,15 +9312,20 @@ public query Store(",
         include_str!("../../../../benchmarks/tasks/T10-estimate-states/reference/pleris.patch");
 
     fn estimate(s: &Server, session: &str, fail: Option<&str>, minutes: i64) {
-        s.store.estimators.lock().expect("estimators").insert(
-            session.to_string(),
-            Estimator {
-                delay_ms: 0,
-                fail: fail.map(str::to_string),
-                minutes,
-                max_minutes: None,
-            },
-        );
+        s.store
+            .faults()
+            .estimators
+            .lock()
+            .expect("estimators")
+            .insert(
+                session.to_string(),
+                Estimator {
+                    delay_ms: 0,
+                    fail: fail.map(str::to_string),
+                },
+            );
+        // What it estimates is the session's data (track `store-pg`).
+        s.set_estimate(session, minutes, None).expect("estimated");
     }
 
     fn page_as(s: &Server, session: &str) -> String {
@@ -8563,11 +9384,9 @@ public query Store(",
         let s = served_from(|app| app.to_string(), None);
         let (before, _) = s.serve_document("a");
         assert!(visible(&before).contains("Cortado"), "{before}");
-        s.store
-            .menu
-            .lock()
-            .expect("menu")
-            .retain(|(id, _)| id != "cortado");
+        s.menu_untold(MenuOp::Remove {
+            id: "cortado".into(),
+        });
         // The query's freshness spent: its value is read again.
         s.queries.invalidate("store.page.Menu");
         let (after, _) = s.serve_document("b");
@@ -8611,7 +9430,14 @@ public query Store(",
         assert_eq!(notice_calls(&s), 1);
         // Posted at the source, and nothing is told: the kept answer is
         // served, and the board is not asked again.
-        *s.store.notice.lock().expect("notice") = "Closing early".to_string();
+        s.untold(
+            "",
+            "store:host/notices#post",
+            &[
+                Val::String(STORE_ID.into()),
+                Val::String("Closing early".into()),
+            ],
+        );
         let (kept, _) = s.serve_document("b");
         assert!(visible(&kept).contains("Open until 7 pm"), "{kept}");
         assert_eq!(notice_calls(&s), 1);
@@ -8646,14 +9472,7 @@ public query Store(",
             );
             assert!(why.contains(&format!("{forged}")), "{why}");
         }
-        let lines = s
-            .store
-            .carts
-            .lock()
-            .expect("carts")
-            .get("a")
-            .cloned()
-            .unwrap_or_default();
+        let lines = s.cart_lines("a");
         assert!(lines.is_empty(), "the cart holds {:?}", lines.len());
         // A quantity the type holds is added, as before.
         let added = s
@@ -8685,13 +9504,13 @@ public query Store(",
             )
             .expect("a well-formed request");
         assert!(added.committed);
-        s.store
-            .carts
-            .lock()
-            .expect("carts")
-            .get_mut("a")
-            .expect("a cart")[0]
-            .quantity = 0;
+        // Around the program, as a row can be. A database that holds the
+        // invariant itself refuses the row (PostgreSQL's
+        // `cart_lines_quantity_check`), and there is nothing to read.
+        if let Err(refused) = s.store.line_around("a", 0, 0) {
+            assert!(refused.contains("cart_lines_quantity_check"), "{refused}");
+            return;
+        }
         let why = match s.serve_store_document("a", STORE_ID) {
             Err(Unread::Failed(why)) => why,
             other => panic!("served from a line of 0: {other:?}"),
@@ -8712,11 +9531,7 @@ public query Store(",
         // given the same answer.
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         s.serve_document("a");
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
+        s.stock_untold("cortado", false);
         let cortado = [shown("cortado"), serde_json::json!(1)];
         let refused = s
             .command_answer(ADD, "a", &cortado, Some("press-1"))
@@ -8739,7 +9554,7 @@ public query Store(",
             .expect("a well-formed request");
         assert_eq!(again, refused, "a retry is given the first answer");
         // Back in stock, the next press adds.
-        s.store.sold_out.lock().expect("sold out").clear();
+        s.stock_untold("cortado", true);
         let added = s
             .command_answer(ADD, "a", &cortado, Some("press-2"))
             .expect("a well-formed request");
@@ -8870,7 +9685,7 @@ public query Store(",
     /// read took, what came of each, and how many reads of a category were
     /// stopped.
     fn hot_then_cold(s: &Server) -> (Timed, Timed, u64) {
-        *s.store.categories.lock().expect("categories") = Categories {
+        *s.store.faults().categories.lock().expect("categories") = Categories {
             slow: Some("hot".to_string()),
             delay_ms: 1_000,
         };
@@ -8888,6 +9703,7 @@ public query Store(",
         });
         let stopped = s
             .store
+            .faults()
             .category_stopped
             .load(std::sync::atomic::Ordering::SeqCst);
         (hot, cold, stopped)
@@ -8945,7 +9761,7 @@ public query Store(",
             s.read_keyed("b", "browsing", 1, b, &category("hot"), STAYED),
             Ok(KeyOutcome::Applied)
         );
-        *s.store.categories.lock().expect("categories") = Categories {
+        *s.store.faults().categories.lock().expect("categories") = Categories {
             slow: Some("hot".to_string()),
             delay_ms: 1_000,
         };
@@ -8969,6 +9785,7 @@ public query Store(",
         // not told to read itself again.
         assert_eq!(
             s.store
+                .faults()
                 .category_stopped
                 .load(std::sync::atomic::Ordering::SeqCst),
             0
@@ -8989,7 +9806,7 @@ public query Store(",
     #[test]
     fn a_browser_that_leaves_lets_go_of_its_read() {
         let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_CANCEL]);
-        *s.store.categories.lock().expect("categories") = Categories {
+        *s.store.faults().categories.lock().expect("categories") = Categories {
             slow: Some("hot".to_string()),
             delay_ms: 1_000,
         };
@@ -9001,6 +9818,7 @@ public query Store(",
         assert!(started.elapsed() < std::time::Duration::from_millis(700));
         assert_eq!(
             s.store
+                .faults()
                 .category_stopped
                 .load(std::sync::atomic::Ordering::SeqCst),
             1
@@ -9743,29 +10561,15 @@ public query Store(",
             .expect("runs");
         s.command(ADD, "session-9", &add_shown("cortado", 1), false)
             .expect("runs");
-        let lines = s
-            .store
-            .carts
-            .lock()
-            .unwrap()
-            .get("session-9")
-            .cloned()
-            .unwrap();
         assert_eq!(
-            lines
-                .iter()
-                .map(|l| (l.item.as_str(), l.quantity))
-                .collect::<Vec<_>>(),
-            [("cortado", 3), ("espresso", 1)]
+            s.cart_lines("session-9"),
+            [("cortado".to_string(), 3), ("espresso".to_string(), 1)]
         );
         // Each recorded with its item's name and price when it was made
-        // (ADR-0172).
+        // (ADR-0172), as the layer answers it.
         assert_eq!(
-            lines
-                .iter()
-                .map(|l| (l.name.as_str(), l.price))
-                .collect::<Vec<_>>(),
-            [("Cortado", 425), ("Espresso", 350)]
+            s.cart_priced("session-9"),
+            [("Cortado".to_string(), 425), ("Espresso".to_string(), 350)]
         );
         assert_eq!(s.cart_value("session-9"), 4);
         assert_eq!(
@@ -9778,13 +10582,7 @@ public query Store(",
     /// A session's lines as the data layer holds them: each item and how
     /// many.
     fn quantities(s: &Server, session: &str) -> Vec<(String, i64)> {
-        s.store
-            .carts
-            .lock()
-            .unwrap()
-            .get(session)
-            .map(|lines| lines.iter().map(|l| (l.item.clone(), l.quantity)).collect())
-            .unwrap_or_default()
+        s.cart_lines(session)
     }
 
     /// **A line's −, + and Remove reach the data layer through their
@@ -9824,7 +10622,7 @@ public query Store(",
         // by name, as an add is, and nothing is written.
         s.command(ADD, "session-9", &add_shown("cortado", 1), false)
             .expect("runs");
-        s.store.sold_out.lock().unwrap().insert("cortado".into());
+        s.stock_untold("cortado", false);
         let refused = s
             .command(INCREASE, "session-9", &item("cortado"), false)
             .expect_err("sold out");
@@ -9871,6 +10669,7 @@ public query Store(",
     fn a_one_shot_write_error_fails_the_next_write_once() {
         let s = rendering_server();
         s.store
+            .faults()
             .cart_faults
             .lock()
             .unwrap()
@@ -9898,6 +10697,7 @@ public query Store(",
         // A page of the session's, served: its entry is made.
         s.serve_document_with_entries("session-9").expect("served");
         s.store
+            .faults()
             .cart_faults
             .lock()
             .unwrap()
@@ -9928,6 +10728,7 @@ public query Store(",
         // The shared queries, read and kept.
         timed("warm");
         s.store
+            .faults()
             .cart_faults
             .lock()
             .unwrap()
@@ -9938,6 +10739,7 @@ public query Store(",
         assert!(timed("quick") < second, "not another's");
 
         s.store
+            .faults()
             .store_delay_ms
             .store(1000, std::sync::atomic::Ordering::SeqCst);
         assert!(
@@ -9947,6 +10749,7 @@ public query Store(",
         s.query_clock.0.advance(30_001);
         assert!(timed("quick") >= second, "read again, and slow");
         s.store
+            .faults()
             .store_delay_ms
             .store(0, std::sync::atomic::Ordering::SeqCst);
         s.query_clock.0.advance(30_001);
@@ -10240,6 +11043,7 @@ public query Store(",
         // A session's cart, whose read fails: not served from anything kept.
         s.serve_document_with_entries("fourth").expect("served");
         s.store
+            .faults()
             .cart_faults
             .lock()
             .unwrap()
@@ -10286,12 +11090,7 @@ public query Store(",
             false,
         )
         .expect("runs");
-        let recorded = |s: &Server| {
-            s.store.carts.lock().unwrap()["session-9"]
-                .iter()
-                .map(|l| (l.name.clone(), l.price))
-                .collect::<Vec<_>>()
-        };
+        let recorded = |s: &Server| s.cart_priced("session-9");
         assert_eq!(recorded(&s), [("Cortado".to_string(), 425)]);
         // An item no store has is not available: refused by name, before
         // anything is written.
@@ -10911,6 +11710,10 @@ public query Store(",
     // where a database is named.
     mod messages;
 
+    /// Track `store-pg`: the store on PostgreSQL, the tests that look at the
+    /// database itself, which skip without one.
+    mod store_pg;
+
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
     mod kiokun;
@@ -11067,6 +11870,356 @@ public query Store(",
         s.tell_waiting();
         let set = format!("{:?}", sets_of(&s, &theirs).pop().expect("a patch set"));
         assert!(set.contains("Late"), "the late post is told: {set}");
+    }
+
+    /// The table's freedom while each derive ran, as a hook records it.
+    fn record_freedom(s: &Server) -> Arc<Mutex<Vec<bool>>> {
+        let free = Arc::new(Mutex::new(Vec::new()));
+        let seen = free.clone();
+        *s.deriving_hook.lock().expect("deriving") = Some(Arc::new(move |s: &Server, _: &Doc| {
+            seen.lock()
+                .expect("seen")
+                .push(s.pending.try_lock().is_ok());
+        }));
+        free
+    }
+
+    /// **The table is free while a telling derives** (ADR-0296). Each
+    /// commit's telling derived every document of a session inside the table,
+    /// 50 to 200 ms a telling under parallel load, and every stream and read
+    /// on the host waited for it: WebKit's "Load more" never got its rows.
+    #[test]
+    fn the_table_is_free_while_a_telling_derives() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let free = record_freedom(&s);
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        let free = free.lock().expect("free").clone();
+        assert!(!free.is_empty() && free.iter().all(|f| *f), "{free:?}");
+    }
+
+    /// **The table is free while a keyed read derives** (ADR-0296): "Load
+    /// more"'s own read, applied.
+    #[test]
+    fn the_table_is_free_while_a_keyed_read_derives() {
+        let s = served_feed();
+        for i in 0..21 {
+            s.command_answered(
+                "feed.app.post",
+                "b",
+                &[Val::String(format!("Post {i}"))],
+                Some(&format!("i-{i}")),
+            )
+            .expect("runs");
+        }
+        let (_, cursor, _, _) = s
+            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        let free = record_freedom(&s);
+        let more = BTreeMap::from([("shown".to_string(), serde_json::json!(40))]);
+        let read = s.read_keyed("a", "feed", 1, cursor, &more, STAYED);
+        assert!(matches!(read, Ok(KeyOutcome::Applied)), "applied");
+        let free = free.lock().expect("free").clone();
+        assert!(!free.is_empty() && free.iter().all(|f| *f), "{free:?}");
+    }
+
+    /// Replaces what `target` shows, whole, at each of its first `times`
+    /// derives, as a change applied meanwhile would; counts its derives.
+    fn replace_while_derived(
+        s: &Server,
+        target: &Doc,
+        times: usize,
+    ) -> Arc<std::sync::atomic::AtomicUsize> {
+        let derived = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let count = derived.clone();
+        let target = target.clone();
+        *s.deriving_hook.lock().expect("deriving") =
+            Some(Arc::new(move |s: &Server, doc: &Doc| {
+                if *doc != target {
+                    return;
+                }
+                if count.fetch_add(1, std::sync::atomic::Ordering::SeqCst) < times {
+                    let mut shown = s.shown.lock().expect("shown");
+                    let was = shown.get(doc).cloned().expect("shown");
+                    shown.insert(doc.clone(), Arc::new((*was).clone()));
+                }
+            }));
+        derived
+    }
+
+    /// **A document changed while its change is derived is derived against
+    /// again** (ADR-0296): a change derived against what it no longer shows
+    /// is not pushed.
+    #[test]
+    fn a_document_changed_while_its_change_is_derived_is_derived_against_again() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        let derived = replace_while_derived(&s, &theirs, 1);
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        assert_eq!(derived.load(std::sync::atomic::Ordering::SeqCst), 2);
+        let set = format!("{:?}", sets_of(&s, &theirs).pop().expect("a patch set"));
+        assert!(set.contains("First"), "told: {set}");
+    }
+
+    /// **A keyed read whose document changed while it derived is derived
+    /// against again** (ADR-0296): "Load more"'s rows are applied over what
+    /// the page shows, never over what it showed.
+    #[test]
+    fn a_keyed_read_whose_document_changed_while_it_derived_is_derived_again() {
+        let s = served_feed();
+        for i in 0..21 {
+            s.command_answered(
+                "feed.app.post",
+                "b",
+                &[Val::String(format!("Post {i}"))],
+                Some(&format!("i-{i}")),
+            )
+            .expect("runs");
+        }
+        let (_, cursor, _, _) = s
+            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        let derived = replace_while_derived(&s, &doc, 1);
+        let more = BTreeMap::from([("shown".to_string(), serde_json::json!(40))]);
+        let read = s.read_keyed("a", "feed", 1, cursor, &more, STAYED);
+        assert!(matches!(read, Ok(KeyOutcome::Applied)), "applied");
+        assert_eq!(
+            derived.load(std::sync::atomic::Ordering::SeqCst),
+            2,
+            "derived against what it shows, again"
+        );
+    }
+
+    /// **A document changed at every attempt is still told** (ADR-0296): the
+    /// last attempt is derived inside the table, where nothing reaches it.
+    #[test]
+    fn a_document_changed_at_every_attempt_is_still_told() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        let derived = replace_while_derived(&s, &theirs, usize::MAX);
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        assert_eq!(
+            derived.load(std::sync::atomic::Ordering::SeqCst),
+            DOCUMENT_ATTEMPTS as usize - 1,
+            "each attempt but the last derived outside"
+        );
+        let set = format!("{:?}", sets_of(&s, &theirs).pop().expect("a patch set"));
+        assert!(set.contains("First"), "told: {set}");
+    }
+
+    /// When a document was told, from its trail: the milliseconds of its
+    /// first telling's note.
+    fn told_ms(s: &Server, doc: &Doc) -> u128 {
+        s.pending.lock().expect("pending")[doc]
+            .trail
+            .iter()
+            .find(|note| note.contains(" told at "))
+            .and_then(|note| note.split(" ms ").next()?.parse().ok())
+            .unwrap_or_else(|| panic!("{doc:?} was not told"))
+    }
+
+    /// **A reader is told while another's telling takes its time**
+    /// (ADR-0297): a commit tells the sessions that read what it dropped at
+    /// once. One after another, the second waited for the first: on CI a
+    /// reader's change waited behind 47 tellings.
+    #[test]
+    fn a_reader_is_told_while_another_readers_telling_takes_its_time() {
+        let s = served_feed();
+        for session in ["a", "b", "c"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let (slow, quick) = {
+            let pending = s.pending.lock().expect("pending");
+            (latest(&pending, "b"), latest(&pending, "c"))
+        };
+        let target = slow.clone();
+        *s.deriving_hook.lock().expect("deriving") =
+            Some(Arc::new(move |_: &Server, doc: &Doc| {
+                if *doc == target {
+                    std::thread::sleep(std::time::Duration::from_millis(400));
+                }
+            }));
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        // "b" comes first in the order, and takes its time.
+        assert!(
+            told_ms(&s, &quick) < told_ms(&s, &slow),
+            "c told at {} ms, b at {} ms",
+            told_ms(&s, &quick),
+            told_ms(&s, &slow)
+        );
+        let set = format!("{:?}", sets_of(&s, &quick).pop().expect("a patch set"));
+        assert!(set.contains("First"), "told: {set}");
+    }
+
+    /// **A document no page asks for is told when one asks** (ADR-0297):
+    /// a telling passes it by, and its page, asking again, is given what
+    /// changed, derived against what it shows.
+    #[test]
+    fn a_document_no_page_asks_for_is_told_when_one_asks() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        s.pending
+            .lock()
+            .expect("pending")
+            .get_mut(&theirs)
+            .expect("subscribed")
+            .seen = std::time::Instant::now()
+            .checked_sub(LIVE + std::time::Duration::from_millis(1))
+            .expect("an instant");
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        assert!(
+            sets_of(&s, &theirs).is_empty(),
+            "passed by: nothing derived for it"
+        );
+        // Its page asks, as a page does, and is answered what changed.
+        let asked = get_as(&s, "b", &format!("/stream?doc={0}&since={0}", theirs.1));
+        assert!(asked.contains("First"), "told as it asks: {asked}");
+        // Asked again, nothing more: it was told once.
+        s.told_as_it_asks(&theirs);
+        assert_eq!(sets_of(&s, &theirs).len(), 1);
+    }
+
+    /// One GET of `path` by `session`, through the server's own handling,
+    /// and the whole answer.
+    fn get_as(s: &Server, session: &str, path: &str) -> String {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let at = listener.local_addr().expect("address");
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let (stream, _) = listener.accept().expect("accept");
+                handle(s, stream);
+            });
+            let mut client = std::net::TcpStream::connect(at).expect("connect");
+            client
+                .write_all(
+                    format!(
+                        "GET {path} HTTP/1.1\r\nHost: t\r\nCookie: pw-session={session}\r\n\r\n"
+                    )
+                    .as_bytes(),
+                )
+                .expect("request");
+            let mut answer = String::new();
+            let _ = std::io::Read::read_to_string(&mut client, &mut answer);
+            answer
+        })
+    }
+
+    /// **A document's trail says what happened to its frames** (ADR-0296):
+    /// each frame pushed, and the telling that pushed it, kept with the
+    /// document and answered to its own session alone (`/bench/records`).
+    #[test]
+    fn a_documents_trail_says_what_happened_to_its_frames() {
+        let s = served_feed();
+        for session in ["a", "b"] {
+            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+        }
+        let theirs = latest(&s.pending.lock().expect("pending"), "b");
+        s.command_answered(
+            "feed.app.post",
+            "a",
+            &[Val::String("First".into())],
+            Some("i-1"),
+        )
+        .expect("runs");
+        s.tell_waiting();
+        let trail = s.pending.lock().expect("pending")[&theirs]
+            .trail
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n");
+        for said in [
+            "subscribed at",
+            "told at",
+            "pushed a change as",
+            "pushed a patch set as",
+        ] {
+            assert!(trail.contains(said), "{said}: {trail}");
+        }
+        // Over HTTP: the session's own document's, and no other's.
+        let asked = |session: &str| {
+            let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+            let at = listener.local_addr().expect("address");
+            std::thread::scope(|scope| {
+                scope.spawn(|| {
+                    let (stream, _) = listener.accept().expect("accept");
+                    handle(&s, stream);
+                });
+                let mut client = std::net::TcpStream::connect(at).expect("connect");
+                client
+                    .write_all(
+                        format!(
+                            "GET /bench/records?doc={} HTTP/1.1\r\nHost: t\r\n\
+                             Cookie: pw-session={session}\r\n\r\n",
+                            theirs.1
+                        )
+                        .as_bytes(),
+                    )
+                    .expect("request");
+                let mut answer = String::new();
+                let _ = std::io::Read::read_to_string(&mut client, &mut answer);
+                answer
+            })
+        };
+        assert!(
+            asked("b").contains("pushed a patch set as"),
+            "{}",
+            asked("b")
+        );
+        assert!(!asked("a").contains("pushed"), "{}", asked("a"));
     }
 
     /// **A telling that panics does not silence the reader** (ADR-0271): the
@@ -12925,20 +14078,20 @@ public query Store(",
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         s.command(ADD, "a", &add_shown("espresso", 2), false)
             .expect("added");
+        s.command(ADD, "a", &add_shown("cortado", 1), false)
+            .expect("added");
         s.command(PLACE, "a", &[], false).expect("placed");
+        // The order is the cart's lines and a status (ADR-0193). Until
+        // 2026-10-08 it kept the status alone, and its lines went with the
+        // emptied cart.
         assert_eq!(
-            s.store
-                .orders
-                .lock()
-                .expect("orders")
-                .get("a")
-                .map(String::as_str),
-            Some("placed")
+            s.order_of("a"),
+            Some((
+                "placed".to_string(),
+                vec![("espresso".to_string(), 2), ("cortado".to_string(), 1)]
+            ))
         );
-        assert!(
-            s.store.carts.lock().expect("carts")["a"].is_empty(),
-            "the cart is empty after"
-        );
+        assert!(s.cart_lines("a").is_empty(), "the cart is empty after");
         let last = sets_of(&s, &doc).pop().expect("a patch set");
         assert!(
             written(&last).contains("Placed: the store has your order."),
@@ -12969,7 +14122,7 @@ public query Store(",
             "{:?}",
             answered.result
         );
-        assert!(s.store.orders.lock().expect("orders").get("a").is_none());
+        assert_eq!(s.order_of("a"), None);
     }
 
     /// **The store moving an order along reaches the page open on it**
@@ -13009,6 +14162,11 @@ public query Store(",
             .filter(|(_, f)| matches!(f, StreamFrame::EntryValue { .. }))
             .count();
         assert_eq!(values, 0, "the cart's value went with the order's change");
+        // Moved along, it keeps the lines it was placed with (ADR-0193).
+        assert_eq!(
+            s.order_of("a"),
+            Some(("delivered".to_string(), vec![("espresso".to_string(), 1)]))
+        );
     }
 
     #[test]
@@ -13018,6 +14176,64 @@ public query Store(",
             |app| app.to_string(),
             &[],
         ));
+    }
+
+    /// **Every event a commit stages is consumed once it is delivered**
+    /// (track `store-pg`), on whichever layer the store is: after orders are
+    /// placed and moved along, the materializer's outbox holds nothing.
+    /// Until 2026-10-08 each `OrderChanged` was kept for good, since no entry
+    /// a drain names reaches it.
+    #[test]
+    fn every_event_a_commit_stages_is_consumed_once_delivered() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        s.serve_document_settled("a", ORDER_PAGE, &Params::new(), &[])
+            .expect("served");
+        for round in 0..3 {
+            s.command(ADD, "a", &add_shown("espresso", 1), false)
+                .expect("added");
+            s.command(PLACE, "a", &[], false).expect("placed");
+            let answer = posted(&s, "/bench/order?status=preparing", "a", "", "");
+            assert!(answer.starts_with("HTTP/1.1 200"), "{round}: {answer}");
+        }
+        s.broadcast_menu(MenuOp::Rename {
+            id: "cortado".into(),
+            name: "Gibraltar".into(),
+        })
+        .expect("renamed");
+        assert_eq!(s.order_of("a").map(|o| o.0).as_deref(), Some("preparing"));
+        assert_eq!(
+            s.materializer.retained_events(),
+            0,
+            "the outbox holds nothing"
+        );
+    }
+
+    /// **A program that names one of the host's own operations is refused**
+    /// (track `store-pg`): the routes that change the store's data stage
+    /// `store:host/…` through the layer, and no grant gives a program one,
+    /// whatever capability it declares for it.
+    #[test]
+    fn a_program_naming_a_host_operation_is_refused() {
+        let (_dir, out) = built_from_patches_in(
+            "examples",
+            |app| {
+                format!(
+                    "{app}\nfn post_notice(id: StoreId) -> Int !{{ database.read<Stores> }}\n    \
+                     host \"store:host/notices#post\"\n\npublic query Posting(id: StoreId) -> \
+                     Int\n    freshness 0.seconds\n    cache shared\n    concurrency one_per_key\n    \
+                     on_key_change cancel\n    timeout 2.seconds\n{{\n    post_notice(id)\n}}\n"
+                )
+            },
+            &[],
+        );
+        let Err(why) = Server::from_build(out.clone(), out) else {
+            panic!("served");
+        };
+        assert!(
+            why.contains("store:host/notices#post")
+                && why.contains("an operation the host keeps for its own routes"),
+            "{why}"
+        );
     }
 
     /// **The stores, as the home page** (ADR-0192): at `/`, each store this
@@ -13354,11 +14570,7 @@ public query Store(",
     #[test]
     fn a_sold_out_item_is_shown_so_and_has_no_add() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
+        s.stock_untold("cortado", false);
         let (html, _) = s.serve_store_document("a", STORE_ID).expect("served");
         let said = visible(&html)
             .split_whitespace()
@@ -13384,13 +14596,9 @@ public query Store(",
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
         let (_, other) = s.serve_store_document("b", "48").expect("served");
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
         s.broadcast_menu(MenuOp::Stock {
             id: "cortado".to_string(),
+            available: false,
         })
         .expect("told");
         let ops = operations_for(&s, "a", document);
@@ -13419,9 +14627,9 @@ public query Store(",
         assert!(visible(&now).contains("Sold out"), "{now}");
         assert!(operations_for(&s, "c", later).is_empty());
 
-        s.store.sold_out.lock().expect("sold out").clear();
         s.broadcast_menu(MenuOp::Stock {
             id: "cortado".to_string(),
+            available: true,
         })
         .expect("told");
         let back = operations_for(&s, "c", later);
@@ -13435,7 +14643,8 @@ public query Store(",
         // An item no store has is refused, and nothing is sent.
         assert!(
             s.broadcast_menu(MenuOp::Stock {
-                id: "matcha".to_string()
+                id: "matcha".to_string(),
+                available: false,
             })
             .is_err()
         );
@@ -13452,11 +14661,7 @@ public query Store(",
     fn an_untold_stock_change_reaches_the_open_pages_when_the_menu_is_read_again() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
+        s.stock_untold("cortado", false);
         let (stale, _) = s.serve_store_document("b", STORE_ID).expect("served");
         assert!(stale.contains("aria-label=\"Add Cortado\""), "{stale}");
         assert!(operations_for(&s, "a", document).is_empty());
@@ -13485,11 +14690,7 @@ public query Store(",
     fn a_change_sends_what_changed_unannounced_with_it() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cold-brew".to_string());
+        s.stock_untold("cold-brew", false);
         s.broadcast_menu(MenuOp::Rename {
             id: "espresso".to_string(),
             name: "Espresso Doppio".to_string(),
@@ -13533,11 +14734,7 @@ public query Store(",
     fn an_insert_and_what_changed_with_it_are_derived_from_the_menu() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("espresso".to_string());
+        s.stock_untold("espresso", false);
         s.broadcast_menu(MenuOp::Insert {
             id: "flat-white".to_string(),
             name: "Flat White".to_string(),
@@ -13604,13 +14801,9 @@ public query Store(",
         let menus = || calls(&s, "store:data/menus#sections");
         page("a");
         let (asked, read) = (asks(), menus());
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
         s.broadcast_menu(MenuOp::Stock {
             id: "cortado".to_string(),
+            available: false,
         })
         .expect("told");
         let shown = page("b");
@@ -13629,11 +14822,7 @@ public query Store(",
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let (_, document) = s.serve_store_document("a", STORE_ID).expect("served");
         let version = s.menu_version(STORE_ID);
-        s.store
-            .sold_out
-            .lock()
-            .expect("sold out")
-            .insert("cortado".to_string());
+        s.stock_untold("cortado", false);
         s.queries.invalidate("store.page.Menu");
         // Read, not served: no refresh before it.
         let read = s.render_store("b");
@@ -13834,15 +15023,19 @@ public query Store(",
         };
         estimate(&s, "a", None, 20);
         assert_eq!(slot(&page("a"), "Delivery"), "Delivery in 20 to 30 min");
-        s.store.estimators.lock().expect("estimators").insert(
-            "b".to_string(),
-            Estimator {
-                delay_ms: 0,
-                fail: None,
-                minutes: 15,
-                max_minutes: Some(45),
-            },
-        );
+        s.store
+            .faults()
+            .estimators
+            .lock()
+            .expect("estimators")
+            .insert(
+                "b".to_string(),
+                Estimator {
+                    delay_ms: 0,
+                    fail: None,
+                },
+            );
+        s.set_estimate("b", 15, Some(45)).expect("estimated");
         assert_eq!(slot(&page("b"), "Delivery"), "Delivery in 15 to 45 min");
         estimate(&s, "c", None, 0);
         let refused = page("c");
@@ -14156,15 +15349,19 @@ public query Store(",
     fn the_store_sends_its_slots_after_its_own_content() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         recommend(&s, 600, None);
-        s.store.estimators.lock().expect("estimators").insert(
-            "a".to_string(),
-            Estimator {
-                delay_ms: 200,
-                fail: None,
-                minutes: 30,
-                max_minutes: None,
-            },
-        );
+        s.store
+            .faults()
+            .estimators
+            .lock()
+            .expect("estimators")
+            .insert(
+                "a".to_string(),
+                Estimator {
+                    delay_ms: 200,
+                    fail: None,
+                },
+            );
+        s.set_estimate("a", 30, None).expect("estimated");
         let chunks = fetched_as(&s, "/stores/47", Some("a"));
         let at =
             |text: &str| arrived(&chunks, text).unwrap_or_else(|| panic!("never sent: {text}"));

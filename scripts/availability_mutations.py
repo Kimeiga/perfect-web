@@ -46,9 +46,10 @@ MUTANTS = [
         "every item is said to be available",
         "server",
         STORE_DATA,
-        # Re-anchored by ADR-0181, whose data layer groups the menu.
-        '                        ("available".into(), Val::Bool(!sold_out.contains(id))),\n',
-        '                        ("available".into(), Val::Bool(true)),\n',
+        # Re-anchored by track store-pg, whose operations are built once over
+        # either layer's rows.
+        '        ("available".into(), Val::Bool(item.available)),\n',
+        '        ("available".into(), Val::Bool(true)),\n',
     ),
     (
         "a sold-out item's row says nothing",
@@ -117,10 +118,14 @@ MUTANTS = [
         "a stock change is announced as the menu's",
         "server",
         SERVER,
-        "            MenuOp::Stock { id } => {\n"
-        '                pw_materialize::Event::new("Events.InventoryChanged", &[STORE_ID, id.as_str()])\n'
-        "            }\n",
-        '            MenuOp::Stock { .. } => pw_materialize::Event::new("Events.MenuChanged", &[STORE_ID]),\n',
+        # Re-anchored by track store-pg, whose stock change is written through the layer
+        # with its event.
+        "            MenuOp::Stock { id, .. } => (\n"
+        '                "Events.InventoryChanged".to_string(),\n'
+        "                vec![Val::String(STORE_ID.into()), Val::String(id.clone())],\n",
+        "            MenuOp::Stock { .. } => (\n"
+        '                "Events.MenuChanged".to_string(),\n'
+        "                vec![Val::String(STORE_ID.into())],\n",
     ),
     (
         "the pages are taken to show the menu as it is now",
@@ -164,8 +169,10 @@ MUTANTS = [
         "`/bench/stock?tell=true` tells nothing",
         "browser",
         SERVER,
-        '            if param("tell").as_deref() == Some("true")\n',
-        '            if false && param("tell").as_deref() == Some("true")\n',
+        # Re-anchored by track store-pg, whose route writes the stock through the
+        # layer.
+        '            let changed = if param("tell").as_deref() == Some("true") {\n',
+        '            let changed = if false && param("tell").as_deref() == Some("true") {\n',
     ),
 ]
 

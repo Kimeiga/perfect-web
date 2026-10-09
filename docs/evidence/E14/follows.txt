@@ -1,8 +1,8 @@
 ADR-0257 - the follows timeline
 
 produced by: just e14-follows
-commit: 4236e3242f43cb48ffb4912b2b8497a72aca0a9b
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37918808029 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 0efa5cad088d29a44297f6c100228b6726551de1
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -18,11 +18,11 @@ test tests::follows::following_yourself_or_no_one_is_not_found ... ok
 test tests::follows::the_button_is_what_the_reader_is_to_the_user ... ok
 test tests::follows::a_users_page_counts_who_follows_them ... ok
 test tests::follows::following_brings_their_posts_into_your_timeline ... ok
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 314 filtered out; finished in 9.98s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 327 filtered out; finished in 17.30s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  66 passed (2.4m)
+  66 passed (2.9m)
 
 == mutation controls (scripts/follows_mutations.py)
 

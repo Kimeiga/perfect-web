@@ -77,6 +77,8 @@ LOCAL_ONLY = {
     # And its page head against kiokun.com's own code, copied from the
     # owner's checkout.
     "e14-kiokun-seo",
+    # And its Japanese examples against kiokun.com's own code.
+    "e14-kiokun-examples",
 }
 
 # Recipes run against a database (ADR-0246). Each is a shard of its own,
@@ -89,6 +91,7 @@ NEEDS_DATABASE = {
     "e14-uploads",
     "e14-notifications",
     "e14-messages",
+    "e14-store-postgres",
 }
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")

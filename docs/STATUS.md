@@ -23,6 +23,73 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0299, 2026-10-09: kiokun's examples and pitch accent** (track
+`kiokun`, W6, merged from `7e3cb51`). The word page shows each sense's
+examples as kiokun.com does, the first and the rest behind a disclosure
+that needs no script, and each word's pitch accent from kiokun.com's own
+pitch files: morae high and low, and the pattern 平板, 頭高, 中高 or 尾高.
+The Japanese examples are held to kiokun.com's own `japaneseExamplesForSense`
+over 1,082 sampled words with nothing to name; the Chinese and Korean
+examples and the pitch rules, which live inside Svelte components, are held
+by hand-written cases. Found: kiokun.com places its entries by a hash over
+code points and its pitch files by one over UTF-16 units, held as it is; and
+the word page's tests outgrew the 4 GiB bound at one thread per core, run
+on four. 28 server tests, 64 of 64 mutants killed on CI (run 37961821792,
+beside WebKit's "Load more", fixed on master since).
+
+**ADR-0298, 2026-10-09: the store's data behind the seam, in memory and
+on PostgreSQL** (track `store-pg`, W5, merged from `d043fa6`). The store's
+operations run through its data layer as the feed's do (ADR-0246), on
+either layer, its guarantees stated as a source's (ADR-0207). Five
+findings fixed on the way: an order dropped its lines (ADR-0193's ruling);
+`OrderChanged` was never consumed from the materializer's outbox in
+memory, each order leaving a row for good; a menu change's event was
+committed nowhere; `/bench/stock` set a stock no menu knew; and store 48's
+items were answered not found. The host's 332 tests pass with the store on
+PostgreSQL and again in memory, 12 of the layer's own, 12 of 12 mutants
+killed, and every re-anchored script's recipe green on CI (run
+37932273524, 29 recipes, beside WebKit's "Load more", fixed on master since
+by ADR-0296). The DoorDash track (W8) builds on it.
+
+**ADR-0296 and ADR-0297, 2026-10-09: a change is derived outside the
+table, and a commit tells the pages that ask, at once** (CI's two
+findings: WebKit's "Load more", failing on every branch, and the feed's "a
+follow reaches another reader", failing in CI's three-engine baselines
+and nowhere else). Every commit's telling derived each open document
+inside the host's one subscriber table, 50 to 200 ms a hold, and every
+stream and read waited; and it told the other sessions one after another,
+every one with a document reading what the commit dropped, the documents
+of pages closed up to two minutes before among them: a failing test's
+printed records showed the second reader told five seconds and 47
+tellings after the follower, or not at all. A change is now derived
+outside the table and pushed only where the document still shows what it
+was derived against; only documents whose pages asked in the last three
+seconds are derived, one passed by when its page next asks; and eight
+sessions are told at once. A failing feed test prints its pages' and the
+server's records, and a red mutation baseline shows them. 8 server tests
+and 2 of the baseline's,
+16 of 16 mutants killed on CI, and all 36 recipes green with WebKit's
+"Load more" passing (run 37943438178, its fifth WebKit pass in five).
+**Corrected with it:** the arrival-clock merge's comment named the earlier
+test's unanswered unfollow as the follow test's cause; it was suspected,
+awaited, and the test failed again.
+
+**2026-10-09, every recipe's evidence is in the repository** (an audit,
+after six were found missing at today's merges). **Corrected:** nineteen
+more recipes their ADRs cite had no evidence on `master`, from ADR-0240 to
+ADR-0273 (`e14-clauses-read-once`, `-transition-values`, `-each-heads`,
+`-statements-separated`, `-let-discard`, `-resource-clauses`,
+`-returned-labels`, `-member-resolution`, `-materialization-chains`,
+`-every-entry`, `-arrival`, `-handles`, `-session-to-browser`,
+`-form-routes`, `-wide-parameters`, `-matched-resources`, `-trap-causes`,
+`-telling`, `-materialization-bodies`): their runs were cited and their
+evidence never fetched, before ADR-0281's merge flow fetched it. All
+nineteen were run again on `master` at `29cae71` (run 37933879838), every
+mutant killed, and recorded. `scripts/evidence_present.py` names any
+recipe whose evidence file is missing, and `master`'s CI fails on one
+(`scripts/tests/test_evidence_present.py`); a branch's new recipe is
+recorded at its merge.
+
 **2026-10-09, navigate merged (ADR-0280, below), and two more recipes
 recorded for the first time.** **Corrected:** ADR-0248's `just
 e14-map-keys` and ADR-0272's `just e14-stream-boot` were cited and never

@@ -534,6 +534,35 @@ impl Materializer {
             .expect("consume");
     }
 
+    /// **Events their host has delivered, consumed** (track `store-pg`):
+    /// those `command` committed as `ids`, once the host that committed them
+    /// has regenerated what they reach and told each reader itself. A
+    /// [`Materializer::drain`] consumes an event only where it reaches an
+    /// instance its caller names, and keeps one it reaches none of for
+    /// another caller; one whose readers the host tells without naming an
+    /// instance here (a session's order, a cached query) was kept for good:
+    /// a row for every order placed. One already consumed is left as it is.
+    pub fn delivered(&self, ids: &[i64]) {
+        for &id in ids {
+            let event: Option<String> = {
+                let db = self.db();
+                let event = db
+                    .query_row("SELECT event FROM outbox WHERE id = ?1", params![id], |r| {
+                        r.get(0)
+                    })
+                    .ok();
+                if event.is_some() {
+                    db.execute("DELETE FROM outbox WHERE id = ?1", params![id])
+                        .expect("consume");
+                }
+                event
+            };
+            if let Some(event) = event {
+                self.record(Trace::Consumed { id, event });
+            }
+        }
+    }
+
     /// Read an entry, following the fragment's declared fallback policy.
     pub fn read(&self, key: &EntryKey) -> Read {
         let entries = self.entries.lock().expect("entries");
@@ -787,6 +816,27 @@ mod tests {
             .with("tenant", "acme")
             .with("locale", "en");
         assert_eq!(c.logical(), d.logical());
+    }
+
+    /// **What a host delivered is consumed** (track `store-pg`): an event
+    /// no instance a drain names reaches stays pending, and is consumed once
+    /// its host says it delivered it; another commit's is not.
+    #[test]
+    fn an_event_its_host_delivered_is_consumed() {
+        let m = Materializer::new(Clock::new(), "build");
+        let ids = m
+            .command::<String>(|_| Ok(vec![Event::new("Events.OrderChanged", &["a"])]))
+            .expect("committed");
+        let other = m
+            .command::<String>(|_| Ok(vec![Event::new("Events.OrderChanged", &["b"])]))
+            .expect("committed");
+        assert_eq!(m.retained_events(), 2);
+        m.delivered(&ids);
+        assert_eq!(m.retained_events(), 1, "the other commit's is kept");
+        m.delivered(&ids);
+        assert_eq!(m.retained_events(), 1, "once");
+        m.delivered(&other);
+        assert_eq!(m.retained_events(), 0);
     }
 
     /// The property that replaced `PW5102`.

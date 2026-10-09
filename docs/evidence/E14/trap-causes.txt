@@ -1,0 +1,62 @@
+ADR-0267 - a component's trap says why it stopped
+
+produced by: just e14-trap-causes
+commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+
+== each cause through the host (compiler/pw-conformance/tests/trap_causes.rs)
+
+test the_compiler_and_the_host_name_a_trap_alike ... ok
+test wasms_own_traps_say_theirs ... ok
+test a_trap_of_the_components_own_says_its_cause ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.66s
+
+== nodes that are no tree, by name (compiler/pw-conformance/tests/recursive_types.rs)
+
+test a_tree_crosses_as_its_nodes_in_level_order_and_back_unchanged ... ok
+test a_host_answers_with_a_tree_and_is_given_one ... ok
+test a_sum_type_that_contains_itself_crosses_both_ways ... ok
+test a_value_as_deep_as_a_host_nests_stays_within_half_a_thread_stack ... ok
+test a_tree_is_rebuilt_in_the_component ... ok
+test nodes_that_are_not_one_tree_in_level_order_trap ... ok
+test a_tree_is_built_and_walked_in_the_component ... ok
+test two_types_that_hold_each_other_through_a_list_compile_inside_a_component ... ok
+test a_chain_deeper_than_any_stack_crosses_both_ways ... ok
+test trees_held_by_other_types_cross_both_ways ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.42s
+
+== the browser's module and the component agree by cause (compiler/pw-conformance/tests/javascript.rs)
+
+test a_case_from_its_expected_type_agrees_with_its_component ... ok
+test a_type_that_holds_itself_in_place_agrees_with_its_component ... ok
+test a_type_that_contains_itself_agrees_with_its_component ... ok
+test kiokuns_shard_rule_as_a_module_agrees_with_its_component ... ok
+test the_modules_case_mapping_is_rusts_for_every_code_point ... ok
+test the_modules_entry_check_is_the_components ... ok
+test every_query_agrees_with_its_component_under_node has been running for over 60 seconds
+test every_query_agrees_with_its_component_under_node ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 104.44s
+
+== mutation controls (scripts/trap_cause_mutations.py)
+
+baseline: 13 passed, 0 failed
+no function is named by its cause: KILLED (2 of 13 tests fail)
+the causes' functions are looked for one place on: KILLED (10 of 13 tests fail)
+an overflow calls another cause's function: KILLED (1 of 13 tests fail)
+a repeated key calls another cause's function: KILLED (1 of 13 tests fail)
+lists of two lengths call another cause's function: KILLED (1 of 13 tests fail)
+a code point not a scalar calls another cause's function: KILLED (1 of 13 tests fail)
+memory that does not grow calls another cause's function: KILLED (1 of 13 tests fail)
+the host reads no cause from the frame a trap stopped in: KILLED (2 of 13 tests fail)
+a zero divisor is not named: KILLED (1 of 13 tests fail)
+calls nested too deep are not named: KILLED (1 of 13 tests fail)
+the least Int divided by -1 is not named: KILLED (1 of 13 tests fail)
+fuel spent is not named: KILLED (1 of 13 tests fail)
+a join too long for memory calls another cause's function: KILLED (1 of 13 tests fail)
+nodes that are no tree call another cause's function: KILLED (1 of 13 tests fail)
+the host's engine captures no backtrace: KILLED (2 of 13 tests fail)
+the host's engine inlines: KILLED (2 of 13 tests fail)
+16 of 16 mutants killed
+memory bound: no process was stopped

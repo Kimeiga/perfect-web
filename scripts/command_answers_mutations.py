@@ -147,8 +147,10 @@ MUTANTS = [
         STORE_DATA,
         # Re-anchored by ADR-0172: an item can be ordered when a store has it
         # and it is not sold out.
-        "                    catalog.contains_key(item) && !sold_out.contains(item),\n",
-        "                    true || (catalog.contains_key(item) && !sold_out.contains(item)),\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                    r.catalog_item(item)?.is_some_and(|(_, _, can)| can),\n",
+        "                    true || r.catalog_item(item)?.is_some_and(|(_, _, can)| can),\n",
     ),
     (
         "a kept answer forgets null",

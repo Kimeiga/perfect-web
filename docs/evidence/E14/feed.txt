@@ -1,8 +1,8 @@
 ADR-0220 - the feed reference app, served in browsers by the host that serves the store
 
 produced by: just e14-feed
-commit: 4236e3242f43cb48ffb4912b2b8497a72aca0a9b
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37918808029 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 0efa5cad088d29a44297f6c100228b6726551de1
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -12,15 +12,11 @@ playwright: Version 1.58.0
 test tests::a_guests_post_names_the_guest_to_every_reader ... ok
 test tests::the_feeds_page_opening_its_stream_is_not_told_to_reload ... ok
 test tests::a_page_carries_its_data_layers_style_and_no_other ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 319 filtered out; finished in 10.52s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 332 filtered out; finished in 18.06s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  1) [webkit] › e2e/feed.spec.mjs:419:1 › Load more shows the next page, and a post after it is shown over it 
-    Error: expect(received).toBeGreaterThan(expected)
-  1 failed
-  10 did not run
-  55 passed (2.1m)
+  66 passed (3.0m)
 
 == mutation controls (scripts/feed_served_mutations.py)
 

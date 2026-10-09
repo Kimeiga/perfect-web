@@ -3046,6 +3046,36 @@ e14-feed-postgres:
      } > docs/evidence/E14/feed-postgres.txt; \
      grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/feed-postgres.txt
 
+# Track store-pg: the store's data behind the DataLayer seam on PostgreSQL,
+# held to what its source states. Needs PW_STORE_DATABASE_URL, a throwaway
+# database (each test uses a schema of its own, `pw_store_test_...`, and drops
+# it); PW_FEED_DATABASE_URL stands in where it is not set, as on CI's
+# database shard. Skips without either, and writes no evidence. Runs the
+# server's whole suite twice: the store on PostgreSQL, and in memory.
+e14-store-postgres:
+    @url="${PW_STORE_DATABASE_URL:-${PW_FEED_DATABASE_URL:-}}"; \
+     if [ -z "$url" ]; then \
+       echo "e14-store-postgres: skipped, PW_STORE_DATABASE_URL is not set (a throwaway PostgreSQL database, e.g. postgresql://localhost/pw_store_test)"; \
+       exit 0; \
+     fi; \
+     export PW_STORE_DATABASE_URL="$url"; \
+     mkdir -p docs/evidence/E14; \
+     { echo "Track store-pg - the store's data on PostgreSQL, held to what its source states"; echo; \
+       echo "produced by: just e14-store-postgres"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "postgres: $(psql "$url" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)')"; echo; \
+       echo "== the store on PostgreSQL (spikes/own-renderer/server/src/tests/store_pg.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- tests::store_pg:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the server's whole suite, the store on PostgreSQL (PW_STORE_TEST_LAYER=postgres)"; echo; \
+       PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- --skip tests::store_pg:: 2>&1 | grep -E '^test result|^---- |panicked at'; \
+       echo; echo "== the server's whole suite, the store in memory"; echo; \
+       PW_STORE_TEST_LAYER=memory cargo test --locked -p pw-dev-server -- --skip tests::store_pg:: 2>&1 | grep -E '^test result|^---- |panicked at'; \
+       echo; echo "== mutation controls (scripts/store_postgres_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/store_postgres_mutations.py; \
+     } > docs/evidence/E14/store-postgres.txt; \
+     grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/store-postgres.txt
+
 # ADR-0219: what a commit drops reaches every session that reads it
 e14-cross-session:
     @mkdir -p docs/evidence/E14
@@ -5464,3 +5494,36 @@ e14-redirects:
        CARGO_INCREMENTAL=0 python3 scripts/redirects_mutations.py; \
      } > docs/evidence/E14/redirects.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/redirects.txt
+
+# ADR-0296: a change is derived outside the table, and what reaches a
+# document is recorded. The development server's tests, the baseline's
+# records, and the mutation controls.
+e14-derived-outside:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0296 - a change is derived outside the table, and what reaches a document is recorded"; echo; \
+       echo "produced by: just e14-derived-outside"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "python: $(python3 --version)"; echo; \
+       echo "== the development server (the table while a change derives, the attempts, the trail)"; echo; \
+       cargo test --locked -p pw-dev-server -- the_table_is_free a_document_changed a_documents_trail a_keyed_read_whose_document_changed 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== a red baseline's records (scripts/tests/test_mutation_baseline.py)"; echo; \
+       python3 -m unittest -v scripts/tests/test_mutation_baseline.py 2>&1 | grep -E ' \.\.\. |^Ran |^OK|^FAILED'; \
+       echo; echo "== mutation controls (scripts/derived_outside_mutations.py)"; echo; \
+       python3 scripts/derived_outside_mutations.py; \
+     } > docs/evidence/E14/derived-outside.txt
+    @grep -E "^test result|^Ran |^OK|^FAILED|mutants killed|panicked at" docs/evidence/E14/derived-outside.txt
+
+# ADR-0297: a commit tells the pages that ask, and tells them at once. The
+# development server's tests, and the mutation controls.
+e14-tell-at-once:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0297 - a commit tells the pages that ask, and tells them at once"; echo; \
+       echo "produced by: just e14-tell-at-once"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the development server (readers told at once; a document passed by, told as its page asks)"; echo; \
+       cargo test --locked -p pw-dev-server -- a_reader_is_told_while a_document_no_page_asks_for a_telling_that_panics a_burst 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/tell_at_once_mutations.py)"; echo; \
+       python3 scripts/tell_at_once_mutations.py; \
+     } > docs/evidence/E14/tell-at-once.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/tell-at-once.txt

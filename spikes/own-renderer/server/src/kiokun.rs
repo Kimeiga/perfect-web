@@ -26,6 +26,7 @@ pub(crate) const GRANTS: &[&str] = &[
     "database.read<Entry>",
     "database.read<Label>",
     "database.read<CharGloss>",
+    "database.read<PitchReading>",
 ];
 
 /// The sample the repository carries (ADR-0037): 28 files of one shard.
@@ -38,20 +39,112 @@ pub(crate) struct KiokunData {
     app: Arc<App>,
 }
 
-/// **kiokun.com's own data, as its app keeps it**, read once: its labels for
-/// JMdict's codes, each a `Label`, and its component glosses by character.
+/// **kiokun.com's own data, as its app keeps it**: its labels for JMdict's
+/// codes, each a `Label`, and its component glosses by character, read once;
+/// and its pitch accents (`static/pitch/<shard>.json`), each shard read when
+/// a page first asks for it and kept.
 #[derive(Default)]
 pub(crate) struct App {
     labels: Vec<Val>,
     glosses: BTreeMap<String, String>,
+    pitch: Option<PathBuf>,
+    shards: Mutex<BTreeMap<String, Arc<PitchShard>>>,
+}
+
+/// One pitch shard: each word's readings and their accents, in the file's
+/// order, which is the order `Object.values` gives (no reading is an
+/// integer-like key). An accent may be `null`.
+type PitchShard = BTreeMap<String, Readings>;
+
+/// A word's readings and accents, in the order the file writes them: serde's
+/// map would sort them, and kiokun.com takes the first where the reading
+/// asked for is not there.
+#[derive(Default)]
+pub(crate) struct Readings(Vec<(String, Option<i64>)>);
+
+impl<'de> serde::Deserialize<'de> for Readings {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Readings, D::Error> {
+        struct InOrder;
+        impl<'de> serde::de::Visitor<'de> for InOrder {
+            type Value = Readings;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a word's readings and their accents")
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<Readings, A::Error> {
+                let mut out = Vec::new();
+                while let Some((reading, accent)) =
+                    map.next_entry::<String, Option<serde_json::Value>>()?
+                {
+                    out.push((reading, accent.and_then(|a| a.as_i64())));
+                }
+                Ok(Readings(out))
+            }
+        }
+        d.deserialize_map(InOrder)
+    }
+}
+
+impl App {
+    /// `word`'s readings in pitch shard `shard`, as `PitchReading`s: none
+    /// where the app has no pitch data, the shard no file, or the file no
+    /// such word. A shard is two hexadecimal digits, nothing else.
+    fn pitch_of(&self, shard: &str, word: &str) -> Result<Val, String> {
+        let empty = Ok(Val::List(Vec::new()));
+        let Some(root) = &self.pitch else {
+            return empty;
+        };
+        if shard.len() != 2
+            || !shard
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return empty;
+        }
+        let read = {
+            let mut shards = self.shards.lock().expect("pitch shards");
+            match shards.get(shard) {
+                Some(s) => s.clone(),
+                None => {
+                    let path = root.join(format!("{shard}.json"));
+                    let parsed: PitchShard = match std::fs::read_to_string(&path) {
+                        Ok(text) => serde_json::from_str(&text)
+                            .map_err(|e| format!("{}: {e}", path.display()))?,
+                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => PitchShard::new(),
+                        Err(e) => return Err(format!("{}: {e}", path.display())),
+                    };
+                    let parsed = Arc::new(parsed);
+                    shards.insert(shard.to_string(), parsed.clone());
+                    parsed
+                }
+            }
+        };
+        Ok(Val::List(
+            read.get(word)
+                .map(|r| r.0.as_slice())
+                .unwrap_or_default()
+                .iter()
+                .map(|(reading, accent)| {
+                    record(vec![
+                        ("reading", Val::String(reading.clone())),
+                        ("accent", Val::Option(accent.map(|a| Box::new(Val::S64(a))))),
+                    ])
+                })
+                .collect(),
+        ))
+    }
 }
 
 /// The app's data at `app`, the checkout's `sveltekit-app`: an error where a
-/// table is missing, not an empty table.
+/// table is missing, not an empty table. Its pitch data is read as pages ask.
 pub(crate) fn app_of(app: &Path) -> Result<App, String> {
     Ok(App {
         labels: labels_of(app)?,
         glosses: glosses_of(app)?,
+        pitch: Some(app.join("static/pitch")),
+        shards: Mutex::default(),
     })
 }
 
@@ -227,7 +320,51 @@ fn headwords(word: &serde_json::Value, key: &str) -> Val {
     )
 }
 
-/// A sense: `Sense { glosses, info, pos, field, misc, dialect }`.
+/// A Chinese reading's examples by sense (`definitionExamples`):
+/// `DefinitionExamples { definition, examples }`, each example
+/// `ChineseExample { simp, trad, en, pinyin }`.
+fn definition_examples(item: &serde_json::Value) -> Val {
+    Val::List(
+        list(item, "definitionExamples")
+            .map(|r| {
+                record(vec![
+                    ("definition", Val::String(text(r, "definition"))),
+                    (
+                        "examples",
+                        Val::List(
+                            list(r, "examples")
+                                .map(|e| {
+                                    record(vec![
+                                        ("simp", Val::String(text(e, "simp"))),
+                                        ("trad", Val::String(text(e, "trad"))),
+                                        ("en", Val::String(text(e, "en"))),
+                                        ("pinyin", Val::String(text(e, "pinyin"))),
+                                    ])
+                                })
+                                .collect(),
+                        ),
+                    ),
+                ])
+            })
+            .collect(),
+    )
+}
+
+/// A Korean word's or sense's examples: `KoreanExample { korean, translation }`.
+fn korean_examples(v: &serde_json::Value) -> Val {
+    Val::List(
+        list(v, "examples")
+            .map(|e| {
+                record(vec![
+                    ("korean", Val::String(text(e, "korean"))),
+                    ("translation", Val::String(text(e, "translation"))),
+                ])
+            })
+            .collect(),
+    )
+}
+
+/// A sense: `Sense { glosses, info, pos, field, misc, dialect, examples }`.
 fn sense(s: &serde_json::Value) -> Val {
     record(vec![
         (
@@ -249,6 +386,29 @@ fn sense(s: &serde_json::Value) -> Val {
         ("field", strings(s, "field")),
         ("misc", strings(s, "misc")),
         ("dialect", strings(s, "dialect")),
+        (
+            "examples",
+            Val::List(
+                list(s, "examples")
+                    .map(|e| {
+                        record(vec![(
+                            "sentences",
+                            Val::List(
+                                list(e, "sentences")
+                                    .map(|t| {
+                                        record(vec![
+                                            ("lang", Val::String(text(t, "lang"))),
+                                            ("land", Val::String(text(t, "land"))),
+                                            ("text", Val::String(text(t, "text"))),
+                                        ])
+                                    })
+                                    .collect(),
+                            ),
+                        )])
+                    })
+                    .collect(),
+            ),
+        ),
     ])
 }
 
@@ -271,6 +431,7 @@ pub(crate) fn entry(json: &serde_json::Value) -> Val {
                                     ("pinyin", Val::String(text(i, "pinyin"))),
                                     ("jyutping", Val::String(text(i, "jyutping"))),
                                     ("definitions", strings(i, "definitions")),
+                                    ("examples", definition_examples(i)),
                                 ])
                             })
                             .collect(),
@@ -297,6 +458,20 @@ pub(crate) fn entry(json: &serde_json::Value) -> Val {
                 ("hanja", Val::String(text(w, "hanja"))),
                 ("pos", Val::String(text(w, "pos"))),
                 ("definitions", texts(w, "definitions", "text")),
+                (
+                    "senses",
+                    Val::List(
+                        list(w, "definitions")
+                            .map(|d| {
+                                record(vec![
+                                    ("text", Val::String(text(d, "text"))),
+                                    ("examples", korean_examples(d)),
+                                ])
+                            })
+                            .collect(),
+                    ),
+                ),
+                ("examples", korean_examples(w)),
             ])
         })
         .collect();
@@ -512,6 +687,16 @@ fn place_fields(v: &Val) -> Result<(String, String), String> {
 fn reads_of(root: PathBuf, app: Arc<App>) -> data::Ops {
     let mut ops: data::Ops = BTreeMap::new();
     let a = app.clone();
+    ops.insert(
+        "kiokun:data/pitch#of".to_string(),
+        Arc::new({
+            let a = app.clone();
+            move |args: &[Val]| match args {
+                [Val::String(shard), Val::String(word)] => Ok(vec![a.pitch_of(shard, word)?]),
+                other => Err(format!("pitch#of received {other:?}")),
+            }
+        }),
+    );
     ops.insert(
         "kiokun:data/support#glosses".to_string(),
         Arc::new(move |args: &[Val]| match args {

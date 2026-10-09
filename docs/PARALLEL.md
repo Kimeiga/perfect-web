@@ -667,3 +667,148 @@ Each a decision for a track, with its date; a track's ADR records it too.
   re-anchors and re-runs the scripts that move, builds in its own target,
   and pushes; the integrator merges on that run, the ADR numbered then.
   W7 (TodoMVC) launches after it.
+- **2026-10-09, the DoorDash track (W8's plan), first in the next free
+  slot** (the owner, relayed 2026-10-09: DoorDash faster, and a third
+  concurrent worker once the disk has room; the coordinator launches it at
+  about 45 GiB free). The slots, once W5 merges: W6 (kiokun, continuing),
+  **W8** (this track), then **W7** (TodoMVC, as ruled above) in the third.
+  W8 launches after W5's merge, on which it builds. Search and filters
+  become W9, and ratings and reviews W10.
+  - **Track `store-accounts`**, branch `track/store-accounts`, from
+    `master` after W5's merge. Its ADRs are `ADR-XXXX`, numbered at the
+    merge; its recipes live in `just/store-accounts.just`; its code block
+    is **PW62** (`Owner::StoreAccounts => "PW62"`); its Playwright runs use
+    PORT=7741 (7741 to 7940, ranges 200 wide), its hosts at PORT+160..162
+    (`STORE_ACCOUNTS_PORTS`); its migrations are the store's from
+    `0003` (`spikes/own-renderer/server/migrations/store/`), each built and
+    tested on both layers, in memory and on PostgreSQL, as W5's store is.
+  - **Milestone 1, a cart and an order are a user's.** ADR-0258's identity
+    and ADR-0270's principal, wired into the store: a signed-in reader's
+    cart and orders are their user's, a guest's its session's guest's
+    (ADR-0270's guest model); at sign-in the guest's cart joins the user's,
+    by a rule the ADR states (each line added, quantities summed within
+    each item's bounds, ADR-0179); an order is read by its user alone, as a
+    notification is (ADR-0274); a tab whose reader signed out elsewhere is
+    refused at its next press, and told so (the refusal ruling, on
+    `track/refusals`, numbered at its merge). Its tests: two users' carts
+    never share a line, in memory and on PostgreSQL; a guest's cart follows
+    them in; an order is no other user's to read.
+  - **Milestone 2, delivery addresses.** A user's saved addresses (add,
+    rename, remove, one chosen; a guest's chosen one is its session's);
+    each with coordinates from a fixed table in the repository, never a
+    geocoding service, which would be a download and an account; **a
+    delivery zone**, each store's radius from its location, a pure check;
+    **an estimate and availability keyed by the chosen address**: the
+    store's estimate gains its travel time, and a store that does not reach
+    the address says so where the menu is, its Add refused by a declared
+    predicate with its words (`predicate DeliversTo ... says "..."`, the
+    refusal ruling's).
+  - **Milestone 3, the owner's Next.js bug, as acceptance** (ADR-0280's
+    brief): a reader saves an address, whose handler's `Ok` arm goes to a
+    store (`navigate StorePage(id)`); the store's page shows the new
+    address's estimate as served, with no cache-busting parameter and no
+    second load of the document after it arrives, in three engines. "No
+    header remount" needs the integrator's soft navigation, not yet built:
+    until it lands the test asserts the estimate and one document load, and
+    the remount assertion is added with it, by whichever of the two lands
+    second.
+  - **What a gap needs of the language, the runtime or the host goes to
+    the integrator as a question**, as W5's and W6's did. A payment is the
+    integrator's (checkout, below), and no crate is added without the
+    owner's approval.
+  - **The integrator's DoorDash items come first** in its own queue (the
+    owner, 2026-10-09): soft navigation, store hours, then checkout, ahead
+    of kiokun's canonical link, std `Json`, `/_pw/` and the
+    infrastructure follow-ups, after the merges in CI (refusal,
+    stream-records, W5).
+- **2026-10-09, W5's store-pg merged** as ADR-0298, from `d043fa6`
+  (master merged in at `67272f8`): verify 37932273524, 29 recipes green,
+  `e14-store-postgres` among them; it failed only in WebKit's "Load more",
+  fixed on `master` since (ADR-0296). Its slot frees: **W8, the DoorDash
+  track, launches next** (above), the coordinator's to start when the disk
+  allows.
+- **2026-10-09, W8 launched** (the coordinator, from `28c8781`, in W5's
+  slot beside W6), **and its three questions, answered:**
+  - **Q1, the cart and the order are the user's in the program (b)**:
+    `private query Cart(reader: User<UserId>)` and the order alike, keyed by
+    `current_user()` as ADR-0270 rules a user's data, its events naming the
+    user. Not (a), the session mapped to its owner inside the store's layer:
+    that adds the store to `identified_by`, which ADR-0270 retires (NEXT),
+    and leaves the program saying a cart is a session's when it is a
+    user's. The layer keys rows by an opaque owner, so the benchmark's copy,
+    which keys by session, runs unchanged on it. The compiler tests that pin
+    the store's text, its committed handlers, its IR and its contracts move
+    with it, each regenerated by its own recipe. Until telling by principal
+    lands (NEXT), a cart's change is derived for every live session that
+    reads `Cart`: a cost of derivation, not of exposure, bounded by
+    ADR-0297.
+  - **Q2, the guest's cart joins at sign-in, through one hook**:
+    `on_sign_in(guest_session, principal)` in `identity.rs`, generic (the
+    identity knows no store), called once the principal is opened and before
+    the reply is written. The join is one store transaction: each guest line
+    added to the user's cart, one item's quantities summed, past a bigint
+    refused rather than wrapped, the guest's cart emptied, the user's
+    `CartChanged` committed with it; run twice, the second finds nothing to
+    join. A join that fails leaves the sign-in done and the guest's rows
+    where they were, logged and stated in the ADR.
+  - **Q3, a command is answered for the reader its page was shown to, as a
+    rule of the platform, not a predicate a program declares**: every
+    program needs it, and a predicate would be each program's to forget.
+    The runtime sends its document's id with each command (`pw-document`);
+    the host refuses, before the command runs, one whose document it served
+    to another session ("You signed in or out in another tab. Reload this
+    page to go on.") or no longer holds ("This page is out of date. Reload
+    it to go on."), and the runtime tells it where the press was, as
+    ADR-0299 (the refusal ruling, at its merge) tells a refusal, the
+    speculation taken back. A command with no document, from no page, is
+    answered as before. W8 builds it in milestone 1 once the refusal ruling
+    is merged, a `TRACK SEAM (store-accounts)` at each of the runtime's and
+    the host's places; the integrator reviews the seam.
+  - **The store's hosts on development accounts** at
+    `STORE_ACCOUNTS_PORTS`, as allocated; the guest model stays the store's
+    default everywhere else.
+- **2026-10-09, W8's finding in `boundary.rs`, answered.** `TypeFacts`'s
+  type-level scope ignored `private` (a type only `private` queries produce
+  carried none, so a view's parameter of it could be captured into a public
+  manifest, R-030's case at the user level), and where scoped producers
+  disagreed the last declaration read won, by unit order. Ruled: `private`
+  maps to `User`, as `manifest_scope` does; disagreeing producers' scopes
+  are joined, never dropped, since the type is all a view's parameter says
+  (R-030); a corpus fixture and a unit test for each, and their mutants. The
+  store's own precision is the program's to give: one record type made by a
+  session query and a user query cannot be proven to hold only the user's,
+  so either `lib/Resources.pw`'s unused session `Cart` leaves the store's
+  build (its fixtures on a module of their own) or the user's cart is a
+  type of its own.
+- **2026-10-09, W8's question: `private` is two things, answered (1).**
+  `private` is both the user's scope (resume, boundary, the checks) and "not
+  importable" (resolve, PW0023), so a user's query could not be imported. A
+  `user` visibility is added, importable as `session` is and user-scoped as
+  `private` is, a contextual keyword at a declaration's start; the store
+  says `user query Cart` and `user page`. `private` keeps both meanings for
+  now: whether it goes on implying the user's scope is the integrator's
+  ruling (NEXT), a change to every program using it.
+- **2026-10-09, W8: the superset telling corrected, telling by principal
+  (A).** With `Cart` keyed by the user, a cart's change reached every live
+  session reading `Cart`, and five browser tests failed on other sessions'
+  empty patch sets. **Corrected:** the integrator's Q1 answer accepted that
+  superset as "a cost of derivation, not of exposure"; it is an exposure, a
+  frame to user B each time user A changes A's own cart. W8 builds NEXT's
+  queued telling by principal: a private entry keyed by a user's handle
+  reaches only that user's sessions (the guest model's included), a
+  session's entry stays its session's, and a shared one reaches every
+  reader with its empty set as before (ADR-0219).
+- **2026-10-09, W6's 1d merged** as ADR-0299 (kiokun's examples and pitch
+  accent), from `7e3cb51`: verify 37961821792, both recipes green (64 of 64
+  mutants), only WebKit's "Load more" failing, fixed on master since. Its
+  evidence is taken over master's though master's run is the later commit:
+  that run (W5's) tested kiokun's older code, and this one 1d's. **W6's
+  finding: `e14-kiokun-word` took 4 h 01 m on CI**, 220 s a mutant, each of
+  its tests compiling the program into its own `TempDir`. Ruled: the
+  build's files, as bytes, are kept in memory once per test process, keyed
+  by a hash of the sources compiled (after a test's `change`), and written
+  into each test's own `TempDir` as now. Not the refused static `TempDir`:
+  nothing on disk outlives its test (ADR-0158), and a mutant's program is
+  compiled once per distinct source instead of once per test, which also
+  cuts how many compile at once (the 4 GiB bound). A mutant that still
+  takes long is given the tests that can see its rule.

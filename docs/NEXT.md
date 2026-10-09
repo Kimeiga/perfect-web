@@ -450,7 +450,20 @@ E14 comes before E11-E13. Its plan, controls and task list are
              browser's decision holds them to the same constants
              (`pw-resume-wasm`), so ADR-0132's checks of a document's schema
              and its privacy scope pass for any page, a private cart's
-             among them; and ~~**four soundness findings of 2026-10-03**~~
+             among them. **The build id is a constant too** (`BUILD`,
+             `"B1"`, read 2026-10-09), so the mixed-build check compares a
+             constant with itself; only the handler's identity is the
+             build's. ADR-0132 deferred both "until a page other than the
+             store's needs it", and the feed's and kiokun's pages do. The
+             integrator's, after the refusal and stream-records merges:
+             the build's id derived from what it built; `/pw-handlers`
+             answering it and each page's document schema, from the build
+             the runtime was served with (ADR-0132's rule: never from the
+             document); each document's manifest naming its own; the
+             decision refusing a document of another build or another
+             schema (codes 10 and 6), each with its recovery; the scope's
+             meaning ruled with it (a session document's scope, and what a
+             runtime knows of its session without reading its cookie); and ~~**four soundness findings of 2026-10-03**~~
              (ADR-0282, `just e14-held-labels`: one label for what a value
              holds; the session "Project
              readiness for kiokun.com rewrite", at `29ebcf9`; its message
@@ -502,28 +515,24 @@ E14 comes before E11-E13. Its plan, controls and task list are
              and, found 2026-10-09 in CI itself: ~~**the nightly could not
              finish**~~ (ADR-0290: two shards cancelled at 345 minutes, the
              plan dealing by mutants; now dealt by each recipe's seconds,
-             the first nightly under it to be named here); open: **the WebKit
-             "Load more" failure's cause**, reproduced here with the
-             server's records (3 of 120, six workers): every commit's
-             telling derived every open document of every session inside
-             the host's one `pending` lock, 50 to 200 ms a hold, back to
-             back, and the page's stream waited up to 1.6 s a pass; the fix,
-             each change derived outside the lock and pushed only where the
-             document still shows what it was derived against, is in CI on
-             `track/stream-records` (its first WebKit job passed, and its
-             second; every other branch's WebKit job fails "Load more" now);
-             open, next, **`feed.spec.mjs`'s "a follow reaches another reader"
-             fails in CI's three-engine runs of the feed**: five mutation
-             baselines red in run 37918808029 (`track/arrival-clock`, in
-             Chromium and Firefox), three in run 37893301747
-             (`track/stream-records`, with "a reply reaches every reader"),
-             and none in the browser jobs; the second reader's count never
-             moved in five seconds, and its streams wrote nothing for four.
-             Not the server's new telling (arrival-clock has the old one),
-             and not the earlier test's unanswered unfollow (arrival-clock
-             awaits it). Next: a failing feed test prints its pages' and the
-             server's records, a red baseline shows them, and the recipe runs
-             again alone until it is caught;
+             the first nightly under it to be named here); ~~**the WebKit "Load more" failure's
+             cause**~~ (ADR-0296, `just e14-derived-outside`: every commit's
+             telling derived each open document inside the host's one
+             `pending` lock, 50 to 200 ms a hold, back to back, and the
+             page's stream waited up to 1.6 s a pass; a change is derived
+             outside it now, and pushed only where the document still shows
+             what it was derived against, 10 of 10 mutants; WebKit's "Load
+             more" passed in each of the branch's five runs, where every
+             other branch's failed it); and ~~**`feed.spec.mjs`'s "a follow
+             reaches another reader" failing in CI's three-engine runs**~~
+             (ADR-0297, `just e14-tell-at-once`: found by the failing test's
+             printed records, run 37925722922, the second reader told five
+             seconds and 47 tellings after the follower, or not at all: a
+             commit told the other sessions one after another, closed pages'
+             documents among them; only documents whose pages asked in the
+             last three seconds are derived now, one passed by when its page
+             asks, and eight sessions at once, 6 of 6 mutants; green in all
+             36 recipes of run 37943438178);
              ~~**`e14-graphs-on-the-wire` took CI's runner down**~~
              (ADR-0292) every time it ran there (the nightly of 2026-10-08,
              navigate's verify twice): the heartbeat (run 37902799186) named
@@ -677,16 +686,24 @@ E14 comes before E11-E13. Its plan, controls and task list are
           scope. The integrator's, in order:
           1. **the parts two pages share kept in place**, ADR-0280's next:
              a soft navigation, which item 3's test needs;
-          2. **accounts in the store**: ADR-0258's identity and ADR-0270's
-             principal wired in, so the cart and the orders are a user's,
-             not only a session's; after W5's merge, whose tables they
-             change;
-          3. **delivery addresses**: entered and saved, a delivery zone
-             checked, estimates and availability keyed by the address
-             chosen. Accepted by the owner's own Next.js bug: save an
-             address, go to a store, and its page shows the new address's
-             estimate, with no cache-busting parameter, no reload and no
-             header mounted again, in three engines;
+          2. ~~**accounts in the store**~~ and 3. ~~**delivery
+             addresses**~~: **W8's since 2026-10-09** (the owner: DoorDash
+             faster, with a third worker; PARALLEL.md, "the DoorDash track"),
+             launched first in the next free slot after W5's merge, whose
+             tables they change. Accepted by the owner's own Next.js bug:
+             save an address, go to a store, and its page shows the new
+             address's estimate, with no cache-busting parameter, no reload
+             and, once item 1 lands, no header mounted again, in three
+             engines. The integrator's own items here (1, 4, 5, 6) come
+             before kiokun's and the infrastructure follow-ups (the owner,
+             2026-10-09);
+          3a. **`private` means two things** (W8's finding, 2026-10-09): the
+             user's scope (resume, boundary, the checks) and "not importable"
+             (resolve, PW0023). W8 adds `user`, importable and the user's, as
+             `session` is the session's; whether `private` goes on implying
+             the user's scope or becomes "not importable" alone is the
+             integrator's ruling, a change to every program that says it
+             (the feed's notifications and messages);
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled;
           5. **idempotency committed with the writes** (PW0348, ADR-0246's
@@ -706,12 +723,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
           The worker tracks, one at a time beside the integrator (the
           owner's budget rule), each launched under docs/PARALLEL.md when
           the slot frees:
-          - **W5, the store's data on PostgreSQL**, behind the DataLayer
-            seam as the feed's is (ADR-0246), its guarantees stated as
-            ADR-0207 states a source's. First, so that each later gap is
-            built and tested on both layers. Its rulings are PARALLEL.md's
-            (2026-10-08), the first a finding: ADR-0193 rules that an order
-            is the cart's lines, and the store keeps its status alone;
+          - ~~**W5, the store's data on PostgreSQL**~~ (ADR-0298, `just
+            e14-store-postgres`, merged 2026-10-09): behind the DataLayer
+            seam as the feed's is, on both layers, with five findings fixed
+            on the way;
+          - **W8, the DoorDash track** (PARALLEL.md, 2026-10-09: accounts in
+            the store, delivery addresses, the owner's Next.js bug as its
+            acceptance), in the slot W5 frees, before W7;
           - **W6 is kiokun.com's**, beside this app (below);
           - **W7, TodoMVC** (the owner, relayed 2026-10-08: "something
             people are familiar with"), the next slot free, since it pays

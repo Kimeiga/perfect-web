@@ -1,31 +1,33 @@
 ADR-0161 - each document is its own subscriber
 
 produced by: just e14-documents
-commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
+commit: 0efa5cad088d29a44297f6c100228b6726551de1
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
 == the development server (pw-dev-server)
 
-test tests::a_change_waiting_for_one_tab_survives_another_tab_being_served ... ok
 test tests::a_change_reaches_every_document_of_its_session ... ok
 test tests::a_change_reaches_each_page_that_reads_it_by_its_own_plan ... ok
+test tests::a_change_waiting_for_one_tab_survives_another_tab_being_served ... ok
 test tests::a_read_older_than_the_latest_is_not_applied ... ok
 test tests::a_session_is_forgotten_with_its_last_document ... ok
-test result: ok. 150 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 51.54s
+test result: ok. 333 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 701.12s
 
 == two tabs of one session (e2e/tabs.spec.mjs), and the keyed reads (e2e/keyed.spec.mjs), three engines
 
-  15 passed (31.0s)
+  15 passed (2.3m)
 
 == mutation controls (scripts/documents_mutations.py)
 
-baseline (cargo): 150 passed, 0 failed
+baseline (cargo): 333 passed, 0 failed
 baseline (browser): 2 passed, 0 failed
-serving a document replaces the session's others: KILLED (8 of 150 tests fail)
-a change reaches only the session's latest document: KILLED (4 of 150 tests fail)
-a keyed read goes to the session's latest document: KILLED (1 of 150 tests fail)
-a session is forgotten with any one of its documents: KILLED (1 of 150 tests fail)
+serving a document replaces the session's others: KILLED (10 of 333 tests fail)
+a change reaches only the session's latest document: KILLED (6 of 333 tests fail)
+a keyed read goes to the session's latest document: KILLED (1 of 333 tests fail)
+a session is forgotten with any one of its documents: KILLED (1 of 333 tests fail)
 the page's long poll names no document: KILLED (1 of 2 tests fail)
 the page's stream names no document: KILLED (1 of 2 tests fail)
 6 of 6 mutants killed
+memory bound: no process was stopped

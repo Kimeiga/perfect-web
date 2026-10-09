@@ -84,6 +84,10 @@ verify() {  # verify <file> <expected-sha256>
     echo "  checksum ok: $(basename "$1")"
 }
 
+# A release's download is asked again on a transient failure (a timeout, or
+# HTTP 408, 429, 500, 502, 503 or 504): one 500 from GitHub's releases failed
+# a browser job of run 37934455275 before it ran a test.
+
 # --- Koka ------------------------------------------------------------------
 if [ -x "$PREFIX/bin/koka" ] && "$PREFIX/bin/koka" --version 2>/dev/null | grep -q "$KOKA_VERSION"; then
     echo "koka $KOKA_VERSION already present"
@@ -91,7 +95,7 @@ else
     tarball="$DIST/$KOKA_ASSET"
     url="https://github.com/koka-lang/koka/releases/download/v${KOKA_VERSION}/${KOKA_ASSET}"
     echo "fetching koka $KOKA_VERSION"
-    [ -f "$tarball" ] || curl -sSL --fail --max-time 300 -o "$tarball" "$url"
+    [ -f "$tarball" ] || curl -sSL --fail --retry 4 --retry-delay 5 --max-time 300 -o "$tarball" "$url"
     verify "$tarball" "$KOKA_SHA256"
     tar xzf "$tarball" -C "$PREFIX"
     echo "  installed: $("$PREFIX/bin/koka" --version | head -1)"
@@ -104,7 +108,7 @@ else
     tarball="$DIST/$WASMTIME_ASSET"
     url="https://github.com/bytecodealliance/wasmtime/releases/download/v${WASMTIME_VERSION}/${WASMTIME_ASSET}"
     echo "fetching wasmtime $WASMTIME_VERSION"
-    [ -f "$tarball" ] || curl -sSL --fail --max-time 300 -o "$tarball" "$url"
+    [ -f "$tarball" ] || curl -sSL --fail --retry 4 --retry-delay 5 --max-time 300 -o "$tarball" "$url"
     verify "$tarball" "$WASMTIME_SHA256"
     tar xJf "$tarball" -C "$DIST"
     cp "$DIST/$WASMTIME_DIR/wasmtime" "$PREFIX/bin/wasmtime"

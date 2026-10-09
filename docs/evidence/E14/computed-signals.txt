@@ -1,7 +1,8 @@
 ADR-0227 - a value computed from a signal is the browser's, and its first value the host's
 
 produced by: just e14-computed-signals
-commit: c7f999bd5223ae9cc476cade7698b647ec95d1ee
+commit: 0efa5cad088d29a44297f6c100228b6726551de1
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -9,32 +10,32 @@ playwright: Version 1.58.0
 == the build (compiler/pw-core/tests/computed_signals.rs, computed_holes.rs)
 
 test a_build_input_a_template_reads_is_no_hosts ... ok
-test a_value_the_template_computes_performs_nothing ... ok
-test a_view_composed_in_the_page_computes_from_the_pages_value ... ok
 test a_member_an_imported_module_lacks_does_not_resolve ... ok
+test a_value_the_template_computes_performs_nothing ... ok
 test a_computed_attribute_is_a_value_the_host_sets ... ok
+test a_view_composed_in_the_page_computes_from_the_pages_value ... ok
+test what_a_host_does_not_compute_is_refused_by_name ... ok
 test a_value_the_template_computes_is_lifted_and_planned ... ok
 test a_view_that_contains_itself_computes_nothing_yet_and_a_speculated_value_is_computed ... ok
-test what_a_host_does_not_compute_is_refused_by_name ... ok
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.14s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.85s
 test an_attribute_and_a_views_field_of_a_signal_are_computed_as_well ... ok
-test a_value_computed_from_a_signal_is_the_browsers_and_its_first_the_hosts ... ok
 test what_the_browser_does_not_compute_yet_is_refused_by_name ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.74s
+test a_value_computed_from_a_signal_is_the_browsers_and_its_first_the_hosts ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.43s
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
 test tests::a_page_of_signals_alone_computes_at_their_first_values ... ok
 test tests::what_a_page_computes_from_a_signal_is_rendered_at_its_first_value ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 144 filtered out; finished in 2.51s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 333 filtered out; finished in 13.17s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  36 passed (34.3s)
+  66 passed (1.9m)
 
 == mutation controls (scripts/computed_signals_mutations.py)
 
-baseline (browser): 36 passed, 0 failed
+baseline (browser): 66 passed, 0 failed
 baseline (cargo): 13 passed, 0 failed
 a signal's value is a query's to compute [cargo]: KILLED (4 of 10 tests fail)
 a text part computed from a signal names no component [cargo]: KILLED (4 of 13 tests fail)
@@ -53,3 +54,4 @@ the browser does not compute a value from a signal [browser]: KILLED (3 of 12 te
 the browser computes each value from the signal's first [browser]: KILLED (3 of 6 tests fail)
 a computed attribute is set from the signal itself [browser]: KILLED (3 of 12 tests fail)
 16 of 16 mutants killed
+memory bound: no process was stopped

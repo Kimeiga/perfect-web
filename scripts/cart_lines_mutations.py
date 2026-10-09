@@ -257,39 +257,49 @@ MUTANTS = [
         "one fewer takes two",
         "server",
         STORE_DATA,
-        "                        lines[at].quantity -= 1;\n",
-        "                        lines[at].quantity -= 2;\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                lines[at].quantity -= 1;\n",
+        "                lines[at].quantity -= 2;\n",
     ),
     (
         "a line at one is kept",
         "server",
         STORE_DATA,
-        "                        lines.remove(at);\n",
-        "                        lines[at].quantity = 0;\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                lines.remove(at);\n",
+        "                lines[at].quantity = 0;\n",
     ),
     (
         "a removal removes nothing",
         "server",
         STORE_DATA,
-        "                lines.retain(|l| l.item != *item);\n",
-        "                lines.retain(|_| true);\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "        lines.retain(|l| l.item != *item);\n",
+        "        lines.retain(|_| true);\n",
     ),
     (
         "an item no store has is available",
         "server",
         STORE_DATA,
-        "                    catalog.contains_key(item) && !sold_out.contains(item),\n",
-        "                    !sold_out.contains(item),\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                    r.catalog_item(item)?.is_some_and(|(_, _, can)| can),\n",
+        "                    r.catalog_item(item)?.is_none_or(|(_, _, can)| can),\n",
     ),
     (
         "a line's price is not recorded",
         "server",
         STORE_DATA,
-        "                            .get(item)\n"
-        "                            .cloned()\n",
-        "                            .get(item)\n"
-        "                            .cloned()\n"
-        "                            .map(|(name, _)| (name, 0))\n",
+        # Re-anchored by track store-pg: the store's operations, built once
+        # over either layer's rows.
+        "                    .catalog_item(item)?\n"
+        "                    .ok_or_else(",
+        "                    .catalog_item(item)?\n"
+        "                    .map(|(name, _, can)| (name, 0, can))\n"
+        "                    .ok_or_else(",
     ),
     (
         "a command does not wait for its session's change in progress",

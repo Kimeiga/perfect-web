@@ -1,0 +1,40 @@
+ADR-0273 - a materialization is a value its body derives
+
+produced by: just e14-materialization-bodies
+commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== derived, read and stated once (compiler/pw-core/tests/materialization_bodies.rs, calls_name_terms.rs)
+
+test a_call_names_no_effect ... ok
+test a_call_names_no_materialization ... ok
+test a_call_names_no_event ... ok
+test a_binding_that_shares_the_name_is_its_value ... ok
+test a_term_or_a_type_that_shares_the_name_is_what_a_call_names ... ok
+test a_call_names_no_view_and_no_page ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test a_fragment_the_host_renders_is_no_value_to_read ... ok
+test a_materializations_body_is_held_to_its_type ... ok
+test a_page_reads_a_public_one_the_host_keeps ... ok
+test one_that_derives_its_value_reads_another_and_a_cycle_of_reads_is_refused ... ok
+test what_it_depends_on_is_stated_once_by_reading_it ... ok
+test a_body_begins_where_the_clauses_end_whatever_it_begins_with ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s
+
+== mutation controls (scripts/materialization_body_mutations.py)
+
+baseline: 26 passed, 0 failed
+a materialization's body is not held to its type: KILLED (1 of 12 tests fail)
+a materialization is no term: KILLED (3 of 12 tests fail)
+a `depends_on` beside a body is not refused: KILLED (1 of 12 tests fail)
+a body's reads are no edges: KILLED (1 of 12 tests fail)
+one that derives its value reads none that derives its own: KILLED (1 of 12 tests fail)
+a fragment the host renders is read as a value: KILLED (1 of 12 tests fail)
+a materialization may be called: KILLED (1 of 6 tests fail)
+`depends_on` looks for a materialization among the views: KILLED (1 of 21 tests fail)
+inside a block, a clause's value reads on past its line: KILLED (1 of 6 tests fail)
+a header's clause ends with its line: KILLED (1 of 26 tests fail)
+a line ending in a comma ends its clause: KILLED (1 of 12 tests fail)
+11 of 11 mutants killed
+memory bound: no process was stopped

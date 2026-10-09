@@ -24,8 +24,9 @@ MUTANTS = [
     (
         "no other session is told",
         SERVER,
-        "        for other in others {\n",
-        "        for other in others.into_iter().take(0) {\n",
+        # Re-anchored by ADR-0297: the sessions are told at once.
+        "        let others: Vec<String> = others.into_iter().collect();\n",
+        "        let others: Vec<String> = others.into_iter().take(0).collect();\n",
     ),
     (
         "a session's own entry reaches the others",

@@ -24,7 +24,7 @@ import shards
 // the one version the deployment opened; there are no transactions, since
 // nothing commits; and nothing tells a change, since none is made.
 source KiokunEntries
-    holds        Entry, Label, CharGloss
+    holds        Entry, Label, CharGloss, PitchReading
     transactions none
     reads        strong
     changes      none
@@ -34,11 +34,28 @@ source KiokunEntries
 // the fields the word page reads, each list as the file lists it. The page's
 // own shapes are below.
 
-// One reading of a Chinese word: its pinyin and Jyutping, and its senses.
+// One example of a Chinese sense (`definitionExamples[].examples[]`): its
+// simplified and traditional text, its English and its pinyin.
+type ChineseExample = ChineseExample {
+    simp: String,
+    trad: String,
+    en: String,
+    pinyin: String,
+}
+
+// A sense's examples, by the sense's text (`definitionExamples[]`).
+type DefinitionExamples = DefinitionExamples {
+    definition: String,
+    examples: List<ChineseExample>,
+}
+
+// One reading of a Chinese word: its pinyin and Jyutping, its senses, and
+// their examples.
 type ChineseItem = ChineseItem {
     pinyin: String,
     jyutping: String,
     definitions: List<String>,
+    examples: List<DefinitionExamples>,
 }
 
 // One Chinese word: CC-CEDICT's line `id`, its forms, its readings.
@@ -70,7 +87,20 @@ type CharMeaning = CharMeaning {
     value: String,
 }
 
-// One sense of a Japanese word: its glosses, notes and labels.
+// One sentence of a Japanese example, Tatoeba's: its language, as the file
+// spells it (`lang`, or `land` in some records), and its text.
+type Sentence = Sentence {
+    lang: String,
+    land: String,
+    text: String,
+}
+
+// One example of a Japanese sense: its sentences in each language.
+type SenseExample = SenseExample {
+    sentences: List<Sentence>,
+}
+
+// One sense of a Japanese word: its glosses, notes, labels and examples.
 type Sense = Sense {
     glosses: List<Gloss>,
     info: List<String>,
@@ -78,6 +108,7 @@ type Sense = Sense {
     field: List<String>,
     misc: List<String>,
     dialect: List<String>,
+    examples: List<SenseExample>,
 }
 
 // One Japanese word: JMdict's sequence number `id`, its forms and senses.
@@ -88,14 +119,28 @@ type JapaneseWord = JapaneseWord {
     senses: List<Sense>,
 }
 
-// One Korean word: hangul, hanja where it has one, a part of speech, and
-// its definitions.
+// One example of a Korean word or sense: its Korean and its translation.
+type KoreanExample = KoreanExample {
+    korean: String,
+    translation: String,
+}
+
+// One sense of a Korean word: its text and its examples.
+type KoreanSense = KoreanSense {
+    text: String,
+    examples: List<KoreanExample>,
+}
+
+// One Korean word: hangul, hanja where it has one, a part of speech, its
+// definitions' texts, its senses with their examples, and its own examples.
 type KoreanWord = KoreanWord {
     id: String,
     hangul: String,
     hanja: String,
     pos: String,
     definitions: List<String>,
+    senses: List<KoreanSense>,
+    examples: List<KoreanExample>,
 }
 
 // One translation of a Japanese name: its kinds and texts.
@@ -209,6 +254,14 @@ type Place = Place {
     file: String,
 }
 
+// One reading of a word in kiokun.com's pitch data (`static/pitch/<shard>.json`,
+// read through `KIOKUN_APP`): the reading, and its accent, the mora after
+// which the pitch falls (0 for none), where the data gives one.
+type PitchReading = PitchReading {
+    reading: String,
+    accent: Option<Int>,
+}
+
 // One character's gloss from kiokun.com's component glosses
 // (`static/game_data/component_glosses.json`, read through `KIOKUN_APP`).
 type CharGloss = CharGloss {
@@ -231,6 +284,10 @@ fn read_labels() -> List<Label> !{ database.read<Label> }
 // The files at `places`, each read as `read_entry` reads one, in order.
 fn read_entries(places: List<Place>) -> List<Option<Entry>> !{ database.read<Entry> }
     host "kiokun:data/entries#read-all"
+
+// A word's readings in pitch shard `shard`, in the data's order, or none.
+fn read_pitch(shard: String, word: String) -> List<PitchReading> !{ database.read<PitchReading> }
+    host "kiokun:data/pitch#of"
 
 // The glosses kiokun.com's component table has for `characters`, or none
 // where the deployment names no app.
@@ -278,6 +335,69 @@ fn numbered(items: List<String>, prefix: String) -> List<Numbered> {
     List.fold(items, none, (out, t) => List.concat(out, [Numbered { id: "{prefix}:{List.length(out)}", text: t }]))
 }
 
+// One example as the page shows it: its text and its translation.
+type Example = Example {
+    text: String,
+    translation: String,
+}
+
+type ShownExample = ShownExample {
+    id: String,
+    text: String,
+    translation: String,
+}
+
+// A sense's examples as `SenseExampleList.svelte` shows them: those with a
+// text, labelled `Example` or `Examples`; the first shown, and the rest
+// behind a disclosure that says how many.
+type ShownExamples = ShownExamples {
+    lang: String,
+    label: String,
+    first: List<ShownExample>,
+    rest: List<ShownExample>,
+    more: String,
+}
+
+fn examples_shown(items: List<Example>, prefix: String, lang: String) -> ShownExamples {
+    let usable = List.filter(items, e => e.text != "")
+    let none: List<ShownExample> = []
+    let all = List.fold(usable, none, (out, e) => List.concat(out, [ShownExample { id: "{prefix}:x{List.length(out)}", text: e.text, translation: e.translation }]))
+    ShownExamples {
+        lang: lang,
+        label: if List.length(all) == 1 { "Example" } else { "Examples" },
+        first: List.take(all, 1),
+        rest: List.drop(all, 1),
+        more: "Show {List.length(all) - 1} more examples for this definition",
+    }
+}
+
+// One sense as the page shows it, with its examples.
+type ShownDefinition = ShownDefinition {
+    id: String,
+    text: String,
+    examples: ShownExamples,
+}
+
+// A Chinese sense's examples (`+page.svelte`'s `matchedExamples`): the first
+// record for the sense's text, each example's text its simplified, else
+// traditional, form.
+fn chinese_examples(item: ChineseItem, definition: String) -> List<Example> {
+    let none: List<Example> = []
+    match List.find(item.examples, r => r.definition == definition) {
+        Some(r) => List.map(r.examples, e => Example { text: if e.simp != "" { e.simp } else { e.trad }, translation: e.en }),
+        None => none,
+    }
+}
+
+fn chinese_definitions(item: ChineseItem, prefix: String) -> List<ShownDefinition> {
+    let none: List<ShownDefinition> = []
+    List.fold(item.definitions, none, (out, d) => List.concat(out, [ShownDefinition {
+        id: "{prefix}:{List.length(out)}",
+        text: d,
+        examples: examples_shown(chinese_examples(item, d), "{prefix}:{List.length(out)}", "zh"),
+    }]))
+}
+
 // One reading of a Chinese word as the page shows it: the word's forms,
 // `simp / trad` where they differ, its pinyin and Jyutping, and its senses.
 type ShownChinese = ShownChinese {
@@ -287,7 +407,7 @@ type ShownChinese = ShownChinese {
     both: Bool,
     pinyin: String,
     jyutping: String,
-    definitions: List<Numbered>,
+    definitions: List<ShownDefinition>,
 }
 
 // A word's readings that have senses (`+page.svelte:711-716`), each keyed
@@ -302,7 +422,7 @@ fn chinese_shown(w: ChineseWord, word: String) -> List<ShownChinese> {
         both: w.simp != "" & w.trad != "" & w.simp != w.trad,
         pinyin: item.pinyin,
         jyutping: item.jyutping,
-        definitions: numbered(item.definitions, "{w.id}:{List.length(out)}"),
+        definitions: chinese_definitions(item, "{w.id}:{List.length(out)}"),
     }]))
     List.filter(all, s => List.length(s.definitions) > 0)
 }
@@ -391,6 +511,26 @@ type ShownSense = ShownSense {
     glosses: List<ShownGloss>,
     info: String,
     labels: List<Numbered>,
+    examples: ShownExamples,
+}
+
+// `japaneseExamplesForSense` (`src/lib/japanese-examples.ts`): each example
+// whose Japanese sentence has a text, with its English where it has one; a
+// sentence's language is its `land` or its `lang`.
+fn japanese_examples(s: Sense) -> List<Example> {
+    let none: List<Example> = []
+    List.fold(s.examples, none, (out, e) => match List.find(e.sentences, t => t.land == "jpn" | t.lang == "jpn") {
+        Some(j) => if j.text == "" { out } else {
+            List.concat(out, [Example {
+                text: j.text,
+                translation: match List.find(e.sentences, t => t.land == "eng" | t.lang == "eng") {
+                    Some(en) => en.text,
+                    None => "",
+                },
+            }])
+        },
+        None => out,
+    })
 }
 
 type ShownGloss = ShownGloss {
@@ -427,6 +567,7 @@ fn senses_shown(ss: List<Sense>, prefix: String, labels: List<Label>) -> List<Sh
         glosses: glosses_shown(s.glosses, "{prefix}:{List.length(out)}:g"),
         info: String.join(s.info, "; "),
         labels: numbered(sense_labels(s, labels), "{prefix}:{List.length(out)}:l"),
+        examples: examples_shown(japanese_examples(s), "{prefix}:{List.length(out)}", "ja"),
     }]))
 }
 
@@ -438,21 +579,24 @@ type ShownJapanese = ShownJapanese {
     kanji: List<ShownHeadword>,
     kana: List<ShownHeadword>,
     reading: String,
+    pitch: Pitch,
     senses: List<ShownSense>,
     many: Bool,
 }
 
-fn japanese_shown(w: JapaneseWord, labels: List<Label>) -> ShownJapanese {
+fn japanese_shown(w: JapaneseWord, labels: List<Label>, pitch: List<PitchReading>) -> ShownJapanese {
     let kanji = headwords(w.kanji, "sK", "{w.id}:k", labels)
     let kana = headwords(w.kana, "sk", "{w.id}:r", labels)
+    let reading = match List.get(kana, 0) {
+        Some(r) => r.text,
+        None => "",
+    }
     ShownJapanese {
         id: w.id,
         kanji: kanji,
         kana: if List.length(kanji) == 0 { kana } else { [] },
-        reading: match List.get(kana, 0) {
-            Some(r) => r.text,
-            None => "",
-        },
+        reading: reading,
+        pitch: pitch_shown(pitch, speak_of(w), reading, w.id),
         senses: senses_shown(w.senses, "{w.id}:s", labels),
         many: List.length(w.senses) > 1,
     }
@@ -465,19 +609,30 @@ type ShownKorean = ShownKorean {
     hangul: String,
     hanja: String,
     pos: String,
-    definitions: List<Numbered>,
+    definitions: List<ShownDefinition>,
     many: Bool,
+    examples: ShownExamples,
+}
+
+fn korean_examples(items: List<KoreanExample>) -> List<Example> {
+    List.map(items, e => Example { text: e.korean, translation: e.translation })
 }
 
 fn korean_shown(w: KoreanWord) -> ShownKorean {
-    let kept = List.filter(w.definitions, d => d != "" & d != "Sentence")
+    let kept = List.filter(w.senses, s => s.text != "" & s.text != "Sentence")
+    let none: List<ShownDefinition> = []
     ShownKorean {
         id: w.id,
         hangul: w.hangul,
         hanja: w.hanja,
         pos: w.pos,
-        definitions: numbered(kept, w.id),
+        definitions: List.fold(kept, none, (out, s) => List.concat(out, [ShownDefinition {
+            id: "{w.id}:{List.length(out)}",
+            text: s.text,
+            examples: examples_shown(korean_examples(s.examples), "{w.id}:{List.length(out)}", "ko"),
+        }])),
         many: List.length(kept) > 1,
+        examples: examples_shown(korean_examples(w.examples), "{w.id}:w", "ko"),
     }
 }
 
@@ -1485,6 +1640,127 @@ fn seo_of(word: String, e: Entry) -> Seo {
         description: truncate("{described}. {kind} readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.", 158),
     }
 }
+// ---------------------------------------------------------------------------
+// Pitch accent (`src/lib/components/PitchAccent.svelte`), beside a Japanese
+// word's first reading.
+
+// The forms the page shows of a word (`WordEntry.svelte:19-23`).
+fn display_forms(items: List<Headword>, hidden: String) -> List<Headword> {
+    List.filter(items, h => !List.any(h.tags, t => t == hidden))
+}
+
+// The word `WordEntry.svelte` speaks and looks pitch up by: its first written
+// form, else its first reading.
+fn speak_of(w: JapaneseWord) -> String {
+    match List.get(display_forms(w.kanji, "sK"), 0) {
+        Some(k) => k.text,
+        None => match List.get(display_forms(w.kana, "sk"), 0) {
+            Some(k) => k.text,
+            None => "",
+        },
+    }
+}
+
+// A code point's UTF-16 units.
+fn utf16_units(c: Int) -> List<Int> {
+    if c > 65535 { [55296 + (c - 65536) / 1024, 56320 + (c - 65536) % 1024] } else { [c] }
+}
+
+// The pitch shard a word is in (`PitchAccent.svelte`'s `simpleHash`): the
+// hash `h * 31 + unit` over its UTF-16 units, in 32 bits, its low byte in two
+// hexadecimal digits. Not the entries' shard rule, which reads code points.
+fn pitch_shard(word: String) -> String {
+    let h = List.fold(String.codepoints(word), 0, (h, c) => List.fold(utf16_units(c), h, (g, u) => (g * 31 + u) % 4294967296))
+    let low = h % 256
+    String.from_codepoints([shards.hex(low / 16), shards.hex(low % 16)])
+}
+
+// The accent shown (`PitchAccent.svelte`): the reading's where the data has
+// the reading, else the first reading's; either may be none.
+fn accent_of(readings: List<PitchReading>, reading: String) -> Option<Int> {
+    match List.find(readings, r => r.reading == reading) {
+        Some(r) => if reading != "" { r.accent } else { first_accent(readings) },
+        None => first_accent(readings),
+    }
+}
+
+fn first_accent(readings: List<PitchReading>) -> Option<Int> {
+    match List.get(readings, 0) {
+        Some(r) => r.accent,
+        None => None,
+    }
+}
+
+// The small kana a mora joins: ゃゅょャュョ.
+fn small_kana(c: Int) -> Bool {
+    c == 12419 | c == 12421 | c == 12423 | c == 12515 | c == 12517 | c == 12519
+}
+
+// `renderPattern`'s morae: each character, with the small kana after it.
+fn morae_of(points: List<Int>) -> List<String> {
+    let none: List<String> = []
+    match List.get(points, 0) {
+        Some(c) => match List.get(points, 1) {
+            Some(next) => if small_kana(next) {
+                List.concat([String.from_codepoints([c, next])], morae_of(List.drop(points, 2)))
+            } else {
+                List.concat([String.from_codepoints([c])], morae_of(List.drop(points, 1)))
+            },
+            None => [String.from_codepoints([c])],
+        },
+        None => none,
+    }
+}
+
+// `countMorae`: each kana, not the small ones, `っ` and `ッ` counted.
+fn mora_count(text: String) -> Int {
+    List.length(List.filter(String.codepoints(text), c => !small_kana(c) & (c == 12387 | c == 12483 | (c >= 12352 & c <= 12447) | (c >= 12448 & c <= 12543))))
+}
+
+// `pitchType`: no fall 平板, after the first mora 頭高, after the last 尾高,
+// elsewhere 中高.
+fn pitch_type(accent: Int, count: Int) -> String {
+    if accent == 0 { "平板" } else { if accent == 1 { "頭高" } else { if accent == count { "尾高" } else { "中高" } } }
+}
+
+type Mora = Mora {
+    id: String,
+    text: String,
+    class_name: String,
+}
+
+// A word's pitch as the page shows it: each mora, high or low, and the
+// pattern's name.
+type Pitch = Pitch {
+    shown: Bool,
+    title: String,
+    label: String,
+    morae: List<Mora>,
+}
+
+fn pitch_shown(readings: List<PitchReading>, word: String, reading: String, prefix: String) -> Pitch {
+    let none: List<Mora> = []
+    let display = if reading != "" { reading } else { word }
+    match accent_of(readings, reading) {
+        Some(a) => Pitch {
+            shown: true,
+            title: "{pitch_type(a, mora_count(display))} (accent: {a})",
+            label: pitch_type(a, mora_count(display)),
+            morae: List.fold(morae_of(String.codepoints(display)), none, (out, m) => List.concat(out, [Mora {
+                id: "{prefix}:m{List.length(out)}",
+                text: m,
+                class_name: if (a == 0 & List.length(out) > 0) | (a == 1 & List.length(out) == 0) | (a > 1 & List.length(out) > 0 & List.length(out) < a) { "pitch-mora high" } else { "pitch-mora" },
+            }])),
+        },
+        None => Pitch { shown: false, title: "", label: "", morae: none },
+    }
+}
+
+// Each Japanese word's readings in the pitch data, in the words' order.
+type WordPitch = WordPitch {
+    readings: List<PitchReading>,
+}
+
 // The entry a stub names, where the word's file is a stub.
 fn target_of(first: Option<Entry>) -> Option<String> {
     match first {
@@ -1548,7 +1824,21 @@ type WordShown = WordShown {
     names: List<ShownName>,
 }
 
-fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>) -> WordShown {
+// Each Japanese word's pitch readings, by its place among the words.
+fn pitch_at(pitches: List<WordPitch>, n: Int) -> List<PitchReading> {
+    let none: List<PitchReading> = []
+    match List.get(pitches, n) {
+        Some(p) => p.readings,
+        None => none,
+    }
+}
+
+fn japanese_all(words: List<JapaneseWord>, labels: List<Label>, pitches: List<WordPitch>) -> List<ShownJapanese> {
+    let none: List<ShownJapanese> = []
+    List.fold(words, none, (out, w) => List.concat(out, [japanese_shown(w, labels, pitch_at(pitches, List.length(out)))]))
+}
+
+fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>, pitches: List<WordPitch>) -> WordShown {
     let none: List<ShownChinese> = []
     let e = l.data
     WordShown {
@@ -1556,7 +1846,7 @@ fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>)
         seo: seo_of(word, e),
         header: header(e, forms_of(word, l, glosses)),
         chinese: List.fold(e.chinese, none, (out, w) => List.concat(out, chinese_shown(w, word))),
-        japanese: List.map(e.japanese, w => japanese_shown(w, labels)),
+        japanese: japanese_all(e.japanese, labels, pitches),
         korean: List.map(e.korean, korean_shown),
         names: List.map(e.names, name_shown),
     }
@@ -1593,10 +1883,46 @@ public query Word(word: String) -> Result<WordShown, KiokunError>
         None => None,
     }
     let glosses = read_glosses(characters_for(word, page))
+    let none: List<WordPitch> = []
+    let pitches = match page {
+        Some(l) => List.map(l.data.japanese, w => WordPitch { readings: read_pitch(pitch_shard(speak_of(w)), speak_of(w)) }),
+        None => none,
+    }
     match page {
-        Some(l) => Ok(shown(word, l, labels, glosses)),
+        Some(l) => Ok(shown(word, l, labels, glosses, pitches)),
         None => Err(NotFound),
     }
+}
+
+// A sense's examples (`SenseExampleList.svelte`): the first, and the rest
+// behind a disclosure, which needs no script. kiokun.com links each to its
+// sentence reader, which the rewrite does not serve yet, and writes its
+// Chinese with pinyin above it, which needs the reader's word breaks.
+view SenseExamples(examples: ShownExamples) {
+    {#if examples.first}
+        <div class="sense-examples">
+            <div class="sense-example-label">{examples.label}</div>
+            <div class="sense-example-list">
+                {#each examples.first as x (x.id)}
+                    <span class="sense-example">
+                        <span class="sense-example-source" lang={examples.lang}>{x.text}</span>
+                        {#if x.translation}<span class="sense-example-translation">{x.translation}</span>{/if}
+                    </span>
+                {/each}
+                {#if examples.rest}
+                    <details class="sense-example-disclosure">
+                        <summary>{examples.more}</summary>
+                        {#each examples.rest as x (x.id)}
+                            <span class="sense-example">
+                                <span class="sense-example-source" lang={examples.lang}>{x.text}</span>
+                                {#if x.translation}<span class="sense-example-translation">{x.translation}</span>{/if}
+                            </span>
+                        {/each}
+                    </details>
+                {/if}
+            </div>
+        </div>
+    {/if}
 }
 
 // The word's page. Its route is `/word/{word}` until the host's own paths
@@ -1684,7 +2010,10 @@ page WordPage(word: String) {
                             </div>
                             <ol class="chinese-definitions">
                                 {#each c.definitions as d (d.id)}
-                                    <li class="chinese-definition">{d.text}</li>
+                                    <li class="chinese-definition">
+                                        <div>{d.text}</div>
+                                        <SenseExamples examples={d.examples} />
+                                    </li>
                                 {/each}
                             </ol>
                         </div>
@@ -1713,7 +2042,17 @@ page WordPage(word: String) {
                                         {#if k.common}<span class="common" title="Common word">★</span>{/if}
                                     </span>
                                 {/each}
-                                {#if j.reading}<span class="kana-pronunciation">{j.reading}</span>{/if}
+                                {#if j.reading}
+                                    <span class="pronunciation-slot" lang="ja">
+                                        <span class="kana-pronunciation">{j.reading}</span>
+                                        {#if j.pitch.shown}
+                                            <span class="pitch-display" title={j.pitch.title}>
+                                                {#each j.pitch.morae as m (m.id)}<span class={m.class_name}>{m.text}</span>{/each}
+                                                <span class="pitch-label">{j.pitch.label}</span>
+                                            </span>
+                                        {/if}
+                                    </span>
+                                {/if}
                             </div>
                             {#if j.many}
                                 <ol class="sense-list">
@@ -1728,6 +2067,7 @@ page WordPage(word: String) {
                                                     {#each s.labels as l (l.id)}<span class="tag">{l.text}</span> {/each}
                                                 </div>
                                             {/if}
+                                            <SenseExamples examples={s.examples} />
                                         </li>
                                     {/each}
                                 </ol>
@@ -1743,6 +2083,7 @@ page WordPage(word: String) {
                                                 {#each s.labels as l (l.id)}<span class="tag">{l.text}</span> {/each}
                                             </div>
                                         {/if}
+                                        <SenseExamples examples={s.examples} />
                                     </div>
                                 {/each}
                             {/if}
@@ -1763,10 +2104,14 @@ page WordPage(word: String) {
                             {#if k.definitions}
                                 <ol class="korean-definitions">
                                     {#each k.definitions as d (d.id)}
-                                        <li class="korean-definition">{d.text}</li>
+                                        <li class="korean-definition">
+                                            <div>{d.text}</div>
+                                            <SenseExamples examples={d.examples} />
+                                        </li>
                                     {/each}
                                 </ol>
                             {/if}
+                            <SenseExamples examples={k.examples} />
                         </div>
                     {/each}
                 </section>
