@@ -677,8 +677,14 @@ test("a follow shows before the server answers, and is the server's after", asyn
   await page.reload();
   await expect(page.locator("#unfollow")).toHaveCount(1);
   expect(await followers(page)).toBe(before + 1);
-  // Left as it was found, for the next test's count.
+  // Left as it was found, for the next test's count, and answered before the
+  // page is left (ADR-0268): `#follow` is the speculation's, before the
+  // server has it. Not awaited, the unfollow could commit after the next
+  // test read its count, which then expected one follower too many (CI's
+  // baselines, run 37893301747, three of three).
+  const unfollowed = page.waitForResponse("**/command/feed.app.unfollow");
   await page.locator("#unfollow").click();
+  await unfollowed;
   await expect(page.locator("#follow")).toHaveCount(1);
 });
 

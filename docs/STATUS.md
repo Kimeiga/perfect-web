@@ -23,6 +23,49 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-09, three findings fixed, and three recipes recorded for the
+first time** (`track/arrival-clock`). **Corrected:** ADR-0257's `just
+e14-follows`, ADR-0268's `just e14-keepalive` and ADR-0275's `just
+e14-waiting-rows` were cited with their mutants killed, and no evidence of
+any of them was ever on `master`; CI recorded all three in run 37918808029
+(12 of 12, 8 of 8 and 7 of 7). Fixed: ADR-0290's plan crashed on a push
+that touches no recipe, taking the longest of no shards, so every such push
+failed its plan job (d81b8af's did): it plans no shard now. A part sent
+after a delay was measured 0.25 ms early on CI, the test's clock started
+after its request was written: it starts before. And the feed's "a follow
+shows before the server answers" ended with its unfollow unanswered; it
+waits for the answer. One test and one mutant (`just e14-dealt-by-time`, 9
+of 9). Named at the merge: WebKit's "Load more", and five recipes' baselines
+red on it and on "a follow reaches another reader" (open, NEXT), whose
+evidence is not taken.
+
+**ADR-0294, 2026-10-09: a list renders in its length** (W6's finding on
+kiokun's sample). さえこ's 128 names took 215 ms to render, and the curve
+was quadratic: 32 names 16.7 ms, 64 57.7 ms, 128 218 ms. Each item's scope
+copied the page's whole environment, the page's value and so the list
+among it, and every fragment's HTML. An item's scope now shares them by
+pointer and holds its own binding alone: on CI, 250 names render in 2.2 ms
+and 2,000 in 18 ms, a ratio of 8.3 for eight times the names, where scopes
+that copy took 7.1 s for 2,000. 2 of 2 mutants killed, and the renderer's
+other recipes re-run (run 37899457744; `e14-nested-lists` again alone, 6 of
+6, run 37915325800).
+
+**ADR-0293, 2026-10-09: kiokun's page head, held to kiokun.com's own
+code** (track `kiokun`, W6, merged from `4df071b`). The word page's title
+and description are kiokun.com's `buildDictionarySeo` in Pleris: its forms,
+its meanings as `definitionFragments` makes them, and its cuts at 68 and 158
+UTF-16 units, never inside a surrogate pair, where JavaScript's would. The
+head carries robots, Open Graph's and Twitter's tags; the canonical link and
+JSON-LD wait on the integrator's rulings, the preview image on an image
+renderer the owner approves. kiokun.com's own code is the oracle, run by
+Node from the owner's checkout and never committed: 5,513 sampled words, no
+unnamed difference; CI holds the served head to a committed fixture of its
+answers. The integrator's sample of the whole dictionary first: 5,938 of
+5,938 answered at 1c's page, p50 2.3 ms, p99 13.8 ms, and さえこ's 128 names 311 ms, the
+renderer quadratic in a list's length (fixed by ADR-0294).
+23 server tests, 15 browser tests, 53 of 53 mutants killed on CI (run
+37911011082, beside WebKit's known flake).
+
 **ADR-0292, 2026-10-09: a mutation script's processes are bounded in
 memory** (found by CI's heartbeat). CI's runner died every time
 `e14-graphs-on-the-wire` ran there, with exit 143 and no word: under its

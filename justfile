@@ -5377,3 +5377,19 @@ e14-mutation-bound:
        python3 scripts/mutation_bound_mutations.py; \
      } > docs/evidence/E14/mutation-bound.txt
     @grep -E "^Ran |^OK|^FAILED|mutants killed" docs/evidence/E14/mutation-bound.txt
+
+# ADR-0294: a list renders in its length (W6's finding on kiokun's sample).
+# The renderer's scope test, the list's scale timed, and the mutation controls.
+e14-shared-scopes:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0294 - a list renders in its length"; echo; \
+       echo "produced by: just e14-shared-scopes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the renderer (runtime/pw-render: scopes, tests/list_scale.rs)"; echo; \
+       cargo test --locked -p pw-render --lib scopes 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-render --test list_scale -- --include-ignored --nocapture 2>&1 | grep -E '^(test |test result)|names|ratio|panicked at'; \
+       echo; echo "== mutation controls (scripts/shared_scopes_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/shared_scopes_mutations.py; \
+     } > docs/evidence/E14/shared-scopes.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at|ratio" docs/evidence/E14/shared-scopes.txt

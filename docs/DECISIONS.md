@@ -2394,3 +2394,21 @@ a mutation script's processes are bounded in memory.
   says whether any mutant's run had a process stopped, and the run's summary
   lists those apart. Only the script's own processes are read, and one is
   stopped only where two readings agree it is the script's.
+[ADR-0293](DECISIONS/ADR-0293-kiokun-page-head-held-to-kiokuns-own-code.md):
+kiokun's page head, held to kiokun.com's own code (track `kiokun`, W6).
+- The word page describes itself as kiokun.com's does, its title and
+  description made in Pleris by kiokun.com's rules and cut as JavaScript
+  cuts, never inside a surrogate pair. kiokun.com's own `seo.ts`, copied
+  from the owner's checkout into a temporary directory each run, is the
+  oracle: 5,513 sampled words, every title and description the same; CI
+  holds a fixture of its answers. A sample of the whole dictionary, served
+  and timed, found the renderer quadratic in a list's length.
+[ADR-0294](DECISIONS/ADR-0294-a-list-renders-in-its-length.md):
+a list renders in its length (W6's finding on kiokun's sample).
+- An item's scope shares the page's values by pointer: `Env` holds each
+  binding's value, its fragments, its settled streams and its capabilities
+  by `Arc`, and entering a scope copies the map of pointers and adds the
+  item's own. Each item had copied the page's whole value, the list among
+  it, so `n` items over a page of size `m` rendered in `n × m`: kiokun's
+  128 names took 215 ms, and 2,000 names took 7.1 s where they now take
+  18 ms on CI.

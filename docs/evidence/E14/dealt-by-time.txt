@@ -1,8 +1,8 @@
-ADR-XXXX - a verification run is dealt by the seconds its recipes last took
+ADR-0290 - a verification run is dealt by the seconds its recipes last took
 
 produced by: just e14-dealt-by-time
-commit: 5bffbbc32e9e2c2c909f060dbcbeaec8f47a8f21
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37907578665 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 4236e3242f43cb48ffb4912b2b8497a72aca0a9b
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37918808029 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 python: Python 3.12.3
 
 == the plan and the fetch (scripts/tests/test_ci_scripts.py)
@@ -37,22 +37,25 @@ test_a_failed_recipe_says_its_last_lines_in_the_jobs_log (scripts.tests.test_ci_
 test_a_heartbeat_says_what_a_recipe_is_doing_until_it_ends (scripts.tests.test_ci_scripts.Recipes.test_a_heartbeat_says_what_a_recipe_is_doing_until_it_ends) ... ok
 test_what_a_recipe_wrote_is_what_changed (scripts.tests.test_ci_scripts.Recipes.test_what_a_recipe_wrote_is_what_changed) ... ok
 test_a_failed_recipe_fails_the_run (scripts.tests.test_ci_scripts.Summary.test_a_failed_recipe_fails_the_run) ... ok
+test_a_kill_perhaps_the_memory_bounds_alone_is_listed_apart (scripts.tests.test_ci_scripts.Summary.test_a_kill_perhaps_the_memory_bounds_alone_is_listed_apart) ... ok
 test_a_run_of_one_shard_is_read_where_it_was_extracted (scripts.tests.test_ci_scripts.Summary.test_a_run_of_one_shard_is_read_where_it_was_extracted) ... ok
 test_a_run_whose_recipes_passed_passes (scripts.tests.test_ci_scripts.Summary.test_a_run_whose_recipes_passed_passes) ... ok
 test_a_shard_that_reported_nothing_fails_the_run (scripts.tests.test_ci_scripts.Summary.test_a_shard_that_reported_nothing_fails_the_run) ... ok
 test_a_surviving_mutant_fails_the_run (scripts.tests.test_ci_scripts.Summary.test_a_surviving_mutant_fails_the_run) ... ok
-Ran 34 tests in 1.720s
+Ran 35 tests in 1.793s
 OK
 
 == mutation controls (scripts/dealt_by_time_mutations.py)
 
-baseline: 34 passed, 0 failed
-a recipe costs its mutants again: KILLED (1 of 34 tests fail)
-a shard's setup is not counted: KILLED (1 of 34 tests fail)
-a recipe not yet measured is estimated at the rate where none is: KILLED (1 of 34 tests fail)
-the recipes run against a database take a shard each: KILLED (1 of 34 tests fail)
-the recipes run against a database share one shard: KILLED (2 of 34 tests fail)
-more shards are taken where fewer end the run as soon: KILLED (1 of 34 tests fail)
-a recipe that failed has its seconds kept: KILLED (1 of 34 tests fail)
-the seconds kept replace every other recipe's: KILLED (1 of 34 tests fail)
-8 of 8 mutants killed
+baseline: 35 passed, 0 failed
+a recipe costs its mutants again: KILLED (1 of 35 tests fail)
+a shard's setup is not counted: KILLED (1 of 35 tests fail)
+a recipe not yet measured is estimated at the rate where none is: KILLED (1 of 35 tests fail)
+the recipes run against a database take a shard each: KILLED (1 of 35 tests fail)
+the recipes run against a database share one shard: KILLED (2 of 35 tests fail)
+more shards are taken where fewer end the run as soon: KILLED (1 of 35 tests fail)
+a plan of nothing takes the longest of no shards: KILLED (1 of 35 tests fail)
+a recipe that failed has its seconds kept: KILLED (1 of 35 tests fail)
+the seconds kept replace every other recipe's: KILLED (1 of 35 tests fail)
+9 of 9 mutants killed
+memory bound: no process was stopped

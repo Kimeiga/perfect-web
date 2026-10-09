@@ -861,3 +861,328 @@ fn an_equivalent_forms_words_are_shown_on_the_canonical_page() {
     assert!(back.contains("behind") && back.contains("queen"), "{back}");
     assert!(!back.contains("surplus"), "{back}");
 }
+
+/// The value at fraction `q` of sorted `values` (nearest rank).
+fn quantile(sorted: &[f64], q: f64) -> f64 {
+    if sorted.is_empty() {
+        return f64::NAN;
+    }
+    let rank = ((q * sorted.len() as f64).ceil() as usize).clamp(1, sorted.len());
+    sorted[rank - 1]
+}
+
+/// **A sample of the whole dictionary, served and timed** (local: it reads
+/// the owner's kiokun-data checkout through `KIOKUN_DATA`, and
+/// `KIOKUN_APP` where it is set). Every `KIOKUN_SAMPLE_EVERY`th file (256 by
+/// default) of every subdirectory, in name order, is looked up by the word
+/// its file records, through the server's own HTTP path, one request at a
+/// time on a fresh connection: its status, and the time from the request to
+/// the response's last byte. Run in release by `just e14-kiokun-sample`.
+///
+/// Every word a file records has a page: anything but 200 is a defect,
+/// named.
+#[test]
+#[ignore = "reads a kiokun-data checkout named by KIOKUN_DATA; a measurement, run by `just e14-kiokun-sample`"]
+fn a_sample_of_the_whole_dictionary_is_served_and_timed() {
+    let Some(root) = std::env::var_os("KIOKUN_DATA").map(std::path::PathBuf::from) else {
+        panic!("KIOKUN_DATA must name a kiokun-data checkout's output_dictionary");
+    };
+    let every: usize = std::env::var("KIOKUN_SAMPLE_EVERY")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(256);
+    let started = std::time::Instant::now();
+    // `KIOKUN_SAMPLE_APP` names another `app.pw` to serve, an earlier
+    // milestone's, for a baseline.
+    let (_dir, out) = built_kiokun_with(|app| match std::env::var_os("KIOKUN_SAMPLE_APP") {
+        Some(other) => std::fs::read_to_string(other).expect("KIOKUN_SAMPLE_APP"),
+        None => app.to_string(),
+    });
+    let s = Server::from_build(out.clone(), out.clone()).expect("served");
+    let word_component = std::fs::metadata(out.join("components/kiokun.site.Word.wasm"))
+        .expect("the Word component")
+        .len();
+    println!(
+        "server built in {:.1} s (the program compiled and loaded); the Word component {} bytes; KIOKUN_APP {}",
+        started.elapsed().as_secs_f64(),
+        word_component,
+        if std::env::var_os("KIOKUN_APP").is_some() {
+            "set"
+        } else {
+            "not set"
+        }
+    );
+    // Every file, in name order, every `every`th of them.
+    let mut files: Vec<std::path::PathBuf> = Vec::new();
+    let mut subs: Vec<std::path::PathBuf> = std::fs::read_dir(&root)
+        .expect("KIOKUN_DATA is a directory")
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.is_dir())
+        .collect();
+    subs.sort();
+    let mut total = 0usize;
+    for sub in subs {
+        let mut names: Vec<std::path::PathBuf> = std::fs::read_dir(&sub)
+            .expect("a subdirectory")
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.to_string_lossy().ends_with(".json.deflate"))
+            .collect();
+        names.sort();
+        total += names.len();
+        files.extend(names.into_iter().step_by(every.max(1)));
+    }
+    println!("files: {total}; sampled: {} (every {every}th)", files.len());
+    let mut times: Vec<f64> = Vec::new();
+    let mut statuses: BTreeMap<String, usize> = BTreeMap::new();
+    let mut defects: Vec<String> = Vec::new();
+    let mut slowest: Vec<(f64, String)> = Vec::new();
+    for file in &files {
+        let raw = std::fs::read(file).expect("the file");
+        let json: serde_json::Value = serde_json::from_slice(
+            &miniz_oxide::inflate::decompress_to_vec(&raw).expect("raw DEFLATE"),
+        )
+        .expect("JSON");
+        let word = json["key"].as_str().unwrap_or_default().to_string();
+        let at = std::time::Instant::now();
+        let page: String = fetched_as(&s, &path_of(&word), Some("sample"))
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        let ms = at.elapsed().as_secs_f64() * 1e3;
+        let status = page.lines().next().unwrap_or_default().to_string();
+        *statuses.entry(status.clone()).or_default() += 1;
+        times.push(ms);
+        slowest.push((ms, word.clone()));
+        if !status.starts_with("HTTP/1.1 200") {
+            let body = page.split("\r\n\r\n").nth(1).unwrap_or_default();
+            defects.push(format!(
+                "{word}: {status}: {}",
+                body.chars().take(300).collect::<String>()
+            ));
+        }
+    }
+    times.sort_by(|a, b| a.partial_cmp(b).expect("a time"));
+    slowest.sort_by(|a, b| b.0.partial_cmp(&a.0).expect("a time"));
+    for (status, n) in &statuses {
+        println!("status: {status}: {n}");
+    }
+    let mean = times.iter().sum::<f64>() / times.len().max(1) as f64;
+    println!(
+        "per request, ms: mean {mean:.1}, p50 {:.1}, p90 {:.1}, p99 {:.1}, max {:.1}",
+        quantile(&times, 0.5),
+        quantile(&times, 0.9),
+        quantile(&times, 0.99),
+        quantile(&times, 1.0)
+    );
+    for (ms, word) in slowest.iter().take(5) {
+        println!("slowest: {word}: {ms:.1} ms");
+    }
+    println!("defects: {}", defects.len());
+    for d in defects.iter().take(20) {
+        println!("defect: {d}");
+    }
+    assert!(defects.is_empty(), "{} page(s) not served", defects.len());
+}
+
+/// The content of the head's `<meta>` whose `attribute` is `value`.
+fn meta(html: &str, attribute: &str, value: &str) -> String {
+    let at = html
+        .find(&format!("{attribute}=\"{value}\""))
+        .unwrap_or_else(|| panic!("no meta {value}: {html}"));
+    let tag = &html[html[..at].rfind('<').expect("its tag")..];
+    let tag = &tag[..tag.find('>').expect("its end")];
+    let content = &tag[tag.find("content=\"").expect("its content") + 9..];
+    content[..content.find('"').expect("its end")].to_string()
+}
+
+fn title(html: &str) -> String {
+    let start = html.find("<title>").expect("a title") + 7;
+    html[start..start + html[start..].find("</title>").expect("its end")].to_string()
+}
+
+/// **The page's description of itself** (`buildDictionarySeo`): 人's title
+/// is the word and its first three meanings, the learner gloss first, and
+/// its description says so; Open Graph and Twitter repeat them.
+#[test]
+fn the_page_describes_itself_as_kiokun_com_does() {
+    let s = served_kiokun();
+    let page = fetched(&s, &path_of("人"));
+    assert_eq!(title(&page), "人 — person, man, people | Kiokun");
+    let described = "人 means person, man, people. Character readings, definitions, examples, \
+                     and learning tools across Chinese, Japanese, and Korean.";
+    assert_eq!(meta(&page, "name", "description"), described);
+    assert_eq!(
+        meta(&page, "property", "og:title"),
+        "人 — person, man, people | Kiokun"
+    );
+    assert_eq!(meta(&page, "property", "og:description"), described);
+    assert_eq!(
+        meta(&page, "name", "twitter:title"),
+        "人 — person, man, people | Kiokun"
+    );
+    assert_eq!(meta(&page, "name", "robots"), "index, follow");
+    // A stub's title names its other forms: 谚 (諺).
+    let stub = fetched(&s, &path_of("谚"));
+    assert!(title(&stub).starts_with("谚 (諺) — "), "{}", title(&stub));
+}
+
+/// **The definitions it names, as `definitionFragments` makes them**: tags
+/// out, split at `;` and `；`, a leading `2)` off, a classifier and a
+/// one-letter piece left out; and a title past 68 UTF-16 units cut to 67,
+/// trimmed, with `…`.
+#[test]
+fn the_description_takes_kiokuns_fragments_and_length() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "卯",
+        r#"{"key":"卯","chinese_char":{"char":"卯"},
+            "chinese_words":[{"_id":"1","simp":"卯","trad":"卯","items":[{"pinyin":"mǎo",
+              "definitions":["x","CL:個","<b>bold</b>  one; 2) two；three"]}]}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "辰",
+        r#"{"key":"辰","chinese_char":{"char":"辰","gloss":"a gloss long enough that the title it heads runs past the limit"}}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    assert_eq!(
+        title(&fetched(&s, &path_of("卯"))),
+        "卯 — bold one, two, three | Kiokun"
+    );
+    let whole = "辰 — a gloss long enough that the title it heads runs past the limit | Kiokun";
+    let cut: Vec<u16> = whole.encode_utf16().take(67).collect();
+    let expected = format!("{}…", String::from_utf16_lossy(&cut).trim_end());
+    assert_eq!(title(&fetched(&s, &path_of("辰"))), expected);
+    // A character past U+FFFF is two units, as JavaScript counts it.
+    write_entry(
+        dir.path(),
+        "𠀀",
+        r#"{"key":"𠀀","chinese_char":{"char":"𠀀","gloss":"a gloss long enough that the title it heads runs past the limit"}}"#,
+    );
+    let whole = "𠀀 — a gloss long enough that the title it heads runs past the limit | Kiokun";
+    let cut: Vec<u16> = whole.encode_utf16().take(67).collect();
+    let expected = format!("{}…", String::from_utf16_lossy(&cut).trim_end());
+    assert_eq!(title(&fetched(&s, &path_of("𠀀"))), expected);
+    // 68 code points and 69 units: JavaScript cuts it, and so does this.
+    write_entry(
+        dir.path(),
+        "𡀀",
+        r#"{"key":"𡀀","chinese_char":{"char":"𡀀","gloss":"a gloss of fifty-five units, just what this case needs!"}}"#,
+    );
+    let whole = "𡀀 — a gloss of fifty-five units, just what this case needs! | Kiokun";
+    assert_eq!(
+        (whole.chars().count(), whole.encode_utf16().count()),
+        (68, 69)
+    );
+    let cut: Vec<u16> = whole.encode_utf16().take(67).collect();
+    let expected = format!("{}…", String::from_utf16_lossy(&cut).trim_end());
+    assert_eq!(title(&fetched(&s, &path_of("𡀀"))), expected);
+}
+
+/// HTML's five escapes read back.
+fn unescaped(text: &str) -> String {
+    text.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&#x27;", "'")
+        .replace("&amp;", "&")
+}
+
+/// **The page head against kiokun.com's answers** (the integrator's ruling
+/// on oracles, 2026-10-09): each word's served title and description beside
+/// the oracle's. An answer the oracle marked with a named difference holds
+/// the rewrite's text for it, and is counted by its name; any other
+/// difference is named here and fails. Returns the count of each named
+/// difference and the differences found.
+fn held_to_oracle(
+    s: &Server,
+    oracle: &serde_json::Value,
+) -> (BTreeMap<String, usize>, Vec<String>) {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut named: BTreeMap<String, usize> = BTreeMap::new();
+    let mut differ: Vec<String> = Vec::new();
+    for (word, answer) in answers {
+        for name in answer["named"].as_array().into_iter().flatten() {
+            *named
+                .entry(name.as_str().unwrap_or_default().to_string())
+                .or_default() += 1;
+        }
+        let page = fetched(s, &path_of(word));
+        let (want_title, want_description) = (
+            answer["title"].as_str().unwrap_or_default(),
+            answer["description"].as_str().unwrap_or_default(),
+        );
+        if !page.starts_with("HTTP/1.1 200") {
+            differ.push(format!(
+                "{word}: {}",
+                page.lines().next().unwrap_or_default()
+            ));
+            continue;
+        }
+        let got_title = unescaped(&title(&page));
+        let got_description = unescaped(&meta(&page, "name", "description"));
+        if got_title != want_title {
+            differ.push(format!(
+                "{word}: title\n  kiokun.com: {want_title}\n  rewrite:    {got_title}"
+            ));
+        }
+        if got_description != want_description {
+            differ.push(format!(
+                "{word}: description\n  kiokun.com: {want_description}\n  rewrite:    {got_description}"
+            ));
+        }
+    }
+    (named, differ)
+}
+
+/// **The page head against kiokun.com's own `buildDictionarySeo`** (local:
+/// `just e14-kiokun-seo` runs kiokun.com's `seo.ts`, copied from
+/// `KIOKUN_APP`, over a stated sample of `KIOKUN_DATA`, and names its
+/// answers in `KIOKUN_SEO_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-seo`"]
+fn the_page_head_matches_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_SEO_ORACLE").expect("KIOKUN_SEO_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let (named, differ) = held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} words (stride {}, {} entries read)",
+        oracle["answered"], oracle["stride"], oracle["read"]
+    );
+    println!("named differences: {named:?}");
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(30) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
+}
+
+/// **The page head against kiokun.com's answers for the repository's sample**
+/// (`spikes/own-renderer/kiokun-oracle/seo-sample.json`, written by `just
+/// e14-kiokun-seo` with its command and both commits): what CI holds, since
+/// it has neither kiokun.com's code nor the owner's data.
+#[test]
+fn the_page_head_matches_kiokuns_answers_for_the_sample() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../kiokun-oracle/seo-sample.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the fixture")).expect("JSON");
+    assert!(
+        fixture["kiokun_commit"]
+            .as_str()
+            .is_some_and(|c| c.len() == 40),
+        "{fixture}"
+    );
+    let oracle = &fixture["oracle"];
+    assert!(
+        oracle["answered"].as_u64().unwrap_or_default() > 0,
+        "{fixture}"
+    );
+    let s = served_kiokun_on(&sample());
+    let (_, differ) = held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+}
