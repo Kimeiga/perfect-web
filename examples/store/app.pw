@@ -557,7 +557,7 @@ session page CartPage() {
                 id="place-order"
                 type="button"
                 on:press={resumable() => match place_order() {
-                    Ok(_) => notice = "Your order is placed.",
+                    Ok(_) => navigate OrderPage(),
                     Err(OrderError.NothingToOrder) => notice = "Your cart is empty: there is nothing to order.",
                 }}
             >

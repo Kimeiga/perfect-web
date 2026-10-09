@@ -634,21 +634,27 @@ E14 comes before E11-E13. Its plan, controls and task list are
              to someone who follows you or has messaged you, by X's rule;
              and a third user held to seeing none of it by page, by
              `/pw-read`, by cache and by stream; then, the integrator's,
-             **a handler navigates after its command commits** (the owner's
-             brief, 2026-10-08, from a Next.js bug: a save, then a soft
-             navigation to a page the Router Cache served from before the
-             save). `navigate Page(args)` in a handler's arm, a page by name
-             with its arguments checked, as a link is (PW5009); only after
-             the commit, never on a speculation or a refusal, whose `Err`
-             arm runs and whose speculation is taken back; the destination
-             read at that commit or later, its basis carried across the
-             navigation (ADR-0224's rule), with no cache-busting parameter
-             and no reload; a press while it is pending given one defined
-             order, tested both ways; the parts the pages share kept in
-             place; three engines with ADR-0268's wait, and mutation
-             controls for each (navigating before the commit, a
-             destination read before it, a press racing it, navigating on
-             a refusal). The ruling is researched and written when built;
+             ~~**a handler navigates after its command commits**~~
+             (ADR-0280, `just e14-navigate`; the owner's brief, 2026-10-08,
+             from a Next.js bug: a save, then a soft navigation to a page
+             the Router Cache served from before the save).
+             `navigate Page(args)`, last in the `Ok` arm of a command's
+             answer, the page by its declaration and its parameters typed
+             (PW5042, PW5043); after the commit, never on a refusal or an
+             `Ok` that did not commit; each press made before it answered
+             first, both ways, and none taken while the page leaves; the
+             page read after the commit by order, with no cache, no
+             cache-busting parameter and no reload. Two of this brief's
+             premises were the integrator's and wrong: a link's arguments
+             are not checked (PW5009 matches its text to a route), and
+             ADR-0224 carries no basis across a navigation, which here is a
+             document load. Next, **the parts the pages share kept in
+             place**: a soft navigation, the page fetched after the commit
+             and the current one changed into it, identical parts kept with
+             their focus and scroll, history pushed, the runtime moved to
+             the new document's subscription, and links as well as
+             `navigate`; on the History API, since the Firefox and WebKit
+             that Playwright 1.58 installs have no Navigation API;
           7. ~~**track `uploads`, W2**~~ (ADR-0260, `just e14-uploads`: an
              image on a post, a typed upload served safely). What it leaves,
              in order: ~~a deleted post's image no longer served, and its

@@ -1734,6 +1734,80 @@ impl<'a> Lower<'a> {
     /// R's value, its `Ok` where R answers a `Result`. The host answers it from
     /// R; where R answers an error the regeneration fails, and the
     /// materialization's `fallback` decides what is served.
+    /// **`navigate Page(args)`** (ADR-0280): the page's route, and each
+    /// argument lowered as the parameter it gives, each text (PW0621), by
+    /// the parameter's name, which is its segment's.
+    fn navigate(
+        &mut self,
+        body: &Body,
+        modifiers: &[String],
+        args: &[ExprId],
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let blocked = |why: String| Lowering::Blocked {
+            why,
+            span: span.clone(),
+        };
+        let Some(name) = modifiers.first() else {
+            return blocked("a navigation names no page".to_string());
+        };
+        let resolution = match name.contains('.') {
+            true => self.cx.ws.resolve_path(self.unit, name),
+            false => self.cx.ws.resolve_in(self.unit, Namespace::Ui, name),
+        };
+        let (Resolution::Local(def) | Resolution::Imported { def, .. }) = resolution else {
+            return blocked(format!("`{name}` does not resolve to a page"));
+        };
+        let hir = self.cx.hirs[def.unit];
+        let decl = hir.decl(crate::hir::DeclId(def.decl));
+        if decl.kind != DeclKind::Page {
+            return blocked(format!("`{name}` is no page"));
+        }
+        let Some(route) = crate::routes::declared_route(hir, decl) else {
+            return blocked(format!("`{name}` declares no route"));
+        };
+        let Some(sig) = self.cx.sigs.by_def(def) else {
+            return blocked(format!("`{name}` has no signature"));
+        };
+        if sig.params.len() != args.len() || decl.params.len() != args.len() {
+            return blocked(format!(
+                "`{name}` takes {} values, and is given {}",
+                sig.params.len(),
+                args.len()
+            ));
+        }
+        let mut given = Vec::new();
+        for ((arg, declared), param) in args.iter().zip(&sig.params).zip(&decl.params) {
+            let Some(declared) = declared.as_ref() else {
+                return blocked(format!("`{name}`'s parameter `{}` has no type", param.name));
+            };
+            if !declared
+                .resolved()
+                .is_some_and(|t| crate::routes::is_text(self.cx.sigs, t))
+            {
+                return blocked(format!(
+                    "`{name}`'s parameter `{}` is not text, which an address gives",
+                    param.name
+                ));
+            }
+            let ty = match self.ty(declared, &span) {
+                Lowering::Lowered(t) => t,
+                other => return other.map(|_| unreachable!()),
+            };
+            match self.expr(body, *arg, Some(&ty)) {
+                Lowering::Lowered(v) => given.push((param.name.clone(), v)),
+                other => return other,
+            }
+        }
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::Navigate {
+            result,
+            route,
+            args: given,
+            ty: Type::Unit,
+        }))
+    }
+
     fn query_read(
         &mut self,
         body: &Body,
@@ -2085,6 +2159,15 @@ impl<'a> Lower<'a> {
                 args,
                 ..
             } if self.reads && keyword == "query" => self.query_read(body, modifiers, args, span),
+            // **A handler goes to a page once its command commits** (ADR-0280).
+            Expr::Keyword {
+                keyword,
+                modifiers,
+                args,
+                ..
+            } if self.handler && keyword == "navigate" => {
+                self.navigate(body, modifiers, args, span)
+            }
             other => Lowering::Unsupported {
                 construct: construct_name(other),
                 span,

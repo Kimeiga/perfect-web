@@ -444,7 +444,10 @@ pub fn parameters_agree(
 }
 
 /// A `String`, or an opaque type whose representation is one.
-fn is_text(sigs: &crate::signatures::Signatures, ty: &crate::resolved::ResolvedType) -> bool {
+pub(crate) fn is_text(
+    sigs: &crate::signatures::Signatures,
+    ty: &crate::resolved::ResolvedType,
+) -> bool {
     use crate::resolved::Primitive;
     if ty.as_primitive() == Some(Primitive::Str) {
         return true;

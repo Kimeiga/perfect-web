@@ -1387,6 +1387,10 @@ impl<'a> Typer<'a> {
                     other => other,
                 }
             }
+            // A navigation produces nothing (ADR-0280): the page goes.
+            Expr::Keyword { keyword, .. } if keyword == "navigate" => {
+                Ty::Primitive(Primitive::Unit)
+            }
             Expr::Binary { op, lhs, rhs } => match op {
                 BinOp::Cmp(_) | BinOp::And | BinOp::Or => Ty::Primitive(Primitive::Bool),
                 BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
@@ -2236,11 +2240,20 @@ impl<'a> Typer<'a> {
                         args.iter().map(|a| (a.name.clone(), a.value)).collect(),
                     )
                 }
-                // `query Menu(id)` invokes the query `Menu`.
+                // `query Menu(id)` invokes the query `Menu`; `navigate
+                // OrderPage()` gives the page its parameters, and a page is
+                // named among the views (ADR-0280).
                 Expr::Keyword {
-                    modifiers, args, ..
+                    keyword,
+                    modifiers,
+                    args,
+                    ..
                 } => {
-                    let target = match self.ws.resolve_in(self.at, Namespace::Term, &modifiers[0]) {
+                    let namespace = match keyword.as_str() {
+                        "navigate" => Namespace::Ui,
+                        _ => Namespace::Term,
+                    };
+                    let target = match self.ws.resolve_in(self.at, namespace, &modifiers[0]) {
                         Resolution::Local(d) | Resolution::Imported { def: d, .. } => {
                             self.sigs.by_def(d).map(Target::Callable)
                         }
@@ -4013,9 +4026,13 @@ impl<'a> Typer<'a> {
                 }
             }
             Expr::Call { .. } => out.extend(self.call(id).relations),
+            // `navigate Page(..)` gives the page its parameters (ADR-0280):
+            // each argument related as a call's is.
             Expr::Keyword {
                 keyword, modifiers, ..
-            } if matches!(keyword.as_str(), "query" | "subscription") && !modifiers.is_empty() => {
+            } if matches!(keyword.as_str(), "query" | "subscription" | "navigate")
+                && !modifiers.is_empty() =>
+            {
                 out.extend(self.call(id).relations)
             }
             Expr::Record { name: Some(_), .. } => out.extend(self.construct(id).relations),
