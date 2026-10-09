@@ -62,6 +62,8 @@ LOCAL_ONLY = {
     # And its page head against kiokun.com's own code, copied from the
     # owner's checkout.
     "e14-kiokun-seo",
+    # And its Japanese examples against kiokun.com's own code.
+    "e14-kiokun-examples",
 }
 
 # Recipes run against a database (ADR-0246). Each is a shard of its own,

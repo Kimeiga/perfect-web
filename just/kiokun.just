@@ -93,6 +93,35 @@ e14-kiokun-seo:
     @cat docs/evidence/E14/kiokun-seo.txt
     @grep -q "unnamed differences: 0" docs/evidence/E14/kiokun-seo.txt
 
+# The word page's Japanese examples against kiokun.com's own
+# `japaneseExamplesForSense` (`src/lib/japanese-examples.ts`, copied from
+# KIOKUN_APP into a temporary directory), as e14-kiokun-seo holds the head:
+# every 256th entry its loader shows as it is, and the CI fixture for the
+# repository's sample. Local (scripts/ci_plan.py's LOCAL_ONLY).
+e14-kiokun-examples:
+    @test -n "${KIOKUN_DATA:-}" || { echo "KIOKUN_DATA must name a kiokun-data checkout's output_dictionary"; exit 1; }
+    @test -n "${KIOKUN_APP:-}" || { echo "KIOKUN_APP must name a kiokun-data checkout's sveltekit-app"; exit 1; }
+    @mkdir -p docs/evidence/E14
+    @lib="$(mktemp -d)"; \
+     cp "$KIOKUN_APP/src/lib/japanese-examples.ts" "$lib/"; \
+     { echo "The word page's Japanese examples, against kiokun.com's own japaneseExamplesForSense"; echo; \
+       echo "produced by: just e14-kiokun-examples (local: reads a kiokun-data checkout)"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "kiokun.com's source: $(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD) (japanese-examples.ts $(shasum -a 256 "$KIOKUN_APP/src/lib/japanese-examples.ts" | cut -c1-12))"; \
+       echo "node: $(node --version)"; echo; \
+       echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/examples.mjs)"; echo; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/examples.mjs "$lib" "$KIOKUN_DATA" 256 "$lib/examples.json"; \
+       echo; echo "== the rewrite's, compared"; echo; \
+       KIOKUN_EXAMPLES_ORACLE="$lib/examples.json" cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::the_japanese_examples_match_kiokuns_own 2>&1 \
+         | grep -E '^(compared|named|unnamed|difference|  kiokun|  rewrite)|test result|panicked'; \
+       echo; echo "== the CI fixture: kiokun.com's answers for the repository's sample"; echo; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/examples.mjs "$lib" examples/kiokun/data/han-1char-3 1 "$lib/sample.json"; \
+       python3 scripts/kiokun_oracle_fixture.py "$lib/sample.json" spikes/own-renderer/kiokun-oracle/examples-sample.json \
+         "just e14-kiokun-examples" "$(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD)" "$(git rev-parse HEAD)" "$(node --version)"; \
+     } > docs/evidence/E14/kiokun-examples.txt; rm -rf "$lib"
+    @cat docs/evidence/E14/kiokun-examples.txt
+    @grep -q "unnamed differences: 0" docs/evidence/E14/kiokun-examples.txt
+
 # The word page (the track's step 1), served by the development server as a
 # third program beside the store and the feed (docs/PARALLEL.md, "W6's
 # inventory, answered", Q2): `examples/kiokun-site`, its entries read by the

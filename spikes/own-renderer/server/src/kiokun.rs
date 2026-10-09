@@ -227,7 +227,51 @@ fn headwords(word: &serde_json::Value, key: &str) -> Val {
     )
 }
 
-/// A sense: `Sense { glosses, info, pos, field, misc, dialect }`.
+/// A Chinese reading's examples by sense (`definitionExamples`):
+/// `DefinitionExamples { definition, examples }`, each example
+/// `ChineseExample { simp, trad, en, pinyin }`.
+fn definition_examples(item: &serde_json::Value) -> Val {
+    Val::List(
+        list(item, "definitionExamples")
+            .map(|r| {
+                record(vec![
+                    ("definition", Val::String(text(r, "definition"))),
+                    (
+                        "examples",
+                        Val::List(
+                            list(r, "examples")
+                                .map(|e| {
+                                    record(vec![
+                                        ("simp", Val::String(text(e, "simp"))),
+                                        ("trad", Val::String(text(e, "trad"))),
+                                        ("en", Val::String(text(e, "en"))),
+                                        ("pinyin", Val::String(text(e, "pinyin"))),
+                                    ])
+                                })
+                                .collect(),
+                        ),
+                    ),
+                ])
+            })
+            .collect(),
+    )
+}
+
+/// A Korean word's or sense's examples: `KoreanExample { korean, translation }`.
+fn korean_examples(v: &serde_json::Value) -> Val {
+    Val::List(
+        list(v, "examples")
+            .map(|e| {
+                record(vec![
+                    ("korean", Val::String(text(e, "korean"))),
+                    ("translation", Val::String(text(e, "translation"))),
+                ])
+            })
+            .collect(),
+    )
+}
+
+/// A sense: `Sense { glosses, info, pos, field, misc, dialect, examples }`.
 fn sense(s: &serde_json::Value) -> Val {
     record(vec![
         (
@@ -249,6 +293,29 @@ fn sense(s: &serde_json::Value) -> Val {
         ("field", strings(s, "field")),
         ("misc", strings(s, "misc")),
         ("dialect", strings(s, "dialect")),
+        (
+            "examples",
+            Val::List(
+                list(s, "examples")
+                    .map(|e| {
+                        record(vec![(
+                            "sentences",
+                            Val::List(
+                                list(e, "sentences")
+                                    .map(|t| {
+                                        record(vec![
+                                            ("lang", Val::String(text(t, "lang"))),
+                                            ("land", Val::String(text(t, "land"))),
+                                            ("text", Val::String(text(t, "text"))),
+                                        ])
+                                    })
+                                    .collect(),
+                            ),
+                        )])
+                    })
+                    .collect(),
+            ),
+        ),
     ])
 }
 
@@ -271,6 +338,7 @@ pub(crate) fn entry(json: &serde_json::Value) -> Val {
                                     ("pinyin", Val::String(text(i, "pinyin"))),
                                     ("jyutping", Val::String(text(i, "jyutping"))),
                                     ("definitions", strings(i, "definitions")),
+                                    ("examples", definition_examples(i)),
                                 ])
                             })
                             .collect(),
@@ -297,6 +365,20 @@ pub(crate) fn entry(json: &serde_json::Value) -> Val {
                 ("hanja", Val::String(text(w, "hanja"))),
                 ("pos", Val::String(text(w, "pos"))),
                 ("definitions", texts(w, "definitions", "text")),
+                (
+                    "senses",
+                    Val::List(
+                        list(w, "definitions")
+                            .map(|d| {
+                                record(vec![
+                                    ("text", Val::String(text(d, "text"))),
+                                    ("examples", korean_examples(d)),
+                                ])
+                            })
+                            .collect(),
+                    ),
+                ),
+                ("examples", korean_examples(w)),
             ])
         })
         .collect();
