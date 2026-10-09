@@ -710,6 +710,19 @@ pub struct PageValues {
     /// what it reads changes, as it sets a text part.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<u32>,
+    /// **Its documents' scope** (ADR-XXXX), as their resume manifest says it
+    /// and the browser's decision holds a capture to: `public`, `session:`,
+    /// `user:`, `organization:` or `private:` (`resume::page_scope`).
+    #[serde(default = "public_scope", skip_serializing_if = "is_public_scope")]
+    pub scope: String,
+}
+
+fn public_scope() -> String {
+    "public".to_string()
+}
+
+fn is_public_scope(scope: &String) -> bool {
+    scope == "public"
 }
 
 /// **A row's read through a member function** (ADR-0169): `{item.price.display}`
@@ -1840,6 +1853,7 @@ fn plan(
             derived: derived_values,
             captures,
             title,
+            scope: crate::resume::page_scope(hir, decl).to_string(),
         },
         members,
         computed,

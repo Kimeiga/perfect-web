@@ -98,6 +98,38 @@ test("a press on a handler from another build reads the page again, once (charte
   await expect(page.locator("#cart-count")).toHaveText("1");
 });
 
+test("a document of another schema reads the page again, once (ADR-XXXX)", async ({ page }) => {
+  // The decision holds a handler's document to what this build says of its
+  // page, from its handler table: its document schema. A document that says
+  // another, its parts' places another build's, is refused and read again.
+  // Until ADR-XXXX every manifest and the decision said `cart-doc`, so this
+  // document attached.
+  let stale = true;
+  await page.route("**/StorePage.html", async (route) => {
+    const response = await route.fetch();
+    let body = await response.text();
+    if (stale) {
+      stale = false;
+      body = body.replace(/"document":"[^"]*"/, '"document":"another-schema"');
+    }
+    await route.fulfill({ response, body });
+  });
+  await ready(page);
+  // Told by the table, never by the document.
+  expect(await page.evaluate(() => window.__pw.log.join("\n"))).toMatch(
+    /knows store\.page\.StorePage's documents: \S+ session:/,
+  );
+  await expect(page.locator("#cart-count")).toHaveText("0");
+  const reloaded = page.waitForEvent("load");
+  await page.locator("#menu button").first().click();
+  await reloaded;
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady);
+  // Not replayed: the press is the reader's to make again.
+  await expect(page.locator("#cart-count")).toHaveText("0");
+  await page.locator("#menu button").first().click();
+  await expect(page.locator("#cart-count")).toHaveText("1");
+});
+
 test("a page still stale after being read again is not read again", async ({ page }) => {
   // A server that keeps sending the stale document must not reload the page
   // for ever: the second press finds the first reload, and the button stays

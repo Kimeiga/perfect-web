@@ -41,8 +41,9 @@ MUTANTS = [
         "a streamed page may be kept by any cache",
         "server",
         SERVER,
-        '            "HTTP/1.1 200 OK\\r\\ncontent-type: text/html; charset=utf-8\\r\\n{PRIVATE}{cookie}\\\n',
-        '            "HTTP/1.1 200 OK\\r\\ncontent-type: text/html; charset=utf-8\\r\\n{cookie}\\\n',
+        # Re-anchored by ADR-XXXX, which names the build after it.
+        '            "HTTP/1.1 200 OK\\r\\ncontent-type: text/html; charset=utf-8\\r\\n{PRIVATE}{cookie}{build}\\\n',
+        '            "HTTP/1.1 200 OK\\r\\ncontent-type: text/html; charset=utf-8\\r\\n{cookie}{build}\\\n',
     ),
     (
         "a file of the build names a session",

@@ -110,8 +110,9 @@ MUTANTS = [
         "the plan does not name the title",
         "core",
         PLAN,
-        "            title,\n        },\n        members,\n",
-        "            title: None,\n        },\n        members,\n",
+        # Re-anchored by ADR-XXXX, whose plan names its scope after it.
+        "            title,\n            scope: crate::resume::page_scope(hir, decl).to_string(),\n",
+        "            title: None,\n            scope: crate::resume::page_scope(hir, decl).to_string(),\n",
     ),
     (
         "a title that reads a speculated value is let through",

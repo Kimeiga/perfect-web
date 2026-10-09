@@ -5496,3 +5496,31 @@ e14-tell-at-once:
        python3 scripts/tell_at_once_mutations.py; \
      } > docs/evidence/E14/tell-at-once.txt
     @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/tell-at-once.txt
+
+# ADR-XXXX: a build is named by what it built, and the browser's decision
+# holds a document to what its build says of its page. The compiler's tests,
+# the host's, the decision's, the browser's in three engines, and the
+# mutation controls.
+e14-build-id:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a build is named by what it built"; echo; \
+       echo "produced by: just e14-build-id"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the build's name (compiler/pw-core/tests/build_id.rs)"; echo; \
+       cargo test --locked -p pw-core --test build_id 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host serves it, and each page's document"; echo; \
+       cargo test --locked -p pw-dev-server -- a_host_serves_its_build a_build_that_names_no_build 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the decision holds a document to its page (runtime/pw-resume-wasm)"; echo; \
+       cargo test --locked -p pw-resume-wasm 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== a document of another schema, in three engines (e2e/recovery.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/recovery.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/build_id_mutations.py)"; echo; \
+       python3 scripts/build_id_mutations.py; \
+     } > docs/evidence/E14/build-id.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/build-id.txt
