@@ -1,8 +1,8 @@
 ADR-0226 - a value the template computes compiles
 
 produced by: just e14-computed-holes
-commit: 4236e3242f43cb48ffb4912b2b8497a72aca0a9b
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37918808029 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 0efa5cad088d29a44297f6c100228b6726551de1
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -14,23 +14,23 @@ test a_member_an_imported_module_lacks_does_not_resolve ... ok
 test a_value_the_template_computes_performs_nothing ... ok
 test a_computed_attribute_is_a_value_the_host_sets ... ok
 test a_view_composed_in_the_page_computes_from_the_pages_value ... ok
-test what_a_host_does_not_compute_is_refused_by_name ... ok
 test a_value_the_template_computes_is_lifted_and_planned ... ok
+test what_a_host_does_not_compute_is_refused_by_name ... ok
 test a_view_that_contains_itself_computes_nothing_yet_and_a_speculated_value_is_computed ... ok
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.08s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.28s
 test a_binding_named_like_a_function_is_its_value ... ok
 test a_function_named_in_a_handler_is_the_handlers ... ok
 test the_diagnostic_says_it_was_named_as_a_value ... ok
-test a_field_of_a_value_is_no_function_of_the_same_name ... ok
 test a_helper_without_a_row_carries_what_it_performs ... ok
+test a_field_of_a_value_is_no_function_of_the_same_name ... ok
 test a_function_named_as_a_value_performs_its_effects_where_it_is_named ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s
 test a_key_is_the_path_from_the_element ... ok
 test the_ir_blocks_a_computed_list_and_a_foreign_key ... ok
 test a_loops_key_is_read_from_its_element ... ok
 test a_directive_other_than_on_does_not_build ... ok
 test a_computed_hole_checks_and_does_not_build ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.10s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.30s
 
 == the corpus at C16 (corpus-check, checking_source.rs, generality.rs, corpus_history.rs, rule_fixtures.rs)
 
@@ -39,9 +39,9 @@ accepted: 32/32 charter §16 categories covered
 rejected: 62 files
 rejected: 62/62 charter §16 categories covered
 corpus-check: OK
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 67.47s
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.44s
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 69.71s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 67.53s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.60s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 72.80s
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
 
 == the server (spikes/own-renderer/server/src/main.rs)
@@ -49,17 +49,11 @@ test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 test tests::an_invalidated_entry_is_dropped_by_the_key_the_command_computed ... ok
 test tests::an_attributes_computed_value_is_the_hosts_and_set_again ... ok
 test tests::a_value_computed_in_a_row_is_each_rows_and_sent_with_it ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 319 filtered out; finished in 12.94s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 332 filtered out; finished in 12.73s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  1) [chromium] › e2e/feed.spec.mjs:663:1 › a follow reaches another reader of the page without a reload 
-    Error: expect(locator).toHaveText(expected) failed
-  2) [webkit] › e2e/feed.spec.mjs:419:1 › Load more shows the next page, and a post after it is shown over it 
-    Error: expect(received).toBeGreaterThan(expected)
-  2 failed
-  13 did not run
-  51 passed (3.5m)
+  66 passed (3.0m)
 
 == mutation controls (scripts/computed_holes_mutations.py)
 

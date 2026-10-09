@@ -97,6 +97,26 @@ class Failures(unittest.TestCase):
             ],
         )
 
+    def test_a_failing_tests_records_are_shown_as_it_printed_them(self):
+        out = (
+            "[chromium] › e2e/feed.spec.mjs:663:1 › a follow reaches another reader\n"
+            "\x1b[2mpw-record (the reader told) {\"trail\":[\"12 ms stream opened since 3\"]}\x1b[22m\n"
+            "  1) [chromium] › e2e/feed.spec.mjs:663:1 › a follow reaches another reader \n"
+            "    Error: expect(locator).toHaveText(expected) failed\n"
+            "  1 failed\n"
+        )
+        self.assertEqual(
+            baseline.records(out),
+            ['pw-record (the reader told) {"trail":["12 ms stream opened since 3"]}'],
+        )
+        # The last four, each cut to its bound.
+        many = "".join(f"pw-record {i} {'x' * baseline.RECORD}\n" for i in range(6))
+        found = baseline.records(many)
+        self.assertEqual([l.split()[1] for l in found], ["2", "3", "4", "5"])
+        self.assertTrue(all(l.endswith(" (cut)") for l in found))
+        # The control: output with none shows none.
+        self.assertEqual(baseline.records(PANIC), [])
+
     def test_a_failed_commands_output_with_no_result_is_shown_as_it_ended(self):
         said = baseline.failures("compiling\nsomething went wrong\n")
         self.assertEqual(said[0], "no test result; its output ended:")
@@ -150,6 +170,23 @@ class Heard(unittest.TestCase):
         self.assertIn("docs/evidence/E10/store.page.add_to_cart.wasm is stale", said)
         # The control: the command that passed is not named.
         self.assertNotIn("4 passed", said)
+
+    def test_explain_shows_a_failing_tests_records(self):
+        baseline.heard.clear()
+        code = (
+            "import sys; print('pw-record (the reader told) {\"trail\":[]}'); "
+            "print('  1) [chromium] › e2e/feed.spec.mjs:663:1 › a follow'); "
+            "print('    Error: expect(locator).toHaveText(expected) failed'); sys.exit(1)"
+        )
+        subprocess.run(python(code), capture_output=True, text=True)
+        said = explained()
+        self.assertIn('    pw-record (the reader told) {"trail":[]}', said)
+        # The control: a command that passed shows none of its records.
+        baseline.heard.clear()
+        # (Its command names the marker only in parts, so only a record
+        # shown would show it.)
+        subprocess.run(python("print('pw' + '-record passed {}')"), capture_output=True, text=True)
+        self.assertNotIn("pw-record", explained())
 
     def test_explain_runs_nothing_again(self):
         subprocess.run(python("import sys; sys.exit(1)"), capture_output=True)

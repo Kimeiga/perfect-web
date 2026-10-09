@@ -23,6 +23,29 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0296 and ADR-0297, 2026-10-09: a change is derived outside the
+table, and a commit tells the pages that ask, at once** (CI's two
+findings: WebKit's "Load more", failing on every branch, and the feed's "a
+follow reaches another reader", failing in CI's three-engine baselines
+and nowhere else). Every commit's telling derived each open document
+inside the host's one subscriber table, 50 to 200 ms a hold, and every
+stream and read waited; and it told the other sessions one after another,
+every one with a document reading what the commit dropped, the documents
+of pages closed up to two minutes before among them: a failing test's
+printed records showed the second reader told five seconds and 47
+tellings after the follower, or not at all. A change is now derived
+outside the table and pushed only where the document still shows what it
+was derived against; only documents whose pages asked in the last three
+seconds are derived, one passed by when its page next asks; and eight
+sessions are told at once. A failing feed test prints its pages' and the
+server's records, and a red mutation baseline shows them. 8 server tests
+and 2 of the baseline's,
+16 of 16 mutants killed on CI, and all 36 recipes green with WebKit's
+"Load more" passing (run 37943438178, its fifth WebKit pass in five).
+**Corrected with it:** the arrival-clock merge's comment named the earlier
+test's unanswered unfollow as the follow test's cause; it was suspected,
+awaited, and the test failed again.
+
 **2026-10-09, every recipe's evidence is in the repository** (an audit,
 after six were found missing at today's merges). **Corrected:** nineteen
 more recipes their ADRs cite had no evidence on `master`, from ADR-0240 to

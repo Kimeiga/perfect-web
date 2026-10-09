@@ -122,6 +122,20 @@ def failures(output, failed=True):
     return said[:20]
 
 
+# How much of one record a red baseline shows.
+RECORD = 16 * 1024
+
+
+def records(output):
+    """What a failing browser test printed of its pages and its server, one
+    line each beginning `pw-record`, the last four, each cut to RECORD
+    characters. A recipe keeps no attachment, and a failure on CI alone
+    (2026-10-09, "a follow reaches another reader") is read in these."""
+    text = ESCAPES.sub("", output)
+    found = [l.strip() for l in text.splitlines() if l.lstrip().startswith("pw-record")]
+    return [l if len(l) <= RECORD else l[:RECORD] + " (cut)" for l in found[-4:]]
+
+
 def result(output):
     """A test runner's last result line: cargo's, or Playwright's count."""
     found = re.findall(
@@ -151,6 +165,8 @@ def explain(out=None):
         ended = "stopped past its bound" if status is None else f"exit {status}"
         print(f"  {shown(args)} ({ended}):", file=out)
         for line in lines or ["(what it said was not captured)"]:
+            print(f"    {line}", file=out)
+        for line in records(said):
             print(f"    {line}", file=out)
         told = True
     if not told and heard:

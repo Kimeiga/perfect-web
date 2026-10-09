@@ -91,14 +91,15 @@ MUTANTS = [
         SERVER,
         # Re-anchored by ADR-0161: what each document shows. And by ADR-0222,
         # whose speculated values are derived with its patches.
-        "                            shown.insert(doc.clone(), now);\n                            (patches, speculated)\n",
-        "                            let _ = now;\n                            (patches, speculated)\n",
+        # And by the stream records' branch: derived outside the table.
+        "                        shown.insert(doc.clone(), now.clone());\n                        (patches, speculated)\n",
+        "                        let _ = &now;\n                        (patches, speculated)\n",
     ),
     (
         "what a served document shows is not recorded",
         "server",
         SERVER,
-        "        self.shown.lock().expect(\"shown\").insert(doc.clone(), shown);\n",
+        "        self.shown\n            .lock()\n            .expect(\"shown\")\n            .insert(doc.clone(), Arc::new(shown));\n",
         "        let _ = shown;\n",
     ),
     (

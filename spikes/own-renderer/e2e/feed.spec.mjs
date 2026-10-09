@@ -47,7 +47,8 @@ test.describe.configure({ mode: "serial" });
 // `/stream` and `/pw-read` was asked, answered and ended, a stream's
 // cursors and a read's answer. Recorded beside the page, not in it.
 const network = new WeakMap();
-test.beforeEach(async ({ page }) => {
+/** Record what the network sees of `page`'s subscription and reads. */
+function watch(page) {
   const seen = [];
   network.set(page, seen);
   const started = Date.now();
@@ -75,7 +76,8 @@ test.beforeEach(async ({ page }) => {
           : body.slice(0, 80);
     seen.push(`${ended} ended ${named(r.url())}: ${said}`);
   });
-});
+}
+test.beforeEach(async ({ page }) => watch(page));
 
 // What the page's runtime said, beside a failure and its trace: its log,
 // its transport, how often it asked again, the versions it holds and
@@ -84,8 +86,13 @@ test.beforeEach(async ({ page }) => {
 // and the page kept its twenty rows. With the runtime's (run 37707617400),
 // the read was applied, `{"applied":1}`, one stream was asked and none
 // after it, and the runtime logged no failure.
-test.afterEach(async ({ page }, testInfo) => {
-  if (testInfo.status === testInfo.expectedStatus) return;
+/**
+ * Attach what `page`'s runtime and the server said of its document, each
+ * named with `name`: a test of several pages records each (run 37893301747:
+ * a follow's second reader was told nothing, and only the first page's
+ * record could be attached).
+ */
+async function record(page, testInfo, name = "") {
   const said = await page
     .evaluate(() => ({
       log: window.__pw?.log ?? null,
@@ -97,10 +104,48 @@ test.afterEach(async ({ page }, testInfo) => {
     }))
     .catch((e) => ({ unavailable: String(e) }));
   said.network = network.get(page) ?? null;
-  await testInfo.attach("runtime", {
+  await testInfo.attach(`runtime${name}`, {
     body: JSON.stringify(said, null, 2),
     contentType: "application/json",
   });
+  // And the server's: what happened to the document's frames, and each
+  // long hold of its table. With the runtime's record alone (run
+  // 37877464406), the read was applied and the stream never seen to end,
+  // and nothing said where the frames were.
+  const doc = [...(said.network ?? []).join("\n").matchAll(/stream\?doc=(\d+)/g)].at(-1)?.[1];
+  if (doc) {
+    const server = await page.request
+      .get(`/bench/records?doc=${doc}`)
+      .then((r) => r.json())
+      .catch((e) => ({ unavailable: String(e) }));
+    await testInfo.attach(`server${name}`, {
+      body: JSON.stringify(server, null, 2),
+      contentType: "application/json",
+    });
+    said.server = server;
+  }
+  // And printed, the latest of each, one line a page: a mutation script's
+  // red baseline shows a failing test's records (`pw-record`), where a
+  // recipe keeps no attachment. "a follow reaches another reader" failed in
+  // five of them in run 37918808029, and in no browser job.
+  const latest = (list, n) => (Array.isArray(list) ? list.slice(-n) : list);
+  console.log(
+    `pw-record${name} ${JSON.stringify({
+      log: latest(said.log, 40),
+      network: latest(said.network, 40),
+      transport: said.transport,
+      reconnects: said.reconnects,
+      trail: latest(said.server?.trail, 80),
+      slow: latest(said.server?.slow, 20),
+      you: said.server?.you,
+      tellings: latest(said.server?.tellings, 60),
+      at: said.server?.at,
+    })}`,
+  );
+}
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  await record(page, testInfo);
 });
 
 /** The home page, its handlers attached. */
@@ -446,7 +491,9 @@ test("Load more shows the next page, and a post after it is shown over it", asyn
     await held;
     await route.continue();
   });
-  const text = `After more in ${testInfo.project.name}, ${Date.now()}`;
+  // Unique among repeats: two run at once wrote one text, and a test read
+  // the other's post as its own.
+  const text = `After more in ${testInfo.project.name}, ${Date.now()} ${testInfo.repeatEachIndex}`;
   await page.getByLabel("What's happening?").fill(text);
   await page.getByRole("button", { name: "Post" }).click();
   await expect(rows.first()).toContainText(text);
@@ -652,30 +699,41 @@ test("a follow shows before the server answers, and is the server's after", asyn
   // Left as it was found, for the next test's count, and answered before the
   // page is left (ADR-0268): `#follow` is the speculation's, before the
   // server has it. Not awaited, the unfollow could commit after the next
-  // test read its count, which then expected one follower too many (CI's
-  // baselines, run 37893301747, three of three).
+  // test read its count. Suspected, and not the cause, of the next test's
+  // failures in CI's baselines (run 37893301747): awaited, it failed again
+  // (run 37918808029).
   const unfollowed = page.waitForResponse("**/command/feed.app.unfollow");
   await page.locator("#unfollow").click();
   await unfollowed;
   await expect(page.locator("#follow")).toHaveCount(1);
 });
 
-test("a follow reaches another reader of the page without a reload", async ({ browser }) => {
+test("a follow reaches another reader of the page without a reload", async ({ browser }, testInfo) => {
   // Two readers, each a session of its own.
   const [one, two] = await Promise.all([browser.newContext(), browser.newContext()]);
   const [a, b] = await Promise.all([one.newPage(), two.newPage()]);
-  await profile(a, "u-grace");
-  await profile(b, "u-grace");
-  await b.evaluate(() => {
-    window.__unreloaded = true;
-  });
-  const before = await followers(b);
-  await a.locator("#follow").click();
-  await expect(b.locator("#follow-counts")).toHaveText(new RegExp(`^${before + 1} follower`));
-  expect(await unreloaded(b)).toBe(true);
-  await a.locator("#unfollow").click();
-  await expect(b.locator("#follow-counts")).toHaveText(new RegExp(`^${before} follower`));
-  await Promise.all([one.close(), two.close()]);
+  watch(a);
+  watch(b);
+  try {
+    await profile(a, "u-grace");
+    await profile(b, "u-grace");
+    await b.evaluate(() => {
+      window.__unreloaded = true;
+    });
+    const before = await followers(b);
+    await a.locator("#follow").click();
+    await expect(b.locator("#follow-counts")).toHaveText(new RegExp(`^${before + 1} follower`));
+    expect(await unreloaded(b)).toBe(true);
+    await a.locator("#unfollow").click();
+    await expect(b.locator("#follow-counts")).toHaveText(new RegExp(`^${before} follower`));
+  } catch (failed) {
+    // Each reader's record: the default page is none of theirs.
+    await record(a, testInfo, " (the reader who follows)");
+    await record(b, testInfo, " (the reader told)");
+    throw failed;
+  } finally {
+    await Promise.all([one.close(), two.close()]);
+  }
 });
 
 test("your own page says it is yours", async ({ page }, testInfo) => {
