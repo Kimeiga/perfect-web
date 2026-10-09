@@ -23,6 +23,21 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0288 and ADR-0289, 2026-10-09: kiokun's labels and character
+header, its loader's merges and the header's written forms** (track
+`kiokun`, W6, merged from `de0c4ca`). The word page shows JMdict's codes by
+kiokun.com's own label table, read from `KIOKUN_APP` (a code the table lacks
+as it is, as kiokun.com shows one), and the character header: the learner
+gloss, its HSK and JLPT levels, the mnemonic's meanings and each language's
+readings. A word's files are read in one batch; kiokun.com's loader rules (a
+stub followed, its variants and related forms merged, an equivalent form
+found) and the header's written forms are Pleris, each named for the
+kiokun.com function it is read from. Found: a host record's field is named as
+its world names it, in kebab case (the host reading either name is on
+`track/record-names`). Twenty server tests, fifteen browser tests in three
+engines, 45 of 45 mutants killed on CI (run 37896778819, beside WebKit's
+known flake and the lone-shard summary, fixed on master).
+
 **ADR-0287, 2026-10-09: a handler is held where it runs** (found probing
 ADR-0283). A page placed at `build` whose button sends a command was refused,
 "`database.write<Thing>` is not available at placement Build", for a lambda

@@ -579,6 +579,37 @@ Each a decision for a track, with its date; a track's ADR records it too.
     word page), from `d19850f`, after the fix (a 503 before, a 404 now) and
     green runs (verify 37886442522, every engine). Next, 1b: Japanese
     labels through `KIOKUN_APP` with Q4's lookup, and the character header.
+- **2026-10-09, W6's 1b and 1c merged; 1e's questions answered.**
+  - **Merged** as ADR-0288 (kiokun's labels and the character header) and
+    ADR-0289 (the loader's merges and the header's written forms), from
+    `de0c4ca`: verify 37896778819, its one recipe shard passed, 45 of 45
+    mutants killed; it failed only in WebKit's known flake and in the
+    summary, the lone-shard bug fixed on `master` that morning.
+  - **1e, the SEO head, waits on the merge** with its timing sample; asked
+    three questions, answered:
+    - **Q1, an oracle of kiokun.com's own code is the standard** for any of
+      its pure functions the rewrite reimplements: its files copied from
+      `KIOKUN_APP` into a fresh directory each run, never committed (Q3);
+      over the real data on a stated, deterministic sample; kiokun's commit
+      and Node's version recorded; every deliberate difference named and
+      counted by name, any other failing the run; a committed fixture of
+      its answers for the CI sample, which CI holds; hand-made cases for the
+      edges the data lacks; an import the harness does not copy refused,
+      never stubbed.
+    - **Q2, a canonical link is a page address**, written as HTML writes it
+      at the top of a page's view (`<link rel="canonical" href={…}/>`),
+      checked as `navigate`'s address is (ADR-0280); the host writes it
+      absolute with the deployment's configured public origin, never the
+      request's `Host`, which a client controls (kiokun.com's uses the
+      request's origin: a stated difference); a host whose pages state one
+      and that has no origin refuses to start; `og:url` is the host's, from
+      it, and a page's own refused (PW5034); no default self-canonical.
+      After navigate's merge.
+    - **Q3, JSON-LD is typed as JSON**, not as schema.org: a std `Json`
+      (null, bool, number, text, list, an object's keys in order), written
+      `<script type="application/ld+json">{data}</script>` at the top of a
+      page's view, serialized and escaped by the host (ADR-0097); any other
+      `<script>` still refused. The integrator's, after the canonical.
 - **2026-10-09, W7's plan: TodoMVC, launched when W5's slot frees** (the
   owner's, relayed 2026-10-08: "something people are familiar with"; NEXT,
   "W7, TodoMVC"). Track `todomvc`, branch `track/todomvc`, from `master`.
