@@ -198,7 +198,10 @@ fn a_value_the_template_computes_is_lifted_and_planned() {
         .filter(|p| p.steps.iter().any(|s| matches!(s, Step::Derived(_))))
         .collect();
     assert_eq!(
-        computed.iter().map(|p| p.binding.as_str()).collect::<Vec<_>>(),
+        computed
+            .iter()
+            .map(|p| p.binding.as_str())
+            .collect::<Vec<_>>(),
         ["me"],
         "the home page's host computes one value, from its reader: {computed:?}"
     );

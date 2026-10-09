@@ -474,7 +474,9 @@ fn a_page_holds_its_announcer_from_the_first_byte() {
     let html = answer.split_once("\r\n\r\n").map_or("", |(_, body)| body);
     assert!(html.starts_with("<!doctype html>"), "{answer}");
     assert_eq!(html.matches(pw_render::ANNOUNCER).count(), 1, "{html}");
-    let (before, _) = html.split_once("id=\"pw-parts\"").expect("a parts manifest");
+    let (before, _) = html
+        .split_once("id=\"pw-parts\"")
+        .expect("a parts manifest");
     assert!(before.contains(pw_render::ANNOUNCER), "{html}");
 }
 

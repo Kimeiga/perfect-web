@@ -14079,9 +14079,18 @@ public query Store(",
             schema: "s".into(),
             chunks: vec![],
         };
-        let page = signal_document("<main></main>", "P", "", &template, &serde_json::json!({}), &[]);
+        let page = signal_document(
+            "<main></main>",
+            "P",
+            "",
+            &template,
+            &serde_json::json!({}),
+            &[],
+        );
         assert_eq!(page.matches(pw_render::ANNOUNCER).count(), 1, "{page}");
-        let (before, _) = page.split_once("id=\"pw-parts\"").expect("a parts manifest");
+        let (before, _) = page
+            .split_once("id=\"pw-parts\"")
+            .expect("a parts manifest");
         assert!(before.contains(pw_render::ANNOUNCER), "{page}");
     }
 

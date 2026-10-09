@@ -172,7 +172,9 @@ fn a_predicate_is_declared_once_in_a_program() {
         .collect();
     assert_eq!(
         found,
-        ["PW0351 `predicate SignedIn` is declared in `d` already: a refusal by it is told \
-          in one set of words"]
+        [
+            "PW0351 `predicate SignedIn` is declared in `d` already: a refusal by it is told \
+          in one set of words"
+        ]
     );
 }

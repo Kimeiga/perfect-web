@@ -178,7 +178,9 @@ fn a_page_with_a_runtime_holds_the_announcer_from_its_first_byte() {
         true,
     );
     assert_eq!(page.matches(pw_render::ANNOUNCER).count(), 1, "{page}");
-    let (before, _) = page.split_once("id=\"pw-parts\"").expect("a parts manifest");
+    let (before, _) = page
+        .split_once("id=\"pw-parts\"")
+        .expect("a parts manifest");
     assert!(before.contains(pw_render::ANNOUNCER), "{page}");
     // The control: a page with no part the runtime changes ships no runtime,
     // and no announcer.
