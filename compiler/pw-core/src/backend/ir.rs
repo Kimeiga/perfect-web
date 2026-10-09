@@ -380,6 +380,18 @@ pub enum Instr {
         /// declaration's `retry` says (ADR-0173). `None`: once.
         resend: Option<Resend>,
     },
+    /// **A handler goes to a page once its command commits** (ADR-0280): the
+    /// page's route, and the value of each parameter it gives, by name, each
+    /// text (PW0621). The browser fills each `{name}` segment of the route
+    /// with its value, encoded as a URI component, and goes there once the
+    /// commit's answer is in. Only a handler's body holds one, last in the
+    /// `Ok` arm of a command's answer (PW5043). Its value is the unit value.
+    Navigate {
+        result: ValueId,
+        route: String,
+        args: Vec<(String, ValueId)>,
+        ty: Type,
+    },
     /// **A page's signal, read** (ADR-0130): the value the browser holds now,
     /// through the handler's context. Only a handler's body holds one.
     SignalGet {
@@ -682,6 +694,7 @@ impl Instr {
             | Instr::Closure { result, .. }
             | Instr::Retype { result, .. }
             | Instr::Command { result, .. }
+            | Instr::Navigate { result, .. }
             | Instr::SignalGet { result, .. }
             | Instr::SignalSet { result, .. }
             | Instr::Apply { result, .. } => *result,
@@ -713,6 +726,7 @@ impl Instr {
             | Instr::Closure { ty, .. }
             | Instr::Retype { ty, .. }
             | Instr::Command { ty, .. }
+            | Instr::Navigate { ty, .. }
             | Instr::SignalGet { ty, .. }
             | Instr::SignalSet { ty, .. }
             | Instr::Apply { ty, .. } => ty,

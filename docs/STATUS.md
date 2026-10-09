@@ -23,6 +23,29 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-09, every recipe's evidence is in the repository** (an audit,
+after six were found missing at today's merges). **Corrected:** nineteen
+more recipes their ADRs cite had no evidence on `master`, from ADR-0240 to
+ADR-0273 (`e14-clauses-read-once`, `-transition-values`, `-each-heads`,
+`-statements-separated`, `-let-discard`, `-resource-clauses`,
+`-returned-labels`, `-member-resolution`, `-materialization-chains`,
+`-every-entry`, `-arrival`, `-handles`, `-session-to-browser`,
+`-form-routes`, `-wide-parameters`, `-matched-resources`, `-trap-causes`,
+`-telling`, `-materialization-bodies`): their runs were cited and their
+evidence never fetched, before ADR-0281's merge flow fetched it. All
+nineteen were run again on `master` at `29cae71` (run 37933879838), every
+mutant killed, and recorded. `scripts/evidence_present.py` names any
+recipe whose evidence file is missing, and `master`'s CI fails on one
+(`scripts/tests/test_evidence_present.py`); a branch's new recipe is
+recorded at its merge.
+
+**2026-10-09, navigate merged (ADR-0280, below), and two more recipes
+recorded for the first time.** **Corrected:** ADR-0248's `just
+e14-map-keys` and ADR-0272's `just e14-stream-boot` were cited and never
+recorded on `master`; navigate's run records them (11 of 11, 3 of 3
+mutants). With the four found this morning, six recipes were claimed
+without their evidence; every recipe is audited for its file next.
+
 **ADR-0295, 2026-10-09: a page at another address of the page is moved
 there** (track `kiokun`'s need: `KiokunError.Moved`, declared and never
 returned). A page declares the error that means its address is another of
@@ -252,6 +275,22 @@ refused without the name's label too, for running where a secret decides it
 "cannot log a `Secret<Payments>` value", where without it the log is refused
 "where a `Secret<Payments>` value decides it". Two tests now log a `String`
 a helper read a secret into, and hold the diagnostic to the value.
+
+**ADR-0280, 2026-10-08: a handler navigates after its command commits**
+(the owner's brief, from a Next.js bug: a save, then a soft navigation to a
+page the Router Cache served from before it). `navigate Page(args)` names
+the page and types its parameters, and is written last in the `Ok` arm of
+a command's answer: an `Ok` is a commit, and the runtime refuses one that
+did not commit. From the navigation the page takes no press and no second
+navigation, and each press made before it is answered first, whichever
+answer comes first; then the page's address is loaded, read after the
+commit by the order of answers and reads, never from a cache. The store's
+"Place order" goes to the order's page, in three engines. Two premises of
+the brief as NEXT wrote it were wrong: a link's arguments are not checked,
+and no ruling carries a basis across a navigation, which here is a document
+load. Keeping the parts two pages share in place is the next ruling. Merged
+2026-10-09: 6 compiler tests, 10 browser tests, 19 of 19 mutants killed on
+CI (run 37911914095).
 
 **ADR-0277, 2026-10-08: a materialization is kept, and a page reads it**
 (ruling 10's last piece, second part). A materialization that derives its

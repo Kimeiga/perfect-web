@@ -5271,6 +5271,29 @@ e14-fmt-meaning:
      } > docs/evidence/E14/fmt-meaning.txt
     @grep -E "^test result|already formatted|need formatting|mutants killed|^---- |panicked at" docs/evidence/E14/fmt-meaning.txt
 
+# ADR-0280: a handler navigates after its command commits. The compiler's
+# tests, the store's order placed and gone to in three engines
+# (e2e/navigate.spec.mjs), and the mutation controls.
+e14-navigate:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0280 - a handler navigates after its command commits"; echo; \
+       echo "produced by: just e14-navigate"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/navigate.rs)"; echo; \
+       cargo test --locked -p pw-core --test navigate 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the order placed and gone to, in three engines (e2e/navigate.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/navigate.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/navigate_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/navigate_mutations.py; \
+     } > docs/evidence/E14/navigate.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/navigate.txt
+
 # ADR-0277: a materialization is kept, and a page reads it. The compiler's,
 # the materializer's and the server's tests, the store's chain in three
 # engines (e2e/materialized.spec.mjs), and the mutation controls.

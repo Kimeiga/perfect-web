@@ -2301,6 +2301,15 @@ direct messages, a conversation read from each side (track `messages`, W4).
   shown before the server answers and waiting by ADR-0275's rule; a third
   user, signed in or not, sees none of it, by page, `/pw-read`, cache and
   stream.
+[ADR-0280](DECISIONS/ADR-0280-a-handler-navigates-after-its-command-commits.md):
+a handler navigates after its command commits.
+- `navigate Page(args)`: the page by its declaration, its parameters typed
+  as a call's are (PW5042), last in the `Ok` arm of the command's answer
+  nearest it, in a handler (PW5043). The runtime refuses an `Ok` that did
+  not commit, takes no press and no second navigation once the page
+  leaves, answers each press made before it first, and loads the page's
+  address, each value one encoded segment: read after the commit, never
+  from a cache, with no cache-busting parameter and no reload.
 [ADR-0281](DECISIONS/ADR-0281-a-merge-is-held-to-ci-s-verification-run.md):
 a merge is held to CI's verification run.
 - A branch is merged when its tip's `ci` and `verify` runs are green,

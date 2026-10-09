@@ -1,0 +1,28 @@
+ADR-0271 - a reader is told once per burst, and served in turn
+
+produced by: just e14-telling
+commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== told once, in turn (spikes/own-renderer/server/src/main.rs)
+
+test tests::a_sessions_turns_are_served_in_the_order_asked ... ok
+test tests::a_post_reaches_every_open_timeline ... ok
+test tests::a_telling_that_panics_does_not_silence_the_reader ... ok
+test tests::a_burst_of_posts_tells_another_reader_once ... ok
+test tests::a_commit_while_a_reader_is_told_is_told_after_it ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 327 filtered out; finished in 18.59s
+
+== mutation controls (scripts/telling_mutations.py)
+
+baseline: 330 passed, 0 failed
+the commits a connection takes are told one by one: KILLED (2 of 330 tests fail)
+a commit that reaches a reader being told is dropped: KILLED (1 of 330 tests fail)
+a commit during a telling is not told after it: KILLED (1 of 330 tests fail)
+a telling ends without letting go of the reader: KILLED (1 of 330 tests fail)
+a telling that panics silences the reader: KILLED (1 of 330 tests fail)
+a session's hold is taken in no order: KILLED (1 of 330 tests fail)
+a turn that panics serves no one: KILLED (1 of 330 tests fail)
+7 of 7 mutants killed
+memory bound: no process was stopped

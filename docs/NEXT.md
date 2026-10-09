@@ -450,7 +450,20 @@ E14 comes before E11-E13. Its plan, controls and task list are
              browser's decision holds them to the same constants
              (`pw-resume-wasm`), so ADR-0132's checks of a document's schema
              and its privacy scope pass for any page, a private cart's
-             among them; and ~~**four soundness findings of 2026-10-03**~~
+             among them. **The build id is a constant too** (`BUILD`,
+             `"B1"`, read 2026-10-09), so the mixed-build check compares a
+             constant with itself; only the handler's identity is the
+             build's. ADR-0132 deferred both "until a page other than the
+             store's needs it", and the feed's and kiokun's pages do. The
+             integrator's, after the refusal and stream-records merges:
+             the build's id derived from what it built; `/pw-handlers`
+             answering it and each page's document schema, from the build
+             the runtime was served with (ADR-0132's rule: never from the
+             document); each document's manifest naming its own; the
+             decision refusing a document of another build or another
+             schema (codes 10 and 6), each with its recovery; the scope's
+             meaning ruled with it (a session document's scope, and what a
+             runtime knows of its session without reading its cookie); and ~~**four soundness findings of 2026-10-03**~~
              (ADR-0282, `just e14-held-labels`: one label for what a value
              holds; the session "Project
              readiness for kiokun.com rewrite", at `29ebcf9`; its message
@@ -521,9 +534,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
              moved in five seconds, and its streams wrote nothing for four.
              Not the server's new telling (arrival-clock has the old one),
              and not the earlier test's unanswered unfollow (arrival-clock
-             awaits it). Next: a failing feed test prints its pages' and the
-             server's records, a red baseline shows them, and the recipe runs
-             again alone until it is caught;
+             awaits it). **Found** (run 37925722922, a failing test's
+             printed records): the second reader's document was never told,
+             or told five seconds and 47 tellings after the follower's. A
+             commit told the other sessions one after another, every
+             session with a document reading what it dropped, among them
+             the documents of pages closed up to two minutes before
+             (`IDLE`), which the runtime never says it left. The fix is on
+             `track/stream-records` (ADR-YYYY there): only documents whose
+             pages asked in the last three seconds are derived, one passed by
+             is derived when its page asks, and the sessions are told at
+             once, eight at a time;
              ~~**`e14-graphs-on-the-wire` took CI's runner down**~~
              (ADR-0292) every time it ran there (the nightly of 2026-10-08,
              navigate's verify twice): the heartbeat (run 37902799186) named
@@ -634,21 +655,27 @@ E14 comes before E11-E13. Its plan, controls and task list are
              to someone who follows you or has messaged you, by X's rule;
              and a third user held to seeing none of it by page, by
              `/pw-read`, by cache and by stream; then, the integrator's,
-             **a handler navigates after its command commits** (the owner's
-             brief, 2026-10-08, from a Next.js bug: a save, then a soft
-             navigation to a page the Router Cache served from before the
-             save). `navigate Page(args)` in a handler's arm, a page by name
-             with its arguments checked, as a link is (PW5009); only after
-             the commit, never on a speculation or a refusal, whose `Err`
-             arm runs and whose speculation is taken back; the destination
-             read at that commit or later, its basis carried across the
-             navigation (ADR-0224's rule), with no cache-busting parameter
-             and no reload; a press while it is pending given one defined
-             order, tested both ways; the parts the pages share kept in
-             place; three engines with ADR-0268's wait, and mutation
-             controls for each (navigating before the commit, a
-             destination read before it, a press racing it, navigating on
-             a refusal). The ruling is researched and written when built;
+             ~~**a handler navigates after its command commits**~~
+             (ADR-0280, `just e14-navigate`; the owner's brief, 2026-10-08,
+             from a Next.js bug: a save, then a soft navigation to a page
+             the Router Cache served from before the save).
+             `navigate Page(args)`, last in the `Ok` arm of a command's
+             answer, the page by its declaration and its parameters typed
+             (PW5042, PW5043); after the commit, never on a refusal or an
+             `Ok` that did not commit; each press made before it answered
+             first, both ways, and none taken while the page leaves; the
+             page read after the commit by order, with no cache, no
+             cache-busting parameter and no reload. Two of this brief's
+             premises were the integrator's and wrong: a link's arguments
+             are not checked (PW5009 matches its text to a route), and
+             ADR-0224 carries no basis across a navigation, which here is a
+             document load. Next, **the parts the pages share kept in
+             place**: a soft navigation, the page fetched after the commit
+             and the current one changed into it, identical parts kept with
+             their focus and scroll, history pushed, the runtime moved to
+             the new document's subscription, and links as well as
+             `navigate`; on the History API, since the Firefox and WebKit
+             that Playwright 1.58 installs have no Navigation API;
           7. ~~**track `uploads`, W2**~~ (ADR-0260, `just e14-uploads`: an
              image on a post, a typed upload served safely). What it leaves,
              in order: ~~a deleted post's image no longer served, and its
@@ -671,16 +698,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
           scope. The integrator's, in order:
           1. **the parts two pages share kept in place**, ADR-0280's next:
              a soft navigation, which item 3's test needs;
-          2. **accounts in the store**: ADR-0258's identity and ADR-0270's
-             principal wired in, so the cart and the orders are a user's,
-             not only a session's; after W5's merge, whose tables they
-             change;
-          3. **delivery addresses**: entered and saved, a delivery zone
-             checked, estimates and availability keyed by the address
-             chosen. Accepted by the owner's own Next.js bug: save an
-             address, go to a store, and its page shows the new address's
-             estimate, with no cache-busting parameter, no reload and no
-             header mounted again, in three engines;
+          2. ~~**accounts in the store**~~ and 3. ~~**delivery
+             addresses**~~: **W8's since 2026-10-09** (the owner: DoorDash
+             faster, with a third worker; PARALLEL.md, "the DoorDash track"),
+             launched first in the next free slot after W5's merge, whose
+             tables they change. Accepted by the owner's own Next.js bug:
+             save an address, go to a store, and its page shows the new
+             address's estimate, with no cache-busting parameter, no reload
+             and, once item 1 lands, no header mounted again, in three
+             engines. The integrator's own items here (1, 4, 5, 6) come
+             before kiokun's and the infrastructure follow-ups (the owner,
+             2026-10-09);
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled;
           5. **idempotency committed with the writes** (PW0348, ADR-0246's

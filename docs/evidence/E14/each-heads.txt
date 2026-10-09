@@ -1,0 +1,47 @@
+ADR-0242 - an each head is read once, by the grammar
+
+produced by: just e14-each-heads
+commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the checker (compiler/pw-core/tests/each_heads.rs)
+
+test a_head_with_no_name_says_so ... ok
+test a_loops_key_is_refused_at_the_key ... ok
+test a_computed_list_needs_its_key_too ... ok
+test a_head_is_its_list_as_its_name_and_its_key ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+== the parser (compiler/pw-syntax/src/grammar.rs)
+
+test grammar::tests::an_each_head_is_its_list_its_name_and_its_key ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 91 filtered out; finished in 0.00s
+
+== the readers (every_name_resolves, lexical_scope, each_typing, marko_adapter, template_blocks, keyed, nested_lists)
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.75s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+
+== mutation controls (scripts/each_heads_mutations.py)
+
+baseline: 93 passed, 0 failed
+an each head is not read: KILLED (5 of 15 tests fail)
+an each head's errors are dropped: KILLED (2 of 15 tests fail)
+two words for a list leave the name unread: KILLED (2 of 15 tests fail)
+what stands before the key swallows it: KILLED (2 of 15 tests fail)
+a key is not read: KILLED (4 of 15 tests fail)
+a keyless list is not refused: KILLED (1 of 15 tests fail)
+a loop's key is refused at its block: KILLED (1 of 15 tests fail)
+a row's name is not a local binding: KILLED (1 of 93 tests fail)
+a row's name is not in lexical scope: KILLED (2 of 22 tests fail)
+the names check reads no head: KILLED (2 of 15 tests fail)
+Marko reads no head: KILLED (1 of 75 tests fail)
+the template IR reads no head: KILLED (2 of 47 tests fail)
+12 of 12 mutants killed
+memory bound: no process was stopped

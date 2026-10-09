@@ -1,0 +1,45 @@
+ADR-0269 - a resource is held by what takes it apart
+
+produced by: just e14-matched-resources
+commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== taken apart (compiler/pw-core/tests/matched_resources.rs, let_discard.rs)
+
+test a_discard_still_holds_its_annotation ... ok
+test a_discard_is_no_value_to_read ... ok
+test a_binding_from_branches_is_typed_by_them ... ok
+test a_resource_a_statement_drops_is_refused ... ok
+test a_resource_given_to_a_call_that_does_not_release_it_is_refused ... ok
+test a_resource_a_result_carries_is_held_with_a_question_mark ... ok
+test a_resource_kept_in_a_value_or_returned_by_a_function_value_is_refused ... ok
+test a_result_discarded_by_let_is_handled ... ok
+test a_resources_acquire_clause_holds_its_value ... ok
+test a_declaration_gives_its_caller_what_it_declares ... ok
+test an_affine_resource_discarded_is_refused_as_never_consumed ... ok
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.67s
+test a_carrying_binding_is_held_by_what_its_question_mark_takes_out ... ok
+test a_path_that_leaves_the_arm_before_ending_it_is_refused_where_it_leaves ... ok
+test a_carrying_binding_is_held_by_the_arm_that_takes_it_apart ... ok
+test an_option_is_taken_apart_as_a_result_is ... ok
+test an_acquisition_matched_where_it_is_made_is_held_by_its_arm ... ok
+test an_arm_that_drops_the_acquisition_is_refused_where_it_drops_it ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.27s
+
+== mutation controls (scripts/matched_resource_mutations.py)
+
+baseline: 17 passed, 0 failed
+a name an arm or a `?` binds does not hold what it carries: KILLED (2 of 17 tests fail)
+a match on the acquisition drops it, as before: KILLED (5 of 17 tests fail)
+an arm no carrying case reaches owes its release: KILLED (5 of 17 tests fail)
+a `?`'s failure owes its release: KILLED (1 of 17 tests fail)
+`Ok(_)` holds it: KILLED (4 of 17 tests fail)
+a `_` that meets a carrying case holds nothing: KILLED (1 of 17 tests fail)
+an arm after the carrying case is taken whole still meets it: KILLED (1 of 17 tests fail)
+a name that holds it whole holds nothing: KILLED (1 of 17 tests fail)
+`let h = r?` does not hold it: KILLED (1 of 17 tests fail)
+a binding's arm that drops it is not refused: KILLED (1 of 17 tests fail)
+`Some` is no carrying case: KILLED (1 of 17 tests fail)
+11 of 11 mutants killed
+memory bound: no process was stopped

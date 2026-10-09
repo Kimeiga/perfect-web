@@ -1,0 +1,49 @@
+ADR-0280 - a handler navigates after its command commits
+
+produced by: just e14-navigate
+commit: 661c8a0b2294e82f23e01740a66e760d88114966
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37911914095 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the compiler (compiler/pw-core/tests/navigate.rs)
+
+test a_navigation_outside_a_handler_is_refused ... ok
+test a_page_with_no_parameters_is_given_none ... ok
+test a_navigation_names_a_page ... ok
+test its_arguments_are_the_pages_parameters ... ok
+test the_module_goes_to_the_page_after_the_answer_and_only_on_ok ... ok
+test it_is_written_last_in_the_ok_arm_of_a_commands_answer ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+== the order placed and gone to, in three engines (e2e/navigate.spec.mjs)
+
+  2 skipped
+  28 passed (1.5m)
+
+== mutation controls (scripts/navigate_mutations.py)
+
+baseline (compiler): 6 passed, 0 failed
+baseline (browser): 10 passed, 0 failed
+a navigation names whatever it names [compiler]: KILLED (1 of 6 tests fail)
+its arguments are related to nothing [compiler]: KILLED (1 of 6 tests fail)
+its page is looked for among the terms [compiler]: KILLED (1 of 6 tests fail)
+a refusal's arm navigates [compiler]: KILLED (1 of 6 tests fail)
+what follows a navigation runs [compiler]: KILLED (1 of 6 tests fail)
+a handler navigates with no answer [compiler]: KILLED (1 of 6 tests fail)
+an answer a `let` binds is no answer [compiler]: KILLED (1 of 6 tests fail)
+a value is given by no name [compiler]: KILLED (1 of 6 tests fail)
+an answer is assumed before it comes [browser]: KILLED (6 of 10 tests fail)
+an `Ok` that did not commit is a commit [browser]: KILLED (1 of 10 tests fail)
+a press made while the page leaves is taken [browser]: KILLED (1 of 10 tests fail)
+a second navigation is taken [browser]: KILLED (1 of 10 tests fail)
+a navigation goes before the presses made before it [browser]: KILLED (1 of 10 tests fail)
+a press is not counted while it runs [browser]: KILLED (1 of 10 tests fail)
+a press never finishes [browser]: KILLED (2 of 10 tests fail)
+a stopped navigation leaves the page leaving [browser]: KILLED (1 of 10 tests fail)
+a page shown again stays leaving [browser]: KILLED (1 of 10 tests fail)
+an address carries a value as written [browser]: KILLED (1 of 10 tests fail)
+an address carries what no segment can [browser]: KILLED (1 of 10 tests fail)
+19 of 19 mutants killed
+memory bound: no process was stopped
