@@ -197,8 +197,9 @@ const HOSTS = process.env.PW_PERFORMANCE
 // environment says: Playwright gives a server the caller's environment with
 // its own `env` over it, and a `PW_FEED_DATABASE_URL` left there put every
 // engine's feed host on one database, and each run's posts on the last's.
-// A suite on PostgreSQL is the server's tests' (`e14-feed-postgres`).
-const IN_MEMORY = { PW_FEED_DATABASE_URL: "" };
+// A suite on PostgreSQL is the server's tests' (`e14-feed-postgres`). The
+// store's hosts likewise (track `store-pg`, `e14-store-postgres`).
+const IN_MEMORY = { PW_FEED_DATABASE_URL: "", PW_STORE_DATABASE_URL: "" };
 
 export default defineConfig({
   testDir: "./e2e",
