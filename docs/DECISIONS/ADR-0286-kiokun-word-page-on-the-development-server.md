@@ -1,13 +1,15 @@
-# ADR-XXXX: kiokun's word page, a third program on the development server
+# ADR-0286: kiokun's word page, a third program on the development server
 
-Status: proposed by track `kiokun` (W6, `track/kiokun`), the first
+Status: accepted at its merge, 2026-10-09, under the owner's delegation of
+2026-10-02; proposed by track `kiokun` (W6, `track/kiokun`), the first
 milestone of step 1 in the integrator's order (docs/PARALLEL.md, "W6's
-inventory, answered"). Date: 2026-10-09. Milestone: E14, the owner's
+inventory, answered"), and reviewed (docs/PARALLEL.md, "W6's word page
+(milestone 1a), reviewed"). Date: 2026-10-09. Milestone: E14, the owner's
 production target.
 
 ## Context
 
-- **The order.** The parity inventory (ADR-XXXX, kiokun's parity inventory)
+- **The order.** The parity inventory (ADR-0285, kiokun's parity inventory)
   was answered on 2026-10-08. Step 1 is the word page from the entry. Every
   page is rendered by the server and works with script off (Q1). kiokun is
   a third program on the development server, beside the store and the feed,
@@ -208,11 +210,14 @@ Its review of 2026-10-09, relayed by message:
 
 1. **A host call through a helper**: the contract is wrong and the build is
    right. A component's imports are what its compiled code calls, the
-   export's body and every Pleris function it reaches, transitively. The
-   integrator fixes `host_calls`; the reads may then move into a helper.
-2. **The empty seed**: the checker's acceptance stands (ADR-0065 §2); the
-   backend is to give the seed the checker's type for the fold where its
-   context expects none. Until then `let none: List<T> = []` stays.
+   export's body and every Pleris function it reaches, transitively.
+   ADR-0283, the integrator's; the reads may then move into a helper.
+2. **The empty seed**: ADR-0284, the integrator's. **Corrected at the
+   merge**: the answer first relayed, that the checker's acceptance stood
+   (ADR-0065 §2), was wrong. The checker bound the accumulator to a list of
+   anything whole, so the function fixed nothing, and it passed ill-typed
+   folds. Now the function fixes it, and the backend gives the seed the
+   fold's solved type. Until then `let none: List<T> = []` stays.
 3. **Ports**: 7341 is the track's, 200 from W5's 7141.
 4. **kiokun.com's label table**: not reproduced (Differences, 4).
 5. **Fixed before the merge**: a word too long to be a file name (Found 4).

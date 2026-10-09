@@ -21,7 +21,7 @@ and git is asked only for the commit and the files changed, without
 taking its optional locks.
 
 usage: kiokun_inventory.py ADR APP_DIR
-  ADR      the inventory, docs/DECISIONS/ADR-XXXX-kiokun-parity-inventory.md
+  ADR      the inventory, docs/DECISIONS/ADR-0285-kiokun-parity-inventory.md
   APP_DIR  the checkout's sveltekit-app
 """
 

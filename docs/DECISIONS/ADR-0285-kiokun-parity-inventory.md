@@ -1,6 +1,7 @@
-# ADR-XXXX: kiokun.com's parity inventory, every route marked
+# ADR-0285: kiokun.com's parity inventory, every route marked
 
-Status: proposed by track `kiokun` (W6, `track/kiokun`), under the
+Status: accepted at its merge, 2026-10-09, under the owner's delegation of
+2026-10-02; proposed by track `kiokun` (W6, `track/kiokun`), under the
 integrator's rulings of 2026-10-08 (docs/PARALLEL.md, "kiokun.com in Pleris
 (W6's plan)"). The track's first ADR. The integrator orders the gaps from
 it. Date: 2026-10-08. Milestone: E14, the owner's production target.

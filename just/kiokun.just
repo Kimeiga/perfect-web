@@ -21,7 +21,7 @@ e14-kiokun-inventory:
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
        echo "python: $(python3 --version)"; echo; \
        echo "== the inventory against the app (scripts/kiokun_inventory.py)"; echo; \
-       python3 scripts/kiokun_inventory.py docs/DECISIONS/ADR-XXXX-kiokun-parity-inventory.md "$KIOKUN_DATA/../sveltekit-app"; \
+       python3 scripts/kiokun_inventory.py docs/DECISIONS/ADR-0285-kiokun-parity-inventory.md "$KIOKUN_DATA/../sveltekit-app"; \
        echo; echo "== mutation controls (scripts/kiokun_inventory_mutations.py)"; echo; \
        python3 scripts/kiokun_inventory_mutations.py; \
      } > docs/evidence/E14/kiokun-inventory.txt
