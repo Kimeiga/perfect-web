@@ -305,7 +305,7 @@ And this track's own:
 - Locally, PostgreSQL 18.6: the suite 327 of 327 in memory and 327 of 327
   with the store on PostgreSQL (after the rebase onto kiokun's merge);
   `tests::store_pg::` 12 of 12; `store_postgres_mutations.py` 12 of 12
-  killed (recorded at `8522ef7`, `docs/evidence/E14/store-postgres.txt`).
+  killed (recorded at `b3c636d`, `docs/evidence/E14/store-postgres.txt`).
 - On CI: run 37878636733 at `85d90ed`, `e14-store-postgres` passed in its
   own PostgreSQL shard in 1754 s; `ci` run 37881251823 at `ada2688` green.
   `browser webkit` failed in both of this track's verify runs on
