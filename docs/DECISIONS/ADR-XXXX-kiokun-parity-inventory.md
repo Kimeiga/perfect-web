@@ -474,3 +474,35 @@ signed-in user's data.
 10. **A small correction.** The rulings cite "charter §13.5's split" for
     local-only work; §13.5 is "macOS-specific concerns". The recipe's
     comment cites the ruling instead.
+
+## The integrator's answers
+
+Ruled 2026-10-08 (docs/PARALLEL.md, "W6's inventory, answered", master
+`4e015f9`). The order above is accepted.
+
+1. **Rendering**: yes. Every page is rendered by the server and works with
+   scripts off; script only where a feature needs it. Parity is by content
+   and behaviour; `ssr = false` is a difference stated, not matched.
+2. **The host**: the development server, kiokun a third program beside the
+   store and the feed (ADR-0218), with a read-only kiokun data layer. The
+   slice's host stays as ADR-0037's and ADR-0041's evidence until the
+   rewrite supersedes it.
+3. **The app's own data**: read-only through `KIOKUN_APP`, the checkout's
+   `sveltekit-app`. Nothing is copied here, nothing written there. The
+   course modules are converted at build time into a local cache git
+   ignores, by a converter committed here: the repository is public, and
+   the owner's content stays out of it.
+4. **The search index**: the builder's current CSV loaded into a declared
+   search source, its guarantees stated as ADR-0207 states a source's.
+5. **The clone**: yes, in the track's scratchpad, with what is installed,
+   no credentials, no `.env`, reaching no production service; only pages
+   that need none are measured.
+6. **Browser capabilities**: each ruled when step 5 reaches it.
+7. **Outside services**: no capability yet; each service and its keys are
+   the owner's, asked when step 6 reaches them.
+8. **The slice's extras**: parity matches kiokun.com's page. The extras are
+   hidden until the owner rules, asked with the word page's first review.
+9. **The security findings** went to the owner from the integrator's
+   session.
+10. **The citation** is ADR-0281's fifth decision; KNOWN_LIMITATIONS' pitch
+    line is corrected.

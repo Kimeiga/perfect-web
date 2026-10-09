@@ -51,9 +51,10 @@ LOCAL_ONLY = {
     "e10-close-bench",
     "e10-load",
     "e10-memory",
-    # The kiokun track's (docs/PARALLEL.md, W6's plan): it reads the owner's
-    # kiokun-data checkout, which no runner has. What needs the owner's
-    # local data is recorded here; what a committed sample shows runs on CI.
+    # The kiokun track's (docs/PARALLEL.md, W6's plan; ADR-0281's fifth
+    # decision): it reads the owner's kiokun-data checkout, which no runner
+    # has. What needs the owner's local data is recorded here; what a
+    # committed sample shows runs on CI.
     "e14-kiokun-inventory",
 }
 
