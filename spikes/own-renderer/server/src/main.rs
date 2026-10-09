@@ -130,6 +130,15 @@ struct Subscriber {
 /// How many notes a document's trail keeps.
 const TRAIL: usize = 400;
 
+/// **A session, as a record names it**: a hash of its id, which is its
+/// cookie and never written where another session can read it.
+fn masked(session: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    session.hash(&mut hasher);
+    format!("s{:08x}", hasher.finish() as u32)
+}
+
 /// **Milliseconds since this server started**, the clock its records read.
 fn uptime_ms() -> u128 {
     static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
@@ -726,6 +735,12 @@ struct Server {
     /// that render or derive while they hold it: what a failing browser test
     /// attaches beside a document's trail (`/bench/records`).
     slow: Mutex<std::collections::VecDeque<String>>,
+    /// **What each telling did, the latest 300 notes** (ADR-XXXX): what a
+    /// commit queued for other sessions, whom each drain chose, and how each
+    /// telling of a session went. Sessions by a hash of their id, which is a
+    /// cookie (`masked`). "a follow reaches another reader" failed on CI
+    /// with its second reader never told, and nothing said why.
+    tellings: Mutex<std::collections::VecDeque<String>>,
     /// **What each document shows** (ADR-0145, ADR-0161), as it was served
     /// and then patched: what a change is derived against. Locked after
     /// `pending` and `keyed`, never before. Each value is replaced whole, so
@@ -1362,6 +1377,7 @@ impl Server {
             artifacts,
             pending: Mutex::new(BTreeMap::new()),
             slow: Mutex::new(std::collections::VecDeque::new()),
+            tellings: Mutex::new(std::collections::VecDeque::new()),
             shown: Mutex::new(BTreeMap::new()),
             documents: std::sync::atomic::AtomicU64::new(1),
             params: Mutex::new(BTreeMap::new()),
@@ -1673,10 +1689,19 @@ impl Server {
         // the author is answered (ADR-0219), so a post's answer does not
         // wait on every reader.
         if !dropped.is_empty() {
+            self.telling_note(format_args!(
+                "{} committed {component_id}: queued for others {dropped:?}",
+                masked(session)
+            ));
             self.telling
                 .lock()
                 .expect("telling")
                 .push((session.to_string(), dropped));
+        } else {
+            self.telling_note(format_args!(
+                "{} ran {component_id}: dropped nothing another session holds",
+                masked(session)
+            ));
         }
         Ok(answered)
     }
@@ -2557,6 +2582,14 @@ impl Server {
             .iter()
             .flat_map(|(session, reached)| self.others_reading(session, reached))
             .collect();
+        if !waiting.is_empty() {
+            self.telling_note(format_args!(
+                "took {} queued, from {:?}: telling {:?}",
+                waiting.len(),
+                waiting.iter().map(|(s, _)| masked(s)).collect::<Vec<_>>(),
+                others.iter().map(|s| masked(s)).collect::<Vec<_>>()
+            ));
+        }
         for other in others {
             self.tell(&other);
         }
@@ -2576,10 +2609,15 @@ impl Server {
             let mut told = self.told.lock().expect("told");
             if let Some(again) = told.get_mut(other) {
                 *again = true;
+                self.telling_note(format_args!(
+                    "{}: a telling runs; one more after it",
+                    masked(other)
+                ));
                 return;
             }
             told.insert(other.to_string(), false);
         }
+        self.telling_note(format_args!("{}: telling", masked(other)));
         // A telling that panics must not silence the session for good: the
         // next commit finds it not being told. One that ends lets go of it
         // where it sees no commit came, in the same hold, so none is lost
@@ -2624,6 +2662,8 @@ impl Server {
                 _ => {
                     told.remove(other);
                     unwound.ended = true;
+                    drop(told);
+                    self.telling_note(format_args!("{}: told", masked(other)));
                     break;
                 }
             }
@@ -3796,6 +3836,15 @@ impl Server {
         if let Some(hook) = hook {
             hook(self, doc);
         }
+    }
+
+    /// A note on [`Server::tellings`], the oldest let go past 300.
+    fn telling_note(&self, what: std::fmt::Arguments<'_>) {
+        let mut tellings = self.tellings.lock().expect("tellings");
+        if tellings.len() >= 300 {
+            tellings.pop_front();
+        }
+        tellings.push_back(format!("{} ms {what}", uptime_ms()));
     }
 
     /// A hold of the table at `site`, from now, timed ([`Held`]).
@@ -6433,11 +6482,20 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .map(|w| w.trail.iter().cloned().collect())
                 .unwrap_or_default();
             let slow: Vec<String> = server.slow.lock().expect("slow").iter().cloned().collect();
+            let tellings: Vec<String> = server
+                .tellings
+                .lock()
+                .expect("tellings")
+                .iter()
+                .cloned()
+                .collect();
             let body = serde_json::json!({
                 "at": uptime_ms() as u64,
                 "doc": document,
+                "you": masked(&session),
                 "trail": trail,
                 "slow": slow,
+                "tellings": tellings,
             });
             respond_json(&mut stream, 200, &session, fresh, &body.to_string());
         }
@@ -11291,7 +11349,12 @@ public query Store(",
             .cloned()
             .collect::<Vec<_>>()
             .join("\n");
-        for said in ["subscribed at", "told at", "pushed a change as", "pushed a patch set as"] {
+        for said in [
+            "subscribed at",
+            "told at",
+            "pushed a change as",
+            "pushed a patch set as",
+        ] {
             assert!(trail.contains(said), "{said}: {trail}");
         }
         // Over HTTP: the session's own document's, and no other's.
@@ -11319,7 +11382,11 @@ public query Store(",
                 answer
             })
         };
-        assert!(asked("b").contains("pushed a patch set as"), "{}", asked("b"));
+        assert!(
+            asked("b").contains("pushed a patch set as"),
+            "{}",
+            asked("b")
+        );
         assert!(!asked("a").contains("pushed"), "{}", asked("a"));
     }
 

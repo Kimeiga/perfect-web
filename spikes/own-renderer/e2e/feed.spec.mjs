@@ -137,6 +137,8 @@ async function record(page, testInfo, name = "") {
       reconnects: said.reconnects,
       trail: latest(said.server?.trail, 80),
       slow: latest(said.server?.slow, 20),
+      you: said.server?.you,
+      tellings: latest(said.server?.tellings, 60),
       at: said.server?.at,
     })}`,
   );
