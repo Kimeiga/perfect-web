@@ -521,9 +521,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
              moved in five seconds, and its streams wrote nothing for four.
              Not the server's new telling (arrival-clock has the old one),
              and not the earlier test's unanswered unfollow (arrival-clock
-             awaits it). Next: a failing feed test prints its pages' and the
-             server's records, a red baseline shows them, and the recipe runs
-             again alone until it is caught;
+             awaits it). **Found** (run 37925722922, a failing test's
+             printed records): the second reader's document was never told,
+             or told five seconds and 47 tellings after the follower's. A
+             commit told the other sessions one after another, every
+             session with a document reading what it dropped, among them
+             the documents of pages closed up to two minutes before
+             (`IDLE`), which the runtime never says it left. The fix is on
+             `track/stream-records` (ADR-YYYY there): only documents whose
+             pages asked in the last three seconds are derived, one passed by
+             is derived when its page asks, and the sessions are told at
+             once, eight at a time;
              ~~**`e14-graphs-on-the-wire` took CI's runner down**~~
              (ADR-0292) every time it ran there (the nightly of 2026-10-08,
              navigate's verify twice): the heartbeat (run 37902799186) named
