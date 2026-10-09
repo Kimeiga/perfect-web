@@ -2368,3 +2368,38 @@ W6).
   target found), each named for the function it is read from; the header's
   written forms, each with its roles, language, label and meaning, the
   component glosses read from `KIOKUN_APP`.
+[ADR-0290](DECISIONS/ADR-0290-a-verification-run-is-dealt-by-the-seconds-its-recipes-last-took.md):
+a verification run is dealt by the seconds its recipes last took (amends
+ADR-0249 and ADR-0278).
+- A recipe's cost is the seconds it last took to its end on CI, kept in
+  `scripts/ci_seconds.json` by every evidence fetch (`--times-only` from any
+  completed run); one not yet measured costs its mutants at the measured
+  median. Each recipe, the longest first, goes to the shard where it ends
+  soonest, what it adds to that shard's setup counted; one that needs less
+  may run where more is set up. The recipes run against a database keep
+  shards of their own, as many as end the run soonest.
+[ADR-0291](DECISIONS/ADR-0291-a-hosts-record-is-written-as-the-program-names-its-fields.md):
+a host's record is written as the program names its fields (extends
+ADR-0172 to the host).
+- A host's record is read field by field by the WIT name, or else by the
+  program's (`-` read as `_`); a field under neither is refused, naming
+  both. W6's finding: kiokun's layer wrote `chinese_char`, as the program
+  names it, and the query trapped.
+[ADR-0292](DECISIONS/ADR-0292-a-mutation-scripts-processes-are-bounded-in-memory.md):
+a mutation script's processes are bounded in memory.
+- Every process a mutation script starts, and theirs, holds at most 4 GiB
+  (a quarter of the machine's memory where less), watched from
+  `mutation_baseline`; one past it is stopped and said before the mutant's
+  verdict. A kill by the bound is a kind of its own: each script's last line
+  says whether any mutant's run had a process stopped, and the run's summary
+  lists those apart. Only the script's own processes are read, and one is
+  stopped only where two readings agree it is the script's.
+[ADR-0293](DECISIONS/ADR-0293-kiokun-page-head-held-to-kiokuns-own-code.md):
+kiokun's page head, held to kiokun.com's own code (track `kiokun`, W6).
+- The word page describes itself as kiokun.com's does, its title and
+  description made in Pleris by kiokun.com's rules and cut as JavaScript
+  cuts, never inside a surrogate pair. kiokun.com's own `seo.ts`, copied
+  from the owner's checkout into a temporary directory each run, is the
+  oracle: 5,513 sampled words, every title and description the same; CI
+  holds a fixture of its answers. A sample of the whole dictionary, served
+  and timed, found the renderer quadratic in a list's length.

@@ -214,25 +214,99 @@ test("a reorder moves the nodes rather than rebuilding them", async ({ page }) =
   ).toEqual(["mark-0", "mark-2", "mark-1"]);
 });
 
-test("a move to where an instance already is moves nothing", async ({ page }) => {
-  // Its anchor is its own first node. Until 2026-10-03 `moveBefore` put the
-  // instance's nodes before its own start, the list's anchors no longer
-  // nested, and the next patch to it was refused (ADR-0168).
-  await ready(page);
-  await command(page, "op=move&id=cortado&after=espresso");
-  await command(page, "op=move&id=espresso");
-  await command(page, "op=rename&id=cortado&name=Gibraltar");
-  const rows = await settled(page, ["Espresso", "Gibraltar", "Cold Brew"]);
-  expect(rows.map((r) => r.identity)).toEqual(["mark-0", "mark-1", "mark-2"]);
-  expect(await page.evaluate(() => window.__pw.refused ?? 0)).toBe(0);
-});
-
 test("a move to the front is a move, not a recreation", async ({ page }) => {
   await ready(page);
   await command(page, "op=move&id=cold-brew");
 
   const rows = await settled(page, ["Cold Brew", "Espresso", "Cortado"]);
   expect(rows.map((r) => r.identity)).toEqual(["mark-2", "mark-0", "mark-1"]);
+});
+
+test("a move to where an instance already is moves nothing", async ({ page }) => {
+  // ADR-0168's guard: an instance already at its anchor is left where it is.
+  // Moved anyway, `moveBefore` put its nodes before its own start, and the
+  // list's anchors no longer nested. No server of this repository sends such
+  // a move since it derives a list's patches as their difference
+  // (2026-10-04), so the press that once reached the guard sends none, and
+  // nothing tested it (found by W5, 2026-10-09). The protocol allows the move,
+  // so the runtime is given one: the real move of Cold Brew to the front,
+  // delivered again once it is there, at the next version.
+  let replay = null;
+  let move = null;
+  let armed = false;
+  await page.route("**/stream*", async (route) => {
+    const response = await route.fetch();
+    let body = await response.text();
+    try {
+      const batch = JSON.parse(body);
+      for (const f of batch.frames ?? []) {
+        if (armed && !move && JSON.stringify(f).includes('"op":"move_instance"')) move = f;
+      }
+      if (replay) {
+        batch.frames = [...(batch.frames ?? []), replay];
+        replay = null;
+        body = JSON.stringify(batch);
+      }
+    } catch {
+      /* an empty poll */
+    }
+    await route.fulfill({ response, body });
+  });
+  // The long poll, whose batches a test can read and add to; a held stream
+  // has no body to read until it closes (protocol-boundary.spec.mjs).
+  await page.goto("/StorePage.html?transport=poll");
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady);
+  await restore(page);
+  await mark(page);
+  // Only this test's own move: putting the list back may move items too, and
+  // a frame of the document `restore` reloaded is older than this one's
+  // (on CI, the restore's moves at version 252, replayed into a page at 267,
+  // were ignored as stale).
+  armed = true;
+  await command(page, "op=move&id=cold-brew");
+  await settled(page, ["Cold Brew", "Espresso", "Cortado"]);
+  await expect.poll(() => move !== null, { timeout: 15000 }).toBe(true);
+
+  // The same move, one version on, every basis it carries advanced.
+  const again = JSON.parse(JSON.stringify(move));
+  const advance = (basis) => basis?.resources?.forEach((r) => (r.version += 1));
+  advance(again.basis);
+  (again.patches ?? []).forEach((p) => advance(p.basis));
+  const before = await page.evaluate(() => {
+    window.__pw.moveKind = null;
+    return {
+      log: window.__pw.log.length,
+      ignored: window.__pw.ignored ?? 0,
+      refused: window.__pw.refused ?? 0,
+    };
+  });
+  replay = again;
+  const version = again.basis.resources[0].version;
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (v) => window.__pw.log.some((l) => l.startsWith("move_instance") && l.endsWith(` at version ${v}`)),
+          version,
+        ),
+      { timeout: 15000 },
+    )
+    .toBe(true);
+
+  const after = await page.evaluate(() => ({
+    moved: window.__pw.moveKind,
+    ignored: window.__pw.ignored ?? 0,
+    refused: window.__pw.refused ?? 0,
+  }));
+  expect(after, "applied, and nothing moved").toEqual({
+    moved: null,
+    ignored: before.ignored,
+    refused: before.refused,
+  });
+  const rows = await shown(page);
+  expect(rows.map((r) => r.name)).toEqual(["Cold Brew", "Espresso", "Cortado"]);
+  expect(rows.map((r) => r.identity)).toEqual(["mark-2", "mark-0", "mark-1"]);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
 test("a moved instance keeps focus", async ({ page }) => {

@@ -25,7 +25,7 @@
 // carries the rewrite's text and the difference's name, and the harness
 // counts it. Any other difference fails the comparison.
 // - `surrogate-pair cut`: JavaScript's `slice` can cut a code point past
-//   U+FFFF in half; the rewrite stops before it (ADR-XXXX, the page head,
+//   U+FFFF in half; the rewrite stops before it (ADR-0293, the page head,
 //   Differences 14).
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

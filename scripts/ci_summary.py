@@ -5,6 +5,10 @@ mutant that survived. Writes a table to `$GITHUB_STEP_SUMMARY` where that is
 set, and exits 1 if any recipe failed, any mutant survived, or a shard left
 no results.
 
+It lists apart each recipe whose mutation script's memory bound stopped a
+process (`mutation_bound.py`): a mutant whose run that was is killed, but
+perhaps by the bound alone, not by a test. The list fails nothing.
+
     python3 scripts/ci_summary.py <artifacts-dir> --shards N
 """
 
@@ -16,6 +20,10 @@ import sys
 
 # What a recipe's evidence says when a mutation control did not hold.
 SURVIVED = ("SURVIVED", "ANCHOR NOT FOUND")
+
+# A mutation script's last line, where its memory bound stopped a process.
+BOUND = "memory bound: "
+UNTOUCHED = "memory bound: no process was stopped"
 
 
 def shards_of(root: pathlib.Path) -> list[pathlib.Path]:
@@ -36,7 +44,7 @@ def main() -> int:
     parser.add_argument("--shards", type=int, required=True)
     args = parser.parse_args()
     root = pathlib.Path(args.artifacts)
-    rows, failed = [], []
+    rows, failed, bound = [], [], []
     shards = shards_of(root)
     if len(shards) != args.shards:
         failed.append(f"{args.shards} shards planned, {len(shards)} reported")
@@ -46,6 +54,11 @@ def main() -> int:
             for path in r["wrote"]:
                 text = (shard / "evidence" / path).read_text(errors="replace")
                 survived += [line.strip() for line in text.splitlines() if any(s in line for s in SURVIVED)]
+                bound += [
+                    f"{r['recipe']}: {line[len(BOUND):]}"
+                    for line in text.splitlines()
+                    if line.startswith(BOUND) and line != UNTOUCHED
+                ]
             ok = r["status"] == 0 and not survived
             rows.append((r["recipe"], "ok" if ok else "FAILED", r["seconds"], len(r["wrote"])))
             if not ok:
@@ -55,7 +68,11 @@ def main() -> int:
     table = ["| recipe | result | seconds | files |", "|---|---|---|---|"]
     table += [f"| `{n}` | {res} | {s} | {f} |" for n, res, s, f in rows]
     head = f"**{len(rows)} recipes, {len(failed)} failed**\n\n"
-    body = head + "\n".join(f"- {f}" for f in failed) + ("\n\n" if failed else "") + "\n".join(table) + "\n"
+    body = head + "\n".join(f"- {f}" for f in failed) + ("\n\n" if failed else "")
+    if bound:
+        body += "Killed, perhaps by the memory bound alone, not by a test:\n\n"
+        body += "\n".join(f"- {b}" for b in bound) + "\n\n"
+    body += "\n".join(table) + "\n"
     print(body)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:

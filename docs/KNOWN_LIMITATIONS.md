@@ -606,10 +606,11 @@ awaited in order. What remains:
   (ADR-0287): `post_paint` and `frame` run in the browser too, but only a
   handler's work is held where it runs. No program places a page with frame
   phases anywhere but the browser.
-- **kiokun's word page is its words sections** (ADR-0286): Japanese labels
-  are shown as JMdict's codes until the label table is read; the character
-  header, examples, pitch, mnemonics, components, contains and appears in,
-  the canonical redirect, variant merge, related forms and the SEO head are
+- **kiokun's word page is its words, its labels, its character header and
+  its written forms** (ADR-0286, ADR-0288, ADR-0289): examples, pitch, the
+  mnemonic's text and components, contains and appears in (waiting on a
+  list's render time), the canonical redirect (`KiokunError.Moved` is
+  declared and not returned until a page can answer it) and the SEO head are
   still to come; the route is `/word/{word}` until `/_pw/` lands; the tests
   run on the repository's sample, and no page was rendered beside
   kiokun.com's yet.

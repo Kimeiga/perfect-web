@@ -1,6 +1,7 @@
-# ADR-XXXX: kiokun's page head, held to kiokun.com's own code
+# ADR-0293: kiokun's page head, held to kiokun.com's own code
 
-Status: proposed by track `kiokun` (W6, `track/kiokun`), the word page's SEO
+Status: accepted at its merge, 2026-10-09, under the owner's delegation of
+2026-10-02; proposed by track `kiokun` (W6, `track/kiokun`), the word page's SEO
 head (step 1, milestone 1e in the integrator's order of 2026-10-09). It also
 records the sampled whole-dictionary timing run the integrator ordered
 first. Builds on ADR-0286 and the two milestones after it (ADR-0288,
@@ -170,3 +171,12 @@ Added to ADR-0286's list:
    value the host serializes into the head's `application/ld+json`, escaped
    as ADR-0097 escapes embedded data? kiokun.com's is one fixed shape a
    page.
+
+Answered by the integrator before the merge (docs/PARALLEL.md, "1e's
+questions answered"): **a canonical link is a page address**, written at
+the top of a page's view and checked as `navigate`'s is (ADR-0280), which
+the host writes absolute with the deployment's configured public origin,
+never the request's `Host`; `og:url` is the host's, from it. **JSON-LD is
+typed as JSON**, a std `Json` the host serializes and escapes (ADR-0097),
+any other `<script>` still refused. Both are the integrator's to build,
+the canonical first; differences 10, 12 and 13 stand until they land.

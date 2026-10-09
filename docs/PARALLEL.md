@@ -649,3 +649,10 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - **In order**: the app with its tests in three engines and its recipe;
     the official Cypress suite, unchanged, as its acceptance; then the
     showcase, W7's second milestone (NEXT).
+- **2026-10-09, W6's 1e merged** as ADR-0293 (kiokun's page head, held to
+  kiokun.com's own code), from `4df071b`: verify 37911011082, its one recipe
+  shard passed, 53 of 53 mutants killed; it failed only in WebKit's known
+  "Load more" flake. W6's 1d (the Japanese examples and pitch accent),
+  held until this merge, may go to CI. Its questions were answered before
+  the merge (above); the canonical link and std `Json` are the
+  integrator's.

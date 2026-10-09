@@ -1,7 +1,8 @@
 ADR-0139 - a frame is forgotten when the page says it applied it
 
 produced by: just e14-stream-ack
-commit: cd260db72bbdf619b705f36c997afd7818b5848d
+commit: eacb6f7a95a4296c8180818b02239750b4fa6440
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37909629152 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the server (spikes/own-renderer/server)
@@ -10,34 +11,35 @@ test tests::a_page_with_nothing_streamed_is_one_response_of_known_length ... ok
 test tests::a_streamed_region_follows_its_document_in_the_same_response ... ok
 test tests::a_frame_a_stream_wrote_to_a_dropped_connection_still_reaches_its_page ... ok
 test tests::a_stream_drops_what_its_page_says_it_applied ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 66 filtered out; finished in 2.70s
+test tests::the_feeds_page_opening_its_stream_is_not_told_to_reload ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 8.83s
 
 == mutation controls (scripts/stream_ack_mutations.py)
 
-baseline: 4 passed, 0 failed
-the stream acknowledges what it wrote: KILLED (1 of 4 tests fail)
-the stream does not acknowledge what the page sent: KILLED (1 of 4 tests fail)
+baseline: 5 passed, 0 failed
+the stream acknowledges what it wrote: KILLED (1 of 5 tests fail)
+the stream does not acknowledge what the page sent: KILLED (1 of 5 tests fail)
 2 of 2 mutants killed
 
 == the keyed-list suite, twenty runs
 
-  42 passed (22.0s) 
-  42 passed (16.3s) 
-  42 passed (19.2s) 
-  42 passed (14.5s) 
-  42 passed (17.0s) 
-  42 passed (14.6s) 
-  42 passed (19.1s) 
-  42 passed (14.6s) 
-  42 passed (14.6s) 
-  42 passed (14.5s) 
-  42 passed (14.7s) 
-  42 passed (14.5s) 
-  42 passed (14.5s) 
-  42 passed (14.6s) 
-  42 passed (14.6s) 
-  42 passed (14.5s) 
-  42 passed (14.5s) 
-  42 passed (18.8s) 
-  42 passed (14.6s) 
-  42 passed (14.6s) 
+  48 passed (2.7m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
+  48 passed (2.6m) 
