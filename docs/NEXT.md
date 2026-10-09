@@ -653,8 +653,43 @@ E14 comes before E11-E13. Its plan, controls and task list are
             storage, charter §9.1's kind 4, starts with the Docs app, and
             TodoMVC takes it then as a second version. Its styling,
             `todomvc-app-css` and `todomvc-common` (npm, MIT), and Cypress
-            to run the official tests unchanged, are downloads that wait for
-            the owner's yes, asked when W7 reaches them;
+            to run the official tests unchanged: the owner said yes
+            (2026-10-08), each one's source and size stated when fetched.
+            Then, W7's second milestone, **the showcase** (the owner,
+            relayed 2026-10-08), the presentation of TodoMVC and of the
+            comparison:
+            - for each demo app (TodoMVC, the store, the feed), three
+              panes: the running app; its Pleris source; and what the
+              browser received, the served HTML and its `pw-parts`
+              manifest, made readable;
+            - "compare with" swaps the second and third panes for the same
+              app's React and Svelte versions, taken from TodoMVC's own
+              repository and never written here; so only where such a
+              version exists, TodoMVC's, until the comparison's stacks
+              exist with who wrote them stated;
+            - under the panes, numbers each from a recorded command, never
+              asserted: lines of source by a stated rule; the app's
+              JavaScript before the first press; the bytes the first press
+              downloads (its lazily loaded handler); the parts patched a
+              press; then Core Web Vitals and an accessibility audit;
+            - "break it": a museum exhibit's edit applied, and the
+              compiler's diagnostic shown in the source pane, as a command
+              recorded it at build time; a compile in the browser would
+              need the checker in Wasm, its own ruling;
+            - "the timeline of one press": the speculation shown, the
+              request sent, the commit, then only the patched parts flash
+              in the app's pane, read from the runtime's own log and
+              patches;
+            - styled without Tailwind, whose class lists would bury the
+              output the third pane exists to show: TodoMVC by its own
+              stylesheet, the store and the feed by one small hand-written
+              stylesheet over semantic HTML;
+            - built in Pleris where it can be, as more evidence; code panes
+              highlighted at build time, never by script in the browser;
+            - honest: the other stacks' code is TodoMVC's own, every number
+              reproducible, a loss shown as plainly as a win, and no
+              placeholder shipped as a number; served here first, any
+              public deploy on the owner's explicit go;
           - **W8, search and filters**: stores and dishes, by name and
             cuisine, run in the database or a declared search source, its
             guarantees stated as ADR-0207 states a source's; no search engine

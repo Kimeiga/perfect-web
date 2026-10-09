@@ -323,8 +323,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
     without the owner's go. Its rulings are below.
   - **W7, TodoMVC**, in the next slot free (the owner, relayed
     2026-10-08; NEXT): the comparison's first app, an objective suite, and
-    the tutorial's first lesson. Its rulings are written here before it
-    launches.
+    the tutorial's first lesson; then, its second milestone, the showcase
+    that presents it and the comparison (NEXT). Its rulings are written
+    here before it launches.
   - **W8, search and filters**, after W7: run in the database or a declared
     search source; no search engine is built here.
   - **W9, ratings and reviews**, after W8 and the integrator's accounts: a
