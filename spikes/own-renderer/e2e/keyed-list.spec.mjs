@@ -233,13 +233,14 @@ test("a move to where an instance already is moves nothing", async ({ page }) =>
   // delivered again once it is there, at the next version.
   let replay = null;
   let move = null;
+  let armed = false;
   await page.route("**/stream*", async (route) => {
     const response = await route.fetch();
     let body = await response.text();
     try {
       const batch = JSON.parse(body);
       for (const f of batch.frames ?? []) {
-        if (!move && JSON.stringify(f).includes('"op":"move_instance"')) move = f;
+        if (armed && !move && JSON.stringify(f).includes('"op":"move_instance"')) move = f;
       }
       if (replay) {
         batch.frames = [...(batch.frames ?? []), replay];
@@ -257,6 +258,11 @@ test("a move to where an instance already is moves nothing", async ({ page }) =>
   await page.waitForFunction(() => document.documentElement.dataset.pwReady);
   await restore(page);
   await mark(page);
+  // Only this test's own move: putting the list back may move items too, and
+  // a frame of the document `restore` reloaded is older than this one's
+  // (on CI, the restore's moves at version 252, replayed into a page at 267,
+  // were ignored as stale).
+  armed = true;
   await command(page, "op=move&id=cold-brew");
   await settled(page, ["Cold Brew", "Espresso", "Cortado"]);
   await expect.poll(() => move !== null, { timeout: 15000 }).toBe(true);
