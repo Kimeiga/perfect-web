@@ -1430,7 +1430,12 @@ fn a_japanese_word_shows_its_pitch_accent() {
         "人",
         &word(
             "人",
-            &format!("{},{}", jword("4", "人", "ひと"), jword("5", "人", "じん")),
+            &format!(
+                "{},{},{}",
+                jword("4", "人", "ひと"),
+                jword("5", "人", "じん"),
+                jword("8", "人", "にん")
+            ),
         ),
     );
     write_entry(dir.path(), "無", &word("無", &jword("6", "無", "む")));
@@ -1448,7 +1453,7 @@ fn a_japanese_word_shows_its_pitch_accent() {
         r#"{"今日":{"きょう":1}}"#,
     );
     // じん is not there: the first reading's, in the file's order (`ひと`
-    // before `にん`, though `にん` sorts first).
+    // before `にん`, though `にん` sorts first). にん is, with its own.
     write_pitch(
         app.path(),
         &pitch_shard_of("人"),
@@ -1464,7 +1469,7 @@ fn a_japanese_word_shows_its_pitch_accent() {
     assert_eq!(pitch("話"), ["は^な^し 尾高"]);
     assert_eq!(pitch("弟"), ["お^とうと 中高"]);
     assert_eq!(pitch("今日"), ["^きょう 頭高"]);
-    assert_eq!(pitch("人"), ["ひ^と 平板", "じ^ん 平板"]);
+    assert_eq!(pitch("人"), ["ひ^と 平板", "じ^ん 平板", "^にん 頭高"]);
     assert_eq!(pitch("無"), [""]);
     assert_eq!(pitch("空"), [""]);
 }
