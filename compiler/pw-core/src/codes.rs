@@ -640,6 +640,10 @@ codes! {
         "a `navigate` names a page by its declaration";
     NAVIGATE_BEFORE_A_COMMIT = "PW5043" / navigate_before_a_commit / 1, Markup,
         "a `navigate` is a handler's, last in the `Ok` arm of the command's answer nearest it: a page is left only once a command has committed";
+    // ADR-0243's amendment of 2026-10-09: `<p>a</p> + 1` checked, rendered
+    // the paragraph and dropped the sum.
+    MARKUP_AS_AN_OPERAND = "PW5047" / markup_as_an_operand / 1, Markup,
+        "markup is shown where it is written, and is no operand of an arithmetic, comparison or logical operator";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //
