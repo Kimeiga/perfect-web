@@ -411,7 +411,25 @@ MUTANTS = [
     ),
 ]
 
-TESTS = [["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "kiokun"]]
+# Four test threads, not one per core: each kiokun test compiles the
+# program into its own TempDir (ADR-0158), so at full parallelism the
+# process peaked at 3.49 GB measured alone and crossed ADR-0292's
+# 4 GiB bound in the baseline run. With four threads it peaks at
+# 2.26 GB (measured with /usr/bin/time -l, 2026-10-09), at about
+# twice the time.
+TESTS = [
+    [
+        "cargo",
+        "test",
+        "--quiet",
+        "--locked",
+        "-p",
+        "pw-dev-server",
+        "--",
+        "kiokun",
+        "--test-threads=4",
+    ]
+]
 
 
 def run_tests():

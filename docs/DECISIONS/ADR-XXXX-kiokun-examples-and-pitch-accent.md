@@ -127,7 +127,10 @@ Added to ADR-0286's list:
   off.
 - **Mutation controls**: 64 in `scripts/kiokun_word_mutations.py`, 11 of them
   this milestone's (7 pitch, 4 examples); the Korean placeholder's
-  re-anchored on the senses.
+  re-anchored on the senses. The script's tests now run on four threads:
+  at one per core the test process peaked at 3.49 GB measured alone, and
+  ADR-0292's 4 GiB bound stopped the baseline after master was merged.
+  On four threads it peaks at 2.26 GB.
 
 ## Not claimed
 
