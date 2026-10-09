@@ -23,6 +23,20 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0290, 2026-10-09: a verification run is dealt by the seconds its
+recipes last took** (found in CI: the nightly cancelled). The nightly of
+2026-10-08 did not finish: two of its 17 shards were cancelled at the job's
+345 minutes with half their recipes unrun, while another ended after 41,
+because the plan weighed a recipe by the mutants it plants, which foretell
+its time poorly (0.43 over 213 recipes). Every evidence fetch now keeps each
+recipe's seconds, and the plan deals the longest first to the shard where it
+ends soonest, its setup counted; the database's recipes take as many shards
+as end the run soonest. Replayed on that night's seconds: sixteen shards at
+about 152 minutes and the database's at 87, where its plan held 437 minutes
+in one. 34 tests, 8 of 8 mutants killed on CI (run 37907578665). Amends
+ADR-0249 (a recipe needing less may run where more is set up) and ADR-0278
+(as many database shards as end the run soonest).
+
 **ADR-0288 and ADR-0289, 2026-10-09: kiokun's labels and character
 header, its loader's merges and the header's written forms** (track
 `kiokun`, W6, merged from `de0c4ca`). The word page shows JMdict's codes by

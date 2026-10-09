@@ -5346,3 +5346,18 @@ e14-handlers-where-they-run:
        CARGO_INCREMENTAL=0 python3 scripts/handlers_where_they_run_mutations.py; \
      } > docs/evidence/E14/handlers-where-they-run.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/handlers-where-they-run.txt
+
+# ADR-0290: a verification run is dealt by the seconds its recipes last
+# took. The CI scripts' tests and the mutation controls.
+e14-dealt-by-time:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0290 - a verification run is dealt by the seconds its recipes last took"; echo; \
+       echo "produced by: just e14-dealt-by-time"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "python: $(python3 --version)"; echo; \
+       echo "== the plan and the fetch (scripts/tests/test_ci_scripts.py)"; echo; \
+       python3 -m unittest -v scripts/tests/test_ci_scripts.py 2>&1 | grep -E ' \.\.\. |^Ran |^OK|^FAILED'; \
+       echo; echo "== mutation controls (scripts/dealt_by_time_mutations.py)"; echo; \
+       python3 scripts/dealt_by_time_mutations.py; \
+     } > docs/evidence/E14/dealt-by-time.txt
+    @grep -E "^Ran |^OK|^FAILED|mutants killed" docs/evidence/E14/dealt-by-time.txt

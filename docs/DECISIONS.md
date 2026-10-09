@@ -2368,3 +2368,13 @@ W6).
   target found), each named for the function it is read from; the header's
   written forms, each with its roles, language, label and meaning, the
   component glosses read from `KIOKUN_APP`.
+[ADR-0290](DECISIONS/ADR-0290-a-verification-run-is-dealt-by-the-seconds-its-recipes-last-took.md):
+a verification run is dealt by the seconds its recipes last took (amends
+ADR-0249 and ADR-0278).
+- A recipe's cost is the seconds it last took to its end on CI, kept in
+  `scripts/ci_seconds.json` by every evidence fetch (`--times-only` from any
+  completed run); one not yet measured costs its mutants at the measured
+  median. Each recipe, the longest first, goes to the shard where it ends
+  soonest, what it adds to that shard's setup counted; one that needs less
+  may run where more is set up. The recipes run against a database keep
+  shards of their own, as many as end the run soonest.

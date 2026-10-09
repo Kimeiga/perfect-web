@@ -499,7 +499,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
              handler, allows `build`. A handler runs in the browser, and a
              command it sends at the command's own placement: the
              DoorDash menu's static pages with an Add button need this;
-             and, found 2026-10-09 in CI itself, open: **the WebKit
+             and, found 2026-10-09 in CI itself: ~~**the nightly could not
+             finish**~~ (ADR-0290: two shards cancelled at 345 minutes, the
+             plan dealing by mutants; now dealt by each recipe's seconds,
+             the first nightly under it to be named here); open: **the WebKit
              "Load more" failure's cause**, reproduced here with the
              server's records (3 of 120, six workers): every commit's
              telling derived every open document of every session inside
