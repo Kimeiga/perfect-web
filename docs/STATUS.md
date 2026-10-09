@@ -23,6 +23,17 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0294, 2026-10-09: a list renders in its length** (W6's finding on
+kiokun's sample). さえこ's 128 names took 215 ms to render, and the curve
+was quadratic: 32 names 16.7 ms, 64 57.7 ms, 128 218 ms. Each item's scope
+copied the page's whole environment, the page's value and so the list
+among it, and every fragment's HTML. An item's scope now shares them by
+pointer and holds its own binding alone: on CI, 250 names render in 2.2 ms
+and 2,000 in 18 ms, a ratio of 8.3 for eight times the names, where scopes
+that copy took 7.1 s for 2,000. 2 of 2 mutants killed, and the renderer's
+other recipes re-run (run 37899457744; `e14-nested-lists` again alone, 6 of
+6, run 37915325800).
+
 **ADR-0293, 2026-10-09: kiokun's page head, held to kiokun.com's own
 code** (track `kiokun`, W6, merged from `4df071b`). The word page's title
 and description are kiokun.com's `buildDictionarySeo` in Pleris: its forms,
@@ -35,7 +46,7 @@ Node from the owner's checkout and never committed: 5,513 sampled words, no
 unnamed difference; CI holds the served head to a committed fixture of its
 answers. The integrator's sample of the whole dictionary first: 5,938 of
 5,938 answered at 1c's page, p50 2.3 ms, p99 13.8 ms, and さえこ's 128 names 311 ms, the
-renderer quadratic in a list's length (its fix is `track/shared-scopes`).
+renderer quadratic in a list's length (fixed by ADR-0294).
 23 server tests, 15 browser tests, 53 of 53 mutants killed on CI (run
 37911011082, beside WebKit's known flake).
 
