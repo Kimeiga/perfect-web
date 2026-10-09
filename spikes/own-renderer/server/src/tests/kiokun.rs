@@ -1109,7 +1109,7 @@ fn held_to_oracle(
                 .entry(name.as_str().unwrap_or_default().to_string())
                 .or_default() += 1;
         }
-        let page = fetched(&s, &path_of(word));
+        let page = fetched(s, &path_of(word));
         let (want_title, want_description) = (
             answer["title"].as_str().unwrap_or_default(),
             answer["description"].as_str().unwrap_or_default(),
