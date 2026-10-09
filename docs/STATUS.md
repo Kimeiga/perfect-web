@@ -23,6 +23,16 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0291, 2026-10-09: a host's record is written as the program names its
+fields** (W6's finding). kiokun's data layer wrote an entry's field
+`chinese_char`, as the program's `Entry` names it, and the query trapped:
+the host read a record's fields by their WIT names alone, `chinese-char`.
+A host now reads each field by its WIT name, or else by the program's, as
+the browser has since ADR-0172, and a field under neither is refused naming
+both. Two tests in `pw-host`; `e14-cart-lines` (41 of 41) and
+`e14-descriptions` (9 of 9) re-run on CI with their anchors moved (run
+37894486009).
+
 **ADR-0290, 2026-10-09: a verification run is dealt by the seconds its
 recipes last took** (found in CI: the nightly cancelled). The nightly of
 2026-10-08 did not finish: two of its 17 shards were cancelled at the job's

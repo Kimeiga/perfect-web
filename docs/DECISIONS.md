@@ -2378,3 +2378,10 @@ ADR-0249 and ADR-0278).
   soonest, what it adds to that shard's setup counted; one that needs less
   may run where more is set up. The recipes run against a database keep
   shards of their own, as many as end the run soonest.
+[ADR-0291](DECISIONS/ADR-0291-a-hosts-record-is-written-as-the-program-names-its-fields.md):
+a host's record is written as the program names its fields (extends
+ADR-0172 to the host).
+- A host's record is read field by field by the WIT name, or else by the
+  program's (`-` read as `_`); a field under neither is refused, naming
+  both. W6's finding: kiokun's layer wrote `chinese_char`, as the program
+  names it, and the query trapped.
