@@ -111,6 +111,22 @@ class Plan(unittest.TestCase):
             plan.touched_scripts({grammar: [(1, 1)]}, 30),
         )
 
+    def test_a_changed_browser_spec_reaches_the_scripts_and_recipes_that_run_it(self) -> None:
+        # ADR-0281: a spec a script runs is its test, as a Rust test file is;
+        # a change to `accessibility.spec.mjs` planned nothing before.
+        spec = "spikes/own-renderer/e2e/accessibility.spec.mjs"
+        self.assertIn("accessibility_mutations.py", plan.touched_scripts({spec: [(1, 1)]}, 30))
+        self.assertEqual(plan.changed_specs({spec: [(1, 1)]}), {"accessibility.spec.mjs"})
+        # And each recipe that runs it: the one that names it in its own
+        # lines, and the one that runs a script that runs it.
+        planned = plan.recipes_for({spec: [(1, 1)]}, 30, plan.recipes())
+        self.assertIn("e14-accessibility", planned)
+        self.assertIn("e14-titles", planned)
+        self.assertNotIn(
+            "accessibility_mutations.py",
+            plan.touched_scripts({"spikes/own-renderer/e2e/nothing.spec.mjs": [(1, 1)]}, 30),
+        )
+
     def test_a_recipe_in_an_imported_file_is_read_and_planned(self) -> None:
         # ADR-0253: a track's recipes live in a file the justfile imports.
         with tempfile.TemporaryDirectory() as d:

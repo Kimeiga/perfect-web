@@ -23,6 +23,18 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0281, 2026-10-08: a merge is held to CI's verification run** (the
+owner's decision, relayed 2026-10-08). A merge waited on a local chain of
+every touched mutation script, 4.5 hours for ADR-0277's seventeen, while
+CI's verification runs the same recipes in seventeen shards in under an
+hour. A branch is merged on its green `ci` and `verify` runs now, locally
+`just ci`, the changed tests and the change's own mutation script once.
+CI's plan missed a change to a browser spec, and plans one now. The record
+is the run's evidence, fetched into `docs/evidence/` once the owner approves
+that download in the integrator's session; what CI cannot run, the
+machine's measurements, macOS's own behaviour and the owner's local data,
+stays local.
+
 **ADR-0279, 2026-10-08: direct messages, a conversation read from each
 side** (track `messages`, W4, merged from `87dbea0`). A conversation is
 private to its two users without a label naming two principals: each reads

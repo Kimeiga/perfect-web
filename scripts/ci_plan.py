@@ -8,7 +8,9 @@ The recipes are `just`'s own list, kept where they record evidence
 - those a range of commits touches (`--changed BASE HEAD`), as a push plans,
   the chain's choice: each recipe running a mutation script that the range
   changed, whose mutant sits within `--near` lines of a changed line, or
-  whose tests the range changed, and each recipe whose own lines changed;
+  whose tests the range changed, a Rust test or a browser spec (ADR-0281);
+  each recipe that runs a browser spec the range changed; and each recipe
+  whose own lines changed;
 - or those named.
 
 Each is dealt to the shard with the least work so far, the costliest first,
@@ -166,10 +168,17 @@ def hunks(base: str, head: str) -> dict[str, list[tuple[int, int]]]:
     return out
 
 
+def changed_specs(changed: dict[str, list[tuple[int, int]]]) -> set[str]:
+    """The browser specs a change reaches, by file name: `pages.spec.mjs`."""
+    return {pathlib.Path(p).name for p in changed if p.endswith(".spec.mjs")}
+
+
 def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set[str]:
     """The mutation scripts a change reaches: the script itself, a mutant
-    within `near` lines of a changed line, or a test file it runs."""
+    within `near` lines of a changed line, or a test file it runs, a Rust
+    test or a browser spec (ADR-0281)."""
     tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
+    specs = changed_specs(changed)
     out = set()
     for path in sorted((ROOT / "scripts").glob("*_mutations.py")):
         rel = str(path.relative_to(ROOT))
@@ -178,6 +187,10 @@ def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set
             continue
         text = path.read_text()
         if any(f'"--test", "{t}"' in text or f"--test {t}" in text for t in tests):
+            out.add(path.name)
+            continue
+        # A browser spec it runs: the mutants it plants are killed there.
+        if any(s in text for s in specs):
             out.add(path.name)
             continue
         try:
@@ -209,13 +222,21 @@ def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set
 
 def changed_recipes(base: str, head: str, near: int, names: list[str]) -> list[str]:
     """The recipes of `names` a range of commits touches (see the module)."""
-    changed = hunks(base, head)
+    return recipes_for(hunks(base, head), near, names)
+
+
+def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: list[str]) -> list[str]:
+    """The recipes of `names` that `changed`, each file's changed lines,
+    touches (see the module)."""
     scripts = touched_scripts(changed, near)
     body = bodies()
+    specs = changed_specs(changed)
     out = {
         name
         for name in names
         if any(f"scripts/{s}" in body.get(name, "") for s in scripts)
+        # A recipe that runs a browser spec the range changed (ADR-0281).
+        or any(s in body.get(name, "") for s in specs)
     }
     # A recipe whose own lines changed: written or changed in the range, in
     # any part of the justfile.
