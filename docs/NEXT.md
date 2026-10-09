@@ -469,7 +469,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
                 any world: it requires" and nothing after it, where a label
                 alone, not an effect, rules out every world;
 
-             and, open, next, **a refusal is never silent** (the owner's,
+             and, open, next, the integrator's, **the host's paths
+             reserved under `/_pw/`** (W6's question, PARALLEL.md
+             2026-10-08): the runtime's files and its root endpoints moved
+             there, a page's route refused that begins with it, then
+             `/command/…` and the test controls, and among declared routes a
+             literal segment over a parameter; kiokun's `/{word}` waits on
+             it; then, **a refusal is never silent** (the owner's,
              using the feed by hand, relayed 2026-10-08 23:30). Signed out,
              a reader types into the home page's composer and presses Post:
              the post shows, then goes, with no word. The server refuses it
@@ -635,11 +641,67 @@ E14 comes before E11-E13. Its plan, controls and task list are
             (2026-10-08), the first a finding: ADR-0193 rules that an order
             is the cart's lines, and the store keeps its status alone;
           - **W6 is kiokun.com's**, beside this app (below);
-          - **W7, search and filters**: stores and dishes, by name and
+          - **W7, TodoMVC** (the owner, relayed 2026-10-08: "something
+            people are familiar with"), the next slot free, since it pays
+            three times: the comparison's first app (TodoMVC's own
+            implementations, React's, Vue's, Svelte's and the rest, to
+            measure against), an objective suite (its spec,
+            `app-spec.md`, and its official behavioural tests, one Cypress
+            spec, `tests/cypress/e2e/spec.cy.js`, read 2026-10-08), and the
+            tutorial's first lesson. What it asks that no app has: editing
+            on a double-click, Enter and blur saving, Escape discarding, the
+            edit field focused; toggle-all and clear completed; "1 item
+            left" against "2 items left"; and the hash routes `#/`,
+            `#/active` and `#/completed`, which reach no server, so a page
+            reads its fragment: the integrator's to rule when W7 asks.
+            Persistence: the spec allows "the framework's own persistence"
+            in place of localStorage, so the first version persists through
+            Pleris's own data layer, a session's, and says so; device-local
+            storage, charter §9.1's kind 4, starts with the Docs app, and
+            TodoMVC takes it then as a second version. Its styling,
+            `todomvc-app-css` and `todomvc-common` (npm, MIT), and Cypress
+            to run the official tests unchanged: the owner said yes
+            (2026-10-08), each one's source and size stated when fetched.
+            Then, W7's second milestone, **the showcase** (the owner,
+            relayed 2026-10-08), the presentation of TodoMVC and of the
+            comparison:
+            - for each demo app (TodoMVC, the store, the feed), three
+              panes: the running app; its Pleris source; and what the
+              browser received, the served HTML and its `pw-parts`
+              manifest, made readable;
+            - "compare with" swaps the second and third panes for the same
+              app's React and Svelte versions, taken from TodoMVC's own
+              repository and never written here; so only where such a
+              version exists, TodoMVC's, until the comparison's stacks
+              exist with who wrote them stated;
+            - under the panes, numbers each from a recorded command, never
+              asserted: lines of source by a stated rule; the app's
+              JavaScript before the first press; the bytes the first press
+              downloads (its lazily loaded handler); the parts patched a
+              press; then Core Web Vitals and an accessibility audit;
+            - "break it": a museum exhibit's edit applied, and the
+              compiler's diagnostic shown in the source pane, as a command
+              recorded it at build time; a compile in the browser would
+              need the checker in Wasm, its own ruling;
+            - "the timeline of one press": the speculation shown, the
+              request sent, the commit, then only the patched parts flash
+              in the app's pane, read from the runtime's own log and
+              patches;
+            - styled without Tailwind, whose class lists would bury the
+              output the third pane exists to show: TodoMVC by its own
+              stylesheet, the store and the feed by one small hand-written
+              stylesheet over semantic HTML;
+            - built in Pleris where it can be, as more evidence; code panes
+              highlighted at build time, never by script in the browser;
+            - honest: the other stacks' code is TodoMVC's own, every number
+              reproducible, a loss shown as plainly as a win, and no
+              placeholder shipped as a number; served here first, any
+              public deploy on the owner's explicit go;
+          - **W8, search and filters**: stores and dishes, by name and
             cuisine, run in the database or a declared search source, its
             guarantees stated as ADR-0207 states a source's; no search engine
             is built here;
-          - **W8, ratings and reviews** of orders and stores, after
+          - **W9, ratings and reviews** of orders and stores, after
             accounts.
 
           Not claimed: a live courier map (ADR-0075 refuses a mounted
@@ -658,9 +720,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
           and no production cutover, DNS change or deploy without the
           owner's explicit go, asked when it is reached. It is W6, the
           worker track beside W5, as the owner chose (two workers at once,
-          relayed 2026-10-08), so DoorDash's tracks after them are W7,
-          search and filters, and W8, ratings and reviews. It decides which
-          of these come first, each its own ADR:
+          relayed 2026-10-08), so the tracks after them are W7, TodoMVC,
+          W8, search and filters, and W9, ratings and reviews. It decides
+          which of these come first, each its own ADR:
           - **developer experience**: docs and a tutorial for a developer
             from outside; editor support, a language server (diagnostics as
             one types, completion, go-to-definition) on the check's ~37 ms;
@@ -739,7 +801,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
                where a reader runs an exhibit, when it is judged worth
                building;
           2. **the head-to-head comparison**, extending E14's three-stack
-             store contract (ADR-0120) rather than starting again: the
+             store contract (ADR-0120) rather than starting again: TodoMVC
+             first (W7), against TodoMVC's own implementations, then the
              DoorDash customer side, in Pleris, Next.js and SvelteKit.
              - Fair: idiomatic in each framework, never a strawman, each
                stack's standard libraries allowed.
