@@ -389,3 +389,40 @@ Each a decision for a track, with its date; a track's ADR records it too.
     runtime's, and ADR-0280 changes the store's page and `store-ir.json`
     only, where a rebase meets it. The integrator's accounts in the store
     wait for this track's merge.
+- **2026-10-08, W5's five design points (answered the same day).**
+  1. **`commit_staged`, one commit path** for commands and the store's
+     routes that change data: accepted. A layer that keeps its own outbox
+     and has the session's entry (the store on PostgreSQL) records what its
+     commit read back into the materializer after the commit. That record
+     is the rows and the events in one materializer transaction, the shape
+     the in-memory path commits, so `drain_held`, `committed_basis` and the
+     cart's entry are as they are in memory. PostgreSQL stays the authority.
+     A record that fails after the commit is logged, and the command is
+     answered committed. Tested: a cart changed on PostgreSQL reaches the
+     session's open page.
+  2. **A route that changes data stages a store-only operation** through
+     `data.begin` and commits it with the route's declared events in one
+     transaction: accepted as "a command's path". The merchant's side is
+     out of scope, so these are the host's operations, not the program's
+     commands. Tested: a program that names one of them is not linked to
+     it, since no grant gives it. The fault hooks stay test controls in
+     `store::Faults`.
+  3. **`StoreLayer` beside an unchanged `DataLayer`**, and
+     `PW_STORE_DATABASE_URL`: accepted, with one change. The store's
+     connections set `search_path` to the store's schema alone, never the
+     feed's. Its own `outbox`, its own migration table and its own advisory
+     lock live there, so no unqualified name can reach the feed's tables.
+  4. **`feed_pg.rs`'s helpers made `pub(crate)`**, visibility only:
+     accepted. If a shared helper changes behaviour later, the feed's
+     mutation scripts run whole.
+  5. **The whole server suite on both layers**
+     (`PW_STORE_TEST_LAYER=postgres`, each server in a schema of its own,
+     dropped with it): accepted, as the stronger evidence. `just ci` runs
+     it in memory; `e14-store-postgres` runs it both ways, on CI in its own
+     shard.
+  - **Its finding, W5's to fix**, since it lies in the commit path it
+    factors: `place_order`'s `OrderChanged` is never consumed from the
+    materializer's outbox in memory, so each order placed leaves a row for
+    good. Every event a commit stages is consumed once delivered. Tested
+    in both layers: after orders are placed and delivered, the outbox
+    holds nothing.
