@@ -251,7 +251,7 @@ Recorded by `just e14-store-postgres` in
   beside the feed's; negative controls: a stated change feed and
   serializable against a read committed default are refused, and served
   against a serializable default and with serializable set on each.
-- **The server's whole suite, 304 tests beside those, with the store on
+- **The server's whole suite, 315 tests beside those, with the store on
   PostgreSQL, and again in memory.**
 - **`scripts/store_postgres_mutations.py`: 12 of 12 mutants killed**: an
   order without its lines (either layer, and PostgreSQL's), a commit without
@@ -302,9 +302,17 @@ And this track's own:
 
 ### Tests and mutants
 
-- Locally, PostgreSQL 18.6: the suite 316 of 316 in memory and 316 of 316
-  with the store on PostgreSQL; `tests::store_pg::` 12 of 12;
-  `store_postgres_mutations.py` 12 of 12 killed.
+- Locally, PostgreSQL 18.6: the suite 327 of 327 in memory and 327 of 327
+  with the store on PostgreSQL (after the rebase onto kiokun's merge);
+  `tests::store_pg::` 12 of 12; `store_postgres_mutations.py` 12 of 12
+  killed (recorded at `8522ef7`, `docs/evidence/E14/store-postgres.txt`).
+- On CI: run 37878636733 at `85d90ed`, `e14-store-postgres` passed in its
+  own PostgreSQL shard in 1754 s; `ci` run 37881251823 at `ada2688` green.
+  `browser webkit` failed in both of this track's verify runs on
+  `feed.spec.mjs:419` ("Load more shows the next page"; jobs 113652917125
+  and 113661213808), NEXT's open intermittent, which master's own runs
+  37881084692, 37880810825 and 37880149611 failed alike. The integrator has
+  taken it.
 - Re-anchored, by ADR-0281 run whole on CI: the eleven of the thirteen
   scripts with anchors in `store.rs` whose anchors moved (`availability`,
   `cart_lines`, `command_answers`, `estimate_range`, `home`,
@@ -315,9 +323,13 @@ And this track's own:
 
 ### Merge notes
 
-- Rebased on `master` at `de64ad7`. ADR-0280 (navigate after commit) had not
-  landed; it meets this track at the place-order handler, `store-ir.json`
-  and two e2e specs, none of which this track changed.
+- Rebased on `master` at `3036497` (kiokun's merge). Two conflicts,
+  resolved by keeping both: `codes.rs` (`Owner::StorePg` PW59 beside
+  `Owner::Kiokun` PW60), and `main.rs`'s choice of layer (a kiokun program
+  gets kiokun's layer and an empty store) and its test modules.
+- ADR-0280 (navigate after commit) had not landed; it meets this track at
+  the place-order handler, `store-ir.json` and two e2e specs, none of which
+  this track changed.
 - `feed_pg.rs`'s change is visibility only.
 - The integrator's accounts-in-the-store work can build on `Rows` and the
   host's operations.
