@@ -602,6 +602,10 @@ awaited in order. What remains:
 - **Only a fold's seed takes the checker's type in the backend**
   (ADR-0284): another `[]` its context does not type, an argument to
   `List.concat` first among them, is refused as before, and says why.
+- **A frame phase's work is held to a page's declared placement**
+  (ADR-0287): `post_paint` and `frame` run in the browser too, but only a
+  handler's work is held where it runs. No program places a page with frame
+  phases anywhere but the browser.
 - **kiokun's word page is its words sections** (ADR-0286): Japanese labels
   are shown as JMdict's codes until the label table is read; the character
   header, examples, pitch, mnemonics, components, contains and appears in,

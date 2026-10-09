@@ -23,6 +23,18 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0287, 2026-10-09: a handler is held where it runs** (found probing
+ADR-0283). A page placed at `build` whose button sends a command was refused,
+"`database.write<Thing>` is not available at placement Build", for a lambda
+that calls the command and for the command named alike, where its contract
+allows `build`, the row check lets it be, and ADR-0113 holds a handler in the
+browser, where a command it calls is a request the command performs. Only
+the declared-placement check held a handler's work to the page's placement.
+It no longer does; a handler that writes the database itself is still
+refused, once, where it runs. The DoorDash menu, every customer's alike and
+built ahead, needs it. Three tests, 1 of 1 mutant killed on CI (run
+37900218861).
+
 **ADR-0283 and ADR-0284, 2026-10-09: a component's contract is what its
 code does, and a value of any type is fixed by the call that meets it**
 (W6's two findings on kiokun's word page, and what probing them found). A

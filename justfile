@@ -5331,3 +5331,18 @@ e14-what-a-component-does:
        CARGO_INCREMENTAL=0 python3 scripts/what_a_component_does_mutations.py; \
      } > docs/evidence/E14/what-a-component-does.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/what-a-component-does.txt
+
+# ADR-0287: a handler is held where it runs. The compiler's tests and the
+# mutation controls.
+e14-handlers-where-they-run:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0287 - a handler is held where it runs"; echo; \
+       echo "produced by: just e14-handlers-where-they-run"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (handlers_where_they_run.rs, handlers_in_the_browser.rs)"; echo; \
+       cargo test --locked -p pw-core --test handlers_where_they_run --test handlers_in_the_browser 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/handlers_where_they_run_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/handlers_where_they_run_mutations.py; \
+     } > docs/evidence/E14/handlers-where-they-run.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/handlers-where-they-run.txt

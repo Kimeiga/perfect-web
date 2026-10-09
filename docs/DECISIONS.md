@@ -2345,3 +2345,9 @@ kiokun's word page, a third program on the development server (track
   the file (the shard rule, kiokun's escape) and answers only for the word it
   records; a stub is followed one hop; what kiokun.com does not show is not
   shown; differences from kiokun.com are stated, its label bug not copied.
+[ADR-0287](DECISIONS/ADR-0287-a-handler-is-held-where-it-runs.md):
+a handler is held where it runs.
+- A page's declared placement grants what the page renders; its handlers'
+  work is held where handlers run, in the browser, by ADR-0113's rule, where
+  a command they call is a request the command performs. A page built ahead
+  may have a button that sends a command.

@@ -10286,6 +10286,17 @@ fn effect_rows(
             // `Grant::Yes`: the effect names nothing, `check_effect_rows` owns
             // that, and "not available at placement origin" would confirm a
             // typo as an effect while blaming the placement.
+            // **A handler is held where it runs** (ADR-0287): in the browser,
+            // when its element is pressed, by its own rule (ADR-0113), where a
+            // command it calls is a request the command performs. Until
+            // ADR-0287 its work was held to the page's placement as well, so a
+            // page placed at `build` whose button sends a command was refused:
+            // "`database.write<Thing>` is not available at placement Build".
+            if crate::contexts::context_of(&regions, &source.span)
+                == crate::contexts::Context::Interaction
+            {
+                continue;
+            }
             if crate::effects::row_covers(row, &source.effect)
                 || world.grants(&source.effect, ontology) != crate::placement::Grant::No
                 || !said.insert(source.effect.clone())
