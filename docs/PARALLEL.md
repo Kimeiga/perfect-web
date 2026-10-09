@@ -667,3 +667,57 @@ Each a decision for a track, with its date; a track's ADR records it too.
   re-anchors and re-runs the scripts that move, builds in its own target,
   and pushes; the integrator merges on that run, the ADR numbered then.
   W7 (TodoMVC) launches after it.
+- **2026-10-09, the DoorDash track (W8's plan), first in the next free
+  slot** (the owner, relayed 2026-10-09: DoorDash faster, and a third
+  concurrent worker once the disk has room; the coordinator launches it at
+  about 45 GiB free). The slots, once W5 merges: W6 (kiokun, continuing),
+  **W8** (this track), then **W7** (TodoMVC, as ruled above) in the third.
+  W8 launches after W5's merge, on which it builds. Search and filters
+  become W9, and ratings and reviews W10.
+  - **Track `store-accounts`**, branch `track/store-accounts`, from
+    `master` after W5's merge. Its ADRs are `ADR-XXXX`, numbered at the
+    merge; its recipes live in `just/store-accounts.just`; its code block
+    is **PW62** (`Owner::StoreAccounts => "PW62"`); its Playwright runs use
+    PORT=7741 (7741 to 7940, ranges 200 wide), its hosts at PORT+160..162
+    (`STORE_ACCOUNTS_PORTS`); its migrations are the store's from
+    `0003` (`spikes/own-renderer/server/migrations/store/`), each built and
+    tested on both layers, in memory and on PostgreSQL, as W5's store is.
+  - **Milestone 1, a cart and an order are a user's.** ADR-0258's identity
+    and ADR-0270's principal, wired into the store: a signed-in reader's
+    cart and orders are their user's, a guest's its session's guest's
+    (ADR-0270's guest model); at sign-in the guest's cart joins the user's,
+    by a rule the ADR states (each line added, quantities summed within
+    each item's bounds, ADR-0179); an order is read by its user alone, as a
+    notification is (ADR-0274); a tab whose reader signed out elsewhere is
+    refused at its next press, and told so (the refusal ruling, on
+    `track/refusals`, ADR-0296 when merged). Its tests: two users' carts
+    never share a line, in memory and on PostgreSQL; a guest's cart follows
+    them in; an order is no other user's to read.
+  - **Milestone 2, delivery addresses.** A user's saved addresses (add,
+    rename, remove, one chosen; a guest's chosen one is its session's);
+    each with coordinates from a fixed table in the repository, never a
+    geocoding service, which would be a download and an account; **a
+    delivery zone**, each store's radius from its location, a pure check;
+    **an estimate and availability keyed by the chosen address**: the
+    store's estimate gains its travel time, and a store that does not reach
+    the address says so where the menu is, its Add refused by a declared
+    predicate with its words (`predicate DeliversTo ... says "..."`, the
+    refusal ruling's).
+  - **Milestone 3, the owner's Next.js bug, as acceptance** (ADR-0280's
+    brief): a reader saves an address, whose handler's `Ok` arm goes to a
+    store (`navigate StorePage(id)`); the store's page shows the new
+    address's estimate as served, with no cache-busting parameter and no
+    second load of the document after it arrives, in three engines. "No
+    header remount" needs the integrator's soft navigation, not yet built:
+    until it lands the test asserts the estimate and one document load, and
+    the remount assertion is added with it, by whichever of the two lands
+    second.
+  - **What a gap needs of the language, the runtime or the host goes to
+    the integrator as a question**, as W5's and W6's did. A payment is the
+    integrator's (checkout, below), and no crate is added without the
+    owner's approval.
+  - **The integrator's DoorDash items come first** in its own queue (the
+    owner, 2026-10-09): soft navigation, store hours, then checkout, ahead
+    of kiokun's canonical link, std `Json`, `/_pw/` and the
+    infrastructure follow-ups, after the merges in CI (refusal,
+    stream-records, W5).
