@@ -437,8 +437,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
   the kiokun slice (ADR-0037, ADR-0041; `examples/kiokun/`). Its ADRs are
   `ADR-XXXX`, numbered at the merge. Its recipes live in `just/kiokun.just`.
   Its code block is **PW60** (`Owner::Kiokun => "PW60"`). Its hosts are at
-  PORT+120..122 (`KIOKUN_PORTS`), and its Playwright runs use PORT=7241 (W5
-  has 7141).
+  PORT+120..122 (`KIOKUN_PORTS`), and its Playwright runs use PORT=7341 (W5
+  has 7141; 7241, planned first, overlapped W5's range, corrected
+  2026-10-09 below).
   - **The data** is read through `KIOKUN_DATA`, the kiokun-data checkout's
     `output_dictionary` (1,485,890 raw-DEFLATE JSON files, 6.4 GB), as `just
     e10-kiokun` reads it. It is never copied here, and nothing is written
@@ -543,3 +544,38 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - **Not (a)**, a file the build put at `dist`'s top winning over pages,
     which ties the URL space to whatever a build emits. **Not (c)**, the
     words at `/w/{word}`, which breaks every link to kiokun.com.
+- **2026-10-09, W6's word page (milestone 1a), reviewed.** Track
+  `kiokun` at `b59ebe0`: `examples/kiokun-site` on the development server,
+  its read-only layer `server/src/kiokun.rs`, the route `/word/{word}`
+  until `/_pw/` lands. Its claims were checked against kiokun's source:
+  `escaped` is `create_safe_filename` (kiokun-data `src/main.rs:6228`), and
+  the stub rule is `+page.ts:438-462`'s.
+  - **One fix before the merge**: a word whose file name is longer than a
+    file name may be (`<file>.json.deflate` over 255 bytes) failed the read
+    with ENAMETOOLONG, which is no `NotFound`, so the query failed where it
+    should answer a 404. `place` refuses such a name, tested at the limit.
+  - **Q1, a host call through a helper**: the contract was wrong, and the
+    build right. ADR-0283, the integrator's: a component imports what the
+    code compiled into it calls.
+  - **Q2, a fold's empty seed**: ADR-0284, the integrator's. The answer
+    first relayed, that the checker's acceptance stood, was wrong: the
+    checker passed ill-typed folds, and the backend was the only backstop.
+  - **Q3, ports**: W6's Playwright runs use PORT=7341. The plan's 7241
+    overlapped W5's range, which reaches PORT+122 (7263): W6's 7241..7243
+    were W5's `MESSAGES_PORTS`. **Each worker's range is 200 wide**: W5
+    7141, W6 7341, and the next worker 7541, where nothing listens on this
+    machine (`lsof -iTCP -sTCP:LISTEN`; Raycast holds 7265).
+  - **Q4, kiokun.com's label bug**: not reproduced. Its `getLabel` is
+    `flatLabels[tag] || tag` (`sveltekit-app/src/lib/utils/japaneseLabels.ts:24-26`),
+    and 53 of the table's 266 flat keys write `_` (`adj_na`, `n_suf`,
+    `v5k_s`, ...) where the entries carry JMdict's `-`, so the live site
+    shows `adj-na` as it is. The rewrite shows the label the table means:
+    the code as written, else with each `-` read as `_`, else the code. It is
+    stated in a list of differences from kiokun.com, each with its evidence,
+    as Q1's rendering difference is; the comparison counts every other
+    difference as a defect. The owner was told; the live site is theirs to
+    fix.
+  - **Merged 2026-10-09** as ADR-0285 (the inventory) and ADR-0286 (the
+    word page), from `d19850f`, after the fix (a 503 before, a 404 now) and
+    green runs (verify 37886442522, every engine). Next, 1b: Japanese
+    labels through `KIOKUN_APP` with Q4's lookup, and the character header.

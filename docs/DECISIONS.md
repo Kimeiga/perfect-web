@@ -2331,3 +2331,17 @@ a value of any type is fixed by the call that meets it (amends ADR-0065).
   each, so a fold's function fixes its accumulator: the checker refuses
   ill-typed folds it passed, and the backend builds a seed its context does
   not type at the fold's solved type. W6's finding.
+[ADR-0285](DECISIONS/ADR-0285-kiokun-parity-inventory.md):
+kiokun.com's parity inventory, every route marked (track `kiokun`, W6).
+- Every route and feature of kiokun.com's SvelteKit app is a row, marked
+  built, partial or missing, held to the app by `scripts/kiokun_inventory.py`:
+  102 routes (0 built, 4 partial, 98 missing) and 63 features; the gaps by
+  kind, and the order the integrator ruled.
+[ADR-0286](DECISIONS/ADR-0286-kiokun-word-page-on-the-development-server.md):
+kiokun's word page, a third program on the development server (track
+`kiokun`, W6).
+- `examples/kiokun-site` serves kiokun's entry for a word as kiokun.com's
+  page shows it, from a read-only layer over kiokun's own files; Pleris finds
+  the file (the shard rule, kiokun's escape) and answers only for the word it
+  records; a stub is followed one hop; what kiokun.com does not show is not
+  shown; differences from kiokun.com are stated, its label bug not copied.

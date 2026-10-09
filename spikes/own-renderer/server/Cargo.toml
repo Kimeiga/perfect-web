@@ -39,6 +39,11 @@ getrandom.workspace = true
 sha2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# Track `kiokun` (W6): kiokun stores each word as raw DEFLATE. The crate
+# kiokun's slice host already takes (spikes/kiokun/server), at the version in
+# Cargo.lock: 0.9.1, MIT OR Zlib OR Apache-2.0, checked on crates.io
+# 2026-09-25.
+miniz_oxide = "0.9.1"
 
 [dev-dependencies]
 # ADR-0158: a test leaves nothing behind.

@@ -602,6 +602,13 @@ awaited in order. What remains:
 - **Only a fold's seed takes the checker's type in the backend**
   (ADR-0284): another `[]` its context does not type, an argument to
   `List.concat` first among them, is refused as before, and says why.
+- **kiokun's word page is its words sections** (ADR-0286): Japanese labels
+  are shown as JMdict's codes until the label table is read; the character
+  header, examples, pitch, mnemonics, components, contains and appears in,
+  the canonical redirect, variant merge, related forms and the SEO head are
+  still to come; the route is `/word/{word}` until `/_pw/` lands; the tests
+  run on the repository's sample, and no page was rendered beside
+  kiokun.com's yet.
 - **A source's guarantees are held to the database the feed opens**
   (ADR-0207, ADR-0246): the host measures a PostgreSQL feed's isolation and
   whether it may write, and refuses to serve on a shortfall. The store's

@@ -1,0 +1,548 @@
+// @corpus: reference
+// @id: KIOKUN-SITE
+// @category: the owner's production target: kiokun.com, a dictionary
+// @milestone: E14
+//
+// kiokun.com in Pleris (track `kiokun`, W6): the owner's Chinese, Japanese and
+// Korean dictionary, a program the development server serves beside the
+// store and the feed (docs/PARALLEL.md, "W6's inventory, answered", Q2).
+//
+// kiokun.com's SvelteKit app is the reference: its word page,
+// `sveltekit-app/src/routes/[word]/`, and the components it renders. Each
+// rule here names the file it is read from. The entry is kiokun's own file,
+// read by the deployment's data layer as kiokun's build wrote it; what the
+// page shows of it, and how, is decided here.
+
+module kiokun.site
+
+import List
+import String
+import shards
+
+// **Where kiokun's entries are** (ADR-0207): its build's output, one
+// raw-DEFLATE JSON file a word, which nothing here writes. Every read sees
+// the one version the deployment opened; there are no transactions, since
+// nothing commits; and nothing tells a change, since none is made.
+source KiokunEntries
+    holds        Entry
+    transactions none
+    reads        strong
+    changes      none
+
+// ---------------------------------------------------------------------------
+// The entry, as kiokun's build writes it (`src/lib/types.ts`, `DictionaryEntry`):
+// the fields the word page reads, each list as the file lists it. The page's
+// own shapes are below.
+
+// One reading of a Chinese word: its pinyin and Jyutping, and its senses.
+type ChineseItem = ChineseItem {
+    pinyin: String,
+    jyutping: String,
+    definitions: List<String>,
+}
+
+// One Chinese word: CC-CEDICT's line `id`, its forms, its readings.
+type ChineseWord = ChineseWord {
+    id: String,
+    simp: String,
+    trad: String,
+    items: List<ChineseItem>,
+}
+
+// A written form or a reading of a Japanese word, JMdict's `kanji` or `kana`.
+type Headword = Headword {
+    text: String,
+    tags: List<String>,
+    common: Bool,
+}
+
+// One gloss of a sense, and its type (`lit`, `fig`, `expl`), or "" for none.
+type Gloss = Gloss {
+    text: String,
+    kind: String,
+}
+
+// One sense of a Japanese word: its glosses, notes and labels.
+type Sense = Sense {
+    glosses: List<Gloss>,
+    info: List<String>,
+    pos: List<String>,
+    field: List<String>,
+    misc: List<String>,
+    dialect: List<String>,
+}
+
+// One Japanese word: JMdict's sequence number `id`, its forms and senses.
+type JapaneseWord = JapaneseWord {
+    id: String,
+    kanji: List<Headword>,
+    kana: List<Headword>,
+    senses: List<Sense>,
+}
+
+// One Korean word: hangul, hanja where it has one, a part of speech, and
+// its definitions.
+type KoreanWord = KoreanWord {
+    id: String,
+    hangul: String,
+    hanja: String,
+    pos: String,
+    definitions: List<String>,
+}
+
+// One translation of a Japanese name: its kinds and texts.
+type NameTranslation = NameTranslation {
+    kinds: List<String>,
+    texts: List<String>,
+}
+
+// One Japanese name, from JMnedict.
+type JapaneseName = JapaneseName {
+    id: String,
+    kanji: List<String>,
+    kana: List<String>,
+    translations: List<NameTranslation>,
+}
+
+// An entry. A stub carries only `key` and `redirect`, the entry it names.
+type Entry = Entry {
+    key: String,
+    redirect: Option<String>,
+    chinese: List<ChineseWord>,
+    japanese: List<JapaneseWord>,
+    korean: List<KoreanWord>,
+    names: List<JapaneseName>,
+}
+
+type KiokunError =
+    | NotFound
+
+// The file `subdirectory/file.json.deflate`, as the data layer reads it, or
+// none where there is no such file. The layer refuses a name that is not one
+// path segment.
+fn read_entry(subdirectory: String, file: String) -> Option<Entry> !{ database.read<Entry> }
+    host "kiokun:data/entries#read"
+
+// ---------------------------------------------------------------------------
+// Finding a word's file.
+
+// kiokun's `create_safe_filename` (kiokun-data `src/main.rs`): each of
+// `/ \ : * ? " < > |` and each control character (Unicode's Cc: U+0000 to
+// U+001F and U+007F to U+009F) is written `_`.
+fn escaped(c: Int) -> Int {
+    let unsafe_mark = c == 47 | c == 92 | c == 58 | c == 42 | c == 63 | c == 34 | c == 60 | c == 62 | c == 124
+    let control = c <= 31 | (c >= 127 & c <= 159)
+    if unsafe_mark | control { 95 } else { c }
+}
+
+fn file_name(word: String) -> String {
+    String.from_codepoints(List.map(String.codepoints(word), escaped))
+}
+
+// The entry a file holds, where it records `word`: a file whose escaped
+// name several words share answers only for the word it records
+// (ADR-0041).
+fn recorded(file: Option<Entry>, word: String) -> Option<Entry> {
+    match file {
+        Some(e) => if e.key == word { Some(e) } else { None },
+        None => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// What the page shows. Each list a page keys is keyed by the source's id,
+// or by its place in the source's list where the source gives none.
+
+type Numbered = Numbered {
+    id: String,
+    text: String,
+}
+
+// A list's strings, each keyed `<prefix>:<n>` by its place.
+fn numbered(items: List<String>, prefix: String) -> List<Numbered> {
+    let none: List<Numbered> = []
+    List.fold(items, none, (out, t) => List.concat(out, [Numbered { id: "{prefix}:{List.length(out)}", text: t }]))
+}
+
+// One reading of a Chinese word as the page shows it: the word's forms,
+// `simp / trad` where they differ, its pinyin and Jyutping, and its senses.
+type ShownChinese = ShownChinese {
+    id: String,
+    simp: String,
+    trad: String,
+    both: Bool,
+    pinyin: String,
+    jyutping: String,
+    definitions: List<Numbered>,
+}
+
+// A word's readings that have senses (`+page.svelte:711-716`), each keyed
+// `<id>:<n>` by its place among the word's items.
+fn chinese_shown(w: ChineseWord) -> List<ShownChinese> {
+    let none: List<ShownChinese> = []
+    let all = List.fold(w.items, none, (out, item) => List.concat(out, [ShownChinese {
+        id: "{w.id}:{List.length(out)}",
+        simp: w.simp,
+        trad: if w.trad == "" { w.simp } else { w.trad },
+        both: w.simp != "" & w.trad != "" & w.simp != w.trad,
+        pinyin: item.pinyin,
+        jyutping: item.jyutping,
+        definitions: numbered(item.definitions, "{w.id}:{List.length(out)}"),
+    }]))
+    List.filter(all, s => List.length(s.definitions) > 0)
+}
+
+// A written form or reading as the page shows it: its text, its notes
+// (`HeadwordInfo.svelte`) and whether it is common, and whether a
+// separator `、` goes before it.
+type ShownHeadword = ShownHeadword {
+    id: String,
+    text: String,
+    tags: List<Numbered>,
+    common: Bool,
+    first: Bool,
+}
+
+// The forms the page shows, in the dictionary's order, without the forms
+// JMdict marks search-only (`sK`, `sk`; `WordEntry.svelte:19-23`).
+fn headwords(items: List<Headword>, hidden: String, prefix: String) -> List<ShownHeadword> {
+    let shown = List.filter(items, h => !List.any(h.tags, t => t == hidden))
+    let none: List<ShownHeadword> = []
+    List.fold(shown, none, (out, h) => List.concat(out, [ShownHeadword {
+        id: "{prefix}:{List.length(out)}",
+        text: h.text,
+        tags: numbered(h.tags, "{prefix}:{List.length(out)}"),
+        common: h.common,
+        first: List.length(out) == 0,
+    }]))
+}
+
+// One sense as the page shows it (`Sense.svelte`): its glosses joined by
+// "; ", each with its type where it has one; its notes; its labels.
+type ShownSense = ShownSense {
+    id: String,
+    glosses: List<ShownGloss>,
+    info: String,
+    labels: List<Numbered>,
+}
+
+type ShownGloss = ShownGloss {
+    id: String,
+    text: String,
+    kind: String,
+    first: Bool,
+}
+
+fn glosses_shown(gs: List<Gloss>, prefix: String) -> List<ShownGloss> {
+    let none: List<ShownGloss> = []
+    List.fold(gs, none, (out, g) => List.concat(out, [ShownGloss {
+        id: "{prefix}:{List.length(out)}",
+        text: g.text,
+        kind: if g.kind == "none" { "" } else { g.kind },
+        first: List.length(out) == 0,
+    }]))
+}
+
+// Part of speech, field, misc and dialect, in that order (`Sense.svelte:47-62`).
+fn senses_shown(ss: List<Sense>, prefix: String) -> List<ShownSense> {
+    let none: List<ShownSense> = []
+    List.fold(ss, none, (out, s) => List.concat(out, [ShownSense {
+        id: "{prefix}:{List.length(out)}",
+        glosses: glosses_shown(s.glosses, "{prefix}:{List.length(out)}:g"),
+        info: String.join(s.info, "; "),
+        labels: numbered(List.concat(List.concat(s.pos, s.field), List.concat(s.misc, s.dialect)), "{prefix}:{List.length(out)}:l"),
+    }]))
+}
+
+// One Japanese word as the page shows it (`WordEntry.svelte`): its written
+// forms, or its readings where it has none; its first reading; its senses,
+// numbered where there is more than one (`Definitions.svelte`).
+type ShownJapanese = ShownJapanese {
+    id: String,
+    kanji: List<ShownHeadword>,
+    kana: List<ShownHeadword>,
+    reading: String,
+    senses: List<ShownSense>,
+    many: Bool,
+}
+
+fn japanese_shown(w: JapaneseWord) -> ShownJapanese {
+    let kanji = headwords(w.kanji, "sK", "{w.id}:k")
+    let kana = headwords(w.kana, "sk", "{w.id}:r")
+    ShownJapanese {
+        id: w.id,
+        kanji: kanji,
+        kana: if List.length(kanji) == 0 { kana } else { [] },
+        reading: match List.get(kana, 0) {
+            Some(r) => r.text,
+            None => "",
+        },
+        senses: senses_shown(w.senses, "{w.id}:s"),
+        many: List.length(w.senses) > 1,
+    }
+}
+
+// One Korean word as the page shows it (`+page.svelte:805-861`): its
+// definitions without kiokun's placeholder text "Sentence".
+type ShownKorean = ShownKorean {
+    id: String,
+    hangul: String,
+    hanja: String,
+    pos: String,
+    definitions: List<Numbered>,
+    many: Bool,
+}
+
+fn korean_shown(w: KoreanWord) -> ShownKorean {
+    let kept = List.filter(w.definitions, d => d != "" & d != "Sentence")
+    ShownKorean {
+        id: w.id,
+        hangul: w.hangul,
+        hanja: w.hanja,
+        pos: w.pos,
+        definitions: numbered(kept, w.id),
+        many: List.length(kept) > 1,
+    }
+}
+
+// One Japanese name as the page shows it (`JapaneseNames.svelte`): its
+// forms joined by `、`, and each translation's texts joined by ", " with
+// its kinds labelled.
+type ShownName = ShownName {
+    id: String,
+    kanji: String,
+    kana: String,
+    translations: List<ShownTranslation>,
+}
+
+type ShownTranslation = ShownTranslation {
+    id: String,
+    text: String,
+    kinds: List<Numbered>,
+}
+
+// `JapaneseNames.svelte`'s `typeLabels`; another kind is shown as it is.
+fn name_kind(kind: String) -> String {
+    match kind {
+        "surname" => "surname",
+        "fem" => "female given name",
+        "masc" => "male given name",
+        "given" => "given name",
+        "place" => "place name",
+        "unclass" => "unclassified name",
+        "company" => "company name",
+        "product" => "product name",
+        "work" => "work of art",
+        "person" => "full name of a particular person",
+        "station" => "railway station",
+        other => other,
+    }
+}
+
+fn name_shown(n: JapaneseName) -> ShownName {
+    let none: List<ShownTranslation> = []
+    ShownName {
+        id: n.id,
+        kanji: String.join(n.kanji, "、"),
+        kana: String.join(n.kana, "、"),
+        translations: List.fold(n.translations, none, (out, t) => List.concat(out, [ShownTranslation {
+            id: "{n.id}:{List.length(out)}",
+            text: String.join(t.texts, ", "),
+            kinds: numbered(List.map(t.kinds, name_kind), "{n.id}:{List.length(out)}"),
+        }])),
+    }
+}
+
+// The word page's content: the word looked up, and each language's words.
+type WordShown = WordShown {
+    word: String,
+    chinese: List<ShownChinese>,
+    japanese: List<ShownJapanese>,
+    korean: List<ShownKorean>,
+    names: List<ShownName>,
+}
+
+fn shown(word: String, e: Entry) -> WordShown {
+    let none: List<ShownChinese> = []
+    WordShown {
+        word: word,
+        chinese: List.fold(e.chinese, none, (out, w) => List.concat(out, chinese_shown(w))),
+        japanese: List.map(e.japanese, japanese_shown),
+        korean: List.map(e.korean, korean_shown),
+        names: List.map(e.names, name_shown),
+    }
+}
+
+// **A word's page** (`[word]/+page.ts`): kiokun's entry for `word`, its
+// redirect followed, as the page shows it; `NotFound` where kiokun has none.
+public query Word(word: String) -> Result<WordShown, KiokunError>
+    freshness   1.hours
+    consistency snapshot
+    cache       shared
+    key         word
+{
+    // The word's file is in the subdirectory the shard rule names
+    // (`shards.Place`, ADR-0041). A stub's `redirect` is followed one hop
+    // (`[word]/+page.ts:438-462`), and the stub itself is shown where the
+    // entry it names is not found. The host reads are written here, in the
+    // query's own body: a host call reached only through a helper is not
+    // among the component's imports (the compiler's `host_calls` reads the
+    // declaration's body alone).
+    match recorded(read_entry(shards.subdirectory(word), file_name(word)), word) {
+        Some(e) => match e.redirect {
+            Some(target) => match recorded(read_entry(shards.subdirectory(target), file_name(target)), target) {
+                Some(t) => Ok(shown(word, t)),
+                None => Ok(shown(word, e)),
+            },
+            None => Ok(shown(word, e)),
+        },
+        None => Err(NotFound),
+    }
+}
+
+// The word's page. Its route is `/word/{word}` until the host's own paths
+// move under `/_pw/` (the integrator's ruling of 2026-10-08), then
+// kiokun.com's `/{word}`.
+page WordPage(word: String) {
+    route        "/word/{word}"
+    not_found_on KiokunError.NotFound
+    placement    origin
+    cache        shared
+
+    let page = query Word(word)
+
+    view {
+        <title>{word} | Kiokun</title>
+        <main>
+            <h1 id="headword">{page.word}</h1>
+            {#if page.chinese}
+                <section id="chinese" aria-labelledby="chinese-heading">
+                    <h2 id="chinese-heading">Chinese</h2>
+                    {#each page.chinese as c (c.id)}
+                        <div class="chinese-word-entry" lang="zh">
+                            <div class="chinese-headwords">
+                                <span class="chinese-word-text">
+                                    {#if c.both}
+                                        <span lang="zh-Hans">{c.simp}</span> / <span lang="zh-Hant">{c.trad}</span>
+                                    {:else}
+                                        {c.trad}
+                                    {/if}
+                                </span>
+                                {#if c.pinyin}<span class="chinese-pronunciation">[{c.pinyin}]</span>{/if}
+                                {#if c.jyutping}<span class="cantonese-pronunciation" title="Cantonese (Jyutping)">[{c.jyutping}]</span>{/if}
+                            </div>
+                            <ol class="chinese-definitions">
+                                {#each c.definitions as d (d.id)}
+                                    <li class="chinese-definition">{d.text}</li>
+                                {/each}
+                            </ol>
+                        </div>
+                    {/each}
+                </section>
+            {/if}
+            {#if page.japanese}
+                <section id="japanese" aria-labelledby="japanese-heading">
+                    <h2 id="japanese-heading">Japanese</h2>
+                    {#each page.japanese as j (j.id)}
+                        <div class="word-entry" lang="ja">
+                            <div class="headwords">
+                                {#each j.kanji as k (k.id)}
+                                    {#if !k.first}<span class="separator">、</span>{/if}
+                                    <span class="kanji-item">
+                                        <span class="kanji-text">{k.text}</span>
+                                        {#each k.tags as t (t.id)}<span class="info-tag">({t.text})</span>{/each}
+                                        {#if k.common}<span class="common" title="Common word">★</span>{/if}
+                                    </span>
+                                {/each}
+                                {#each j.kana as k (k.id)}
+                                    {#if !k.first}<span class="separator">、</span>{/if}
+                                    <span class="kana-item">
+                                        <span class="kana-text">{k.text}</span>
+                                        {#each k.tags as t (t.id)}<span class="info-tag">({t.text})</span>{/each}
+                                        {#if k.common}<span class="common" title="Common word">★</span>{/if}
+                                    </span>
+                                {/each}
+                                {#if j.reading}<span class="kana-pronunciation">{j.reading}</span>{/if}
+                            </div>
+                            {#if j.many}
+                                <ol class="sense-list">
+                                    {#each j.senses as s (s.id)}
+                                        <li class="sense-item">
+                                            <div class="sense-primary">
+                                                {#each s.glosses as g (g.id)}{#if !g.first}; {/if}{#if g.kind}<span class="gloss-type">({g.kind})</span> {/if}<span>{g.text}</span>{/each}
+                                                {#if s.info}<span class="info-text"> ({s.info})</span>{/if}
+                                            </div>
+                                            {#if s.labels}
+                                                <div class="sense-meta" aria-label="Definition labels">
+                                                    {#each s.labels as l (l.id)}<span class="tag">{l.text}</span> {/each}
+                                                </div>
+                                            {/if}
+                                        </li>
+                                    {/each}
+                                </ol>
+                            {:else}
+                                {#each j.senses as s (s.id)}
+                                    <div class="single-sense">
+                                        <div class="sense-primary">
+                                            {#each s.glosses as g (g.id)}{#if !g.first}; {/if}{#if g.kind}<span class="gloss-type">({g.kind})</span> {/if}<span>{g.text}</span>{/each}
+                                            {#if s.info}<span class="info-text"> ({s.info})</span>{/if}
+                                        </div>
+                                        {#if s.labels}
+                                            <div class="sense-meta" aria-label="Definition labels">
+                                                {#each s.labels as l (l.id)}<span class="tag">{l.text}</span> {/each}
+                                            </div>
+                                        {/if}
+                                    </div>
+                                {/each}
+                            {/if}
+                        </div>
+                    {/each}
+                </section>
+            {/if}
+            {#if page.korean}
+                <section id="korean" aria-labelledby="korean-heading" lang="ko">
+                    <h2 id="korean-heading">Korean</h2>
+                    {#each page.korean as k (k.id)}
+                        <div class="korean-word-entry">
+                            <div class="korean-headwords">
+                                <span class="korean-word-text">{k.hangul}</span>
+                                {#if k.hanja}<span class="korean-hanja">[{k.hanja}]</span>{/if}
+                            </div>
+                            {#if k.pos}<div class="korean-pos-tags"><span class="tag">{k.pos}</span></div>{/if}
+                            {#if k.definitions}
+                                <ol class="korean-definitions">
+                                    {#each k.definitions as d (d.id)}
+                                        <li class="korean-definition">{d.text}</li>
+                                    {/each}
+                                </ol>
+                            {/if}
+                        </div>
+                    {/each}
+                </section>
+            {/if}
+            {#if page.names}
+                <section id="names" aria-labelledby="names-heading">
+                    <h2 id="names-heading">Japanese Names</h2>
+                    <div class="names-grid">
+                        {#each page.names as n (n.id)}
+                            <div class="name-entry">
+                                <div class="name-headwords" lang="ja">
+                                    {#if n.kanji}<span class="kanji-forms">{n.kanji}</span>{/if}
+                                    <span class="kana-forms">{n.kana}</span>
+                                </div>
+                                <div class="name-translations">
+                                    {#each n.translations as t (t.id)}
+                                        <div class="translation-line">
+                                            <span class="translation-text">{t.text}</span>
+                                            {#each t.kinds as kd (kd.id)}<span class="tag">{kd.text}</span>{/each}
+                                        </div>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                </section>
+            {/if}
+        </main>
+    }
+}
