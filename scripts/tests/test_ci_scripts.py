@@ -341,6 +341,25 @@ class Summary(unittest.TestCase):
     def test_a_shard_that_reported_nothing_fails_the_run(self) -> None:
         self.assertEqual(self.run_summary([[self.result()]], {}, 2), 1)
 
+    def test_a_run_of_one_shard_is_read_where_it_was_extracted(self) -> None:
+        # `download-artifact` puts a lone match in the path itself: W6's 1b
+        # ran one shard, passed it, and the run reported none.
+        def one(results: list[dict], files: dict[str, str]) -> int:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)
+                (root / "evidence").mkdir()
+                (root / "results.json").write_text(json.dumps(results))
+                for path, text in files.items():
+                    (root / "evidence" / path).write_text(text)
+                return subprocess.run(
+                    [sys.executable, str(SCRIPTS / "ci_summary.py"), tmp, "--shards", "1"],
+                    capture_output=True,
+                    text=True,
+                ).returncode
+
+        self.assertEqual(one([self.result(wrote=["a.txt"])], {"a.txt": "3 of 3 mutants killed\n"}), 0)
+        self.assertEqual(one([self.result(wrote=["a.txt"])], {"a.txt": "x: SURVIVED\n"}), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
