@@ -75,9 +75,10 @@ MUTANTS = [
         STORE_DATA,
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
-        "                    .map(|o| Box::new(Val::Variant(o.status, None)));\n",
-        "                    .map(|o| Box::new(Val::Variant(o.status, None)))\n"
-        "                    .filter(|_| false);\n",
+        # Re-anchored by track store-accounts: an owner's, a session's or a user's.
+        "                        .map(|o| Box::new(Val::Variant(o.status, None)));\n",
+        "                        .map(|o| Box::new(Val::Variant(o.status, None)))\n"
+        "                        .filter(|_| false);\n",
     ),
     (
         "a no-session block is rendered",

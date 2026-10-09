@@ -43,8 +43,9 @@ MUTANTS = [
     (
         "an order is placed without its lines",
         STORE,
-        "                r.place(&this, &lines)?;\n",
-        "                r.place(&this, &[])?;\n",
+        # Re-anchored by track store-accounts: an owner's, a session's or a user's.
+        "                    r.place(owner, &lines)?;\n",
+        "                    r.place(owner, &[])?;\n",
     ),
     (
         "on PostgreSQL, an order's lines are not written",

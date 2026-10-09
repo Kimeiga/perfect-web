@@ -64,8 +64,8 @@ MUTANTS = [
         SERVER,
         # Re-anchored by ADR-0176: the version is the entry's, or the one a
         # failed regeneration was tried at.
-        '        serde_json::json!([{ "entry": cart_entry(session), "version": version }])\n',
-        '        serde_json::json!([{ "entry": cart_entry(session), "version": 0 }])\n',
+        '        serde_json::json!([{ "entry": self.cart_entry(session), "version": version }])\n',
+        '        serde_json::json!([{ "entry": self.cart_entry(session), "version": 0 }])\n',
     ),
 ]
 

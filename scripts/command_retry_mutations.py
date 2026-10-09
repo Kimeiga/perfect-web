@@ -74,10 +74,10 @@ MUTANTS = [
         "    idempotent_by InteractionId\n"
         "    retry         transport_only(max = 2, jitter = true)\n"
         "    transaction   serializable\n"
-        "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n",
+        "    optimistic    Cart(current_user()) as cart => UserCarts.with_line(cart, item, quantity)\n",
         "    idempotent_by InteractionId\n"
         "    transaction   serializable\n"
-        "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n",
+        "    optimistic    Cart(current_user()) as cart => UserCarts.with_line(cart, item, quantity)\n",
     ),
     (
         "nothing is sent again",

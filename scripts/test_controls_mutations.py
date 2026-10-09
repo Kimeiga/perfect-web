@@ -56,12 +56,14 @@ MUTANTS = [
         STORE_DATA,
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
-        "                            &mut m.fail_write\n"
-        "                        } else {\n"
-        "                            &mut m.fail_read\n",
-        "                            &mut m.fail_read\n"
-        "                        } else {\n"
-        "                            &mut m.fail_write\n",
+        # And by track store-accounts: each operation by the session and by
+        # the reader's handle.
+        "                                &mut m.fail_write\n"
+        "                            } else {\n"
+        "                                &mut m.fail_read\n",
+        "                                &mut m.fail_read\n"
+        "                            } else {\n"
+        "                                &mut m.fail_write\n",
     ),
     (
         "the cart's delay is not waited",
@@ -69,11 +71,13 @@ MUTANTS = [
         STORE_DATA,
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
-        "                if delay > 0 {\n"
-        "                    std::thread::sleep(std::time::Duration::from_millis(delay));\n"
-        "                }\n"
-        "                op(args)\n",
-        "                op(args)\n",
+        # And by track store-accounts: each operation by the session and by
+        # the reader's handle.
+        "                    if delay > 0 {\n"
+        "                        std::thread::sleep(std::time::Duration::from_millis(delay));\n"
+        "                    }\n"
+        "                    op(args)\n",
+        "                    op(args)\n",
     ),
     (
         "every session waits a cart's delay",
@@ -81,10 +85,12 @@ MUTANTS = [
         STORE_DATA,
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
-        "                    mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
-        "                        .unwrap_or_default()\n",
-        "                    mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
-        "                        .unwrap_or(1000)\n",
+        # And by track store-accounts: each operation by the session and by
+        # the reader's handle.
+        "                        mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
+        "                            .unwrap_or_default()\n",
+        "                        mine.map(|m| if writes { 0 } else { m.delay_ms })\n"
+        "                            .unwrap_or(1000)\n",
     ),
     (
         "the store's delay is not waited",

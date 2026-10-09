@@ -64,11 +64,11 @@ MUTANTS = [
         "a session's cart is materialized in the public partition",
         "server",
         SERVER,
-        "        &[session],\n"
+        "        &[owner],\n"
         "        Partition::Session {\n"
         "            id: session.to_string(),\n"
         "        },\n",
-        "        &[session],\n"
+        "        &[owner],\n"
         "        Partition::Public,\n",
     ),
     (

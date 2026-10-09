@@ -77,15 +77,15 @@ MUTANTS = [
         "core",
         RULES,
         "        && f.value.trim() == \"last_known_good\"\n"
-        "        && (matches!(visibility, \"session\" | \"private\")\n",
+        "        && (matches!(visibility, \"session\" | \"private\" | \"user\")\n",
         "        && f.value.trim() == \"last_known_good\"\n"
-        "        && false && (matches!(visibility, \"session\" | \"private\")\n",
+        "        && false && (matches!(visibility, \"session\" | \"private\" | \"user\")\n",
     ),
     (
         "PW0343 is raised for public data",
         "core",
         RULES,
-        "        && (matches!(visibility, \"session\" | \"private\")\n",
+        "        && (matches!(visibility, \"session\" | \"private\" | \"user\")\n",
         "        && (true\n",
     ),
     (
