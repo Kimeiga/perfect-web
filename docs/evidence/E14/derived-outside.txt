@@ -1,0 +1,55 @@
+ADR-XXXX - a change is derived outside the table, and what reaches a document is recorded
+
+produced by: just e14-derived-outside
+commit: 0efa5cad088d29a44297f6c100228b6726551de1
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+python: Python 3.12.3
+
+== the development server (the table while a change derives, the attempts, the trail)
+
+test tests::a_documents_trail_says_what_happened_to_its_frames ... ok
+test tests::a_document_changed_at_every_attempt_is_still_told ... ok
+test tests::a_document_changed_while_its_change_is_derived_is_derived_against_again ... ok
+test tests::a_keyed_read_whose_document_changed_while_it_derived_is_derived_again ... ok
+test tests::the_table_is_free_while_a_telling_derives ... ok
+test tests::the_table_is_free_while_a_keyed_read_derives ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 329 filtered out; finished in 19.91s
+
+== a red baseline's records (scripts/tests/test_mutation_baseline.py)
+
+test_imported_it_bounds_every_process_the_script_starts (scripts.tests.test_mutation_baseline.Bounded.test_imported_it_bounds_every_process_the_script_starts) ... ok
+test_every_red_baseline_says_what_failed (scripts.tests.test_mutation_baseline.EveryScript.test_every_red_baseline_says_what_failed) ... ok
+test_every_script_keeps_what_its_commands_say_from_its_start (scripts.tests.test_mutation_baseline.EveryScript.test_every_script_keeps_what_its_commands_say_from_its_start) ... ok
+test_a_browser_suites_failure_read_through_its_escapes (scripts.tests.test_mutation_baseline.Failures.test_a_browser_suites_failure_read_through_its_escapes) ... ok
+test_a_build_that_failed (scripts.tests.test_mutation_baseline.Failures.test_a_build_that_failed) ... ok
+test_a_failed_commands_output_with_no_result_is_shown_as_it_ended (scripts.tests.test_mutation_baseline.Failures.test_a_failed_commands_output_with_no_result_is_shown_as_it_ended) ... ok
+test_a_failing_test_and_its_panic (scripts.tests.test_mutation_baseline.Failures.test_a_failing_test_and_its_panic) ... ok
+test_a_failing_tests_records_are_shown_as_it_printed_them (scripts.tests.test_mutation_baseline.Failures.test_a_failing_tests_records_are_shown_as_it_printed_them) ... ok
+test_a_command_not_captured_keeps_how_it_ended (scripts.tests.test_mutation_baseline.Heard.test_a_command_not_captured_keeps_how_it_ended) ... ok
+test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then (scripts.tests.test_mutation_baseline.Heard.test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then) ... ok
+test_commands_that_ended_well_say_what_each_counted (scripts.tests.test_mutation_baseline.Heard.test_commands_that_ended_well_say_what_each_counted) ... ok
+test_explain_names_what_failed_as_it_failed (scripts.tests.test_mutation_baseline.Heard.test_explain_names_what_failed_as_it_failed) ... ok
+test_explain_runs_nothing_again (scripts.tests.test_mutation_baseline.Heard.test_explain_runs_nothing_again) ... ok
+test_explain_shows_a_failing_tests_records (scripts.tests.test_mutation_baseline.Heard.test_explain_shows_a_failing_tests_records) ... ok
+test_only_the_last_commands_are_kept (scripts.tests.test_mutation_baseline.Heard.test_only_the_last_commands_are_kept) ... ok
+test_what_a_command_said_is_kept_with_how_it_ended (scripts.tests.test_mutation_baseline.Heard.test_what_a_command_said_is_kept_with_how_it_ended) ... ok
+Ran 16 tests in 5.032s
+OK
+
+== mutation controls (scripts/derived_outside_mutations.py)
+
+baseline (host): 6 passed, 0 failed
+baseline (scripts): 16 passed, 0 failed
+a telling derives inside the table [host]: KILLED (3 of 6 tests fail)
+a keyed read derives inside the table [host]: KILLED (2 of 6 tests fail)
+a telling pushes what it derived against what is no longer shown [host]: KILLED (2 of 6 tests fail)
+a keyed read applies what it derived against what is no longer shown [host]: KILLED (1 of 6 tests fail)
+what is shown is the same whatever replaced it [host]: KILLED (3 of 6 tests fail)
+the last attempt is derived outside too [host]: KILLED (1 of 6 tests fail)
+a document's trail is not kept [host]: KILLED (1 of 6 tests fail)
+a document's trail is answered to another session [host]: KILLED (1 of 6 tests fail)
+a red baseline shows no record [scripts]: KILLED (1 of 16 tests fail)
+every line is a record [scripts]: KILLED (1 of 16 tests fail)
+10 of 10 mutants killed
+memory bound: no process was stopped

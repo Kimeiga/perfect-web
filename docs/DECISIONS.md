@@ -2431,3 +2431,21 @@ a page at another address of the page is moved there (for track `kiokun`'s
   kept, no origin named, kept by no cache; a move to itself or to a value no
   segment carries is the program's fault (500), and a case the page does not
   name a failure (503).
+[ADR-0296](DECISIONS/ADR-0296-a-change-is-derived-outside-the-table.md):
+a change is derived outside the table, and what reaches a document is
+recorded (WebKit's "Load more", failing on CI).
+- A telling and a keyed read derive a document's change outside the host's
+  subscriber table, against what the document shows, and push it only while
+  the document still shows exactly that, the last attempt inside. Each
+  document keeps a trail of what reached it, answered to its own session
+  (`/bench/records`), and a failing feed test prints its records, which a
+  red mutation baseline shows.
+[ADR-0297](DECISIONS/ADR-0297-a-commit-tells-the-pages-that-ask-at-once.md):
+a commit tells the pages that ask, and tells them at once (the feed's
+"a follow reaches another reader", failing on CI).
+- A telling derives only documents whose pages asked in the last three
+  seconds (`LIVE`); a document passed by is derived when its page next
+  asks, before its frames. The other sessions are told at once, eight at a
+  time, each in its own hold. A commit had told every session one after
+  another, the documents of pages closed up to two minutes before among
+  them.

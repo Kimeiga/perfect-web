@@ -1,7 +1,8 @@
 ADR-0236 - a speculation on the entry a page's parameter keys
 
 produced by: just e14-speculated-routes
-commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
+commit: 0efa5cad088d29a44297f6c100228b6726551de1
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -11,21 +12,21 @@ playwright: Version 1.58.0
 test the_thread_page_speculates_on_the_thread_its_parameter_keys ... ok
 test a_region_a_speculation_renders_reads_the_pages_parameter ... ok
 test any_other_flow_to_the_key_is_refused_by_name ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
-test tests::a_speculating_document_carries_its_parameters ... ok
 test tests::a_speculated_thread_is_named_by_its_page_parameter ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 148 filtered out; finished in 1.43s
+test tests::a_speculating_document_carries_its_parameters ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 333 filtered out; finished in 10.28s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  45 passed (35.3s)
+  66 passed (3.0m)
 
 == mutation controls (scripts/speculated_routes_mutations.py)
 
-baseline (browser): 45 passed, 0 failed
+baseline (browser): 66 passed, 0 failed
 baseline (cargo): 5 passed, 0 failed
 a key from the command's parameter matches no binding [cargo]: KILLED (4 of 5 tests fail)
 a name the handler binds passes the page's parameter [cargo]: KILLED (1 of 5 tests fail)
@@ -34,7 +35,8 @@ a speculated entry is named without the page's parameters [cargo]: KILLED (1 of 
 a document's parameters name no entry [cargo]: KILLED (1 of 5 tests fail)
 a frame is sent at the entry of no parameter [cargo]: KILLED (1 of 5 tests fail)
 a commit's basis names the entry of no parameter [cargo]: KILLED (1 of 5 tests fail)
-a region a speculation renders does not hold the page's parameters [cargo]: KILLED (1 of 5 tests fail)
+a region a speculation renders does not hold the page's parameters [cargo]: KILLED (3 of 5 tests fail)
 a speculating document carries no parameters [cargo]: KILLED (1 of 5 tests fail)
-the feed's reply is not speculated [browser]: KILLED (3 of 39 tests fail)
+the feed's reply is not speculated [browser]: KILLED (3 of 42 tests fail)
 10 of 10 mutants killed
+memory bound: no process was stopped

@@ -515,36 +515,24 @@ E14 comes before E11-E13. Its plan, controls and task list are
              and, found 2026-10-09 in CI itself: ~~**the nightly could not
              finish**~~ (ADR-0290: two shards cancelled at 345 minutes, the
              plan dealing by mutants; now dealt by each recipe's seconds,
-             the first nightly under it to be named here); open: **the WebKit
-             "Load more" failure's cause**, reproduced here with the
-             server's records (3 of 120, six workers): every commit's
-             telling derived every open document of every session inside
-             the host's one `pending` lock, 50 to 200 ms a hold, back to
-             back, and the page's stream waited up to 1.6 s a pass; the fix,
-             each change derived outside the lock and pushed only where the
-             document still shows what it was derived against, is in CI on
-             `track/stream-records` (its first WebKit job passed, and its
-             second; every other branch's WebKit job fails "Load more" now);
-             open, next, **`feed.spec.mjs`'s "a follow reaches another reader"
-             fails in CI's three-engine runs of the feed**: five mutation
-             baselines red in run 37918808029 (`track/arrival-clock`, in
-             Chromium and Firefox), three in run 37893301747
-             (`track/stream-records`, with "a reply reaches every reader"),
-             and none in the browser jobs; the second reader's count never
-             moved in five seconds, and its streams wrote nothing for four.
-             Not the server's new telling (arrival-clock has the old one),
-             and not the earlier test's unanswered unfollow (arrival-clock
-             awaits it). **Found** (run 37925722922, a failing test's
-             printed records): the second reader's document was never told,
-             or told five seconds and 47 tellings after the follower's. A
-             commit told the other sessions one after another, every
-             session with a document reading what it dropped, among them
-             the documents of pages closed up to two minutes before
-             (`IDLE`), which the runtime never says it left. The fix is on
-             `track/stream-records` (ADR-YYYY there): only documents whose
-             pages asked in the last three seconds are derived, one passed by
-             is derived when its page asks, and the sessions are told at
-             once, eight at a time;
+             the first nightly under it to be named here); ~~**the WebKit "Load more" failure's
+             cause**~~ (ADR-0296, `just e14-derived-outside`: every commit's
+             telling derived each open document inside the host's one
+             `pending` lock, 50 to 200 ms a hold, back to back, and the
+             page's stream waited up to 1.6 s a pass; a change is derived
+             outside it now, and pushed only where the document still shows
+             what it was derived against, 10 of 10 mutants; WebKit's "Load
+             more" passed in each of the branch's five runs, where every
+             other branch's failed it); and ~~**`feed.spec.mjs`'s "a follow
+             reaches another reader" failing in CI's three-engine runs**~~
+             (ADR-0297, `just e14-tell-at-once`: found by the failing test's
+             printed records, run 37925722922, the second reader told five
+             seconds and 47 tellings after the follower, or not at all: a
+             commit told the other sessions one after another, closed pages'
+             documents among them; only documents whose pages asked in the
+             last three seconds are derived now, one passed by when its page
+             asks, and eight sessions at once, 6 of 6 mutants; green in all
+             36 recipes of run 37943438178);
              ~~**`e14-graphs-on-the-wire` took CI's runner down**~~
              (ADR-0292) every time it ran there (the nightly of 2026-10-08,
              navigate's verify twice): the heartbeat (run 37902799186) named
