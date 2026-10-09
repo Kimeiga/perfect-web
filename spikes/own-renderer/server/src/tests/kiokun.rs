@@ -388,3 +388,43 @@ fn a_record_listed_twice_is_shown_twice_each_keyed_once() {
         .collect();
     assert_eq!(ids, ["5", "5:1", "5:2"]);
 }
+
+/// **A word too long to be a file name is no word of kiokun's**: a file
+/// name is at most 255 bytes (`NAME_MAX` on macOS and Linux), so kiokun's
+/// build wrote no `<file>.json.deflate` longer, and such a word is a 404, not
+/// a read the file system refuses (ENAMETOOLONG, which Rust's `std` reports
+/// as `InvalidFilename`, not `NotFound`). A word at the limit is read.
+#[test]
+fn a_word_too_long_to_be_a_file_name_is_not_found() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    // Every subdirectory, as a whole build has: a missing one would answer
+    // `NotFound` before the name's length is read.
+    for n in 0..256 {
+        std::fs::create_dir_all(dir.path().join(format!("{n:02x}"))).expect("a subdirectory");
+    }
+    // `<242 a's>.json.deflate` is 255 bytes: the longest name there is.
+    let longest = "a".repeat(242);
+    write_entry(
+        dir.path(),
+        &longest,
+        &format!(
+            r#"{{"key":"{longest}","chinese_words":[{{"_id":"1","simp":"x","trad":"x","items":[{{"pinyin":"x","definitions":["the longest word"]}}]}}]}}"#
+        ),
+    );
+    let s = served_kiokun_on(dir.path());
+    let found = fetched(&s, &format!("/word/{longest}"));
+    assert!(found.starts_with("HTTP/1.1 200 OK\r\n"), "{found}");
+    assert!(found.contains("the longest word"), "{found}");
+    // One byte more, and a hundred CJK characters (300 bytes).
+    for word in ["a".repeat(243), "人".repeat(100)] {
+        let page = fetched(&s, &path_of(&word));
+        assert!(
+            page.starts_with("HTTP/1.1 404 Not Found\r\n"),
+            "{}: {page}",
+            word.len()
+        );
+    }
+    use crate::kiokun::place;
+    assert!(place("00", &longest).is_some());
+    assert_eq!(place("00", &"a".repeat(243)), None);
+}

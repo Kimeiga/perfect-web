@@ -92,6 +92,12 @@ MUTANTS = [
         ";",
     ),
     (
+        "a name too long for the file system is read",
+        LAYER,
+        "    let fits = name.len() <= NAME_MAX;",
+        "    let fits = true;",
+    ),
+    (
         "a repeated id keys two records",
         LAYER,
         '        } else {\n            format!("{id}:{n}")\n        };',

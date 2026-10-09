@@ -68,7 +68,9 @@ production target.
      file)`: the file inflated and decoded into `Entry`, or none.
    - It reads one of kiokun's files and nothing else: a subdirectory is two
      lowercase hexadecimal digits, a name one path segment, never `.` or
-     `..`.
+     `..`, whose file name `<file>.json.deflate` is at most 255 bytes
+     (`NAME_MAX` on macOS and Linux), since kiokun's build wrote none
+     longer (the integrator's review, below).
    - It reads `KIOKUN_DATA` where the deployment names it, and the
      repository's sample otherwise (ADR-0037). It stages nothing.
    - A record whose id repeats in its list is kept, as kiokun.com shows each,
@@ -97,9 +99,39 @@ production target.
 2. **A fold's empty seed needs its type written.** `List.fold(xs, [], ..)`
    was refused by the backend ("an empty list whose element type nothing
    fixes yet"); `let none: List<T> = []` fixes it. The checker passed it.
+4. **A word too long to be a file name was an error, not a 404** (the
+   integrator's review of 2026-10-09). The layer passed any one segment to
+   the file system, and a file name over 255 bytes is refused there
+   (ENAMETOOLONG, which Rust's `std` reports as `InvalidFilename`, not
+   `NotFound`): `/word/` and 243 `a`s answered 503, the read's error. The
+   layer now refuses such a name, and the word is a 404, as any word kiokun
+   lacks; a word at the limit is read. The test makes every subdirectory, as
+   a whole build has, since a missing one answers `NotFound` first.
 3. **The renderer's part markers are in every served page**
    (`<!--pw:s0-->`), so a test reads a page's text through them, not its
    raw markup.
+
+## Differences from kiokun.com
+
+kiokun.com's word page, as its source states it, is the reference. Each
+difference here is stated with its evidence; any other the clone comparison
+finds is a defect.
+
+1. **Rendered by the server, and shown with script off.** kiokun.com sets
+   `ssr = false` (`src/routes/+layout.ts:4`) and shows nothing without
+   script. Ruled (docs/PARALLEL.md, "W6's inventory, answered", Q1).
+2. **The route is `/word/{word}`**, not `/{word}`, until the host's paths
+   move under `/_pw/` (Decision 3).
+3. **The title is `<word> | Kiokun`.** kiokun.com's is `buildDictionarySeo`'s
+   (`src/lib/seo.ts:163-198`), with its description, canonical link, link
+   preview and JSON-LD; the SEO head is a later milestone of step 1.
+4. **Japanese labels are JMdict's codes** (`n`, `ctr`), where kiokun.com
+   shows its table's labels (`japaneseLabels.ts`); the next milestone reads
+   the table through `KIOKUN_APP`. There, by the integrator's ruling (Q4 of
+   the review), a code is read as written, else with each `-` read as `_`,
+   else as itself: kiokun.com's table keys 53 codes with `_` while its
+   entries carry JMdict's `-`, so kiokun.com shows `adj-na` where its table
+   means `na adj.`. That is kiokun.com's defect, not matched.
 
 ## Alternatives
 
@@ -123,7 +155,7 @@ production target.
 
 ## Acceptance
 
-- **The server's tests, 10** (`server/src/tests/kiokun.rs`), on the
+- **The server's tests, 11** (`server/src/tests/kiokun.rs`), on the
   repository's sample and on files a test writes:
   - the host chooses the kiokun layer, which grants reading entries alone;
   - each language's words, as kiokun.com's page shows them;
@@ -136,11 +168,13 @@ production target.
   - what kiokun.com leaves out, left out: a reading with no senses, a
     search-only form, the placeholder "Sentence", each with its control;
   - the layer reads no path but one of kiokun's files;
-  - a record listed twice is shown twice, each keyed once.
+  - a record listed twice is shown twice, each keyed once;
+  - a word too long to be a file name is a 404, and one at the limit is
+    read.
 - **The browser, in three engines** (`e2e/kiokun-site.spec.mjs`): the page
   with script on, with no console error; the same with script off; a stub
   followed; a 404; the extras not shown.
-- **Mutation controls** (`scripts/kiokun_word_mutations.py`): 14 mutants,
+- **Mutation controls** (`scripts/kiokun_word_mutations.py`): 15 mutants,
   each undoing one rule, in the program, the layer or the seam.
 - `just e14-kiokun-word` records all three in
   `docs/evidence/E14/kiokun-word.txt`.
@@ -167,3 +201,18 @@ production target.
    program and the build refuses it.
 2. **The empty seed** (Found 2). Should the checker give `[]` its type from
    the fold's other arguments, or report it where the build would?
+
+## The integrator's answers
+
+Its review of 2026-10-09, relayed by message:
+
+1. **A host call through a helper**: the contract is wrong and the build is
+   right. A component's imports are what its compiled code calls, the
+   export's body and every Pleris function it reaches, transitively. The
+   integrator fixes `host_calls`; the reads may then move into a helper.
+2. **The empty seed**: the checker's acceptance stands (ADR-0065 §2); the
+   backend is to give the seed the checker's type for the fold where its
+   context expects none. Until then `let none: List<T> = []` stays.
+3. **Ports**: 7341 is the track's, 200 from W5's 7141.
+4. **kiokun.com's label table**: not reproduced (Differences, 4).
+5. **Fixed before the merge**: a word too long to be a file name (Found 4).

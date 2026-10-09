@@ -48,6 +48,9 @@ impl KiokunData {
     }
 }
 
+/// The longest file name, in bytes, on macOS (APFS) and Linux (ext4).
+const NAME_MAX: usize = 255;
+
 /// **Is `subdirectory/file` one of kiokun's files, and nothing else?** Two
 /// lowercase hexadecimal digits, as the shard rule writes them, and one path
 /// segment: kiokun's file names escape every separator
@@ -60,7 +63,12 @@ pub(crate) fn place(subdirectory: &str, file: &str) -> Option<PathBuf> {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
     let segment =
         !file.is_empty() && file != "." && file != ".." && !file.contains(['/', '\\', '\0']);
-    (hex && segment).then(|| PathBuf::from(subdirectory).join(format!("{file}.json.deflate")))
+    let name = format!("{file}.json.deflate");
+    // A file name is at most `NAME_MAX` bytes, 255 on macOS and Linux:
+    // kiokun's build wrote none longer, and reading one is the file system's
+    // refusal (ENAMETOOLONG), not a word kiokun lacks.
+    let fits = name.len() <= NAME_MAX;
+    (hex && segment && fits).then(|| PathBuf::from(subdirectory).join(name))
 }
 
 fn text(v: &serde_json::Value, key: &str) -> String {
