@@ -5361,3 +5361,19 @@ e14-dealt-by-time:
        python3 scripts/dealt_by_time_mutations.py; \
      } > docs/evidence/E14/dealt-by-time.txt
     @grep -E "^Ran |^OK|^FAILED|mutants killed" docs/evidence/E14/dealt-by-time.txt
+
+# ADR-0292: a mutation script's processes are bounded in memory. The bound's
+# tests and `mutation_baseline`'s, which starts it, and the mutation
+# controls.
+e14-mutation-bound:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0292 - a mutation script's processes are bounded in memory"; echo; \
+       echo "produced by: just e14-mutation-bound"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "python: $(python3 --version)"; echo "platform: $(uname -sm)"; echo; \
+       echo "== the bound (scripts/tests/test_mutation_bound.py, test_mutation_baseline.py)"; echo; \
+       python3 -m unittest -v scripts/tests/test_mutation_bound.py scripts/tests/test_mutation_baseline.py 2>&1 | grep -E ' \.\.\. |^Ran |^OK|^FAILED'; \
+       echo; echo "== mutation controls (scripts/mutation_bound_mutations.py)"; echo; \
+       python3 scripts/mutation_bound_mutations.py; \
+     } > docs/evidence/E14/mutation-bound.txt
+    @grep -E "^Ran |^OK|^FAILED|mutants killed" docs/evidence/E14/mutation-bound.txt

@@ -2385,3 +2385,12 @@ ADR-0172 to the host).
   program's (`-` read as `_`); a field under neither is refused, naming
   both. W6's finding: kiokun's layer wrote `chinese_char`, as the program
   names it, and the query trapped.
+[ADR-0292](DECISIONS/ADR-0292-a-mutation-scripts-processes-are-bounded-in-memory.md):
+a mutation script's processes are bounded in memory.
+- Every process a mutation script starts, and theirs, holds at most 4 GiB
+  (a quarter of the machine's memory where less), watched from
+  `mutation_baseline`; one past it is stopped and said before the mutant's
+  verdict. A kill by the bound is a kind of its own: each script's last line
+  says whether any mutant's run had a process stopped, and the run's summary
+  lists those apart. Only the script's own processes are read, and one is
+  stopped only where two readings agree it is the script's.

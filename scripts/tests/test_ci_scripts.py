@@ -434,6 +434,9 @@ class Fetch(unittest.TestCase):
 
 class Summary(unittest.TestCase):
     def run_summary(self, shards: list[list[dict]], files: dict[str, str], planned: int) -> int:
+        return self.summary_of(shards, files, planned).returncode
+
+    def summary_of(self, shards: list[list[dict]], files: dict[str, str], planned: int):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             for i, results in enumerate(shards):
@@ -448,13 +451,36 @@ class Summary(unittest.TestCase):
                 [sys.executable, str(SCRIPTS / "ci_summary.py"), tmp, "--shards", str(planned)],
                 capture_output=True,
                 text=True,
-            ).returncode
+            )
 
     def result(self, status: int = 0, wrote: list[str] | None = None) -> dict:
         return {"recipe": "e14-x", "status": status, "seconds": 1.0, "wrote": wrote or []}
 
     def test_a_run_whose_recipes_passed_passes(self) -> None:
         self.assertEqual(self.run_summary([[self.result(wrote=["a.txt"])]], {"a.txt": "3 of 3 mutants killed\n"}, 1), 0)
+
+    def test_a_kill_perhaps_the_memory_bounds_alone_is_listed_apart(self) -> None:
+        # A kind of its own (mutation_bound.py): not a failure, and not
+        # counted with a test's kills.
+        stopped = (
+            "  memory bound: stopped `graphs`, which held more than 4 GiB\n"
+            "the renderer takes a node twice: KILLED (1 of 25 tests fail)\n"
+            "19 of 19 mutants killed\n"
+            "memory bound: a process was stopped in 1 of 19 mutants' runs, "
+            "each perhaps killed by the bound alone: the renderer takes a node twice\n"
+        )
+        done = self.summary_of([[self.result(wrote=["a.txt"])]], {"a.txt": stopped}, 1)
+        self.assertEqual(done.returncode, 0)
+        self.assertIn(
+            "Killed, perhaps by the memory bound alone, not by a test:\n\n"
+            "- e14-x: a process was stopped in 1 of 19 mutants' runs, each perhaps killed "
+            "by the bound alone: the renderer takes a node twice\n",
+            done.stdout,
+        )
+        quiet = self.summary_of(
+            [[self.result(wrote=["a.txt"])]], {"a.txt": "3 of 3 mutants killed\nmemory bound: no process was stopped\n"}, 1
+        )
+        self.assertNotIn("memory bound", quiet.stdout)
 
     def test_a_failed_recipe_fails_the_run(self) -> None:
         self.assertEqual(self.run_summary([[self.result(status=1)]], {}, 1), 1)

@@ -23,6 +23,19 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0292, 2026-10-09: a mutation script's processes are bounded in
+memory** (found by CI's heartbeat). CI's runner died every time
+`e14-graphs-on-the-wire` ran there, with exit 143 and no word: under its
+mutant "the renderer takes a node twice", the 100,000-node chain test copies
+each node's whole rest and keeps it, 14.5 GiB in thirty seconds. Every
+process a mutation script starts now holds at most 4 GiB, watched from
+`mutation_baseline` in all of the scripts; one past it is stopped and said,
+and a kill by the bound is a kind of its own, named in each script's last
+line and listed apart in the run's summary, so a suite whose kills were the
+bound's cannot pass for one whose kills were its tests'. On CI the runaway is
+stopped at 3.9 GiB and the recipe passes in ten minutes (run 37908865560).
+15 tests, 16 of 16 mutants killed on CI.
+
 **ADR-0291, 2026-10-09: a host's record is written as the program names its
 fields** (W6's finding). kiokun's data layer wrote an entry's field
 `chinese_char`, as the program's `Entry` names it, and the query trapped:
