@@ -42,6 +42,10 @@ e14-kiokun-sample:
     @test -n "${KIOKUN_DATA:-}" || { echo "KIOKUN_DATA must name a kiokun-data checkout's output_dictionary"; exit 1; }
     @mkdir -p docs/evidence/E14
     @git show 3036497:examples/kiokun-site/app.pw > "${TMPDIR:-/tmp}/kiokun-site-0286.pw"
+    @# The baseline's source holds what today's layer grants (Label, CharGloss),
+    @# declared and unused, so the host holds it to the guarantees it states.
+    @sed -i.bak 's/^    holds        Entry$/    holds        Entry, Label, CharGloss/' "${TMPDIR:-/tmp}/kiokun-site-0286.pw"
+    @printf '\ntype Label = Label {\n    kind: String,\n    code: String,\n    text: String,\n}\n\ntype CharGloss = CharGloss {\n    character: String,\n    gloss: String,\n}\n' >> "${TMPDIR:-/tmp}/kiokun-site-0286.pw"
     @{ echo "A sample of the whole dictionary, served by the development server and timed"; echo; \
        echo "produced by: just e14-kiokun-sample (local: reads a kiokun-data checkout)"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
