@@ -1989,9 +1989,21 @@ pub mod engine {
                     fields.into_iter().collect();
                 let mut out = Vec::new();
                 for field in record.fields() {
-                    let v = given.remove(field.name).ok_or_else(|| {
-                        format!("the host's record has no field `{}`", field.name)
-                    })?;
+                    // By its WIT name, or as the program writes it (ADR-XXXX):
+                    // a data layer writes a record as Pleris names its
+                    // fields, as a browser does (ADR-0172), and the program's
+                    // `opens_minute` is the world's `opens-minute`.
+                    let written = field.name.replace('-', "_");
+                    let v = given
+                        .remove(field.name)
+                        .or_else(|| given.remove(&written))
+                        .ok_or_else(|| match written == field.name {
+                            true => format!("the host's record has no field `{}`", field.name),
+                            false => format!(
+                                "the host's record has no field `{}`, nor `{written}`",
+                                field.name
+                            ),
+                        })?;
                     out.push((field.name.to_string(), project(v, &field.ty)?));
                 }
                 Val::Record(out)

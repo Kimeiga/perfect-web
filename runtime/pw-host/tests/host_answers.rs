@@ -154,6 +154,33 @@ fn a_field_the_type_declares_and_the_answer_lacks_is_refused() {
 }
 
 #[test]
+fn a_field_written_as_the_program_names_it_is_read() {
+    // ADR-XXXX: a data layer writes `opens_minute`, as the program's record
+    // names it, and the world's `opens-minute` is read from it. kiokun's
+    // layer wrote `chinese_char`, and its query trapped.
+    let mut row = declared();
+    row[3].1 = Val::Record(vec![
+        ("opens_minute".into(), Val::S64(420)),
+        ("closes_minute".into(), Val::S64(1140)),
+    ]);
+    assert_eq!(
+        the_store(ok(Val::Record(row))),
+        Ok(vec![ok(Val::Record(declared()))])
+    );
+}
+
+#[test]
+fn a_field_under_neither_name_is_refused_by_both() {
+    let mut row = declared();
+    row[3].1 = Val::Record(vec![("closes_minute".into(), Val::S64(1140))]);
+    let refused = the_store(ok(Val::Record(row))).expect_err("refused");
+    assert!(
+        refused.contains("the host's record has no field `opens-minute`, nor `opens_minute`"),
+        "{refused}"
+    );
+}
+
+#[test]
 fn a_list_s_rows_and_a_declared_error_are_read_through_their_types() {
     let coffee = || {
         Val::Record(vec![
