@@ -1344,15 +1344,59 @@ impl Server {
 
     /// How many items the data layer holds for the session: the tests' view
     /// of the state. The page's count is `domain.line_count`'s (ADR-0125).
+    /// Read through the layer, as a query reads it, so that a test reads
+    /// the same on every layer (track `store-pg`).
     #[cfg(test)]
     fn cart_value(&self, session: &str) -> i64 {
-        self.store
-            .carts
-            .lock()
-            .expect("carts")
-            .get(session)
-            .map(|lines| lines.iter().map(|l| l.quantity).sum())
-            .unwrap_or(0)
+        self.cart_lines(session).iter().map(|(_, q)| q).sum()
+    }
+
+    /// **The session's cart, read through the layer** (track `store-pg`):
+    /// each line's item and quantity, in order.
+    #[cfg(test)]
+    fn cart_lines(&self, session: &str) -> Vec<(String, i64)> {
+        let read = self.layer_read(session, "store:data/carts#current", session);
+        match read {
+            Val::Result(Ok(Some(cart))) => lines_of(&cart),
+            other => panic!("carts#current answered {other:?}"),
+        }
+    }
+
+    /// **The session's order, read through the layer** (ADR-0193, track
+    /// `store-pg`): its status's case and the lines it was placed with, or
+    /// none before one is placed.
+    #[cfg(test)]
+    fn order_of(&self, session: &str) -> Option<(String, Vec<(String, i64)>)> {
+        let status = match self.layer_read(session, "store:data/orders#current", session) {
+            Val::Result(Ok(Some(v))) => match *v {
+                Val::Option(None) => return None,
+                Val::Option(Some(case)) => match *case {
+                    Val::Variant(case, _) => case,
+                    other => panic!("orders#current answered {other:?}"),
+                },
+                other => panic!("orders#current answered {other:?}"),
+            },
+            other => panic!("orders#current answered {other:?}"),
+        };
+        let lines = match self.layer_read(session, "store:data/orders#placed", session) {
+            Val::Option(Some(cart)) => lines_of(&cart),
+            Val::Option(None) => Vec::new(),
+            other => panic!("orders#placed answered {other:?}"),
+        };
+        Some((status, lines))
+    }
+
+    /// One read of the data layer's, by its key, for `session`, passed
+    /// `arg`.
+    #[cfg(test)]
+    fn layer_read(&self, session: &str, op: &str, arg: &str) -> Val {
+        let ops = self.data.reads(session, None);
+        let read = ops
+            .get(op)
+            .unwrap_or_else(|| panic!("the layer has no `{op}`"));
+        let mut out = read(&[Val::String(arg.to_string())]).expect(op);
+        assert_eq!(out.len(), 1, "{op}: {out:?}");
+        out.remove(0)
     }
 
     /// **The platform's outbox, for one command** (ADR-0208, ADR-0209): each
@@ -5173,6 +5217,24 @@ fn cart_value(lines: &[Line]) -> Val {
     )])
 }
 
+/// **A cart's lines, as `(item, quantity)`**, from a cart's value: what a
+/// test compares (track `store-pg`).
+#[cfg(test)]
+fn lines_of(cart: &Val) -> Vec<(String, i64)> {
+    let Some(Val::List(lines)) = val_at(cart, &["lines"]) else {
+        panic!("no cart: {cart:?}");
+    };
+    lines
+        .iter()
+        .map(
+            |line| match (val_at(line, &["item-id"]), val_at(line, &["quantity"])) {
+                (Some(Val::String(item)), Some(Val::S64(q))) => (item.clone(), *q),
+                other => panic!("no line: {other:?}"),
+            },
+        )
+        .collect()
+}
+
 /// **A binding's policy, as `pw-resource`'s manifest** (ADR-0127).
 /// **A query's value, from its answer** (ADR-0147): the `Ok` value, and a
 /// declared error as a failure.
@@ -6124,8 +6186,20 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .map(str::to_string);
             let mut orders = server.store.orders.lock().expect("orders");
             match status {
-                Some(s) => orders.insert(session.clone(), s),
-                None => orders.remove(&session),
+                // The order moved along keeps its lines (ADR-0193); one the
+                // kitchen sets with none placed has none.
+                Some(s) => {
+                    orders
+                        .entry(session.clone())
+                        .or_insert_with(|| store::Order {
+                            status: String::new(),
+                            lines: Lines::new(),
+                        })
+                        .status = s
+                }
+                None => {
+                    orders.remove(&session);
+                }
             };
             drop(orders);
             // And the session's open pages told (ADR-0193).
@@ -7998,11 +8072,13 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         let s = orders_server();
         let (none, _) = s.serve_document("a");
         assert!(visible(&none).contains("No order yet."), "{none}");
-        s.store
-            .orders
-            .lock()
-            .expect("orders")
-            .insert("a".into(), "preparing".into());
+        s.store.orders.lock().expect("orders").insert(
+            "a".into(),
+            store::Order {
+                status: "preparing".into(),
+                lines: Lines::new(),
+            },
+        );
         let (preparing, _) = s.serve_document("a");
         assert!(
             visible(&preparing).contains("Your order is being prepared."),
@@ -8018,11 +8094,13 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
         let s = orders_server();
         // A status the program's type does not have: the component's types
         // refuse what the host gives, and the query fails.
-        s.store
-            .orders
-            .lock()
-            .expect("orders")
-            .insert("a".into(), "ready".into());
+        s.store.orders.lock().expect("orders").insert(
+            "a".into(),
+            store::Order {
+                status: "ready".into(),
+                lines: Lines::new(),
+            },
+        );
         let refused = s
             .serve_document_with_entries("a")
             .expect_err("a page that cannot be shown");
@@ -8036,11 +8114,13 @@ session query CartLines(id: StoreId, session: Session<SessionId>) -> Result<List
     fn a_served_page_whose_values_fail_is_told_to_read_itself_again() {
         let s = orders_server();
         s.serve_document("a");
-        s.store
-            .orders
-            .lock()
-            .expect("orders")
-            .insert("a".into(), "ready".into());
+        s.store.orders.lock().expect("orders").insert(
+            "a".into(),
+            store::Order {
+                status: "ready".into(),
+                lines: Lines::new(),
+            },
+        );
         s.command(ADD, "a", &add("espresso", 1), false)
             .expect("the command commits");
         let queue = s.pending.lock().expect("pending");
@@ -12729,20 +12809,20 @@ public query Store(",
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         s.command(ADD, "a", &add_shown("espresso", 2), false)
             .expect("added");
+        s.command(ADD, "a", &add_shown("cortado", 1), false)
+            .expect("added");
         s.command(PLACE, "a", &[], false).expect("placed");
+        // The order is the cart's lines and a status (ADR-0193). Until
+        // 2026-10-08 it kept the status alone, and its lines went with the
+        // emptied cart.
         assert_eq!(
-            s.store
-                .orders
-                .lock()
-                .expect("orders")
-                .get("a")
-                .map(String::as_str),
-            Some("placed")
+            s.order_of("a"),
+            Some((
+                "placed".to_string(),
+                vec![("espresso".to_string(), 2), ("cortado".to_string(), 1)]
+            ))
         );
-        assert!(
-            s.store.carts.lock().expect("carts")["a"].is_empty(),
-            "the cart is empty after"
-        );
+        assert!(s.cart_lines("a").is_empty(), "the cart is empty after");
         let last = sets_of(&s, &doc).pop().expect("a patch set");
         assert!(
             written(&last).contains("Placed: the store has your order."),
@@ -12773,7 +12853,7 @@ public query Store(",
             "{:?}",
             answered.result
         );
-        assert!(s.store.orders.lock().expect("orders").get("a").is_none());
+        assert_eq!(s.order_of("a"), None);
     }
 
     /// **The store moving an order along reaches the page open on it**
@@ -12813,6 +12893,11 @@ public query Store(",
             .filter(|(_, f)| matches!(f, StreamFrame::EntryValue { .. }))
             .count();
         assert_eq!(values, 0, "the cart's value went with the order's change");
+        // Moved along, it keeps the lines it was placed with (ADR-0193).
+        assert_eq!(
+            s.order_of("a"),
+            Some(("delivered".to_string(), vec![("espresso".to_string(), 1)]))
+        );
     }
 
     #[test]

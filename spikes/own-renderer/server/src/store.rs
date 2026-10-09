@@ -19,10 +19,11 @@ pub(crate) struct StoreData {
     /// `store:data/carts#add` is its operation, and the compiled command calls
     /// it through the host.
     pub(crate) carts: Mutex<BTreeMap<String, Lines>>,
-    /// **Each session's order, by its status's case** (E14, T04): what
-    /// `store:data/orders#current` answers. The kitchen sets it through
-    /// `/bench/order`; no order is `None`.
-    pub(crate) orders: Mutex<BTreeMap<String, String>>,
+    /// **Each session's order** (E14, T04; ADR-0193): the cart's lines it
+    /// was placed with, and its status's case, what
+    /// `store:data/orders#current` answers. The kitchen sets the status
+    /// through `/bench/order`; no order is `None`.
+    pub(crate) orders: Mutex<BTreeMap<String, Order>>,
     /// **The recommender** (ADR-0148): what a streamed region's query reads,
     /// with the delay and failure a test sets.
     pub(crate) recommender: Mutex<Recommender>,
@@ -294,14 +295,16 @@ impl StoreData {
 
     /// **The store's data layer for orders, as a command sees it**
     /// (ADR-0193): `orders#place` places the session's cart as its order.
-    /// The order is the cart's lines, staged as `placed`, and the cart is
-    /// staged empty, so the two commit together, in the command's commit.
-    /// An empty cart places nothing, and says so.
+    /// The order is the cart's lines and the status `placed`, staged as
+    /// `placed`, and the cart is staged empty, so the two commit together,
+    /// in the command's commit. An empty cart places nothing, and says so.
+    /// Until 2026-10-08 the order kept its status alone, and its lines went
+    /// with the emptied cart.
     pub(crate) fn order_layer(
         session: &str,
         current: Lines,
         staged: Arc<Mutex<Option<Lines>>>,
-        placed: Arc<Mutex<Option<String>>>,
+        placed: Arc<Mutex<Option<Order>>>,
     ) -> BTreeMap<String, HostFn> {
         let this_session = session.to_string();
         let place: HostFn = Arc::new(move |args: &[Val]| {
@@ -320,7 +323,10 @@ impl StoreData {
                 )))))]);
             }
             *staged = Some(Lines::new());
-            *placed.lock().expect("placed") = Some("placed".to_string());
+            *placed.lock().expect("placed") = Some(Order {
+                status: "placed".to_string(),
+                lines,
+            });
             Ok(vec![Val::Result(Ok(Some(Box::new(Val::Variant(
                 "placed".into(),
                 None,
@@ -600,6 +606,13 @@ impl StoreData {
         // program's type does not have is refused by the component's types,
         // as any value the host gives is.
         let order = self.orders.lock().expect("orders").get(session).cloned();
+        // And the lines it was placed with (ADR-0193), a cart's value, or
+        // none before one is placed.
+        host.insert(
+            "store:data/orders#placed".to_string(),
+            placed_op(session, order.clone().map(|o| o.lines)),
+        );
+        let order = order.map(|o| o.status);
         let this_session = session.to_string();
         host.insert(
             "store:data/orders#current".to_string(),
@@ -670,7 +683,7 @@ impl StoreData {
         let staged: Arc<Mutex<Option<Lines>>> = Arc::default();
         // The order a command places (ADR-0193), staged with the cart it
         // empties, and committed with it.
-        let placed: Arc<Mutex<Option<String>>> = Arc::default();
+        let placed: Arc<Mutex<Option<Order>>> = Arc::default();
         let order = Self::order_layer(session, current.clone(), staged.clone(), placed.clone());
         let mut host = self.faulted(
             session,
@@ -712,7 +725,7 @@ pub(crate) struct Staging<'a> {
     staged: Arc<Mutex<Option<Lines>>>,
     /// The order a command places (ADR-0193), staged with the cart it
     /// empties, and committed with it.
-    placed: Arc<Mutex<Option<String>>>,
+    placed: Arc<Mutex<Option<Order>>>,
     ops: BTreeMap<String, HostFn>,
 }
 
@@ -738,14 +751,39 @@ impl Staging<'_> {
         if let Some(lines) = self.staged.lock().expect("staged").take() {
             self.carts.insert(self.session.clone(), lines);
         }
-        if let Some(status) = self.placed.lock().expect("placed").take() {
+        if let Some(order) = self.placed.lock().expect("placed").take() {
             self.store
                 .orders
                 .lock()
                 .expect("orders")
-                .insert(self.session.clone(), status);
+                .insert(self.session.clone(), order);
         }
     }
+}
+
+/// **A session's order** (ADR-0193): the cart's lines it was placed with,
+/// and its status's case.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Order {
+    pub(crate) status: String,
+    pub(crate) lines: Lines,
+}
+
+/// **`store:data/orders#placed`** (ADR-0193): the lines the session's order
+/// was placed with, as a cart's value, or none before one is placed. No
+/// program reads it yet; the store's tests read an order through it.
+pub(crate) fn placed_op(session: &str, lines: Option<Lines>) -> HostFn {
+    let this_session = session.to_string();
+    Arc::new(move |args: &[Val]| {
+        let [Val::String(s)] = args else {
+            return Err(format!("orders#placed received {args:?}"));
+        };
+        if *s != this_session {
+            return Err("orders#placed was passed another session".to_string());
+        }
+        let cart = lines.as_deref().map(|l| Box::new(cart_value(l)));
+        Ok(vec![Val::Option(cart)])
+    })
 }
 
 impl crate::data::Staged for Staging<'_> {
