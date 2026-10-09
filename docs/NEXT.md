@@ -499,7 +499,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
              handler, allows `build`. A handler runs in the browser, and a
              command it sends at the command's own placement: the
              DoorDash menu's static pages with an Add button need this;
-             and, found 2026-10-09 in CI itself, open: **the WebKit
+             and, found 2026-10-09 in CI itself: ~~**the nightly could not
+             finish**~~ (ADR-0290: two shards cancelled at 345 minutes, the
+             plan dealing by mutants; now dealt by each recipe's seconds,
+             the first nightly under it to be named here); open: **the WebKit
              "Load more" failure's cause**, reproduced here with the
              server's records (3 of 120, six workers): every commit's
              telling derived every open document of every session inside
@@ -508,15 +511,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
              each change derived outside the lock and pushed only where the
              document still shows what it was derived against, is in CI on
              `track/stream-records` (its first WebKit job passed);
-             **`e14-graphs-on-the-wire` takes CI's runner down** a few
-             minutes in, every time it runs there (the nightly of
-             2026-10-08, navigate's verify twice), and passes here (19 of 19,
-             2.2 GB at most): a heartbeat in `ci_recipes.py`
-             (`track/one-shard`) will show what it does when the runner
-             dies; **a run of one recipe shard reported none**
-             (`download-artifact` extracts a lone match into its path), so
-             its summary failed: fixed on `track/one-shard`; and
-             `e14-contract` exited 1 in that nightly, not yet looked at;
+             ~~**`e14-graphs-on-the-wire` took CI's runner down**~~
+             (ADR-0292) every time it ran there (the nightly of 2026-10-08,
+             navigate's verify twice): the heartbeat (run 37902799186) named
+             a mutant, "the renderer takes a node twice", under which the
+             100,000-node chain test holds 14.5 GiB in thirty seconds; it did
+             here too, where the binary ended without a result (corrected:
+             this file said the recipe passed here, 2.2 GB at most). Every
+             process a mutation script starts is now bounded at 4 GiB, a
+             kill by the bound its own kind; the recipe passes on CI in ten
+             minutes (run 37908865560); `e14-contract`, which exited 1 in
+             that nightly, passed alone (run 37902799186);
              and, open, next, the integrator's, **the host's paths
              reserved under `/_pw/`** (W6's question, PARALLEL.md
              2026-10-08): the runtime's files and its root endpoints moved

@@ -23,6 +23,43 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0292, 2026-10-09: a mutation script's processes are bounded in
+memory** (found by CI's heartbeat). CI's runner died every time
+`e14-graphs-on-the-wire` ran there, with exit 143 and no word: under its
+mutant "the renderer takes a node twice", the 100,000-node chain test copies
+each node's whole rest and keeps it, 14.5 GiB in thirty seconds. Every
+process a mutation script starts now holds at most 4 GiB, watched from
+`mutation_baseline` in all of the scripts; one past it is stopped and said,
+and a kill by the bound is a kind of its own, named in each script's last
+line and listed apart in the run's summary, so a suite whose kills were the
+bound's cannot pass for one whose kills were its tests'. On CI the runaway is
+stopped at 3.9 GiB and the recipe passes in ten minutes (run 37908865560).
+15 tests, 16 of 16 mutants killed on CI.
+
+**ADR-0291, 2026-10-09: a host's record is written as the program names its
+fields** (W6's finding). kiokun's data layer wrote an entry's field
+`chinese_char`, as the program's `Entry` names it, and the query trapped:
+the host read a record's fields by their WIT names alone, `chinese-char`.
+A host now reads each field by its WIT name, or else by the program's, as
+the browser has since ADR-0172, and a field under neither is refused naming
+both. Two tests in `pw-host`; `e14-cart-lines` (41 of 41) and
+`e14-descriptions` (9 of 9) re-run on CI with their anchors moved (run
+37894486009).
+
+**ADR-0290, 2026-10-09: a verification run is dealt by the seconds its
+recipes last took** (found in CI: the nightly cancelled). The nightly of
+2026-10-08 did not finish: two of its 17 shards were cancelled at the job's
+345 minutes with half their recipes unrun, while another ended after 41,
+because the plan weighed a recipe by the mutants it plants, which foretell
+its time poorly (0.43 over 213 recipes). Every evidence fetch now keeps each
+recipe's seconds, and the plan deals the longest first to the shard where it
+ends soonest, its setup counted; the database's recipes take as many shards
+as end the run soonest. Replayed on that night's seconds: sixteen shards at
+about 152 minutes and the database's at 87, where its plan held 437 minutes
+in one. 34 tests, 8 of 8 mutants killed on CI (run 37907578665). Amends
+ADR-0249 (a recipe needing less may run where more is set up) and ADR-0278
+(as many database shards as end the run soonest).
+
 **ADR-0288 and ADR-0289, 2026-10-09: kiokun's labels and character
 header, its loader's merges and the header's written forms** (track
 `kiokun`, W6, merged from `de0c4ca`). The word page shows JMdict's codes by
