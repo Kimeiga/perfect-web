@@ -19,9 +19,10 @@ Each mutant undoes one piece:
   a build renders served without its announcer;
 - the program: the feed's composer shown to a reader signed out.
 
-A checker mutant must fail `pw-core`'s tests, all of them run; a host
-mutant, the host's identity and announcer tests; a runtime or program
-mutant, the browser tests below, in Chromium.
+A checker mutant must fail `pw-core`'s tests, all of them run; the build's
+page's, `pw-render`'s binary's (`tests/titles.rs`); a host mutant, the
+host's identity and announcer tests; a runtime or program mutant, the
+browser tests below, in Chromium.
 
 Run from the repository root; `just e14-refusal` records the output. The
 source is restored after every mutant, whatever happens.
@@ -173,8 +174,8 @@ MUTANTS = [
         '    let announcer = "";\n',
     ),
     (
-        "a page a build renders is served without its announcer",
-        "browser",
+        "a page a build renders holds no announcer",
+        "render",
         RENDER,
         "        tail.push_str(pw_render::ANNOUNCER);\n",
         "",
@@ -267,6 +268,7 @@ MUTANTS = [
 
 CARGO = {
     "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core"],
+    "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render", "--test", "titles"],
     "host": [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
         "sign_in::", "a_signal_page_holds_its_announcer",
@@ -345,7 +347,12 @@ def browser_tests(_suite="browser"):
     return passed + failed > 0, passed, failed
 
 
-SUITES = {"core": cargo_tests, "host": cargo_tests, "browser": browser_tests}
+SUITES = {
+    "core": cargo_tests,
+    "render": cargo_tests,
+    "host": cargo_tests,
+    "browser": browser_tests,
+}
 
 
 def main():

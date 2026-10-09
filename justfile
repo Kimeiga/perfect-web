@@ -5177,6 +5177,8 @@ e14-refusal:
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== a predicate says what a refusal by it is told (compiler/pw-core, PW0351)"; echo; \
        cargo test --locked -p pw-core --test predicates 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the build's page holds the announcer (runtime/pw-render, tests/titles.rs)"; echo; \
+       cargo test --locked -p pw-render --test titles 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the host answers a refusal with its words, kept with its press; a page holds its announcer"; echo; \
        cargo test --locked -p pw-dev-server -- sign_in:: a_signal_page_holds_its_announcer 2>&1 \
          | grep -E '^(test |test result)|panicked at'; \

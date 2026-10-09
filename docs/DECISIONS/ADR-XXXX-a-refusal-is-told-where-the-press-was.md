@@ -125,6 +125,11 @@ the third holds a control to what the page shows its predicate holds.
   declared predicate with too few or too many arguments, or one of another
   type, refused; `says` on anything but a predicate refused; a predicate the
   program does not declare, or imports, accepted.
+- The build's page (`runtime/pw-render/tests/titles.rs`): a page that
+  ships the runtime holds the announcer once, before it; a page that ships
+  none holds none. Not the browser's to test: the development server renders
+  `/StorePage.html` itself, and the build's file is never served there (the
+  first run of the mutation controls found its mutant alive).
 - Host (`tests/sign_in.rs`, and a page that binds no query): 403 with the
   program's words, and the deployment's where it declares none; a resend of
   a refused press answered the same; a host that cannot evaluate a
