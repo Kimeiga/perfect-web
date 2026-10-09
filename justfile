@@ -5344,3 +5344,99 @@ e14-held-labels:
      } > docs/evidence/E14/held-labels.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/held-labels.txt
 
+
+# ADR-0283 and ADR-0284, from W6's report on kiokun's word page: a
+# component's contract is what its code does, and a value of any type is
+# fixed by the call that meets it. The compiler's tests, the store's
+# contracts and worlds held to the committed ones, and the mutation controls.
+e14-what-a-component-does:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0283 and ADR-0284 - a component's contract is what its code does; a value of any type is fixed by the call that meets it"; echo; \
+       echo "produced by: just e14-what-a-component-does"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (what_a_component_does.rs, any_type.rs, component_contract.rs, evidence_is_current.rs)"; echo; \
+       cargo test --locked -p pw-core --test what_a_component_does --test any_type --test component_contract --test evidence_is_current 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/what_a_component_does_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/what_a_component_does_mutations.py; \
+     } > docs/evidence/E14/what-a-component-does.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/what-a-component-does.txt
+
+# ADR-0287: a handler is held where it runs. The compiler's tests and the
+# mutation controls.
+e14-handlers-where-they-run:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0287 - a handler is held where it runs"; echo; \
+       echo "produced by: just e14-handlers-where-they-run"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (handlers_where_they_run.rs, handlers_in_the_browser.rs)"; echo; \
+       cargo test --locked -p pw-core --test handlers_where_they_run --test handlers_in_the_browser 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/handlers_where_they_run_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/handlers_where_they_run_mutations.py; \
+     } > docs/evidence/E14/handlers-where-they-run.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/handlers-where-they-run.txt
+
+# ADR-0290: a verification run is dealt by the seconds its recipes last
+# took. The CI scripts' tests and the mutation controls.
+e14-dealt-by-time:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0290 - a verification run is dealt by the seconds its recipes last took"; echo; \
+       echo "produced by: just e14-dealt-by-time"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "python: $(python3 --version)"; echo; \
+       echo "== the plan and the fetch (scripts/tests/test_ci_scripts.py)"; echo; \
+       python3 -m unittest -v scripts/tests/test_ci_scripts.py 2>&1 | grep -E ' \.\.\. |^Ran |^OK|^FAILED'; \
+       echo; echo "== mutation controls (scripts/dealt_by_time_mutations.py)"; echo; \
+       python3 scripts/dealt_by_time_mutations.py; \
+     } > docs/evidence/E14/dealt-by-time.txt
+    @grep -E "^Ran |^OK|^FAILED|mutants killed" docs/evidence/E14/dealt-by-time.txt
+
+# ADR-0292: a mutation script's processes are bounded in memory. The bound's
+# tests and `mutation_baseline`'s, which starts it, and the mutation
+# controls.
+e14-mutation-bound:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0292 - a mutation script's processes are bounded in memory"; echo; \
+       echo "produced by: just e14-mutation-bound"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "python: $(python3 --version)"; echo "platform: $(uname -sm)"; echo; \
+       echo "== the bound (scripts/tests/test_mutation_bound.py, test_mutation_baseline.py)"; echo; \
+       python3 -m unittest -v scripts/tests/test_mutation_bound.py scripts/tests/test_mutation_baseline.py 2>&1 | grep -E ' \.\.\. |^Ran |^OK|^FAILED'; \
+       echo; echo "== mutation controls (scripts/mutation_bound_mutations.py)"; echo; \
+       python3 scripts/mutation_bound_mutations.py; \
+     } > docs/evidence/E14/mutation-bound.txt
+    @grep -E "^Ran |^OK|^FAILED|mutants killed" docs/evidence/E14/mutation-bound.txt
+
+# ADR-0294: a list renders in its length (W6's finding on kiokun's sample).
+# The renderer's scope test, the list's scale timed, and the mutation controls.
+e14-shared-scopes:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0294 - a list renders in its length"; echo; \
+       echo "produced by: just e14-shared-scopes"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the renderer (runtime/pw-render: scopes, tests/list_scale.rs)"; echo; \
+       cargo test --locked -p pw-render --lib scopes 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-render --test list_scale -- --include-ignored --nocapture 2>&1 | grep -E '^(test |test result)|names|ratio|panicked at'; \
+       echo; echo "== mutation controls (scripts/shared_scopes_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/shared_scopes_mutations.py; \
+     } > docs/evidence/E14/shared-scopes.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at|ratio" docs/evidence/E14/shared-scopes.txt
+
+# ADR-0295: a page at another address of the page is moved there. The
+# compiler's tests, the development server's, and the mutation controls.
+e14-redirects:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0295 - a page at another address of the page is moved there"; echo; \
+       echo "produced by: just e14-redirects"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (compiler/pw-core/tests/redirects.rs, not_found.rs)"; echo; \
+       cargo test --locked -p pw-core --test redirects --test not_found 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the development server (spikes/own-renderer/server/src/tests/redirects.rs)"; echo; \
+       cargo test --locked -p pw-dev-server tests::redirects 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/redirects_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/redirects_mutations.py; \
+     } > docs/evidence/E14/redirects.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/redirects.txt

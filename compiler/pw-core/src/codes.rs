@@ -270,6 +270,10 @@ codes! {
         "a command's record of an interaction commits with its writes";
     SOURCE_MALFORMED = "PW0349" / source_malformed / 1, DeclarationRules,
         "a source holds what the program's effects name, and each is held by one";
+    // ADR-0295: a page whose address is another address of the page answers
+    // a redirect there, as kiokun.com's word page does.
+    REDIRECT_NAMES_A_CASE = "PW0350" / redirect_names_a_case / 1, DeclarationRules,
+        "a page's `redirect_on` names a case a query it reads can answer, which carries the one parameter of the page's route, and says whether the move is permanent";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
 

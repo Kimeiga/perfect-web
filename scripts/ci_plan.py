@@ -13,14 +13,15 @@ The recipes are `just`'s own list, kept where they record evidence
   whose own lines changed;
 - or those named.
 
-Each is dealt to the shard with the least work so far, the costliest first,
-by an estimate of its cost: the mutants the scripts it runs plant, each a
-build and a test run. One that needs a database (`NEEDS_DATABASE`) is a
-shard of its own, which the run gives a PostgreSQL of its own (ADR-0278),
-while the shards go round; the rest are dealt into the shards left. A
-recipe that drives a browser, or reads what the build makes (the servers,
-`pw`), shares its shards with its kind (ADR-0249): only those shards install
-the browsers and build, most of a shard's setup, and the others do neither.
+Each is dealt, the longest first, to the shard where it ends soonest
+(ADR-0290): its seconds, as the last run that ran it to its end took them
+(`SECONDS`), or, not yet measured, the mutants its scripts plant at the
+measured median; and what it adds to that shard's setup. A shard installs
+browsers, or builds, only where a recipe dealt it needs them (ADR-0249),
+and a recipe that needs less may run where more is set up. The recipes
+that need a database (`NEEDS_DATABASE`) run in shards of their own, each
+given a PostgreSQL of its own (ADR-0278), as many shards as make the run
+end soonest; the rest are dealt into the shards left.
 Prints, for `$GITHUB_OUTPUT`, `shards=<json>`, a list of `{"index": i,
 "recipes": [...], "browsers": b, "build": b, "database": b}`, empty where
 nothing is to run.
@@ -40,6 +41,20 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
+# Each recipe's seconds in the last run that ran it to its end, written by
+# `evidence_fetch.py` from each shard's `results.json` (ADR-0290).
+SECONDS = ROOT / "scripts/ci_seconds.json"
+
+# What a recipe not yet measured takes for itself and each mutant it
+# plants, in seconds, where no recipe is measured: the median of the
+# nightly of 2026-10-08, 213 recipes.
+RATE = 24
+
+# What a shard sets up before its first recipe, in seconds, as that nightly
+# took it: a plain shard 0.6 to 1.0 minutes; one that builds, or installs
+# browsers and builds, 2.5 to 6.5.
+SETUP = {(False, False): 42, (False, True): 384, (True, False): 390, (True, True): 390}
+
 # Measurements of the machine they run on: a time, a load, a memory curve,
 # each naming its machine in a `host:` line. A shared runner's numbers are
 # not comparable from one run to the next, so these are recorded on the
@@ -56,6 +71,12 @@ LOCAL_ONLY = {
     # has. What needs the owner's local data is recorded here; what a
     # committed sample shows runs on CI.
     "e14-kiokun-inventory",
+    # The kiokun track's sample of the whole dictionary: the owner's data, and
+    # this machine's times.
+    "e14-kiokun-sample",
+    # And its page head against kiokun.com's own code, copied from the
+    # owner's checkout.
+    "e14-kiokun-seo",
 }
 
 # Recipes run against a database (ADR-0246). Each is a shard of its own,
@@ -253,17 +274,38 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
     return sorted(out)
 
 
-def deal(names: list[str], costs: dict[str, int], shards: int) -> list[list[str]]:
-    """Deal `names` into `shards`, the costliest first, each to the least
-    loaded shard; ties to the lower index, so a deal is the same every
-    time."""
-    loads = [0] * shards
+def joined(a: tuple[bool, bool], b: tuple[bool, bool]) -> tuple[bool, bool]:
+    """What a shard sets up for two recipes: what either needs."""
+    return (a[0] or b[0], a[1] or b[1])
+
+
+def deal(
+    names: list[str],
+    costs: dict[str, int],
+    shards: int,
+    need: dict[str, tuple[bool, bool]] | None = None,
+) -> list[tuple[list[str], tuple[bool, bool], int]]:
+    """Deal `names` into `shards`, the costliest first, each to the shard
+    where it ends soonest: its cost, and what it adds to that shard's setup
+    (`SETUP`); ties to the lower index, so a deal is the same every time.
+    Each shard dealt a recipe, as its recipes, what it sets up, and when it
+    ends."""
+    need = need or {}
+    plain = (False, False)
+    kinds = [plain] * shards
+    ends = [SETUP[plain]] * shards
     dealt: list[list[str]] = [[] for _ in range(shards)]
     for name in sorted(names, key=lambda n: (-costs.get(n, 1), n)):
-        i = min(range(shards), key=lambda k: (loads[k], k))
-        loads[i] += costs.get(name, 1)
+        wants = need.get(name, plain)
+
+        def after(k: int) -> int:
+            return ends[k] + costs.get(name, 1) + SETUP[joined(kinds[k], wants)] - SETUP[kinds[k]]
+
+        i = min(range(shards), key=lambda k: (after(k), k))
+        ends[i] = after(i)
+        kinds[i] = joined(kinds[i], wants)
         dealt[i].append(name)
-    return [sorted(r) for r in dealt if r]
+    return [(sorted(r), kinds[i], ends[i]) for i, r in enumerate(dealt) if r]
 
 
 def needs(body: str) -> tuple[bool, bool]:
@@ -282,52 +324,59 @@ def plan(
     need: dict[str, tuple[bool, bool]] | None = None,
     database: frozenset[str] | set[str] = frozenset(),
 ) -> list[dict]:
-    """Deal `names` into at most `shards`, each kind of recipe (browsers and
-    a build, a build alone, neither) into shards of its own, as many as its
-    share of the work, at least one where it has a recipe.
+    """Deal `names` into at most `shards` (`deal`), so that the run ends
+    soonest.
 
-    A recipe of `database` is a shard of its own, beside a PostgreSQL of its
-    own (ADR-0278), while the shards go round, leaving one for the rest
-    where there are any; past that, they share theirs, dealt as any are.
+    The recipes of `database` run in shards of their own, each beside a
+    PostgreSQL of its own (ADR-0278), and the others never there: a
+    database's shard names it to each recipe it runs. They take as many
+    shards as make the run end soonest, the fewest where more would not;
+    the others are dealt into the rest, at least one where there are any.
     Theirs are numbered after the others'."""
     need = need or {}
+    # Nothing to run, no shard: a push that touches no recipe plans none
+    # (until 2026-10-09 this took the longest of no shards, and failed).
+    if not names:
+        return []
     on_database = [n for n in names if n in database]
-    names = [n for n in names if n not in database]
-    beside = min(len(on_database), max(1, shards - (1 if names else 0))) if on_database else 0
-    shards = max(1, shards - beside)
-    kinds: dict[tuple[bool, bool], list[str]] = {}
-    for n in names:
-        kinds.setdefault(need.get(n, (False, False)), []).append(n)
-    total = sum(costs.get(n, 1) for n in names) or 1
-    order = sorted(kinds, reverse=True)
-    share = {
-        k: min(len(kinds[k]), max(1, round(shards * sum(costs.get(n, 1) for n in kinds[k]) / total)))
-        for k in order
-    }
-    # More shards than there are: the largest share gives one back, until
-    # they fit.
-    while sum(share.values()) > max(shards, len(order)):
-        k = max(order, key=lambda k: (share[k], k))
-        share[k] -= 1
+    rest = [n for n in names if n not in database]
+    # At most every shard but one for the rest, where there is any; one,
+    # at least, though the run were given one shard in all.
+    most = min(len(on_database), max(1, shards - (1 if rest else 0)))
+    best = None
+    for beside in range(1, most + 1) if on_database else [0]:
+        left = max(1, min(len(rest), shards - beside)) if rest else 0
+        others = deal(rest, costs, left, need)
+        theirs = deal(on_database, costs, beside, need)
+        ends = max(end for _, _, end in others + theirs)
+        if best is None or ends < best[0]:
+            best = (ends, others, theirs)
     out = []
-    for k in order:
-        for recipes in deal(kinds[k], costs, share[k]):
-            out.append(
-                {"index": len(out), "recipes": recipes, "browsers": k[0], "build": k[1], "database": False}
-            )
-    # Each sets up what its recipes need, as a shard of their kind would.
-    for recipes in deal(on_database, costs, beside):
-        setup = [need.get(n, (False, False)) for n in recipes]
-        out.append(
-            {
-                "index": len(out),
-                "recipes": recipes,
-                "browsers": any(b for b, _ in setup),
-                "build": any(b for _, b in setup),
-                "database": True,
-            }
-        )
+    if best is not None:
+        for dealt, on in ((best[1], False), (best[2], True)):
+            for recipes, kind, _ in dealt:
+                out.append(
+                    {"index": len(out), "recipes": recipes, "browsers": kind[0], "build": kind[1], "database": on}
+                )
     return out
+
+
+def measured(path: pathlib.Path | None = None) -> dict[str, float]:
+    """Each recipe's seconds, as the last run that ran it to its end took
+    them (`SECONDS`); none where the file is missing or unreadable."""
+    try:
+        return {k: float(v) for k, v in json.loads((path or SECONDS).read_text()).items()}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def estimated(names: list[str], body: dict[str, str], seconds: dict[str, float]) -> dict[str, int]:
+    """Each recipe's cost, in seconds: as measured where it was; otherwise
+    itself and the mutants it plants (`cost`), each at the median of what
+    the measured recipes took a mutant, or at `RATE` where none was."""
+    rates = sorted(seconds[n] / cost(body[n]) for n in seconds if n in body)
+    rate = rates[len(rates) // 2] if rates else RATE
+    return {n: round(seconds[n]) if n in seconds else round(rate * cost(body.get(n, ""))) for n in names}
 
 
 def main() -> int:
@@ -354,7 +403,7 @@ def main() -> int:
         print("ci_plan: say --all, --changed BASE HEAD, or the recipes", file=sys.stderr)
         return 1
     body = bodies()
-    costs = {n: cost(body.get(n, "")) for n in names}
+    costs = estimated(names, body, measured())
     need = {n: needs(body.get(n, "")) for n in names}
     print("shards=" + json.dumps(plan(names, costs, args.shards, need, NEEDS_DATABASE)))
     return 0

@@ -1,7 +1,8 @@
 ADR-0232 - an opaque value's representation is read in a template
 
 produced by: just e14-representations
-commit: 4310769be543b572da4cad5644b55f101cb803d1
+commit: 4236e3242f43cb48ffb4912b2b8497a72aca0a9b
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37918808029 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the build (compiler/pw-core/tests/template_representations.rs)
@@ -9,12 +10,12 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test a_records_field_named_value_is_a_field ... ok
 test a_speculated_value_read_through_a_view_reads_its_representation ... ok
 test a_representation_is_read_by_the_opaque_values_path ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.81s
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
 test tests::an_opaque_values_representation_is_rendered ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 147 filtered out; finished in 1.30s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 321 filtered out; finished in 5.79s
 
 == mutation controls (scripts/template_representations_mutations.py)
 
@@ -22,5 +23,6 @@ baseline (cargo): 4 passed, 0 failed
 a representation is read as a field [cargo]: KILLED (4 of 4 tests fail)
 a record's field named `value` is a representation [cargo]: KILLED (1 of 4 tests fail)
 a base the checker's types leave untyped is typed no further [cargo]: KILLED (3 of 4 tests fail)
-the speculation module reads a representation as a field [cargo]: KILLED (1 of 4 tests fail)
+the speculation module reads a representation as a field [cargo]: KILLED (3 of 4 tests fail)
 4 of 4 mutants killed
+memory bound: no process was stopped

@@ -1,0 +1,69 @@
+{
+ "kiokun_commit": "abf71a89af1111f4039578cd1fde58e06f14c4bf",
+ "node": "v22.21.1",
+ "oracle": {
+  "answered": 11,
+  "answers": {
+   "上": {
+    "description": "上 means up, see 上聲|上声[shǎng​shēng], on top. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "上 — up, see 上聲|上声[shǎng​shēng], on top | Kiokun"
+   },
+   "人": {
+    "description": "人 means person, man, people. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "人 — person, man, people | Kiokun"
+   },
+   "半": {
+    "description": "半 means half, semi-, incomplete. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "半 — half, semi-, incomplete | Kiokun"
+   },
+   "博": {
+    "description": "博 means plentiful, gamble, extensive, ample. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "博 — plentiful, gamble, extensive, ample | Kiokun"
+   },
+   "多": {
+    "description": "多 means much, many, often. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "多 — much, many, often | Kiokun"
+   },
+   "市": {
+    "description": "市 means market, city, fair. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "市 — market, city, fair | Kiokun"
+   },
+   "形": {
+    "description": "形 means form, shape, to appear, to look. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "形 — form, shape, to appear, to look | Kiokun"
+   },
+   "空": {
+    "description": "空 means empty, air, sky. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "空 — empty, air, sky | Kiokun"
+   },
+   "色": {
+    "description": "色 means color, look, appearance. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "色 — color, look, appearance | Kiokun"
+   },
+   "酒": {
+    "description": "酒 means wine, wine (esp. rice wine), liquor. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "酒 — wine, wine (esp. rice wine), liquor | Kiokun"
+   },
+   "青": {
+    "description": "青 means green or blue, abbr. for 青海[Qīng​hǎi], Qinghai Province, green. Character readings, definitions, examples, and learning tools across Chinese, Japanes…",
+    "named": [],
+    "title": "青 — green or blue, abbr. for 青海[Qīng​hǎi], Qinghai Province, green…"
+   }
+  },
+  "named": {},
+  "read": 28,
+  "stride": 1
+ },
+ "pleris_commit": "9e1bfdd4459792b8e8f6d1196afbd2f1a6839411",
+ "produced_by": "just e14-kiokun-seo"
+}

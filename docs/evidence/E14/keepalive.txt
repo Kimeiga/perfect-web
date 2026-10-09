@@ -1,0 +1,27 @@
+ADR-0268 - a command outlives the page that sent it
+
+produced by: just e14-keepalive
+commit: 4236e3242f43cb48ffb4912b2b8497a72aca0a9b
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37918808029 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== kept alive, in three engines (e2e/keepalive.spec.mjs; e2e/feed.spec.mjs, a post by its bytes)
+
+  15 passed (1.5m)
+  3 passed (1.1m)
+
+== mutation controls (scripts/keepalive_mutations.py)
+
+baseline: 6 passed, 0 failed
+a command's request is not kept alive: KILLED (2 of 6 tests fail)
+the budget is not read: KILLED (1 of 6 tests fail)
+the bytes in flight are not counted: KILLED (4 of 6 tests fail)
+an answered request stays counted: KILLED (3 of 6 tests fail)
+a failed request stays counted: KILLED (1 of 6 tests fail)
+a body is counted in characters: KILLED (1 of 6 tests fail)
+`?keepalive=` raises the budget past 64 KiB: KILLED (1 of 6 tests fail)
+an unreadable `?keepalive=` keeps the whole budget: KILLED (1 of 6 tests fail)
+8 of 8 mutants killed
+memory bound: no process was stopped

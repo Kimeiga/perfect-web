@@ -1,0 +1,25 @@
+ADR-0275 - a row shown before the server answers waits
+
+produced by: just e14-waiting-rows
+commit: 4236e3242f43cb48ffb4912b2b8497a72aca0a9b
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37918808029 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the feed in three engines (e2e/feed.spec.mjs)
+
+  66 passed (2.6m)
+
+== mutation controls (scripts/waiting_rows_mutations.py)
+
+baseline: 2 passed, 0 failed
+a row the server made waits too: KILLED (2 of 2 tests fail)
+no row waits: KILLED (2 of 2 tests fail)
+a reply waits, and a post the timeline shows does not: KILLED (2 of 2 tests fail)
+a waiting row's Like acts: KILLED (2 of 2 tests fail)
+a waiting row's Delete acts: KILLED (2 of 2 tests fail)
+a waiting row's author links to the post: KILLED (2 of 2 tests fail)
+a waiting row's handle links to its author: KILLED (2 of 2 tests fail)
+7 of 7 mutants killed
+memory bound: no process was stopped

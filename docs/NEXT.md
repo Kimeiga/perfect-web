@@ -433,8 +433,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
              and, open, **`feed.spec.mjs`'s "Load more shows the next page"
              in WebKit, on CI again** (run 37826467131 at `b393cee`, job
              113480498704: its rows stayed at twenty, and again in run
-             37867532722's job 113617759049). ADR-0271 left 2 of 160 failing
-             under loads past CI's; this one was on CI's own; and, open,
+             37867532722's job 113617759049, and in run 37877464406's job
+             113649231199, read 2026-10-09: the runtime's own record shows
+             the Load-more read answered `{"applied":1}` at 8804 ms on an
+             open stream, with no reconnect, and no frame applied in the
+             four seconds after, while the 25 seeding posts had taken up to
+             598 ms each to commit. The server applied the read, and its
+             frame never came, or came late: what the server did with doc
+             22's frames is the next thing to record, in the failure's
+             attachment). ADR-0271 left 2 of 160 failing under loads past
+             CI's; this one was on CI's own; and, open,
              **a resume manifest's document and scope are constants**
              (found writing the capability matrix, 2026-10-08): every
              document's manifest says `"document": "cart-doc"` and `"scope":
@@ -469,6 +477,64 @@ E14 comes before E11-E13. Its plan, controls and task list are
                 any world: it requires" and nothing after it, where a label
                 alone, not an effect, rules out every world;
 
+             and ~~**W6's two compiler findings**~~ (ADR-0283, ADR-0284,
+             `just e14-what-a-component-does`, 2026-10-09): a host call
+             reached through a function, imported; a fold's empty seed,
+             typed, after the checker was found passing ill-typed folds;
+             and, found probing them, a query that read the database
+             through a function value or inside a lambda required no
+             capability and could be placed in the browser; and, open,
+             small, each over-stating or refusing rather than granting:
+             **a call through a local is charged its namesake's effects**
+             (ADR-0283's first limit: the effect inference's call walk
+             resolves a callee's name without its scope), and **only a
+             fold's seed takes the checker's type in the backend**
+             (ADR-0284's: `List.concat([], xs)` in a `let` is refused);
+             and ~~found probing ADR-0283, **a page's handler is held
+             to the page's placement**~~ (ADR-0287): the row check keeps an `on:`
+             handler's effects in the page's row and grants them against
+             the page's world, so a page placed at `build` whose button
+             sends a command is refused (PW5005, `database.write<Thing>`
+             not available at Build), where its contract, which defers the
+             handler, allows `build`. A handler runs in the browser, and a
+             command it sends at the command's own placement: the
+             DoorDash menu's static pages with an Add button need this;
+             and, found 2026-10-09 in CI itself: ~~**the nightly could not
+             finish**~~ (ADR-0290: two shards cancelled at 345 minutes, the
+             plan dealing by mutants; now dealt by each recipe's seconds,
+             the first nightly under it to be named here); open: **the WebKit
+             "Load more" failure's cause**, reproduced here with the
+             server's records (3 of 120, six workers): every commit's
+             telling derived every open document of every session inside
+             the host's one `pending` lock, 50 to 200 ms a hold, back to
+             back, and the page's stream waited up to 1.6 s a pass; the fix,
+             each change derived outside the lock and pushed only where the
+             document still shows what it was derived against, is in CI on
+             `track/stream-records` (its first WebKit job passed, and its
+             second; every other branch's WebKit job fails "Load more" now);
+             open, next, **`feed.spec.mjs`'s "a follow reaches another reader"
+             fails in CI's three-engine runs of the feed**: five mutation
+             baselines red in run 37918808029 (`track/arrival-clock`, in
+             Chromium and Firefox), three in run 37893301747
+             (`track/stream-records`, with "a reply reaches every reader"),
+             and none in the browser jobs; the second reader's count never
+             moved in five seconds, and its streams wrote nothing for four.
+             Not the server's new telling (arrival-clock has the old one),
+             and not the earlier test's unanswered unfollow (arrival-clock
+             awaits it). Next: a failing feed test prints its pages' and the
+             server's records, a red baseline shows them, and the recipe runs
+             again alone until it is caught;
+             ~~**`e14-graphs-on-the-wire` took CI's runner down**~~
+             (ADR-0292) every time it ran there (the nightly of 2026-10-08,
+             navigate's verify twice): the heartbeat (run 37902799186) named
+             a mutant, "the renderer takes a node twice", under which the
+             100,000-node chain test holds 14.5 GiB in thirty seconds; it did
+             here too, where the binary ended without a result (corrected:
+             this file said the recipe passed here, 2.2 GB at most). Every
+             process a mutation script starts is now bounded at 4 GiB, a
+             kill by the bound its own kind; the recipe passes on CI in ten
+             minutes (run 37908865560); `e14-contract`, which exited 1 in
+             that nightly, passed alone (run 37902799186);
              and, open, next, the integrator's, **the host's paths
              reserved under `/_pw/`** (W6's question, PARALLEL.md
              2026-10-08): the runtime's files and its root endpoints moved

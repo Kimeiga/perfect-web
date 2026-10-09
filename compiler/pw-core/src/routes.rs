@@ -528,11 +528,46 @@ pub(crate) fn not_found_case(
     unit: usize,
     decl: &crate::hir::Decl,
 ) -> Result<Option<(crate::resolve::DefId, String)>, String> {
-    use crate::resolve::{Namespace, Resolution};
     let Some(p) = decl.policy("not_found_on") else {
         return Ok(None);
     };
-    let value = p.value.trim();
+    case_named(ws, sigs, unit, p.value.trim()).map(Some)
+}
+
+/// **The case a page's `redirect_on` names** (ADR-0295), as `not_found_on`'s
+/// is, and whether the move is `permanent` (308) or `temporary` (307), which
+/// the clause must say. `Ok(None)` for a declaration without the clause.
+pub(crate) fn redirect_case(
+    ws: &crate::resolve::Workspace,
+    sigs: &crate::signatures::Signatures,
+    unit: usize,
+    decl: &crate::hir::Decl,
+) -> Result<Option<(crate::resolve::DefId, String, bool)>, String> {
+    let Some(p) = decl.policy("redirect_on") else {
+        return Ok(None);
+    };
+    let words: Vec<&str> = p.value.split_whitespace().collect();
+    let [case, how] = words[..] else {
+        return Err("write `Type.Case permanent`, or `Type.Case temporary`".to_string());
+    };
+    let permanent = match how {
+        "permanent" => true,
+        "temporary" => false,
+        other => return Err(format!("`{other}` is neither `permanent` nor `temporary`")),
+    };
+    let (ty, case) = case_named(ws, sigs, unit, case)?;
+    Ok(Some((ty, case, permanent)))
+}
+
+/// `Type.Case`, resolved: the type by identity and the case's name, where the
+/// type is visible as written and has the case.
+fn case_named(
+    ws: &crate::resolve::Workspace,
+    sigs: &crate::signatures::Signatures,
+    unit: usize,
+    value: &str,
+) -> Result<(crate::resolve::DefId, String), String> {
+    use crate::resolve::{Namespace, Resolution};
     let Some((ty, case)) = value.rsplit_once('.') else {
         return Err(format!("`{value}` is not a case: write `Type.Case`"));
     };
@@ -548,7 +583,18 @@ pub(crate) fn not_found_case(
     if !has {
         return Err(format!("`{ty}` has no case `{case}`"));
     }
-    Ok(Some((def, case.to_string())))
+    Ok((def, case.to_string()))
+}
+
+/// The `{name}` segments of a route as written, `"/word/{word}"`, in order.
+pub(crate) fn route_holes(route: &str) -> Vec<String> {
+    route
+        .trim()
+        .trim_matches('"')
+        .split('/')
+        .filter_map(|s| s.strip_prefix('{').and_then(|s| s.strip_suffix('}')))
+        .map(str::to_string)
+        .collect()
 }
 
 /// The error type a query declares, `E` of its `Result<T, E>`, by identity.

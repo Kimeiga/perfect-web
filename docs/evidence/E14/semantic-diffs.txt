@@ -1,19 +1,20 @@
 ADR-0149 - pw diff, what a change means, for review
 
 produced by: just e14-diffs
-commit: c989b45ab14dbc8080d257e7ce9fbab9921e2807
+commit: ae555e9a08ef808665f519c4b10341c6b8d94133
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37888911377 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the tests (compiler/pw-core/tests/semantic_diff.rs)
 
-test a_program_that_does_not_check_has_no_model ... ok
 test a_comment_or_a_reflow_changes_nothing ... ok
-test the_same_program_changes_nothing ... ok
-test a_new_query_brings_its_effects_capabilities_and_policies ... ok
-test a_freshness_change_is_a_cache_change ... ok
-test a_streamed_region_is_a_page_change ... ok
 test a_new_case_is_a_domain_change ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.69s
+test a_program_that_does_not_check_has_no_model ... ok
+test a_freshness_change_is_a_cache_change ... ok
+test a_new_query_brings_its_effects_capabilities_and_policies ... ok
+test the_same_program_changes_nothing ... ok
+test a_streamed_region_is_a_page_change ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.68s
 
 == each task's Pleris patches (scripts/semantic_diffs.py)
 
@@ -44,8 +45,8 @@ Pages
 - none
 
 Client impact
-- added the speculation of `store.page.StorePage`, 2460 bytes
-- the browser's compiled code: 4516 bytes, was 2056
+- added the speculation of `store.page.StorePage`, 2549 bytes
+- the browser's compiled code: 4605 bytes, was 2056
 
 Server components
 - none
@@ -64,7 +65,7 @@ Other policies
 
 === T01-optimistic-cart: unsafe
 
-pw diff: unsafe: it does not check: store/app.pw: PW0330 `add_to_cart`'s optimistic transition performs database.write<Carts>, session.read; store/app.pw: PW0331 `add_to_cart`'s optimistic transition produces `Result<Cart, CartError>`, but it targets a resource whose value is `Cart`
+pw diff: unsafe: it does not check: store/app.pw: PW0330 `add_to_cart`'s optimistic transition performs database.write<Carts>, session.read; store/app.pw: PW0331 `add_to_cart`'s optimistic transition produces `Result<domain.Cart, domain.CartError>`, but it targets a resource whose value is `domain.Cart`
 
 === T02-request-storm: reference
 
@@ -195,7 +196,7 @@ Client impact
 - none
 
 Server components
-- added component `store.page.CartLines`, 4883 bytes
+- added component `store.page.CartLines`, 5200 bytes
 
 Obligations
 - none
@@ -243,7 +244,7 @@ Client impact
 - none
 
 Server components
-- `store.page.Order`: 3092 bytes, was 3076
+- `store.page.Order`: 3407 bytes, was 3391
 
 Obligations
 - none
@@ -341,8 +342,8 @@ Pages
 Client impact
 - added the handler a5e94305 in `store.page.StorePage`, 1051 bytes
 - added the handler f9efa45e in `store.page.StorePage`, 335 bytes
-- the speculation of `store.page.StorePage`: 2461 bytes, was 2460
-- the browser's compiled code: 5903 bytes, was 4516
+- the speculation of `store.page.StorePage`: 2550 bytes, was 2549
+- the browser's compiled code: 5992 bytes, was 4605
 
 Server components
 - none
@@ -674,7 +675,7 @@ Client impact
 - added the handler 2148f1ab in `store.page.StorePage`, 266 bytes
 - added the handler 6cc02212 in `store.page.StorePage`, 265 bytes
 - the handler `clear_cart` in `store.page.StorePage` changed: 891 bytes, was 814
-- the browser's compiled code: 5124 bytes, was 4516
+- the browser's compiled code: 5213 bytes, was 4605
 
 Server components
 - none
@@ -697,7 +698,7 @@ pw diff: unsafe: it does not check: store/app.pw: PW5303 this `<dialog>` is show
 
 === T12-repair-cart-cache: reference
 
-pw diff: before: it does not check: store/app.pw: PW0100 cannot materialize `Cart` in a shared public cache; store/app.pw: PW5001 `Cart` is Session<SessionId> and declares a shared cache
+pw diff: before: it does not check: store/app.pw: PW5001 `Cart` is Session<SessionId> and declares a shared cache
 
 Against the canonical store, which checks:
 
@@ -745,7 +746,7 @@ Other policies
 
 === T12-repair-cart-cache: unsafe
 
-pw diff: before: it does not check: store/app.pw: PW0100 cannot materialize `Cart` in a shared public cache; store/app.pw: PW5001 `Cart` is Session<SessionId> and declares a shared cache
+pw diff: before: it does not check: store/app.pw: PW5001 `Cart` is Session<SessionId> and declares a shared cache
 
 Against the canonical store, which checks:
 
@@ -754,11 +755,11 @@ pw diff: unsafe: it does not check: store/app.pw: PW5001 `Cart` is Session<Sessi
 
 == mutation controls (scripts/semantic_mutations.py)
 
-baseline: 14 passed, 0 failed
-a new case is not a domain change: KILLED (1 of 14 tests fail)
-a changed policy is not reported: KILLED (1 of 14 tests fail)
-a capability gained is not reported: KILLED (1 of 14 tests fail)
-a stream a page gained is not reported: KILLED (1 of 14 tests fail)
-a program that does not check is compared: KILLED (1 of 14 tests fail)
-a stream's query is its page's authority: KILLED (1 of 14 tests fail)
+baseline: 15 passed, 0 failed
+a new case is not a domain change: KILLED (1 of 15 tests fail)
+a changed policy is not reported: KILLED (1 of 15 tests fail)
+a capability gained is not reported: KILLED (1 of 15 tests fail)
+a stream a page gained is not reported: KILLED (1 of 15 tests fail)
+a program that does not check is compared: KILLED (1 of 15 tests fail)
+a stream's query is its page's authority: KILLED (1 of 15 tests fail)
 6 of 6 mutants killed

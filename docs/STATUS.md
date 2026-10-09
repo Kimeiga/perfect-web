@@ -23,6 +23,152 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0295, 2026-10-09: a page at another address of the page is moved
+there** (track `kiokun`'s need: `KiokunError.Moved`, declared and never
+returned). A page declares the error that means its address is another of
+its own, and how it moves: `redirect_on KiokunError.Moved permanent`.
+PW0350 holds it to one value of the type of the one parameter the page's
+route carries, a case a query the page reads can answer, and not the case
+it is absent by. The host answers it 308, or 307, to the page's own route
+with that value, encoded as a link's hole is, the query kept and no origin
+named, so no `Host` header picks one; kept by no cache; a move to itself or
+to `..` is the program's fault, 500, never a loop. 7 compiler tests, 5 of
+the host's on kiokun's word page, 15 of 15 mutants killed on CI (run
+37912147550). **Corrected with it:** ADR-0262's `just e14-host-bindings`
+was cited and never recorded on `master`; that run records it, 6 of 6.
+
+**2026-10-09, three findings fixed, and three recipes recorded for the
+first time** (`track/arrival-clock`). **Corrected:** ADR-0257's `just
+e14-follows`, ADR-0268's `just e14-keepalive` and ADR-0275's `just
+e14-waiting-rows` were cited with their mutants killed, and no evidence of
+any of them was ever on `master`; CI recorded all three in run 37918808029
+(12 of 12, 8 of 8 and 7 of 7). Fixed: ADR-0290's plan crashed on a push
+that touches no recipe, taking the longest of no shards, so every such push
+failed its plan job (d81b8af's did): it plans no shard now. A part sent
+after a delay was measured 0.25 ms early on CI, the test's clock started
+after its request was written: it starts before. And the feed's "a follow
+shows before the server answers" ended with its unfollow unanswered; it
+waits for the answer. One test and one mutant (`just e14-dealt-by-time`, 9
+of 9). Named at the merge: WebKit's "Load more", and five recipes' baselines
+red on it and on "a follow reaches another reader" (open, NEXT), whose
+evidence is not taken.
+
+**ADR-0294, 2026-10-09: a list renders in its length** (W6's finding on
+kiokun's sample). さえこ's 128 names took 215 ms to render, and the curve
+was quadratic: 32 names 16.7 ms, 64 57.7 ms, 128 218 ms. Each item's scope
+copied the page's whole environment, the page's value and so the list
+among it, and every fragment's HTML. An item's scope now shares them by
+pointer and holds its own binding alone: on CI, 250 names render in 2.2 ms
+and 2,000 in 18 ms, a ratio of 8.3 for eight times the names, where scopes
+that copy took 7.1 s for 2,000. 2 of 2 mutants killed, and the renderer's
+other recipes re-run (run 37899457744; `e14-nested-lists` again alone, 6 of
+6, run 37915325800).
+
+**ADR-0293, 2026-10-09: kiokun's page head, held to kiokun.com's own
+code** (track `kiokun`, W6, merged from `4df071b`). The word page's title
+and description are kiokun.com's `buildDictionarySeo` in Pleris: its forms,
+its meanings as `definitionFragments` makes them, and its cuts at 68 and 158
+UTF-16 units, never inside a surrogate pair, where JavaScript's would. The
+head carries robots, Open Graph's and Twitter's tags; the canonical link and
+JSON-LD wait on the integrator's rulings, the preview image on an image
+renderer the owner approves. kiokun.com's own code is the oracle, run by
+Node from the owner's checkout and never committed: 5,513 sampled words, no
+unnamed difference; CI holds the served head to a committed fixture of its
+answers. The integrator's sample of the whole dictionary first: 5,938 of
+5,938 answered at 1c's page, p50 2.3 ms, p99 13.8 ms, and さえこ's 128 names 311 ms, the
+renderer quadratic in a list's length (fixed by ADR-0294).
+23 server tests, 15 browser tests, 53 of 53 mutants killed on CI (run
+37911011082, beside WebKit's known flake).
+
+**ADR-0292, 2026-10-09: a mutation script's processes are bounded in
+memory** (found by CI's heartbeat). CI's runner died every time
+`e14-graphs-on-the-wire` ran there, with exit 143 and no word: under its
+mutant "the renderer takes a node twice", the 100,000-node chain test copies
+each node's whole rest and keeps it, 14.5 GiB in thirty seconds. Every
+process a mutation script starts now holds at most 4 GiB, watched from
+`mutation_baseline` in all of the scripts; one past it is stopped and said,
+and a kill by the bound is a kind of its own, named in each script's last
+line and listed apart in the run's summary, so a suite whose kills were the
+bound's cannot pass for one whose kills were its tests'. On CI the runaway is
+stopped at 3.9 GiB and the recipe passes in ten minutes (run 37908865560).
+15 tests, 16 of 16 mutants killed on CI.
+
+**ADR-0291, 2026-10-09: a host's record is written as the program names its
+fields** (W6's finding). kiokun's data layer wrote an entry's field
+`chinese_char`, as the program's `Entry` names it, and the query trapped:
+the host read a record's fields by their WIT names alone, `chinese-char`.
+A host now reads each field by its WIT name, or else by the program's, as
+the browser has since ADR-0172, and a field under neither is refused naming
+both. Two tests in `pw-host`; `e14-cart-lines` (41 of 41) and
+`e14-descriptions` (9 of 9) re-run on CI with their anchors moved (run
+37894486009).
+
+**ADR-0290, 2026-10-09: a verification run is dealt by the seconds its
+recipes last took** (found in CI: the nightly cancelled). The nightly of
+2026-10-08 did not finish: two of its 17 shards were cancelled at the job's
+345 minutes with half their recipes unrun, while another ended after 41,
+because the plan weighed a recipe by the mutants it plants, which foretell
+its time poorly (0.43 over 213 recipes). Every evidence fetch now keeps each
+recipe's seconds, and the plan deals the longest first to the shard where it
+ends soonest, its setup counted; the database's recipes take as many shards
+as end the run soonest. Replayed on that night's seconds: sixteen shards at
+about 152 minutes and the database's at 87, where its plan held 437 minutes
+in one. 34 tests, 8 of 8 mutants killed on CI (run 37907578665). Amends
+ADR-0249 (a recipe needing less may run where more is set up) and ADR-0278
+(as many database shards as end the run soonest).
+
+**ADR-0288 and ADR-0289, 2026-10-09: kiokun's labels and character
+header, its loader's merges and the header's written forms** (track
+`kiokun`, W6, merged from `de0c4ca`). The word page shows JMdict's codes by
+kiokun.com's own label table, read from `KIOKUN_APP` (a code the table lacks
+as it is, as kiokun.com shows one), and the character header: the learner
+gloss, its HSK and JLPT levels, the mnemonic's meanings and each language's
+readings. A word's files are read in one batch; kiokun.com's loader rules (a
+stub followed, its variants and related forms merged, an equivalent form
+found) and the header's written forms are Pleris, each named for the
+kiokun.com function it is read from. Found: a host record's field is named as
+its world names it, in kebab case (the host reading either name is on
+`track/record-names`). Twenty server tests, fifteen browser tests in three
+engines, 45 of 45 mutants killed on CI (run 37896778819, beside WebKit's
+known flake and the lone-shard summary, fixed on master).
+
+**ADR-0287, 2026-10-09: a handler is held where it runs** (found probing
+ADR-0283). A page placed at `build` whose button sends a command was refused,
+"`database.write<Thing>` is not available at placement Build", for a lambda
+that calls the command and for the command named alike, where its contract
+allows `build`, the row check lets it be, and ADR-0113 holds a handler in the
+browser, where a command it calls is a request the command performs. Only
+the declared-placement check held a handler's work to the page's placement.
+It no longer does; a handler that writes the database itself is still
+refused, once, where it runs. The DoorDash menu, every customer's alike and
+built ahead, needs it. Three tests, 1 of 1 mutant killed on CI (run
+37900218861).
+
+**ADR-0283 and ADR-0284, 2026-10-09: a component's contract is what its
+code does, and a value of any type is fixed by the call that meets it**
+(W6's two findings on kiokun's word page, and what probing them found). A
+query that read kiokun's entries through a function of its own checked
+clean, and `pw build` refused it: the contract read the declaration's body
+alone, where the backend compiles every function it reaches. Probing it
+found a query that read the database through a function passed by name, or
+inside a lambda handed to `List.map`, required no capability, and its
+contract allowed the browser and the build. Placement, the source checks
+and the contract counted calls alone, where the row check has counted
+function values and members since ADR-0078, and the contract deferred every
+lambda as a page's handler. Now a component imports what the functions
+compiled into it call, placement and the contract read what a body performs
+as the row check walks it, and only a handler's work is deferred; the
+store's contracts and worlds are unchanged.
+And `List.fold(xs, [], f)` checked clean however `f` built its list: the
+accumulator was bound to a list of anything whole, so an `Int` was returned
+as a `String`. Each part of any type now gets a variable of its own, which
+the function fixes: the checker refuses those folds, and the backend builds
+the seed at the fold's solved type. A cached query that read through a
+function value was no reader of what it read, so a write never invalidated
+it (PW5106); it is now. Eight tests of the contract and two of the fold, and
+12 of 12 mutants killed on CI, run 37888911377 (`just
+e14-what-a-component-does`).
+
 **ADR-0285 and ADR-0286, 2026-10-09: kiokun.com in Pleris, its inventory
 and its word page** (track `kiokun`, W6, merged from `d19850f`). Every
 route and feature of kiokun.com's SvelteKit app is inventoried, built,

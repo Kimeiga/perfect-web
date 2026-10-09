@@ -2831,6 +2831,64 @@ impl<'a> Lower<'a> {
         }
     }
 
+    /// **The type of the fold a seed is given to, as the checker solved
+    /// it** (ADR-0283), where every part of it is one the backend lays out.
+    /// `None` where the seed is no expression of the body being lowered, or
+    /// the checker leaves a part of any type or unknown.
+    fn solved_seed(&self, body: &Body, seed: &Given) -> Option<Type> {
+        let Given::Expr(s) = seed else {
+            return None;
+        };
+        let def = *self.inlining.last()?;
+        let decl = crate::resolve::declaration(self.cx.hirs, def)?;
+        let hir = self.cx.hirs[def.unit];
+        if !std::ptr::eq(hir.body(decl.body?), body) {
+            return None;
+        }
+        let call = body.walk().into_iter().find(|e| {
+            matches!(body.expr(*e), Expr::Call { args, .. } if args.iter().any(|a| a.value == *s))
+        })?;
+        let module = hir.module_of(crate::hir::DeclId(def.decl));
+        let (t, _) =
+            crate::values::type_of(self.cx.sigs, self.cx.ws, def.unit, module, decl, body, call);
+        self.solved(&t)
+    }
+
+    /// **A type the checker solved, as the backend lays it out**: `None`
+    /// where a part holds at every type, or the program does not say.
+    fn solved(&self, t: &crate::values::Ty) -> Option<Type> {
+        use crate::values::Ty;
+        let each = |args: &[Ty]| {
+            args.iter()
+                .map(|a| self.solved(a))
+                .collect::<Option<Vec<_>>>()
+        };
+        Some(match t {
+            Ty::Primitive(p) => match p {
+                Primitive::Int => Type::Int,
+                Primitive::Float => Type::Float,
+                Primitive::Bool => Type::Bool,
+                Primitive::Str => Type::Str,
+                Primitive::Unit => Type::Unit,
+            },
+            Ty::Builtin(b, args) => match (b, each(args)?.as_slice()) {
+                (Builtin::List, [e]) => Type::List(Box::new(e.clone())),
+                (Builtin::Option, [e]) => Type::Option(Box::new(e.clone())),
+                (Builtin::Result, [o, e]) => Type::Result(Box::new(o.clone()), Box::new(e.clone())),
+                (Builtin::Map, [k, v]) if ordered_key(self.cx.sigs, k) => {
+                    Type::Map(Box::new(k.clone()), Box::new(v.clone()))
+                }
+                (Builtin::Set, [e]) if ordered_key(self.cx.sigs, e) => {
+                    Type::Set(Box::new(e.clone()))
+                }
+                _ => return None,
+            },
+            Ty::Nominal(def, args) => Type::Nominal(*def, each(args)?),
+            Ty::Parameter { binder, index } => self.subst.get(&(*binder, *index))?.clone(),
+            Ty::Var(_) | Ty::Unknown | Ty::Any => return None,
+        })
+    }
+
     /// **A loop over a list**, its body the function argument.
     fn each(
         &mut self,
@@ -2876,8 +2934,15 @@ impl<'a> Lower<'a> {
                 };
             }
         };
+        // **A seed its context does not type** (ADR-0283): `let all =
+        // List.fold(xs, [], f)` expects nothing of `[]`, and the fold's own
+        // type, as the checker solved it, is the seed's.
+        let solved = match (kind, expected, seed) {
+            (EachKind::Fold, None, Some(g)) => self.solved_seed(body, g),
+            _ => None,
+        };
         let seed = match seed {
-            Some(g) => match self.given(body, g, expected) {
+            Some(g) => match self.given(body, g, expected.or(solved.as_ref())) {
                 Lowering::Lowered(v) => Some(v),
                 other => return other,
             },

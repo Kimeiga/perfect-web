@@ -579,3 +579,80 @@ Each a decision for a track, with its date; a track's ADR records it too.
     word page), from `d19850f`, after the fix (a 503 before, a 404 now) and
     green runs (verify 37886442522, every engine). Next, 1b: Japanese
     labels through `KIOKUN_APP` with Q4's lookup, and the character header.
+- **2026-10-09, W6's 1b and 1c merged; 1e's questions answered.**
+  - **Merged** as ADR-0288 (kiokun's labels and the character header) and
+    ADR-0289 (the loader's merges and the header's written forms), from
+    `de0c4ca`: verify 37896778819, its one recipe shard passed, 45 of 45
+    mutants killed; it failed only in WebKit's known flake and in the
+    summary, the lone-shard bug fixed on `master` that morning.
+  - **1e, the SEO head, waits on the merge** with its timing sample; asked
+    three questions, answered:
+    - **Q1, an oracle of kiokun.com's own code is the standard** for any of
+      its pure functions the rewrite reimplements: its files copied from
+      `KIOKUN_APP` into a fresh directory each run, never committed (Q3);
+      over the real data on a stated, deterministic sample; kiokun's commit
+      and Node's version recorded; every deliberate difference named and
+      counted by name, any other failing the run; a committed fixture of
+      its answers for the CI sample, which CI holds; hand-made cases for the
+      edges the data lacks; an import the harness does not copy refused,
+      never stubbed.
+    - **Q2, a canonical link is a page address**, written as HTML writes it
+      at the top of a page's view (`<link rel="canonical" href={…}/>`),
+      checked as `navigate`'s address is (ADR-0280); the host writes it
+      absolute with the deployment's configured public origin, never the
+      request's `Host`, which a client controls (kiokun.com's uses the
+      request's origin: a stated difference); a host whose pages state one
+      and that has no origin refuses to start; `og:url` is the host's, from
+      it, and a page's own refused (PW5034); no default self-canonical.
+      After navigate's merge.
+    - **Q3, JSON-LD is typed as JSON**, not as schema.org: a std `Json`
+      (null, bool, number, text, list, an object's keys in order), written
+      `<script type="application/ld+json">{data}</script>` at the top of a
+      page's view, serialized and escaped by the host (ADR-0097); any other
+      `<script>` still refused. The integrator's, after the canonical.
+- **2026-10-09, W7's plan: TodoMVC, launched when W5's slot frees** (the
+  owner's, relayed 2026-10-08: "something people are familiar with"; NEXT,
+  "W7, TodoMVC"). Track `todomvc`, branch `track/todomvc`, from `master`.
+  Its ADRs are `ADR-XXXX`, numbered at the merge; its recipes live in
+  `just/todomvc.just`; its code block is **PW61** (`Owner::Todomvc =>
+  "PW61"`); its Playwright runs use PORT=7541 (7541 to 7740, where nothing
+  listens here; ranges are 200 wide), its hosts at PORT+140..142
+  (`TODOMVC_PORTS`).
+  - **The reference is TodoMVC's own**: its spec (`app-spec.md`) and its
+    official behavioural tests (`tests/cypress/e2e/spec.cy.js`), run
+    unchanged. Cypress, `todomvc-app-css` and `todomvc-common` (npm, MIT)
+    are approved downloads (the owner, 2026-10-08), each one's source and
+    size stated when fetched; nothing else is.
+  - **A fourth program on the development server**, `examples/todomvc/
+    app.pw`, beside the store, the feed and kiokun, with a layer of its own
+    at a `TRACK SEAM (todomvc)` in `from_build_with`, chosen where the
+    program imports `todomvc:`. A session's todos, as the spec allows "the
+    framework's own persistence" in place of localStorage; the version on
+    a device's own storage waits for the Docs app's device-local storage
+    (charter §9.1's kind 4) and says so.
+  - **Every behaviour the spec states**, each with its test and its
+    mutation control: adding on Enter, trimmed, never empty; the counter's
+    "1 item left" and "2 items left"; toggling one and all; editing on a
+    double-click, the field focused, Enter and blur saving, Escape
+    discarding, an edit trimmed to nothing destroying the item; clear
+    completed, shown only where one is; the footer and the toggle-all
+    hidden with no items; and the three filters.
+  - **The filters' hash routes** (`#/`, `#/active`, `#/completed`) reach no
+    server, so a page reads its address's fragment. That is the language's
+    and the runtime's, the integrator's to rule when W7 asks, as the plan
+    says. The direction: a page binds a signal to its fragment, whose type
+    names the forms it takes; the runtime keeps it to `location.hash` at
+    start and on each `hashchange`; the server renders its declared
+    default. W7 builds the rest meanwhile.
+  - **What a gap needs of the language, the runtime or the host goes to
+    the integrator as a question**, as W5's and W6's did.
+  - **In order**: the app with its tests in three engines and its recipe;
+    the official Cypress suite, unchanged, as its acceptance; then the
+    showcase, W7's second milestone (NEXT).
+- **2026-10-09, W6's 1e merged** as ADR-0293 (kiokun's page head, held to
+  kiokun.com's own code), from `4df071b`: verify 37911011082, its one recipe
+  shard passed, 53 of 53 mutants killed; it failed only in WebKit's known
+  "Load more" flake. W6's 1d (the Japanese examples and pitch accent),
+  held until this merge, may go to CI. Its questions were answered before
+  the merge (above); the canonical link and std `Json` are the
+  integrator's.
