@@ -25,7 +25,7 @@ Checked against `master` at `73e462b` (2026-10-08), ADR-0001 to ADR-0279.
 |---|---|---|
 | Reading, caching and live updates | 0007, 0100–0103, 0107, 0127, 0128, 0145, 0146, 0177, 0219, 0224, 0271 | One host: a second hears nothing of the first's commits (0246). |
 | Commands: optimistic, idempotent, retried | 0025, 0121, 0122, 0154, 0157, 0159, 0173, 0222, 0236, 0238, 0268, 0275 | Idempotency is kept in the host's memory, not with the writes (0121, 0246). A command declares no timeout (0173). |
-| Privacy and per-user isolation | 0112, 0128, 0129, 0184, 0252, 0263, 0264, 0270, 0274, 0279 | Held by page, `/pw-read`, cache and stream. A label is not followed through storage or time (0129). |
+| Privacy and per-user isolation | 0112, 0128, 0129, 0184, 0252, 0263, 0264, 0270, 0274, 0279, 0282 | Held by page, `/pw-read`, cache and stream. A label is not followed through storage or time (0129). |
 | A typed principal | 0263, 0264, 0270 | The host answers `current_user()`. |
 | Streaming, out of order | 0148, 0223, 0272 | A region renders once per document, at a page's top only. Without scripts it fills only in Chrome 150 and later. |
 | Static pages and SEO | 0114, 0183, 0186, 0189 | No canonical or alternate-language link, and no JSON-LD. |

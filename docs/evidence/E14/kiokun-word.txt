@@ -1,0 +1,87 @@
+kiokun.com's word page, served by the development server
+
+produced by: just e14-kiokun-word
+commit: de0c4ca9e43d75bf845acb5c4729aae7071d15bf
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37896778819 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+entries: the repository's sample, examples/kiokun/data/han-1char-3
+
+== the server (server/src/tests/kiokun.rs)
+
+test tests::kiokun::a_record_listed_twice_is_shown_twice_each_keyed_once ... ok
+test tests::kiokun::a_stubs_card_heads_the_page_it_names ... ok
+test tests::kiokun::a_file_answers_only_for_the_word_it_records ... ok
+test tests::kiokun::a_stub_of_several_traditional_forms_shows_each_ones_words ... ok
+test tests::kiokun::a_stubs_page_shows_its_targets_forms_and_its_own ... ok
+test tests::kiokun::a_code_is_shown_by_kiokuns_label_for_it ... ok
+test tests::kiokun::an_app_without_its_label_table_is_refused ... ok
+test tests::kiokun::a_stubs_redirect_is_followed_to_the_entry_it_names ... ok
+test tests::kiokun::a_word_kiokun_lacks_is_not_found ... ok
+test tests::kiokun::a_word_too_long_to_be_a_file_name_is_not_found ... ok
+test tests::kiokun::one_japanese_sense_is_not_numbered_and_many_are ... ok
+test tests::kiokun::an_equivalent_forms_words_are_shown_on_the_canonical_page ... ok
+test tests::kiokun::kiokun_is_served_by_the_host_its_entries_read_from_kiokuns_files ... ok
+test tests::kiokun::the_layer_reads_no_path_but_one_of_kiokuns_files ... ok
+test tests::kiokun::the_character_header_shows_its_gloss_levels_and_readings ... ok
+test tests::kiokun::the_character_headers_rules_hold ... ok
+test tests::kiokun::the_header_shows_each_written_form_with_its_roles ... ok
+test tests::kiokun::what_kiokun_com_does_not_show_is_not_shown ... ok
+test tests::kiokun::the_word_page_shows_each_languages_words_as_kiokun_does ... ok
+test tests::kiokun::what_kiokun_com_leaves_out_is_left_out ... ok
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 302 filtered out; finished in 106.29s
+
+== the browser in three engines (e2e/kiokun-site.spec.mjs)
+
+  15 passed (2.6m)
+
+== mutation controls (scripts/kiokun_word_mutations.py)
+
+baseline: 20 passed, 0 failed
+a file answers for any word whose name it has: KILLED (1 of 20 tests fail)
+a stub's redirect is read and not shown: KILLED (4 of 20 tests fail)
+kiokun's file names escape control characters alone: KILLED (1 of 20 tests fail)
+a Chinese reading with no senses is shown: KILLED (1 of 20 tests fail)
+a search-only form is shown: KILLED (1 of 20 tests fail)
+kiokun's placeholder definition is shown: KILLED (1 of 20 tests fail)
+one sense is numbered as many are: KILLED (1 of 20 tests fail)
+a name's kind is shown as its code: KILLED (1 of 20 tests fail)
+a reading's Jyutping is its pinyin: KILLED (2 of 20 tests fail)
+any subdirectory is read: KILLED (1 of 20 tests fail)
+a file name may hold a separator: KILLED (1 of 20 tests fail)
+a name too long for the file system is read: KILLED (1 of 20 tests fail)
+a repeated id keys two records: KILLED (1 of 20 tests fail)
+the layer promises no strong reads, which the program states: KILLED (17 of 20 tests fail)
+a Chinese word with empty forms shows no headword: KILLED (1 of 20 tests fail)
+a label of kiokun's table is not read: KILLED (1 of 20 tests fail)
+a code is looked up as written alone, as kiokun.com does: KILLED (1 of 20 tests fail)
+a form's note is looked up by its short code: KILLED (1 of 20 tests fail)
+a part of speech is labelled from another table: KILLED (1 of 20 tests fail)
+Mandarin keeps the readings the words do not read: KILLED (1 of 20 tests fail)
+Mandarin skips the older sources: KILLED (1 of 20 tests fail)
+the gloss is the meaning before the keyword: KILLED (1 of 20 tests fail)
+the gloss keeps its source markers: KILLED (2 of 20 tests fail)
+a marker is matched in its case alone: KILLED (1 of 20 tests fail)
+every entry has a character header: KILLED (1 of 20 tests fail)
+an HSK level of 0 is shown: KILLED (1 of 20 tests fail)
+dictionary meanings are shown with no keyword: KILLED (1 of 20 tests fail)
+a reading the file repeats is shown twice: KILLED (1 of 20 tests fail)
+KANJIDIC's flat readings are never read: KILLED (1 of 20 tests fail)
+a hanja reading is its romanization: KILLED (1 of 20 tests fail)
+the forms' notes are not read from the table: KILLED (1 of 20 tests fail)
+an app without its label table is served with none: KILLED (1 of 20 tests fail)
+a stub's card yields to its target's: KILLED (1 of 20 tests fail)
+a stub's traditional variants are not read: KILLED (1 of 20 tests fail)
+a Chinese word read twice is shown twice: KILLED (1 of 20 tests fail)
+a simplified form is equivalent whatever its card teaches: KILLED (1 of 20 tests fail)
+a concept keeps its case and spaces: KILLED (1 of 20 tests fail)
+an equivalent form's words are not merged: KILLED (1 of 20 tests fail)
+a traditional form is not Hong Kong's: KILLED (2 of 20 tests fail)
+a simplified form is written as a traditional one: KILLED (1 of 20 tests fail)
+a form without a card has no meaning: KILLED (1 of 20 tests fail)
+a component gloss keeps its source marker: KILLED (1 of 20 tests fail)
+the batched read reads nothing: KILLED (2 of 20 tests fail)
+the app's glosses are read from another file: KILLED (2 of 20 tests fail)
+the host does not choose the kiokun layer: KILLED (17 of 20 tests fail)
+45 of 45 mutants killed

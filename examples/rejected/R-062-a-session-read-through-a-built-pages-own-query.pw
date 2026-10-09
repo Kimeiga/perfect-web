@@ -1,0 +1,35 @@
+// @corpus: rejected
+// @id: R-062
+// @category: a session read through a query of a built page's own
+// @rule: PW5002
+// @invariant: no_feasible_placement
+// @charter: §7.3, §7.8, §9.3
+// @milestone: 6
+// @expect-error: `BuiltViaHelper` cannot run in any world: it holds Session<SessionId>
+//
+// Found on 2026-10-03 and refused since ADR-0282. `MyCart` names no session
+// in its signature and reads one inside. Since ADR-0128 the cache rules saw
+// the session through it, but placement read the keywords of what a page
+// reads alone: reading `Cart(current_session())` here was refused, and
+// reading it through `MyCart` was placed at build.
+
+module store.built
+
+import Carts
+import context.{ current_session }
+import domain.{ Cart, CartError }
+
+query MyCart() -> Result<Cart, CartError> {
+    Carts.current(current_session())
+}
+
+page BuiltViaHelper() {
+    route     "/built-helper"
+    // ERROR: the build world holds no session's value.
+    placement build
+    let cart = query MyCart()
+    view {
+        <title>Cart</title>
+        <main><p>{cart.line_count}</p></main>
+    }
+}

@@ -392,7 +392,9 @@ its logic in Pleris and its data layer in the host:
 - **Korean is looked up, not searched.** An entry shows its Korean words,
   Japanese names and character (ADR-0037, amended). The index has Chinese and
   Japanese rows; kiokun.com's Korean rows need its romanization and ranking
-  ported first. Pitch accent is not in kiokun's entries.
+  ported first. Pitch accent is not in kiokun's entries: kiokun.com shows it
+  from its app's own files (`sveltekit-app/static/pitch/`, 256 of them),
+  which the slice does not read (W6's inventory, 2026-10-08).
 - **A call is a fresh instance** (ADR-0032). Bulk work needs a query over a
   list, as `shards.Places` is: a call a word made the whole shard's load three
   times slower.
@@ -592,6 +594,37 @@ awaited in order. What remains:
   parser resolves `/stores/..` to `/`, so such a link goes elsewhere, and
   PW5009 matched its text to the route. `navigate` refuses such a value; a
   link does not.
+- **A placement names one world** (ADR-0282): a declaration's `placement`
+  listing several worlds is read as no pin, and no program writes one.
+- **A fragment's placement is read by no runtime** (ADR-0282): the
+  materializer keeps it and never reads it, so a fragment runs where the
+  host runs it, at the origin; the checker holds what a program declares
+  to what it holds, and no work moves to the edge.
+- **A secret laundered through a materialization's body** (ADR-0282):
+  ADR-0129's summaries follow functions, queries, commands, subscriptions
+  and resources, and not a materialization's body.
+- **A call through a local is charged its namesake's effects** (ADR-0283):
+  the effect inference's call walk resolves a callee's name without its
+  scope, so a local `found` that shadows `fn found` is charged `fn found`'s
+  row. That over-states, which refuses work rather than grants authority.
+  The contract's imports read the scope, and import nothing of `fn found`.
+- **A component's imports mirror the backend's resolution** (ADR-0283):
+  they are not read off the lowered IR, which exists only for what the
+  backend lowers; the build's audit holds the two to each other.
+- **Only a fold's seed takes the checker's type in the backend**
+  (ADR-0284): another `[]` its context does not type, an argument to
+  `List.concat` first among them, is refused as before, and says why.
+- **A frame phase's work is held to a page's declared placement**
+  (ADR-0287): `post_paint` and `frame` run in the browser too, but only a
+  handler's work is held where it runs. No program places a page with frame
+  phases anywhere but the browser.
+- **kiokun's word page is its words sections** (ADR-0286): Japanese labels
+  are shown as JMdict's codes until the label table is read; the character
+  header, examples, pitch, mnemonics, components, contains and appears in,
+  the canonical redirect, variant merge, related forms and the SEO head are
+  still to come; the route is `/word/{word}` until `/_pw/` lands; the tests
+  run on the repository's sample, and no page was rendered beside
+  kiokun.com's yet.
 - **A source's guarantees are held to the database the feed opens**
   (ADR-0207, ADR-0246): the host measures a PostgreSQL feed's isolation and
   whether it may write, and refuses to serve on a shortfall. The store's

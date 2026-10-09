@@ -23,6 +23,88 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0288 and ADR-0289, 2026-10-09: kiokun's labels and character
+header, its loader's merges and the header's written forms** (track
+`kiokun`, W6, merged from `de0c4ca`). The word page shows JMdict's codes by
+kiokun.com's own label table, read from `KIOKUN_APP` (a code the table lacks
+as it is, as kiokun.com shows one), and the character header: the learner
+gloss, its HSK and JLPT levels, the mnemonic's meanings and each language's
+readings. A word's files are read in one batch; kiokun.com's loader rules (a
+stub followed, its variants and related forms merged, an equivalent form
+found) and the header's written forms are Pleris, each named for the
+kiokun.com function it is read from. Found: a host record's field is named as
+its world names it, in kebab case (the host reading either name is on
+`track/record-names`). Twenty server tests, fifteen browser tests in three
+engines, 45 of 45 mutants killed on CI (run 37896778819, beside WebKit's
+known flake and the lone-shard summary, fixed on master).
+
+**ADR-0287, 2026-10-09: a handler is held where it runs** (found probing
+ADR-0283). A page placed at `build` whose button sends a command was refused,
+"`database.write<Thing>` is not available at placement Build", for a lambda
+that calls the command and for the command named alike, where its contract
+allows `build`, the row check lets it be, and ADR-0113 holds a handler in the
+browser, where a command it calls is a request the command performs. Only
+the declared-placement check held a handler's work to the page's placement.
+It no longer does; a handler that writes the database itself is still
+refused, once, where it runs. The DoorDash menu, every customer's alike and
+built ahead, needs it. Three tests, 1 of 1 mutant killed on CI (run
+37900218861).
+
+**ADR-0283 and ADR-0284, 2026-10-09: a component's contract is what its
+code does, and a value of any type is fixed by the call that meets it**
+(W6's two findings on kiokun's word page, and what probing them found). A
+query that read kiokun's entries through a function of its own checked
+clean, and `pw build` refused it: the contract read the declaration's body
+alone, where the backend compiles every function it reaches. Probing it
+found a query that read the database through a function passed by name, or
+inside a lambda handed to `List.map`, required no capability, and its
+contract allowed the browser and the build. Placement, the source checks
+and the contract counted calls alone, where the row check has counted
+function values and members since ADR-0078, and the contract deferred every
+lambda as a page's handler. Now a component imports what the functions
+compiled into it call, placement and the contract read what a body performs
+as the row check walks it, and only a handler's work is deferred; the
+store's contracts and worlds are unchanged.
+And `List.fold(xs, [], f)` checked clean however `f` built its list: the
+accumulator was bound to a list of anything whole, so an `Int` was returned
+as a `String`. Each part of any type now gets a variable of its own, which
+the function fixes: the checker refuses those folds, and the backend builds
+the seed at the fold's solved type. A cached query that read through a
+function value was no reader of what it read, so a write never invalidated
+it (PW5106); it is now. Eight tests of the contract and two of the fold, and
+12 of 12 mutants killed on CI, run 37888911377 (`just
+e14-what-a-component-does`).
+
+**ADR-0285 and ADR-0286, 2026-10-09: kiokun.com in Pleris, its inventory
+and its word page** (track `kiokun`, W6, merged from `d19850f`). Every
+route and feature of kiokun.com's SvelteKit app is inventoried, built,
+partial or missing, and held to the app: 102 routes and 63 features. Step 1
+began with the word page: `examples/kiokun-site`, a third program on the
+development server, reads kiokun's entries through a read-only layer, finds
+a word's file by kiokun's own shard rule and escape, follows a stub one hop,
+and shows each language's words as kiokun.com's page does, server-rendered
+and working with script off. A word too long for a file name was a 503, and
+is a 404 (fixed before the merge). Found on the way: kiokun.com's own label
+table never matches JMdict's codes, so 53 labels show as codes on the live
+site; the rewrite does not copy it, and the owner was told. Its two compiler
+findings became ADR-0283 and ADR-0284. Ten server tests, fifteen browser
+tests in three engines, 15 of 15 mutants killed on CI (run 37886442522).
+
+**ADR-0282, 2026-10-08: what a value holds is one label** (four soundness
+findings of 2026-10-03, reproduced at `d346c43`; amends ADR-0118, corrects
+ADR-0128). A secret a query answered, kept by a shared fragment at the edge,
+checked clean; a fragment of a session's cart placed at build checked clean;
+a page placed at build that read the session through a query of its own
+checked clean; and PW5002 said "it requires" and nothing more. Three
+derivations of what a value holds fed different rules, and a fragment's
+`depends_on` fed the graph alone. Now a secret a declaration answers is
+held and one it only uses as a key is not, a materialization reads what it
+depends on, and placement reads what a declaration holds, as the cache rules
+read it, in the checker and the contract alike. ADR-0128 said effects keep a
+session off the build world; they do not, since `session.read` declares no
+placement, and only the label does. Six tests, three rejected exhibits (C18)
+and 8 of 8 mutants killed (`just e14-held-labels`).
+
 **ADR-0281, 2026-10-08: a merge is held to CI's verification run** (the
 owner's decision, relayed 2026-10-08). A merge waited on a local chain of
 every touched mutation script, 4.5 hours for ADR-0277's seventeen, while

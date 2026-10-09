@@ -18,6 +18,7 @@ import 'just/identity.just'
 import 'just/uploads.just'
 import 'just/notifications.just'
 import 'just/messages.just'
+import 'just/kiokun.just'
 
 default:
     @just --list
@@ -112,7 +113,7 @@ test-unit:
 test-compile:
     # ADR-0276: the reference apps, the demo and the generality cases too;
     # `examples/history` keeps the sources as they were.
-    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw
+    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw examples/kiokun-site/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw
     cargo run --quiet -p corpus-check -- examples
     # The accepted corpus as the ONE program it is: the shared library plus
     # every accepted file. Feeding it the rejected files too would ask the
@@ -126,6 +127,8 @@ test-compile:
     # The kiokun slice (E10): a second application, and the first to use the
     # platform package without the store's domain.
     cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw
+    # kiokun.com in Pleris (track `kiokun`), beside the slice's shard rule.
+    cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/Shards.pw examples/kiokun/dictionary.pw examples/kiokun-site/*.pw
 
 # Show what pw currently rejects in the corpus, and why.
 # E7V — the resume-version deployment matrix. Every row of the architect's
@@ -5262,7 +5265,7 @@ e14-fmt-meaning:
        echo; echo "== a number's grouped digits (compiler/pw-core/tests/backend_lowering.rs)"; echo; \
        cargo test --locked -p pw-core --test backend_lowering 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== every program held to pw fmt --check"; echo; \
-       cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw 2>&1; \
+       cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw examples/kiokun-site/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw 2>&1; \
        echo; echo "== mutation controls (scripts/fmt_meaning_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/fmt_meaning_mutations.py; \
      } > docs/evidence/E14/fmt-meaning.txt
@@ -5317,3 +5320,52 @@ e14-materializations-kept:
        CARGO_INCREMENTAL=0 python3 scripts/materializations_kept_mutations.py; \
      } > docs/evidence/E14/materializations-kept.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/materializations-kept.txt
+
+# ADR-0282: what a value holds is one label. The compiler's tests, the
+# rejected corpus's exhibits through `checking_source`, and the mutation
+# controls.
+e14-held-labels:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0282 - what a value holds is one label"; echo; \
+       echo "produced by: just e14-held-labels"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (held_where_it_runs.rs, reads_through_calls.rs, checking_source.rs)"; echo; \
+       cargo test --locked -p pw-core --test held_where_it_runs --test reads_through_calls --test checking_source 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/held_labels_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/held_labels_mutations.py; \
+     } > docs/evidence/E14/held-labels.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/held-labels.txt
+
+
+# ADR-0283 and ADR-0284, from W6's report on kiokun's word page: a
+# component's contract is what its code does, and a value of any type is
+# fixed by the call that meets it. The compiler's tests, the store's
+# contracts and worlds held to the committed ones, and the mutation controls.
+e14-what-a-component-does:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0283 and ADR-0284 - a component's contract is what its code does; a value of any type is fixed by the call that meets it"; echo; \
+       echo "produced by: just e14-what-a-component-does"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (what_a_component_does.rs, any_type.rs, component_contract.rs, evidence_is_current.rs)"; echo; \
+       cargo test --locked -p pw-core --test what_a_component_does --test any_type --test component_contract --test evidence_is_current 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/what_a_component_does_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/what_a_component_does_mutations.py; \
+     } > docs/evidence/E14/what-a-component-does.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/what-a-component-does.txt
+
+# ADR-0287: a handler is held where it runs. The compiler's tests and the
+# mutation controls.
+e14-handlers-where-they-run:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0287 - a handler is held where it runs"; echo; \
+       echo "produced by: just e14-handlers-where-they-run"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the compiler (handlers_where_they_run.rs, handlers_in_the_browser.rs)"; echo; \
+       cargo test --locked -p pw-core --test handlers_where_they_run --test handlers_in_the_browser 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/handlers_where_they_run_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/handlers_where_they_run_mutations.py; \
+     } > docs/evidence/E14/handlers-where-they-run.txt
+    @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/handlers-where-they-run.txt

@@ -172,3 +172,12 @@ what its signature says comes out, which is the question ADR-0085 left open.
 - **A key may still name a parameter holding a secret**, because PW0336
   requires every argument the body reads to be in the key. Nothing in the
   corpus passes a query a secret.
+
+## Corrected by ADR-0282 (2026-10-08)
+
+"Effects already keep a session's value off the build world" is not so:
+`session.read` declares no placement, so every world grants it, build
+among them. Only a label keeps a session off build, and placement read the
+declared label alone, so a page placed at build that read the session
+through a query of its own was allowed there until ADR-0282, in the checker
+and in the contract.

@@ -861,7 +861,23 @@ fn component_kind(kind: DeclKind) -> Option<&'static str> {
     })
 }
 
-/// **The host operations this declaration's body calls.**
+/// **What a call's or a function value's path names, as the backend
+/// resolves it** (`backend::lower`): a dotted path through the modules, a
+/// bare name among the terms in scope.
+fn compiled_as(ws: &Workspace, unit: usize, path: &str) -> Option<crate::resolve::DefId> {
+    use crate::resolve::{Namespace, Resolution};
+    let found = match path.contains('.') {
+        true => ws.resolve_path(unit, path),
+        false => ws.resolve_in(unit, Namespace::Term, path),
+    };
+    match found {
+        Resolution::Local(def) | Resolution::Imported { def, .. } => Some(def),
+        _ => None,
+    }
+}
+
+/// **The host operations this declaration's code calls**: its body's, and
+/// those of each function compiled into it with it (ADR-0283).
 ///
 /// One import per CALLABLE, with the ABI and the authority read off the
 /// operation's own declaration. Architect ruling, 2026-08-20: a capability
@@ -897,17 +913,83 @@ fn host_calls(
     for root in emitted.iter().chain(&invalidated).flat_map(|p| &p.roots) {
         exprs.extend(body.walk_from(root.root));
     }
+    // **And what the code compiled with it calls** (ADR-0283). A function
+    // with a body and no `host` or `intrinsic` binding is compiled into this
+    // component, called (inlined, ADR-0039 §4, or beside the export where it
+    // recurses, ADR-0050) or named as a value (ADR-0052): each is walked
+    // once, in its own unit, resolved as the backend resolves it. A query or
+    // a command it calls is another component, its dependency
+    // (`component_calls`), and a handler's code is the handler's: an `on:`
+    // attribute's lambda, or the declaration it names (ADR-0199). Until
+    // ADR-0283 the declaration's own body was read alone, so a host call one
+    // function down was in no world: `pw check` passed, and `pw build`
+    // refused it.
+    let handlers: Vec<crate::hir::Span> = crate::resume::handler_lambdas(body)
+        .into_iter()
+        .map(|e| match body.expr(e) {
+            Expr::Lambda { body: inner, .. } => body.expr_span(*inner),
+            _ => body.expr_span(e),
+        })
+        .collect();
+    let in_handler = |e: crate::hir::ExprId| {
+        let at = body.expr_span(e);
+        handlers
+            .iter()
+            .any(|h| at.start >= h.start && at.end <= h.end)
+    };
+    let exprs: Vec<crate::hir::ExprId> = exprs.into_iter().filter(|e| !in_handler(*e)).collect();
+    let root = crate::resolve::DefId { unit, decl: id.0 };
+    let mut compiled: BTreeSet<crate::resolve::DefId> = BTreeSet::from([root]);
+    let mut pending = vec![(root, exprs)];
     let mut callees: Vec<crate::resolve::DefId> = Vec::new();
-    for expr in exprs {
-        let Expr::Call { callee, .. } = body.expr(expr) else {
+    while let Some((at, exprs)) = pending.pop() {
+        let h = hirs[at.unit];
+        let at_id = crate::hir::DeclId(at.decl);
+        let Some(b) = h.decl(at_id).body else {
             continue;
         };
-        let path = crate::infer::path_of(body, *callee);
-        if path.is_empty() {
-            continue;
-        }
-        if let Some(def) = inference.resolved_from(unit, &path) {
-            callees.push(def);
+        let body = h.body(b);
+        // A name a binding in scope holds is that binding's, whatever
+        // declaration shares it (ADR-0068).
+        let lexical = crate::lexical::Lexical::build_in(h, at_id);
+        let local = |e| lexical.as_ref().is_some_and(|l| l.binder(e).is_some());
+        let called: BTreeSet<crate::hir::ExprId> = exprs
+            .iter()
+            .filter_map(|e| match body.expr(*e) {
+                Expr::Call { callee, .. } => Some(*callee),
+                _ => None,
+            })
+            .collect();
+        for expr in exprs {
+            let (named, is_call) = match body.expr(expr) {
+                Expr::Call { callee, .. } => (*callee, true),
+                Expr::Name(_) | Expr::Field { .. } if !called.contains(&expr) => (expr, false),
+                _ => continue,
+            };
+            if local(named) {
+                continue;
+            }
+            let path = crate::infer::path_of(body, named);
+            if path.is_empty() {
+                continue;
+            }
+            if is_call && let Some(def) = inference.resolved_from(at.unit, &path) {
+                callees.push(def);
+            }
+            let Some(def) = compiled_as(sigs.workspace(), at.unit, &path) else {
+                continue;
+            };
+            let Some(callee) = crate::resolve::declaration(hirs, def) else {
+                continue;
+            };
+            if let Some(b) = callee.body
+                && callee.kind == DeclKind::Fn
+                && crate::backend::host_binding(callee).is_none()
+                && crate::backend::intrinsic_binding(callee).is_none()
+                && compiled.insert(def)
+            {
+                pending.push((def, hirs[def.unit].body(b).walk()));
+            }
         }
     }
     // And the outbox's function for each event it emits.
@@ -1275,8 +1357,13 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     // drift: a declaration's own label, joined with what it reads through
     // what it calls (ADR-0118). Keyed by RESOLVED IDENTITY: `Cart` in one
     // module and `Cart` in another are two declarations with two labels.
-    let labels: BTreeMap<crate::resolve::DefId, Label> =
-        crate::check::Reads::of(hirs, sigs, &inference).labels();
+    //
+    // And what each holds where it runs (ADR-0282), as the checker's
+    // placement reads it: a secret it answers or reads, never one it only
+    // uses.
+    let reads = crate::check::Reads::of(hirs, sigs, &inference)
+        .answering(&crate::check::summaries(hirs, sigs));
+    let labels: BTreeMap<crate::resolve::DefId, Label> = reads.labels();
 
     // The functions a page's template reads as members (ADR-0125): a host
     // calls each to compute what the page shows, so each is a component with
@@ -1337,12 +1424,19 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
                     // read, typed and serialized then. Excluding it would let a
                     // page perform an effect at render time and attribute it to
                     // a button nobody has pressed.
-                    let mut deferred: Vec<_> = body
-                        .walk()
+                    //
+                    // **A handler's, and no other lambda's** (ADR-0283): an
+                    // `on:` attribute's lambda, or the declaration it names
+                    // (ADR-0199). A lambda handed to `List.map` runs where it
+                    // is written. Until ADR-0283 every lambda's body was
+                    // deferred, so a query that read the database inside one
+                    // required no capability, and could be placed in the
+                    // browser.
+                    let mut deferred: Vec<_> = crate::resume::handler_lambdas(body)
                         .into_iter()
-                        .filter_map(|e| match body.expr(e) {
-                            Expr::Lambda { body: inner, .. } => Some(*inner),
-                            _ => None,
+                        .map(|e| match body.expr(e) {
+                            Expr::Lambda { body: inner, .. } => *inner,
+                            _ => e,
                         })
                         .collect();
                     // And a `<stream>`'s query (ADR-0148), for the same reason:
@@ -1423,12 +1517,17 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // would have given the contract's placement a second channel from
             // policy values.
             //
-            // `check::body_label` is the checker's own derivation, called
-            // rather than repeated, so the artifact and the diagnostic cannot
-            // disagree about how private a component is.
+            // `check::declaration_label` and `Reads::holds` are the
+            // checker's own derivation, called rather than repeated, so the
+            // artifact and the diagnostic cannot disagree about how private
+            // a component is (ADR-0282: until 2026-10-08 the contract's page
+            // reading the session through a query of its own was allowed at
+            // build).
+            let def = crate::resolve::DefId { unit, decl: id.0 };
             let demand = Demand {
                 effects: effects.clone(),
-                label: crate::check::declaration_label(hir, &labels, &inference, unit, decl),
+                label: crate::check::declaration_label(hir, &labels, &inference, unit, decl)
+                    .join(&reads.holds(def)),
                 declared: crate::check::declared_world(hir, decl),
             };
             // A `Blocked` effect leaves this EMPTY, and empty is the contract's

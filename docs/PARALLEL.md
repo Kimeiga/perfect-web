@@ -321,9 +321,14 @@ Each a decision for a track, with its date; a track's ADR records it too.
     owner's production target, relayed 2026-10-08; NEXT): parity with the
     live site, served here first, with no deploy, cutover or DNS change
     without the owner's go. Its rulings are below.
-  - **W7, search and filters**, after W6: run in the database or a
-    declared search source; no search engine is built here.
-  - **W8, ratings and reviews**, after W7 and the integrator's accounts: a
+  - **W7, TodoMVC**, in the next slot free (the owner, relayed
+    2026-10-08; NEXT): the comparison's first app, an objective suite, and
+    the tutorial's first lesson; then, its second milestone, the showcase
+    that presents it and the comparison (NEXT). Its rulings are written
+    here before it launches.
+  - **W8, search and filters**, after W7: run in the database or a declared
+    search source; no search engine is built here.
+  - **W9, ratings and reviews**, after W8 and the integrator's accounts: a
     review is a user's.
   - **The integrator's**: the soft navigation, the store's accounts,
     delivery addresses, store hours, and checkout with payment, the last
@@ -432,8 +437,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
   the kiokun slice (ADR-0037, ADR-0041; `examples/kiokun/`). Its ADRs are
   `ADR-XXXX`, numbered at the merge. Its recipes live in `just/kiokun.just`.
   Its code block is **PW60** (`Owner::Kiokun => "PW60"`). Its hosts are at
-  PORT+120..122 (`KIOKUN_PORTS`), and its Playwright runs use PORT=7241 (W5
-  has 7141).
+  PORT+120..122 (`KIOKUN_PORTS`), and its Playwright runs use PORT=7341 (W5
+  has 7141; 7241, planned first, overlapped W5's range, corrected
+  2026-10-09 below).
   - **The data** is read through `KIOKUN_DATA`, the kiokun-data checkout's
     `output_dictionary` (1,485,890 raw-DEFLATE JSON files, 6.4 GB), as `just
     e10-kiokun` reads it. It is never copied here, and nothing is written
@@ -460,9 +466,186 @@ Each a decision for a track, with its date; a track's ADR records it too.
     go, asked in the integrator's session: a preview origin among them, a
     DNS change and a cutover. The track holds no credentials for any host.
   - **What needs the owner's local data is local.** A run over the whole
-    dictionary is recorded on this machine, and its recipe says so (charter
-    §13.5's split, as `LOCAL_ONLY`'s). What a committed sample can show,
+    dictionary is recorded on this machine, and its recipe says so
+    (ADR-0281's fifth decision, as `LOCAL_ONLY`'s; this cited charter
+    §13.5, which is macOS's concerns, until W6 found it). What a committed
+    sample can show,
     as `scripts/kiokun_sample.py` makes one, runs on CI.
   - **In order**: the inventory and its ADR; then the gaps in the order the
     integrator gives; each with its tests, its browser suite in three
     engines, its mutation controls and its recipe.
+- **2026-10-08, W6's inventory, answered.** Its order is accepted:
+  (1) the word page from the entry; (2) the whole dictionary's search, held
+  to `/api/search` with Korean, then the reading index, homophones and
+  deinflection in Pleris; (3) the static-data pages; (4) accounts and the
+  user's data; (5) browser capabilities; (6) outside services.
+  - **Q1, rendering**: yes. Every page is rendered by the server and works
+    with scripts off, with script only where a feature needs it, as every
+    Pleris page is. Parity is by content and behaviour, not by rendering
+    strategy. The live site renders nothing without script (`ssr = false`),
+    a difference stated, not matched.
+  - **Q2, the host**: the development server, a third program beside the
+    store and the feed (ADR-0218: a host serves any program), with a
+    read-only kiokun data layer. The slice's GET-only host stays as
+    ADR-0037's and ADR-0041's evidence until the rewrite supersedes it.
+  - **Q3, the app's own data**: yes, read-only through `KIOKUN_APP` (the
+    checkout's `sveltekit-app`), as `KIOKUN_DATA` is. Nothing is copied here
+    and nothing is written there. The course modules are converted at build
+    time into a local cache git ignores, by a converter committed here: this
+    repository is public, and the owner's content stays out of it unless
+    the owner says otherwise.
+  - **Q4, the search index**: (b), the builder's current output loaded
+    into a declared search source, its guarantees stated as ADR-0207 states
+    a source's; W8's search for DoorDash builds on it. The committed
+    `output_search_index.sql` is older than the builder and lacks
+    `jyutping_search`, so the CSV is read. (c) would copy the builder's
+    rule into a second place, to drift; (a) stays the slice's until (b).
+  - **Q5, the clone**: yes. A copy-on-write clone of `sveltekit-app` in the
+    track's scratchpad, run there with what is installed, with no
+    credentials and no `.env`, reaching no production service (R2, OpenAI,
+    Workers AI, Google Input Tools). Only pages that need none are
+    measured, and nothing is written to the checkout.
+  - **Q6, browser capabilities**: each a platform operation the integrator
+    rules when (5) reaches it: speech synthesis, device storage (with the
+    Docs app's device-local storage), the clipboard, a canvas (ADR-0075's
+    mounted resources) and sharing.
+  - **Q7, outside services**: no capability yet for an outbound request
+    with a secret; the host has no outbound client (the capability matrix's
+    third-party row). Each service and its keys are the owner's to approve,
+    asked when (6) reaches them.
+  - **Q8, the slice's extras** (stroke count, grade, frequency rank, Korean
+    meanings and pronunciation): kiokun.com's page is the reference, so
+    parity matches it. Whether to keep the extras is the owner's call,
+    asked with the word page's first review; until then they are not shown.
+  - **The security findings** in kiokun.com's own source went to the owner
+    in the integrator's session (2026-10-08). None is fixed in kiokun-data
+    by this project, which writes nothing there.
+  - **Corrections taken**: the local-data citation (above), and
+    KNOWN_LIMITATIONS' pitch line, which now names kiokun.com's own pitch
+    files.
+- **2026-10-08, W6's routing question: the host's paths are reserved.**
+  kiokun.com's words are at `/<word>`, so its page's route is `/{word}`. The
+  development server matches its own endpoints before pages, and a page
+  before a file, so that route would answer `/pw-runtime.mjs` and the
+  runtime would never load. Ruled (b), as Next.js reserves `/_next/`,
+  SvelteKit `/_app/` and Nuxt `/_nuxt/`:
+  - **The host's own paths move under `/_pw/`**: the runtime's files and
+    its protocol endpoints at the root (`/pw-read`, `/stream`,
+    `/pw-handlers`). A page's route may not begin with `/_pw/`, refused at
+    compile time. `/command/…` and the store's test controls follow in a
+    second step, the rule refusing a page's route under them until then.
+  - **Among declared routes, a literal segment beats a parameter at the same
+    place** (`/sign-in` over `/{word}`), as routers do, and the routes check
+    says so.
+  - **Built by the integrator**, being the host's and the runtime's, after
+    ADR-0282 lands. W6 builds its program and read-only layer meanwhile;
+    its `TRACK SEAM (kiokun)` choosing `KiokunData` in `from_build_with` is
+    accepted.
+  - **Not (a)**, a file the build put at `dist`'s top winning over pages,
+    which ties the URL space to whatever a build emits. **Not (c)**, the
+    words at `/w/{word}`, which breaks every link to kiokun.com.
+- **2026-10-09, W6's word page (milestone 1a), reviewed.** Track
+  `kiokun` at `b59ebe0`: `examples/kiokun-site` on the development server,
+  its read-only layer `server/src/kiokun.rs`, the route `/word/{word}`
+  until `/_pw/` lands. Its claims were checked against kiokun's source:
+  `escaped` is `create_safe_filename` (kiokun-data `src/main.rs:6228`), and
+  the stub rule is `+page.ts:438-462`'s.
+  - **One fix before the merge**: a word whose file name is longer than a
+    file name may be (`<file>.json.deflate` over 255 bytes) failed the read
+    with ENAMETOOLONG, which is no `NotFound`, so the query failed where it
+    should answer a 404. `place` refuses such a name, tested at the limit.
+  - **Q1, a host call through a helper**: the contract was wrong, and the
+    build right. ADR-0283, the integrator's: a component imports what the
+    code compiled into it calls.
+  - **Q2, a fold's empty seed**: ADR-0284, the integrator's. The answer
+    first relayed, that the checker's acceptance stood, was wrong: the
+    checker passed ill-typed folds, and the backend was the only backstop.
+  - **Q3, ports**: W6's Playwright runs use PORT=7341. The plan's 7241
+    overlapped W5's range, which reaches PORT+122 (7263): W6's 7241..7243
+    were W5's `MESSAGES_PORTS`. **Each worker's range is 200 wide**: W5
+    7141, W6 7341, and the next worker 7541, where nothing listens on this
+    machine (`lsof -iTCP -sTCP:LISTEN`; Raycast holds 7265).
+  - **Q4, kiokun.com's label bug**: not reproduced. Its `getLabel` is
+    `flatLabels[tag] || tag` (`sveltekit-app/src/lib/utils/japaneseLabels.ts:24-26`),
+    and 53 of the table's 266 flat keys write `_` (`adj_na`, `n_suf`,
+    `v5k_s`, ...) where the entries carry JMdict's `-`, so the live site
+    shows `adj-na` as it is. The rewrite shows the label the table means:
+    the code as written, else with each `-` read as `_`, else the code. It is
+    stated in a list of differences from kiokun.com, each with its evidence,
+    as Q1's rendering difference is; the comparison counts every other
+    difference as a defect. The owner was told; the live site is theirs to
+    fix.
+  - **Merged 2026-10-09** as ADR-0285 (the inventory) and ADR-0286 (the
+    word page), from `d19850f`, after the fix (a 503 before, a 404 now) and
+    green runs (verify 37886442522, every engine). Next, 1b: Japanese
+    labels through `KIOKUN_APP` with Q4's lookup, and the character header.
+- **2026-10-09, W6's 1b and 1c merged; 1e's questions answered.**
+  - **Merged** as ADR-0288 (kiokun's labels and the character header) and
+    ADR-0289 (the loader's merges and the header's written forms), from
+    `de0c4ca`: verify 37896778819, its one recipe shard passed, 45 of 45
+    mutants killed; it failed only in WebKit's known flake and in the
+    summary, the lone-shard bug fixed on `master` that morning.
+  - **1e, the SEO head, waits on the merge** with its timing sample; asked
+    three questions, answered:
+    - **Q1, an oracle of kiokun.com's own code is the standard** for any of
+      its pure functions the rewrite reimplements: its files copied from
+      `KIOKUN_APP` into a fresh directory each run, never committed (Q3);
+      over the real data on a stated, deterministic sample; kiokun's commit
+      and Node's version recorded; every deliberate difference named and
+      counted by name, any other failing the run; a committed fixture of
+      its answers for the CI sample, which CI holds; hand-made cases for the
+      edges the data lacks; an import the harness does not copy refused,
+      never stubbed.
+    - **Q2, a canonical link is a page address**, written as HTML writes it
+      at the top of a page's view (`<link rel="canonical" href={…}/>`),
+      checked as `navigate`'s address is (ADR-0280); the host writes it
+      absolute with the deployment's configured public origin, never the
+      request's `Host`, which a client controls (kiokun.com's uses the
+      request's origin: a stated difference); a host whose pages state one
+      and that has no origin refuses to start; `og:url` is the host's, from
+      it, and a page's own refused (PW5034); no default self-canonical.
+      After navigate's merge.
+    - **Q3, JSON-LD is typed as JSON**, not as schema.org: a std `Json`
+      (null, bool, number, text, list, an object's keys in order), written
+      `<script type="application/ld+json">{data}</script>` at the top of a
+      page's view, serialized and escaped by the host (ADR-0097); any other
+      `<script>` still refused. The integrator's, after the canonical.
+- **2026-10-09, W7's plan: TodoMVC, launched when W5's slot frees** (the
+  owner's, relayed 2026-10-08: "something people are familiar with"; NEXT,
+  "W7, TodoMVC"). Track `todomvc`, branch `track/todomvc`, from `master`.
+  Its ADRs are `ADR-XXXX`, numbered at the merge; its recipes live in
+  `just/todomvc.just`; its code block is **PW61** (`Owner::Todomvc =>
+  "PW61"`); its Playwright runs use PORT=7541 (7541 to 7740, where nothing
+  listens here; ranges are 200 wide), its hosts at PORT+140..142
+  (`TODOMVC_PORTS`).
+  - **The reference is TodoMVC's own**: its spec (`app-spec.md`) and its
+    official behavioural tests (`tests/cypress/e2e/spec.cy.js`), run
+    unchanged. Cypress, `todomvc-app-css` and `todomvc-common` (npm, MIT)
+    are approved downloads (the owner, 2026-10-08), each one's source and
+    size stated when fetched; nothing else is.
+  - **A fourth program on the development server**, `examples/todomvc/
+    app.pw`, beside the store, the feed and kiokun, with a layer of its own
+    at a `TRACK SEAM (todomvc)` in `from_build_with`, chosen where the
+    program imports `todomvc:`. A session's todos, as the spec allows "the
+    framework's own persistence" in place of localStorage; the version on
+    a device's own storage waits for the Docs app's device-local storage
+    (charter §9.1's kind 4) and says so.
+  - **Every behaviour the spec states**, each with its test and its
+    mutation control: adding on Enter, trimmed, never empty; the counter's
+    "1 item left" and "2 items left"; toggling one and all; editing on a
+    double-click, the field focused, Enter and blur saving, Escape
+    discarding, an edit trimmed to nothing destroying the item; clear
+    completed, shown only where one is; the footer and the toggle-all
+    hidden with no items; and the three filters.
+  - **The filters' hash routes** (`#/`, `#/active`, `#/completed`) reach no
+    server, so a page reads its address's fragment. That is the language's
+    and the runtime's, the integrator's to rule when W7 asks, as the plan
+    says. The direction: a page binds a signal to its fragment, whose type
+    names the forms it takes; the runtime keeps it to `location.hash` at
+    start and on each `hashchange`; the server renders its declared
+    default. W7 builds the rest meanwhile.
+  - **What a gap needs of the language, the runtime or the host goes to
+    the integrator as a question**, as W5's and W6's did.
+  - **In order**: the app with its tests in three engines and its recipe;
+    the official Cypress suite, unchanged, as its acceptance; then the
+    showcase, W7's second milestone (NEXT).

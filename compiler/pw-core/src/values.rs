@@ -212,7 +212,14 @@ struct Subst {
     /// Variables met by a value of any type and by nothing that fixes one:
     /// `T` in `List.get([], 0)`. Each closes to [`Ty::Any`] (ADR-0065).
     any: BTreeSet<u32>,
+    /// How many variables [`Subst::holes`] has made, numbered from
+    /// [`HOLES`], above any callee's type parameters.
+    holes: u32,
 }
+
+/// The first variable a part of any type is given (ADR-0283). A callee's own
+/// type parameters are its variables `0..n`.
+const HOLES: u32 = 1 << 30;
 
 impl Subst {
     fn resolve(&self, t: &Ty) -> Ty {
@@ -234,6 +241,27 @@ impl Subst {
             Ty::Builtin(c, args) => Ty::Builtin(c, args.iter().map(|a| self.close(a)).collect()),
             Ty::Nominal(d, args) => Ty::Nominal(d, args.iter().map(|a| self.close(a)).collect()),
             other => other,
+        }
+    }
+
+    /// **A type a variable is bound to, each part of any type a variable of
+    /// its own** (ADR-0283): what else the call meets may fix one, and one
+    /// nothing fixes closes to [`Ty::Any`], as it was. A fold's accumulator
+    /// met by `[]` was bound to `List<_>` whole, so the function's result fixed
+    /// nothing and agreed with it whatever list it built:
+    /// `List.fold(xs, [], (out, x) => List.concat(out, [1]))` was a
+    /// `List<String>` where one was declared.
+    fn holes(&mut self, t: &Ty) -> Ty {
+        match t {
+            Ty::Any => {
+                let v = HOLES + self.holes;
+                self.holes += 1;
+                self.any.insert(v);
+                Ty::Var(v)
+            }
+            Ty::Builtin(c, args) => Ty::Builtin(*c, args.iter().map(|a| self.holes(a)).collect()),
+            Ty::Nominal(d, args) => Ty::Nominal(*d, args.iter().map(|a| self.holes(a)).collect()),
+            other => other.clone(),
         }
     }
 
@@ -267,7 +295,8 @@ fn unify(s: &mut Subst, expected: &Ty, actual: &Ty) -> Verdict {
             if t.is_unknown() || s.occurs(*v, t) {
                 return Verdict::Undecided;
             }
-            s.bound.insert(*v, t.clone());
+            let t = s.holes(t);
+            s.bound.insert(*v, t);
             Verdict::Agree
         }
         (Ty::Any, _) | (_, Ty::Any) => Verdict::Agree,

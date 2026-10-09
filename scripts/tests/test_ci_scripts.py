@@ -9,7 +9,8 @@
 - `ci_summary.py` fails a run where a recipe failed, a mutant survived, or a
   shard reported nothing;
 - `evidence_fetch.py` names the run after a file's `commit:` line, and
-  refuses a file of another commit.
+  refuses a file of another commit, and a run that failed anywhere but in
+  the jobs it is told are known.
 """
 
 import importlib.util
@@ -18,6 +19,7 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
@@ -229,6 +231,33 @@ class Recipes(unittest.TestCase):
         )
 
 
+    def test_a_failed_recipe_says_its_last_lines_in_the_jobs_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = pathlib.Path(tmp)
+            (out / "logs").mkdir()
+            (out / "logs" / "e14-x.log").write_text("".join(f"line {i}\n" for i in range(100)))
+            (out / "evidence" / "docs").mkdir(parents=True)
+            (out / "evidence" / "docs" / "x.txt").write_text("built\nError: no such module\n")
+            said = recipes.failed_tail("e14-x", out, ["docs/x.txt"], lines=5)
+        self.assertIn("| line 99", said)
+        self.assertNotIn("| line 94", said)
+        self.assertIn("| Error: no such module", said)
+
+    def test_a_heartbeat_says_what_a_recipe_is_doing_until_it_ends(self) -> None:
+        # A runner that dies mid-recipe keeps what reached the job's log.
+        import contextlib, io, threading
+        stop = threading.Event()
+        said = io.StringIO()
+        with contextlib.redirect_stdout(said):
+            beat = threading.Thread(target=recipes.heartbeat, args=("e14-x", stop, 0.05))
+            beat.start()
+            time.sleep(0.3)
+            stop.set()
+            beat.join()
+        lines = [l for l in said.getvalue().splitlines() if l.startswith("  [e14-x, ")]
+        self.assertTrue(lines, said.getvalue())
+        self.assertIn("evidence", lines[-1])
+
 class Prune(unittest.TestCase):
     def test_what_builds_leave_is_freed_and_the_newest_binary_kept(self) -> None:
         import os
@@ -278,6 +307,35 @@ class Fetch(unittest.TestCase):
         self.assertEqual(fetch.stamp("raw output\n", self.SHA, self.URL, "r"), "raw output\n")
 
 
+    def test_main_reaches_the_refusal_by_its_own_name(self) -> None:
+        # `main` keeps a list of refused files; a function of the same name
+        # was shadowed there, and `main` failed before it fetched anything.
+        import ast
+        tree = ast.parse((SCRIPTS / "evidence_fetch.py").read_text())
+        main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+        assigned = {t.id for n in ast.walk(main) if isinstance(n, ast.Assign) for t in n.targets if isinstance(t, ast.Name)}
+        self.assertNotIn("refusal", assigned)
+
+    def test_a_run_that_failed_is_fetched_only_where_its_failures_are_known(self) -> None:
+        # ADR-0281: a merge names each failure open in NEXT, and its
+        # evidence is fetched beside it.
+        run = {"status": "completed", "conclusion": "failure"}
+        jobs = [
+            {"name": "recipes 0", "conclusion": "success"},
+            {"name": "browser webkit", "conclusion": "failure"},
+            {"name": "summary", "conclusion": "failure"},
+        ]
+        self.assertIsNone(fetch.refusal(run, jobs, ["browser webkit", "summary"]))
+        self.assertIn("summary", fetch.refusal(run, jobs, ["browser webkit"]))
+        self.assertIn("browser webkit", fetch.refusal(run, jobs, []))
+        # A recipe shard is never known: its evidence is what is copied.
+        shard = jobs + [{"name": "recipes 3", "conclusion": "failure"}]
+        self.assertIn("recipes 3", fetch.refusal(run, shard, ["browser webkit", "summary", "recipes 3"]))
+        # A run that has not finished, or one that failed nowhere, is not.
+        self.assertIn("in_progress", fetch.refusal({"status": "in_progress", "conclusion": None}, jobs, []))
+        self.assertIsNone(fetch.refusal({"status": "completed", "conclusion": "success"}, jobs, []))
+        self.assertIn("no job", fetch.refusal(run, [{"name": "recipes 0", "conclusion": "success"}], ["x"]))
+
 class Summary(unittest.TestCase):
     def run_summary(self, shards: list[list[dict]], files: dict[str, str], planned: int) -> int:
         with tempfile.TemporaryDirectory() as tmp:
@@ -310,6 +368,25 @@ class Summary(unittest.TestCase):
 
     def test_a_shard_that_reported_nothing_fails_the_run(self) -> None:
         self.assertEqual(self.run_summary([[self.result()]], {}, 2), 1)
+
+    def test_a_run_of_one_shard_is_read_where_it_was_extracted(self) -> None:
+        # `download-artifact` puts a lone match in the path itself: W6's 1b
+        # ran one shard, passed it, and the run reported none.
+        def one(results: list[dict], files: dict[str, str]) -> int:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)
+                (root / "evidence").mkdir()
+                (root / "results.json").write_text(json.dumps(results))
+                for path, text in files.items():
+                    (root / "evidence" / path).write_text(text)
+                return subprocess.run(
+                    [sys.executable, str(SCRIPTS / "ci_summary.py"), tmp, "--shards", "1"],
+                    capture_output=True,
+                    text=True,
+                ).returncode
+
+        self.assertEqual(one([self.result(wrote=["a.txt"])], {"a.txt": "3 of 3 mutants killed\n"}), 0)
+        self.assertEqual(one([self.result(wrote=["a.txt"])], {"a.txt": "x: SURVIVED\n"}), 1)
 
 
 if __name__ == "__main__":

@@ -433,8 +433,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
              and, open, **`feed.spec.mjs`'s "Load more shows the next page"
              in WebKit, on CI again** (run 37826467131 at `b393cee`, job
              113480498704: its rows stayed at twenty, and again in run
-             37867532722's job 113617759049). ADR-0271 left 2 of 160 failing
-             under loads past CI's; this one was on CI's own; and, open,
+             37867532722's job 113617759049, and in run 37877464406's job
+             113649231199, read 2026-10-09: the runtime's own record shows
+             the Load-more read answered `{"applied":1}` at 8804 ms on an
+             open stream, with no reconnect, and no frame applied in the
+             four seconds after, while the 25 seeding posts had taken up to
+             598 ms each to commit. The server applied the read, and its
+             frame never came, or came late: what the server did with doc
+             22's frames is the next thing to record, in the failure's
+             attachment). ADR-0271 left 2 of 160 failing under loads past
+             CI's; this one was on CI's own; and, open,
              **a resume manifest's document and scope are constants**
              (found writing the capability matrix, 2026-10-08): every
              document's manifest says `"document": "cart-doc"` and `"scope":
@@ -442,8 +450,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              browser's decision holds them to the same constants
              (`pw-resume-wasm`), so ADR-0132's checks of a document's schema
              and its privacy scope pass for any page, a private cart's
-             among them; and, open, first, ahead of features, **four
-             soundness findings of 2026-10-03** (the session "Project
+             among them; and ~~**four soundness findings of 2026-10-03**~~
+             (ADR-0282, `just e14-held-labels`: one label for what a value
+             holds; the session "Project
              readiness for kiokun.com rewrite", at `29ebcf9`; its message
              expired unread), each reproduced at `d346c43` on 2026-10-08:
              1. a secret kept in a cached fragment: a `public query`
@@ -468,7 +477,53 @@ E14 comes before E11-E13. Its plan, controls and task list are
                 any world: it requires" and nothing after it, where a label
                 alone, not an effect, rules out every world;
 
-             and, open, next, **a refusal is never silent** (the owner's,
+             and ~~**W6's two compiler findings**~~ (ADR-0283, ADR-0284,
+             `just e14-what-a-component-does`, 2026-10-09): a host call
+             reached through a function, imported; a fold's empty seed,
+             typed, after the checker was found passing ill-typed folds;
+             and, found probing them, a query that read the database
+             through a function value or inside a lambda required no
+             capability and could be placed in the browser; and, open,
+             small, each over-stating or refusing rather than granting:
+             **a call through a local is charged its namesake's effects**
+             (ADR-0283's first limit: the effect inference's call walk
+             resolves a callee's name without its scope), and **only a
+             fold's seed takes the checker's type in the backend**
+             (ADR-0284's: `List.concat([], xs)` in a `let` is refused);
+             and ~~found probing ADR-0283, **a page's handler is held
+             to the page's placement**~~ (ADR-0287): the row check keeps an `on:`
+             handler's effects in the page's row and grants them against
+             the page's world, so a page placed at `build` whose button
+             sends a command is refused (PW5005, `database.write<Thing>`
+             not available at Build), where its contract, which defers the
+             handler, allows `build`. A handler runs in the browser, and a
+             command it sends at the command's own placement: the
+             DoorDash menu's static pages with an Add button need this;
+             and, found 2026-10-09 in CI itself, open: **the WebKit
+             "Load more" failure's cause**, reproduced here with the
+             server's records (3 of 120, six workers): every commit's
+             telling derived every open document of every session inside
+             the host's one `pending` lock, 50 to 200 ms a hold, back to
+             back, and the page's stream waited up to 1.6 s a pass; the fix,
+             each change derived outside the lock and pushed only where the
+             document still shows what it was derived against, is in CI on
+             `track/stream-records` (its first WebKit job passed);
+             **`e14-graphs-on-the-wire` takes CI's runner down** a few
+             minutes in, every time it runs there (the nightly of
+             2026-10-08, navigate's verify twice), and passes here (19 of 19,
+             2.2 GB at most): a heartbeat in `ci_recipes.py`
+             (`track/one-shard`) will show what it does when the runner
+             dies; **a run of one recipe shard reported none**
+             (`download-artifact` extracts a lone match into its path), so
+             its summary failed: fixed on `track/one-shard`; and
+             `e14-contract` exited 1 in that nightly, not yet looked at;
+             and, open, next, the integrator's, **the host's paths
+             reserved under `/_pw/`** (W6's question, PARALLEL.md
+             2026-10-08): the runtime's files and its root endpoints moved
+             there, a page's route refused that begins with it, then
+             `/command/…` and the test controls, and among declared routes a
+             literal segment over a parameter; kiokun's `/{word}` waits on
+             it; then, **a refusal is never silent** (the owner's,
              using the feed by hand, relayed 2026-10-08 23:30). Signed out,
              a reader types into the home page's composer and presses Post:
              the post shows, then goes, with no word. The server refuses it
@@ -640,11 +695,67 @@ E14 comes before E11-E13. Its plan, controls and task list are
             (2026-10-08), the first a finding: ADR-0193 rules that an order
             is the cart's lines, and the store keeps its status alone;
           - **W6 is kiokun.com's**, beside this app (below);
-          - **W7, search and filters**: stores and dishes, by name and
+          - **W7, TodoMVC** (the owner, relayed 2026-10-08: "something
+            people are familiar with"), the next slot free, since it pays
+            three times: the comparison's first app (TodoMVC's own
+            implementations, React's, Vue's, Svelte's and the rest, to
+            measure against), an objective suite (its spec,
+            `app-spec.md`, and its official behavioural tests, one Cypress
+            spec, `tests/cypress/e2e/spec.cy.js`, read 2026-10-08), and the
+            tutorial's first lesson. What it asks that no app has: editing
+            on a double-click, Enter and blur saving, Escape discarding, the
+            edit field focused; toggle-all and clear completed; "1 item
+            left" against "2 items left"; and the hash routes `#/`,
+            `#/active` and `#/completed`, which reach no server, so a page
+            reads its fragment: the integrator's to rule when W7 asks.
+            Persistence: the spec allows "the framework's own persistence"
+            in place of localStorage, so the first version persists through
+            Pleris's own data layer, a session's, and says so; device-local
+            storage, charter §9.1's kind 4, starts with the Docs app, and
+            TodoMVC takes it then as a second version. Its styling,
+            `todomvc-app-css` and `todomvc-common` (npm, MIT), and Cypress
+            to run the official tests unchanged: the owner said yes
+            (2026-10-08), each one's source and size stated when fetched.
+            Then, W7's second milestone, **the showcase** (the owner,
+            relayed 2026-10-08), the presentation of TodoMVC and of the
+            comparison:
+            - for each demo app (TodoMVC, the store, the feed), three
+              panes: the running app; its Pleris source; and what the
+              browser received, the served HTML and its `pw-parts`
+              manifest, made readable;
+            - "compare with" swaps the second and third panes for the same
+              app's React and Svelte versions, taken from TodoMVC's own
+              repository and never written here; so only where such a
+              version exists, TodoMVC's, until the comparison's stacks
+              exist with who wrote them stated;
+            - under the panes, numbers each from a recorded command, never
+              asserted: lines of source by a stated rule; the app's
+              JavaScript before the first press; the bytes the first press
+              downloads (its lazily loaded handler); the parts patched a
+              press; then Core Web Vitals and an accessibility audit;
+            - "break it": a museum exhibit's edit applied, and the
+              compiler's diagnostic shown in the source pane, as a command
+              recorded it at build time; a compile in the browser would
+              need the checker in Wasm, its own ruling;
+            - "the timeline of one press": the speculation shown, the
+              request sent, the commit, then only the patched parts flash
+              in the app's pane, read from the runtime's own log and
+              patches;
+            - styled without Tailwind, whose class lists would bury the
+              output the third pane exists to show: TodoMVC by its own
+              stylesheet, the store and the feed by one small hand-written
+              stylesheet over semantic HTML;
+            - built in Pleris where it can be, as more evidence; code panes
+              highlighted at build time, never by script in the browser;
+            - honest: the other stacks' code is TodoMVC's own, every number
+              reproducible, a loss shown as plainly as a win, and no
+              placeholder shipped as a number; served here first, any
+              public deploy on the owner's explicit go;
+          - **W8, search and filters**: stores and dishes, by name and
             cuisine, run in the database or a declared search source, its
             guarantees stated as ADR-0207 states a source's; no search engine
             is built here;
-          - **W8, ratings and reviews** of orders and stores, after
+          - **W9, ratings and reviews** of orders and stores, after
             accounts.
 
           Not claimed: a live courier map (ADR-0075 refuses a mounted
@@ -657,15 +768,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
           (`/Users/haki/code/kiokun-data`: `sveltekit-app/`, the Rust
           builder, and the 1.49 million files of `output_dictionary`),
           rewritten in Pleris and served, from the kiokun slice (ADR-0037,
-          ADR-0041). Real users, data, devices and deploys are the strongest
+          ADR-0041). Its inventory and its word page are merged (ADR-0285,
+          ADR-0286, 2026-10-09); next, Japanese labels through `KIOKUN_APP`
+          and the character header, then `/{word}` once `/_pw/` lands. Real
+          users, data, devices and deploys are the strongest
           evidence there is. Its conditions: parity with the live site,
           measured; served first on a preview origin beside the live site;
           and no production cutover, DNS change or deploy without the
           owner's explicit go, asked when it is reached. It is W6, the
           worker track beside W5, as the owner chose (two workers at once,
-          relayed 2026-10-08), so DoorDash's tracks after them are W7,
-          search and filters, and W8, ratings and reviews. It decides which
-          of these come first, each its own ADR:
+          relayed 2026-10-08), so the tracks after them are W7, TodoMVC,
+          W8, search and filters, and W9, ratings and reviews. It decides
+          which of these come first, each its own ADR:
           - **developer experience**: docs and a tutorial for a developer
             from outside; editor support, a language server (diagnostics as
             one types, completion, go-to-definition) on the check's ~37 ms;
@@ -744,7 +858,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
                where a reader runs an exhibit, when it is judged worth
                building;
           2. **the head-to-head comparison**, extending E14's three-stack
-             store contract (ADR-0120) rather than starting again: the
+             store contract (ADR-0120) rather than starting again: TodoMVC
+             first (W7), against TodoMVC's own implementations, then the
              DoorDash customer side, in Pleris, Next.js and SvelteKit.
              - Fair: idiomatic in each framework, never a strawman, each
                stack's standard libraries allowed.

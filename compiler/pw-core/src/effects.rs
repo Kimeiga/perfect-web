@@ -208,6 +208,11 @@ pub struct Inference<'a> {
     known: BTreeMap<DefId, BTreeSet<Effect>>,
     // NOTE: `known` keyed by a `String` would be RISK_QUEUE 34 again. See
     // `name-keyed-allow.txt` and `tests/name_keyed_maps.rs`.
+    /// **What each declaration's own body performs** (ADR-0283), as its row
+    /// is checked against: its calls, the members it reads and the
+    /// declarations it names as values (ADR-0078), from `run`'s last pass.
+    /// Its declared row is not in it: a row permits, and does not perform.
+    performed: BTreeMap<DefId, Inferred>,
     /// Which unit each `Hir` in the last `run` was, so a declaration can be
     /// given the same `DefId` the workspace gave it.
     workspace: &'a Workspace,
@@ -218,6 +223,7 @@ impl<'a> Inference<'a> {
         Self {
             sigs,
             known: BTreeMap::new(),
+            performed: BTreeMap::new(),
             workspace,
         }
     }
@@ -273,12 +279,14 @@ impl<'a> Inference<'a> {
             let mut changed = false;
             for (unit, id, body, types) in &typed {
                 let found = self.infer_in_at(*unit, body, types);
-                let entry = self.known.entry(self.def_of(*unit, *id)).or_default();
+                let def = self.def_of(*unit, *id);
+                let entry = self.known.entry(def).or_default();
                 let before = entry.len();
-                entry.extend(found.effects);
+                entry.extend(found.effects.iter().cloned());
                 if entry.len() != before {
                     changed = true;
                 }
+                self.performed.insert(def, found);
             }
             if !changed {
                 break;
@@ -512,46 +520,19 @@ impl<'a> Inference<'a> {
     /// uses. That is the exact over-granting the capability model exists to
     /// prevent, arriving through the front door.
     pub fn infer_excluding(&self, unit: usize, body: &Body, exclude: &[ExprId]) -> Inferred {
-        let mut out = self.infer_at(unit, body);
-        if exclude.is_empty() {
-            return out;
-        }
+        subtracted(self.infer_at(unit, body), body, exclude)
+    }
 
-        let inside = |span: &Span| {
-            exclude.iter().any(|root| {
-                let outer = body.expr_span(*root);
-                span.start >= outer.start && span.end <= outer.end
-            })
-        };
-
-        // SUBTRACTED, not rebuilt.
-        //
-        // An effect is dropped only when it has at least one source and every
-        // one of them lies inside an excluded subtree. Rebuilding the set from
-        // the surviving sources instead was wrong in the direction that
-        // matters: an effect carried without a source vanished, and a query
-        // that reads the database reported needing no authority at all.
-        //
-        // Keeping a sourceless effect is the conservative direction. An
-        // over-stated capability is refused work; an under-stated one is
-        // authority nobody approved.
-        let mut dropped: BTreeSet<String> = BTreeSet::new();
-        for effect in &out.effects {
-            let mut seen = false;
-            let mut all_inside = true;
-            for s in out.sources.iter().filter(|s| &s.effect == effect) {
-                seen = true;
-                if !inside(&s.span) {
-                    all_inside = false;
-                }
-            }
-            if seen && all_inside {
-                dropped.insert(effect.clone());
+    /// **What a declaration's own body performs** (ADR-0283): `run`'s
+    /// finding, or, for a body `run` did not see, the same walk now.
+    fn performed(&self, unit: usize, hir: &Hir, id: crate::hir::DeclId, body: &Body) -> Inferred {
+        match self.performed.get(&self.def_of(unit, id)) {
+            Some(found) => found.clone(),
+            None => {
+                let types = crate::infer::Types::of_decl(self.sigs, hir, id, body);
+                self.infer_in_at(unit, body, &types)
             }
         }
-        out.effects.retain(|e| !dropped.contains(e));
-        out.sources.retain(|s| !inside(&s.span));
-        out
     }
 
     /// `infer`, without a unit to resolve names in.
@@ -792,7 +773,11 @@ impl<'a> Inference<'a> {
         match decl.body {
             Some(body) => {
                 let b = hir.body(body);
-                let mut out: Vec<String> = self.infer_at(unit, b).effects.into_iter().collect();
+                let mut out: Vec<String> = self
+                    .performed(unit, hir, id, b)
+                    .effects
+                    .into_iter()
+                    .collect();
                 // **Plus the named roots that ARE this declaration's work.**
                 //
                 // A painter's `draw` block and a resource's `acquire`/`release`
@@ -861,12 +846,12 @@ impl<'a> Inference<'a> {
         let decl = hir.decl(id);
         match decl.body {
             Some(body) => {
-                let mut out: Vec<String> = self
-                    .infer_excluding(unit, hir.body(body), exclude)
+                let b = hir.body(body);
+                let mut out: Vec<String> = subtracted(self.performed(unit, hir, id, b), b, exclude)
                     .effects
                     .into_iter()
                     .collect();
-                self.roots_and_events(unit, hir.body(body), decl, &mut out);
+                self.roots_and_events(unit, b, decl, &mut out);
                 out.sort();
                 out.dedup();
                 out
@@ -888,6 +873,49 @@ impl<'a> Inference<'a> {
     pub fn effects_of(&self, unit: usize, path: &str) -> Option<&BTreeSet<Effect>> {
         self.resolved(unit, path).and_then(|d| self.known.get(&d))
     }
+}
+
+/// **What `out` found, less what only happens inside `exclude`**: each
+/// effect every one of whose sources lies inside an excluded subtree.
+fn subtracted(mut out: Inferred, body: &Body, exclude: &[ExprId]) -> Inferred {
+    if exclude.is_empty() {
+        return out;
+    }
+    let inside = |span: &Span| {
+        exclude.iter().any(|root| {
+            let outer = body.expr_span(*root);
+            span.start >= outer.start && span.end <= outer.end
+        })
+    };
+
+    // SUBTRACTED, not rebuilt.
+    //
+    // An effect is dropped only when it has at least one source and every
+    // one of them lies inside an excluded subtree. Rebuilding the set from
+    // the surviving sources instead was wrong in the direction that
+    // matters: an effect carried without a source vanished, and a query
+    // that reads the database reported needing no authority at all.
+    //
+    // Keeping a sourceless effect is the conservative direction. An
+    // over-stated capability is refused work; an under-stated one is
+    // authority nobody approved.
+    let mut dropped: BTreeSet<String> = BTreeSet::new();
+    for effect in &out.effects {
+        let mut seen = false;
+        let mut all_inside = true;
+        for s in out.sources.iter().filter(|s| &s.effect == effect) {
+            seen = true;
+            if !inside(&s.span) {
+                all_inside = false;
+            }
+        }
+        if seen && all_inside {
+            dropped.insert(effect.clone());
+        }
+    }
+    out.effects.retain(|e| !dropped.contains(e));
+    out.sources.retain(|s| !inside(&s.span));
+    out
 }
 
 /// The function a call sits inside the callback of, if any.
