@@ -1064,6 +1064,20 @@ fn the_description_takes_kiokuns_fragments_and_length() {
     let cut: Vec<u16> = whole.encode_utf16().take(67).collect();
     let expected = format!("{}…", String::from_utf16_lossy(&cut).trim_end());
     assert_eq!(title(&fetched(&s, &path_of("𠀀"))), expected);
+    // 68 code points and 69 units: JavaScript cuts it, and so does this.
+    write_entry(
+        dir.path(),
+        "𡀀",
+        r#"{"key":"𡀀","chinese_char":{"char":"𡀀","gloss":"a gloss of fifty-five units, just what this case needs!"}}"#,
+    );
+    let whole = "𡀀 — a gloss of fifty-five units, just what this case needs! | Kiokun";
+    assert_eq!(
+        (whole.chars().count(), whole.encode_utf16().count()),
+        (68, 69)
+    );
+    let cut: Vec<u16> = whole.encode_utf16().take(67).collect();
+    let expected = format!("{}…", String::from_utf16_lossy(&cut).trim_end());
+    assert_eq!(title(&fetched(&s, &path_of("𡀀"))), expected);
 }
 
 /// HTML's five escapes read back.
