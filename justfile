@@ -2367,6 +2367,29 @@ e14-invariants:
      } > docs/evidence/E14/invariants.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/invariants.txt
 
+# ADR-0304: what a page shows by the clock is told when the clock passes it.
+# The zones, the checker's cases, the host's clock and timers, and the
+# mutation controls.
+e14-clock:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0304 - what a page shows by the clock is told when the clock passes it"; echo; \
+       echo "produced by: just e14-clock"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "tz database: $(cat /usr/share/zoneinfo/+VERSION 2>/dev/null || sed -n 's/^# version //p' /usr/share/zoneinfo/tzdata.zi 2>/dev/null || echo unknown)"; echo; \
+       echo "== time zones, read from the host's own database (runtime/pw-time)"; echo; \
+       cargo test --locked -p pw-time 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== where a clock compared may be kept (compiler/pw-core: effects, tests/clock_compared.rs)"; echo; \
+       cargo test --locked -p pw-core --lib effects 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-core --test clock_compared 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host's clock, what a value holds until, and a page told then (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server -- clock:: a_page_is_told_when a_kept_value_past a_page_that_compares_no the_hosts_clock 2>&1 \
+         | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/clock_mutations.py)"; echo; \
+       python3 scripts/clock_mutations.py; \
+     } > docs/evidence/E14/clock.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/clock.txt
+
 # ADR-0180: a delivery estimate is a range, and says when it was made. The
 # server's tests, the page in three engines, and the mutation controls.
 e14-estimate-range:

@@ -897,3 +897,17 @@ Each a decision for a track, with its date; a track's ADR records it too.
 - **2026-10-10, ADR-0243's amendment merged** (markup on one line is one
   region, and no operand), from `31eeb3c`: verify 38013103417 green, 32 of
   32 mutants; its PW5047 beside ADR-0303's PW5046.
+- **2026-10-10, a verify dealt within a ceiling** (ADR-0290 amended).
+  `track/command-order`'s verify 38015617597 was stopped at 345 minutes in
+  its shard 7 (two recipes took twice their seconds: mutants that hang under
+  the command order's wait, killed at their bound), and
+  `track/soft-navigation`'s was dealt 21,900 s into five of its nine shards.
+  The planner now deals no shard of more than one recipe past 13,800 s and
+  takes more shards where a track's 9 would; their jobs past the Free plan's
+  20 wait. Both tracks run again on it.
+- **2026-10-10, the clock merged** as ADR-0304, from `4c079dc` (verify
+  38022822226 green, 25 of 25 mutants), ahead of the command order and the
+  soft navigation, whose verifies run again on the planner's ceiling: they
+  take 0305 and 0306. Its host read is merged with ADR-0303's: a document's
+  bindings are read once each, inside the clock's noting of what they
+  compared. Store hours' step 2 waits for W8's merge.

@@ -59,8 +59,9 @@ jobs:
           case "$EVENT" in
             push)
               # A track's push (ADR-0253): what the track changed since it left
-              # `master`, at every push, in at most 9 shards, so that `master`'s
-              # runs keep most of the plan's 20 jobs.
+              # `master`, at every push, in 9 shards, so that `master`'s runs
+              # keep most of the plan's 20 jobs; in more where 9 would end past
+              # the planner's ceiling (ADR-0290, amended 2026-10-10).
               if [ "${GITHUB_REF_NAME#track/}" != "$GITHUB_REF_NAME" ]; then
                 base=$(git merge-base origin/master "$GITHUB_SHA")
                 python3 scripts/ci_plan.py --shards 9 --changed "$base" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"

@@ -675,6 +675,8 @@ mod materializations;
 mod messages;
 // TRACK SEAM (kiokun): kiokun's dictionary, read (docs/PARALLEL.md, W6).
 mod kiokun;
+// ADR-0304: the platform's clock, and what a value read by it holds until.
+mod clock;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -877,6 +879,17 @@ struct Server {
     /// Per session, the interaction keys held in `commands`, oldest first,
     /// each with the arguments it was first sent with.
     interactions: Mutex<BTreeMap<String, std::collections::VecDeque<(String, String)>>>,
+    /// **The host's wall clock at start** (ADR-0304), in milliseconds since
+    /// the epoch: [`Server::now`] is it and the query clock since.
+    epoch: i64,
+    /// **The host's tz database** (ADR-0304), for the platform's clock.
+    zones: Arc<pw_time::Database>,
+    /// **What each kept value holds until** (ADR-0304): the earliest instant
+    /// its read compared the clock with, by its `pw-resource` key.
+    held: Mutex<std::collections::HashMap<pw_resource::Key, i64>>,
+    /// **Each live document, to read again when what it shows holds no
+    /// longer** (ADR-0304).
+    timers: clock::Timers,
     /// **Who a request is, and what `requires` is told**: the identity
     /// track's (ADR-0253).
     identity: identity::Identity,
@@ -1173,6 +1186,11 @@ fn topology_for(layer: &[&'static str]) -> Topology {
                 "session.read",
                 // A command's events, committed with its writes (ADR-0208).
                 "outbox.write",
+                // The platform's clock, compared (ADR-0304): this host
+                // answers it, and tells what it held when time passes.
+                "clock.compare",
+                // And its tz database (ADR-0304), read from the host's own.
+                "clock.zone",
             ]
             .iter()
             .chain(layer)
@@ -1534,6 +1552,10 @@ impl Server {
             calls: Arc::default(),
             commands: pw_resource::Resources::new(pw_resource::Clock::new()),
             interactions: Mutex::new(BTreeMap::new()),
+            epoch: wall_millis(),
+            zones: Arc::new(pw_time::Database::system()),
+            held: Mutex::new(std::collections::HashMap::new()),
+            timers: clock::Timers::default(),
             // TRACK SEAM (identity): built above, its principals the layer's.
             identity,
             uploads: uploads::Uploads::default(),
@@ -1976,6 +1998,8 @@ impl Server {
                 notifications::PRINCIPAL_READ.to_string(),
                 notifications::principal_operation(&self.identity.principals(), session),
             );
+            // The platform's clock (ADR-0304), for the command's moment.
+            host.extend(clock::operations(self.now(), &self.zones));
 
             // What the command emits (ADR-0208): it computes each event's
             // values itself and hands them to the platform's outbox, which
@@ -2466,6 +2490,8 @@ impl Server {
             for (key, _) in keys {
                 self.commands.forget_command(&key);
             }
+            // And what its kept values held until (ADR-0304).
+            self.held.lock().expect("held").retain(|k, _| !mine(&k.key));
             // And the versions its speculated values were sent at (ADR-0222).
             self.speculated_versions
                 .lock()
@@ -2475,6 +2501,60 @@ impl Server {
     }
 
     /// `pw-resource`'s clock, brought to wall time (ADR-0127).
+    /// **The host's wall clock** (ADR-0304), in milliseconds since the
+    /// epoch: the system's at start, moved since as the query clock is, by
+    /// time and by a test (`/bench/clock`). One clock, so what is kept and
+    /// what is compared move together.
+    fn now(&self) -> i64 {
+        self.sync_query_clock();
+        self.epoch + i64::try_from(self.query_clock.0.now()).unwrap_or(i64::MAX)
+    }
+
+    /// **Each live document read again at the instant what it shows holds
+    /// until** (ADR-0304), for as long as the host runs: woken when an
+    /// instant is set or the clock is moved, and each second at least, as the
+    /// clock moves with time.
+    fn tell_when_time_passes(&self) {
+        loop {
+            let (told, wait) = self.tell_due();
+            if told == 0 {
+                self.timers.wait(wait);
+            }
+        }
+    }
+
+    /// Each document whose instant has come, read again and told: how many,
+    /// and how long until the next, a second at most.
+    fn tell_due(&self) -> (usize, u64) {
+        let now = self.now();
+        let (due, next) = self.timers.take_due(now);
+        for doc in &due {
+            self.time_passed(doc);
+        }
+        let wait = next.map_or(1000, |at| (at - now).clamp(1, 1000));
+        (due.len(), u64::try_from(wait).unwrap_or(1000))
+    }
+
+    /// **`doc` shows what held until now**: read again, and told what
+    /// changed, as a change of the session's would tell it, in the session's
+    /// turn.
+    fn time_passed(&self, doc: &Doc) {
+        let session = doc.0.as_str();
+        let session_lock = self.one_at_a_time(session);
+        let _one = session_lock
+            .lock()
+            .expect("one change of a session at a time");
+        self.clock.advance(1);
+        let version = Version(self.clock.now());
+        self.send_documents_where(
+            session,
+            |d| d == doc,
+            &session_documents(session),
+            version,
+            false,
+        );
+    }
+
     fn sync_query_clock(&self) {
         let (clock, started, seen) = &self.query_clock;
         let now = started.elapsed().as_millis() as u64;
@@ -2582,6 +2662,19 @@ impl Server {
         let resource = binding["resource"].as_str().unwrap_or_default();
         let manifest = runtime_manifest(resource, &binding["policy"]);
         let key = key.clone();
+        // **A value held until an instant now passed is read again**
+        // (ADR-0304): what it compared the clock with answers otherwise.
+        let passed = {
+            let mut held = self.held.lock().expect("held");
+            let passed = held.get(&key).is_some_and(|&until| until <= self.now());
+            if passed {
+                held.remove(&key);
+            }
+            passed
+        };
+        if passed {
+            self.queries.invalidate_key(&key);
+        }
         // A flight a commit invalidated is not an error: its result was about
         // to be stale, and a reader asks again (found 2026-10-02: two presses
         // at once made one command's re-read fail on the other's commit).
@@ -2601,6 +2694,11 @@ impl Server {
                 | pw_resource::Fetched::Deduplicated(v) => {
                     if matches!(*v, Val::Result(Err(_))) {
                         self.queries.invalidate_key(&key);
+                    }
+                    // What it holds until, for the read it is part of
+                    // (ADR-0304): a kept value's, or another flight's.
+                    if let Some(&until) = self.held.lock().expect("held").get(&key) {
+                        clock::note(until);
                     }
                     return Ok(Val::clone(&v));
                 }
@@ -2638,8 +2736,16 @@ impl Server {
                 // waiting for any longer (ADR-0152).
                 let cancellation = cancellation.clone();
                 let stopped: Stopped = Arc::new(move || cancellation.is_cancelled());
-                self.answer_within(resource, session, args, Some(stopped))
-                    .map(Arc::new)
+                // What the value holds until (ADR-0304), kept with it before
+                // it is published, so a reader its flight answers knows too.
+                let (answer, until) =
+                    clock::noting(|| self.answer_within(resource, session, args, Some(stopped)));
+                let mut held = self.held.lock().expect("held");
+                match until {
+                    Some(until) => held.insert(key.clone(), until),
+                    None => held.remove(key),
+                };
+                answer.map(Arc::new)
             })
     }
 
@@ -3183,6 +3289,9 @@ impl Server {
             notifications::PRINCIPAL_READ.to_string(),
             notifications::principal_operation(&self.identity.principals(), session),
         );
+        // The platform's clock (ADR-0304): every comparison in one read
+        // answers for one instant, and notes what the read holds until.
+        host.extend(clock::operations(self.now(), &self.zones));
         let host = host
             .into_iter()
             .map(|(name, f)| {
@@ -3241,30 +3350,39 @@ impl Server {
             |d| self.page_of(&(session.to_string(), d)),
         );
         let plan = self.plan_of(&page);
-        let mut out = BTreeMap::new();
-        // **One query with one key is read once for its document**
-        // (ADR-0303): a page and its layout that each bind `Cart` of the
-        // session's read it once, and show one value of it.
-        let mut read: Vec<(&str, Vec<Val>, Val)> = Vec::new();
-        for b in plan["bindings"].as_array().into_iter().flatten() {
-            if !wanted(b["binding"].as_str().unwrap_or_default()) {
-                continue;
-            }
-            let args = self.args_of(plan, session, document, b, keys)?;
-            let resource = b["resource"].as_str().unwrap_or_default();
-            let value = match read.iter().find(|(r, a, _)| *r == resource && *a == args) {
-                Some((_, _, v)) => v.clone(),
-                None => {
-                    let v = self.fetch_binding(session, b, &args)?;
-                    read.push((resource, args, v.clone()));
-                    v
+        // What the document's values hold until (ADR-0304): the earliest
+        // instant any of them compared the clock with, when it is read again.
+        let (out, until) = clock::noting(|| {
+            let mut out = BTreeMap::new();
+            // **One query with one key is read once for its document**
+            // (ADR-0303): a page and its layout that each bind `Cart` of the
+            // session's read it once, and show one value of it.
+            let mut read: Vec<(&str, Vec<Val>, Val)> = Vec::new();
+            for b in plan["bindings"].as_array().into_iter().flatten() {
+                if !wanted(b["binding"].as_str().unwrap_or_default()) {
+                    continue;
                 }
-            };
-            out.insert(b["binding"].as_str().unwrap_or_default().to_string(), value);
+                let args = self.args_of(plan, session, document, b, keys)?;
+                let resource = b["resource"].as_str().unwrap_or_default();
+                let value = match read.iter().find(|(r, a, _)| *r == resource && *a == args) {
+                    Some((_, _, v)) => v.clone(),
+                    None => {
+                        let v = self.fetch_binding(session, b, &args)?;
+                        read.push((resource, args, v.clone()));
+                        v
+                    }
+                };
+                out.insert(b["binding"].as_str().unwrap_or_default().to_string(), value);
+            }
+            Ok::<_, Unread>(out)
+        });
+        if let (Some(document), Some(until)) = (document, until) {
+            self.timers.hold(&(session.to_string(), document), until);
         }
         // **What the page asks of its reader** (ADR-XXXX): each predicate's
         // answer for the document, as `requires` would answer it now, read
         // by the name its template reads it by.
+        let mut out = out?;
         for predicate in plan["predicates"]
             .as_array()
             .into_iter()
@@ -6726,6 +6844,13 @@ fn main() {
         println!("pw dev server uploads: {uploads}");
     }
 
+    // **Each live document read again when what it shows holds no longer**
+    // (ADR-0304): the host's timer.
+    {
+        let server = server.clone();
+        std::thread::spawn(move || server.tell_when_time_passes());
+    }
+
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
         let server = server.clone();
@@ -6959,6 +7084,42 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // hook, as every stack in it has one. `?status=preparing` sets the
         // status's case; no status removes the order. The page reads it again
         // when it is next served.
+        // **The host's clock, as a test moves it** (ADR-0304): forward
+        // only, as time goes, to the instant `at` or `advance` milliseconds
+        // on. Every document that shows what holds no longer is told.
+        ("GET", "/bench/clock") => {
+            let now = serde_json::json!({ "now": server.now() });
+            respond_json(&mut stream, 200, &session, fresh, &now.to_string());
+        }
+        ("POST", "/bench/clock") => {
+            let read = |k: &str| {
+                query
+                    .split('&')
+                    .find_map(|p| p.strip_prefix(k)?.strip_prefix('='))
+                    .and_then(|v| v.parse::<i64>().ok())
+            };
+            let now = server.now();
+            let ahead = match (read("at"), read("advance")) {
+                (Some(at), None) => Some(at - now),
+                (None, Some(ms)) => Some(ms),
+                _ => None,
+            };
+            match ahead.and_then(|ms| u64::try_from(ms).ok()) {
+                Some(ms) => {
+                    server.query_clock.0.advance(ms);
+                    server.timers.changed.notify_all();
+                    let now = serde_json::json!({ "now": server.now() });
+                    respond_json(&mut stream, 200, &session, fresh, &now.to_string());
+                }
+                None => respond_json(
+                    &mut stream,
+                    400,
+                    &session,
+                    fresh,
+                    "{\"error\":\"`at` (an instant not passed) or `advance` (milliseconds not below 0)\"}",
+                ),
+            }
+        }
         ("POST", "/bench/order") => {
             let status = query
                 .split('&')
@@ -10959,6 +11120,135 @@ public query Store(",
             [("cortado".to_string(), 2)],
             "once"
         );
+    }
+
+    /// **A page that shows what the clock decides is told when the clock
+    /// passes it** (ADR-0304): the home page asks whether today's 21:00, in
+    /// UTC, has passed. Read at 20:59:30 it says "On sale", held until 21:00;
+    /// at 20:59:59 nothing is told, and past 21:00 the page is sent "Sale
+    /// over", once.
+    #[test]
+    fn a_page_is_told_when_the_instant_it_compared_passes() {
+        let s = on_sale_until_nine();
+        // 20:59:30 UTC, on a day ahead of the host's.
+        let now = s.now();
+        let day = now.div_euclid(86_400_000) + 1;
+        let nine = day * 86_400_000 + 21 * 3_600_000;
+        s.query_clock
+            .0
+            .advance(u64::try_from(nine - 30_000 - now).unwrap());
+        let (html, _, _, _) = s
+            .serve_document_settled("a", "store.page.HomePage", &Params::new(), &[])
+            .expect("served");
+        assert!(visible(&html).contains("On sale"), "{html}");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        assert_eq!(s.timers.at(&doc), Some(nine), "held until 21:00");
+        let before = sets_of(&s, &doc).len();
+        s.query_clock.0.advance(29_000);
+        assert_eq!(s.tell_due().0, 0, "20:59:59: nothing is due");
+        assert_eq!(sets_of(&s, &doc).len(), before);
+        s.query_clock.0.advance(2_000);
+        assert_eq!(s.tell_due().0, 1, "21:00:01: the page is due");
+        let sets = sets_of(&s, &doc);
+        assert_eq!(sets.len(), before + 1, "told once");
+        assert!(
+            written(sets.last().expect("a set")).contains("Sale over"),
+            "{:?}",
+            sets.last()
+        );
+        // Read again past 21:00, it holds until the day ends: today's date
+        // was compared too, and tomorrow's sale is on again.
+        assert_eq!(
+            s.timers.at(&doc),
+            Some((day + 1) * 86_400_000),
+            "held until the next day begins"
+        );
+    }
+
+    /// The store's home page with a sale on until 21:00 UTC each day
+    /// (ADR-0304): a shared query, kept ten minutes, so only the instant it
+    /// compared makes it be read again sooner.
+    fn on_sale_until_nine() -> Served {
+        served_from_patches_in(
+            "examples",
+            |app| {
+                let page = "    let stores = query StoreList()\n    let cart = query Cart(current_session())\n";
+                let shown = "            <h1>Stores</h1>\n";
+                assert!(app.contains(page) && app.contains(shown), "the home page");
+                app.replacen("import List\n", "import List\nimport clock\n", 1)
+                    .replacen(
+                        "public query StoreList() -> List<Store>\n",
+                        "public query Sale() -> String\n    freshness   10.minutes\n    consistency snapshot\n    cache       shared\n    concurrency one_per_key\n    timeout     2.seconds\n{\n    let utc = clock.zone(\"UTC\")\n    match clock.time(21, 0) {\n        Some(nine) => if clock.passed(clock.at(clock.today_in(utc), nine, utc)) { \"Sale over\" } else { \"On sale\" },\n        None => \"No sale\",\n    }\n}\n\npublic query StoreList() -> List<Store>\n",
+                        1,
+                    )
+                    .replacen(page, &format!("{page}    let sale = query Sale()\n"), 1)
+                    .replacen(shown, &format!("{shown}            <p id=\"sale\">{{sale}}</p>\n"), 1)
+            },
+            &[],
+        )
+    }
+
+    /// **A value kept past the instant it compared is read again**
+    /// (ADR-0304): the sale's entry is kept ten minutes, and a page served a
+    /// second after 21:00 is not served the value from 20:59:30. A second
+    /// session's page, served from the kept entry, is held to its instant
+    /// too.
+    #[test]
+    fn a_kept_value_past_its_instant_is_read_again() {
+        let s = on_sale_until_nine();
+        let now = s.now();
+        let day = now.div_euclid(86_400_000) + 1;
+        let nine = day * 86_400_000 + 21 * 3_600_000;
+        s.query_clock
+            .0
+            .advance(u64::try_from(nine - 30_000 - now).unwrap());
+        let home = |session: &str| {
+            let (html, _, _, _) = s
+                .serve_document_settled(session, "store.page.HomePage", &Params::new(), &[])
+                .expect("served");
+            visible(&html)
+        };
+        assert!(home("a").contains("On sale"));
+        // From the kept entry, and held to 21:00 as the first was.
+        assert!(home("b").contains("On sale"));
+        let b = latest(&s.pending.lock().expect("pending"), "b");
+        assert_eq!(s.timers.at(&b), Some(nine), "a kept value's instant");
+        s.query_clock.0.advance(31_000);
+        assert!(
+            home("c").contains("Sale over"),
+            "not the value from before 21:00"
+        );
+    }
+
+    /// **A page that compares no clock is held by nothing** (ADR-0304): the
+    /// store's own home page is read again only when something changes.
+    #[test]
+    fn a_page_that_compares_no_clock_holds_nothing() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let _ = s
+            .serve_document_settled("a", "store.page.HomePage", &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        assert_eq!(s.timers.at(&doc), None);
+    }
+
+    /// **The host's clock, as a test moves it** (ADR-0304): the system's,
+    /// moved forward by `advance` or to `at`, never back.
+    #[test]
+    fn the_hosts_clock_moves_forward_as_a_test_says() {
+        let s = rendering_server();
+        let now = s.now();
+        assert!((now - wall_millis()).abs() < 5_000, "the system's: {now}");
+        let moved = posted(&s, "/bench/clock?advance=60000", "clock", "c-1", "");
+        assert!(moved.starts_with("HTTP/1.1 200"), "{moved}");
+        assert!(s.now() >= now + 60_000);
+        let to = s.now() + 3_600_000;
+        let moved = posted(&s, &format!("/bench/clock?at={to}"), "clock", "c-2", "");
+        assert!(moved.starts_with("HTTP/1.1 200"), "{moved}");
+        assert!(s.now() >= to && s.now() < to + 5_000);
+        let back = posted(&s, &format!("/bench/clock?at={now}"), "clock", "c-3", "");
+        assert!(back.starts_with("HTTP/1.1 400"), "never back: {back}");
+        assert!(s.now() >= to, "and not moved");
     }
 
     /// **A forced reconnect** (charter §15.5, ADR-0175): the session's open

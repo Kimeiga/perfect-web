@@ -15,6 +15,7 @@ members = [
     "runtime/pw-resume",
     "runtime/pw-resume-wasm",
     "runtime/pw-tasks",
+    "runtime/pw-time",
     "spikes/compiler-diagnostic",
     "spikes/kiokun/server",
     "spikes/own-renderer/server",
