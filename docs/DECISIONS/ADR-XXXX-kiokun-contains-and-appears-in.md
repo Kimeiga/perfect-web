@@ -86,8 +86,8 @@ Numbered after ADR-0301's 20.
     466 KB with its 543 list items, 71 KB without them.
 22. **The rest of each list is a `<details>` disclosure**, where kiokun.com
     shows ten more each time the reader scrolls near the list's end. The
-    disclosure needs no script; it costs a long list's page about 16 ms and
-    390 KB (人 and 色, Found 3). Reading the rest on demand, when the
+    disclosure needs no script; it costs a long list's page 16 to 20 ms
+    and about 390 KB (人 and 色, Found 3). Reading the rest on demand, when the
     disclosure opens, is a later step.
 23. **The reader's language preferences are not read**: every language's
     column and every card's readings are shown, as kiokun.com shows them
@@ -108,19 +108,21 @@ Numbered after ADR-0301's 20.
    decodes the whole response once and refuses invalid UTF-8. The
    integrator took the shared helper's fix (2026-10-10).
 3. **What the lists cost**, each request of a server just started, since a
-   word's page is kept in the shared cache once read (one-minute load 4.8
-   to 7.7 on 12 cores, `docs/evidence/E14/kiokun-contains.txt`):
+   word's page is kept in the shared cache once read
+   (`docs/evidence/E14/kiokun-contains.txt`, recorded at a one-minute load
+   of 34 falling to 9 on 12 cores):
 
    | | the page | its lists left empty |
    |---|---|---|
-   | 人 (Chinese 143, Japanese 200, Korean 200) | p50 43.6 ms, 466 KB | p50 26.3 ms, 71 KB |
-   | 色 (142, 200, 200) | p50 43.4 ms, 450 KB | p50 27.6 ms, 69 KB |
-   | 陸上貨物運送事業労働災害防止協会 (26 cards) | p50 3.1 ms, 57 KB | p50 1.6 ms, 26 KB |
+   | 人 (Chinese 143, Japanese 200, Korean 200) | p50 46.7 ms, 466 KB | p50 29.3 ms, 71 KB |
+   | 色 (142, 200, 200) | p50 49.1 ms, 450 KB | p50 29.4 ms, 69 KB |
+   | 陸上貨物運送事業労働災害防止協会 (26 cards) | p50 3.3 ms, 57 KB | p50 1.7 ms, 26 KB |
 
-   A page whose lists are long spends about 16 ms and 390 KB on them; a
-   run an hour earlier, at a higher load, measured the same within 2 ms.
-   Reading the disclosed rest on demand is a later step (Difference 22);
-   the oracle and the tests hold the order whichever way it is sent.
+   An earlier run at a load of 4.8 to 7.7 measured 43.6 and 26.3 ms for
+   人, and 43.4 and 27.6 ms for 色. A page whose lists are long spends 16
+   to 20 ms and about 390 KB on them. Reading the disclosed rest on demand
+   is a later step (Difference 22); the oracle and the tests hold the
+   order whichever way it is sent.
 4. **The repository's sample has no Contains**: its words are single
    characters. CI holds Contains by hand cases answered by kiokun.com's own
    code (`contains.mjs` run on the same entries), and Appears in by the
