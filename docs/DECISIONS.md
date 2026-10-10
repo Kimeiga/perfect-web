@@ -2393,7 +2393,11 @@ ADR-0249 and ADR-0278).
   out of time). Each recipe, the longest first, goes to the shard where it ends
   soonest, what it adds to that shard's setup counted; one that needs less
   may run where more is set up. The recipes run against a database keep
-  shards of their own, as many as end the run soonest.
+  shards of their own, as many as end the run soonest. Amended 2026-10-10:
+  no shard of more than one recipe is dealt past 13,800 s, two thirds of a
+  shard's 345-minute limit; a run takes more shards than it asks for where
+  its own would (a track's 9 were dealt 21,900 s, and a shard stopped at
+  the limit throws the run away).
 [ADR-0291](DECISIONS/ADR-0291-a-hosts-record-is-written-as-the-program-names-its-fields.md):
 a host's record is written as the program names its fields (extends
 ADR-0172 to the host).

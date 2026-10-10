@@ -897,3 +897,11 @@ Each a decision for a track, with its date; a track's ADR records it too.
 - **2026-10-10, ADR-0243's amendment merged** (markup on one line is one
   region, and no operand), from `31eeb3c`: verify 38013103417 green, 32 of
   32 mutants; its PW5047 beside ADR-0303's PW5046.
+- **2026-10-10, a verify dealt within a ceiling** (ADR-0290 amended).
+  `track/command-order`'s verify 38015617597 was stopped at 345 minutes in
+  its shard 7 (two recipes took twice their seconds: mutants that hang under
+  the command order's wait, killed at their bound), and
+  `track/soft-navigation`'s was dealt 21,900 s into five of its nine shards.
+  The planner now deals no shard of more than one recipe past 13,800 s and
+  takes more shards where a track's 9 would; their jobs past the Free plan's
+  20 wait. Both tracks run again on it.

@@ -761,6 +761,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
             what it adds to a cold build and to `target/`;
           - **a recipe not yet measured is planned at its kind's upper
             quartile** (done, ADR-0290's amendment of 2026-10-09).
+          - **a shard dealt within a ceiling under its limit** (done,
+            ADR-0290's amendment of 2026-10-10: a track's verify was dealt
+            21,900 s into nine shards, and command order's shard was stopped
+            at 345 minutes);
+          - **each mutant given the tests that can see its rule** (W6's
+            ruling of 2026-10-09, measured 2026-10-10): 45 mutation scripts
+            run a crate's tests whole for each mutant, most of them the
+            server's 377; the top 20 cost about 150,000 of a full verify's
+            265,000 seconds, and `e14-command-answers` alone took 15,426 s,
+            past the ceiling by itself. Each script narrowed is run whole
+            first, every mutant still killed (done for `refusal_mutations`'
+            core suite, 8 of 8 in 103 s).
 
           The worker tracks, one at a time beside the integrator (the
           owner's budget rule), each launched under docs/PARALLEL.md when
