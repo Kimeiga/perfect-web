@@ -239,12 +239,37 @@ Recorded by `just e14-store-accounts` in
 
 ### Tests and mutants
 
-Filled in at the milestone's recording.
+- `just e14-store-accounts`, recorded at `ce4c300` against PostgreSQL 18.6:
+  every test above is green on both layers, **29 of 29 mutants killed** (17
+  from milestone 1, 12 from milestone 2), each by a failing test, and the
+  memory bound stopped no process. The 12 are: the radius read in
+  kilometres; the estimate without the travel, or answering for a store out
+  of reach; an Add, or an order, to a store out of reach let through; a
+  saved address not chosen; a choice that leaves the last one chosen; an
+  eleventh address kept; a place outside the table saved; on PostgreSQL, a
+  reader's addresses read whoever saved them, or store 48 delivering as far
+  as store 47; and the reach not told when addresses change. The first
+  recording left the PostgreSQL radius mutant alive (Found). The fix is
+  `ce4c300`.
+- The workspace's tests (311 result lines, none failed); the server's whole
+  suite, 379 tests, in memory and on PostgreSQL; the browser suite in three
+  engines at `PORT=7300`, 901 passed, and the feed's spec 66; the conformance
+  oracle.
+- `just fmt-check`, `lint`, `case-check`, `evidence-gates`,
+  `mutation-anchors`, `test-compile` and `audit` green.
+- **Re-anchored, not run whole here**: `descriptions`, `slots` and
+  `estimate_range`, on the store page's new text and the estimate's new
+  operation. Also every script anchored in a file this milestone changed
+  (`store.rs`, `store_pg.rs`, `main.rs`, `app.pw`). CI's verification plans
+  those recipes and runs them whole (ADR-0281).
 
 ### Merge notes
 
 - **Shared files**: `main.rs` (`mod places`, `TRACK SEAM (store-accounts)`;
-  `stream_runs`), `store.rs`, `store_pg.rs`, `examples/domain.pw`,
+  `stream_runs`), `spikes/own-renderer/store-values.json` (the address
+  page's signals and the document's `id`, which the static render needs),
+  four browser specs that count the store page's anchors, tab stops and
+  tree, or found the Add's part by its owner, `store.rs`, `store_pg.rs`, `examples/domain.pw`,
   `examples/store/app.pw`, `examples/lib/Events.pw`, `StoreData.pw`, the
   compiler's and the host's tests that pin the store's text, the
   conformance oracle, `playwright.config.mjs` (`STORE_ACCOUNTS_PORTS`).

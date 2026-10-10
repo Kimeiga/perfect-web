@@ -328,7 +328,9 @@ Recorded by `just e14-store-accounts` in
 ### Tests and mutants
 
 - `just e14-store-accounts` (recorded locally, PostgreSQL 18.6): every test
-  above green on both layers; **17 of 17 mutants killed**, each by a failing
+  above green on both layers; **17 of 17 mutants killed** (the recording
+  now holds milestone 2's twelve as well, 29 of 29: "a delivery goes to the
+  reader's chosen address"), each by a failing
   test, and the memory bound stopped no process. Its first run left one
   survivor, "a signed-in session that signs in again is joined to the next
   user": on the canonical store a signed-in session's guest owner holds
