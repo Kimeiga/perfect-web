@@ -2367,6 +2367,23 @@ e14-invariants:
      } > docs/evidence/E14/invariants.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/invariants.txt
 
+# ADR-XXXX: a name means its binding, in every analysis. The checker's cases,
+# pw-core's tests, and the mutation controls.
+e14-name-bindings:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a name means its binding, in every analysis"; echo; \
+       echo "produced by: just e14-name-bindings"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker's cases (compiler/pw-core/tests/names_mean_their_binding.rs)"; echo; \
+       cargo test --locked -p pw-core --test names_mean_their_binding 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== pw-core's library and the corpus (checking_source, every_name_resolves)"; echo; \
+       cargo test --locked -p pw-core --lib --test checking_source --test every_name_resolves 2>&1 | grep -E '^test result|panicked at'; \
+       echo; echo "== mutation controls (scripts/name_binding_mutations.py)"; echo; \
+       python3 scripts/name_binding_mutations.py; \
+     } > docs/evidence/E14/name-bindings.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/name-bindings.txt
+
 # ADR-0180: a delivery estimate is a range, and says when it was made. The
 # server's tests, the page in three engines, and the mutation controls.
 e14-estimate-range:

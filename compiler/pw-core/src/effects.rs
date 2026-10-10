@@ -213,6 +213,10 @@ pub struct Inference<'a> {
     /// declarations it names as values (ADR-0078), from `run`'s last pass.
     /// Its declared row is not in it: a row permits, and does not perform.
     performed: BTreeMap<DefId, Inferred>,
+    /// **Each body's names, as its scopes bind them**, by its unit and its
+    /// owner, from `run`: a call through a local is that local's, never a
+    /// declaration of its spelling's (ADR-0063; ADR-0283's limitation).
+    lexicals: BTreeMap<(usize, crate::hir::DeclId), crate::lexical::Lexical>,
     /// Which unit each `Hir` in the last `run` was, so a declaration can be
     /// given the same `DefId` the workspace gave it.
     workspace: &'a Workspace,
@@ -224,6 +228,7 @@ impl<'a> Inference<'a> {
             sigs,
             known: BTreeMap::new(),
             performed: BTreeMap::new(),
+            lexicals: BTreeMap::new(),
             workspace,
         }
     }
@@ -275,6 +280,9 @@ impl<'a> Inference<'a> {
                 })
             })
             .collect();
+        for (unit, id, _, types) in &typed {
+            self.lexicals.insert((*unit, *id), types.lexical().clone());
+        }
         for _ in 0..8 {
             let mut changed = false;
             for (unit, id, body, types) in &typed {
@@ -595,6 +603,14 @@ impl<'a> Inference<'a> {
             if path.is_empty() {
                 continue;
             }
+            // **A call through a local is that local's** (ADR-0063): `found()`
+            // where a `let`, a parameter or a pattern binds `found` calls the
+            // value, never a `fn found` the module declares, and what the
+            // value names was charged where it was named (ADR-0078). Until
+            // then a local was charged its namesake's row (ADR-0283).
+            if matches!(body.expr(*callee), Expr::Name(_)) && self.local(unit, body, *callee) {
+                continue;
+            }
 
             // A signature first — that is E2C's single source of truth — then a
             // local declaration's own inferred effects.
@@ -639,6 +655,15 @@ impl<'a> Inference<'a> {
             }
         }
         out
+    }
+
+    /// **Whether `name`, in `body` of `unit`, is a local's**: a binding in
+    /// scope there, as the body's declaration's scopes resolve it. `false`
+    /// for a body `run` did not see, which resolves as before.
+    pub fn local(&self, unit: usize, body: &Body, name: ExprId) -> bool {
+        self.lexicals
+            .get(&(unit, body.owner))
+            .is_some_and(|l| l.binder(name).is_some())
     }
 
     /// Which declaration a path names, from inside `unit`.
