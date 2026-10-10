@@ -1,7 +1,7 @@
 kiokun.com's parity inventory, held to the SvelteKit app it inventories
 
 produced by: just e14-kiokun-inventory (local: reads a kiokun-data checkout)
-commit: 2aee4a770d4ded0c5aeed0778a93d8ff31fa19a3
+commit: 6a18a8ae6dacfc6cf8d73b12096a331e48a976c1
 python: Python 3.12.8
 
 == the inventory against the app (scripts/kiokun_inventory.py)
@@ -16,24 +16,26 @@ inventory: OK
 
 == mutation controls (scripts/kiokun_inventory_mutations.py)
 
-baseline: 21 passed, 0 failed
-any directory is a route: KILLED (8 of 21 tests fail)
-an endpoint is not a route: KILLED (8 of 21 tests fail)
-the index is read, which holds files staged and not committed: KILLED (1 of 21 tests fail)
-the owner's work is not named as not read: KILLED (1 of 21 tests fail)
-an oracle copies the working tree: KILLED (2 of 21 tests fail)
-an oracle's copy names no uncommitted work: KILLED (1 of 21 tests fail)
-an oracle's digest is of nothing: KILLED (1 of 21 tests fail)
-the sample keeps every Chinese item, Dong Chinese's too: KILLED (1 of 21 tests fail)
-the sample keeps KANJIDIC2's contributed readings: KILLED (1 of 21 tests fail)
-the sample keeps whole what it names a part of: KILLED (7 of 21 tests fail)
-the sample keeps the owner's mnemonics: KILLED (1 of 21 tests fail)
-a route listed twice passes: KILLED (1 of 21 tests fail)
-a row's status may be any word: KILLED (1 of 21 tests fail)
-a route the app does not have passes: KILLED (1 of 21 tests fail)
-a route the inventory leaves out passes: KILLED (2 of 21 tests fail)
-a route row is counted as a feature: KILLED (1 of 21 tests fail)
-the check passes whatever it finds: KILLED (1 of 21 tests fail)
-the recipe is planned on a runner, which has no checkout: KILLED (1 of 21 tests fail)
-18 of 18 mutants killed
+baseline: 25 passed, 0 failed
+any directory is a route: KILLED (8 of 25 tests fail)
+an endpoint is not a route: KILLED (8 of 25 tests fail)
+the index is read, which holds files staged and not committed: KILLED (1 of 25 tests fail)
+the owner's work is not named as not read: KILLED (1 of 25 tests fail)
+an oracle copies the working tree: KILLED (2 of 25 tests fail)
+an oracle's copy names no uncommitted work: KILLED (1 of 25 tests fail)
+an oracle's digest is of nothing: KILLED (1 of 25 tests fail)
+the sample keeps every Chinese item, Dong Chinese's too: KILLED (1 of 25 tests fail)
+the sample keeps KANJIDIC2's contributed readings: KILLED (1 of 25 tests fail)
+the sample keeps whole what it names a part of: KILLED (7 of 25 tests fail)
+the sample keeps the owner's mnemonics: KILLED (1 of 25 tests fail)
+the search sample keeps every Chinese row: KILLED (1 of 25 tests fail)
+the search sample keeps the Korean IPA: KILLED (1 of 25 tests fail)
+a route listed twice passes: KILLED (1 of 25 tests fail)
+a row's status may be any word: KILLED (1 of 25 tests fail)
+a route the app does not have passes: KILLED (1 of 25 tests fail)
+a route the inventory leaves out passes: KILLED (2 of 25 tests fail)
+a route row is counted as a feature: KILLED (1 of 25 tests fail)
+the check passes whatever it finds: KILLED (1 of 25 tests fail)
+the recipe is planned on a runner, which has no checkout: KILLED (1 of 25 tests fail)
+20 of 20 mutants killed
 memory bound: no process was stopped
