@@ -239,10 +239,12 @@ Recorded by `just e14-store-accounts` in
 
 ### Tests and mutants
 
-- `just e14-store-accounts`, recorded at `ce4c300` against PostgreSQL 18.6:
-  every test above is green on both layers, **29 of 29 mutants killed** (17
-  from milestone 1, 12 from milestone 2), each by a failing test, and the
-  memory bound stopped no process. The 12 are: the radius read in
+- `just e14-store-accounts`, first recorded at `ce4c300` against
+  PostgreSQL 18.6: every test above green on both layers, **29 of 29 mutants
+  killed** (17 from milestone 1, 12 from milestone 2), each by a failing
+  test, and the memory bound stopped no process. Recorded again at
+  `441b41a1` with the stale tab's six added: 35 of 35 (the first ADR's
+  report). The 12 are: the radius read in
   kilometres; the estimate without the travel, or answering for a store out
   of reach; an Add, or an order, to a store out of reach let through; a
   saved address not chosen; a choice that leaves the last one chosen; an
@@ -258,6 +260,17 @@ Recorded by `just e14-store-accounts` in
   oracle.
 - `just fmt-check`, `lint`, `case-check`, `evidence-gates`,
   `mutation-anchors`, `test-compile` and `audit` green.
+- **Verify 38018360138** (tip `6ed733e`): survivors in four recipes, each
+  mutant on text the store no longer reads, re-anchored and killed locally
+  by the test that killed it before. In `cart_lines` (five) and
+  `optimistic_transitions` (one), the transitions are now `UserCarts`'. In
+  `estimate_range` (one), the range is now `user-estimates#for-store`'s. In
+  `cross_session` (one), "a session's own entry reaches the others" needed a
+  session-keyed cart, and the benchmark's store gives one; the new test
+  is `a_session_keyed_carts_change_reaches_no_other_session`. A fifth
+  recipe's two survivors, in `e10-callbacks` (`infer.rs`, `values.rs`), are
+  not this track's: they survive on master at `7a701c2` without its
+  changes, and have been reported to the integrator.
 - **Re-anchored, not run whole here**: `descriptions`, `slots` and
   `estimate_range`, on the store page's new text and the estimate's new
   operation. Also every script anchored in a file this milestone changed
@@ -279,6 +292,10 @@ Recorded by `just e14-store-accounts` in
   `examples/store/app.pw`, `examples/lib/Events.pw`, `StoreData.pw`, the
   compiler's and the host's tests that pin the store's text, the
   conformance oracle, `playwright.config.mjs` (`STORE_ACCOUNTS_PORTS`).
+- `origin/master` merged again at `9aa40977` (layouts ADR-0303, refusals
+  ADR-0302, the clock ADR-0304): the address page is shown in `StoreLayout`
+  as the store's other pages are, a `user` layout (the first ADR's merge
+  notes).
 - **Ports**: `PORT=7769`, inside the track's range (7741 to 7940). The
   hosts reach `PORT+162`, and 7769 is the first PORT in range whose hosts
   miss 7768, which the owner's Spotify holds. The runs before the merge were

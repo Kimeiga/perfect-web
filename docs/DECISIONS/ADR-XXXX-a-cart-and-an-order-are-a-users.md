@@ -160,15 +160,37 @@ Milestone: E14, the DoorDash store's customer side, milestone 1.
   open page nothing.
 - It retires ADR-0270's queued "telling by principal".
 
-### 6. A tab whose reader changed is refused (Q3): next
+### 6. A command is answered for the reader its page was shown to (Q3)
 
-The integrator's ruling, built once the refusal ruling (ADR-0299) merges: the
-runtime sends its document's id with each command (`pw-document`), and the
-host refuses, before the command runs, one whose document it served to
-another session ("You signed in or out in another tab. Reload this page to
-go on.") or no longer holds ("This page is out of date. Reload it to go
-on."), told where the press was. Not in this ADR's first merge; recorded
-here when built.
+A rule of the platform, built once the refusal ruling (ADR-0302) merged, a
+`TRACK SEAM (store-accounts)` at each of its two places:
+
+- **The runtime names its document** with each command: `pw-document`, the
+  document's number, its first cursor (ADR-0161), beside `pw-interaction`.
+  A page the host did not number (cursor 0, a build's static page) names
+  none.
+- **The host refuses, before the command runs**, a command whose document
+  it served to another session, and one whose document it does not hold.
+  Document numbers are the host's own, one per document served
+  (`Server::documents`), so a number names one session's document; the host
+  keeps each document's page by its session and number (`Server::pages`)
+  until the document is forgotten while idle.
+  - Served to another session: the reader signed in or out in another tab,
+    which gives the browser a new session (ADR-0258's rotation). 403
+    `{"committed":false,"refused":"another-reader","says":"You signed in or
+    out in another tab. Reload this page to go on."}`.
+  - Not held: forgotten while idle, or served by a host before this one.
+    `"refused":"out-of-date"`, ADR-0302's words for a page out of date.
+  - A command that names no document is answered as before.
+- **The runtime tells it where the press was**, as ADR-0302 tells a
+  refusal: the words beside the control and by the page's announcer, the
+  speculation taken back, `data-pw-handler-error` `refused:another-reader`.
+  The press is not replayed; read again, the page is the new reader's.
+
+The words are the platform's, not a predicate's: no program declares this
+rule, so no program can forget it. The feed's tab whose reader signed out
+in another (ADR-0302's test) is now refused by this rule, before `requires`
+is read, and told these words; its test says so.
 
 ## Questions to the integrator, and its answers
 
@@ -281,19 +303,33 @@ Recorded by `just e14-store-accounts` in
 - **Identity's sign-in** (`tests/sign_in.rs`) and **the feed's
   notifications** (`tests/notifications.rs`, mark-read tells no other user's
   page, in memory and on PostgreSQL).
+- **The stale tab** (`tests/store_accounts.rs`, in memory and on
+  PostgreSQL): a guest's page pressed from its session runs; signed in in
+  another tab, the same page is refused 403 with the platform's words and
+  nothing runs; a page the host does not hold is told it is out of date; a
+  request that names no page, or page 0, runs; the new reader's own page
+  runs. In three engines (`e2e/store-accounts.spec.mjs`): refused at the
+  next press, told beside the button and by the announcer, the cart as it
+  was; read again, the press runs; signed out in the other tab, refused
+  again. The feed's stale tab (`e2e/identity.spec.mjs`) is told these
+  words.
 - **`scripts/store_accounts_mutations.py`**: see the report.
 
 ## Not claimed
 
-- **The stale tab** (6), with the refusal ruling.
+- **A host restarted** numbers its documents from 1 again, so a tab's page
+  from before the restart may name a document now another session's: it is
+  refused all the same, told the sign-in words where the out-of-date ones
+  are meant.
+- **Soft navigation**: a page swapped in without a document load would
+  name the document it replaced; the rule holds while every page is a
+  document, and is the soft navigation's to carry.
 - **Telling by principal for a key that is not the reader's handle**: a
   private entry keyed by a user's id the binding does not fill with
   `current_user()` reaches every reader of it, as before.
 - **A failed join's lines** are reachable by no one (2).
 - **Several orders a user keeps**: a user's order is their latest, as a
   session's was (ADR-0193).
-- **The browser suite on development accounts** (`STORE_ACCOUNTS_PORTS`):
-  with 6.
 - **`private` made "not importable" only**: the integrator's, queued.
 
 ## Report
@@ -315,7 +351,9 @@ Recorded by `just e14-store-accounts` in
   `store:host/carts#join`.
 - **The host**: `Server::owner`, the cart's and the order's entries and
   events by owner; `Identity::answer`'s `on_sign_in` and `Server::joined`;
-  telling by principal (`Reached`, `others_reading`).
+  telling by principal (`Reached`, `others_reading`); the stale tab's
+  refusal at the command route (`Server::stale_document`, 6).
+- **The runtime**: `pw-document` with each command (6).
 - **The artifacts** regenerated by their recipes: contracts, components
   (`UserCarts.line_count` and `UserCarts.subtotal` in place of
   `domain.line_count` and `domain.subtotal`), WIT, graph, plan.
@@ -327,11 +365,16 @@ Recorded by `just e14-store-accounts` in
 
 ### Tests and mutants
 
-- `just e14-store-accounts` (recorded locally, PostgreSQL 18.6): every test
-  above green on both layers; **17 of 17 mutants killed** (the recording
-  now holds milestone 2's twelve as well, 29 of 29: "a delivery goes to the
-  reader's chosen address"), each by a failing
-  test, and the memory bound stopped no process. Its first run left one
+- `just e14-store-accounts` (recorded locally at `441b41a1`, only the two
+  ADRs' text uncommitted, PostgreSQL 18.6, `PORT=7769`): every test above
+  green on both layers, the store's customer side in three engines (18
+  passed); **35 of 35 mutants killed**, each by a failing test, and the
+  memory bound stopped no process. They are milestone 1's 17, the stale
+  tab's 6 (five in the host, and the runtime naming no document, in
+  Chromium), and milestone 2's 12 ("a delivery goes to the reader's chosen
+  address"). Each mutant now runs its own suite (server, core or browser),
+  as `refusal_mutations.py` does under W6's ruling. Before that, every
+  mutant ran every command, and CI took 1 h 51 min over 29 mutants. Its first run left one
   survivor, "a signed-in session that signs in again is joined to the next
   user": on the canonical store a signed-in session's guest owner holds
   nothing once the sign-in closes it, so nothing moved. It is killed now by a
@@ -344,6 +387,11 @@ Recorded by `just e14-store-accounts` in
   (Found).
 - `just fmt-check`, `lint`, `case-check`, `evidence-gates`,
   `mutation-anchors`, `test-compile` and `audit` green.
+- **Verify 38018360138 (tip `6ed733e`)**: e14-store-accounts passed on
+  CI's database shard; four other recipes had survivors on the store's new
+  text, fixed in `0765f632` and `3d9f2b71` (milestone 2's ADR). Six shards
+  ran past the job's limit. Master's ceiling for dealing a verify
+  (`e5ad4b72`, merged at `9aa40977`) is meant to keep that from recurring.
 - **Re-anchored, not yet run whole here**: `command_retry`, `cross_session`,
   `every_entry`, `identity`, `last_known_good`, `optimistic_transitions`,
   `orders`, `query_values`, `shared_output`, `store_postgres`,
@@ -375,6 +423,12 @@ Recorded by `just e14-store-accounts` in
   a PORT in the range is 7741 to 7778; `PORT=7769` is the first whose hosts
   miss 7768, and the suite runs there now (milestone 2's ADR). CI runs at its
   default.
-- **Not yet built, the rest of milestone 1**: the stale tab (6), after the
-  refusal ruling merges.
+- **The stale tab** (6), after the refusal ruling (ADR-0302) and the
+  layouts (ADR-0303) merged at `9aa40977`: `TRACK SEAM (store-accounts)` in
+  `pw-runtime.mjs`'s `command()` (the header) and at `main.rs`'s command
+  route (the refusal, before the one-shot drop and `requires`). Also
+  `e2e/identity.spec.mjs`'s stale tab, now told the platform's words, and
+  `command_retry_mutations.py`'s runtime mutant, re-anchored on the headers
+  now on lines of their own. The store's `StoreLayout` is a `user` layout
+  that reads `Cart(current_user())`.
 - **The four status documents are untouched.**
