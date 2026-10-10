@@ -1,12 +1,15 @@
 """`kiokun_inventory.py`: kiokun.com's parity inventory names every route of
 the SvelteKit app, and only those, each marked once.
 
-Each test builds a small app's routes in a temporary directory, as
-SvelteKit lays them out, and an inventory beside it.
+Each test builds a small app's routes in a temporary git repository, as
+SvelteKit lays them out, commits them, and writes an inventory beside it:
+the script reads the commit at HEAD, never the working tree.
 """
 
 import importlib.util
+import os
 import pathlib
+import subprocess
 import tempfile
 import unittest
 
@@ -21,6 +24,18 @@ def load(name: str):
 
 
 inventory = load("kiokun_inventory")
+
+
+def git(repo: pathlib.Path, *args: str) -> None:
+    """git in the test's repository, as no one's user and with no one's
+    configuration."""
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+        check=True,
+        capture_output=True,
+        env=env,
+    )
 
 INVENTORY = """\
 | route | kind | status | what it is | evidence |
@@ -48,6 +63,10 @@ class Inventory(unittest.TestCase):
             (routes / path).mkdir(parents=True, exist_ok=True)
             for f in files:
                 (routes / path / f).write_text("")
+        (routes / "api" / ".keep").write_text("")
+        git(self.app, "init", "-q")
+        git(self.app, "add", "-A")
+        git(self.app, "commit", "-q", "-m", "the app")
 
     def tearDown(self) -> None:
         self.dir.cleanup()
@@ -57,6 +76,27 @@ class Inventory(unittest.TestCase):
             inventory.app_routes(self.app),
             {"/": "page", "/[word]": "page", "/api/search": "endpoint", "/blog/post": "page"},
         )
+
+    def test_a_route_not_committed_is_not_read_and_is_named(self) -> None:
+        # One staged and not committed, one not added at all: the owner's
+        # work, which the evidence's commit does not hold.
+        routes = self.app / "src" / "routes"
+        (routes / "api" / "lesson").mkdir()
+        (routes / "api" / "lesson" / "+server.ts").write_text("")
+        git(self.app, "add", "src/routes/api/lesson/+server.ts")
+        (routes / "api" / "narrative").mkdir()
+        (routes / "api" / "narrative" / "+server.ts").write_text("")
+        self.assertEqual(
+            inventory.app_routes(self.app),
+            {"/": "page", "/[word]": "page", "/api/search": "endpoint", "/blog/post": "page"},
+        )
+        self.assertEqual(
+            sorted(inventory.not_read(self.app)),
+            ["src/routes/api/lesson/+server.ts", "src/routes/api/narrative/"],
+        )
+        # Committed, it is a route.
+        git(self.app, "commit", "-q", "-m", "a lesson")
+        self.assertIn("/api/lesson", inventory.app_routes(self.app))
 
     def test_an_inventory_naming_every_route_once_passes(self) -> None:
         problems, counts = inventory.check(INVENTORY, inventory.app_routes(self.app))
