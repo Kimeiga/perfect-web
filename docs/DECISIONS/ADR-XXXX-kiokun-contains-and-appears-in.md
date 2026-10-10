@@ -163,6 +163,48 @@ Numbered after ADR-0301's 20.
   head's and the examples' fixtures too, which had none. And trim this
   fixture (Decision 6).
 
+## Amendment to ADR-0285: kiokun-data is read at HEAD
+
+**The inventory and the oracles read kiokun-data's HEAD** (the
+integrator's ruling, 2026-10-10).
+
+- **Why**: the evidence names a commit ("kiokun.com's source: <commit>"),
+  which is true, and the run reproducible, only if what was read is that
+  commit. The owner works in the checkout. While this milestone was built
+  it held uncommitted changes to `[word]/+page.svelte` and untracked
+  character-lesson and character-narrative routes. The inventory guard
+  read the working tree and failed on the new narrative route. The
+  Contains oracle copied the page from the tree; its 19 new lines did not
+  touch the functions taken, but the evidence called the commit clean.
+- **What changed**:
+  - `scripts/kiokun_inventory.py` reads the routes with
+    `git ls-tree -r --name-only HEAD -- src/routes`: the commit, not the
+    index (`ls-files` would read files staged and not committed) and not
+    the tree.
+  - `scripts/kiokun_app_source.py` copies each file an oracle runs with
+    `git show HEAD:./PATH`. It prints the commit and each file's digest as
+    committed.
+  - Each names the owner's uncommitted work under its paths as "not
+    read"; that is information and fails nothing. The data files git does
+    not track (`output_dictionary`) are out of the rule's scope and are
+    recorded as before.
+  - The four oracle recipes (head, examples, moves, Contains) copy through
+    it, the Contains oracle's game data too.
+  - Tests: a route staged or untracked is not a route and is named; a
+    copy is the commit's whatever the tree holds; a file not committed is
+    refused. Five mutants in `scripts/kiokun_inventory_mutations.py`
+    (14 of 14 killed).
+- **What it changed in ADR-0285**: its table had been made from the
+  working tree. `/api/character-lesson/[character]` and the
+  `CharacterMiniLesson.svelte` feature were the owner's uncommitted work
+  then and are still, so they come out until the owner commits them. At
+  `abf71a89`: routes 101 (49 pages, 52 endpoints), 0 built, 4 partial, 97
+  missing; features 62, 4 built, 11 partial, 47 missing.
+- **What it does not change**: the rewrite's server still reads
+  `KIOKUN_APP`'s label table, component glosses and pitch data from the
+  tree, as a deployment reads its files. The oracles read the committed
+  ones, so a difference between the two would show as a difference.
+
 ## Not claimed
 
 - **The reader's language preferences** (Difference 23).
