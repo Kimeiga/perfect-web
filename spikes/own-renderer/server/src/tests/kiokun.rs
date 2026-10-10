@@ -1520,6 +1520,43 @@ fn word_pages_with_long_lists_are_timed() {
     }
 }
 
+/// **EDRDG's acknowledgement on each page that shows its data**: the
+/// licence of JMdict, JMnedict and KANJIDIC2 asks a web dictionary to
+/// acknowledge the files "on each screen display"
+/// (https://www.edrdg.org/edrdg/licence.html, checked 2026-10-10). 人's page
+/// shows JMdict's words and KANJIDIC2's character, and says so at its foot,
+/// linking each to its project and the Group to its licence; a page with
+/// Chinese words alone does not. kiokun.com's pages carry none.
+#[test]
+fn a_page_with_edrdg_data_acknowledges_the_group() {
+    let person = fetched(&served_kiokun(), &path_of("人"));
+    let html = person.split("<script").next().unwrap_or_default();
+    let foot = &html[html
+        .find("<footer class=\"data-sources\"")
+        .expect("the acknowledgement")..];
+    let text = visible(foot);
+    assert!(
+        text.contains("These files are the property of the Electronic Dictionary Research and Development Group, and are used in conformance with the Group's licence."),
+        "{text}"
+    );
+    for link in [
+        "https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project",
+        "https://www.edrdg.org/wiki/index.php/KANJIDIC_Project",
+        "https://www.edrdg.org/edrdg/licence.html",
+    ] {
+        assert!(foot.contains(&format!("href=\"{link}\"")), "{foot}");
+    }
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "电脑",
+        r#"{"key":"电脑","chinese_words":[{"_id":"1","simp":"电脑","trad":"電腦","items":[{"pinyin":"diàn nǎo","definitions":["computer"]}]}]}"#,
+    );
+    let computer = fetched(&served_kiokun_on(dir.path()), &path_of("电脑"));
+    assert!(computer.starts_with("HTTP/1.1 200"), "{computer}");
+    assert!(!computer.contains("data-sources"), "{computer}");
+}
+
 /// The value at fraction `q` of sorted `values` (nearest rank).
 fn quantile(sorted: &[f64], q: f64) -> f64 {
     if sorted.is_empty() {

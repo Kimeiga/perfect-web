@@ -583,6 +583,18 @@ MUTANTS = [
         '                    ("fr", maybe_int(p.get("fr"))),\n',
         '                    ("fr", maybe_int(None)),\n',
     ),
+    (
+        "a page with EDRDG's data does not acknowledge the Group",
+        APP,
+        "        edrdg: edrdg_shown(e),\n",
+        "        edrdg: false,\n",
+    ),
+    (
+        "every page acknowledges EDRDG, its data shown or not",
+        APP,
+        "        edrdg: edrdg_shown(e),\n",
+        "        edrdg: true,\n",
+    ),
 ]
 
 # Four test threads, not one per core. Each distinct program is compiled

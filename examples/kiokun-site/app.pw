@@ -2437,6 +2437,7 @@ type WordShown = WordShown {
     names: List<ShownName>,
     contains: ContainsList,
     appears: Appears,
+    edrdg: Bool,
 }
 
 // Each Japanese word's pitch readings, by its place among the words.
@@ -2466,6 +2467,21 @@ fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>,
         names: List.map(e.names, name_shown),
         contains: contains_of(e, word, glosses),
         appears: appears_in(e),
+        edrdg: edrdg_shown(e),
+    }
+}
+
+// Does the page show the Electronic Dictionary Research and Development
+// Group's data: JMdict's words, JMnedict's names, KANJIDIC2's character, or
+// a preview read from them (a Japanese word's reading, gloss or common
+// flag; a character's on'yomi)? EDRDG's licence asks a web dictionary to
+// acknowledge the files "on each screen display"
+// (https://www.edrdg.org/edrdg/licence.html, checked 2026-10-10).
+fn edrdg_shown(e: Entry) -> Bool {
+    let previewed = List.any(e.contains, p => p.jp != "" | p.jo != "") | List.length(e.in_japanese) > 0
+    List.length(e.japanese) > 0 | List.length(e.names) > 0 | previewed | match e.japanese_char {
+        Some(_) => true,
+        None => false,
     }
 }
 
@@ -2859,6 +2875,11 @@ page WordPage(word: String) {
             {/if}
             <ContainsSection list={page.contains} />
             <AppearsSection appears={page.appears} />
+            {#if page.edrdg}
+                <footer class="data-sources">
+                    <p>This page uses the <a href="https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project">JMdict</a>, JMnedict and <a href="https://www.edrdg.org/wiki/index.php/KANJIDIC_Project">KANJIDIC2</a> dictionary files. These files are the property of the <a href="https://www.edrdg.org/">Electronic Dictionary Research and Development Group</a>, and are used in conformance with the Group's <a href="https://www.edrdg.org/edrdg/licence.html">licence</a>.</p>
+                </footer>
+            {/if}
         </main>
     }
 }
