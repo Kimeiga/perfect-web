@@ -49,7 +49,7 @@ pub fn render_module(
         ) {
             continue;
         }
-        // A page shown in its layout (ADR-XXXX) is composed by the build,
+        // A page shown in its layout (ADR-0303) is composed by the build,
         // which this adapter does not run: rendered alone, it would lose the
         // layout's markup, and say nothing of it.
         if decl.policy("layout").is_some() {

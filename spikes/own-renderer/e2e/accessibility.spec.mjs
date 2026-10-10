@@ -376,7 +376,7 @@ test("every control is reached from the keyboard, in the order it is read, and s
   const [forward, back] = browserName === "webkit" ? ["Alt+Tab", "Alt+Shift+Tab"] : ["Tab", "Shift+Tab"];
   const stops = await page.evaluate(tabStops);
   expect(stops).toEqual([
-    // The layout the page is shown in, read first (ADR-XXXX): the way home,
+    // The layout the page is shown in, read first (ADR-0303): the way home,
     // and the cart, counted.
     "Stores",
     "Cart 1",
@@ -423,7 +423,7 @@ test("each control is pressed with Enter and with Space", async ({ page }) => {
 });
 
 test("the page's announcer is in it from the first byte, empty", async ({ request }) => {
-  // Where a failed press is said (ADR-XXXX), served before the runtime, in
+  // Where a failed press is said (ADR-0302), served before the runtime, in
   // the page a build renders and in the page a host does.
   for (const path of ["/StorePage.html", "/stores/47"]) {
     const served = await (await request.get(path)).text();
@@ -459,7 +459,7 @@ test("a live region is the same node from the start, and says each change once",
     return found.map((r) => r.getAttribute("aria-label") || r.id || r.localName);
   });
   // The estimate, the cart's count, what the cart last had to say, and the
-  // page's announcer, where a failed press is said (ADR-XXXX).
+  // page's announcer, where a failed press is said (ADR-0302).
   expect(regions).toHaveLength(4);
 
   await slots(page);

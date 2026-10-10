@@ -1,9 +1,9 @@
 //! **A predicate a command requires, and the words its refusal is told in**
-//! (ADR-XXXX).
+//! (ADR-0302).
 //!
 //! `requires SignedIn, OwnsPost(post)` names predicates whose meaning is the
 //! deployment's (ADR-0115): the host evaluates each over the caller and the
-//! command's typed arguments, before the command runs. Until ADR-XXXX nothing
+//! command's typed arguments, before the command runs. Until ADR-0302 nothing
 //! said what a reader is told when one refuses, and the browser told
 //! nothing: a press that was refused failed silently (the owner's finding of
 //! 2026-10-08). Now the deployment that gives a predicate its meaning gives
@@ -62,7 +62,7 @@ pub fn check(hir: &Hir, unit: usize, sigs: &Signatures, ws: &Workspace) -> Vec<D
             }],
             explanation: Some(
                 "A command a predicate refuses is told to the reader where the press was, \
-                 in the predicate's own words (ADR-XXXX). The deployment says what a \
+                 in the predicate's own words (ADR-0302). The deployment says what a \
                  predicate means; the program says what it is called, what it takes, and \
                  what a reader is told when it refuses."
                     .to_string(),

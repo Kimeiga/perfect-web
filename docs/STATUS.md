@@ -23,6 +23,65 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0243 amended, 2026-10-10: markup written on one line is one region,
+and no operand** (found writing ADR-0303's refusals; track `siblings`,
+merged from `31eeb3c`). `<h1>a</h1><p>b</p>` at a view's top was PW0009 at
+the second element: the template region ended after its first root, and the
+next `<` was read as a comparison. Probing it, `<p>a</p> + 1` checked and
+rendered the paragraph, the sum dropped. Markup after a root on its line
+now goes on as one region, and an operator over markup is refused (PW5047).
+The checker's 5 tests, the parser's, the corpus's 18, 32 of 32 mutants
+(verify 38013103417).
+
+**ADR-0303, 2026-10-10: a page is shown in its layout** (the integrator's,
+the second of three steps to the parts two pages share kept in place; track
+`layouts`, merged from `328720e`). `layout Name { … <slot /> … }`, and a
+page's `layout Name`: composed into each page as a view is, its parts and
+elements numbered first so they are the same on every page that names it,
+the page's markup in its slot, its bindings and signals under names no
+source writes; a page declares at least its layout's audience (PW5046).
+Found: two sibling elements on one line at a view's top did not parse
+(track `siblings`); a page and its layout that bind one query read it
+twice for one document, now once; a speculation moved one binding per
+entry, now every binding that shows it, the layout's among them. The
+store's four pages share `StoreLayout`. 13 compiler tests, the host's, 12
+in three engines, 23 of 23 mutants (verify 38006542533, whose one Firefox
+failure, navigate.spec's "its answer first", is the command order's
+finding, on `track/command-order`).
+
+**ADR-0302, 2026-10-10: a refusal is told where the press was** (the
+owner's finding, using the feed by hand; track `refusals`, merged from
+`6964ee7`). Signed out, the owner typed into the feed's composer and pressed
+Post: the post showed, then went, with no word, the server's refusal (403)
+read by nothing. Now a predicate has words, the deployment's or the program's
+own (`predicate SignedIn says "…"`, PW0351); the host answers a refusal with
+them and keeps it with its press, so a resend is refused alike (found
+reading the path: a resend was answered 202, as a command that did not
+commit); and the runtime tells them beside the control and through the
+page's announcer, a `role="status"` in every document from its first byte,
+focus and what was typed kept. A press no answer came for, a stale page's
+and a failed handler's are told too, in the platform's words. The feed's
+composer is a signed-in reader's. 13 compiler tests, 22 host tests, 30 in
+three engines, 30 of 30 mutants killed (verify run 37993980886; its mutation
+script took 3.5 h of CI, narrowed next).
+
+**ADR-0301, 2026-10-10: kiokun's word page moves an equivalent simplified
+form** (track `kiokun`, W6, merged from `4cbe3aa`). Where a word's own file
+is a simplified form that equals its one traditional form in meaning, the
+page answers 308 to that form's page, the query kept, as kiokun.com does:
+`redirect_on KiokunError.Moved permanent`, ADR-0295's clause, now the
+program's own. Held to kiokun.com's own `equivalentTraditionalTarget` over
+1,643 words, every one with a simplified form among them: 3 moves in the
+whole dictionary, nothing unexplained, each target a page. ADR-0295's five
+tests keep every assertion. And the word page's tests compile each distinct
+program once per test process, its files kept in memory and written into
+each test's own directory (ADR-0158): `e14-kiokun-word` took 3 h 06 m on CI,
+about 160 s a mutant where it took 220. 69 of 69 mutants killed, and
+`e14-redirects` 15 of 15, on CI (run 38006256503). What remains of the
+recipe's time is the server's load, Wasmtime compiling the program's
+components in a debug build, 7.7 s a test: the integrator's, queued (NEXT,
+the infrastructure follow-ups).
+
 **ADR-0300, 2026-10-09: a build is named by what it built** (the
 integrator's, merged from `e441733`), the first of three steps to the parts
 two pages share kept in place. `pw build` writes `build-id`, a hash over every

@@ -582,6 +582,11 @@ awaited in order. What remains:
   binding named `line` beside the cart's `{#each cart.lines as line}` was
   read for `line.name` inside the loop, and the build refused. The checker
   accepts the shadowing; the binding is named `summary`.
+- **A layout is one, unnested, and given nothing** (ADR-0303): a page names
+  one layout; a layout is shown in no other, is given none of the page's
+  parameters, has no title template of its own, and holds one slot. A
+  navigation between two pages of one layout does not keep it yet (the soft
+  navigation, next).
 - **A navigation is a document load** (ADR-0280): the page a handler goes
   to replaces this one whole, so the parts the two share are rendered
   again, not kept in place with their focus and scroll; a soft navigation
@@ -618,6 +623,13 @@ awaited in order. What remains:
   (ADR-0287): `post_paint` and `frame` run in the browser too, but only a
   handler's work is held where it runs. No program places a page with frame
   phases anywhere but the browser.
+- **A refusal is told in one language, the first failing predicate's**
+  (ADR-0302): a program has one set of words, keyed by predicate, and the
+  host stops at the first predicate that fails, in declared order. A
+  predicate over another's data may tell, by refusing, that the data is
+  there. The message is the control's next sibling, and an author cannot
+  yet place it elsewhere; a page without its runtime sends no command to
+  refuse.
 - **kiokun's word page is its words, its labels, its character header,
   its written forms, its head's title and description, its examples and its
   pitch accent** (ADR-0286, ADR-0288, ADR-0289, ADR-0293, ADR-0299): the

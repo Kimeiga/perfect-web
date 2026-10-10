@@ -1,4 +1,4 @@
-//! **A page is shown in its layout** (ADR-XXXX): the markup and the
+//! **A page is shown in its layout** (ADR-0303): the markup and the
 //! bindings the pages that name it share, composed into each page as a view
 //! is (ADR-0136), its parts and elements numbered first, so they are the same
 //! on every page, and the page's markup placed in its `<slot />`.

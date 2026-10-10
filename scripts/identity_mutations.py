@@ -86,7 +86,7 @@ MUTANTS = [
         "                    [Val::Result(Ok(Some(found)))] => Ok(author_of(found) != Some(&principal.user)),\n",
     ),
     (
-        # Re-anchored by ADR-XXXX: the refusal is kept with the interaction's
+        # Re-anchored by ADR-0302: the refusal is kept with the interaction's
         # answer, and a refused command never commits, so this never matches.
         "a refusal is answered as a command that did not commit",
         SERVER,

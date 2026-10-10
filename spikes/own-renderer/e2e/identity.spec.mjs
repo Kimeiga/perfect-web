@@ -4,7 +4,7 @@
 // (`PW_IDENTITY=dev-accounts`), which this server serves at /dev-idp as a
 // deployment's provider would be served at its own origin.
 //   - a signed-out reader reads the timeline and is shown how to sign in,
-//     where the post form's guard is, and is given no composer (ADR-XXXX);
+//     where the post form's guard is, and is given no composer (ADR-0302);
 //     a like pressed anyway is refused by the server (`requires SignedIn`,
 //     403), taken back, and told beside the button, in the feed's words for
 //     the predicate, and said by the page's announcer; a tab whose reader
@@ -73,7 +73,7 @@ test("a signed-out reader reads, is given no composer, and a like is refused whe
   await expect(page.locator("#signed-out")).toHaveText("Sign in to post, reply or like.");
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
-  // No composer to be refused at (ADR-XXXX).
+  // No composer to be refused at (ADR-0302).
   await expect(page.getByLabel("What's happening?")).toBeHidden();
   await expect(page.getByRole("button", { name: "Post" })).toBeHidden();
   // A like pressed anyway: refused before the command runs, and told where

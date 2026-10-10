@@ -51,7 +51,7 @@ MUTANTS = [
         "    if (response.status === 409) {\n",
     ),
     (
-        # Re-anchored by ADR-XXXX: a request with no answer is thrown as
+        # Re-anchored by ADR-0302: a request with no answer is thrown as
         # unreachable.
         "a failed request stays counted",
         RUNTIME,

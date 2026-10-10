@@ -763,7 +763,7 @@ impl Identity {
     }
 }
 
-/// **What a reader is told when a predicate refuses** (ADR-XXXX), in this
+/// **What a reader is told when a predicate refuses** (ADR-0302), in this
 /// deployment's words: a program may declare its own (`predicate SignedIn
 /// says "…"`), told in their place. `None` for a predicate this deployment
 /// cannot evaluate, which the host refuses to serve a program requiring.

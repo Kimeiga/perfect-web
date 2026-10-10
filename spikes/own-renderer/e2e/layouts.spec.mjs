@@ -1,4 +1,4 @@
-// ADR-XXXX: a page is shown in its layout, which the pages that name it
+// ADR-0303: a page is shown in its layout, which the pages that name it
 // share. The store's four pages are shown in `StoreLayout`: a header with the
 // way home and the session's cart, counted, its markup the same on every
 // page, the page's own in its slot, and its count told as the cart changes,

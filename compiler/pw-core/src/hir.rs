@@ -164,7 +164,7 @@ pub enum DeclKind {
     /// its `route`, served once committed under `serves`, and its limits.
     /// Named by nothing a program writes; `pw build` writes it for the host.
     Upload,
-    /// `predicate OwnsPost(post: PostId)  says "…"` (ADR-XXXX): a predicate a
+    /// `predicate OwnsPost(post: PostId)  says "…"` (ADR-0302): a predicate a
     /// command's `requires` names, its parameters, and the words a refusal
     /// by it is told in. Its meaning is the deployment's (ADR-0115).
     Predicate,

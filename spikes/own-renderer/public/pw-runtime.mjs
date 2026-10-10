@@ -658,7 +658,7 @@ async function send(component, args, interaction, retry, after, before) {
       }
     }
     if (!response.ok) {
-      // **Refused by its `requires`** (ADR-XXXX): the predicate and the words
+      // **Refused by its `requires`** (ADR-0302): the predicate and the words
       // a reader is told, which the host that refused sends.
       if (response.status === 403) {
         const refusal = await response.json().catch(() => null);
@@ -1710,7 +1710,7 @@ const verdicts = new Map();
 
 // --- what a failed press is told -----------------------------------------
 //
-// **A refusal is told where the press was** (ADR-XXXX). Until 2026-10-09 a
+// **A refusal is told where the press was** (ADR-0302). Until 2026-10-09 a
 // press a command's `requires` refused failed silently: the speculation was
 // taken back, `data-pw-handler-error` set, a line logged, and the reader told
 // nothing, the dead button this project exists to remove (the owner's
@@ -2096,7 +2096,7 @@ function bindEvent(template, part) {
         return;
       }
       lastActed = el;
-      // What its last press was told, taken back (ADR-XXXX).
+      // What its last press was told, taken back (ADR-0302).
       untell(el);
       const record = eventRecord(event, e);
       // Which instance each signal the handler names is, for this use of
@@ -2198,7 +2198,7 @@ function bindEvent(template, part) {
         // user's only way to find out.
         loaded.delete(part.value);
         attempts.set(part.value, (attempts.get(part.value) ?? 0) + 1);
-        // Told where the press was (ADR-XXXX): a refusal in its predicate's
+        // Told where the press was (ADR-0302): a refusal in its predicate's
         // words, anything else in the platform's.
         if (error instanceof Refused) {
           tell(el, error.says || PLATFORM_SAYS.failed, `refused:${error.predicate}`);
@@ -2232,7 +2232,7 @@ async function attach() {
   // One traversal, before anything else. Every later lookup is a map hit.
   const indexed = buildIndex();
   // The announcer a failed press is said by, there before anything is
-  // (ADR-XXXX): a live region added with its words is not reliably said.
+  // (ADR-0302): a live region added with its words is not reliably said.
   announcerOf();
   log.push(`indexed ${indexed} address(es)`);
   for (const p of parts.parts ?? []) {

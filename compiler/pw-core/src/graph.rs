@@ -315,7 +315,7 @@ impl Graph {
                         g.push_edge(&from, &name, EdgeKind::Reads, key, resolve(&name));
                     }
                 }
-                // **A page reads what its layout reads** (ADR-XXXX): the
+                // **A page reads what its layout reads** (ADR-0303): the
                 // layout's markup is rendered into the page's document, and
                 // its bindings are the page's, each resolved where the layout
                 // is written.

@@ -89,7 +89,7 @@ pub enum Domain {
     Listener,
     /// A predicate over the caller: `requires SignedIn, OwnsOrder(order)`.
     PredicateRef,
-    /// **A layout a page is shown in**: `layout StoreLayout` (ADR-XXXX).
+    /// **A layout a page is shown in**: `layout StoreLayout` (ADR-0303).
     /// Resolved, and held to name one layout, by `layouts::check` (PW0352).
     LayoutRef,
     /// **A case of a declared sum type**: `not_found_on StoreError.NotFound`
@@ -366,7 +366,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         // are served, its limits, and its kinds, a closed set each sniffed
         // from a file's bytes.
         "serves" => Domain::Str,
-        // A predicate's (ADR-XXXX): the words a refusal by it is told in, one
+        // A predicate's (ADR-0302): the words a refusal by it is told in, one
         // string, held by `predicates::check`.
         "says" => Domain::Str,
         "max_bytes" | "max_width" | "max_height" => Domain::Count,
@@ -580,7 +580,7 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         "revision" => (&[K::Page], "a page"),
         // A page's address, or where a form posts an upload (track `uploads`).
         "route" => (&[K::Page, K::Upload], "a page or an upload"),
-        // The layout a page is shown in (ADR-XXXX): a page's, and not a
+        // The layout a page is shown in (ADR-0303): a page's, and not a
         // layout's, which names none.
         "layout" => (&[K::Page], "a page"),
         "privacy" => (&[K::Page, K::Other], "a page or a replicated value"),

@@ -173,3 +173,28 @@ is the error's, not the program's.
 The grammar's unit test holds `g(a[0])` to PW0010 and PW0009 alone, and
 `scripts/statements_separated_mutations.py` has a mutant for each, 29 in
 all.
+
+## Amended, 2026-10-09: markup written on one line is one region, and no operand
+
+Found writing the layouts ADR's refusals (`<h1>Your cart</h1><slot />` was
+PW0009): two roots on one line at a view's top did not parse.
+`<h1>a</h1><p>b</p>` was PW0009 at the second element's `/`, and
+`<h1>a</h1><hr />` at its `>`, while inside an element both were markup. The
+template region ended after its first root, and the next `<` was read as a
+comparison with it. Probing that, `<p>a</p> + 1` checked with nothing said:
+the paragraph rendered, and the sum was dropped.
+
+- **Markup written on one line after a root goes on as one region** when
+  what follows begins as markup does: an element, a comment, or a block's
+  marker. The space between two roots on the line is text, as it is between
+  two elements inside one (`<span>a</span> <span>b</span>`). A root on the
+  next line is a statement of its own, as before, and anything else after
+  markup on its line is the expression it begins.
+- **Markup is no operand** (PW5047): an arithmetic, comparison or logical
+  operator over markup is refused where it is written. A value is shown
+  inside markup, `<p>{a + 1}</p>`.
+
+The grammar's unit test holds each form and its controls, the checker's
+(`tests/statements_separated.rs`) that each checks and that an operator over
+markup is PW5047, and `scripts/statements_separated_mutations.py` has three
+more mutants, 32 in all.

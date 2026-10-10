@@ -836,3 +836,72 @@ Each a decision for a track, with its date; a track's ADR records it too.
 - **2026-10-09, ADR-0300 (the build id) merged** before the refusal ruling,
   whose verify still ran: the numbers follow merge order, so the refusal
   ruling takes the next.
+- **2026-10-10, W6's word page moves merged** as ADR-0301, from `4cbe3aa`, before
+  the refusal ruling, whose PostgreSQL shard ran again:
+  verify 38006256503 and ci 38006256479 green, `e14-kiokun-word` 69 of 69
+  and `e14-redirects` 15 of 15 from that run, the moves' oracle (local)
+  1,643 words with 3 moves. W6 next, in order: the whole-dictionary sample
+  timed again at low load, Contains and Appears-in, then step 2, search.
+  Step 4, kiokun's accounts (notes, review cards, custom words), stays W6's:
+  kiokun's own data, on the platform's identity (ADR-0258, ADR-0263,
+  ADR-0270) and W8's `user` visibility once it is merged; anything it needs
+  of the identity layer or the principal is asked of the integrator first.
+- **2026-10-10, the refusal ruling merged** as ADR-0302, from `6964ee7`:
+  verify 37993980886 green, its PostgreSQL shard run again after a start
+  that failed in 43 s; 30 of 30 mutants. Its mutation script took 3.5 h of
+  CI (each core mutant ran pw-core's tests whole, each browser mutant built
+  `run.sh` and `feed.sh` again): its core mutants are given the tests that
+  can see their rule next, the integrator's, as W6's ruling of 2026-10-09
+  says.
+- **2026-10-10, ports and targets (the coordinator's).** A worker's port
+  range avoids what the owner's own apps listen on (Spotify holds 7768 on
+  this machine) and what any session left listening: a `python3 -m
+  http.server 7801` from the integrator's 2026-10-04 layout-shift probe held
+  7801 inside W8's 7741-7940 until the coordinator stopped it. A session
+  stops the servers it starts; a probe's server runs in the background only
+  with its stop in the same command. Workers build in their own targets
+  (`.claude/worktrees/agent-*/target`); only the integrator's worktrees
+  share master's `target/`, one build at a time.
+- **2026-10-10, W6's questions, ruled.** (1) The Contains/Appears-in
+  fixture: a NOTICE.md beside kiokun-oracle's `*-sample.json` (also closing
+  the gap for `seo-sample.json` and `examples-sample.json`); the fixture
+  trimmed to each list's first 20 and last 5 items with its length, the
+  rule recorded in the fixture and the ADR. (2) The guards and oracles read
+  kiokun-data's committed HEAD (`git ls-tree`, `git show HEAD:./path`), never
+  its working tree: the evidence names a commit, and only a commit is
+  reproducible; the owner's uncommitted work is named, not read (ADR-0285
+  amended in the Contains ADR). (3) Licences, checked at each primary
+  source: KRDICT's text CC BY-SA 2.0 KR (its media licensed per file, never
+  committed), EDRDG's files CC BY-SA 4.0 (KANJIDIC2's contributors named
+  where their fields are kept), Wiktionary CC BY-SA 4.0 with the GFDL,
+  CC-CEDICT CC BY-SA 4.0, Tatoeba CC BY 2.0 FR (each sentence's author, by
+  its id). Every committed fixture's NOTICE names each source present, from
+  the builder's source, with its licence, version, address and the date
+  checked; the fixtures are CC BY-SA 4.0; track `kiokun` merges with it.
+  (4) Search: the committed CSV now (no Cantonese romanization, a data
+  difference) and a current one asked of the owner; kiokun's two statements
+  run in the kiokun layer over FTS5, declared as a source's operations, the
+  program doing the rest; a platform full-text source and a route that
+  answers JSON are the integrator's, later (NEXT).
+- **2026-10-10, W6's finding: `fetched_as` decoded each TCP read alone**:
+  a character a read ended inside became U+FFFD ("に��める" under load).
+  Fixed on master: the incomplete sequence is carried to the next read,
+  and bytes that are no UTF-8 are refused, not replaced.
+- **2026-10-10, the layouts merged** as ADR-0303, from `328720e`: verify
+  38006542533 green but for Firefox's navigate.spec "its answer first" (the
+  command order's finding, named known), 23 of 23 mutants; the store's page
+  plan made again over the build id (`just e10-component`). **W8:**
+  `StoreLayout` binds `Cart(current_session())`; at `track/store-accounts`'
+  next master merge, the layout's cart is its pages' (the user's), and the
+  layout is declared `user` (PW5046 holds a page to its layout's audience).
+- **2026-10-10, ADR-0243's amendment merged** (markup on one line is one
+  region, and no operand), from `31eeb3c`: verify 38013103417 green, 32 of
+  32 mutants; its PW5047 beside ADR-0303's PW5046.
+- **2026-10-10, a verify dealt within a ceiling** (ADR-0290 amended).
+  `track/command-order`'s verify 38015617597 was stopped at 345 minutes in
+  its shard 7 (two recipes took twice their seconds: mutants that hang under
+  the command order's wait, killed at their bound), and
+  `track/soft-navigation`'s was dealt 21,900 s into five of its nine shards.
+  The planner now deals no shard of more than one recipe past 13,800 s and
+  takes more shards where a track's 9 would; their jobs past the Free plan's
+  20 wait. Both tracks run again on it.

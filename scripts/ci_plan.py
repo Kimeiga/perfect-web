@@ -55,6 +55,20 @@ RATE = 24
 # browsers and builds, 2.5 to 6.5.
 SETUP = {(False, False): 42, (False, True): 384, (True, False): 390, (True, True): 390}
 
+# **What a shard is planned to end within**, in seconds (ADR-0290, amended
+# 2026-10-10). A shard runs at most 345 minutes (verify.yml's
+# `timeout-minutes`, 20,700 s), and one stopped there is a recipe shard that
+# failed: nothing of its run is fetched (ADR-0281), and the run is made again
+# whole. Two thirds of the limit, since measured shards ended up to half again
+# past their recorded seconds: track/command-order's verify 38015617597 dealt
+# 13,959 s into its shard 7, whose two recipes then took twice theirs, and
+# the shard was stopped at 345 minutes. A run is dealt into more shards than
+# it asks for where its number would end past this, up to `MOST`: the jobs
+# past the Free plan's 20 wait for one to end, which costs a run less than a
+# stopped shard does.
+CEILING = 13_800
+MOST = 40
+
 # Measurements of the machine they run on: a time, a load, a memory curve,
 # each naming its machine in a `host:` line. A shared runner's numbers are
 # not comparable from one run to the next, so these are recorded on the
@@ -79,6 +93,8 @@ LOCAL_ONLY = {
     "e14-kiokun-seo",
     # And its Japanese examples against kiokun.com's own code.
     "e14-kiokun-examples",
+    # And its moves against kiokun.com's own code.
+    "e14-kiokun-moves",
 }
 
 # Recipes run against a database (ADR-0246). Each is a shard of its own,
@@ -363,6 +379,37 @@ def plan(
     return out
 
 
+def ends(dealt: list[dict], costs: dict[str, int]) -> int:
+    """When the last of `dealt`'s shards ends: what it sets up, and its
+    recipes' costs."""
+    return max(
+        (SETUP[(s["browsers"], s["build"])] + sum(costs.get(r, 1) for r in s["recipes"]) for s in dealt),
+        default=0,
+    )
+
+
+def planned(
+    names: list[str],
+    costs: dict[str, int],
+    shards: int,
+    need: dict[str, tuple[bool, bool]] | None = None,
+    database: frozenset[str] | set[str] = frozenset(),
+) -> list[dict]:
+    """`plan` in `shards`, or in the fewest more whose every shard ends
+    within `CEILING`, up to `MOST`: a shard the run's limit stops throws away
+    every recipe it ran. A shard of one recipe that is longer by itself is
+    let be: no number of shards ends it sooner."""
+    def within(dealt: list[dict]) -> bool:
+        return all(ends([s], costs) <= CEILING or len(s["recipes"]) == 1 for s in dealt)
+
+    dealt = plan(names, costs, shards, need, database)
+    for more in range(shards + 1, max(shards, MOST) + 1):
+        if within(dealt):
+            break
+        dealt = plan(names, costs, more, need, database)
+    return dealt
+
+
 def measured(path: pathlib.Path | None = None) -> dict[str, float]:
     """Each recipe's seconds, as the last run that ran it to its end took
     them (`SECONDS`); none where the file is missing or unreadable."""
@@ -445,7 +492,7 @@ def main() -> int:
     body = bodies()
     costs = estimated(names, body, measured())
     need = {n: needs(body.get(n, "")) for n in names}
-    print("shards=" + json.dumps(plan(names, costs, args.shards, need, NEEDS_DATABASE)))
+    print("shards=" + json.dumps(planned(names, costs, args.shards, need, NEEDS_DATABASE)))
     return 0
 
 

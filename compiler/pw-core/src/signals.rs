@@ -121,7 +121,7 @@ fn check_body(
     // binding, and the query. The browser reads the binding again, for the
     // new key, when the signal changes.
     let mut keys: BTreeMap<ExprId, (String, DefId)> = BTreeMap::new();
-    // A layout's too (ADR-XXXX): its bindings are its pages'.
+    // A layout's too (ADR-0303): its bindings are its pages'.
     if matches!(decl.kind, DeclKind::Page | DeclKind::Layout) {
         for (binding, query, args) in crate::page_values::query_bindings(sigs.workspace(), at, body)
         {
@@ -1221,7 +1221,7 @@ fn provided(
     }
 
     // A page provides what it, and every view it uses, needs; and a layout
-    // what it and its views need (ADR-XXXX), since nothing is provided
+    // what it and its views need (ADR-0303), since nothing is provided
     // around it.
     if !matches!(decl.kind, DeclKind::Page | DeclKind::Layout) {
         return;

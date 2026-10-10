@@ -5193,14 +5193,14 @@ e14-keepalive:
      } > docs/evidence/E14/keepalive.txt
     @grep -E "passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/keepalive.txt
 
-# ADR-XXXX: a refusal is told where the press was. The checker's tests, the
+# ADR-0302: a refusal is told where the press was. The checker's tests, the
 # host's, the browser's in three engines, and the mutation controls.
 e14-refusal:
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @BUILD_ONLY=1 bash spikes/own-renderer/feed.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - a refusal is told where the press was"; echo; \
+    @{ echo "ADR-0302 - a refusal is told where the press was"; echo; \
        echo "produced by: just e14-refusal"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
@@ -5552,31 +5552,6 @@ e14-tell-at-once:
      } > docs/evidence/E14/tell-at-once.txt
     @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/tell-at-once.txt
 
-# ADR-XXXX: a page is shown in its layout, which the pages that name it
-# share. The compiler's tests, the host's, the store's pages in three
-# engines, and the mutation controls.
-e14-layouts:
-    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
-    @cargo build --quiet --locked -p pw-dev-server
-    @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - a page is shown in its layout"; echo; \
-       echo "produced by: just e14-layouts"; \
-       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
-       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
-       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
-       echo "== the layout, composed into each page (compiler/pw-core/tests/layouts.rs)"; echo; \
-       cargo test --locked -p pw-core --test layouts 2>&1 | grep -E '^(test |test result)|panicked at'; \
-       echo; echo "== the store's pages, served in their layout"; echo; \
-       cargo test --locked -p pw-dev-server -- a_store_page_is_shown_in_its_layout_and_its_count_is_told 2>&1 | grep -E '^(test |test result)|panicked at'; \
-       echo; echo "== the store's pages in three engines (e2e/layouts.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/layouts.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
-       echo; echo "== mutation controls (scripts/layouts_mutations.py)"; echo; \
-       python3 scripts/layouts_mutations.py; \
-     } > docs/evidence/E14/layouts.txt
-    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/layouts.txt
-
 # ADR-0300: a build is named by what it built, and the browser's decision
 # holds a document to what its build says of its page. The compiler's tests,
 # the host's, the decision's, the browser's in three engines, and the
@@ -5604,6 +5579,31 @@ e14-build-id:
        python3 scripts/build_id_mutations.py; \
      } > docs/evidence/E14/build-id.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/build-id.txt
+
+# ADR-0303: a page is shown in its layout, which the pages that name it
+# share. The compiler's tests, the host's, the store's pages in three
+# engines, and the mutation controls.
+e14-layouts:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0303 - a page is shown in its layout"; echo; \
+       echo "produced by: just e14-layouts"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the layout, composed into each page (compiler/pw-core/tests/layouts.rs)"; echo; \
+       cargo test --locked -p pw-core --test layouts 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the store's pages, served in their layout"; echo; \
+       cargo test --locked -p pw-dev-server -- a_store_page_is_shown_in_its_layout_and_its_count_is_told 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the store's pages in three engines (e2e/layouts.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/layouts.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/layouts_mutations.py)"; echo; \
+       python3 scripts/layouts_mutations.py; \
+     } > docs/evidence/E14/layouts.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/layouts.txt
 
 # The soft navigation's ADR: a navigation keeps the layout, and shows the next
 # page in it. The browser's tests in three engines, ADR-0280's navigation as

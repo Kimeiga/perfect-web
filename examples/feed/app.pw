@@ -337,7 +337,7 @@ public query Thread(id: PostId) -> Result<Post, FeedError>
     thread(id)
 }
 
-// **What a reader is told when a predicate refuses a press** (ADR-XXXX):
+// **What a reader is told when a predicate refuses a press** (ADR-0302):
 // each in the feed's words, said where the press was. What each means is the
 // deployment's (ADR-0115); none says what the predicate read.
 predicate SignedIn
@@ -587,7 +587,7 @@ session page Home() {
                     <button type="submit">Attach</button>
                 </form>
             {/if}
-            <!-- A signed-in reader's (ADR-XXXX): a reader signed out is given no
+            <!-- A signed-in reader's (ADR-0302): a reader signed out is given no
                  composer to be refused at. Hidden, not in a block: a bound draft in
                  a block a query decides is not rendered again (ADR-0137), as the
                  conversation's composer is (ADR-0279). -->

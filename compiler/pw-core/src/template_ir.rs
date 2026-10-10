@@ -601,14 +601,14 @@ struct Indexer {
     /// The name each `{#each}` around the node binds its item to, outermost
     /// first: a value computed from the innermost's is the row's (ADR-0228).
     loops: Vec<String>,
-    /// **The layout being lowered around a page** (ADR-XXXX): the file and
+    /// **The layout being lowered around a page** (ADR-0303): the file and
     /// the declaration whose `<slot />` is the page's place.
     layout: Option<(usize, DeclId)>,
     /// Where its `<slot />` was written: the page's markup goes there.
     slot: Option<Slot>,
 }
 
-/// **Where a layout's `<slot />` is** (ADR-XXXX): the index in the
+/// **Where a layout's `<slot />` is** (ADR-0303): the index in the
 /// template's chunks the page's markup is placed at, and how many elements
 /// enclose it, which the page's own nest inside (ADR-0203).
 #[derive(Debug, Clone, Copy)]
@@ -617,7 +617,7 @@ struct Slot {
     elements: u32,
 }
 
-/// **The layout a page is shown in** (ADR-XXXX), as its plan records it:
+/// **The layout a page is shown in** (ADR-0303), as its plan records it:
 /// what a navigation compares, to keep the layout in place.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PageLayout {
@@ -1034,7 +1034,7 @@ pub fn build_with(hirs: &[&Hir], sigs: &Signatures, handlers: &Handlers) -> Vec<
     out
 }
 
-/// **Each layout, lowered alone** (ADR-XXXX): its markup, its slot empty.
+/// **Each layout, lowered alone** (ADR-0303): its markup, its slot empty.
 /// Not a template the build writes (a layout is rendered in each page that
 /// names it), but one the build refuses as it refuses a page's: a part the
 /// renderer cannot render in a layout no page names yet is still a defect.
@@ -1143,7 +1143,7 @@ pub struct Lowered {
     pub instances: Vec<Instance>,
     /// The most elements any of its parts nests in (ADR-0203).
     pub deepest: u32,
-    /// **The layout it is shown in** (ADR-XXXX), for a page that names one.
+    /// **The layout it is shown in** (ADR-0303), for a page that names one.
     pub layout: Option<PageLayout>,
 }
 
@@ -1211,7 +1211,7 @@ pub fn lowered(
         signals,
     };
     // A layout alone, as the build checks one no page names: its markup,
-    // its slot empty, its values named as a page names them (ADR-XXXX).
+    // its slot empty, its values named as a page names them (ADR-0303).
     if decl.kind == crate::hir::DeclKind::Layout {
         let def = DefId { unit, decl: id.0 };
         ix.instances.clear();
@@ -1242,7 +1242,7 @@ pub fn lowered(
         .partition(|r| page && (is_title(body, *r) || is_meta(body, *r)));
     let (titles, metas): (Vec<NodeId>, Vec<NodeId>) =
         head.into_iter().partition(|r| is_title(body, *r));
-    // **The layout the page is shown in** (ADR-XXXX): its markup lowered
+    // **The layout the page is shown in** (ADR-0303): its markup lowered
     // first, so its parts and elements are numbered the same on every page
     // that names it, and the page's own after them, placed in its slot.
     let layout = page
@@ -1302,7 +1302,7 @@ pub fn lowered(
     })
 }
 
-/// **A page's layout, lowered into its template first** (ADR-XXXX), as a
+/// **A page's layout, lowered into its template first** (ADR-0303), as a
 /// view used in it is (ADR-0136): its bindings and its signals the page's,
 /// each under the name [`crate::layouts::bound`] gives it, which no source
 /// writes; its handlers the page's; its computed parts named by the layout,
@@ -2143,7 +2143,7 @@ fn lower_element(
         children,
         self_closing,
     } = el;
-    // **A layout's `<slot />`** (ADR-XXXX): where the page that names the
+    // **A layout's `<slot />`** (ADR-0303): where the page that names the
     // layout is shown. Only the layout's own, at the top of its view, once,
     // and empty (PW5044): the page's markup is lowered after the layout's,
     // and placed here, between two markers a navigation finds.

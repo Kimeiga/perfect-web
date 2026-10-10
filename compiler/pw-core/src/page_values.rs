@@ -715,7 +715,7 @@ pub struct PageValues {
     /// `user:`, `organization:` or `private:` (`resume::page_scope`).
     #[serde(default = "public_scope", skip_serializing_if = "is_public_scope")]
     pub scope: String,
-    /// **The layout the page is shown in** (ADR-XXXX): its path, its own
+    /// **The layout the page is shown in** (ADR-0303): its path, its own
     /// markup's schema, and how many parts and elements it numbers first. A
     /// navigation between two pages that record the same keeps it in place.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1327,7 +1327,7 @@ fn plan(
         });
     }
 
-    // **Its layout's bindings** (ADR-XXXX), read once for each document as
+    // **Its layout's bindings** (ADR-0303), read once for each document as
     // the page's are, each under the name the layout's markup is lowered
     // with (`cart~StoreLayout`). A key is the request's reader or the
     // layout's own signal: a layout is given nothing by its page. Neither

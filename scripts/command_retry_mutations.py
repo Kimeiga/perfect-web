@@ -80,7 +80,7 @@ MUTANTS = [
         "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n",
     ),
     (
-        # Re-anchored by ADR-XXXX: a request with no answer is thrown as
+        # Re-anchored by ADR-0302: a request with no answer is thrown as
         # unreachable, which the press tells.
         "nothing is sent again",
         "browser",
@@ -97,7 +97,7 @@ MUTANTS = [
         "      body = await response.text();\n",
     ),
     (
-        # Re-anchored by ADR-XXXX.
+        # Re-anchored by ADR-0302.
         "there is no bound",
         "browser",
         RUNTIME,

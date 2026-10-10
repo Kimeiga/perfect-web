@@ -324,7 +324,7 @@ fn document(
         // the element's text free of `<`, which is what ends it (ADR-0097).
         let json =
             pw_render::escape::json_in_script(&serde_json::to_string(&json).unwrap_or_default());
-        // Where a failed press is said (ADR-XXXX), there from the first byte.
+        // Where a failed press is said (ADR-0302), there from the first byte.
         tail.push_str(pw_render::ANNOUNCER);
         tail.push('\n');
         tail.push_str(&format!(

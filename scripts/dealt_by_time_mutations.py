@@ -8,8 +8,11 @@ at the upper quartile of its kind (the amendment of 2026-10-09: not the
 median, not every recipe's, its scripts read for its kind, the host's
 tests a kind of their own), the database recipes' shards chosen by when
 the run ends (and the fewest of those that end it as soon), and the fetch
-keeping only a recipe that ran to its end, over the others kept. At least
-one test of `scripts/tests/test_ci_scripts.py` must then fail.
+keeping only a recipe that ran to its end, over the others kept; and (the
+amendment of 2026-10-10) a run dealt into more shards than it asks for where
+its own would end a shard past the ceiling, a recipe longer than it alone
+let be, and the ceiling under a shard's limit. At least one test of
+`scripts/tests/test_ci_scripts.py` must then fail.
 
 Run from the repository root; `just e14-dealt-by-time` records the output.
 The sources are restored after every mutant, whatever happens.
@@ -105,6 +108,30 @@ MUTANTS = [
         FETCH,
         "    kept.update(seconds)\n",
         "    kept = dict(seconds)\n",
+    ),
+    (
+        "a run is dealt into the shards it asks for, past the ceiling",
+        PLAN,
+        "    for more in range(shards + 1, max(shards, MOST) + 1):\n",
+        "    for more in range(0):\n",
+    ),
+    (
+        "a recipe longer than the ceiling alone is paid for in shards",
+        PLAN,
+        '        return all(ends([s], costs) <= CEILING or len(s["recipes"]) == 1 for s in dealt)\n',
+        '        return all(ends([s], costs) <= CEILING for s in dealt)\n',
+    ),
+    (
+        "a run's plan is its asked shards' again",
+        PLAN,
+        '    print("shards=" + json.dumps(planned(names, costs, args.shards, need, NEEDS_DATABASE)))\n',
+        '    print("shards=" + json.dumps(plan(names, costs, args.shards, need, NEEDS_DATABASE)))\n',
+    ),
+    (
+        "the ceiling is a shard's limit",
+        PLAN,
+        "CEILING = 13_800\n",
+        "CEILING = 20_700\n",
     ),
 ]
 

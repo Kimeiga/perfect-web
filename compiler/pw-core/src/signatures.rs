@@ -347,7 +347,7 @@ impl Signatures {
                         // namespace, so nothing calls it.
                         | DeclKind::Event
                         // So are a predicate's, which `requires` gives
-                        // (ADR-XXXX); nothing calls it either.
+                        // (ADR-0302); nothing calls it either.
                         | DeclKind::Predicate
                 ) {
                     continue;

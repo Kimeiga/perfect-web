@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-XXXX: a page is shown in its layout, which the
+"""Mutation controls for ADR-0303: a page is shown in its layout, which the
 pages that name it share.
 
 Each mutant undoes one piece:

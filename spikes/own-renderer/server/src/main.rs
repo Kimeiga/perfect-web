@@ -268,9 +268,9 @@ struct Answered {
     committed: bool,
     result: Option<serde_json::Value>,
     why: Option<String>,
-    /// **The predicate its `requires` refused it by** (ADR-XXXX), kept with
+    /// **The predicate its `requires` refused it by** (ADR-0302), kept with
     /// the interaction, so a resent press is answered as the press was:
-    /// until ADR-XXXX the refusal lived only on the thread that ran
+    /// until ADR-0302 the refusal lived only on the thread that ran
     /// `requires`, and a resend, answered from what was kept, was answered
     /// as a command that did not commit, with nothing to tell.
     refused: Option<String>,
@@ -812,7 +812,7 @@ struct Server {
     /// meanwhile** (ADR-0271): one telling of a session at a time, and one
     /// more after it for every commit that came while it ran.
     told: Mutex<BTreeMap<String, bool>>,
-    /// **The words a program declares for its predicates** (ADR-XXXX,
+    /// **The words a program declares for its predicates** (ADR-0302,
     /// `predicates.json`): what a reader is told when one refuses, in place
     /// of the deployment's.
     words: BTreeMap<String, String>,
@@ -1320,7 +1320,7 @@ impl Server {
             ));
         }
         // **Every predicate the program requires, this deployment
-        // evaluates** (ADR-XXXX): one it cannot would answer each press of
+        // evaluates** (ADR-0302): one it cannot would answer each press of
         // its commands with nothing to tell, so it is refused here, before
         // anything is served. And the words the program declares for them.
         let words: BTreeMap<String, String> =
@@ -2295,7 +2295,7 @@ impl Server {
         // contract states (ADR-0179): a forged quantity of 0 is refused here.
         let args = loaded.prepared.arguments_for(&export, json)?;
         // With the predicate `requires` refused it by, where one did
-        // (ADR-XXXX): taken on the thread that ran it, as it ends, so it is
+        // (ADR-0302): taken on the thread that ran it, as it ends, so it is
         // kept with the interaction.
         let answered = |run: Result<Answered, String>| {
             let mut answered = match run {
@@ -3251,7 +3251,7 @@ impl Server {
         let plan = self.plan_of(&page);
         let mut out = BTreeMap::new();
         // **One query with one key is read once for its document**
-        // (ADR-XXXX): a page and its layout that each bind `Cart` of the
+        // (ADR-0303): a page and its layout that each bind `Cart` of the
         // session's read it once, and show one value of it.
         let mut read: Vec<(&str, Vec<Val>, Val)> = Vec::new();
         for b in plan["bindings"].as_array().into_iter().flatten() {
@@ -6896,7 +6896,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 return;
             }
             // TRACK SEAM (identity): the refusal, where `requires` refused,
-            // kept with the interaction (ADR-XXXX), and what a reader is
+            // kept with the interaction (ADR-0302), and what a reader is
             // told of it: the program's words for the predicate where it
             // declares them, the deployment's where it does not. Never
             // what the predicate read.
@@ -8544,7 +8544,7 @@ fn signal_document(
     // No `<` in a script element's text (ADR-0097).
     let json =
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
-    // Where a failed press is said (ADR-XXXX), from the first byte.
+    // Where a failed press is said (ADR-0302), from the first byte.
     let announcer = pw_render::ANNOUNCER;
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
@@ -8785,7 +8785,7 @@ fn document(
         "" => String::new(),
         css => format!("<style>{css}</style>\n"),
     };
-    // Where a failed press is said (ADR-XXXX), from the first byte.
+    // Where a failed press is said (ADR-0302), from the first byte.
     let announcer = pw_render::ANNOUNCER;
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
@@ -9254,18 +9254,34 @@ public query Store(",
                 .expect("request");
             let mut chunks = Vec::new();
             let mut buf = [0u8; 65536];
+            // A character a read ends inside is told with the read that
+            // completes it. Decoded alone, its first bytes were U+FFFD, and a
+            // test comparing the page's text failed by where the reads fell:
+            // under load, 煮's "にしめる" read as "に\u{fffd}\u{fffd}める" (W6's
+            // finding, 2026-10-10). Bytes that are no UTF-8 are refused, not
+            // replaced.
+            let mut pending: Vec<u8> = Vec::new();
             loop {
                 let n = client.read(&mut buf).expect("read");
                 if n == 0 {
+                    assert!(pending.is_empty(), "the response ends inside a character");
                     // The close, which is what tells a browser the document
                     // is complete: the last chunk, empty, when it came.
                     chunks.push((started.elapsed(), String::new()));
                     break;
                 }
-                chunks.push((
-                    started.elapsed(),
-                    String::from_utf8_lossy(&buf[..n]).into_owned(),
-                ));
+                pending.extend_from_slice(&buf[..n]);
+                let whole = match std::str::from_utf8(&pending) {
+                    Ok(text) => text.len(),
+                    // Ends inside a character: the rest comes next.
+                    Err(e) if e.error_len().is_none() => e.valid_up_to(),
+                    Err(e) => panic!("the response is no UTF-8: {e}"),
+                };
+                if whole > 0 {
+                    let text =
+                        String::from_utf8(pending.drain(..whole).collect()).expect("decoded above");
+                    chunks.push((started.elapsed(), text));
+                }
             }
             chunks
         })
@@ -11684,7 +11700,7 @@ public query Store(",
     #[test]
     fn a_command_drops_the_entry_it_invalidates_and_no_other() {
         let mut s = rendering_server();
-        // The cart's every binding, the page's and its layout's (ADR-XXXX):
+        // The cart's every binding, the page's and its layout's (ADR-0303):
         // a query's policy is its declaration's.
         for b in s.plan["bindings"].as_array_mut().expect("bindings") {
             if b["resource"] == "store.page.Cart" {
@@ -14323,7 +14339,7 @@ public query Store(",
             .collect()
     }
 
-    /// **A page is shown in its layout** (ADR-XXXX): the store's four pages
+    /// **A page is shown in its layout** (ADR-0303): the store's four pages
     /// in `StoreLayout`, its header the same markup on each, the page's own
     /// in its slot; and its count told as the cart changes on a page that
     /// reads no cart of its own, the order's, as any part's value is
@@ -15608,7 +15624,7 @@ public query Store(",
         );
     }
 
-    /// **A page that binds no query holds the announcer too** (ADR-XXXX):
+    /// **A page that binds no query holds the announcer too** (ADR-0302):
     /// once, empty, before the runtime that says what a failed press is told.
     #[test]
     fn a_signal_page_holds_its_announcer() {
@@ -15744,7 +15760,7 @@ public query Store(",
         // Each arm with the comment after it (ADR-0223).
         assert!(
             // ADR-0277: the menu counted is a part of the page's, before
-            // them; and ADR-XXXX: the layout's count is part 0, before all.
+            // them; and ADR-0303: the layout's count is part 0, before all.
             whole.ends_with("</template><!--/pw-32--></body>\n</html>\n"),
             "{whole}"
         );

@@ -67,7 +67,7 @@ pub enum Namespace {
     /// materialization that names an event must not silently resolve to a
     /// query that happens to share the spelling.
     Event,
-    /// `predicate` (ADR-XXXX). Its own namespace, as an event's is: a
+    /// `predicate` (ADR-0302). Its own namespace, as an event's is: a
     /// predicate is named only in `requires`, never in an expression.
     Predicate,
 }
