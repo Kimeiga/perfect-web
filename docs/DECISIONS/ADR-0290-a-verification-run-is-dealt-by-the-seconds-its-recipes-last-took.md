@@ -127,3 +127,32 @@ recipes, 287 and 483; 64 `browser` recipes, 142 and 408.
 
 `scripts/tests/test_ci_scripts.py`:
 `test_a_recipe_not_yet_measured_costs_what_its_kind_does`.
+
+## Amended, 2026-10-10: a run is dealt so that no shard ends past a ceiling under its limit
+
+Found by `track/command-order`'s verify 38015617597: its shard 7 was dealt
+13,959 s, its two longest recipes then took twice what they last had
+(`e14-connection-faults` 10,364 s, `e14-invariants` 9,474 s: mutants that
+hang under the command order's wait, killed at their bound), and the shard was
+stopped at verify.yml's `timeout-minutes`, 345 minutes. A stopped shard is a
+recipe shard that failed: nothing of the run is fetched (ADR-0281), and it is
+made again whole. And `track/soft-navigation`'s verify was dealt 21,900 s into
+five of its nine shards, past the limit before any overran: a track is dealt
+into 9 shards (ADR-0253), and a track that touches the runtime now reaches
+recipes of 184,111 s.
+
+- **No shard of more than one recipe is dealt past `CEILING`**, 13,800 s, two
+  thirds of the limit: measured shards ended up to half again past their
+  recorded seconds. Where a run's asked number of shards would deal one past
+  it, the run is dealt into the fewest more that do not, up to `MOST`, 40.
+- **A recipe longer than the ceiling by itself** is dealt a shard of its own
+  and let be: no number of shards ends it sooner. `e14-command-answers` took
+  15,426 s and `e14-cart-lines` 14,021 in that run; each is the mutation
+  narrowing's to shorten (NEXT, infrastructure).
+- **The jobs past the Free plan's 20 wait for one to end**, which costs a run
+  less than a stopped shard does. `track/soft-navigation`'s recipes, dealt
+  again: 14 shards, two of one long recipe each, the rest within 13,637 s.
+- The ceiling is held under the limit by a test that reads verify.yml.
+
+`scripts/tests/test_ci_scripts.py`: four tests;
+`scripts/dealt_by_time_mutations.py`: four more mutants, 17 of 17.
