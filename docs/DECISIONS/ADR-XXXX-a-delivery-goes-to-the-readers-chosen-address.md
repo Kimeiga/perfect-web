@@ -29,17 +29,20 @@ layers).
 
 ### 1. The places are a fixed table, and a store's zone a radius
 
-`places.rs` holds ten places (Union Square, the Ferry Building, Chinatown,
-Dolores Park, the Castro, Golden Gate Park, Ocean Beach, Lake Merritt,
-Berkeley, Palo Alto), each with an id, a name and coordinates in millionths
-of a degree. An address keeps a place's id and a label of the reader's (1 to
+`places.rs` holds eleven places (Union Square, the Ferry Building,
+Chinatown, Civic Center, Dolores Park, the Castro, Golden Gate Park, Ocean
+Beach, Lake Merritt, Berkeley, Palo Alto), each with an id, a name and
+coordinates in millionths of a degree. An address keeps a place's id and a label of the reader's (1 to
 40 code points, `AddressLabel`). Nothing resolves a place the table does not
 hold, and no request leaves the machine.
 
 A store has a zone: where it is and a radius in metres. Store 47 is at Union
 Square and reaches 4 km; store 48 at the Ferry Building, 2 km. In memory
 (`store::zone_of`) and on PostgreSQL (migration `0004_addresses`, three
-columns on `stores`), a test holding the two alike.
+columns on `stores`), a test holding the two alike. Civic Center is within
+store 47's radius and past store 48's: without a place between the two
+radii, a layer that held store 48's radius as store 47's answered as the rule
+does (Found).
 
 ### 2. One rule, read by the estimate, the page and the commands
 
@@ -59,7 +62,7 @@ through it:
   from a store that lists it and reaches the address.
 
 `tests/addresses.rs`'s `the_page_the_estimate_and_the_commands_read_one_rule`
-holds it: for each store and each of the ten places, the page's `delivers`,
+holds it: for each store and each of the eleven places, the page's `delivers`,
 the command's answer and the estimate's refusal each equal `delivers_to`, on
 both layers.
 
@@ -150,6 +153,11 @@ All 2026-10-09, relayed through the coordinating session.
   `Addresses.estimate`; it is `estimate_to` here, which the fix will not
   change. The integrator's ruling: a resolver defect, the integrator's,
   queued on NEXT with a test for each binding form, after soft navigation.
+- **The table first told the two stores' radii apart nowhere.** With ten
+  places, none lay between 2 and 4 km of the Ferry Building, so the mutant
+  "on PostgreSQL, store 48 delivers as far as store 47" survived the first
+  recording. Civic Center is the place between the two radii, and the rule's
+  test asserts that the table holds one.
 - **`!reach.delivers` in a condition made a derived component** the
   committed component evidence did not list; the page reads
   `{#if reach.delivers}{:else}…{/if}`.
@@ -205,7 +213,7 @@ Recorded by `just e14-store-accounts` in
 
 ## Not claimed
 
-- **The places are a fixture, not a geocoder.** Ten places, approximate
+- **The places are a fixture, not a geocoder.** Eleven places, approximate
   coordinates, no address outside them.
 - **A courier's minutes are a stated model**, four a kilometre in a straight
   line; no road, no traffic.

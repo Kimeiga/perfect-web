@@ -192,6 +192,18 @@ fn a_reader_keeps_at_most_ten_addresses() {
 /// check all answer as `places::delivers_to` does, on this layer.
 #[test]
 fn the_page_the_estimate_and_the_commands_read_one_rule() {
+    // The table tells the two stores' radii apart: a place store 48 would
+    // reach with store 47's radius and does not with its own. Without one, a
+    // layer that held store 48's radius wrong would answer as the rule does.
+    let wide = places::Zone {
+        radius_m: store::zone_of(STORE_ID).radius_m,
+        ..store::zone_of(SECOND_STORE.0)
+    };
+    assert!(
+        places::PLACES.iter().any(|p| places::delivers_to(&wide, p)
+            && !places::delivers_to(&store::zone_of(SECOND_STORE.0), p)),
+        "a place between the two radii"
+    );
     let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
     for (n, place) in places::PLACES.iter().enumerate() {
         run(

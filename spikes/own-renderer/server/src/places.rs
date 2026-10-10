@@ -45,6 +45,14 @@ pub(crate) const PLACES: &[Place] = &[
         lat_e6: 37_794_100,
         lon_e6: -122_407_800,
     },
+    // Within four kilometres of Union Square and past two of the Ferry
+    // Building: the place that tells store 47's radius from store 48's.
+    Place {
+        id: "civic-center",
+        name: "Civic Center, San Francisco",
+        lat_e6: 37_779_300,
+        lon_e6: -122_419_300,
+    },
     Place {
         id: "dolores-park",
         name: "Dolores Park, San Francisco",
