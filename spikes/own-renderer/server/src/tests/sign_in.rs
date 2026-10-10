@@ -417,6 +417,117 @@ fn a_signed_out_reader_reads_and_cannot_post() {
     assert!(replied.contains("\"refused\":\"SignedIn\""), "{replied}");
 }
 
+/// A response's body, as JSON.
+fn body_of(answer: &str) -> serde_json::Value {
+    let body = answer.split("\r\n\r\n").nth(1).unwrap_or_default();
+    serde_json::from_str(body).unwrap_or_else(|e| panic!("{e}: {answer}"))
+}
+
+/// **A refusal says the program's words for its predicate** (ADR-0302): the
+/// feed declares `predicate SignedIn  says "…"`, and a post refused by it is
+/// answered with those words, the predicate's name, and nothing the
+/// predicate read.
+#[test]
+fn a_refusal_says_the_programs_words_for_its_predicate() {
+    let s = feed_with(Arc::new(TestProvider::default()));
+    let answer = command(&s, "feed.app.post", "s-reader", "i-1", "[\"Let me in\"]");
+    assert!(answer.starts_with("HTTP/1.1 403"), "{answer}");
+    assert_eq!(
+        body_of(&answer),
+        serde_json::json!({
+            "committed": false,
+            "refused": "SignedIn",
+            "says": "Sign in to post, reply, like or follow.",
+        })
+    );
+}
+
+/// **Where the program declares no words, the deployment's are said**
+/// (ADR-0302): the deployment that gives a predicate its meaning gives it
+/// words too.
+#[test]
+fn a_refusal_the_program_gives_no_words_is_told_in_the_deployments() {
+    let s = served_feed_with(|app| {
+        app.replace(
+            "predicate SignedIn\n    says \"Sign in to post, reply, like or follow.\"\n",
+            "",
+        )
+    });
+    s.identity
+        .use_provider(Arc::new(TestProvider::default()), REDIRECT);
+    let answer = command(&s, "feed.app.post", "s-reader", "i-1", "[\"Let me in\"]");
+    assert!(answer.starts_with("HTTP/1.1 403"), "{answer}");
+    assert_eq!(body_of(&answer)["says"], "Sign in to do this.");
+}
+
+/// **A refused press sent again is refused again, as it was** (ADR-0302):
+/// the refusal is kept with its interaction. Until ADR-0302 it lived only
+/// on the thread that ran `requires`, and a resend, answered from what was
+/// kept, was answered 202 as a command that did not commit, with nothing
+/// to tell the reader.
+#[test]
+fn a_refused_press_sent_again_is_refused_again() {
+    let s = feed_with(Arc::new(TestProvider::default()));
+    let first = command(&s, "feed.app.post", "s-reader", "i-1", "[\"Let me in\"]");
+    let again = command(&s, "feed.app.post", "s-reader", "i-1", "[\"Let me in\"]");
+    assert!(again.starts_with("HTTP/1.1 403"), "{again}");
+    assert_eq!(body_of(&first), body_of(&again));
+}
+
+/// **A page holds its announcer from the first byte** (ADR-0302): where a
+/// failed press is said, once, empty, before the runtime that says it. A
+/// live region added with its words is not reliably said (ADR-0182).
+#[test]
+fn a_page_holds_its_announcer_from_the_first_byte() {
+    let s = feed_with(Arc::new(TestProvider::default()));
+    let answer = get(&s, "/", "pw-session=s-reader");
+    let html = answer.split_once("\r\n\r\n").map_or("", |(_, body)| body);
+    assert!(html.starts_with("<!doctype html>"), "{answer}");
+    assert_eq!(html.matches(pw_render::ANNOUNCER).count(), 1, "{html}");
+    let (before, _) = html
+        .split_once("id=\"pw-parts\"")
+        .expect("a parts manifest");
+    assert!(before.contains(pw_render::ANNOUNCER), "{html}");
+}
+
+/// **A program is not served by a deployment that cannot evaluate a
+/// predicate it requires or declares** (ADR-0302): each press of its
+/// commands would be answered with nothing to tell.
+#[test]
+fn a_predicate_the_deployment_cannot_evaluate_is_refused_at_start() {
+    for (change, unknown) in [
+        (
+            (|app: &str| {
+                app.replacen(
+                    "    requires      SignedIn\n",
+                    "    requires      SignedIn, Verified\n",
+                    1,
+                )
+            }) as fn(&str) -> String,
+            "`Verified`",
+        ),
+        (
+            |app: &str| {
+                format!(
+                    "{app}\npredicate Trusted\n    says \"Only a trusted reader can do this.\"\n"
+                )
+            },
+            "`Trusted`",
+        ),
+    ] {
+        let (_dir, out) = built_feed_with(change);
+        match Server::from_build(out.clone(), out) {
+            Ok(_) => panic!("served, though the deployment cannot evaluate {unknown}"),
+            Err(why) => assert!(
+                why.contains(&format!(
+                    "cannot evaluate the predicate the program requires: {unknown}"
+                )),
+                "{why}"
+            ),
+        }
+    }
+}
+
 /// **What a signed-in user writes is theirs** (ADR-0258): a post and a reply
 /// name their author as their provider named them, to every reader, and the
 /// reader's own page says who is signed in.

@@ -134,6 +134,10 @@ interface store-page-store-api {
     store: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
 }
 
+interface store-page-store-layout-api {
+    store-layout: func();
+}
+
 interface store-page-store-list-api {
     use pw:types/types.{domain-store};
     store-list: func() -> list<domain-store>;
@@ -325,6 +329,12 @@ world store-page-saved-addresses {
 world store-page-store {
     import store:data/stores;
     export store-page-store-api;
+}
+
+world store-page-store-layout {
+    import pw:host/principal;
+    import store-page-cart-api;
+    export store-page-store-layout-api;
 }
 
 world store-page-store-list {

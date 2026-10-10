@@ -443,11 +443,15 @@ fn the_trusted_platform_contract_is_hashed() {
     // places its cart as an order and follows it (ADR-0193).
     // ADR-0208 declared `outbox.write`, the effect of emitting an event, and
     // ADR-0214 renamed `LayoutSnapshot`'s accessor from `value` to `measured`.
+    // ADR-0304: `clock` declares `TimeZone`, `LocalDate`, `LocalTime` and
+    // `Weekday`, the host's `passed`, `today_in`, `at`, `date_of` and
+    // `time_of`, and `clock.compare` and `clock.zone`, the wall clock read by
+    // comparing it and the host's tz database.
     // 2026-10-09: `examples/domain.pw`'s `CartError` gains `OutOfRange`, an
     // item's store that does not reach the reader's chosen address, and
     // `OrderError` `NoCoverage`, an order such a store's item is in (track
     // `store-accounts`, milestone 2).
-    const EXPECTED: u64 = 0x9c1811abb5f74368;
+    const EXPECTED: u64 = 0x57dbcf4ff8602699;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

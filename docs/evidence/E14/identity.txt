@@ -1,66 +1,75 @@
-ADR-XXXX - accounts and sign-in: Pleris the relying party, the provider the deployment's
+ADR-0258 - accounts and sign-in: Pleris the relying party, the provider the deployment's
 
 produced by: just e14-identity
-commit: b38d10db6345cae49c743801bf0f610e93c01c0f
+commit: 6964ee77b89b8ab24ab7fac6e5b651efa878aeb2
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37993980886 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
-postgres: 18.6 (Homebrew)
+postgres: 18.6 (Debian 18.6-1.pgdg13+2)
 
 == the server (identity.rs, accounts.rs, tests/sign_in.rs)
 
-test identity::tests::a_cookie_is_http_only_and_secure_outside_this_machine ... ok
-test identity::tests::a_token_is_held_to_its_issuer_audience_expiry_and_nonce ... ok
-test identity::tests::s256_is_rfc_7636s_worked_example ... ok
-test identity::tests::the_guest_model_runs_only_in_development_on_this_machine ... ok
-test identity::tests::requires_starts_as_the_development_model ... ok
-test identity::tests::a_refusal_is_taken_once ... ok
-test identity::tests::an_unsafe_request_from_another_origin_is_refused ... ok
-test identity::tests::ids_are_random_and_forms_are_decoded ... ok
-test accounts::tests::the_development_provider_refuses_to_start_outside_development ... ok
 test accounts::tests::an_unverified_request_is_refused_at_the_provider ... ok
 test accounts::tests::an_account_is_checked_when_it_is_made ... ok
+test accounts::tests::the_development_provider_refuses_to_start_outside_development ... ok
+test identity::tests::a_cookie_is_http_only_and_secure_outside_this_machine ... ok
+test identity::tests::a_refusal_is_taken_once ... ok
+test identity::tests::a_token_is_held_to_its_issuer_audience_expiry_and_nonce ... ok
+test identity::tests::an_unsafe_request_from_another_origin_is_refused ... ok
+test identity::tests::ids_are_random_and_forms_are_decoded ... ok
+test identity::tests::requires_starts_as_the_development_model ... ok
+test identity::tests::s256_is_rfc_7636s_worked_example ... ok
+test identity::tests::the_guest_model_runs_only_in_development_on_this_machine ... ok
 test accounts::tests::a_password_is_kept_only_as_its_argon2id_hash ... ok
 test accounts::tests::a_code_is_exchanged_once_by_its_verifier ... ok
 test accounts::tests::signing_in_takes_the_password_and_says_nothing_of_who_exists ... ok
-test tests::sign_in::a_callback_another_browser_started_is_refused ... ok
-test tests::sign_in::a_sign_in_rotates_the_session_and_the_old_one_is_no_one ... ok
-test tests::sign_in::a_fresh_sessions_cookie_is_http_only_and_unguessable ... ok
 test tests::sign_in::a_command_from_another_origin_is_refused ... ok
+test tests::sign_in::a_callback_another_browser_started_is_refused ... ok
+test tests::sign_in::a_fresh_sessions_cookie_is_http_only_and_unguessable ... ok
+test tests::sign_in::a_page_holds_its_announcer_from_the_first_byte ... ok
 test tests::sign_in::a_post_and_a_reply_are_their_signed_in_authors ... ok
-test tests::sign_in::a_signed_out_reader_reads_and_cannot_post ... ok
+test tests::sign_in::a_refusal_says_the_programs_words_for_its_predicate ... ok
+test tests::sign_in::a_refusal_the_program_gives_no_words_is_told_in_the_deployments ... ok
+test tests::sign_in::a_refused_press_sent_again_is_refused_again ... ok
+test tests::sign_in::a_predicate_the_deployment_cannot_evaluate_is_refused_at_start ... ok
 test tests::sign_in::a_session_is_no_one_until_a_provider_vouches_for_it ... ok
+test tests::sign_in::a_sign_in_rotates_the_session_and_the_old_one_is_no_one ... ok
+test tests::sign_in::a_signed_out_reader_reads_and_cannot_post ... ok
 test tests::sign_in::on_postgres::a_delete_on_postgres_is_its_authors_alone ... ok
 test tests::sign_in::on_postgres::a_post_on_postgres_is_its_signed_in_authors ... ok
 test tests::sign_in::only_its_author_deletes_a_post ... ok
 test tests::sign_in::signing_out_forgets_the_principal ... ok
-test tests::sign_in::the_guest_models_reader_is_its_sessions_guest ... ok
 test tests::sign_in::the_development_provider_signs_up_and_in_through_the_flow ... ok
-test tests::sign_in::two_users_pages_never_share_private_parts ... ok
+test tests::sign_in::the_guest_models_reader_is_its_sessions_guest ... ok
+test tests::sign_in::the_relying_party_answers_the_routes_the_compiler_knows ... ok
+test tests::sign_in::a_token_not_this_sign_ins_is_refused has been running for over 60 seconds
 test tests::sign_in::a_token_not_this_sign_ins_is_refused ... ok
-test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 160 filtered out; finished in 8.56s
+test tests::sign_in::two_users_pages_never_share_private_parts ... ok
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 331 filtered out; finished in 124.27s
 
 == the flows in three engines (e2e/identity.spec.mjs)
 
-  9 passed (30.7s)
+  18 passed (2.4m)
 
 == mutation controls (scripts/identity_mutations.py)
 
-baseline: 29 passed, 0 failed
-a command from another origin runs (no CSRF check): KILLED (1 of 29 tests fail)
-a sign-in keeps the session the browser came with (fixation): KILLED (1 of 29 tests fail)
-a sign-in leaves the session it replaced signed in: KILLED (1 of 29 tests fail)
-signing out leaves the session signed in: KILLED (2 of 29 tests fail)
-a callback is not bound to the browser that started it (login CSRF): KILLED (1 of 29 tests fail)
-an ID token's nonce is not checked: KILLED (2 of 29 tests fail)
-every session is SignedIn: KILLED (5 of 29 tests fail)
-the ownership predicate is inverted: KILLED (2 of 29 tests fail)
-a refusal is answered as a command that did not commit: KILLED (3 of 29 tests fail)
-the session cookie is readable by scripts: KILLED (3 of 29 tests fail)
-a fresh session's id is guessable: KILLED (8 of 29 tests fail)
-the guest model runs in production: KILLED (1 of 29 tests fail)
-the development provider starts in production: KILLED (1 of 29 tests fail)
-the development provider exchanges a code without its verifier: KILLED (1 of 29 tests fail)
-a password is stored as it was typed: KILLED (4 of 29 tests fail)
-a post is its session's guest's, not its signed-in author's: KILLED (3 of 29 tests fail)
+baseline: 35 passed, 0 failed
+a command from another origin runs (no CSRF check): KILLED (1 of 35 tests fail)
+a sign-in keeps the session the browser came with (fixation): KILLED (1 of 35 tests fail)
+a sign-in leaves the session it replaced signed in: KILLED (1 of 35 tests fail)
+signing out leaves the session signed in: KILLED (2 of 35 tests fail)
+a callback is not bound to the browser that started it (login CSRF): KILLED (1 of 35 tests fail)
+an ID token's nonce is not checked: KILLED (2 of 35 tests fail)
+every session is SignedIn: KILLED (8 of 35 tests fail)
+the ownership predicate is inverted: KILLED (2 of 35 tests fail)
+a refusal is answered as a command that did not commit: KILLED (6 of 35 tests fail)
+the session cookie is readable by scripts: KILLED (3 of 35 tests fail)
+a fresh session's id is guessable: KILLED (8 of 35 tests fail)
+the guest model runs in production: KILLED (1 of 35 tests fail)
+the development provider starts in production: KILLED (1 of 35 tests fail)
+the development provider exchanges a code without its verifier: KILLED (1 of 35 tests fail)
+a password is stored as it was typed: KILLED (4 of 35 tests fail)
+a post is its session's guest's, not its signed-in author's: KILLED (3 of 35 tests fail)
 16 of 16 mutants killed
+memory bound: no process was stopped

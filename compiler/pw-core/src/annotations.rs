@@ -674,6 +674,7 @@ fn names_no_handler(
             DeclKind::View => "a view",
             DeclKind::Component => "a component",
             DeclKind::Page => "a page",
+            DeclKind::Layout => "a layout",
             DeclKind::Query => "a query",
             DeclKind::Subscription => "a subscription",
             DeclKind::Resource => "a resource",

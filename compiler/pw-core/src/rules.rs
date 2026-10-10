@@ -108,10 +108,12 @@ fn noun_of(kind: DeclKind) -> &'static str {
         DeclKind::View => "view",
         DeclKind::Component => "component",
         DeclKind::Page => "page",
+        DeclKind::Layout => "layout",
         DeclKind::Task => "task",
         DeclKind::Event => "event",
         DeclKind::Source => "source",
         DeclKind::Upload => "upload",
+        DeclKind::Predicate => "predicate",
         DeclKind::Prelude => "prelude",
         DeclKind::Effect => "effect",
         DeclKind::Fn => "fn",
@@ -167,6 +169,12 @@ pub(crate) fn placement_conflict(
         "build" if effect.starts_with("clock.wall") || effect.starts_with("random") => Some((
             "static generation requires a deterministic effect row",
             "remove the nondeterministic read, or drop the `build` placement",
+        )),
+        // ADR-0304: a value that compares the clock is read again when the
+        // instant it compared passes, and a file generated once is not.
+        "build" if effect.starts_with("clock.compare") => Some((
+            "static generation is told nothing when the instant it compared passes",
+            "read the clock where the page is served, or drop the `build` placement",
         )),
         _ => None,
     }

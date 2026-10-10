@@ -1,8 +1,8 @@
 ADR-0280 - a handler navigates after its command commits
 
 produced by: just e14-navigate
-commit: 661c8a0b2294e82f23e01740a66e760d88114966
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37911914095 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 6964ee77b89b8ab24ab7fac6e5b651efa878aeb2
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37993980886 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -12,15 +12,18 @@ playwright: Version 1.58.0
 test a_navigation_outside_a_handler_is_refused ... ok
 test a_page_with_no_parameters_is_given_none ... ok
 test a_navigation_names_a_page ... ok
-test its_arguments_are_the_pages_parameters ... ok
 test the_module_goes_to_the_page_after_the_answer_and_only_on_ok ... ok
+test its_arguments_are_the_pages_parameters ... ok
 test it_is_written_last_in_the_ok_arm_of_a_commands_answer ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
 
 == the order placed and gone to, in three engines (e2e/navigate.spec.mjs)
 
+  1) [firefox] › e2e/navigate.spec.mjs:134:1 › a press made before the navigation is answered first, its answer first 
+    Error: page.waitForURL: Test timeout of 30000ms exceeded.
+  1 failed
   2 skipped
-  28 passed (1.5m)
+  27 passed (2.6m)
 
 == mutation controls (scripts/navigate_mutations.py)
 

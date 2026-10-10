@@ -1,7 +1,8 @@
 ADR-0167 - markup text is text, and a comment in markup is <!-- -->
 
 produced by: just e14-markup-comments
-commit: dd563910d0aad20f19e8108b017c1d1a7bb86d38
+commit: 31eeb3ca0a008e189ec581febf3ed7f3002361cd
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38013103417 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the parser (compiler/pw-syntax)
@@ -9,12 +10,12 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test grammar::tests::an_html_comment_in_markup_is_a_comment ... ok
 test grammar::tests::a_slash_slash_in_markup_text_is_text ... ok
 test grammar::tests::an_unquoted_attribute_value_is_read_as_html_reads_it ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 73 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 90 filtered out; finished in 0.00s
 
 == the checker and what a page sends (compiler/pw-core/tests/markup_comments.rs)
 
-test a_comment_is_not_sent_and_text_with_slashes_is ... ok
 test an_unquoted_attribute_value_is_sent_whole ... ok
+test a_comment_is_not_sent_and_text_with_slashes_is ... ok
 test a_line_that_reads_as_a_comment_is_refused ... ok
 test text_that_holds_slashes_and_a_comment_in_markup_are_the_controls ... ok
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
@@ -23,27 +24,28 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 test no_accepted_corpus_file_reports_a_body_level_error ... ok
 test every_rejected_fixture_emits_only_its_own_defect ... ok
-test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.23s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 48.54s
 
 == the store checks
 
-pw check: 50 file(s), no diagnostics
+pw check: 53 file(s), no diagnostics
 
 == mutation controls (scripts/markup_comments_mutations.py)
 
-baseline (syntax): 96 passed, 0 failed
+baseline (syntax): 115 passed, 0 failed
 baseline (core): 4 passed, 0 failed
-a `//` between elements is a comment again [syntax]: KILLED (1 of 76 tests fail)
-a `//` inside a run of text is a comment again [syntax]: KILLED (1 of 76 tests fail)
-markup text runs to the line's end [syntax]: KILLED (1 of 76 tests fail)
-an HTML comment is read as an element [syntax]: KILLED (1 of 76 tests fail)
-an HTML comment ends at its first `>` [syntax]: KILLED (1 of 76 tests fail)
-a comment that is not closed is quiet [syntax]: KILLED (1 of 76 tests fail)
+a `//` between elements is a comment again [syntax]: KILLED (1 of 93 tests fail)
+a `//` inside a run of text is a comment again [syntax]: KILLED (1 of 93 tests fail)
+markup text runs to the line's end [syntax]: KILLED (1 of 93 tests fail)
+an HTML comment is read as an element [syntax]: KILLED (1 of 93 tests fail)
+an HTML comment ends at its first `>` [syntax]: KILLED (1 of 93 tests fail)
+a comment that is not closed is quiet [syntax]: KILLED (1 of 93 tests fail)
 a comment in markup is sent as text [core]: KILLED (1 of 4 tests fail)
-an unquoted value ends at its first mark [syntax]: KILLED (1 of 76 tests fail)
-an unquoted value runs over `/>` [syntax]: KILLED (1 of 76 tests fail)
-an unquoted value that begins with `//` is a comment again [syntax]: KILLED (1 of 76 tests fail)
+an unquoted value ends at its first mark [syntax]: KILLED (1 of 93 tests fail)
+an unquoted value runs over `/>` [syntax]: KILLED (1 of 93 tests fail)
+an unquoted value that begins with `//` is a comment again [syntax]: KILLED (1 of 93 tests fail)
 a line that reads as a comment is let be [core]: KILLED (1 of 4 tests fail)
 a stylesheet's own comment is refused [core]: KILLED (1 of 4 tests fail)
 only `//` reads as a comment [core]: KILLED (1 of 4 tests fail)
 13 of 13 mutants killed
+memory bound: no process was stopped

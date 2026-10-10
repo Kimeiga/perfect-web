@@ -431,6 +431,27 @@ command choose_address(id: AddressId)
     Addresses.choose(current_user(), id)
 }
 
+// **What every page of the store is shown in** (ADR-0303): the way home,
+// and the reader's cart, its count told as the cart changes, whichever page
+// is open. Its own markup and bindings, the same on every page that names it;
+// read again with every document, so a page gone to after a change shows it.
+// The reader's user's (track `store-accounts`), as the pages' cart is: a
+// page declares at least its layout's audience (PW5046), and the store's
+// pages are `user` pages.
+user layout StoreLayout {
+    let cart = query Cart(current_user())
+
+    view {
+        <header>
+            <nav aria-label="Store">
+                <a href="/">Stores</a>
+                <a id="header-cart" href="/cart">Cart <span id="header-cart-count">{cart.line_count}</span></a>
+            </nav>
+        </header>
+        <slot />
+    }
+}
+
 // Private to the reader's user (ADR-0172; track `store-accounts`): its cart's
 // lines are the user's, and its handlers capture them, so a resume manifest
 // must say to whom what it carries is private. `cache private` alone names no
@@ -440,6 +461,7 @@ user page StorePage(id: StoreId) {
     // and an id that names no store is not found (ADR-0163).
     route        "/stores/{id}"
     not_found_on StoreError.NotFound
+    layout       StoreLayout
     placement    origin
     cache        private
 
@@ -610,6 +632,7 @@ user page StorePage(id: StoreId) {
 // store's route.
 user page CartPage() {
     route     "/cart"
+    layout    StoreLayout
     placement origin
     cache     private
 
@@ -703,6 +726,7 @@ user page CartPage() {
 // them. A store list is the first of a delivery site's pages.
 user page HomePage() {
     route     "/"
+    layout    StoreLayout
     placement origin
     cache     private
 
@@ -733,6 +757,7 @@ user page HomePage() {
 // page while it is open, and a screen reader says it.
 user page OrderPage() {
     route     "/order"
+    layout    StoreLayout
     placement origin
     cache     private
 
@@ -767,6 +792,7 @@ user page OrderPage() {
 // second load of the document.
 user page AddressPage(id: StoreId) {
     route     "/stores/{id}/address"
+    layout    StoreLayout
     placement origin
     cache     private
 

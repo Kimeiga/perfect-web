@@ -161,6 +161,13 @@ store.page.Store  abi 4aedcc2febb0861f
   host      store:data/stores#get  (database.read<Stores>)
   exports   query Store
 
+store.page.StoreLayout  abi b337b80a218b9741
+  runs at   browser, edge, origin
+  needs     session.read
+  component pw:app/store.page.Cart#Cart
+  host      pw:host/principal#read  (session.read)
+  exports   layout StoreLayout
+
 store.page.StoreList  abi 7fad5df1af8cdb8f
   runs at   origin
   needs     database.read<Stores>

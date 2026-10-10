@@ -1,53 +1,56 @@
 ADR-0199 - a function or a command named as a handler is the lambda that calls it
 
 produced by: just e14-named-handlers
-commit: afb63a39b2204ee231b9bb1fd3dc2e9ecc66246d
+commit: 328720e89d73f343c9e671077dfc0fd51e1fed46
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38006542533 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 
 == the rule (compiler/pw-core/tests/named_handlers.rs)
 
 test a_local_that_shadows_a_declaration_is_refused_as_a_local ... ok
-test a_named_handler_is_held_to_its_event_by_any_path ... ok
-test a_named_function_that_changes_nothing_is_refused_as_its_lambda_is ... ok
 test a_named_command_is_held_to_what_its_lambda_form_is ... ok
+test a_named_function_that_changes_nothing_is_refused_as_its_lambda_is ... ok
 test a_name_that_is_no_function_or_command_is_refused_when_checked ... ok
 test a_command_named_as_a_handler_is_compiled_as_the_lambda_that_calls_it ... ok
+test a_named_handler_is_held_to_its_event_by_any_path ... ok
 test a_named_handler_is_built_with_an_identity_and_a_module ... ok
 test a_named_handler_is_named_as_its_lambda_forms_call_is ... ok
 test a_named_handler_is_given_its_event ... ok
 test a_named_handlers_identity_is_what_its_name_resolves_to ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.84s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.79s
 
 == what it performs, and a local (handlers_in_the_browser.rs, every_handler_is_resumable.rs)
 
 test a_handler_performs_only_what_the_browser_may ... ok
 test a_function_named_as_a_handler_performs_only_what_the_browser_may ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s
 test a_handler_named_by_a_local_is_refused_when_checked ... ok
 test a_listed_capture_is_still_held_to_what_the_handler_reads ... ok
+test an_event_part_with_no_code_is_refused_at_build ... ok
 test a_handler_written_as_a_lambda_has_code ... ok
 test a_handler_captures_what_it_reads_of_the_page ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.92s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.21s
 
 == mutation controls (scripts/named_handlers_mutations.py)
 
-baseline: 16 passed, 0 failed
-a declaration's name is no handler: KILLED (8 of 16 tests fail)
-a local's value is a named handler: KILLED (2 of 16 tests fail)
-any declaration is a named handler: KILLED (1 of 16 tests fail)
-the backend does not compile a named handler: KILLED (6 of 16 tests fail)
-a named handler is not given its event: KILLED (1 of 16 tests fail)
-a named handler's answer is not the runtime's: KILLED (1 of 16 tests fail)
-a named handler's other parameters are not counted: KILLED (1 of 16 tests fail)
-a name that is no function or command is not refused: KILLED (4 of 16 tests fail)
-a named command is not sent: KILLED (1 of 16 tests fail)
-a local's name is sent as the command it shadows: KILLED (1 of 16 tests fail)
-a named function's effects are not held to the browser: KILLED (1 of 16 tests fail)
-a local's name is held to the browser as what it shadows: KILLED (1 of 16 tests fail)
-a named function is held to its row alone: KILLED (1 of 16 tests fail)
-a command named as the handler is held to the browser: KILLED (1 of 16 tests fail)
-a named handler's identity ignores what it names: KILLED (1 of 16 tests fail)
-a named handler has no artifact: KILLED (6 of 16 tests fail)
-a named handler is named by nothing: KILLED (3 of 16 tests fail)
+baseline: 17 passed, 0 failed
+a declaration's name is no handler: KILLED (8 of 17 tests fail)
+a local's value is a named handler: KILLED (2 of 17 tests fail)
+any declaration is a named handler: KILLED (1 of 17 tests fail)
+the backend does not compile a named handler: KILLED (6 of 17 tests fail)
+a named handler is not given its event: KILLED (1 of 17 tests fail)
+a named handler's answer is not the runtime's: KILLED (1 of 17 tests fail)
+a named handler's other parameters are not counted: KILLED (1 of 17 tests fail)
+a name that is no function or command is not refused: KILLED (4 of 17 tests fail)
+a named command is not sent: KILLED (1 of 17 tests fail)
+a local's name is sent as the command it shadows: KILLED (1 of 17 tests fail)
+a named function's effects are not held to the browser: KILLED (1 of 17 tests fail)
+a local's name is held to the browser as what it shadows: KILLED (1 of 17 tests fail)
+a named function is held to its row alone: KILLED (1 of 17 tests fail)
+a command named as the handler is held to the browser: KILLED (1 of 17 tests fail)
+a named handler's identity ignores what it names: KILLED (1 of 17 tests fail)
+a named handler has no artifact: KILLED (6 of 17 tests fail)
+a named handler is named by nothing: KILLED (3 of 17 tests fail)
 17 of 17 mutants killed
+memory bound: no process was stopped

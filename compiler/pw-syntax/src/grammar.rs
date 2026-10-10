@@ -57,6 +57,10 @@ pub const DECL_STARTERS: &[&str] = &[
     "view",
     "component",
     "page",
+    // A page's layout: the markup and the bindings the pages that name it
+    // share, the page shown in its `<slot />`. A declaration only where a
+    // name follows: `layout.measure` is an effect's path.
+    "layout",
     "query",
     "command",
     "subscription",
@@ -67,6 +71,9 @@ pub const DECL_STARTERS: &[&str] = &[
     "source",
     // Track `uploads` (ADR-0260): a file a form posts, and its limits.
     "upload",
+    // ADR-0302: a predicate a command `requires`, and the words a refusal
+    // by it is told in.
+    "predicate",
     "effect",
     "prelude",
     "replicated",
@@ -91,7 +98,7 @@ pub const VOID_ELEMENTS: &[&str] = &[
     "track", "wbr",
 ];
 
-pub const UI_NOUNS: &[&str] = &["view", "component", "page"];
+pub const UI_NOUNS: &[&str] = &["view", "component", "page", "layout"];
 
 /// Statement keywords that may appear inside a body and take a
 /// `kw [name] [(args)] [-> Type] [{ block }]` shape.
@@ -141,6 +148,8 @@ pub const RESOURCE_NOUNS: &[&str] = &[
     // Track `uploads` (ADR-0260): `upload PostImage  route "/uploads/post-image"
     // serves "/images"  max_bytes 5_000_000  types png, jpeg`.
     "upload",
+    // ADR-0302: `predicate OwnsPost(post: PostId)  says "…"`.
+    "predicate",
     "replicated",
     "paint",
 ];
@@ -261,6 +270,8 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     "types",
     "max_width",
     "max_height",
+    // ADR-0302: the words a refusal by a predicate is told in.
+    "says",
     "fallback",
     "retry",
     "concurrency",
@@ -283,6 +294,10 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     // ADR-0295: the declared error that means a page's address is another
     // address of the page, answered 308 or 307 there.
     "redirect_on",
+    // The layout a page is shown in: `layout StoreLayout`. A clause only
+    // where a name follows on its line (`at_policy_head`): `layout.measure`
+    // is an effect's path, and a body may begin with one.
+    "layout",
     "privacy",
     "storage",
     "offline",
@@ -1348,6 +1363,30 @@ impl<'a> P<'a> {
         }
     }
 
+    /// **Does the markup go on, on this line, after a root?** A view's
+    /// roots are statements, one a line (ADR-0243), and two written on one
+    /// line, `<h1>a</h1><p>b</p>`, as HTML writes them, were a root and then
+    /// a comparison with the second: PW0009 at its `/` or `>`. What follows a
+    /// finished element on its line is markup if it begins as markup does,
+    /// an element, a comment or a block, since markup is never compared. The
+    /// space between them is kept as text, as it is between two elements
+    /// inside one (`<span>a</span> <span>b</span>`).
+    fn sibling_on_line(&mut self) -> bool {
+        let next = (self.at(Kind::LAngle)
+            && (self.nth_is(1, Kind::Ident)
+                || self.src[self.cur_span().start..].starts_with("<!--")))
+            || (self.at(Kind::LBrace) && self.nth_is(1, Kind::Hash));
+        if !next || self.newline_ahead() {
+            return false;
+        }
+        if self.trivia_pending() {
+            self.start_keeping_trivia(K::Text);
+            self.eat_trivia();
+            self.finish();
+        }
+        true
+    }
+
     /// A template region: `<main>...</main>`, `{#each ..}`, `{/each}`.
     ///
     /// Charter §14 M2 task 9 asks for "only enough template parsing to
@@ -1424,6 +1463,9 @@ impl<'a> P<'a> {
                         self.finish(); // Element
                     }
                     if depth <= 0 {
+                        if self.sibling_on_line() {
+                            continue;
+                        }
                         break;
                     }
                 }
@@ -1438,6 +1480,9 @@ impl<'a> P<'a> {
                         open.push(Open::Element);
                     }
                     if depth <= 0 {
+                        if self.sibling_on_line() {
+                            continue;
+                        }
                         break;
                     }
                 }
@@ -1450,6 +1495,9 @@ impl<'a> P<'a> {
                         self.finish(); // MarkupBlock
                     }
                     if depth <= 0 {
+                        if self.sibling_on_line() {
+                            continue;
+                        }
                         break;
                     }
                 }
@@ -2408,15 +2456,24 @@ impl<'a> P<'a> {
     ///
     /// The `( .. ) {` form is unambiguous in either position, because a
     /// declaration's body never follows a parameter list at a policy head.
+    /// **A head the parser knows, here.** `layout` is one only where a name
+    /// follows it on its line, `layout StoreLayout`: the word is also an
+    /// effect family's, and `layout.measure` written first in a body is not
+    /// a clause.
+    fn at_policy_head(&self) -> bool {
+        self.at(Kind::Ident)
+            && POLICY_KEYWORDS.contains(&self.cur_text())
+            && (self.cur_text() != "layout"
+                || (self.nth_is(1, Kind::Ident) && !self.nth_starts_line(1)))
+    }
+
     fn policies(&mut self, in_block: bool) {
-        let known = self.at(Kind::Ident) && POLICY_KEYWORDS.contains(&self.cur_text());
+        let known = self.at_policy_head();
         if !known && !self.at_unknown_policy() {
             return;
         }
         self.start(K::PolicyList);
-        while (self.at(Kind::Ident) && POLICY_KEYWORDS.contains(&self.cur_text()))
-            || self.at_unknown_policy()
-        {
+        while self.at_policy_head() || self.at_unknown_policy() {
             // Recorded as what it is. `Policy` for a head the parser knows,
             // `UnknownPolicy` for one it does not — never nothing.
             let unknown = !POLICY_KEYWORDS.contains(&self.cur_text());
@@ -2823,7 +2880,13 @@ impl<'a> P<'a> {
         let after_vis = if vis { self.nth(1) } else { self.nth(0) };
         let after_vis_text = &self.src[after_vis.span.clone()];
 
-        if after_vis.kind == Kind::Ident && UI_NOUNS.contains(&after_vis_text) {
+        // `layout` is a declaration only where a name follows it: the word is
+        // also an effect family's (`layout.measure`).
+        let named = self.nth(if vis { 2 } else { 1 }).kind == Kind::Ident;
+        if after_vis.kind == Kind::Ident
+            && UI_NOUNS.contains(&after_vis_text)
+            && (after_vis_text != "layout" || named)
+        {
             self.start(K::UiDecl);
             if vis {
                 self.bump();
@@ -3666,6 +3729,58 @@ mod tests {
         // Positive control: on the SAME line `<` is still a comparison.
         let cmp = parse_ok("fn f() { a < b }");
         assert_eq!(first_text(&cmp, K::BinaryExpr).unwrap().trim(), "a < b");
+    }
+
+    #[test]
+    fn markup_written_on_one_line_after_a_root_is_one_region() {
+        // Two roots on one line, as HTML writes them: until 2026-10-09 the
+        // second `<` was a comparison with the first, PW0009 at its `/`.
+        for line in [
+            "<h1>a</h1><p>b</p>",
+            "<h1>a</h1><hr />",
+            "<hr /><hr />",
+            "<p>a</p><!-- note --><p>b</p>",
+            "<p>a</p>{#if x}<b>y</b>{/if}",
+            "{#if x}<b>y</b>{/if}<p>a</p>",
+        ] {
+            let src = format!("view V() !{{}} {{\n    {line}\n}}\n");
+            let p = parse_ok(&src);
+            assert_lossless(&src, &p);
+            assert_eq!(texts(&p, K::TemplateRegion), [line], "{line}");
+            let found = p
+                .green
+                .descendants()
+                .filter(|n| n.kind() == K::Element)
+                .count();
+            assert_eq!(found, 2, "{line}: each element its own");
+            assert!(
+                !kinds(&p.green).contains(&K::BinaryExpr),
+                "{line}: no comparison"
+            );
+        }
+        // The space between two on one line is text, as inside an element.
+        let src = "view V() !{} {\n    <span>a</span> <span>b</span>\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let region = p
+            .green
+            .descendants()
+            .find(|n| n.kind() == K::TemplateRegion)
+            .expect("a region");
+        let spaces: Vec<String> = region
+            .children()
+            .filter(|n| n.kind() == K::Text)
+            .map(|n| n.text().to_string())
+            .collect();
+        assert_eq!(spaces, [" "], "the space between the two roots");
+        // Controls: on the next line, a second region, as before; and what
+        // follows markup on its line and is no markup is left to the
+        // expression it is, an operator here, as before.
+        let two = parse_ok("view V() !{} {\n    <h1>a</h1>\n    <p>b</p>\n}\n");
+        assert_eq!(texts(&two, K::TemplateRegion), ["<h1>a</h1>", "<p>b</p>"]);
+        let sum = parse_ok("view V() !{} {\n    <p>a</p> + 1\n}\n");
+        assert_eq!(texts(&sum, K::TemplateRegion), ["<p>a</p>"]);
+        assert!(kinds(&sum.green).contains(&K::BinaryExpr));
     }
 
     #[test]

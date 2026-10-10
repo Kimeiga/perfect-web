@@ -3481,7 +3481,7 @@ impl<'a> Typer<'a> {
     fn is_ui(&self) -> bool {
         matches!(
             self.decl.kind,
-            DeclKind::View | DeclKind::Component | DeclKind::Page
+            DeclKind::View | DeclKind::Component | DeclKind::Page | DeclKind::Layout
         )
     }
 

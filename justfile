@@ -2368,6 +2368,29 @@ e14-invariants:
      } > docs/evidence/E14/invariants.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/invariants.txt
 
+# ADR-0304: what a page shows by the clock is told when the clock passes it.
+# The zones, the checker's cases, the host's clock and timers, and the
+# mutation controls.
+e14-clock:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0304 - what a page shows by the clock is told when the clock passes it"; echo; \
+       echo "produced by: just e14-clock"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "tz database: $(cat /usr/share/zoneinfo/+VERSION 2>/dev/null || sed -n 's/^# version //p' /usr/share/zoneinfo/tzdata.zi 2>/dev/null || echo unknown)"; echo; \
+       echo "== time zones, read from the host's own database (runtime/pw-time)"; echo; \
+       cargo test --locked -p pw-time 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== where a clock compared may be kept (compiler/pw-core: effects, tests/clock_compared.rs)"; echo; \
+       cargo test --locked -p pw-core --lib effects 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-core --test clock_compared 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host's clock, what a value holds until, and a page told then (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server -- clock:: a_page_is_told_when a_kept_value_past a_page_that_compares_no the_hosts_clock 2>&1 \
+         | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/clock_mutations.py)"; echo; \
+       python3 scripts/clock_mutations.py; \
+     } > docs/evidence/E14/clock.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/clock.txt
+
 # ADR-0180: a delivery estimate is a range, and says when it was made. The
 # server's tests, the page in three engines, and the mutation controls.
 e14-estimate-range:
@@ -5194,6 +5217,37 @@ e14-keepalive:
      } > docs/evidence/E14/keepalive.txt
     @grep -E "passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/keepalive.txt
 
+# ADR-0302: a refusal is told where the press was. The checker's tests, the
+# host's, the browser's in three engines, and the mutation controls.
+e14-refusal:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @BUILD_ONLY=1 bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0302 - a refusal is told where the press was"; echo; \
+       echo "produced by: just e14-refusal"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== a predicate says what a refusal by it is told (compiler/pw-core, PW0351)"; echo; \
+       cargo test --locked -p pw-core --test predicates 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the build's page holds the announcer (runtime/pw-render, tests/titles.rs)"; echo; \
+       cargo test --locked -p pw-render --test titles 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host answers a refusal with its words, kept with its press; a page holds its announcer"; echo; \
+       cargo test --locked -p pw-dev-server -- sign_in:: a_signal_page_holds_its_announcer 2>&1 \
+         | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== told where the press was, in three engines (e2e/identity.spec.mjs; recovery, lazy-handler, accessibility)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/identity.spec.mjs --reporter=line 2>&1; \
+          pnpm exec playwright test e2e/recovery.spec.mjs -g "still stale" --reporter=line 2>&1; \
+          pnpm exec playwright test e2e/lazy-handler.spec.mjs -g "fails to load" --reporter=line 2>&1; \
+          pnpm exec playwright test e2e/accessibility.spec.mjs -g "announcer|same node from the start" --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/refusal_mutations.py)"; echo; \
+       python3 scripts/refusal_mutations.py; \
+     } > docs/evidence/E14/refusal.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/refusal.txt
+
 # ADR-0269: a resource is held by what takes it apart. The checker's tests,
 # and the mutation controls.
 e14-matched-resources:
@@ -5525,3 +5579,28 @@ e14-build-id:
        python3 scripts/build_id_mutations.py; \
      } > docs/evidence/E14/build-id.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/build-id.txt
+
+# ADR-0303: a page is shown in its layout, which the pages that name it
+# share. The compiler's tests, the host's, the store's pages in three
+# engines, and the mutation controls.
+e14-layouts:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0303 - a page is shown in its layout"; echo; \
+       echo "produced by: just e14-layouts"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the layout, composed into each page (compiler/pw-core/tests/layouts.rs)"; echo; \
+       cargo test --locked -p pw-core --test layouts 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the store's pages, served in their layout"; echo; \
+       cargo test --locked -p pw-dev-server -- a_store_page_is_shown_in_its_layout_and_its_count_is_told 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the store's pages in three engines (e2e/layouts.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/layouts.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/layouts_mutations.py)"; echo; \
+       python3 scripts/layouts_mutations.py; \
+     } > docs/evidence/E14/layouts.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/layouts.txt

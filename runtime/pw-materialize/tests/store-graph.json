@@ -490,6 +490,14 @@
     },
     {
       "from": "store.page.AddressPage",
+      "to": "store.page.Cart",
+      "kind": "reads",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.AddressPage",
       "to": "store.page.Places",
       "kind": "reads",
       "key": []
@@ -604,6 +612,14 @@
       "kind": "invalidated_by",
       "key": [
         "reader"
+      ]
+    },
+    {
+      "from": "store.page.OrderPage",
+      "to": "store.page.Cart",
+      "kind": "reads",
+      "key": [
+        "current_user()"
       ]
     },
     {

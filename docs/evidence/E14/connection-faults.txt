@@ -1,8 +1,8 @@
 ADR-0175 - a network error and a forced reconnect, made by the server
 
 produced by: just e14-connection-faults
-commit: 0efa5cad088d29a44297f6c100228b6726551de1
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 6964ee77b89b8ab24ab7fac6e5b651efa878aeb2
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37993980886 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -11,7 +11,7 @@ playwright: Version 1.58.0
 
 test tests::a_dropped_command_connection_is_answered_by_nothing ... ok
 test tests::a_forced_reconnect_ends_a_subscription_and_refuses_new_ones_for_its_window ... ok
-test result: ok. 333 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 501.77s
+test result: ok. 363 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 501.82s
 
 == the page, in three engines (e2e/connections.spec.mjs)
 
@@ -19,17 +19,17 @@ test result: ok. 333 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; fi
 
 == mutation controls (scripts/connection_faults_mutations.py)
 
-baseline (server): 333 passed, 0 failed
+baseline (server): 363 passed, 0 failed
 baseline (browser): 3 passed, 0 failed
-the drop is not taken [server]: KILLED (1 of 333 tests fail)
-`before` runs the command [server]: KILLED (1 of 333 tests fail)
-`after` sends the answer [server]: KILLED (1 of 333 tests fail)
-an open stream is not ended [server]: KILLED (1 of 333 tests fail)
-an open long poll is not ended [server]: KILLED (1 of 333 tests fail)
-a new subscription is not refused [server]: KILLED (1 of 333 tests fail)
-the window refuses nothing [server]: KILLED (1 of 333 tests fail)
-a cut ends what opened after it [server]: KILLED (1 of 333 tests fail)
+the drop is not taken [server]: KILLED (1 of 363 tests fail)
+`before` runs the command [server]: KILLED (1 of 363 tests fail)
+`after` sends the answer [server]: KILLED (1 of 363 tests fail)
+an open stream is not ended [server]: KILLED (1 of 363 tests fail)
+an open long poll is not ended [server]: KILLED (1 of 363 tests fail)
+a new subscription is not refused [server]: KILLED (1 of 363 tests fail)
+the window refuses nothing [server]: KILLED (1 of 363 tests fail)
+a cut ends what opened after it [server]: KILLED (1 of 363 tests fail)
 `/bench/drop` arms nothing [browser]: KILLED (2 of 3 tests fail)
-`/bench/reconnect` cuts nothing [server]: KILLED (1 of 333 tests fail)
+`/bench/reconnect` cuts nothing [server]: KILLED (1 of 363 tests fail)
 10 of 10 mutants killed
 memory bound: no process was stopped

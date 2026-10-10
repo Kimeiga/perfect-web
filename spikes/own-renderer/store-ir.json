@@ -5,17 +5,30 @@
     "params": [
       "id"
     ],
-    "schema": "a337b89d8d4521fd",
+    "schema": "d6cc737ea73172cb",
     "chunks": [
       {
         "chunk": "static",
-        "value": "<main>\n            <h1>Delivery address</h1>\n            <label>Call it <input data-pw=\"0\" id=\"label\" type=\"text\" "
+        "value": "<header>\n            <nav aria-label=\"Store\">\n                <a href=\"/\">Stores</a>\n                <a id=\"header-cart\" href=\"/cart\">Cart <span id=\"header-cart-count\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 0,
+          "value": "cart~StoreLayout.line_count",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</span></a>\n            </nav>\n        </header><!--pw-slot--><main>\n            <h1>Delivery address</h1>\n            <label>Call it <input data-pw=\"0\" id=\"label\" type=\"text\" "
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "attribute",
-          "id": 0,
+          "id": 1,
           "owner": 0,
           "name": "value",
           "value": "label",
@@ -26,7 +39,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "event",
-          "id": 1,
+          "id": 2,
           "owner": 0,
           "event": "input",
           "handler": "8ef712ee855dff03",
@@ -41,7 +54,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 2,
+          "id": 3,
           "value": "said",
           "context": "text"
         }
@@ -54,7 +67,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "each",
-          "id": 3,
+          "id": 4,
           "collection": "saved",
           "binding": "a",
           "key": "id",
@@ -67,7 +80,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 4,
+                "id": 5,
                 "value": "a.label",
                 "context": "text"
               }
@@ -80,7 +93,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 5,
+                "id": 6,
                 "value": "a.place",
                 "context": "text"
               }
@@ -93,7 +106,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "conditional",
-                "id": 6,
+                "id": 7,
                 "value": "a.chosen",
                 "then": [
                   {
@@ -112,7 +125,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 7,
+                "id": 8,
                 "owner": 1,
                 "name": "aria-label",
                 "segments": [
@@ -132,7 +145,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 8,
+                "id": 9,
                 "owner": 1,
                 "event": "press",
                 "handler": "8d96aa03266aae5b",
@@ -151,7 +164,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 9,
+                "id": 10,
                 "owner": 2,
                 "name": "aria-label",
                 "segments": [
@@ -171,7 +184,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 10,
+                "id": 11,
                 "owner": 2,
                 "event": "press",
                 "handler": "26058453d2c7def8",
@@ -189,7 +202,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 11,
+                "id": 12,
                 "owner": 3,
                 "name": "aria-label",
                 "segments": [
@@ -209,7 +222,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 12,
+                "id": 13,
                 "owner": 3,
                 "event": "press",
                 "handler": "2a2607ad200b08c0",
@@ -234,7 +247,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "each",
-          "id": 13,
+          "id": 14,
           "collection": "places",
           "binding": "p",
           "key": "id",
@@ -247,7 +260,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 14,
+                "id": 15,
                 "value": "p.name",
                 "context": "text"
               }
@@ -260,7 +273,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 15,
+                "id": 16,
                 "owner": 4,
                 "name": "aria-label",
                 "segments": [
@@ -280,7 +293,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 16,
+                "id": 17,
                 "owner": 4,
                 "event": "press",
                 "handler": "9b11646e3891a94e",
@@ -300,13 +313,13 @@
       },
       {
         "chunk": "static",
-        "value": "\n            </ul>\n        </main>"
+        "value": "\n            </ul>\n        </main><!--/pw-slot-->"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 17,
+          "id": 18,
           "pieces": [
             {
               "piece": "text",
@@ -321,17 +334,30 @@
     "path": "store.page.CartPage",
     "name": "CartPage",
     "params": [],
-    "schema": "675e6011599b0dac",
+    "schema": "0653b48a6aee2b1e",
     "chunks": [
       {
         "chunk": "static",
-        "value": "<main>\n            <h1 id=\"cart-heading\" tabindex=\"-1\">Your cart</h1>\n            <p aria-live=\"polite\" aria-atomic=\"true\">Items in cart: <span id=\"cart-count\">"
+        "value": "<header>\n            <nav aria-label=\"Store\">\n                <a href=\"/\">Stores</a>\n                <a id=\"header-cart\" href=\"/cart\">Cart <span id=\"header-cart-count\">"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "text",
           "id": 0,
+          "value": "cart~StoreLayout.line_count",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</span></a>\n            </nav>\n        </header><!--pw-slot--><main>\n            <h1 id=\"cart-heading\" tabindex=\"-1\">Your cart</h1>\n            <p aria-live=\"polite\" aria-atomic=\"true\">Items in cart: <span id=\"cart-count\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 1,
           "value": "cart.line_count",
           "context": "text"
         }
@@ -344,7 +370,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "boolean_attribute",
-          "id": 1,
+          "id": 2,
           "owner": 0,
           "name": "hidden",
           "value": "cart.lines"
@@ -358,7 +384,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "each",
-          "id": 2,
+          "id": 3,
           "collection": "cart.lines",
           "binding": "line",
           "key": "item_id",
@@ -371,7 +397,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 3,
+                "id": 4,
                 "value": "line.name",
                 "context": "text"
               }
@@ -384,7 +410,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 4,
+                "id": 5,
                 "owner": 1,
                 "name": "aria-label",
                 "segments": [
@@ -404,7 +430,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 5,
+                "id": 6,
                 "owner": 1,
                 "event": "press",
                 "handler": "15483a28f370066a",
@@ -422,7 +448,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 6,
+                "id": 7,
                 "value": "line.quantity.count",
                 "context": "text"
               }
@@ -435,7 +461,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 7,
+                "id": 8,
                 "owner": 2,
                 "name": "aria-label",
                 "segments": [
@@ -455,7 +481,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 8,
+                "id": 9,
                 "owner": 2,
                 "event": "press",
                 "handler": "e54d74c7f76a6a78",
@@ -473,7 +499,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 9,
+                "id": 10,
                 "value": "line.total.display",
                 "context": "text"
               }
@@ -486,7 +512,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 10,
+                "id": 11,
                 "owner": 3,
                 "name": "aria-label",
                 "segments": [
@@ -506,7 +532,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 11,
+                "id": 12,
                 "owner": 3,
                 "event": "press",
                 "handler": "0884d13a19812a03",
@@ -531,7 +557,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 12,
+          "id": 13,
           "value": "cart.subtotal.display",
           "context": "text"
         }
@@ -544,7 +570,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "conditional",
-          "id": 13,
+          "id": 14,
           "value": "cart.lines",
           "then": [
             {
@@ -563,7 +589,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 14,
+          "id": 15,
           "value": "notice",
           "context": "text"
         }
@@ -576,7 +602,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "event",
-          "id": 15,
+          "id": 16,
           "owner": 4,
           "event": "press",
           "handler": "b5c3e56ff370a6a8",
@@ -591,7 +617,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "event",
-          "id": 16,
+          "id": 17,
           "owner": 5,
           "event": "press",
           "handler": "1fcfca1cde1b9a61",
@@ -606,7 +632,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "match",
-          "id": 17,
+          "id": 18,
           "value": "order",
           "arms": [
             {
@@ -633,13 +659,13 @@
       },
       {
         "chunk": "static",
-        "value": "\n        </main>"
+        "value": "\n        </main><!--/pw-slot-->"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 18,
+          "id": 19,
           "pieces": [
             {
               "piece": "text",
@@ -654,17 +680,30 @@
     "path": "store.page.HomePage",
     "name": "HomePage",
     "params": [],
-    "schema": "67d9fb5284999a50",
+    "schema": "5f1e40c768c5289c",
     "chunks": [
       {
         "chunk": "static",
-        "value": "<main>\n            <h1>Stores</h1>\n            <ul id=\"stores\">\n                "
+        "value": "<header>\n            <nav aria-label=\"Store\">\n                <a href=\"/\">Stores</a>\n                <a id=\"header-cart\" href=\"/cart\">Cart <span id=\"header-cart-count\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 0,
+          "value": "cart~StoreLayout.line_count",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</span></a>\n            </nav>\n        </header><!--pw-slot--><main>\n            <h1>Stores</h1>\n            <ul id=\"stores\">\n                "
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "each",
-          "id": 0,
+          "id": 1,
           "collection": "stores",
           "binding": "store",
           "key": "id",
@@ -677,7 +716,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 1,
+                "id": 2,
                 "owner": 0,
                 "name": "href",
                 "segments": [
@@ -701,7 +740,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 2,
+                "id": 3,
                 "value": "store.name",
                 "context": "text"
               }
@@ -714,7 +753,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 3,
+                "id": 4,
                 "value": "store.description",
                 "context": "text"
               }
@@ -734,20 +773,20 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 4,
+          "id": 5,
           "value": "cart.line_count",
           "context": "text"
         }
       },
       {
         "chunk": "static",
-        "value": "</span> items\n            </p>\n        </main>"
+        "value": "</span> items\n            </p>\n        </main><!--/pw-slot-->"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 5,
+          "id": 6,
           "pieces": [
             {
               "piece": "text",
@@ -760,7 +799,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "meta",
-          "id": 6,
+          "id": 7,
           "attribute": "name",
           "key": "description",
           "content": [
@@ -777,17 +816,30 @@
     "path": "store.page.OrderPage",
     "name": "OrderPage",
     "params": [],
-    "schema": "61ec162c990472ca",
+    "schema": "4861a03f1c971894",
     "chunks": [
       {
         "chunk": "static",
-        "value": "<main>\n            <h1>Your order</h1>\n            <section aria-label=\"Status\" aria-live=\"polite\" aria-atomic=\"true\">\n                "
+        "value": "<header>\n            <nav aria-label=\"Store\">\n                <a href=\"/\">Stores</a>\n                <a id=\"header-cart\" href=\"/cart\">Cart <span id=\"header-cart-count\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 0,
+          "value": "cart~StoreLayout.line_count",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</span></a>\n            </nav>\n        </header><!--pw-slot--><main>\n            <h1>Your order</h1>\n            <section aria-label=\"Status\" aria-live=\"polite\" aria-atomic=\"true\">\n                "
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "match",
-          "id": 0,
+          "id": 1,
           "value": "order",
           "arms": [
             {
@@ -802,7 +854,7 @@
                   "chunk": "dynamic",
                   "value": {
                     "part": "match",
-                    "id": 1,
+                    "id": 2,
                     "value": "status",
                     "arms": [
                       {
@@ -864,13 +916,13 @@
       },
       {
         "chunk": "static",
-        "value": "\n            </section>\n            <p><a href=\"/\">Order from a store</a></p>\n        </main>"
+        "value": "\n            </section>\n            <p><a href=\"/\">Order from a store</a></p>\n        </main><!--/pw-slot-->"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 2,
+          "id": 3,
           "pieces": [
             {
               "piece": "text",
@@ -887,17 +939,30 @@
     "params": [
       "id"
     ],
-    "schema": "681f0e5867cbcebf",
+    "schema": "58e4188af13fff33",
     "chunks": [
       {
         "chunk": "static",
-        "value": "<main>\n            <h1 id=\"store-name\">"
+        "value": "<header>\n            <nav aria-label=\"Store\">\n                <a href=\"/\">Stores</a>\n                <a id=\"header-cart\" href=\"/cart\">Cart <span id=\"header-cart-count\">"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "text",
           "id": 0,
+          "value": "cart~StoreLayout.line_count",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</span></a>\n            </nav>\n        </header><!--pw-slot--><main>\n            <h1 id=\"store-name\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 1,
           "value": "store.name",
           "context": "text"
         }
@@ -910,7 +975,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 1,
+          "id": 2,
           "value": "store.description",
           "context": "text"
         }
@@ -923,7 +988,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 2,
+          "id": 3,
           "value": "summary",
           "context": "text"
         }
@@ -936,7 +1001,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "conditional",
-          "id": 3,
+          "id": 4,
           "value": "reach.chosen",
           "then": [
             {
@@ -947,7 +1012,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 4,
+                "id": 5,
                 "value": "reach.to",
                 "context": "text"
               }
@@ -969,7 +1034,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "interpolated_attribute",
-          "id": 5,
+          "id": 6,
           "owner": 0,
           "name": "href",
           "segments": [
@@ -997,7 +1062,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "conditional",
-          "id": 6,
+          "id": 7,
           "value": "reach.delivers",
           "then": [],
           "otherwise": [
@@ -1009,7 +1074,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 7,
+                "id": 8,
                 "value": "store.name",
                 "context": "text"
               }
@@ -1022,7 +1087,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 8,
+                "id": 9,
                 "value": "reach.to",
                 "context": "text"
               }
@@ -1042,7 +1107,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "stream",
-          "id": 9,
+          "id": 10,
           "query": "store.page.Estimate",
           "args": [
             "id",
@@ -1066,7 +1131,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "text",
-                  "id": 10,
+                  "id": 11,
                   "value": "estimate.min_minutes",
                   "context": "text"
                 }
@@ -1079,7 +1144,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "text",
-                  "id": 11,
+                  "id": 12,
                   "value": "estimate.max_minutes",
                   "context": "text"
                 }
@@ -1108,7 +1173,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "each",
-          "id": 12,
+          "id": 13,
           "collection": "menu",
           "binding": "section",
           "key": "category.id",
@@ -1121,7 +1186,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 13,
+                "id": 14,
                 "value": "section.category.name",
                 "context": "text"
               }
@@ -1134,7 +1199,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "each",
-                "id": 14,
+                "id": 15,
                 "collection": "section.items",
                 "binding": "item",
                 "key": "id",
@@ -1147,7 +1212,7 @@
                     "chunk": "dynamic",
                     "value": {
                       "part": "text",
-                      "id": 15,
+                      "id": 16,
                       "value": "item.name",
                       "context": "text"
                     }
@@ -1160,7 +1225,7 @@
                     "chunk": "dynamic",
                     "value": {
                       "part": "text",
-                      "id": 16,
+                      "id": 17,
                       "value": "item.description",
                       "context": "text"
                     }
@@ -1173,7 +1238,7 @@
                     "chunk": "dynamic",
                     "value": {
                       "part": "text",
-                      "id": 17,
+                      "id": 18,
                       "value": "item.price.display",
                       "context": "text"
                     }
@@ -1186,7 +1251,7 @@
                     "chunk": "dynamic",
                     "value": {
                       "part": "conditional",
-                      "id": 18,
+                      "id": 19,
                       "value": "item.available",
                       "then": [
                         {
@@ -1197,7 +1262,7 @@
                           "chunk": "dynamic",
                           "value": {
                             "part": "interpolated_attribute",
-                            "id": 19,
+                            "id": 20,
                             "owner": 1,
                             "name": "aria-label",
                             "segments": [
@@ -1217,7 +1282,7 @@
                           "chunk": "dynamic",
                           "value": {
                             "part": "event",
-                            "id": 20,
+                            "id": 21,
                             "owner": 1,
                             "event": "press",
                             "handler": "ce4501910ab2a49a",
@@ -1262,7 +1327,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 21,
+          "id": 22,
           "value": "cart.line_count",
           "context": "text"
         }
@@ -1275,7 +1340,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "boolean_attribute",
-          "id": 22,
+          "id": 23,
           "owner": 2,
           "name": "hidden",
           "value": "cart.lines"
@@ -1289,7 +1354,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "each",
-          "id": 23,
+          "id": 24,
           "collection": "cart.lines",
           "binding": "line",
           "key": "item_id",
@@ -1302,7 +1367,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 24,
+                "id": 25,
                 "value": "line.name",
                 "context": "text"
               }
@@ -1315,7 +1380,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 25,
+                "id": 26,
                 "owner": 3,
                 "name": "aria-label",
                 "segments": [
@@ -1335,7 +1400,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 26,
+                "id": 27,
                 "owner": 3,
                 "event": "press",
                 "handler": "15483a28f370066a",
@@ -1353,7 +1418,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 27,
+                "id": 28,
                 "value": "line.quantity.count",
                 "context": "text"
               }
@@ -1366,7 +1431,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 28,
+                "id": 29,
                 "owner": 4,
                 "name": "aria-label",
                 "segments": [
@@ -1386,7 +1451,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 29,
+                "id": 30,
                 "owner": 4,
                 "event": "press",
                 "handler": "e54d74c7f76a6a78",
@@ -1404,7 +1469,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 30,
+                "id": 31,
                 "value": "line.total.display",
                 "context": "text"
               }
@@ -1417,7 +1482,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 31,
+                "id": 32,
                 "owner": 5,
                 "name": "aria-label",
                 "segments": [
@@ -1437,7 +1502,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 32,
+                "id": 33,
                 "owner": 5,
                 "event": "press",
                 "handler": "0884d13a19812a03",
@@ -1462,7 +1527,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 33,
+          "id": 34,
           "value": "cart.subtotal.display",
           "context": "text"
         }
@@ -1475,7 +1540,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "conditional",
-          "id": 34,
+          "id": 35,
           "value": "cart.lines",
           "then": [
             {
@@ -1494,7 +1559,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 35,
+          "id": 36,
           "value": "notice",
           "context": "text"
         }
@@ -1507,7 +1572,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "event",
-          "id": 36,
+          "id": 37,
           "owner": 6,
           "event": "press",
           "handler": "b5c3e56ff370a6a8",
@@ -1522,7 +1587,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "stream",
-          "id": 37,
+          "id": 38,
           "query": "store.page.Recommendations",
           "args": [
             "id"
@@ -1545,7 +1610,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "each",
-                  "id": 38,
+                  "id": 39,
                   "collection": "items",
                   "binding": "item",
                   "key": "id",
@@ -1558,7 +1623,7 @@
                       "chunk": "dynamic",
                       "value": {
                         "part": "text",
-                        "id": 39,
+                        "id": 40,
                         "value": "item.name",
                         "context": "text"
                       }
@@ -1588,13 +1653,13 @@
       },
       {
         "chunk": "static",
-        "value": "\n            </section>\n        </main>"
+        "value": "\n            </section>\n        </main><!--/pw-slot-->"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 40,
+          "id": 41,
           "pieces": [
             {
               "piece": "value",
@@ -1607,7 +1672,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "meta",
-          "id": 41,
+          "id": 42,
           "attribute": "name",
           "key": "description",
           "content": [

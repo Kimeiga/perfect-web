@@ -89,6 +89,9 @@ pub enum Domain {
     Listener,
     /// A predicate over the caller: `requires SignedIn, OwnsOrder(order)`.
     PredicateRef,
+    /// **A layout a page is shown in**: `layout StoreLayout` (ADR-0303).
+    /// Resolved, and held to name one layout, by `layouts::check` (PW0352).
+    LayoutRef,
     /// **A case of a declared sum type**: `not_found_on StoreError.NotFound`
     /// (ADR-0163). Resolved, and held to the page's queries, by
     /// `routes::not_found_case`.
@@ -318,6 +321,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         // ADR-0040: the operation the compiler supplies, by its name.
         "intrinsic" => Domain::Str,
         "route" => Domain::RoutePattern,
+        "layout" => Domain::LayoutRef,
         "not_found_on" => Domain::CaseRef,
         // ADR-0295: `redirect_on KiokunError.Moved permanent`, a case and how
         // the move is answered, held by `routes::redirect_case`.
@@ -362,6 +366,9 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         // are served, its limits, and its kinds, a closed set each sniffed
         // from a file's bytes.
         "serves" => Domain::Str,
+        // A predicate's (ADR-0302): the words a refusal by it is told in, one
+        // string, held by `predicates::check`.
+        "says" => Domain::Str,
         "max_bytes" | "max_width" | "max_height" => Domain::Count,
         "types" => Domain::Words(UPLOAD_TYPES),
         "captures" => Domain::Word(&["serializable_only"]),
@@ -485,6 +492,7 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         K::View,
         K::Component,
         K::Page,
+        K::Layout,
         K::Query,
         K::Command,
         K::Subscription,
@@ -572,6 +580,9 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         "revision" => (&[K::Page], "a page"),
         // A page's address, or where a form posts an upload (track `uploads`).
         "route" => (&[K::Page, K::Upload], "a page or an upload"),
+        // The layout a page is shown in (ADR-0303): a page's, and not a
+        // layout's, which names none.
+        "layout" => (&[K::Page], "a page"),
         "privacy" => (&[K::Page, K::Other], "a page or a replicated value"),
         // An effect's.
         "capability" | "impact" => (&[K::Effect], "an effect"),
@@ -584,6 +595,7 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         "serves" | "max_bytes" | "types" | "max_width" | "max_height" => {
             (&[K::Upload], "an upload")
         }
+        "says" => (&[K::Predicate], "a predicate"),
         // A painter's, a replicated value's, a handler policy's: forms the
         // grammar keeps as `Other`.
         "draw" | "inputs" | "isolated" => (&[K::Other], "a painter"),
@@ -1069,6 +1081,7 @@ mod tests {
         "requires",
         "placement",
         "route",
+        "layout",
         "not_found_on",
         "redirect_on",
         "privacy",

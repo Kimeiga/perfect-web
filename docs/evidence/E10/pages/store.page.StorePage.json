@@ -6,6 +6,25 @@
   ],
   "bindings": [
     {
+      "binding": "cart~StoreLayout",
+      "resource": "store.page.Cart",
+      "args": [
+        "current_user()"
+      ],
+      "policy": {
+        "cache": "private",
+        "privacy": "private",
+        "freshness_ms": 0,
+        "timeout_ms": 2000,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0
+        ],
+        "on_key_change": "cancel"
+      }
+    },
+    {
       "binding": "store",
       "resource": "store.page.Store",
       "args": [
@@ -114,6 +133,16 @@
   "parts": [
     {
       "part": 0,
+      "path": "cart~StoreLayout.line_count",
+      "binding": "cart~StoreLayout",
+      "steps": [
+        {
+          "member": "UserCarts.line_count"
+        }
+      ]
+    },
+    {
+      "part": 1,
       "path": "store.name",
       "binding": "store",
       "steps": [
@@ -123,7 +152,7 @@
       ]
     },
     {
-      "part": 1,
+      "part": 2,
       "path": "store.description",
       "binding": "store",
       "steps": [
@@ -133,13 +162,13 @@
       ]
     },
     {
-      "part": 2,
+      "part": 3,
       "path": "summary",
       "binding": "summary",
       "steps": []
     },
     {
-      "part": 21,
+      "part": 22,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -149,7 +178,7 @@
       ]
     },
     {
-      "part": 33,
+      "part": 34,
       "path": "cart.subtotal.display",
       "binding": "cart",
       "steps": [
@@ -174,20 +203,20 @@
   ],
   "live": [
     {
-      "part": 35,
+      "part": 36,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
     }
   ],
   "blocks": [
-    3,
-    6,
-    34
+    4,
+    7,
+    35
   ],
   "streams": [
     {
-      "part": 9,
+      "part": 10,
       "resource": "store.page.Estimate",
       "args": [
         "id",
@@ -209,7 +238,7 @@
       "streamed": true
     },
     {
-      "part": 37,
+      "part": 38,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -271,8 +300,14 @@
     }
   ],
   "attributes": [
-    22
+    23
   ],
-  "title": 40,
-  "scope": "user:"
+  "title": 41,
+  "scope": "user:",
+  "layout": {
+    "path": "store.page.StoreLayout",
+    "schema": "d92ef64b146df5d6",
+    "parts": 1,
+    "elements": 0
+  }
 }

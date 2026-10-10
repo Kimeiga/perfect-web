@@ -39,9 +39,13 @@ MUTANTS = [
         "a materialization is no term",
         RESOLVE,
         "            | DeclKind::Materialize => Namespace::Term,\n"
-        "            DeclKind::View | DeclKind::Component | DeclKind::Page => Namespace::Ui,\n",
+        "            DeclKind::View | DeclKind::Component | DeclKind::Page | DeclKind::Layout => {\n",
         "            => Namespace::Term,\n"
-        "            DeclKind::View | DeclKind::Component | DeclKind::Page | DeclKind::Materialize => Namespace::Ui,\n",
+        "            DeclKind::View\n"
+        "            | DeclKind::Component\n"
+        "            | DeclKind::Page\n"
+        "            | DeclKind::Layout\n"
+        "            | DeclKind::Materialize => {\n",
     ),
     (
         "a `depends_on` beside a body is not refused",

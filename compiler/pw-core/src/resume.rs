@@ -488,7 +488,7 @@ pub fn page_scope(hir: &Hir, decl: &Decl) -> &'static str {
     }
 }
 
-fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::Label> {
+pub(crate) fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::Label> {
     // A declared principal. `session`, `user` and `organization` each name WHO
     // the scope belongs to, which is what a flow relation needs.
     let by_visibility = match decl.visibility.as_deref() {

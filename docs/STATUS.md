@@ -23,6 +23,63 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0304, 2026-10-10: what a page shows by the clock is told when the
+clock passes it** (the integrator's, the first of the store hours' steps;
+track `time`, merged from `4c079dc`). The clock was a stub answering 0. Now
+the wall clock is read only by comparing it (`clock.passed(at)`,
+`clock.today_in(zone)`, effect `clock.compare`): the host notes the earliest
+instant each read compared, keeps the value until then, and at that instant
+reads each live document that shows it again and tells it what changed, as
+Materialize's temporal filters do. Refused where nothing would tell (a page
+built once, a public materialization). Time zones come from the host's own
+tz database (`pw-time`: TZif, RFC 8536, a skipped or repeated local time
+read as RFC 5545 does). Found: a host function whose effect needs no
+authority was never linked. 9 pw-time tests (vectors from Python's
+zoneinfo, tz 2026c), 15 compiler tests, 10 host tests, 25 of 25 mutants
+(verify 38022822226).
+
+**ADR-0243 amended, 2026-10-10: markup written on one line is one region,
+and no operand** (found writing ADR-0303's refusals; track `siblings`,
+merged from `31eeb3c`). `<h1>a</h1><p>b</p>` at a view's top was PW0009 at
+the second element: the template region ended after its first root, and the
+next `<` was read as a comparison. Probing it, `<p>a</p> + 1` checked and
+rendered the paragraph, the sum dropped. Markup after a root on its line
+now goes on as one region, and an operator over markup is refused (PW5047).
+The checker's 5 tests, the parser's, the corpus's 18, 32 of 32 mutants
+(verify 38013103417).
+
+**ADR-0303, 2026-10-10: a page is shown in its layout** (the integrator's,
+the second of three steps to the parts two pages share kept in place; track
+`layouts`, merged from `328720e`). `layout Name { … <slot /> … }`, and a
+page's `layout Name`: composed into each page as a view is, its parts and
+elements numbered first so they are the same on every page that names it,
+the page's markup in its slot, its bindings and signals under names no
+source writes; a page declares at least its layout's audience (PW5046).
+Found: two sibling elements on one line at a view's top did not parse
+(track `siblings`); a page and its layout that bind one query read it
+twice for one document, now once; a speculation moved one binding per
+entry, now every binding that shows it, the layout's among them. The
+store's four pages share `StoreLayout`. 13 compiler tests, the host's, 12
+in three engines, 23 of 23 mutants (verify 38006542533, whose one Firefox
+failure, navigate.spec's "its answer first", is the command order's
+finding, on `track/command-order`).
+
+**ADR-0302, 2026-10-10: a refusal is told where the press was** (the
+owner's finding, using the feed by hand; track `refusals`, merged from
+`6964ee7`). Signed out, the owner typed into the feed's composer and pressed
+Post: the post showed, then went, with no word, the server's refusal (403)
+read by nothing. Now a predicate has words, the deployment's or the program's
+own (`predicate SignedIn says "…"`, PW0351); the host answers a refusal with
+them and keeps it with its press, so a resend is refused alike (found
+reading the path: a resend was answered 202, as a command that did not
+commit); and the runtime tells them beside the control and through the
+page's announcer, a `role="status"` in every document from its first byte,
+focus and what was typed kept. A press no answer came for, a stale page's
+and a failed handler's are told too, in the platform's words. The feed's
+composer is a signed-in reader's. 13 compiler tests, 22 host tests, 30 in
+three engines, 30 of 30 mutants killed (verify run 37993980886; its mutation
+script took 3.5 h of CI, narrowed next).
+
 **ADR-0301, 2026-10-10: kiokun's word page moves an equivalent simplified
 form** (track `kiokun`, W6, merged from `4cbe3aa`). Where a word's own file
 is a simplified form that equals its one traditional form in meaning, the
