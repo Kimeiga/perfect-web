@@ -736,7 +736,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
             module's function `estimate` (PW0401) though the page bound the
             name. Names a template binds (`<ready as>`, `<failed as>`,
             `{#each … as}`, a match arm's binders) shadow module members and
-            imports, as a `let` does: a test for each form.
+            imports, as a `let` does: a test for each form;
+          - **a full-text source a program declares** (the integrator's
+            ruling for W6, 2026-10-10): its index's columns, tokenizer and
+            ranking, designed from two real uses, kiokun's search (whose
+            two statements run in the kiokun layer over FTS5 meanwhile) and
+            the next, DoorDash's store search likely;
+          - **a route that answers data, not a document** (the same day):
+            kiokun's `/api/search` and the other endpoints ADR-0285's
+            inventory names; Pleris has pages and uploads, and no form for
+            a route whose answer is JSON.
 
           The infrastructure follow-ups, after these (the owner's order of
           2026-10-09):
