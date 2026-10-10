@@ -1,0 +1,5571 @@
+{
+ "kiokun_commit": "abf71a89af1111f4039578cd1fde58e06f14c4bf",
+ "node": "v22.21.1",
+ "oracle": {
+  "answered": 11,
+  "answers": {
+   "上": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "maa5 soeng6",
+       "d": "at once",
+       "reading": "mǎ​shàng",
+       "w": "马上"
+      },
+      {
+       "at": 1,
+       "ct": "maan5 soeng6",
+       "d": "evening",
+       "reading": "wǎn​shang",
+       "w": "晚上"
+      },
+      {
+       "at": 2,
+       "ct": "san1 soeng6",
+       "d": "on the body",
+       "reading": "shēn​shang",
+       "w": "身上"
+      },
+      {
+       "at": 3,
+       "ct": "hon3 soeng5 heoi3",
+       "d": "it would appear",
+       "reading": "kàn​shang​qu",
+       "w": "看上去"
+      },
+      {
+       "at": 4,
+       "ct": "si6 sat6 soeng6",
+       "d": "in fact",
+       "reading": "shì​shí​shàng",
+       "w": "事实上"
+      },
+      {
+       "at": 5,
+       "ct": "soeng6 min6",
+       "d": "on top of",
+       "reading": "shàng​miàn",
+       "w": "上面"
+      },
+      {
+       "at": 6,
+       "ct": "zou2 soeng6",
+       "d": "early morning",
+       "reading": "zǎo​shang",
+       "w": "早上"
+      },
+      {
+       "at": 7,
+       "ct": "sat6 zai3 soeng6",
+       "d": "in fact",
+       "reading": "shí​jì​shàng",
+       "w": "实际上"
+      },
+      {
+       "at": 8,
+       "ct": "lou6 soeng6",
+       "d": "on the road",
+       "reading": "lù​shang",
+       "w": "路上"
+      },
+      {
+       "at": 9,
+       "ct": "soeng5 baan1",
+       "d": "to go to work",
+       "reading": "shàng​bān",
+       "w": "上班"
+      },
+      {
+       "at": 10,
+       "ct": "soeng5 heoi3",
+       "d": "to go up",
+       "reading": "shàng​qù",
+       "w": "上去"
+      },
+      {
+       "at": 11,
+       "ct": "soeng6 ci3",
+       "d": "last time",
+       "reading": "shàng​cì",
+       "w": "上次"
+      },
+      {
+       "at": 12,
+       "ct": "oi3 soeng6",
+       "d": "to fall in love with",
+       "reading": "ài​shàng",
+       "w": "爱上"
+      },
+      {
+       "at": 13,
+       "ct": "soeng6 zau1",
+       "d": "last week",
+       "reading": "shàng​zhōu",
+       "w": "上周"
+      },
+      {
+       "at": 14,
+       "ct": "dei6 soeng6",
+       "d": "on the ground",
+       "reading": "dì​shang",
+       "w": "地上"
+      },
+      {
+       "at": 15,
+       "ct": "gaa1 soeng5",
+       "d": "plus",
+       "reading": "jiā​shàng",
+       "w": "加上"
+      },
+      {
+       "at": 16,
+       "ct": "soeng5 hok6",
+       "d": "to go to school",
+       "reading": "shàng​xué",
+       "w": "上学"
+      },
+      {
+       "at": 17,
+       "ct": "soeng6 wai3",
+       "d": "captain (military rank)",
+       "reading": "shàng​wèi",
+       "w": "上尉"
+      },
+      {
+       "at": 18,
+       "ct": "soeng6 si1",
+       "d": "boss",
+       "reading": "shàng​si",
+       "w": "上司"
+      },
+      {
+       "at": 19,
+       "ct": "soeng5 coeng4",
+       "d": "on stage",
+       "reading": "shàng​chǎng",
+       "w": "上场"
+      },
+      {
+       "at": 144,
+       "ct": "soeng6 san1 sai3",
+       "d": "Pliocene (geological epoch from 5m-2m years ago)",
+       "reading": "Shàng​xīn​shì",
+       "w": "上新世"
+      },
+      {
+       "at": 145,
+       "ct": "soeng6 si1 jyun6",
+       "d": "Shangxi county in Fangchenggang 防城港[Fáng​chéng​gǎng], Guangxi",
+       "reading": "Shàng​sī​xiàn",
+       "w": "上思县"
+      },
+      {
+       "at": 146,
+       "ct": "soeng6 hap6 zou2 zik1",
+       "d": "Shanghai Cooperation Organisation (SCO)",
+       "reading": "Shàng​Hé​Zǔ​zhī",
+       "w": "上合组织"
+      },
+      {
+       "at": 147,
+       "ct": "soeng6 ngoi6",
+       "d": "abbr. for 上海外國語大學|上海外国语大学[Shàng​hǎi​Wài​guó​yǔ​Dà​xué]",
+       "reading": "Shàng​Wài",
+       "w": "上外"
+      },
+      {
+       "at": 148,
+       "ct": "soeng6 zo6 bou6",
+       "d": "Theravada school of Buddhism",
+       "reading": "Shàng​zuò​bù",
+       "w": "上座部"
+      }
+     ],
+     "length": 149
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "not less than ...",
+       "reading": "いじょう",
+       "w": "以上"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "to raise",
+       "reading": "あげる",
+       "w": "上げる"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "to rise",
+       "reading": "あがる",
+       "w": "上がる"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "to stand up",
+       "reading": "たちあがる",
+       "w": "立ち上がる"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "to look up at",
+       "reading": "みあげる",
+       "w": "見上げる"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "older brother",
+       "reading": "あに",
+       "w": "兄"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "above ground",
+       "reading": "ちじょう",
+       "w": "地上"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "in addition",
+       "reading": "そのうえ",
+       "w": "その上"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "to elevate",
+       "reading": "もちあげる",
+       "w": "持ち上げる"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "to swell",
+       "reading": "もりあがる",
+       "w": "盛り上がる"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "to ascend",
+       "reading": "のぼる",
+       "w": "上る"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "skillful",
+       "reading": "じょうず",
+       "w": "上手"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "to say",
+       "reading": "もうしあげる",
+       "w": "申し上げる"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "older",
+       "reading": "としうえ",
+       "w": "年上"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "to pick up",
+       "reading": "とりあげる",
+       "w": "取り上げる"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "to pull up",
+       "reading": "ひきあげる",
+       "w": "引き上げる"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "skillful",
+       "reading": "うまい",
+       "w": "上手い"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "overhead",
+       "reading": "ずじょう",
+       "w": "頭上"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "rooftop",
+       "reading": "おくじょう",
+       "w": "屋上"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "to rise",
+       "reading": "おきあがる",
+       "w": "起き上がる"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "to check through",
+       "reading": "しらべあげる",
+       "w": "調べ上げる"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "intentionally",
+       "reading": "しょうちのうえで",
+       "w": "承知の上で"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "to give one's name",
+       "reading": "なのりをあげる",
+       "w": "名乗りを上げる"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "convalescence",
+       "reading": "やみあがり",
+       "w": "病み上がり"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "to fabricate",
+       "reading": "でっちあげる",
+       "w": "でっち上げる"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "oh my goodness; oh my gosh",
+       "reading": "",
+       "w": "세상에"
+      },
+      {
+       "at": 1,
+       "d": "or more; and over",
+       "reading": "",
+       "w": "이상"
+      },
+      {
+       "at": 2,
+       "d": "superior; boss",
+       "reading": "",
+       "w": "상관"
+      },
+      {
+       "at": 3,
+       "d": "world",
+       "reading": "",
+       "w": "세상"
+      },
+      {
+       "at": 4,
+       "d": "being in history; existing historically",
+       "reading": "",
+       "w": "역사상"
+      },
+      {
+       "at": 5,
+       "d": "master sergeant; first sergeant",
+       "reading": "",
+       "w": "상사"
+      },
+      {
+       "at": 6,
+       "d": "being actual; being as a matter of fact; being virtual",
+       "reading": "",
+       "w": "사실상"
+      },
+      {
+       "at": 7,
+       "d": "portable water; service water",
+       "reading": "",
+       "w": "상수"
+      },
+      {
+       "at": 8,
+       "d": "raise; increase",
+       "reading": "",
+       "w": "인상하다"
+      },
+      {
+       "at": 9,
+       "d": "top",
+       "reading": "",
+       "w": "상의"
+      },
+      {
+       "at": 10,
+       "d": "ground",
+       "reading": "",
+       "w": "지상"
+      },
+      {
+       "at": 11,
+       "d": "being in history",
+       "reading": "",
+       "w": "사상"
+      },
+      {
+       "at": 12,
+       "d": "rooftop",
+       "reading": "",
+       "w": "옥상"
+      },
+      {
+       "at": 13,
+       "d": "corporal",
+       "reading": "",
+       "w": "상병"
+      },
+      {
+       "at": 14,
+       "d": "improvement; enhancement; progress",
+       "reading": "",
+       "w": "향상"
+      },
+      {
+       "at": 15,
+       "d": "high rank",
+       "reading": "",
+       "w": "상위"
+      },
+      {
+       "at": 16,
+       "d": "rise; increase; ascent",
+       "reading": "",
+       "w": "상승"
+      },
+      {
+       "at": 17,
+       "d": "water way; being on the water",
+       "reading": "",
+       "w": "수상"
+      },
+      {
+       "at": 18,
+       "d": "elite; high society; upper class",
+       "reading": "",
+       "w": "상류층"
+      },
+      {
+       "at": 19,
+       "d": "Shanghai",
+       "reading": "",
+       "w": "상해"
+      },
+      {
+       "at": 156,
+       "d": "one's lifetime; one's whole life",
+       "reading": "",
+       "w": "한世上"
+      },
+      {
+       "at": 157,
+       "d": "one's lifetime; one's whole life",
+       "reading": "",
+       "w": "한세상"
+      },
+      {
+       "at": 158,
+       "d": "being on the sea",
+       "reading": "",
+       "w": "해상"
+      },
+      {
+       "at": 159,
+       "d": "improve; enhance; make progress",
+       "reading": "",
+       "w": "향상되다"
+      },
+      {
+       "at": 160,
+       "d": "improve; enhance; make progress",
+       "reading": "",
+       "w": "향상하다"
+      }
+     ],
+     "length": 161
+    }
+   },
+   "人": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "neoi5 jan4",
+       "d": "woman",
+       "reading": "nǚ​rén",
+       "w": "女人"
+      },
+      {
+       "at": 1,
+       "ct": "bit6 jan4",
+       "d": "other people",
+       "reading": "bié​ren",
+       "w": "别人"
+      },
+      {
+       "at": 2,
+       "ct": "naam4 jan4",
+       "d": "a man",
+       "reading": "nán​rén",
+       "w": "男人"
+      },
+      {
+       "at": 3,
+       "ct": "jau5 jan4",
+       "d": "someone",
+       "reading": "yǒu​rén",
+       "w": "有人"
+      },
+      {
+       "at": 4,
+       "ct": "jan4 mun4",
+       "d": "people",
+       "reading": "rén​men",
+       "w": "人们"
+      },
+      {
+       "at": 5,
+       "ct": "jat1 go3 jan4",
+       "d": "by oneself (without assistance)",
+       "reading": "yī​gè​rén",
+       "w": "一个人"
+      },
+      {
+       "at": 6,
+       "ct": "fu1 jan4",
+       "d": "lady",
+       "reading": "fū​ren",
+       "w": "夫人"
+      },
+      {
+       "at": 7,
+       "ct": "jan4 leoi6",
+       "d": "humanity",
+       "reading": "rén​lèi",
+       "w": "人类"
+      },
+      {
+       "at": 8,
+       "ct": "go3 jan4",
+       "d": "individual",
+       "reading": "gè​rén",
+       "w": "个人"
+      },
+      {
+       "at": 9,
+       "ct": "beng6 jan4",
+       "d": "sick person",
+       "reading": "bìng​rén",
+       "w": "病人"
+      },
+      {
+       "at": 10,
+       "ct": "gaa1 jan4",
+       "d": "household",
+       "reading": "jiā​rén",
+       "w": "家人"
+      },
+      {
+       "at": 11,
+       "ct": "jan4 sang1",
+       "d": "life (one's time on earth)",
+       "reading": "rén​shēng",
+       "w": "人生"
+      },
+      {
+       "at": 12,
+       "ct": "daai6 jan4",
+       "d": "adult",
+       "reading": "dà​ren",
+       "w": "大人"
+      },
+      {
+       "at": 13,
+       "ct": "jan4 jyun4",
+       "d": "staff",
+       "reading": "rén​yuán",
+       "w": "人员"
+      },
+      {
+       "at": 14,
+       "ct": "dik6 jan4",
+       "d": "enemy",
+       "reading": "dí​rén",
+       "w": "敌人"
+      },
+      {
+       "at": 15,
+       "ct": "jan4 mat6",
+       "d": "person",
+       "reading": "rén​wù",
+       "w": "人物"
+      },
+      {
+       "at": 16,
+       "ct": "jan4 man4",
+       "d": "the people",
+       "reading": "rén​mín",
+       "w": "人民"
+      },
+      {
+       "at": 17,
+       "ct": "zyu2 jan4",
+       "d": "master",
+       "reading": "zhǔ​rén",
+       "w": "主人"
+      },
+      {
+       "at": 18,
+       "ct": "jan4 gaa1",
+       "d": "household",
+       "reading": "rén​jiā",
+       "w": "人家"
+      },
+      {
+       "at": 19,
+       "ct": "lou5 jan4",
+       "d": "old man or woman",
+       "reading": "lǎo​rén",
+       "w": "老人"
+      },
+      {
+       "at": 138,
+       "ct": "zung1 gwok3 jan4 man4 gaai2 fong3 gwan1 hoi2 gwan1",
+       "d": "Chinese People's Liberation Army Navy (PLAN)",
+       "reading": "Zhōng​guó​Rén​mín​Jiě​fàng​jūn​Hǎi​jūn",
+       "w": "中国人民解放军海军"
+      },
+      {
+       "at": 139,
+       "ct": "zung1 gwok3 jan4 man4 gaai2 fong3 gwan1 hung1 gwan1",
+       "d": "People's Liberation Army Air Force (PLAAF)",
+       "reading": "Zhōng​guó​Rén​mín​Jiě​fàng​jūn​Kōng​jūn",
+       "w": "中国人民解放军空军"
+      },
+      {
+       "at": 140,
+       "ct": "zung1 gwok3 caan4 zat6 jan4 lyun4 hap6 wui2",
+       "d": "China Disabled Persons' Federation",
+       "reading": "Zhōng​guó​Cán​jí​rén​Lián​hé​huì",
+       "w": "中国残疾人联合会"
+      },
+      {
+       "at": 141,
+       "ct": "zung1 joeng1 jan4 man4 zing3 fu2 zyu3 hoeng1 gong2 dak6 bit6 hang4 zing3 keoi1 lyun4 lok3 baan6 gung1 sat1",
+       "d": "Liaison Office of the Central People's Government in the Hong Kong Special Administrative Region",
+       "reading": "Zhōng​yāng​Rén​mín​Zhèng​fǔ​Zhù​Xiāng​gǎng​Tè​bié​Xíng​zhèng​qū​Lián​luò​Bàn​gōng​shì",
+       "w": "中央人民政府驻香港特别行政区联络办公室"
+      },
+      {
+       "at": 142,
+       "ct": "lyun6 sai3 gaai1 jan4",
+       "d": "Gone with the Wind (film)",
+       "reading": "Luàn​shì​Jiā​rén",
+       "w": "乱世佳人"
+      }
+     ],
+     "length": 143
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "human being",
+       "reading": "にんげん",
+       "w": "人間"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "two persons",
+       "reading": "ふたり",
+       "w": "二人"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "one person",
+       "reading": "ひとり",
+       "w": "一人"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "(one's) life",
+       "reading": "じんせい",
+       "w": "人生"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "alone",
+       "reading": "ひとりで",
+       "w": "一人で"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "people",
+       "reading": "ひとびと",
+       "w": "人々"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "the person in question",
+       "reading": "ほんにん",
+       "w": "本人"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "he",
+       "reading": "あのひと",
+       "w": "あの人"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "person",
+       "reading": "じんぶつ",
+       "w": "人物"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "another person",
+       "reading": "たにん",
+       "w": "他人"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "people",
+       "reading": "ひとたち",
+       "w": "人たち"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "adult",
+       "reading": "おとな",
+       "w": "大人"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "guest",
+       "reading": "きゃく",
+       "w": "客"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "friend",
+       "reading": "ゆうじん",
+       "w": "友人"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "popularity",
+       "reading": "にんき",
+       "w": "人気"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "three people",
+       "reading": "さんにん",
+       "w": "三人"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "lover",
+       "reading": "こいびと",
+       "w": "恋人"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "offender",
+       "reading": "はんにん",
+       "w": "犯人"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "doll",
+       "reading": "にんぎょう",
+       "w": "人形"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "both (people)",
+       "reading": "ふたりとも",
+       "w": "二人とも"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "standing on formality",
+       "reading": "たにんぎょうぎ",
+       "w": "他人行儀"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "per-capita division",
+       "reading": "にんずうぶん",
+       "w": "人数分"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "human realm",
+       "reading": "にんげんかい",
+       "w": "人間界"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "hereditary disposition",
+       "reading": "ひととなり",
+       "w": "人となり"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "puppet",
+       "reading": "あやつりにんぎょう",
+       "w": "操り人形"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "wife",
+       "reading": "",
+       "w": "부인"
+      },
+      {
+       "at": 1,
+       "d": "murder; killing",
+       "reading": "",
+       "w": "살인"
+      },
+      {
+       "at": 2,
+       "d": "human; human being",
+       "reading": "",
+       "w": "인간"
+      },
+      {
+       "at": 3,
+       "d": "life",
+       "reading": "",
+       "w": "인생"
+      },
+      {
+       "at": 4,
+       "d": "each person; individual",
+       "reading": "",
+       "w": "개인"
+      },
+      {
+       "at": 5,
+       "d": "figure; distinguished person",
+       "reading": "",
+       "w": "인사"
+      },
+      {
+       "at": 6,
+       "d": "sea of people; waves of people",
+       "reading": "",
+       "w": "인해"
+      },
+      {
+       "at": 7,
+       "d": "Caucasian",
+       "reading": "",
+       "w": "백인"
+      },
+      {
+       "at": 8,
+       "d": "murder; kill",
+       "reading": "",
+       "w": "살인하다"
+      },
+      {
+       "at": 9,
+       "d": "jung-in",
+       "reading": "",
+       "w": "중인"
+      },
+      {
+       "at": 10,
+       "d": "lover; one's beloved",
+       "reading": "",
+       "w": "애인"
+      },
+      {
+       "at": 11,
+       "d": "being artificial",
+       "reading": "",
+       "w": "인공"
+      },
+      {
+       "at": 12,
+       "d": "owner",
+       "reading": "",
+       "w": "주인"
+      },
+      {
+       "at": 13,
+       "d": "soldier",
+       "reading": "",
+       "w": "군인"
+      },
+      {
+       "at": 14,
+       "d": "human duty; human obligation",
+       "reading": "",
+       "w": "인도"
+      },
+      {
+       "at": 15,
+       "d": "doll; figure",
+       "reading": "",
+       "w": "인형"
+      },
+      {
+       "at": 16,
+       "d": "alien",
+       "reading": "",
+       "w": "외계인"
+      },
+      {
+       "at": 17,
+       "d": "Negroid",
+       "reading": "",
+       "w": "흑인"
+      },
+      {
+       "at": 18,
+       "d": "gynecology; department of gynecology",
+       "reading": "",
+       "w": "부인과"
+      },
+      {
+       "at": 19,
+       "d": "one person; one man",
+       "reading": "",
+       "w": "일인"
+      },
+      {
+       "at": 195,
+       "d": "tenant farmer",
+       "reading": "",
+       "w": "소작인"
+      },
+      {
+       "at": 196,
+       "d": "holder; possessor",
+       "reading": "",
+       "w": "소지인"
+      },
+      {
+       "at": 197,
+       "d": "recipient",
+       "reading": "",
+       "w": "수령인"
+      },
+      {
+       "at": 198,
+       "d": "addressee",
+       "reading": "",
+       "w": "수신인"
+      },
+      {
+       "at": 199,
+       "d": "addressee; consignee",
+       "reading": "",
+       "w": "수취인"
+      }
+     ],
+     "length": 200
+    }
+   },
+   "半": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "jat1 bun3",
+       "d": "half",
+       "reading": "yī​bàn",
+       "w": "一半"
+      },
+      {
+       "at": 1,
+       "ct": "bun3 nin4",
+       "d": "half a year",
+       "reading": "bàn​nián",
+       "w": "半年"
+      },
+      {
+       "at": 2,
+       "ct": "bun3 coeng4",
+       "d": "half of a game or contest",
+       "reading": "bàn​chǎng",
+       "w": "半场"
+      },
+      {
+       "at": 3,
+       "ct": "bun3 go3",
+       "d": "half of sth",
+       "reading": "bàn​ge",
+       "w": "半个"
+      },
+      {
+       "at": 4,
+       "ct": "bun3 je6",
+       "d": "midnight",
+       "reading": "bàn​yè",
+       "w": "半夜"
+      },
+      {
+       "at": 5,
+       "ct": "bun3 bui3 zi2",
+       "d": "half of a lifetime",
+       "reading": "bàn​bèi​zi",
+       "w": "半辈子"
+      },
+      {
+       "at": 6,
+       "ct": "do1 bun3",
+       "d": "most",
+       "reading": "duō​bàn",
+       "w": "多半"
+      },
+      {
+       "at": 7,
+       "ct": "bun3 sei2",
+       "d": "half dead (of torment, hunger, tiredness etc)",
+       "reading": "bàn​sǐ",
+       "w": "半死"
+      },
+      {
+       "at": 8,
+       "ct": "bun3 jyut6",
+       "d": "half-moon",
+       "reading": "bàn​yuè",
+       "w": "半月"
+      },
+      {
+       "at": 9,
+       "ct": "daai6 bun3",
+       "d": "more than half",
+       "reading": "dà​bàn",
+       "w": "大半"
+      },
+      {
+       "at": 10,
+       "ct": "bun3 tin1",
+       "d": "half of the day",
+       "reading": "bàn​tiān",
+       "w": "半天"
+      },
+      {
+       "at": 11,
+       "ct": "bun3 sou3",
+       "d": "half the number",
+       "reading": "bàn​shù",
+       "w": "半数"
+      },
+      {
+       "at": 12,
+       "ct": "bun3 ging3",
+       "d": "radius",
+       "reading": "bàn​jìng",
+       "w": "半径"
+      },
+      {
+       "at": 13,
+       "ct": "bun3 dim2",
+       "d": "the least bit",
+       "reading": "bàn​diǎn",
+       "w": "半点"
+      },
+      {
+       "at": 14,
+       "ct": "bun3 sang1",
+       "d": "half a lifetime",
+       "reading": "bàn​shēng",
+       "w": "半生"
+      },
+      {
+       "at": 15,
+       "ct": "bun3 dou2",
+       "d": "peninsula",
+       "reading": "bàn​dǎo",
+       "w": "半岛"
+      },
+      {
+       "at": 16,
+       "ct": "bun3 hoeng2",
+       "d": "half of the day",
+       "reading": "bàn​shǎng",
+       "w": "半晌"
+      },
+      {
+       "at": 17,
+       "ct": "bun3 lou6",
+       "d": "halfway",
+       "reading": "bàn​lù",
+       "w": "半路"
+      },
+      {
+       "at": 18,
+       "ct": "bun3 kyut3 coi3",
+       "d": "semifinals",
+       "reading": "bàn​jué​sài",
+       "w": "半决赛"
+      },
+      {
+       "at": 19,
+       "ct": "bun3 hung1",
+       "d": "midair",
+       "reading": "bàn​kōng",
+       "w": "半空"
+      },
+      {
+       "at": 134,
+       "ct": "ham3 caat3 gaa1 bun3 dou2",
+       "d": "Kamchatka Peninsula, far-eastern Russia",
+       "reading": "Kān​chá​jiā​Bàn​dǎo",
+       "w": "勘察加半岛"
+      },
+      {
+       "at": 135,
+       "ct": "bun3 bo1 wai4 zi2",
+       "d": "Banpo neolithic Yangshao culture archaeological site east of Xi'an 西安",
+       "reading": "Bàn​pō​yí​zhǐ",
+       "w": "半坡遗址"
+      },
+      {
+       "at": 136,
+       "ct": "",
+       "d": "P&O",
+       "reading": "Bàn​dǎo​hé​dōng​fāng​háng​hǎi",
+       "w": "半岛和东方航海"
+      },
+      {
+       "at": 137,
+       "ct": "bun3 dou2 gwok3 zai3 hok6 haau6",
+       "d": "International School of the Penninsula",
+       "reading": "Bàn​dǎo​Guó​jì​Xué​xiào",
+       "w": "半岛国际学校"
+      },
+      {
+       "at": 138,
+       "ct": "bun3 dou2 din6 si6 toi4",
+       "d": "Al Jazeera (Arabic news network)",
+       "reading": "Bàn​dǎo​Diàn​shì​tái",
+       "w": "半岛电视台"
+      }
+     ],
+     "length": 139
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "half",
+       "reading": "はんぶん",
+       "w": "半分"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "middle",
+       "reading": "なかば",
+       "w": "半ば"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "half a year",
+       "reading": "はんとし",
+       "w": "半年"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "second half",
+       "reading": "こうはん",
+       "w": "後半"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "majority",
+       "reading": "たいはん",
+       "w": "大半"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "halfway",
+       "reading": "ちゅうとはんぱ",
+       "w": "中途半端"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "upper half of the body",
+       "reading": "じょうはんしん",
+       "w": "上半身"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "lower half of the body",
+       "reading": "かはんしん",
+       "w": "下半身"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "half day",
+       "reading": "はんにち",
+       "w": "半日"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "first half",
+       "reading": "ぜんはん",
+       "w": "前半"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "remnant",
+       "reading": "はんぱ",
+       "w": "半端"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "half the number",
+       "reading": "はんすう",
+       "w": "半数"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "half the body",
+       "reading": "はんしん",
+       "w": "半身"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "half-moon",
+       "reading": "はんげつ",
+       "w": "半月"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "radius",
+       "reading": "はんけい",
+       "w": "半径"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "reduction by half",
+       "reading": "はんげん",
+       "w": "半減"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "half and half",
+       "reading": "はんはん",
+       "w": "半々"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "half the amount (of money)",
+       "reading": "はんがく",
+       "w": "半額"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "short sleeves",
+       "reading": "はんそで",
+       "w": "半袖"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "during",
+       "reading": "あいだじゅう",
+       "w": "間中"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "goat-god",
+       "reading": "はんじゅうしん",
+       "w": "半獣神"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "eastern hemisphere",
+       "reading": "ひがしはんきゅう",
+       "w": "東半球"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "insufficiency",
+       "reading": "はんか",
+       "w": "半可"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "syllable with a \"p\" sound (in Japanese)",
+       "reading": "はんだくおん",
+       "w": "半濁音"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "comedian who plays a lover's part",
+       "reading": "にまいめはん",
+       "w": "二枚目半"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "ring",
+       "reading": "",
+       "w": "반지"
+      },
+      {
+       "at": 1,
+       "d": "half",
+       "reading": "",
+       "w": "절반"
+      },
+      {
+       "at": 2,
+       "d": "second half; latter part",
+       "reading": "",
+       "w": "후반"
+      },
+      {
+       "at": 3,
+       "d": "peninsula",
+       "reading": "",
+       "w": "반도"
+      },
+      {
+       "at": 4,
+       "d": "half year; six months",
+       "reading": "",
+       "w": "반년"
+      },
+      {
+       "at": 5,
+       "d": "half",
+       "reading": "",
+       "w": "반쪽"
+      },
+      {
+       "at": 6,
+       "d": "informal speech",
+       "reading": "",
+       "w": "반말"
+      },
+      {
+       "at": 7,
+       "d": "wedding ring",
+       "reading": "",
+       "w": "결혼반지"
+      },
+      {
+       "at": 8,
+       "d": "majority",
+       "reading": "",
+       "w": "과반"
+      },
+      {
+       "at": 9,
+       "d": "majority",
+       "reading": "",
+       "w": "과반수"
+      },
+      {
+       "at": 10,
+       "d": "gold ring",
+       "reading": "",
+       "w": "금반지"
+      },
+      {
+       "at": 11,
+       "d": "southern hemisphere",
+       "reading": "",
+       "w": "남반구"
+      },
+      {
+       "at": 12,
+       "d": "southern half",
+       "reading": "",
+       "w": "남반부"
+      },
+      {
+       "at": 13,
+       "d": "be cut by half; be halved",
+       "reading": "",
+       "w": "반감되다"
+      },
+      {
+       "at": 14,
+       "d": "cut by half; halve",
+       "reading": "",
+       "w": "반감하다"
+      },
+      {
+       "at": 15,
+       "d": "half price",
+       "reading": "",
+       "w": "반값"
+      },
+      {
+       "at": 16,
+       "d": "hemisphere",
+       "reading": "",
+       "w": "반구"
+      },
+      {
+       "at": 17,
+       "d": "being hemispherical",
+       "reading": "",
+       "w": "반구형"
+      },
+      {
+       "at": 18,
+       "d": "more than half",
+       "reading": "",
+       "w": "반나마"
+      },
+      {
+       "at": 19,
+       "d": "half joking; half in jest",
+       "reading": "",
+       "w": "반농담조"
+      },
+      {
+       "at": 77,
+       "d": "lower body",
+       "reading": "",
+       "w": "하반신"
+      },
+      {
+       "at": 78,
+       "d": "hanbando",
+       "reading": "",
+       "w": "한반도"
+      },
+      {
+       "at": 79,
+       "d": "second half; latter part",
+       "reading": "",
+       "w": "후반기"
+      },
+      {
+       "at": 80,
+       "d": "second half; latter part",
+       "reading": "",
+       "w": "후반부"
+      },
+      {
+       "at": 81,
+       "d": "second half",
+       "reading": "",
+       "w": "후반전"
+      }
+     ],
+     "length": 82
+    }
+   },
+   "博": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "bok3 si6",
+       "d": "doctor",
+       "reading": "bó​shì",
+       "w": "博士"
+      },
+      {
+       "at": 1,
+       "ct": "bok3 mat6 gun2",
+       "d": "museum",
+       "reading": "bó​wù​guǎn",
+       "w": "博物馆"
+      },
+      {
+       "at": 2,
+       "ct": "dou2 bok3",
+       "d": "to gamble",
+       "reading": "dǔ​bó",
+       "w": "赌博"
+      },
+      {
+       "at": 3,
+       "ct": "bok3 haak3",
+       "d": "blog (loanword)",
+       "reading": "bó​kè",
+       "w": "博客"
+      },
+      {
+       "at": 4,
+       "ct": "bok3 si6 hok6 wai2",
+       "d": "doctoral degree",
+       "reading": "bó​shì​xué​wèi",
+       "w": "博士学位"
+      },
+      {
+       "at": 5,
+       "ct": "bok3 dak1",
+       "d": "to win",
+       "reading": "bó​dé",
+       "w": "博得"
+      },
+      {
+       "at": 6,
+       "ct": "bok3 laam5 wui2",
+       "d": "exposition",
+       "reading": "bó​lǎn​huì",
+       "w": "博览会"
+      },
+      {
+       "at": 7,
+       "ct": "bok3 hok6",
+       "d": "learned",
+       "reading": "bó​xué",
+       "w": "博学"
+      },
+      {
+       "at": 8,
+       "ct": "jyun1 bok3",
+       "d": "erudite",
+       "reading": "yuān​bó",
+       "w": "渊博"
+      },
+      {
+       "at": 9,
+       "ct": "bok3 ceoi2",
+       "d": "to win (favors, confidence etc)",
+       "reading": "bó​qǔ",
+       "w": "博取"
+      },
+      {
+       "at": 10,
+       "ct": "bok3 jik6 leon6",
+       "d": "game theory",
+       "reading": "bó​yì​lùn",
+       "w": "博弈论"
+      },
+      {
+       "at": 11,
+       "ct": "bok3 dou6",
+       "d": "Ph.D. advisor",
+       "reading": "bó​dǎo",
+       "w": "博导"
+      },
+      {
+       "at": 12,
+       "ct": "bok3 jik6",
+       "d": "games (such as chess, dice etc)",
+       "reading": "bó​yì",
+       "w": "博弈"
+      },
+      {
+       "at": 13,
+       "ct": "bok3 man4",
+       "d": "blog article",
+       "reading": "bó​wén",
+       "w": "博文"
+      },
+      {
+       "at": 14,
+       "ct": "bok3 daai6",
+       "d": "enormous",
+       "reading": "bó​dà",
+       "w": "博大"
+      },
+      {
+       "at": 15,
+       "ct": "bok3 laam5",
+       "d": "to read extensively",
+       "reading": "bó​lǎn",
+       "w": "博览"
+      },
+      {
+       "at": 16,
+       "ct": "dei6 daai6 mat6 bok3",
+       "d": "vast territory with abundant resources (idiom)",
+       "reading": "dì​dà​wù​bó",
+       "w": "地大物博"
+      },
+      {
+       "at": 17,
+       "ct": "bok3 ngaa5",
+       "d": "learned",
+       "reading": "bó​yǎ",
+       "w": "博雅"
+      },
+      {
+       "at": 18,
+       "ct": "bok3 mat6",
+       "d": "natural science",
+       "reading": "bó​wù",
+       "w": "博物"
+      },
+      {
+       "at": 19,
+       "ct": "bok3 hok6 do1 coi4",
+       "d": "erudite and multi-talented (idiom); versatile and able",
+       "reading": "bó​xué​duō​cái",
+       "w": "博学多才"
+      },
+      {
+       "at": 125,
+       "ct": "bok3 seon3",
+       "d": "abbr. for 博訊新聞網|博讯新闻网[Bó​xùn​Xīn​wén​wǎng], Boxun, US-based dissident Chinese news network",
+       "reading": "Bó​xùn",
+       "w": "博讯"
+      },
+      {
+       "at": 126,
+       "ct": "bok3 ngou4",
+       "d": "see 博鰲鎮|博鳌镇[Bó​'áo​zhèn]",
+       "reading": "Bó​'áo",
+       "w": "博鳌"
+      },
+      {
+       "at": 127,
+       "ct": "bok3 ngou4 aa3 zau1 leon6 taan4",
+       "d": "Bo'ao Forum for Asia (since 2001)",
+       "reading": "Bó​'áo​Yà​zhōu​Lùn​tán",
+       "w": "博鳌亚洲论坛"
+      },
+      {
+       "at": 128,
+       "ct": "aai1 bok3 laai1 beng6 duk6",
+       "d": "Ebola virus",
+       "reading": "Aī​bó​lā​bìng​dú",
+       "w": "埃博拉病毒"
+      },
+      {
+       "at": 129,
+       "ct": "wat1 leon4 bok3 haak1",
+       "d": "Culemborg, city in the Netherlands",
+       "reading": "Qū​lún​bó​hè",
+       "w": "屈伦博赫"
+      }
+     ],
+     "length": 130
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "museum",
+       "reading": "はくぶつかん",
+       "w": "博物館"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "charity",
+       "reading": "はくあい",
+       "w": "博愛"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "exhibition",
+       "reading": "はくらんかい",
+       "w": "博覧会"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "erudition",
+       "reading": "はくがく",
+       "w": "博学"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "natural history",
+       "reading": "はくぶつ",
+       "w": "博物"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "national museum",
+       "reading": "こくりつはくぶつかん",
+       "w": "国立博物館"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "doctor",
+       "reading": "はくし",
+       "w": "博士"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "Hakata (old but still commonly used name for Fukuoka)",
+       "reading": "はかた",
+       "w": "博多"
+      },
+      {
+       "at": 8,
+       "c": false,
+       "d": "gambling",
+       "reading": "とばく",
+       "w": "賭博"
+      },
+      {
+       "at": 9,
+       "c": false,
+       "d": "gambling",
+       "reading": "ばくち",
+       "w": "博打"
+      },
+      {
+       "at": 10,
+       "c": false,
+       "d": "extensive knowledge",
+       "reading": "はくしき",
+       "w": "博識"
+      },
+      {
+       "at": 11,
+       "c": false,
+       "d": "to win",
+       "reading": "はくする",
+       "w": "博する"
+      },
+      {
+       "at": 12,
+       "c": false,
+       "d": "doctor's degree",
+       "reading": "はくしごう",
+       "w": "博士号"
+      },
+      {
+       "at": 13,
+       "c": false,
+       "d": "gambling house",
+       "reading": "とばくじょう",
+       "w": "賭博場"
+      },
+      {
+       "at": 14,
+       "c": false,
+       "d": "gambling",
+       "reading": "ばくえき",
+       "w": "博奕"
+      },
+      {
+       "at": 15,
+       "c": false,
+       "d": "gambler",
+       "reading": "ばくと",
+       "w": "博徒"
+      },
+      {
+       "at": 16,
+       "c": false,
+       "d": "world fair",
+       "reading": "ばんぱく",
+       "w": "万博"
+      },
+      {
+       "at": 17,
+       "c": false,
+       "d": "doctor of medicine",
+       "reading": "いがくはかせ",
+       "w": "医学博士"
+      },
+      {
+       "at": 18,
+       "c": false,
+       "d": "risky speculation",
+       "reading": "おおばくち",
+       "w": "大博打"
+      },
+      {
+       "at": 19,
+       "c": false,
+       "d": "natural history",
+       "reading": "はくぶつがく",
+       "w": "博物学"
+      },
+      {
+       "at": 116,
+       "c": false,
+       "d": "doctoral degree (e.g. PhD) by thesis only",
+       "reading": "ろんぶんはかせ",
+       "w": "論文博士"
+      },
+      {
+       "at": 117,
+       "c": false,
+       "d": "gambling table",
+       "reading": "とばくだい",
+       "w": "賭博台"
+      },
+      {
+       "at": 118,
+       "c": false,
+       "d": "doctor of agriculture",
+       "reading": "のうはく",
+       "w": "農博"
+      },
+      {
+       "at": 119,
+       "c": false,
+       "d": "outdoor gambling",
+       "reading": "のばくち",
+       "w": "野博打"
+      },
+      {
+       "at": 120,
+       "c": false,
+       "d": "professor specializing in the readings of kanji in classic Confucianist texts",
+       "reading": "おんはかせ",
+       "w": "音博士"
+      }
+     ],
+     "length": 121
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "doctoral degree; Ph.D.",
+       "reading": "",
+       "w": "박사"
+      },
+      {
+       "at": 1,
+       "d": "museum",
+       "reading": "",
+       "w": "박물관"
+      },
+      {
+       "at": 2,
+       "d": "gamble",
+       "reading": "",
+       "w": "도박하다"
+      },
+      {
+       "at": 3,
+       "d": "gambling",
+       "reading": "",
+       "w": "도박"
+      },
+      {
+       "at": 4,
+       "d": "National Museum",
+       "reading": "",
+       "w": "국립 박물관"
+      },
+      {
+       "at": 5,
+       "d": "habitual gambler",
+       "reading": "",
+       "w": "도박꾼"
+      },
+      {
+       "at": 6,
+       "d": "gambler",
+       "reading": "",
+       "w": "도박사"
+      },
+      {
+       "at": 7,
+       "d": "gambling house",
+       "reading": "",
+       "w": "도박장"
+      },
+      {
+       "at": 8,
+       "d": "gambling place",
+       "reading": "",
+       "w": "도박판"
+      },
+      {
+       "at": 9,
+       "d": "walking encyclopedia; walking dictionary",
+       "reading": "",
+       "w": "만물박사"
+      },
+      {
+       "at": 10,
+       "d": "honorary doctorate",
+       "reading": "",
+       "w": "명예박사"
+      },
+      {
+       "at": 11,
+       "d": "folk museum",
+       "reading": "",
+       "w": "민속 박물관"
+      },
+      {
+       "at": 12,
+       "d": "exposition; exhibition",
+       "reading": "",
+       "w": "박람회"
+      },
+      {
+       "at": 13,
+       "d": "knowledgeable; erudite",
+       "reading": "",
+       "w": "박식하다"
+      },
+      {
+       "at": 14,
+       "d": "love of mankind; philanthropy",
+       "reading": "",
+       "w": "박애"
+      },
+      {
+       "at": 15,
+       "d": "great learning; profound knowledge",
+       "reading": "",
+       "w": "박학"
+      },
+      {
+       "at": 16,
+       "d": "being erudite; being knowledgeable",
+       "reading": "",
+       "w": "박학다식"
+      },
+      {
+       "at": 17,
+       "d": "erudite; knowledgeable",
+       "reading": "",
+       "w": "박학하다"
+      },
+      {
+       "at": 18,
+       "d": "walking encyclopedia; walking dictionary",
+       "reading": "",
+       "w": "척척博士"
+      },
+      {
+       "at": 19,
+       "d": "walking encyclopedia; walking dictionary",
+       "reading": "",
+       "w": "척척박사"
+      },
+      {
+       "at": 20,
+       "d": "knowledgeable; erudite; learned",
+       "reading": "",
+       "w": "해박하다"
+      }
+     ],
+     "length": 21
+    }
+   },
+   "多": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "do1 siu2",
+       "d": "number",
+       "reading": "duō​shǎo",
+       "w": "多少"
+      },
+      {
+       "at": 1,
+       "ct": "do1 gau2",
+       "d": "how long?",
+       "reading": "duō​jiǔ",
+       "w": "多久"
+      },
+      {
+       "at": 2,
+       "ct": "caa1 bat1 do1",
+       "d": "almost",
+       "reading": "chà​bu​duō",
+       "w": "差不多"
+      },
+      {
+       "at": 3,
+       "ct": "do1 mo1",
+       "d": "how (wonderful etc)",
+       "reading": "duō​me",
+       "w": "多么"
+      },
+      {
+       "at": 4,
+       "ct": "do1 ze6",
+       "d": "many thanks",
+       "reading": "duō​xiè",
+       "w": "多谢"
+      },
+      {
+       "at": 5,
+       "ct": "heoi2 do1",
+       "d": "many",
+       "reading": "xǔ​duō",
+       "w": "许多"
+      },
+      {
+       "at": 6,
+       "ct": "daai6 do1 sou3",
+       "d": "(great) majority",
+       "reading": "dà​duō​shù",
+       "w": "大多数"
+      },
+      {
+       "at": 7,
+       "ct": "hou2 do1",
+       "d": "many",
+       "reading": "hǎo​duō",
+       "w": "好多"
+      },
+      {
+       "at": 8,
+       "ct": "zeoi3 do1",
+       "d": "at most",
+       "reading": "zuì​duō",
+       "w": "最多"
+      },
+      {
+       "at": 9,
+       "ct": "do1 go3",
+       "d": "many",
+       "reading": "duō​ge",
+       "w": "多个"
+      },
+      {
+       "at": 10,
+       "ct": "do1 kwai1",
+       "d": "thanks to",
+       "reading": "duō​kuī",
+       "w": "多亏"
+      },
+      {
+       "at": 11,
+       "ct": "do1 wan4",
+       "d": "cloudy (meteorology)",
+       "reading": "duō​yún",
+       "w": "多云"
+      },
+      {
+       "at": 12,
+       "ct": "do1 nin4 loi4",
+       "d": "for the past many years",
+       "reading": "duō​nián​lái",
+       "w": "多年来"
+      },
+      {
+       "at": 13,
+       "ct": "do1 sou3",
+       "d": "majority",
+       "reading": "duō​shù",
+       "w": "多数"
+      },
+      {
+       "at": 14,
+       "ct": "do1 jyu4",
+       "d": "superfluous",
+       "reading": "duō​yú",
+       "w": "多余"
+      },
+      {
+       "at": 15,
+       "ct": "do1 ci3",
+       "d": "many times",
+       "reading": "duō​cì",
+       "w": "多次"
+      },
+      {
+       "at": 16,
+       "ct": "zung3 do1",
+       "d": "numerous",
+       "reading": "zhòng​duō",
+       "w": "众多"
+      },
+      {
+       "at": 17,
+       "ct": "daai6 do1",
+       "d": "for the most part",
+       "reading": "dà​duō",
+       "w": "大多"
+      },
+      {
+       "at": 18,
+       "ct": "do1 bun3",
+       "d": "most",
+       "reading": "duō​bàn",
+       "w": "多半"
+      },
+      {
+       "at": 19,
+       "ct": "zyut6 daai6 do1 sou3",
+       "d": "absolute majority",
+       "reading": "jué​dà​duō​shù",
+       "w": "绝大多数"
+      },
+      {
+       "at": 136,
+       "ct": "sing3 on1 do1 nei4 tong4 keoi1",
+       "d": "St Anthony Parish (Macau)",
+       "reading": "Shèng​An​duō​ní​táng​qū",
+       "w": "圣安多尼堂区"
+      },
+      {
+       "at": 137,
+       "ct": "",
+       "d": "Queen Victoria (1819-1901), reigned 1837-1901",
+       "reading": "Yù​duō​lì​huáng​hòu",
+       "w": "域多利皇后"
+      },
+      {
+       "at": 138,
+       "ct": "do1 fat6 ji5",
+       "d": "Dover",
+       "reading": "Duō​fó​'ěr",
+       "w": "多佛尔"
+      },
+      {
+       "at": 139,
+       "ct": "do1 lik6 do1 zi1",
+       "d": "Doritos (brand of tortilla chips)",
+       "reading": "Duō​lì​duō​zī",
+       "w": "多力多滋"
+      },
+      {
+       "at": 140,
+       "ct": "do1 haa1 wui4 hap6",
+       "d": "Doha Round (world trade talks that began in Doha, Qatar in 2001)",
+       "reading": "Duō​hā​Huí​hé",
+       "w": "多哈回合"
+      }
+     ],
+     "length": 141
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "many",
+       "reading": "おおい",
+       "w": "多い"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "many",
+       "reading": "おおく",
+       "w": "多く"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "probably",
+       "reading": "たぶん",
+       "w": "多分"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "a little",
+       "reading": "たしょう",
+       "w": "多少"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "very",
+       "reading": "おおいに",
+       "w": "大いに"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "large number (of)",
+       "reading": "たすう",
+       "w": "多数"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "rarely",
+       "reading": "めったに",
+       "w": "滅多に"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "in great numbers",
+       "reading": "かずおおく",
+       "w": "数多く"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "great (quantity, amount, etc.)",
+       "reading": "ただい",
+       "w": "多大"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "somewhat larger (amount)",
+       "reading": "おおめ",
+       "w": "多め"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "being very busy",
+       "reading": "たぼう",
+       "w": "多忙"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "large (amount of money)",
+       "reading": "たがく",
+       "w": "多額"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "great majority",
+       "reading": "だいたすう",
+       "w": "大多数"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "thoughtless",
+       "reading": "めった",
+       "w": "滅多"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "diverse",
+       "reading": "たよう",
+       "w": "多様"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "large quantity",
+       "reading": "たりょう",
+       "w": "多量"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "colourful",
+       "reading": "たさい",
+       "w": "多彩"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "repeated occurrence",
+       "reading": "たはつ",
+       "w": "多発"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "multiple",
+       "reading": "たじゅう",
+       "w": "多重"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "majority decision",
+       "reading": "たすうけつ",
+       "w": "多数決"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "various meanings",
+       "reading": "たぎ",
+       "w": "多義"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "owning multiple animals (esp. pets of the same kind)",
+       "reading": "たとうがい",
+       "w": "多頭飼い"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "complex and wide-ranging",
+       "reading": "ふくざつたき",
+       "w": "複雑多岐"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "it is justifiable to kill one person to save the lives of many",
+       "reading": "いっさつたしょう",
+       "w": "一殺多生"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "versatile",
+       "reading": "たげいたさい",
+       "w": "多芸多才"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "the most; the largest; maximum",
+       "reading": "",
+       "w": "최다"
+      },
+      {
+       "at": 1,
+       "d": "luckily; with luck",
+       "reading": "",
+       "w": "다행히"
+      },
+      {
+       "at": 2,
+       "d": "more or less",
+       "reading": "",
+       "w": "다소"
+      },
+      {
+       "at": 3,
+       "d": "extreme",
+       "reading": "",
+       "w": "과다"
+      },
+      {
+       "at": 4,
+       "d": "multilayer",
+       "reading": "",
+       "w": "다중"
+      },
+      {
+       "at": 5,
+       "d": "many sides",
+       "reading": "",
+       "w": "다면"
+      },
+      {
+       "at": 6,
+       "d": "being simultaneous",
+       "reading": "",
+       "w": "다발성"
+      },
+      {
+       "at": 7,
+       "d": "osteoporosis",
+       "reading": "",
+       "w": "골다공증"
+      },
+      {
+       "at": 8,
+       "d": "excessive",
+       "reading": "",
+       "w": "과다하다"
+      },
+      {
+       "at": 9,
+       "d": "multi-household house",
+       "reading": "",
+       "w": "다가구 주택"
+      },
+      {
+       "at": 10,
+       "d": "multiangle",
+       "reading": "",
+       "w": "다각도"
+      },
+      {
+       "at": 11,
+       "d": "many-sided; multilateral; diversified",
+       "reading": "",
+       "w": "다각적"
+      },
+      {
+       "at": 12,
+       "d": "polygon",
+       "reading": "",
+       "w": "다각형"
+      },
+      {
+       "at": 13,
+       "d": "diversification",
+       "reading": "",
+       "w": "다각화"
+      },
+      {
+       "at": 14,
+       "d": "emotional; sentimental",
+       "reading": "",
+       "w": "다감하다"
+      },
+      {
+       "at": 15,
+       "d": "many or few; quantity; amount",
+       "reading": "",
+       "w": "다과"
+      },
+      {
+       "at": 16,
+       "d": "many languages",
+       "reading": "",
+       "w": "다국어"
+      },
+      {
+       "at": 17,
+       "d": "multinational",
+       "reading": "",
+       "w": "다국적"
+      },
+      {
+       "at": 18,
+       "d": "multinational enterprise",
+       "reading": "",
+       "w": "다국적 기업"
+      },
+      {
+       "at": 19,
+       "d": "multipolarization",
+       "reading": "",
+       "w": "다극화"
+      },
+      {
+       "at": 106,
+       "d": "fortune",
+       "reading": "",
+       "w": "천만다행"
+      },
+      {
+       "at": 107,
+       "d": "widespread; known widely",
+       "reading": "",
+       "w": "파다하다"
+      },
+      {
+       "at": 108,
+       "d": "countless; plenty; numerous",
+       "reading": "",
+       "w": "허다하다"
+      },
+      {
+       "at": 109,
+       "d": "countlessly; so many; plentifully",
+       "reading": "",
+       "w": "허다히"
+      },
+      {
+       "at": 110,
+       "d": "with the good comes the bad",
+       "reading": "",
+       "w": "호사다마"
+      }
+     ],
+     "length": 111
+    }
+   },
+   "市": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "sing4 si5",
+       "d": "city",
+       "reading": "chéng​shì",
+       "w": "城市"
+      },
+      {
+       "at": 1,
+       "ct": "si5 coeng4",
+       "d": "marketplace",
+       "reading": "shì​chǎng",
+       "w": "市场"
+      },
+      {
+       "at": 2,
+       "ct": "si5 zoeng2",
+       "d": "mayor",
+       "reading": "shì​zhǎng",
+       "w": "市长"
+      },
+      {
+       "at": 3,
+       "ct": "ciu1 si5",
+       "d": "supermarket",
+       "reading": "chāo​shì",
+       "w": "超市"
+      },
+      {
+       "at": 4,
+       "ct": "si5 man4",
+       "d": "city resident",
+       "reading": "shì​mín",
+       "w": "市民"
+      },
+      {
+       "at": 5,
+       "ct": "zi1 bun2 si5 coeng4",
+       "d": "capital market",
+       "reading": "zī​běn​shì​chǎng",
+       "w": "资本市场"
+      },
+      {
+       "at": 6,
+       "ct": "si5 zung1 sam1",
+       "d": "city center",
+       "reading": "shì​zhōng​xīn",
+       "w": "市中心"
+      },
+      {
+       "at": 7,
+       "ct": "si5 keoi1",
+       "d": "urban district",
+       "reading": "shì​qū",
+       "w": "市区"
+      },
+      {
+       "at": 8,
+       "ct": "fu3 si5 zoeng2",
+       "d": "deputy mayor",
+       "reading": "fù​shì​zhǎng",
+       "w": "副市长"
+      },
+      {
+       "at": 9,
+       "ct": "dou1 si5",
+       "d": "city",
+       "reading": "dū​shì",
+       "w": "都市"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "li (Chinese unit of length equal to 500 meters)",
+       "reading": "shì​lǐ",
+       "w": "市里"
+      },
+      {
+       "at": 11,
+       "ct": "si5 zing3 teng1",
+       "d": "city hall",
+       "reading": "shì​zhèng​tīng",
+       "w": "市政厅"
+      },
+      {
+       "at": 12,
+       "ct": "hak1 si5",
+       "d": "black market",
+       "reading": "hēi​shì",
+       "w": "黑市"
+      },
+      {
+       "at": 13,
+       "ct": "soeng5 si5",
+       "d": "to hit the market (of a new product)",
+       "reading": "shàng​shì",
+       "w": "上市"
+      },
+      {
+       "at": 14,
+       "ct": "si5 zing3 fu2",
+       "d": "city hall",
+       "reading": "shì​zhèng​fǔ",
+       "w": "市政府"
+      },
+      {
+       "at": 15,
+       "ct": "si5 zing3",
+       "d": "municipal administration",
+       "reading": "shì​zhèng",
+       "w": "市政"
+      },
+      {
+       "at": 16,
+       "ct": "bun2 si5",
+       "d": "this city",
+       "reading": "běn​shì",
+       "w": "本市"
+      },
+      {
+       "at": 17,
+       "ct": "zaap6 si5",
+       "d": "market",
+       "reading": "jí​shì",
+       "w": "集市"
+      },
+      {
+       "at": 18,
+       "ct": "cyun4 si5",
+       "d": "whole city",
+       "reading": "quán​shì",
+       "w": "全市"
+      },
+      {
+       "at": 19,
+       "ct": "gu2 si5",
+       "d": "stock market",
+       "reading": "gǔ​shì",
+       "w": "股市"
+      },
+      {
+       "at": 152,
+       "ct": "zung1 wo4 si5",
+       "d": "Zhonghe or Chungho city in New Taipei City 新北市[Xīn​běi​shì], Taiwan",
+       "reading": "Zhōng​hé​shì",
+       "w": "中和市"
+      },
+      {
+       "at": 153,
+       "ct": "ng5 toi4 si5",
+       "d": "Wutai city in Shanxi",
+       "reading": "Wǔ​tái​shì",
+       "w": "五台市"
+      },
+      {
+       "at": 154,
+       "ct": "jan4 cyun1 gwong2 wik6 si5",
+       "d": "Incheon Metropolitan City in Gyeonggi Province 京畿道[Jīng​jī​dào], South Korea",
+       "reading": "Rén​chuān​Guǎng​yù​shì",
+       "w": "仁川广域市"
+      },
+      {
+       "at": 155,
+       "ct": "loi4 ban1 si5",
+       "d": "Laibin prefecture-level city in Guangxi",
+       "reading": "Lái​bīn​shì",
+       "w": "来宾市"
+      },
+      {
+       "at": 156,
+       "ct": "gwong1 zau1 gwong2 wik6 si5",
+       "d": "Gwangju Metropolitan City, capital of South Jeolla Province 全羅南道|全罗南道[Quán​luó​nán​dào], South Korea",
+       "reading": "Guāng​zhōu​guǎng​yù​shì",
+       "w": "光州广域市"
+      }
+     ],
+     "length": 157
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "town",
+       "reading": "とし",
+       "w": "都市"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "citizen (of a country)",
+       "reading": "しみん",
+       "w": "市民"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "in the city",
+       "reading": "しない",
+       "w": "市内"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "mayor",
+       "reading": "しちょう",
+       "w": "市長"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "urban areas",
+       "reading": "しがい",
+       "w": "市街"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "town area",
+       "reading": "しがいち",
+       "w": "市街地"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "putting on the market",
+       "reading": "しはん",
+       "w": "市販"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "metropolis",
+       "reading": "だいとし",
+       "w": "大都市"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "in the city",
+       "reading": "しちゅう",
+       "w": "市中"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "municipal office",
+       "reading": "しやくしょ",
+       "w": "市役所"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "urban area",
+       "reading": "としぶ",
+       "w": "都市部"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "outside the city",
+       "reading": "しがい",
+       "w": "市外"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "citizenship",
+       "reading": "しみんけん",
+       "w": "市民権"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "municipal",
+       "reading": "しりつ",
+       "w": "市立"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "(town) market",
+       "reading": "いちば",
+       "w": "市場"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "cities, towns and villages",
+       "reading": "しちょうそん",
+       "w": "市町村"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "stock market",
+       "reading": "かぶしきしじょう",
+       "w": "株式市場"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "city planning",
+       "reading": "としけいかく",
+       "w": "都市計画"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "municipal government",
+       "reading": "しせい",
+       "w": "市政"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "trade fair",
+       "reading": "みほんいち",
+       "w": "見本市"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "secondhand book fair",
+       "reading": "こしょいち",
+       "w": "古書市"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "citizens' rally",
+       "reading": "しみんたいかい",
+       "w": "市民大会"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "city name",
+       "reading": "しめい",
+       "w": "市名"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "neighboring towns",
+       "reading": "きんこうとし",
+       "w": "近郊都市"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "city god",
+       "reading": "いちがみ",
+       "w": "市神"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "city",
+       "reading": "",
+       "w": "도시"
+      },
+      {
+       "at": 1,
+       "d": "mayor",
+       "reading": "",
+       "w": "시장"
+      },
+      {
+       "at": 2,
+       "d": "urbanite; city dweller",
+       "reading": "",
+       "w": "시민"
+      },
+      {
+       "at": 3,
+       "d": "creating a new market",
+       "reading": "",
+       "w": "개시"
+      },
+      {
+       "at": 4,
+       "d": "street of city",
+       "reading": "",
+       "w": "시가"
+      },
+      {
+       "at": 5,
+       "d": "city hall",
+       "reading": "",
+       "w": "시청"
+      },
+      {
+       "at": 6,
+       "d": "launch; start",
+       "reading": "",
+       "w": "개시하다"
+      },
+      {
+       "at": 7,
+       "d": "industrial city",
+       "reading": "",
+       "w": "공업 도시"
+      },
+      {
+       "at": 8,
+       "d": "tourist city",
+       "reading": "",
+       "w": "관광 도시"
+      },
+      {
+       "at": 9,
+       "d": "metropolitan city",
+       "reading": "",
+       "w": "광역시"
+      },
+      {
+       "at": 10,
+       "d": "domestic market",
+       "reading": "",
+       "w": "국내 시장"
+      },
+      {
+       "at": 11,
+       "d": "international market",
+       "reading": "",
+       "w": "국제 시장"
+      },
+      {
+       "at": 12,
+       "d": "international city",
+       "reading": "",
+       "w": "국제도시"
+      },
+      {
+       "at": 13,
+       "d": "financial market",
+       "reading": "",
+       "w": "금융 시장"
+      },
+      {
+       "at": 14,
+       "d": "Namdaemun Market",
+       "reading": "",
+       "w": "남대문 시장"
+      },
+      {
+       "at": 15,
+       "d": "big city; metropolis",
+       "reading": "",
+       "w": "대도시"
+      },
+      {
+       "at": 16,
+       "d": "busy and disorderly market; zoo",
+       "reading": "",
+       "w": "도깨비市場"
+      },
+      {
+       "at": 17,
+       "d": "busy and disorderly market; zoo",
+       "reading": "",
+       "w": "도깨비시장"
+      },
+      {
+       "at": 18,
+       "d": "crowded and disorderly market",
+       "reading": "",
+       "w": "도떼기市場"
+      },
+      {
+       "at": 19,
+       "d": "crowded and disorderly market",
+       "reading": "",
+       "w": "도떼기시장"
+      },
+      {
+       "at": 76,
+       "d": "release; launch",
+       "reading": "",
+       "w": "출시하다"
+      },
+      {
+       "at": 77,
+       "d": "teukbyeol-si",
+       "reading": "",
+       "w": "특별시"
+      },
+      {
+       "at": 78,
+       "d": "niche market",
+       "reading": "",
+       "w": "틈새市場"
+      },
+      {
+       "at": 79,
+       "d": "niche market",
+       "reading": "",
+       "w": "틈새시장"
+      },
+      {
+       "at": 80,
+       "d": "port city",
+       "reading": "",
+       "w": "항구 도시"
+      }
+     ],
+     "length": 81
+    }
+   },
+   "形": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "jing4 zoeng6",
+       "d": "image",
+       "reading": "xíng​xiàng",
+       "w": "形象"
+      },
+      {
+       "at": 1,
+       "ct": "jing4 jung4",
+       "d": "to describe",
+       "reading": "xíng​róng",
+       "w": "形容"
+      },
+      {
+       "at": 2,
+       "ct": "jing4 sik1",
+       "d": "outer appearance",
+       "reading": "xíng​shì",
+       "w": "形式"
+      },
+      {
+       "at": 3,
+       "ct": "cing4 jing4",
+       "d": "circumstances",
+       "reading": "qíng​xing",
+       "w": "情形"
+      },
+      {
+       "at": 4,
+       "ct": "jing4 sing4",
+       "d": "to form",
+       "reading": "xíng​chéng",
+       "w": "形成"
+      },
+      {
+       "at": 5,
+       "ct": "jing4 zong6",
+       "d": "form",
+       "reading": "xíng​zhuàng",
+       "w": "形状"
+      },
+      {
+       "at": 6,
+       "ct": "jan2 jing4",
+       "d": "invisible",
+       "reading": "yǐn​xíng",
+       "w": "隐形"
+      },
+      {
+       "at": 7,
+       "ct": "jing4 sai3",
+       "d": "circumstances",
+       "reading": "xíng​shì",
+       "w": "形势"
+      },
+      {
+       "at": 8,
+       "ct": "zing2 jing4",
+       "d": "shaping",
+       "reading": "zhěng​xíng",
+       "w": "整形"
+      },
+      {
+       "at": 9,
+       "ct": "bin3 jing4",
+       "d": "deformation",
+       "reading": "biàn​xíng",
+       "w": "变形"
+      },
+      {
+       "at": 10,
+       "ct": "kei1 jing4",
+       "d": "deformity",
+       "reading": "jī​xíng",
+       "w": "畸形"
+      },
+      {
+       "at": 11,
+       "ct": "ngoi6 jing4",
+       "d": "figure",
+       "reading": "wài​xíng",
+       "w": "外形"
+      },
+      {
+       "at": 12,
+       "ct": "dei6 jing4",
+       "d": "topography",
+       "reading": "dì​xíng",
+       "w": "地形"
+      },
+      {
+       "at": 13,
+       "ct": "jyun4 jing4",
+       "d": "round",
+       "reading": "yuán​xíng",
+       "w": "圆形"
+      },
+      {
+       "at": 14,
+       "ct": "jing4 taai3",
+       "d": "shape",
+       "reading": "xíng​tài",
+       "w": "形态"
+      },
+      {
+       "at": 15,
+       "ct": "tai2 jing4",
+       "d": "figure",
+       "reading": "tǐ​xíng",
+       "w": "体形"
+      },
+      {
+       "at": 16,
+       "ct": "deoi6 jing4",
+       "d": "formation",
+       "reading": "duì​xíng",
+       "w": "队形"
+      },
+      {
+       "at": 17,
+       "ct": "mou4 jing4",
+       "d": "incorporeal",
+       "reading": "wú​xíng",
+       "w": "无形"
+      },
+      {
+       "at": 18,
+       "ct": "jan4 jing4",
+       "d": "human shape",
+       "reading": "rén​xíng",
+       "w": "人形"
+      },
+      {
+       "at": 19,
+       "ct": "jyun4 jing4",
+       "d": "original shape",
+       "reading": "yuán​xíng",
+       "w": "原形"
+      },
+      {
+       "at": 127,
+       "ct": "saan1 jing4",
+       "d": "Yamagata prefecture in the north of Japan's main island Honshū 本州[Běn​zhōu]",
+       "reading": "Shān​xíng",
+       "w": "山形"
+      },
+      {
+       "at": 128,
+       "ct": "",
+       "d": "U-turn",
+       "reading": "U ​xíng​zhuǎn​wān",
+       "w": "U形转弯"
+      },
+      {
+       "at": 129,
+       "ct": "bin3 jing4 gam1 gong1",
+       "d": "Transformers (franchise)",
+       "reading": "Biàn​xíng​jīn​gāng",
+       "w": "变形金刚"
+      },
+      {
+       "at": 130,
+       "ct": "gun1 coeng4 jin6 jing4 gei3",
+       "d": "Observations on the Current State of Officialdom, late Qing novel by Li Baojia 李寶嘉|李宝嘉[Lǐ​Bǎo​jià]",
+       "reading": "Guān​chǎng​Xiàn​xíng​Jì",
+       "w": "官场现形记"
+      },
+      {
+       "at": 131,
+       "ct": "saan1 jing4 jyun6",
+       "d": "Yamagata prefecture in the north of Japan's main island Honshū 本州[Běn​zhōu]",
+       "reading": "Shān​xíng​xiàn",
+       "w": "山形县"
+      }
+     ],
+     "length": 132
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "form",
+       "reading": "かたち",
+       "w": "形"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "doll",
+       "reading": "にんぎょう",
+       "w": "人形"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "large",
+       "reading": "おおがた",
+       "w": "大型"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "small-sized",
+       "reading": "こがた",
+       "w": "小型"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "formation",
+       "reading": "けいせい",
+       "w": "形成"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "form (as opposed to substance)",
+       "reading": "けいしき",
+       "w": "形式"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "hair style",
+       "reading": "かみがた",
+       "w": "髪型"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "shape",
+       "reading": "けいじょう",
+       "w": "形状"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "form",
+       "reading": "けいたい",
+       "w": "形態"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "traces",
+       "reading": "けいせき",
+       "w": "形跡"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "dress",
+       "reading": "みなり",
+       "w": "身なり"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "figure",
+       "reading": "たいけい",
+       "w": "体型"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "transformation",
+       "reading": "へんけい",
+       "w": "変形"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "terrain",
+       "reading": "ちけい",
+       "w": "地形"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "creation",
+       "reading": "せいせい",
+       "w": "生成"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "disposition",
+       "reading": "きしつ",
+       "w": "気質"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "description",
+       "reading": "けいよう",
+       "w": "形容"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "round shape",
+       "reading": "えんけい",
+       "w": "円形"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "new type",
+       "reading": "しんがた",
+       "w": "新型"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "memento (esp. of a deceased person)",
+       "reading": "かたみ",
+       "w": "形見"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "doll clothed in chrysanthemum flowers and branches",
+       "reading": "きくにんぎょう",
+       "w": "菊人形"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "Japanese puppet theatre in which recited narrative and dialog is accompanied by a shamisen (forerunner of bunraku)",
+       "reading": "にんぎょうじょうるり",
+       "w": "人形浄瑠璃"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "formal logic",
+       "reading": "けいしきろんりがく",
+       "w": "形式論理学"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "leading actor",
+       "reading": "はながたやくしゃ",
+       "w": "花形役者"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "linear",
+       "reading": "せんけい",
+       "w": "線形"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "doll; figure",
+       "reading": "",
+       "w": "인형"
+      },
+      {
+       "at": 1,
+       "d": "poor; low; bad",
+       "reading": "",
+       "w": "형편없다"
+      },
+      {
+       "at": 2,
+       "d": "plastic surgery; department of plastic surgery",
+       "reading": "",
+       "w": "성형외과"
+      },
+      {
+       "at": 3,
+       "d": "situation; state",
+       "reading": "",
+       "w": "형편"
+      },
+      {
+       "at": 4,
+       "d": "orthopedics; department of orthopedics",
+       "reading": "",
+       "w": "정형외과"
+      },
+      {
+       "at": 5,
+       "d": "shaping",
+       "reading": "",
+       "w": "성형"
+      },
+      {
+       "at": 6,
+       "d": "formation; building; development",
+       "reading": "",
+       "w": "형성"
+      },
+      {
+       "at": 7,
+       "d": "form; build; develop",
+       "reading": "",
+       "w": "형성하다"
+      },
+      {
+       "at": 8,
+       "d": "model; example",
+       "reading": "",
+       "w": "모형"
+      },
+      {
+       "at": 9,
+       "d": "badly; terribly; awfully",
+       "reading": "",
+       "w": "형편없이"
+      },
+      {
+       "at": 10,
+       "d": "exclamatory form",
+       "reading": "",
+       "w": "감탄형"
+      },
+      {
+       "at": 11,
+       "d": "egg shape",
+       "reading": "",
+       "w": "계란형"
+      },
+      {
+       "at": 12,
+       "d": "solid",
+       "reading": "",
+       "w": "고형"
+      },
+      {
+       "at": 13,
+       "d": "past tense",
+       "reading": "",
+       "w": "과거형"
+      },
+      {
+       "at": 14,
+       "d": "adnominal",
+       "reading": "",
+       "w": "관형격"
+      },
+      {
+       "at": 15,
+       "d": "adnominal case marker",
+       "reading": "",
+       "w": "관형격 조사"
+      },
+      {
+       "at": 16,
+       "d": "determiner",
+       "reading": "",
+       "w": "관형사"
+      },
+      {
+       "at": 17,
+       "d": "adnominal suffix",
+       "reading": "",
+       "w": "관형사형 어미"
+      },
+      {
+       "at": 18,
+       "d": "adnominal phrase",
+       "reading": "",
+       "w": "관형어"
+      },
+      {
+       "at": 19,
+       "d": "adnominal clause",
+       "reading": "",
+       "w": "관형절"
+      },
+      {
+       "at": 116,
+       "d": "form; shape",
+       "reading": "",
+       "w": "형체"
+      },
+      {
+       "at": 117,
+       "d": "form; shape",
+       "reading": "",
+       "w": "형태"
+      },
+      {
+       "at": 118,
+       "d": "morpheme",
+       "reading": "",
+       "w": "형태소"
+      },
+      {
+       "at": 119,
+       "d": "being physical; being morphological",
+       "reading": "",
+       "w": "형태적"
+      },
+      {
+       "at": 120,
+       "d": "variety; diversity; many different colors",
+       "reading": "",
+       "w": "형형색색"
+      }
+     ],
+     "length": 121
+    }
+   },
+   "空": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "hung1 gaan1",
+       "d": "space",
+       "reading": "kōng​jiān",
+       "w": "空间"
+      },
+      {
+       "at": 1,
+       "ct": "hung1 hei3",
+       "d": "air",
+       "reading": "kōng​qì",
+       "w": "空气"
+      },
+      {
+       "at": 2,
+       "ct": "taai3 hung1",
+       "d": "outer space",
+       "reading": "tài​kōng",
+       "w": "太空"
+      },
+      {
+       "at": 3,
+       "ct": "jau5 hung1",
+       "d": "to have time (to do sth)",
+       "reading": "yǒu​kòng",
+       "w": "有空"
+      },
+      {
+       "at": 4,
+       "ct": "tin1 hung1",
+       "d": "sky",
+       "reading": "tiān​kōng",
+       "w": "天空"
+      },
+      {
+       "at": 5,
+       "ct": "hung1 zung1",
+       "d": "in the sky",
+       "reading": "kōng​zhōng",
+       "w": "空中"
+      },
+      {
+       "at": 6,
+       "ct": "hong4 hung1",
+       "d": "aviation",
+       "reading": "háng​kōng",
+       "w": "航空"
+      },
+      {
+       "at": 7,
+       "ct": "hung1 gwan1",
+       "d": "air force",
+       "reading": "kōng​jūn",
+       "w": "空军"
+      },
+      {
+       "at": 8,
+       "ct": "si4 hung1",
+       "d": "time and place",
+       "reading": "shí​kōng",
+       "w": "时空"
+      },
+      {
+       "at": 9,
+       "ct": "hung1 baak6",
+       "d": "blank space",
+       "reading": "kòng​bái",
+       "w": "空白"
+      },
+      {
+       "at": 10,
+       "ct": "hong4 hung1 gung1 si1",
+       "d": "airline",
+       "reading": "háng​kōng​gōng​sī",
+       "w": "航空公司"
+      },
+      {
+       "at": 11,
+       "ct": "hung1 sau2",
+       "d": "empty-handed",
+       "reading": "kōng​shǒu",
+       "w": "空手"
+      },
+      {
+       "at": 12,
+       "ct": "hung1 tiu4",
+       "d": "air conditioning",
+       "reading": "kōng​tiáo",
+       "w": "空调"
+      },
+      {
+       "at": 13,
+       "ct": "hung1 heoi1",
+       "d": "hollow",
+       "reading": "kōng​xū",
+       "w": "空虚"
+      },
+      {
+       "at": 14,
+       "ct": "taai3 hung1 syun4",
+       "d": "spaceship",
+       "reading": "tài​kōng​chuán",
+       "w": "太空船"
+      },
+      {
+       "at": 15,
+       "ct": "soeng6 hung1",
+       "d": "overhead",
+       "reading": "shàng​kōng",
+       "w": "上空"
+      },
+      {
+       "at": 16,
+       "ct": "hung1 dei6",
+       "d": "air-to-surface (missile)",
+       "reading": "kōng​dì",
+       "w": "空地"
+      },
+      {
+       "at": 17,
+       "ct": "pang4 hung1",
+       "d": "baseless (lie)",
+       "reading": "píng​kōng",
+       "w": "凭空"
+      },
+      {
+       "at": 18,
+       "ct": "hung1 ze2",
+       "d": "abbr. for 空中小姐",
+       "reading": "kōng​jiě",
+       "w": "空姐"
+      },
+      {
+       "at": 19,
+       "ct": "hung1 kyut3",
+       "d": "vacancy",
+       "reading": "kòng​quē",
+       "w": "空缺"
+      },
+      {
+       "at": 130,
+       "ct": "haa1 baak3 taai3 hung1 mong6 jyun5 geng3",
+       "d": "Hubble Space Telescope",
+       "reading": "Hā​bó​Tài​kōng​Wàng​yuǎn​jìng",
+       "w": "哈伯太空望远镜"
+      },
+      {
+       "at": 131,
+       "ct": "gwok3 taai3 hong4 hung1",
+       "d": "Cathay Pacific, Hong Kong-based airline",
+       "reading": "Guó​tài​Háng​kōng",
+       "w": "国泰航空"
+      },
+      {
+       "at": 132,
+       "ct": "gwok3 zai3 hong4 hung1 lyun4 hap6 wui2",
+       "d": "Fédération Aéronautique Internationale (FAI), world body of gliding and aeronautic sports",
+       "reading": "Guó​jì​Háng​kōng​Lián​hé​huì",
+       "w": "国际航空联合会"
+      },
+      {
+       "at": 133,
+       "ct": "gwok3 zai3 hong4 hung1 wan6 syu1 hip3 wui2",
+       "d": "International Air Transport Association (IATA)",
+       "reading": "Guó​jì​Háng​kōng​Yùn​shū​Xié​huì",
+       "w": "国际航空运输协会"
+      },
+      {
+       "at": 134,
+       "ct": "daai6 hon4 hong4 hung1",
+       "d": "Korean Air, South Korea's main airline",
+       "reading": "Dà​hán​Háng​kōng",
+       "w": "大韩航空"
+      }
+     ],
+     "length": 135
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "to open",
+       "reading": "ひらく",
+       "w": "開く"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "to open (a door, etc.)",
+       "reading": "あける",
+       "w": "開ける"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "air",
+       "reading": "くうき",
+       "w": "空気"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "sky",
+       "reading": "くうちゅう",
+       "w": "空中"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "sky",
+       "reading": "じょうくう",
+       "w": "上空"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "night sky",
+       "reading": "よぞら",
+       "w": "夜空"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "to confide",
+       "reading": "うちあける",
+       "w": "打ち明ける"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "empty",
+       "reading": "からっぽ",
+       "w": "空っぽ"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "blue sky",
+       "reading": "あおぞら",
+       "w": "青空"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "empty stomach",
+       "reading": "くうふく",
+       "w": "空腹"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "daydream",
+       "reading": "くうそう",
+       "w": "空想"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "empty space",
+       "reading": "こくう",
+       "w": "虚空"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "empty",
+       "reading": "むなしい",
+       "w": "虚しい"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "starry sky",
+       "reading": "ほしぞら",
+       "w": "星空"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "to become less crowded",
+       "reading": "すく",
+       "w": "空く"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "blank space (in a document)",
+       "reading": "くうはく",
+       "w": "空白"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "airport",
+       "reading": "くうこう",
+       "w": "空港"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "cavity",
+       "reading": "くうどう",
+       "w": "空洞"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "emptiness",
+       "reading": "くうきょ",
+       "w": "空虚"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "fictitious",
+       "reading": "かくう",
+       "w": "架空"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "vacuum pack",
+       "reading": "しんくうパック",
+       "w": "真空パック"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "Japan Air Lines",
+       "reading": "にっぽんこうくう",
+       "w": "日本航空"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "karate practitioner",
+       "reading": "からてか",
+       "w": "空手家"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "absentminded response",
+       "reading": "そらへんじ",
+       "w": "空返事"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "air mobile",
+       "reading": "くうちゅうきどう",
+       "w": "空中機動"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "gaining for free",
+       "reading": "",
+       "w": "공하다"
+      },
+      {
+       "at": 1,
+       "d": "something gained free of charge",
+       "reading": "",
+       "w": "공짜"
+      },
+      {
+       "at": 2,
+       "d": "airport",
+       "reading": "",
+       "w": "공항"
+      },
+      {
+       "at": 3,
+       "d": "space",
+       "reading": "",
+       "w": "공간"
+      },
+      {
+       "at": 4,
+       "d": "being antiaircraft",
+       "reading": "",
+       "w": "대공"
+      },
+      {
+       "at": 5,
+       "d": "fantasy",
+       "reading": "",
+       "w": "공상"
+      },
+      {
+       "at": 6,
+       "d": "vainly; in vain; to no avail",
+       "reading": "",
+       "w": "공연히"
+      },
+      {
+       "at": 7,
+       "d": "aviation; air",
+       "reading": "",
+       "w": "항공"
+      },
+      {
+       "at": 8,
+       "d": "airplane; aircraft; plane",
+       "reading": "",
+       "w": "항공기"
+      },
+      {
+       "at": 9,
+       "d": "vacuum",
+       "reading": "",
+       "w": "진공"
+      },
+      {
+       "at": 10,
+       "d": "fictional character",
+       "reading": "",
+       "w": "가공인물"
+      },
+      {
+       "at": 11,
+       "d": "being fictitious; being fictive",
+       "reading": "",
+       "w": "가공적"
+      },
+      {
+       "at": 12,
+       "d": "high altitude",
+       "reading": "",
+       "w": "고공"
+      },
+      {
+       "at": 13,
+       "d": "spatiality",
+       "reading": "",
+       "w": "공간성"
+      },
+      {
+       "at": 14,
+       "d": "being spatial",
+       "reading": "",
+       "w": "공간적"
+      },
+      {
+       "at": 15,
+       "d": "something gained free of charge; freebies",
+       "reading": "",
+       "w": "공것"
+      },
+      {
+       "at": 16,
+       "d": "briefcase",
+       "reading": "",
+       "w": "공공칠가방"
+      },
+      {
+       "at": 17,
+       "d": "air force",
+       "reading": "",
+       "w": "공군"
+      },
+      {
+       "at": 18,
+       "d": "Air Force Academy",
+       "reading": "",
+       "w": "공군 사관 학교"
+      },
+      {
+       "at": 19,
+       "d": "air cleaner",
+       "reading": "",
+       "w": "공기 정화기"
+      },
+      {
+       "at": 73,
+       "d": "air route; airway",
+       "reading": "",
+       "w": "항공로"
+      },
+      {
+       "at": 74,
+       "d": "airfare; flight fare",
+       "reading": "",
+       "w": "항공료"
+      },
+      {
+       "at": 75,
+       "d": "airline",
+       "reading": "",
+       "w": "항공사"
+      },
+      {
+       "at": 76,
+       "d": "air transportation; flight",
+       "reading": "",
+       "w": "항공편"
+      },
+      {
+       "at": 77,
+       "d": "air; sky",
+       "reading": "",
+       "w": "허공"
+      }
+     ],
+     "length": 78
+    }
+   },
+   "色": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "ceot1 sik1",
+       "d": "remarkable",
+       "reading": "chū​sè",
+       "w": "出色"
+      },
+      {
+       "at": 1,
+       "ct": "gok3 sik1",
+       "d": "role",
+       "reading": "jué​sè",
+       "w": "角色"
+      },
+      {
+       "at": 2,
+       "ct": "ngaan4 sik1",
+       "d": "color",
+       "reading": "yán​sè",
+       "w": "颜色"
+      },
+      {
+       "at": 3,
+       "ct": "hung4 sik1",
+       "d": "red (color)",
+       "reading": "hóng​sè",
+       "w": "红色"
+      },
+      {
+       "at": 4,
+       "ct": "laam4 sik1",
+       "d": "blue (color)",
+       "reading": "lán​sè",
+       "w": "蓝色"
+      },
+      {
+       "at": 5,
+       "ct": "hak1 sik1",
+       "d": "black",
+       "reading": "hēi​sè",
+       "w": "黑色"
+      },
+      {
+       "at": 6,
+       "ct": "luk6 sik1",
+       "d": "green",
+       "reading": "lǜ​sè",
+       "w": "绿色"
+      },
+      {
+       "at": 7,
+       "ct": "baak6 sik1",
+       "d": "white",
+       "reading": "bái​sè",
+       "w": "白色"
+      },
+      {
+       "at": 8,
+       "ct": "sik1 cing4",
+       "d": "pornography",
+       "reading": "sè​qíng",
+       "w": "色情"
+      },
+      {
+       "at": 9,
+       "ct": "wong4 sik1",
+       "d": "yellow (color)",
+       "reading": "huáng​sè",
+       "w": "黄色"
+      },
+      {
+       "at": 10,
+       "ct": "zung1 sik1",
+       "d": "brown",
+       "reading": "zōng​sè",
+       "w": "棕色"
+      },
+      {
+       "at": 11,
+       "ct": "gam1 sik1",
+       "d": "golden",
+       "reading": "jīn​sè",
+       "w": "金色"
+      },
+      {
+       "at": 12,
+       "ct": "hei3 sik1",
+       "d": "complexion",
+       "reading": "qì​sè",
+       "w": "气色"
+      },
+      {
+       "at": 13,
+       "ct": "lim5 sik1",
+       "d": "complexion",
+       "reading": "liǎn​sè",
+       "w": "脸色"
+      },
+      {
+       "at": 14,
+       "ct": "zi2 sik1",
+       "d": "purple",
+       "reading": "zǐ​sè",
+       "w": "紫色"
+      },
+      {
+       "at": 15,
+       "ct": "fui1 sik1",
+       "d": "gray",
+       "reading": "huī​sè",
+       "w": "灰色"
+      },
+      {
+       "at": 16,
+       "ct": "fu1 sik1",
+       "d": "skin color",
+       "reading": "fū​sè",
+       "w": "肤色"
+      },
+      {
+       "at": 17,
+       "ct": "dak6 sik1",
+       "d": "characteristic",
+       "reading": "tè​sè",
+       "w": "特色"
+      },
+      {
+       "at": 18,
+       "ct": "sik1 coi2",
+       "d": "tint",
+       "reading": "sè​cǎi",
+       "w": "色彩"
+      },
+      {
+       "at": 19,
+       "ct": "ngan4 sik1",
+       "d": "silver (color)",
+       "reading": "yín​sè",
+       "w": "银色"
+      },
+      {
+       "at": 137,
+       "ct": "jim5 sik1 tai2 pui5 sing3",
+       "d": "ploidy (number of homologous chromosomes)",
+       "reading": "rǎn​sè​tǐ​bèi​xìng",
+       "w": "染色体倍性"
+      },
+      {
+       "at": 138,
+       "ct": "ji5 sik1 lit6",
+       "d": "Israel",
+       "reading": "Yǐ​sè​liè",
+       "w": "以色列"
+      },
+      {
+       "at": 139,
+       "ct": "ji5 sik1 lit6 jan4",
+       "d": "Israelite",
+       "reading": "Yǐ​sè​liè​rén",
+       "w": "以色列人"
+      },
+      {
+       "at": 140,
+       "ct": "zung1 gwok3 dak6 sik1 se5 wui2 zyu2 ji6",
+       "d": "\"socialism with Chinese characteristics\"",
+       "reading": "Zhōng​guó​tè​sè​shè​huì​zhǔ​yì",
+       "w": "中国特色社会主义"
+      },
+      {
+       "at": 141,
+       "ct": "hei1 gaak3 si1 bo1 sik1 zi2",
+       "d": "Higgs boson (particle physics)",
+       "reading": "Xī​gé​sī​bō​sè​zǐ",
+       "w": "希格斯玻色子"
+      }
+     ],
+     "length": 142
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "various",
+       "reading": "いろいろ",
+       "w": "色々"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "scenery",
+       "reading": "けしき",
+       "w": "景色"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "complexion",
+       "reading": "かおいろ",
+       "w": "顔色"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "grey",
+       "reading": "はいいろ",
+       "w": "灰色"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "gold (colour, color)",
+       "reading": "きんいろ",
+       "w": "金色"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "silver (color, colour)",
+       "reading": "ぎんいろ",
+       "w": "銀色"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "various",
+       "reading": "いろんな",
+       "w": "色んな"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "yellow",
+       "reading": "きいろい",
+       "w": "黄色い"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "green",
+       "reading": "みどりいろ",
+       "w": "緑色"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "yellow",
+       "reading": "きいろ",
+       "w": "黄色"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "purple",
+       "reading": "むらさきいろ",
+       "w": "紫色"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "colouring",
+       "reading": "いろけ",
+       "w": "色気"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "brown",
+       "reading": "ちゃいろ",
+       "w": "茶色"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "to colour",
+       "reading": "いろどる",
+       "w": "彩る"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "colour",
+       "reading": "しきさい",
+       "w": "色彩"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "light blue",
+       "reading": "みずいろ",
+       "w": "水色"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "colouring",
+       "reading": "いろあい",
+       "w": "色合い"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "tone of voice",
+       "reading": "こわいろ",
+       "w": "声色"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "pink (colour, color)",
+       "reading": "ももいろ",
+       "w": "桃色"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "tone color",
+       "reading": "ねいろ",
+       "w": "音色"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "bronze color",
+       "reading": "どうしょく",
+       "w": "銅色"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "grayish white",
+       "reading": "かいはくしょく",
+       "w": "灰白色"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "red-light district",
+       "reading": "いろまち",
+       "w": "色町"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "dark green",
+       "reading": "あんりょくしょく",
+       "w": "暗緑色"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "red light (esp. on emergency vehicles)",
+       "reading": "せきしょくとう",
+       "w": "赤色灯"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "green",
+       "reading": "",
+       "w": "녹색"
+      },
+      {
+       "at": 1,
+       "d": "brown",
+       "reading": "",
+       "w": "갈색"
+      },
+      {
+       "at": 2,
+       "d": "white",
+       "reading": "",
+       "w": "흰색"
+      },
+      {
+       "at": 3,
+       "d": "blue",
+       "reading": "",
+       "w": "파란색"
+      },
+      {
+       "at": 4,
+       "d": "green",
+       "reading": "",
+       "w": "초록색"
+      },
+      {
+       "at": 5,
+       "d": "yellow",
+       "reading": "",
+       "w": "노란색"
+      },
+      {
+       "at": 6,
+       "d": "red; dark red",
+       "reading": "",
+       "w": "적색"
+      },
+      {
+       "at": 7,
+       "d": "violet; purple",
+       "reading": "",
+       "w": "보라색"
+      },
+      {
+       "at": 8,
+       "d": "silver",
+       "reading": "",
+       "w": "은색"
+      },
+      {
+       "at": 9,
+       "d": "red color",
+       "reading": "",
+       "w": "빨간색"
+      },
+      {
+       "at": 10,
+       "d": "golden color",
+       "reading": "",
+       "w": "금색"
+      },
+      {
+       "at": 11,
+       "d": "black",
+       "reading": "",
+       "w": "검은색"
+      },
+      {
+       "at": 12,
+       "d": "color; hue; tint",
+       "reading": "",
+       "w": "색깔"
+      },
+      {
+       "at": 13,
+       "d": "gray",
+       "reading": "",
+       "w": "회색"
+      },
+      {
+       "at": 14,
+       "d": "black",
+       "reading": "",
+       "w": "검정색"
+      },
+      {
+       "at": 15,
+       "d": "orange color",
+       "reading": "",
+       "w": "주황색"
+      },
+      {
+       "at": 16,
+       "d": "diverse colors",
+       "reading": "",
+       "w": "각색"
+      },
+      {
+       "at": 17,
+       "d": "sky blue",
+       "reading": "",
+       "w": "하늘색"
+      },
+      {
+       "at": 18,
+       "d": "dyeing",
+       "reading": "",
+       "w": "염색"
+      },
+      {
+       "at": 19,
+       "d": "white",
+       "reading": "",
+       "w": "하얀색"
+      },
+      {
+       "at": 195,
+       "d": "gunmetal gray",
+       "reading": "",
+       "w": "청회색"
+      },
+      {
+       "at": 196,
+       "d": "all natural color",
+       "reading": "",
+       "w": "총천연색"
+      },
+      {
+       "at": 197,
+       "d": "khaki",
+       "reading": "",
+       "w": "카키색"
+      },
+      {
+       "at": 198,
+       "d": "bleach; decoloration",
+       "reading": "",
+       "w": "탈색"
+      },
+      {
+       "at": 199,
+       "d": "be bleached; be decolored",
+       "reading": "",
+       "w": "탈색되다"
+      }
+     ],
+     "length": 200
+    }
+   },
+   "酒": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "zau2 baa1",
+       "d": "bar",
+       "reading": "jiǔ​bā",
+       "w": "酒吧"
+      },
+      {
+       "at": 1,
+       "ct": "be1 zau2",
+       "d": "beer (loanword)",
+       "reading": "pí​jiǔ",
+       "w": "啤酒"
+      },
+      {
+       "at": 2,
+       "ct": "hot3 zau2",
+       "d": "to drink (alcohol)",
+       "reading": "hē​jiǔ",
+       "w": "喝酒"
+      },
+      {
+       "at": 3,
+       "ct": "zau2 dim3",
+       "d": "wine shop",
+       "reading": "jiǔ​diàn",
+       "w": "酒店"
+      },
+      {
+       "at": 4,
+       "ct": "zau2 zing1",
+       "d": "alcohol",
+       "reading": "jiǔ​jīng",
+       "w": "酒精"
+      },
+      {
+       "at": 5,
+       "ct": "jyu3 zau2",
+       "d": "heavy drinking",
+       "reading": "xù​jiǔ",
+       "w": "酗酒"
+      },
+      {
+       "at": 6,
+       "ct": "gai1 mei5 zau2",
+       "d": "cocktail (loanword)",
+       "reading": "jī​wěi​jiǔ",
+       "w": "鸡尾酒"
+      },
+      {
+       "at": 7,
+       "ct": "zau2 gwai2",
+       "d": "drunkard",
+       "reading": "jiǔ​guǐ",
+       "w": "酒鬼"
+      },
+      {
+       "at": 8,
+       "ct": "pou4 tou4 zau2",
+       "d": "(grape) wine",
+       "reading": "pú​tao​jiǔ",
+       "w": "葡萄酒"
+      },
+      {
+       "at": 9,
+       "ct": "zau2 hau6",
+       "d": "after drinking",
+       "reading": "jiǔ​hòu",
+       "w": "酒后"
+      },
+      {
+       "at": 10,
+       "ct": "gaai3 zau2",
+       "d": "to give up drinking",
+       "reading": "jiè​jiǔ",
+       "w": "戒酒"
+      },
+      {
+       "at": 11,
+       "ct": "zau2 gun2",
+       "d": "tavern",
+       "reading": "jiǔ​guǎn",
+       "w": "酒馆"
+      },
+      {
+       "at": 12,
+       "ct": "joeng6 zau2",
+       "d": "to brew wine",
+       "reading": "niàng​jiǔ",
+       "w": "酿酒"
+      },
+      {
+       "at": 13,
+       "ct": "zau2 wui2",
+       "d": "drinking party",
+       "reading": "jiǔ​huì",
+       "w": "酒会"
+      },
+      {
+       "at": 14,
+       "ct": "jam2 zau2",
+       "d": "to drink wine",
+       "reading": "yǐn​jiǔ",
+       "w": "饮酒"
+      },
+      {
+       "at": 15,
+       "ct": "mei5 zau2",
+       "d": "good wine",
+       "reading": "měi​jiǔ",
+       "w": "美酒"
+      },
+      {
+       "at": 16,
+       "ct": "lit6 zau2",
+       "d": "strong alcoholic drink",
+       "reading": "liè​jiǔ",
+       "w": "烈酒"
+      },
+      {
+       "at": 17,
+       "ct": "zau2 bui1",
+       "d": "wine cup",
+       "reading": "jiǔ​bēi",
+       "w": "酒杯"
+      },
+      {
+       "at": 18,
+       "ct": "zau2 seoi2",
+       "d": "beverage",
+       "reading": "jiǔ​shuǐ",
+       "w": "酒水"
+      },
+      {
+       "at": 19,
+       "ct": "liu6 zau2",
+       "d": "cooking wine",
+       "reading": "liào​jiǔ",
+       "w": "料酒"
+      },
+      {
+       "at": 139,
+       "ct": "bo1 dak6 zau2",
+       "d": "Port wine",
+       "reading": "Bō​tè​jiǔ",
+       "w": "波特酒"
+      },
+      {
+       "at": 140,
+       "ct": "jin1 ging1 be1 zau2",
+       "d": "Yanjing beer (Beijing beer brand)",
+       "reading": "Yān​jīng​pí​jiǔ",
+       "w": "燕京啤酒"
+      },
+      {
+       "at": 141,
+       "ct": "baak3 lei6 tim4 zau2",
+       "d": "Baileys Irish Cream (brand of alcoholic drink)",
+       "reading": "Bǎi​lì​Tián​jiǔ",
+       "w": "百利甜酒"
+      },
+      {
+       "at": 142,
+       "ct": "baak3 wai1 be1 zau2",
+       "d": "Budweiser beer",
+       "reading": "Bǎi​wēi​pí​jiǔ",
+       "w": "百威啤酒"
+      },
+      {
+       "at": 143,
+       "ct": "wong4 gun1 gaa3 jat6 zau2 dim3",
+       "d": "Crowne Plaza (hotel chain)",
+       "reading": "Huáng​guān​Jià​rì​Jiǔ​diàn",
+       "w": "皇冠假日酒店"
+      }
+     ],
+     "length": 144
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "bar",
+       "reading": "さかば",
+       "w": "酒場"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "sake cup",
+       "reading": "さかずき",
+       "w": "杯"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "izakaya",
+       "reading": "いざかや",
+       "w": "居酒屋"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "sake (rice wine)",
+       "reading": "にほんしゅ",
+       "w": "日本酒"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "liquor store",
+       "reading": "さかや",
+       "w": "酒屋"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "drinking alcohol",
+       "reading": "いんしゅ",
+       "w": "飲酒"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "abstinence from alcohol",
+       "reading": "きんしゅ",
+       "w": "禁酒"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "alcoholic drinks",
+       "reading": "しゅるい",
+       "w": "酒類"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "brewing (sake)",
+       "reading": "しゅぞう",
+       "w": "酒造"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "Western wine and spirits",
+       "reading": "ようしゅ",
+       "w": "洋酒"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "ume liqueur",
+       "reading": "うめしゅ",
+       "w": "梅酒"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "drunk driving",
+       "reading": "いんしゅうんてん",
+       "w": "飲酒運転"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "refined sake",
+       "reading": "せいしゅ",
+       "w": "清酒"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "liquor store",
+       "reading": "さかだな",
+       "w": "酒店"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "liquor tax",
+       "reading": "しゅぜい",
+       "w": "酒税"
+      },
+      {
+       "at": 15,
+       "c": false,
+       "d": "alcohol",
+       "reading": "おさけ",
+       "w": "お酒"
+      },
+      {
+       "at": 16,
+       "c": false,
+       "d": "sake bottle",
+       "reading": "さかびん",
+       "w": "酒瓶"
+      },
+      {
+       "at": 17,
+       "c": false,
+       "d": "(grape) wine",
+       "reading": "ぶどうしゅ",
+       "w": "ぶどう酒"
+      },
+      {
+       "at": 18,
+       "c": false,
+       "d": "appetizer or snack served with drinks",
+       "reading": "さかな",
+       "w": "肴"
+      },
+      {
+       "at": 19,
+       "c": false,
+       "d": "reeking of liquor",
+       "reading": "さけくさい",
+       "w": "酒臭い"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "sake used for seasoning (oft. containing a small amount of salt)",
+       "reading": "さかしお",
+       "w": "酒塩"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "cream of tartar",
+       "reading": "しゅせきえい",
+       "w": "酒石英"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "potassium bitartrate",
+       "reading": "しゅせきさんすいそカリウム",
+       "w": "酒石酸水素カリウム"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "Buddhist precept prohibiting the consumption of alcohol",
+       "reading": "ふおんじゅかい",
+       "w": "不飲酒戒"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "high-grade sake",
+       "reading": "うまさけ",
+       "w": "旨酒"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "beer",
+       "reading": "",
+       "w": "맥주"
+      },
+      {
+       "at": 1,
+       "d": "wine",
+       "reading": "",
+       "w": "포도주"
+      },
+      {
+       "at": 2,
+       "d": "soju",
+       "reading": "",
+       "w": "소주"
+      },
+      {
+       "at": 3,
+       "d": "drinking",
+       "reading": "",
+       "w": "음주"
+      },
+      {
+       "at": 4,
+       "d": "drunkard",
+       "reading": "",
+       "w": "주정뱅이"
+      },
+      {
+       "at": 5,
+       "d": "medicinal wine",
+       "reading": "",
+       "w": "약주"
+      },
+      {
+       "at": 6,
+       "d": "heavy drinkers",
+       "reading": "",
+       "w": "주당"
+      },
+      {
+       "at": 7,
+       "d": "bootleg; moonshining",
+       "reading": "",
+       "w": "밀주"
+      },
+      {
+       "at": 8,
+       "d": "bottled beer",
+       "reading": "",
+       "w": "병맥주"
+      },
+      {
+       "at": 9,
+       "d": "gamju",
+       "reading": "",
+       "w": "감주"
+      },
+      {
+       "at": 10,
+       "d": "gangsoju; straight soju",
+       "reading": "",
+       "w": "강燒酒"
+      },
+      {
+       "at": 11,
+       "d": "gangsoju; straight soju",
+       "reading": "",
+       "w": "강소주"
+      },
+      {
+       "at": 12,
+       "d": "gaesoju",
+       "reading": "",
+       "w": "개燒酒"
+      },
+      {
+       "at": 13,
+       "d": "gaesoju",
+       "reading": "",
+       "w": "개소주"
+      },
+      {
+       "at": 14,
+       "d": "kaoliang spirits; kaoliang liquor",
+       "reading": "",
+       "w": "고량주"
+      },
+      {
+       "at": 15,
+       "d": "grain whiskey",
+       "reading": "",
+       "w": "곡주"
+      },
+      {
+       "at": 16,
+       "d": "fruit wine",
+       "reading": "",
+       "w": "과실주"
+      },
+      {
+       "at": 17,
+       "d": "fruit wine",
+       "reading": "",
+       "w": "과일酒"
+      },
+      {
+       "at": 18,
+       "d": "fruit wine",
+       "reading": "",
+       "w": "과일주"
+      },
+      {
+       "at": 19,
+       "d": "ban drinking",
+       "reading": "",
+       "w": "금주하다"
+      },
+      {
+       "at": 56,
+       "d": "be in a drunken frenzy",
+       "reading": "",
+       "w": "주정하다"
+      },
+      {
+       "at": 57,
+       "d": "cheongju",
+       "reading": "",
+       "w": "청주"
+      },
+      {
+       "at": 58,
+       "d": "takju",
+       "reading": "",
+       "w": "탁주"
+      },
+      {
+       "at": 59,
+       "d": "mixed liquor; bomb-shot",
+       "reading": "",
+       "w": "폭탄주"
+      },
+      {
+       "at": 60,
+       "d": "hapwanju",
+       "reading": "",
+       "w": "합환주"
+      }
+     ],
+     "length": 61
+    }
+   },
+   "青": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "cing1 siu3 nin4",
+       "d": "adolescent",
+       "reading": "qīng​shào​nián",
+       "w": "青少年"
+      },
+      {
+       "at": 1,
+       "ct": "cing1 waa1",
+       "d": "frog",
+       "reading": "qīng​wā",
+       "w": "青蛙"
+      },
+      {
+       "at": 2,
+       "ct": "cing1 nin4",
+       "d": "youth",
+       "reading": "qīng​nián",
+       "w": "青年"
+      },
+      {
+       "at": 3,
+       "ct": "cing1 ceon1",
+       "d": "youth",
+       "reading": "qīng​chūn",
+       "w": "青春"
+      },
+      {
+       "at": 4,
+       "ct": "cing1 ceon1 kei4",
+       "d": "puberty",
+       "reading": "qīng​chūn​qī",
+       "w": "青春期"
+      },
+      {
+       "at": 5,
+       "ct": "zung1 cing1 nin4",
+       "d": "middle-aged",
+       "reading": "zhōng​qīng​nián",
+       "w": "中青年"
+      },
+      {
+       "at": 6,
+       "ct": "zi3 cing1",
+       "d": "educated youth (sent to work in farms during the Cultural Revolution)",
+       "reading": "zhī​qīng",
+       "w": "知青"
+      },
+      {
+       "at": 7,
+       "ct": "nin4 cing1",
+       "d": "youthful",
+       "reading": "nián​qīng",
+       "w": "年青"
+      },
+      {
+       "at": 8,
+       "ct": "cing1 loi6",
+       "d": "(lit.) to fix one's gaze on",
+       "reading": "qīng​lài",
+       "w": "青睐"
+      },
+      {
+       "at": 9,
+       "ct": "lik6 ceng1",
+       "d": "asphalt",
+       "reading": "lì​qīng",
+       "w": "沥青"
+      },
+      {
+       "at": 10,
+       "ct": "cing1 mei4 sou3",
+       "d": "penicillin",
+       "reading": "qīng​méi​sù",
+       "w": "青霉素"
+      },
+      {
+       "at": 11,
+       "ct": "cing1 mui4 zuk1 maa5",
+       "d": "lit. green plums and hobby-horse (idiom)",
+       "reading": "qīng​méi​zhú​mǎ",
+       "w": "青梅竹马"
+      },
+      {
+       "at": 12,
+       "ct": "cing1 tung4",
+       "d": "bronze (alloy of copper 銅|铜 and tin 錫|锡[xī])",
+       "reading": "qīng​tóng",
+       "w": "青铜"
+      },
+      {
+       "at": 13,
+       "ct": "soeng4 cing1 tang4",
+       "d": "ivy",
+       "reading": "cháng​qīng​téng",
+       "w": "常青藤"
+      },
+      {
+       "at": 14,
+       "ct": "ping4 bou6 cing1 wan4",
+       "d": "to rapidly go up in the world",
+       "reading": "píng​bù​qīng​yún",
+       "w": "平步青云"
+      },
+      {
+       "at": 15,
+       "ct": "dung1 cing1",
+       "d": "holly",
+       "reading": "dōng​qīng",
+       "w": "冬青"
+      },
+      {
+       "at": 16,
+       "ct": "ceng1 coi3",
+       "d": "green vegetables",
+       "reading": "qīng​cài",
+       "w": "青菜"
+      },
+      {
+       "at": 17,
+       "ct": "siu2 cing1 nin4",
+       "d": "young person",
+       "reading": "xiǎo​qīng​nián",
+       "w": "小青年"
+      },
+      {
+       "at": 18,
+       "ct": "cing1 cou2",
+       "d": "grass",
+       "reading": "qīng​cǎo",
+       "w": "青草"
+      },
+      {
+       "at": 19,
+       "ct": "ceng1 gwong1 ngaan5",
+       "d": "glaucoma",
+       "reading": "qīng​guāng​yǎn",
+       "w": "青光眼"
+      },
+      {
+       "at": 136,
+       "ct": "san1 cing1",
+       "d": "Xinqing district of Yichun city 伊春市[Yī​chūn​shì], Heilongjiang",
+       "reading": "Xīn​qīng",
+       "w": "新青"
+      },
+      {
+       "at": 137,
+       "ct": "kwai4 cing1",
+       "d": "Kwai Tsing district of New Territories, Hong Kong",
+       "reading": "Kuí​qīng",
+       "w": "葵青"
+      },
+      {
+       "at": 138,
+       "ct": "cing1 wan4 pou2",
+       "d": "Qingyunpu district of Nanchang city 南昌市, Jiangxi",
+       "reading": "Qīng​yún​pǔ",
+       "w": "青云谱"
+      },
+      {
+       "at": 139,
+       "ct": "",
+       "d": "Qingnang Jing, a book on medical practice written by 華佗|华佗[Huà​Tuó]",
+       "reading": "Qīng​náng​Jīng",
+       "w": "青囊经"
+      },
+      {
+       "at": 140,
+       "ct": "cing1 dou2 be1 zau2",
+       "d": "Tsingtao Beer",
+       "reading": "Qīng​dǎo​pí​jiǔ",
+       "w": "青岛啤酒"
+      }
+     ],
+     "length": 141
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "blue",
+       "reading": "あおい",
+       "w": "青い"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "blue",
+       "reading": "あお",
+       "w": "青"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "youth",
+       "reading": "せいねん",
+       "w": "青年"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "to become pale",
+       "reading": "あおざめる",
+       "w": "青ざめる"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "pale",
+       "reading": "あおじろい",
+       "w": "青白い"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "youth",
+       "reading": "せいしゅん",
+       "w": "青春"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "blue sky",
+       "reading": "あおぞら",
+       "w": "青空"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "deep blue",
+       "reading": "まっさお",
+       "w": "真っ青"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "blue",
+       "reading": "あおいろ",
+       "w": "青色"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "minority (i.e. being under age)",
+       "reading": "みせいねん",
+       "w": "未成年"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "lush mountain",
+       "reading": "せいざん",
+       "w": "青山"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "Japanese laurel (Aucuba japonica)",
+       "reading": "あおき",
+       "w": "青木"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "fresh leaves",
+       "reading": "あおば",
+       "w": "青葉"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "young people",
+       "reading": "せいしょうねん",
+       "w": "青少年"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "bronze",
+       "reading": "せいどう",
+       "w": "青銅"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "green willow (i.e. one that has budded)",
+       "reading": "あおやぎ",
+       "w": "青柳"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "verdigris",
+       "reading": "ろくしょう",
+       "w": "緑青"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "young persons' association",
+       "reading": "せいねんだん",
+       "w": "青年団"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "unripe plum",
+       "reading": "あおうめ",
+       "w": "青梅"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "hydrocyanic acid",
+       "reading": "せいさん",
+       "w": "青酸"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "Blue Sky, White Sun, and a Wholly Red Earth (flag of the Republic of China)",
+       "reading": "せいてんはくじつまんちこうき",
+       "w": "青天白日満地紅旗"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "Shorenin school of calligraphy",
+       "reading": "しょうれんいんりゅう",
+       "w": "青蓮院流"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "Seishun 18 ticket",
+       "reading": "せいしゅんじゅうはちきっぷ",
+       "w": "青春１８きっぷ"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "Blue Book (government-issued report)",
+       "reading": "せいしょ",
+       "w": "青書"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "green flesh (melon, etc.)",
+       "reading": "あおにく",
+       "w": "青肉"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [],
+     "length": 0
+    }
+   }
+  },
+  "named": {},
+  "read": 28,
+  "stride": 1,
+  "trimmed": "each list's length, and its first 20 and last 5 items, each with its place"
+ },
+ "pleris_commit": "aab7428e408f17cc373a18ae7ac07f6d3c75f26b",
+ "produced_by": "just e14-kiokun-contains"
+}

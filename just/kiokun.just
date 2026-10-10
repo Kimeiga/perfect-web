@@ -155,6 +155,53 @@ e14-kiokun-moves:
     @cat docs/evidence/E14/kiokun-moves.txt
     @grep -q "unnamed differences: 0" docs/evidence/E14/kiokun-moves.txt
 
+# The word page's Contains and Appears in against kiokun.com's own code
+# (`contains-order.ts`, `appears-in-order.ts`, `character-support.ts`, and
+# the page's, `Contains.svelte`'s and `word-character-learning.ts`'s own
+# functions, copied from KIOKUN_APP into a temporary directory), as
+# e14-kiokun-seo holds the head: every 256th entry its loader shows as it
+# is, and the CI fixture for the repository's sample, each list trimmed to
+# its length and its first 20 and last 5 items (the integrator's ruling of
+# 2026-10-10). Then pages with long lists timed, beside the same page with
+# its lists left empty. Local (scripts/ci_plan.py's LOCAL_ONLY).
+e14-kiokun-contains:
+    @test -n "${KIOKUN_DATA:-}" || { echo "KIOKUN_DATA must name a kiokun-data checkout's output_dictionary"; exit 1; }
+    @test -n "${KIOKUN_APP:-}" || { echo "KIOKUN_APP must name a kiokun-data checkout's sveltekit-app"; exit 1; }
+    @mkdir -p docs/evidence/E14
+    @lib="$(mktemp -d)"; \
+     for f in contains-order.ts appears-in-order.ts character-support.ts word-character-learning.ts Contains.svelte; do cp "$KIOKUN_APP/src/lib/$f" "$lib/"; done; \
+     cp "$KIOKUN_APP/src/routes/[word]/+page.svelte" "$lib/page.svelte"; \
+     sed -e 's/List.sort_by(e.contains, /List.sort_by(List.take(e.contains, 0), /' \
+         -e 's/appears_of(e.in_\([a-z]*\), /appears_of(List.take(e.in_\1, 0), /' \
+         examples/kiokun-site/app.pw > "$lib/empty-lists.pw"; \
+     test "$(grep -c 'List.take(e.contains, 0)\|List.take(e.in_' "$lib/empty-lists.pw")" = 4 || { echo "the page with empty lists was not made"; exit 1; }; \
+     { echo "The word page's Contains and Appears in, against kiokun.com's own code"; echo; \
+       echo "produced by: just e14-kiokun-contains (local: reads a kiokun-data checkout)"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       echo "kiokun.com's source: $(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD) ($(cd "$KIOKUN_APP" && shasum -a 256 src/lib/contains-order.ts src/lib/appears-in-order.ts src/lib/character-support.ts src/lib/word-character-learning.ts src/lib/Contains.svelte 'src/routes/[word]/+page.svelte' | awk '{printf "%s %s; ", $2, substr($1,1,12)}'))"; \
+       echo "node: $(node --version)"; echo "host: $(uname -sm), $(sysctl -n hw.ncpu 2>/dev/null || nproc) cores, $(uptime | sed 's/.*load/load/')"; echo; \
+       echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/contains.mjs)"; echo; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/contains.mjs "$lib" "$KIOKUN_APP" "$KIOKUN_DATA" 256 "$lib/contains.json"; \
+       echo; echo "== the rewrite's, compared"; echo; \
+       KIOKUN_CONTAINS_ORACLE="$lib/contains.json" cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::contains_and_appears_in_match_kiokuns_own 2>&1 \
+         | grep -E '^(compared|named|unnamed|difference|  kiokun|  rewrite)|test result|panicked'; \
+       echo; echo "== pages with long lists, timed: this branch's page"; echo; \
+       KIOKUN_TIME_WORDS="人,色,陸上貨物運送事業労働災害防止協会" cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::word_pages_with_long_lists 2>&1 \
+         | grep -E '^word |test result|panicked'; \
+       echo "after it: $(uptime | sed 's/.*load/load/')"; \
+       echo; echo "== the same pages, their four lists left empty"; echo; \
+       KIOKUN_SAMPLE_APP="$lib/empty-lists.pw" KIOKUN_TIME_WORDS="人,色,陸上貨物運送事業労働災害防止協会" cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::word_pages_with_long_lists 2>&1 \
+         | grep -E '^word |test result|panicked'; \
+       echo "after it: $(uptime | sed 's/.*load/load/')"; \
+       echo; echo "== the CI fixture: kiokun.com's answers for the repository's sample"; echo; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/contains.mjs "$lib" "$KIOKUN_APP" examples/kiokun/data/han-1char-3 1 "$lib/sample.json" 20,5; \
+       python3 scripts/kiokun_oracle_fixture.py "$lib/sample.json" spikes/own-renderer/kiokun-oracle/contains-sample.json \
+         "just e14-kiokun-contains" "$(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD)" "$(git rev-parse HEAD)" "$(node --version)"; \
+     } > docs/evidence/E14/kiokun-contains.txt; rm -rf "$lib"
+    @cat docs/evidence/E14/kiokun-contains.txt
+    @grep -q "unnamed differences: 0" docs/evidence/E14/kiokun-contains.txt
+    @! grep -qE "panicked|FAILED" docs/evidence/E14/kiokun-contains.txt
+
 # The word page (the track's step 1), served by the development server as a
 # third program beside the store and the feed (docs/PARALLEL.md, "W6's
 # inventory, answered", Q2): `examples/kiokun-site`, its entries read by the
