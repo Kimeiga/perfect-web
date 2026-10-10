@@ -37,9 +37,13 @@
   "controls": 27,
   "moved": 0,
   "named": {},
+  "provenance": {
+   "answers": "written forms alone, and the word each moves to, from the entries' structure (kiokun-data's builder)",
+   "the sample": "read from the repository's sample (examples/kiokun/data/han-1char-3, its MANIFEST), which holds cleared fields alone; see NOTICE.md"
+  },
   "read": 28,
   "stride": 1
  },
- "pleris_commit": "669ffc1897bbcd103ba1a822f1b68a9f5c1004ec",
+ "pleris_commit": "c1929d3868c66c9c0b0e8c67992c934757080cb2",
  "produced_by": "just e14-kiokun-moves"
 }
