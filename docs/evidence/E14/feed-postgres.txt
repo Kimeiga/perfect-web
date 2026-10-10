@@ -1,33 +1,43 @@
-ADR-XXXX - the feed's data in PostgreSQL, held to what its source states
+ADR-0246 - the feed's data in PostgreSQL, held to what its source states
 
 produced by: just e14-feed-postgres
-commit: f041a722aaf165c9d2c1d39627dc1531ae2d57b1
+commit: e44173313ff4e815b5097c5c50f7af9c8cdfd9a7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37998533705 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
-postgres: 18.6 (Homebrew)
+postgres: 18.6 (Debian 18.6-1.pgdg13+2)
 
-== the feed on PostgreSQL (spikes/own-renderer/server/src/tests/feed_pg.rs)
+== the feed on PostgreSQL (spikes/own-renderer/server/src/tests/feed_pg.rs, follows.rs)
 
-test tests::feed_pg::on_postgres_the_database_provides_what_the_feed_states ... ok
-test tests::feed_pg::on_postgres_a_like_counts_and_reaches_an_open_thread ... ok
-test tests::feed_pg::on_postgres_a_stated_change_feed_the_layer_cannot_deliver_is_refused ... ok
-test tests::feed_pg::on_postgres_a_reply_is_in_its_thread_as_deep_as_it_goes ... ok
-test tests::feed_pg::on_postgres_a_command_refused_at_its_commit_leaves_nothing ... ok
-test tests::feed_pg::on_postgres_a_post_reaches_another_session ... ok
 test tests::feed_pg::on_postgres_a_post_commits_with_its_event_in_one_transaction ... ok
+test tests::feed_pg::on_postgres_a_post_reaches_another_session ... ok
+test tests::feed_pg::on_postgres_a_like_counts_and_reaches_an_open_thread ... ok
+test tests::feed_pg::on_postgres_a_command_refused_at_its_commit_leaves_nothing ... ok
+test tests::feed_pg::on_postgres_a_reply_is_in_its_thread_as_deep_as_it_goes ... ok
+test tests::feed_pg::on_postgres_a_stated_change_feed_the_layer_cannot_deliver_is_refused ... ok
+test tests::feed_pg::on_postgres_the_database_provides_what_the_feed_states ... ok
+test tests::feed_pg::on_postgres_an_entry_written_with_a_wildcard_is_every_entry ... ok
+test tests::follows::on_postgres_a_users_page_counts_who_follows_them ... ok
 test tests::feed_pg::on_postgres_the_timeline_loads_more ... ok
 test tests::feed_pg::on_postgres_the_feed_serves_what_it_serves_in_memory ... ok
 test tests::feed_pg::on_postgres_serializable_against_a_read_committed_default_is_refused ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 150 filtered out; finished in 6.23s
+test tests::follows::on_postgres_following_brings_their_posts_into_your_timeline ... ok
+test tests::follows::on_postgres_following_yourself_or_no_one_is_not_found ... ok
+test tests::follows::on_postgres_the_button_is_what_the_reader_is_to_the_user ... ok
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 347 filtered out; finished in 72.81s
 
 == the in-memory layer, unchanged (the server's other tests)
 
-test result: ok. 150 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 50.08s
+test result: ok. 344 passed; 0 failed; 3 ignored; 0 measured; 15 filtered out; finished in 829.29s
 
 == mutation controls (scripts/feed_postgres_mutations.py)
 
-baseline: 10 passed, 0 failed
-the events commit outside the command's transaction: KILLED (2 of 10 tests fail)
-a command's transaction is the connection's default: KILLED (9 of 10 tests fail)
-the host serves whatever its database gives: KILLED (2 of 10 tests fail)
-a refused commit is answered as committed: KILLED (1 of 10 tests fail)
-4 of 4 mutants killed
+baseline: 15 passed, 0 failed
+the events commit outside the command's transaction: KILLED (2 of 15 tests fail)
+a command's transaction is the connection's default: KILLED (14 of 15 tests fail)
+the host serves whatever its database gives: KILLED (2 of 15 tests fail)
+a refused commit is answered as committed: KILLED (1 of 15 tests fail)
+on PostgreSQL, the timeline of those you follow is everyone's: KILLED (1 of 15 tests fail)
+on PostgreSQL, a follow is not written: KILLED (3 of 15 tests fail)
+on PostgreSQL, a reader may follow itself: KILLED (1 of 15 tests fail)
+7 of 7 mutants killed
+memory bound: no process was stopped

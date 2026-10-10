@@ -87,6 +87,16 @@ test("a press on a handler from another build reads the page again, once (charte
   });
   await ready(page);
   await expect(page.locator("#cart-count")).toHaveText("0");
+  // The decision names its recovery in `pw-resume`'s order (ADR-0155): the
+  // store's page is a session's (its plan's scope), so its region is a
+  // private slot, rendered again from the server. Until the build named a
+  // page's scope every page was planned public, a region to refetch, and a
+  // list read one place off made that "none", which no press acted on; a
+  // session's page made it "refetch-region", which reloads as well, and only
+  // this name tells the two apart.
+  expect(await page.evaluate(() => window.__pw.log.join("\n"))).toMatch(
+    /refused \S+: code \d+ recovery rerender-private-slot/,
+  );
   // The press reads the page again, from this build, and is not replayed.
   const reloaded = page.waitForEvent("load");
   await page.locator("#menu button").first().click();
@@ -94,6 +104,39 @@ test("a press on a handler from another build reads the page again, once (charte
   await page.waitForFunction(() => document.documentElement.dataset.pwReady);
   await expect(page.locator("#cart-count")).toHaveText("0");
   // The page from this build presses as any does.
+  await page.locator("#menu button").first().click();
+  await expect(page.locator("#cart-count")).toHaveText("1");
+});
+
+test("a document of another schema reads the page again, once (ADR-0300)", async ({ page }) => {
+  // The decision holds a handler's document to what this build says of its
+  // page, from its handler table: its document schema. A document that says
+  // another, its parts' places another build's, is refused and read again.
+  // Until ADR-0300 every manifest and the decision said `cart-doc`, so this
+  // document attached.
+  let stale = true;
+  await page.route("**/StorePage.html", async (route) => {
+    const response = await route.fetch();
+    let body = await response.text();
+    if (stale) {
+      stale = false;
+      body = body.replace(/"document":"[^"]*"/, '"document":"another-schema"');
+    }
+    await route.fulfill({ response, body });
+  });
+  await ready(page);
+  // Told by the table, never by the document; and its recovery named in
+  // `pw-resume`'s order, a session's region rendered again (ADR-0155).
+  const told = await page.evaluate(() => window.__pw.log.join("\n"));
+  expect(told).toMatch(/knows store\.page\.StorePage's documents: \S+ session:/);
+  expect(told).toMatch(/refused \S+: code \d+ recovery rerender-private-slot/);
+  await expect(page.locator("#cart-count")).toHaveText("0");
+  const reloaded = page.waitForEvent("load");
+  await page.locator("#menu button").first().click();
+  await reloaded;
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady);
+  // Not replayed: the press is the reader's to make again.
+  await expect(page.locator("#cart-count")).toHaveText("0");
   await page.locator("#menu button").first().click();
   await expect(page.locator("#cart-count")).toHaveText("1");
 });
