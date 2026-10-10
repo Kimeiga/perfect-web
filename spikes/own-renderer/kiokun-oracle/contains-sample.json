@@ -5566,6 +5566,6 @@
   "stride": 1,
   "trimmed": "each list's length, and its first 20 and last 5 items, each with its place"
  },
- "pleris_commit": "aab7428e408f17cc373a18ae7ac07f6d3c75f26b",
+ "pleris_commit": "6164629c65841bcc0aa6cec3d2de15d85c724354",
  "produced_by": "just e14-kiokun-contains"
 }

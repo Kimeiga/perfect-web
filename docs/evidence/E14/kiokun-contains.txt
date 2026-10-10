@@ -1,0 +1,40 @@
+The word page's Contains and Appears in, against kiokun.com's own code
+
+produced by: just e14-kiokun-contains (local: reads a kiokun-data checkout)
+commit: 6164629c65841bcc0aa6cec3d2de15d85c724354
+kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree (src/lib/contains-order.ts a4dc414c27a0; src/lib/appears-in-order.ts 49d37f1aa72a; src/lib/character-support.ts 467ce33385c1; src/lib/word-character-learning.ts cbbd88a0f133; src/lib/Contains.svelte 047845d7d2d2; src/routes/[word]/+page.svelte fc006753eea8; static/game_data/component_glosses.json 226612fdfa3e; static/game_data/char_taxonomy.json 3e4c0bc38b73; static/game_data/component_uses.json 30db94da05dd)
+the checkout has uncommitted work, not read: sveltekit-app/src/routes/[word]/+page.svelte
+node: v22.21.1
+host: Darwin arm64, 12 cores, load averages: 33.88 26.73 17.71
+
+== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/contains.mjs)
+
+stride 256: read 5938 entries; 5513 answered
+
+== the rewrite's, compared
+
+compared: 5513 words (stride 256, 5938 entries read)
+named differences: {}
+unnamed differences: 0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 369 filtered out; finished in 16.08s
+
+== pages with long lists, timed: this branch's page
+
+word 人: 465783 bytes; Contains 0, Chinese 143, Japanese 200, Korean 200; per request, ms: p50 46.7, p90 53.7, max 56.9 (30 requests)
+word 色: 450161 bytes; Contains 0, Chinese 142, Japanese 200, Korean 200; per request, ms: p50 49.1, p90 58.8, max 91.3 (30 requests)
+word 陸上貨物運送事業労働災害防止協会: 56889 bytes; Contains 26, Chinese 0, Japanese 0, Korean 0; per request, ms: p50 3.3, p90 4.0, max 4.2 (30 requests)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 369 filtered out; finished in 63.10s
+after it: load averages: 11.98 21.22 16.49
+
+== the same pages, their four lists left empty
+
+word 人: 71061 bytes; Contains 0, Chinese 0, Japanese 0, Korean 0; per request, ms: p50 29.3, p90 36.5, max 45.4 (30 requests)
+word 色: 68912 bytes; Contains 0, Chinese 0, Japanese 0, Korean 0; per request, ms: p50 29.4, p90 35.0, max 61.2 (30 requests)
+word 陸上貨物運送事業労働災害防止協会: 26026 bytes; Contains 0, Chinese 0, Japanese 0, Korean 0; per request, ms: p50 1.7, p90 2.1, max 4.6 (30 requests)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 369 filtered out; finished in 60.04s
+after it: load averages: 9.33 18.86 15.93
+
+== the CI fixture: kiokun.com's answers for the repository's sample
+
+stride 1: read 28 entries; 11 answered
+fixture: spikes/own-renderer/kiokun-oracle/contains-sample.json: 11 answers, named {}
