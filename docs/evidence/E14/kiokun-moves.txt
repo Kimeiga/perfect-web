@@ -1,0 +1,22 @@
+The word page's moves, against kiokun.com's own equivalentTraditionalTarget
+
+produced by: just e14-kiokun-moves (local: reads a kiokun-data checkout)
+commit: f1e4c114a0841bda5788bbf88fbc90fc72fb0b0f
+kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf (character-forms.ts 459012aa4f0f)
+node: v22.21.1
+
+== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/moves.mjs)
+
+stride 64: read 94908 one-character entries; 107 candidates, 1536 controls; 3 move
+
+== the rewrite's, compared
+
+compared: 1643 words (107 candidates, 1536 controls, stride 64; 94908 one-character entries read); 3 move
+named differences: {}
+unnamed differences: 0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 362 filtered out; finished in 4.42s
+
+== the CI fixture: kiokun.com's answers for the repository's sample
+
+stride 1: read 28 one-character entries; 1 candidates, 27 controls; 0 move
+fixture: spikes/own-renderer/kiokun-oracle/moves-sample.json: 28 answers, named {}
