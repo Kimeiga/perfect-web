@@ -116,7 +116,10 @@ async function placedWithAPressMeanwhile(page, first) {
     if (orderPage(r)) at.document = Date.now();
   });
   await page.getByRole("button", { name: "Place order" }).click();
-  await page.locator("#clear-cart").click();
+  // Pressed from the keyboard: the order's commit removes the cart's lines
+  // while the press is made, and a pointer's press could land where the
+  // button was, focus it, and click nothing (Firefox, under load).
+  await page.locator("#clear-cart").press("Enter");
   await page.waitForURL(/\/order$/);
   return at;
 }
@@ -196,7 +199,9 @@ test("a second navigation, made while the page leaves, is not taken", async ({ p
   const button = page.getByRole("button", { name: "Place order" });
   await button.click();
   await firstRequested;
-  await button.click();
+  // From the keyboard, as the press above: no pointer to miss a button the
+  // first command's frames may move.
+  await button.press("Enter");
   // The first decides; the second, waiting on it as it waits on the second,
   // would hold both for ever.
   await page.waitForURL(/\/order$/, { timeout: 10_000 });

@@ -552,6 +552,31 @@ function loadHandler(identity) {
 }
 
 /**
+ * **A page's commands run in the order it sent them** (ADR-XXXX). Each names
+ * the latest command this page sent and has not been answered (`pw-after`),
+ * and the server runs it only once that one has run, whichever request the
+ * network brings first. Until 2026-10-10 each went its own way, and under
+ * load "Clear", pressed after "Place order", arrived first: the cart was
+ * emptied, and the order refused as nothing to order.
+ */
+async function command(component, args, interaction, retry) {
+  const before = [...unanswered.values()];
+  const after = [...unanswered.keys()].at(-1);
+  let answered;
+  unanswered.set(interaction, new Promise((resolve) => (answered = resolve)));
+  try {
+    return await send(component, args, interaction, retry, after, before);
+  } finally {
+    unanswered.delete(interaction);
+    answered();
+  }
+}
+
+/** Each command this page has sent and not been answered, by interaction, in
+ * the order sent, as a promise of its answer (ADR-XXXX). */
+const unanswered = new Map();
+
+/**
  * A command, as a compiled handler calls one: the command's component id and
  * the arguments the handler computed.
  *
@@ -573,8 +598,13 @@ function loadHandler(identity) {
  * page and the request with it, a press shown taken and never made. A request
  * marked `keepalive` outlives its document (the Fetch standard), within 64 KiB
  * of such bodies in flight; one past what remains is sent as before.
+ *
+ * **Answered early** (ADR-XXXX): the one before it, `after`, had not reached
+ * the server in time, and this one ran nothing. That is no outcome: it is sent
+ * again once each command sent `before` it is answered, naming none, and it
+ * is no resend of the `retry` clause's.
  */
-async function command(component, args, interaction, retry) {
+async function send(component, args, interaction, retry, after, before) {
   const sent = JSON.stringify(args);
   const bytes = new Blob([sent]).size;
   for (let attempt = 0; ; attempt += 1) {
@@ -590,7 +620,11 @@ async function command(component, args, interaction, retry) {
         // handler, and carried unchanged by any retry of this request: a
         // command declared `idempotent_by InteractionId` runs once for it
         // however many times the request is sent.
-        headers: { "content-type": "application/json", "pw-interaction": interaction },
+        headers: {
+          "content-type": "application/json",
+          "pw-interaction": interaction,
+          ...(after && { "pw-after": after }),
+        },
         body: sent,
         keepalive,
       });
@@ -604,6 +638,16 @@ async function command(component, args, interaction, retry) {
       continue;
     }
     if (keepalive) keptAlive -= bytes;
+    if (response.status === 409) {
+      const early = await response.json().catch(() => null);
+      if (early?.early) {
+        log.push(`${component} sent again: the one before it had not arrived`);
+        await Promise.all(before);
+        after = undefined;
+        attempt -= 1;
+        continue;
+      }
+    }
     if (!response.ok) {
       // **Refused by its `requires`** (ADR-XXXX): the predicate and the words
       // a reader is told, which the host that refused sends.

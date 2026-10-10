@@ -105,11 +105,13 @@ MUTANTS = [
         "      if (!retry) throw new Unreachable(component, error);\n",
     ),
     (
+        # Re-anchored by ADR-XXXX: a request names the one its page sent
+        # before it, on a line of its own.
         "a request is sent again under another interaction",
         "browser",
         RUNTIME,
-        '        headers: { "content-type": "application/json", "pw-interaction": interaction },\n',
-        '        headers: { "content-type": "application/json", "pw-interaction": attempt === 0 ? interaction : `${interaction}-${attempt}` },\n',
+        '          "pw-interaction": interaction,\n',
+        '          "pw-interaction": attempt === 0 ? interaction : `${interaction}-${attempt}`,\n',
     ),
 ]
 
