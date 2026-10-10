@@ -9204,18 +9204,34 @@ public query Store(",
                 .expect("request");
             let mut chunks = Vec::new();
             let mut buf = [0u8; 65536];
+            // A character a read ends inside is told with the read that
+            // completes it. Decoded alone, its first bytes were U+FFFD, and a
+            // test comparing the page's text failed by where the reads fell:
+            // under load, 煮's "にしめる" read as "に\u{fffd}\u{fffd}める" (W6's
+            // finding, 2026-10-10). Bytes that are no UTF-8 are refused, not
+            // replaced.
+            let mut pending: Vec<u8> = Vec::new();
             loop {
                 let n = client.read(&mut buf).expect("read");
                 if n == 0 {
+                    assert!(pending.is_empty(), "the response ends inside a character");
                     // The close, which is what tells a browser the document
                     // is complete: the last chunk, empty, when it came.
                     chunks.push((started.elapsed(), String::new()));
                     break;
                 }
-                chunks.push((
-                    started.elapsed(),
-                    String::from_utf8_lossy(&buf[..n]).into_owned(),
-                ));
+                pending.extend_from_slice(&buf[..n]);
+                let whole = match std::str::from_utf8(&pending) {
+                    Ok(text) => text.len(),
+                    // Ends inside a character: the rest comes next.
+                    Err(e) if e.error_len().is_none() => e.valid_up_to(),
+                    Err(e) => panic!("the response is no UTF-8: {e}"),
+                };
+                if whole > 0 {
+                    let text = String::from_utf8(pending.drain(..whole).collect())
+                        .expect("decoded above");
+                    chunks.push((started.elapsed(), text));
+                }
             }
             chunks
         })
