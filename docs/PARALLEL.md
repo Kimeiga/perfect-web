@@ -836,3 +836,13 @@ Each a decision for a track, with its date; a track's ADR records it too.
 - **2026-10-09, ADR-0300 (the build id) merged** before the refusal ruling,
   whose verify still ran: the numbers follow merge order, so the refusal
   ruling takes the next.
+- **2026-10-10, W6's word page moves merged** as ADR-0301, from `4cbe3aa`, before
+  the refusal ruling, whose PostgreSQL shard ran again:
+  verify 38006256503 and ci 38006256479 green, `e14-kiokun-word` 69 of 69
+  and `e14-redirects` 15 of 15 from that run, the moves' oracle (local)
+  1,643 words with 3 moves. W6 next, in order: the whole-dictionary sample
+  timed again at low load, Contains and Appears-in, then step 2, search.
+  Step 4, kiokun's accounts (notes, review cards, custom words), stays W6's:
+  kiokun's own data, on the platform's identity (ADR-0258, ADR-0263,
+  ADR-0270) and W8's `user` visibility once it is merged; anything it needs
+  of the identity layer or the principal is asked of the integrator first.

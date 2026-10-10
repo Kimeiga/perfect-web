@@ -2484,3 +2484,13 @@ pages share kept in place).
   shows keeps the page working. Found: a runtime-recovery mutant survived
   once pages had real scopes; a stale press's recovery is now held to its
   name.
+[ADR-0301](DECISIONS/ADR-0301-kiokun-word-page-moves.md): kiokun's word page
+moves an equivalent simplified form (track `kiokun`, W6).
+- `redirect_on KiokunError.Moved permanent`, ADR-0295's clause, declared by
+  the program: where a word's own file is a simplified form that equals its
+  one traditional form in meaning, the page is answered 308 to that form's
+  page, the query kept, as kiokun.com's `equivalentTraditionalTarget` says.
+  Held to kiokun.com's own function over 1,643 words: 3 moves, none
+  unexplained, each target a page. ADR-0295's five tests keep every
+  assertion, their helpers asserting the clause before they patch it. And
+  the word page's tests compile each distinct program once per test process.

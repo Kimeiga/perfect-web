@@ -1001,6 +1001,19 @@ fn equivalent_target(e: Entry) -> Option<String> {
     }
 }
 
+// Where kiokun.com moves the word's page (`[word]/+page.ts:419-425`):
+// `equivalentTraditionalTarget` of the word's own file, where that names
+// another word.
+fn moved_from(first: Option<Entry>, word: String) -> Option<String> {
+    match first {
+        Some(f) => match equivalent_target(f) {
+            Some(t) => if t != word { Some(t) } else { None },
+            None => None,
+        },
+        None => None,
+    }
+}
+
 // `mergeSemanticMnemonicVariants` (`+page.ts:136-150`): the cards other than
 // the primary, each character once.
 fn other_cards(cards: List<Card>, primary: Option<Card>) -> List<Card> {
@@ -1888,9 +1901,17 @@ public query Word(word: String) -> Result<WordShown, KiokunError>
         Some(l) => List.map(l.data.japanese, w => WordPitch { readings: read_pitch(pitch_shard(speak_of(w)), speak_of(w)) }),
         None => none,
     }
-    match page {
-        Some(l) => Ok(shown(word, l, labels, glosses, pitches)),
-        None => Err(NotFound),
+    // A simplified form that equals its one traditional form in meaning is
+    // moved to that form's page, for good (`[word]/+page.ts:415-425`,
+    // ADR-0295): the word's own file decides, before a stub is followed or
+    // forms merged.
+    let moved = moved_from(first, word)
+    match moved {
+        Some(t) => Err(Moved(t)),
+        None => match page {
+            Some(l) => Ok(shown(word, l, labels, glosses, pitches)),
+            None => Err(NotFound),
+        },
     }
 }
 
@@ -1931,6 +1952,7 @@ view SenseExamples(examples: ShownExamples) {
 page WordPage(word: String) {
     route        "/word/{word}"
     not_found_on KiokunError.NotFound
+    redirect_on  KiokunError.Moved permanent
     placement    origin
     cache        shared
 
