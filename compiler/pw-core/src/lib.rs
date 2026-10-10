@@ -53,6 +53,7 @@ pub mod outcome;
 pub mod page_values;
 pub mod placement;
 pub mod policy;
+pub mod predicates;
 pub mod privacy;
 pub mod provenance;
 pub mod recursion;

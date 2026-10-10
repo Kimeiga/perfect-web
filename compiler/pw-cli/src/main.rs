@@ -157,6 +157,13 @@ fn explain_with(
                     let _ = writeln!(s, "             {} {}", p.name, p.value);
                 }
             }
+            // ADR-0302: a predicate a command requires, and its words.
+            DeclKind::Predicate => {
+                let _ = writeln!(s, "predicate    {name}");
+                for p in &d.policies {
+                    let _ = writeln!(s, "             {} {}", p.name, p.value);
+                }
+            }
             DeclKind::Opaque => {
                 let _ = writeln!(s, "opaque type  {name}");
                 let _ = writeln!(

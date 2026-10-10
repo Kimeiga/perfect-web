@@ -1,18 +1,18 @@
 ADR-0254 - a member names the declaration its module sees
 
 produced by: just e14-member-resolution
-commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 6964ee77b89b8ab24ab7fac6e5b651efa878aeb2
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37993980886 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the checker (compiler/pw-core/tests/member_resolution.rs)
 
-test a_member_of_modules_none_imported_is_refused ... ok
 test a_member_two_imported_modules_declare_is_refused ... ok
+test a_member_of_modules_none_imported_is_refused ... ok
 test a_member_declared_beside_its_type_is_seen_without_an_import ... ok
+test an_ambiguous_member_is_no_function_value ... ok
 test a_members_effects_are_the_imported_ones ... ok
 test a_member_two_modules_declare_is_the_one_imported ... ok
-test an_ambiguous_member_is_no_function_value ... ok
 test a_members_type_is_the_imported_ones ... ok
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
 

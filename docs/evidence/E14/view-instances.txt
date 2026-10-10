@@ -1,8 +1,8 @@
 ADR-0203 - a view that contains itself is an instance of its own template, made at run time
 
 produced by: just e14-view-instances
-commit: e44173313ff4e815b5097c5c50f7af9c8cdfd9a7
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37998533705 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 6964ee77b89b8ab24ab7fac6e5b651efa878aeb2
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37993980886 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
@@ -12,13 +12,13 @@ test a_view_that_contains_itself_through_a_block_checks ... ok
 test a_view_that_contains_itself_holds_no_signal_yet ... ok
 test each_use_is_an_instance_of_the_views_own_template ... ok
 test it_renders_to_the_depth_its_data_has_each_instance_in_a_frame ... ok
-test a_view_that_contains_itself_shows_no_stream_yet ... ok
 test one_that_contains_itself_with_no_block_on_the_way_back_is_refused ... ok
+test a_view_that_contains_itself_shows_no_stream_yet ... ok
 test a_templates_schema_closes_over_the_views_its_instances_reach ... ok
 test an_instance_is_rendered_again_whole_by_what_gives_it_its_value ... ok
 test the_renderer_goes_no_deeper_for_each_instance ... ok
 test past_what_a_browser_nests_it_is_refused ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
 
 == the renderer (runtime/pw-render/tests/properties.rs) and the browser's (runtime/pw-render-wasm)
 

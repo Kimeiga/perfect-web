@@ -345,6 +345,9 @@ impl Signatures {
                         // `emits` gives them (ADR-0088). It is in no term's
                         // namespace, so nothing calls it.
                         | DeclKind::Event
+                        // So are a predicate's, which `requires` gives
+                        // (ADR-0302); nothing calls it either.
+                        | DeclKind::Predicate
                 ) {
                     continue;
                 }

@@ -67,6 +67,9 @@ pub const DECL_STARTERS: &[&str] = &[
     "source",
     // Track `uploads` (ADR-0260): a file a form posts, and its limits.
     "upload",
+    // ADR-0302: a predicate a command `requires`, and the words a refusal
+    // by it is told in.
+    "predicate",
     "effect",
     "prelude",
     "replicated",
@@ -141,6 +144,8 @@ pub const RESOURCE_NOUNS: &[&str] = &[
     // Track `uploads` (ADR-0260): `upload PostImage  route "/uploads/post-image"
     // serves "/images"  max_bytes 5_000_000  types png, jpeg`.
     "upload",
+    // ADR-0302: `predicate OwnsPost(post: PostId)  says "…"`.
+    "predicate",
     "replicated",
     "paint",
 ];
@@ -261,6 +266,8 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     "types",
     "max_width",
     "max_height",
+    // ADR-0302: the words a refusal by a predicate is told in.
+    "says",
     "fallback",
     "retry",
     "concurrency",

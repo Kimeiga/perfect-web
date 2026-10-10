@@ -2494,3 +2494,16 @@ moves an equivalent simplified form (track `kiokun`, W6).
   unexplained, each target a page. ADR-0295's five tests keep every
   assertion, their helpers asserting the clause before they patch it. And
   the word page's tests compile each distinct program once per test process.
+[ADR-0302](DECISIONS/ADR-0302-a-refusal-is-told-where-the-press-was.md): a
+refusal is told where the press was (the owner's finding, using the feed by
+hand).
+- A predicate has words: the deployment's (`SignedIn`: "Sign in to do
+  this."), or the program's, where it declares them (`predicate SignedIn
+  says "…"`, PW0351: one string, not empty, no hole; a `requires` held to a
+  declared one's parameters; declared once). The host answers a refusal 403
+  with them, keeps it with its press, and refuses to start for a predicate it
+  cannot evaluate. The runtime tells it beside the control, named by its
+  `aria-describedby`, and says it through the page's announcer, a
+  `role="status"` every document holds from its first byte; an unreachable
+  command, a stale page and a failed handler are told in the platform's
+  words. The feed's composer is a signed-in reader's.

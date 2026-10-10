@@ -293,8 +293,10 @@ test("an `Ok` that did not commit goes nowhere", async ({ page }) => {
   const documents = [];
   page.on("request", (r) => orderPage(r) && documents.push(r.url()));
   await page.getByRole("button", { name: "Place order" }).click();
-  // The press failed, visibly, and the page stayed.
-  await expect(page.locator("#place-order")).toHaveAttribute("data-pw-handler-error", "1");
+  // The press failed, visibly, told beside the button (ADR-0302), and the
+  // page stayed.
+  await expect(page.locator("#place-order")).toHaveAttribute("data-pw-handler-error", "failed");
+  await expect(page.locator("#place-order + .pw-refusal")).toHaveText("This did not work. Try again.");
   expect(new URL(page.url()).pathname).toBe("/cart");
   expect(documents).toEqual([]);
 });

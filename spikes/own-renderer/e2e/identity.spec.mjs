@@ -4,8 +4,12 @@
 // (`PW_IDENTITY=dev-accounts`), which this server serves at /dev-idp as a
 // deployment's provider would be served at its own origin.
 //   - a signed-out reader reads the timeline and is shown how to sign in,
-//     where the post form's guard is; a post sent anyway is refused by the
-//     server (`requires SignedIn`, 403) and taken back;
+//     where the post form's guard is, and is given no composer (ADR-0302);
+//     a like pressed anyway is refused by the server (`requires SignedIn`,
+//     403), taken back, and told beside the button, in the feed's words for
+//     the predicate, and said by the page's announcer; a tab whose reader
+//     signed out in another is told so at its next post; a press no answer
+//     comes for is told so;
 //   - sign-up at the provider, back signed in, the session cookie HttpOnly
 //     and SameSite=Lax and a new one;
 //   - a post is its author's: named for them to every reader, and a Delete
@@ -58,30 +62,118 @@ async function sessionCookie(context) {
   return cookies.find((c) => c.name === "pw-session");
 }
 
-test("a signed-out reader reads, and a post sent anyway is refused", async ({ page }) => {
+/** What the page's announcer says, as a screen reader would hear it. */
+const announced = (page) => page.locator(".pw-announcer[role=status]");
+
+test("a signed-out reader reads, is given no composer, and a like is refused where it was pressed", async ({
+  page,
+}) => {
   await home(page);
   await expect(post(page, "Hello, feed.")).toHaveCount(1);
   await expect(page.locator("#signed-out")).toHaveText("Sign in to post, reply or like.");
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
-  // A post sent anyway: the server refuses it before the command runs, and
-  // the row shown before its answer is taken back.
-  const text = `Refused at ${Date.now()}`;
-  await page.getByLabel("What's happening?").fill(text);
-  const refused = page.waitForResponse((r) => r.url().includes("/command/feed.app.post"));
-  await page.getByRole("button", { name: "Post" }).click();
+  // No composer to be refused at (ADR-0302).
+  await expect(page.getByLabel("What's happening?")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Post" })).toBeHidden();
+  // A like pressed anyway: refused before the command runs, and told where
+  // it was pressed, in the feed's words for `SignedIn`.
+  const like = post(page, "Hello, feed.").getByRole("button", { name: "Like" });
+  const likes = await post(page, "Hello, feed.").locator(".likes").innerText();
+  const refused = page.waitForResponse((r) => r.url().includes("/command/feed.app.like"));
+  // From the keyboard, where the focus is the button's in every engine.
+  await like.focus();
+  await like.press("Enter");
   expect((await refused).status()).toBe(403);
-  await expect(post(page, text)).toHaveCount(0);
-  // What the server answered, asked again with the page's session (the
-  // runtime reads no body from a refused command, and Chromium keeps none).
-  const again = await page.request.post("/command/feed.app.post", {
-    data: [text],
+  const words = "Sign in to post, reply, like or follow.";
+  const message = post(page, "Hello, feed.").locator(".pw-refusal");
+  await expect(message).toHaveText(words);
+  // Named by the button, and said without the focus moving.
+  const id = await message.getAttribute("id");
+  await expect(like).toHaveAttribute("aria-describedby", new RegExp(`\\b${id}\\b`));
+  await expect(like).toHaveAttribute("data-pw-handler-error", "refused:SignedIn");
+  await expect(announced(page)).toHaveText(words);
+  // The focus stays where the press was.
+  await expect(like).toBeFocused();
+  // Taken back: the count is the server's.
+  await expect(post(page, "Hello, feed.").locator(".likes")).toHaveText(likes);
+  // Pressed again: cleared as it is pressed, and told again; the announcer
+  // emptied before it is written, so the same words are said again.
+  await page.evaluate(() => (window.__heard = { message: [], said: [] }));
+  for (const [node, into] of [
+    [message, "message"],
+    [announced(page), "said"],
+  ]) {
+    await node.evaluate(
+      (el, into) =>
+        new MutationObserver(() => window.__heard[into].push(el.textContent)).observe(el, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        }),
+      into,
+    );
+  }
+  const again = page.waitForResponse((r) => r.url().includes("/command/feed.app.like"));
+  await like.click();
+  await again;
+  await expect(message).toHaveText(words);
+  await expect
+    .poll(() => page.evaluate(() => window.__heard))
+    .toEqual({ message: ["", words], said: ["", words] });
+  // What the server answered: the predicate and its words, nothing else.
+  const answer = await page.request.post("/command/feed.app.like", {
+    data: ["p1"],
     headers: { "pw-interaction": `refused-${Date.now()}` },
   });
-  expect(again.status()).toBe(403);
-  expect(await again.json()).toEqual({ committed: false, refused: "SignedIn" });
-  await page.reload();
-  await expect(post(page, text)).toHaveCount(0);
+  expect(answer.status()).toBe(403);
+  expect(await answer.json()).toEqual({ committed: false, refused: "SignedIn", says: words });
+});
+
+test("the page's announcer is in it from the first byte, empty", async ({ request }) => {
+  // Served by the host, before the runtime: a live region added with its
+  // words is not reliably said (ADR-0182).
+  const served = await (await request.get("/")).text();
+  const found = served.match(/<div role="status" class="pw-announcer"[^>]*>(.*?)<\/div>/gs) ?? [];
+  expect(found).toHaveLength(1);
+  expect(found[0]).toMatch(/><\/div>$/);
+  expect(served.indexOf(found[0])).toBeLessThan(served.indexOf('id="pw-parts"'));
+});
+
+test("a tab whose reader signed out in another is told so at its next post", async ({
+  browser,
+}, testInfo) => {
+  const context = await browser.newContext();
+  const [here, there] = [await context.newPage(), await context.newPage()];
+  await signUp(here, handle(testInfo, "eve"), `Eve ${testInfo.project.name}`);
+  await home(there);
+  await there.getByRole("button", { name: "Sign out" }).click();
+  await expect(there.locator("#signed-out")).toBeVisible();
+  // Still showing a signed-in reader's page: its composer is there.
+  const text = `Stale at ${Date.now()}`;
+  await here.getByLabel("What's happening?").fill(text);
+  const refused = here.waitForResponse((r) => r.url().includes("/command/feed.app.post"));
+  await here.getByRole("button", { name: "Post" }).click();
+  expect((await refused).status()).toBe(403);
+  // Told beside the form, the post taken back, what was typed kept.
+  await expect(here.locator("form + .pw-refusal").first()).toHaveText(
+    "Sign in to post, reply, like or follow.",
+  );
+  await expect(post(here, text)).toHaveCount(0);
+  await expect(here.getByLabel("What's happening?")).toHaveValue(text);
+  await context.close();
+});
+
+test("a press no answer comes for is told so", async ({ page }) => {
+  await home(page);
+  await page.route("**/command/feed.app.like", (route) => route.abort("failed"));
+  const like = post(page, "Hello, feed.").getByRole("button", { name: "Like" });
+  await like.click();
+  await expect(post(page, "Hello, feed.").locator(".pw-refusal")).toHaveText(
+    "This could not be sent. Check the connection and try again.",
+  );
+  await expect(like).toHaveAttribute("data-pw-handler-error", "unreachable");
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
 test("a post is its author's, and theirs alone to delete", async ({ browser }, testInfo) => {

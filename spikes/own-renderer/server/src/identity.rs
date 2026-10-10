@@ -763,6 +763,22 @@ impl Identity {
     }
 }
 
+/// **What a reader is told when a predicate refuses** (ADR-0302), in this
+/// deployment's words: a program may declare its own (`predicate SignedIn
+/// says "…"`), told in their place. `None` for a predicate this deployment
+/// cannot evaluate, which the host refuses to serve a program requiring.
+/// Each names the need, never what the predicate read: `OwnsPost` does not
+/// say whose the post is.
+pub fn says(predicate: &str) -> Option<&'static str> {
+    Some(match predicate {
+        "SignedIn" => "Sign in to do this.",
+        "OwnsPost" => "Only its author can do this.",
+        // TRACK SEAM (messages).
+        "MayMessage" => "You can't send this person a message.",
+        _ => return None,
+    })
+}
+
 thread_local! {
     /// **The predicate `requires` refused**, on the thread that ran the
     /// command: the command's route answers it as its own case (403), and

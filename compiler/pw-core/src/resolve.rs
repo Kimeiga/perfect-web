@@ -67,6 +67,9 @@ pub enum Namespace {
     /// materialization that names an event must not silently resolve to a
     /// query that happens to share the spelling.
     Event,
+    /// `predicate` (ADR-0302). Its own namespace, as an event's is: a
+    /// predicate is named only in `requires`, never in an expression.
+    Predicate,
 }
 
 impl Namespace {
@@ -76,12 +79,13 @@ impl Namespace {
     /// such sites, both hand-written, and adding `Event` for E6 fixed one and
     /// left the other — so an event was importable and unresolvable, or the
     /// reverse, depending on which path asked.
-    pub const ALL: [Namespace; 5] = [
+    pub const ALL: [Namespace; 6] = [
         Namespace::Type,
         Namespace::Term,
         Namespace::Ui,
         Namespace::Effect,
         Namespace::Event,
+        Namespace::Predicate,
     ];
 
     pub fn of(kind: DeclKind) -> Option<Namespace> {
@@ -101,6 +105,7 @@ impl Namespace {
             | DeclKind::Materialize => Namespace::Term,
             DeclKind::View | DeclKind::Component | DeclKind::Page => Namespace::Ui,
             DeclKind::Event => Namespace::Event,
+            DeclKind::Predicate => Namespace::Predicate,
             DeclKind::Effect => Namespace::Effect,
             // A source is named by nothing a program writes (ADR-0207), and
             // nor is an upload (track `uploads`).
@@ -128,6 +133,7 @@ pub fn namespace_named(name: &str) -> Option<Namespace> {
         "Ui" => Namespace::Ui,
         "Effect" => Namespace::Effect,
         "Event" => Namespace::Event,
+        "Predicate" => Namespace::Predicate,
         _ => return None,
     })
 }

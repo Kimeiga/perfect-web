@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0302, 2026-10-10: a refusal is told where the press was** (the
+owner's finding, using the feed by hand; track `refusals`, merged from
+`6964ee7`). Signed out, the owner typed into the feed's composer and pressed
+Post: the post showed, then went, with no word, the server's refusal (403)
+read by nothing. Now a predicate has words, the deployment's or the program's
+own (`predicate SignedIn says "…"`, PW0351); the host answers a refusal with
+them and keeps it with its press, so a resend is refused alike (found
+reading the path: a resend was answered 202, as a command that did not
+commit); and the runtime tells them beside the control and through the
+page's announcer, a `role="status"` in every document from its first byte,
+focus and what was typed kept. A press no answer came for, a stale page's
+and a failed handler's are told too, in the platform's words. The feed's
+composer is a signed-in reader's. 13 compiler tests, 22 host tests, 30 in
+three engines, 30 of 30 mutants killed (verify run 37993980886; its mutation
+script took 3.5 h of CI, narrowed next).
+
 **ADR-0301, 2026-10-10: kiokun's word page moves an equivalent simplified
 form** (track `kiokun`, W6, merged from `4cbe3aa`). Where a word's own file
 is a simplified form that equals its one traditional form in meaning, the

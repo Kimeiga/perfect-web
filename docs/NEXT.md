@@ -565,16 +565,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
              so the safety net holds, but the press fails silently, the
              dead button this project exists to remove. In order, each its
              own ADR where it rules:
-             1. the feed's composer is a signed-in reader's, hidden from
-                one signed out as W4 hid the conversation's (ADR-0279). It
-                sits outside `{#if me.signed_in}` because a bound draft in
-                a block a query decides is not rendered again (ADR-0137);
-             2. a refusal shown by the runtime (W1's queued item, raised):
-                a command refused by its `requires` (403, its predicate) is
-                told to the reader where the press was, in an accessible
-                status, in the predicate's own words, which the predicate
-                declares; a stale tab's among them. Never only
-                `data-pw-handler-error` and a log line;
+             1. ~~the feed's composer is a signed-in reader's~~ (ADR-0302,
+                2026-10-10), hidden from one signed out by `hidden`, since a
+                bound draft in a block a query decides is not rendered again
+                (ADR-0137);
+             2. ~~a refusal shown by the runtime~~ (ADR-0302): told where
+                the press was, beside the control and through the page's
+                announcer, in the predicate's words, which the program may
+                declare (`predicate P says "…"`); a press no answer came
+                for, a stale page's and a failed handler's in the
+                platform's;
              3. the compiler holds what the page can tell: a control whose
                 handler sends a command `requires P` is rendered only where
                 the page shows `P` holds, through the predicate's declared
