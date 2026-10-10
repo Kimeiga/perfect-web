@@ -2,17 +2,17 @@
  "kiokun_commit": "abf71a89af1111f4039578cd1fde58e06f14c4bf",
  "node": "v22.21.1",
  "oracle": {
-  "answered": 11,
+  "answered": 23,
   "answers": {
    "上": {
-    "description": "上 means up, see 上聲|上声[shǎng​shēng], on top. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "description": "上 means see 上聲|上声[shǎng​shēng], on top, upon. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
     "named": [],
-    "title": "上 — up, see 上聲|上声[shǎng​shēng], on top | Kiokun"
+    "title": "上 — see 上聲|上声[shǎng​shēng], on top, upon | Kiokun"
    },
    "人": {
-    "description": "人 means person, man, people. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "description": "人 means man, person, people. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
     "named": [],
-    "title": "人 — person, man, people | Kiokun"
+    "title": "人 — man, person, people | Kiokun"
    },
    "半": {
     "description": "半 means half, semi-, incomplete. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
@@ -20,14 +20,24 @@
     "title": "半 — half, semi-, incomplete | Kiokun"
    },
    "博": {
-    "description": "博 means plentiful, gamble, extensive, ample. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "description": "博 means extensive, ample, rich. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
     "named": [],
-    "title": "博 — plentiful, gamble, extensive, ample | Kiokun"
+    "title": "博 — extensive, ample, rich | Kiokun"
+   },
+   "園": {
+    "description": "園 means surname Yuan, land used for growing plants, site used for public recreation. Character readings, definitions, examples, and learning tools across Chi…",
+    "named": [],
+    "title": "園 — surname Yuan, land used for growing plants, site used for publi…"
    },
    "多": {
-    "description": "多 means much, many, often. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "description": "多 means many, much, often. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
     "named": [],
-    "title": "多 — much, many, often | Kiokun"
+    "title": "多 — many, much, often | Kiokun"
+   },
+   "夢": {
+    "description": "夢 means dream, (bound form) to dream, vision. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "夢 — dream, (bound form) to dream, vision | Kiokun"
    },
    "市": {
     "description": "市 means market, city, fair. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
@@ -35,35 +45,89 @@
     "title": "市 — market, city, fair | Kiokun"
    },
    "形": {
-    "description": "形 means form, shape, to appear, to look. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "description": "形 means to appear, to look, form. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
     "named": [],
-    "title": "形 — form, shape, to appear, to look | Kiokun"
+    "title": "形 — to appear, to look, form | Kiokun"
+   },
+   "攢": {
+    "description": "攢 means to bring together, to collect, to hoard. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "攢 — to bring together, to collect, to hoard | Kiokun"
+   },
+   "時": {
+    "description": "時 means surname Shi, o'clock, time. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "時 — surname Shi, o'clock, time | Kiokun"
+   },
+   "樂": {
+    "description": "樂 (楽) means surname Le, surname Yue, happy. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "樂 (楽) — surname Le, surname Yue, happy | Kiokun"
    },
    "空": {
     "description": "空 means empty, air, sky. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
     "named": [],
     "title": "空 — empty, air, sky | Kiokun"
    },
+   "終": {
+    "description": "終 means end, finish, final. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "終 — end, finish, final | Kiokun"
+   },
+   "縊": {
+    "description": "縊 means (literary) to die by hanging or strangulation, strangle. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and…",
+    "named": [],
+    "title": "縊 — (literary) to die by hanging or strangulation, strangle | Kiokun"
+   },
+   "聲": {
+    "description": "聲 means sound, voice, tone. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "聲 — sound, voice, tone | Kiokun"
+   },
    "色": {
     "description": "色 means color, look, appearance. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
     "named": [],
     "title": "色 — color, look, appearance | Kiokun"
    },
-   "酒": {
-    "description": "酒 means wine, wine (esp. rice wine), liquor. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+   "諺": {
+    "description": "諺 means proverb, saying, aphorism. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
     "named": [],
-    "title": "酒 — wine, wine (esp. rice wine), liquor | Kiokun"
+    "title": "諺 — proverb, saying, aphorism | Kiokun"
+   },
+   "貪": {
+    "description": "貪 means to have a voracious desire for, to covet, greedy. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "貪 — to have a voracious desire for, to covet, greedy | Kiokun"
+   },
+   "酒": {
+    "description": "酒 means wine (esp. rice wine), liquor, spirits. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "酒 — wine (esp. rice wine), liquor, spirits | Kiokun"
+   },
+   "錢": {
+    "description": "錢 (銭) means surname Qian, coin, money. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "錢 (銭) — surname Qian, coin, money | Kiokun"
    },
    "青": {
-    "description": "青 means green or blue, abbr. for 青海[Qīng​hǎi], Qinghai Province, green. Character readings, definitions, examples, and learning tools across Chinese, Japanes…",
+    "description": "青 means abbr. for 青海[Qīng​hǎi], Qinghai Province, green, blue. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Ko…",
     "named": [],
-    "title": "青 — green or blue, abbr. for 青海[Qīng​hǎi], Qinghai Province, green…"
+    "title": "青 — abbr. for 青海[Qīng​hǎi], Qinghai Province, green, blue | Kiokun"
+   },
+   "魚": {
+    "description": "魚 means surname Yu, fish. Character readings, definitions, examples, and learning tools across Chinese, Japanese, and Korean.",
+    "named": [],
+    "title": "魚 — surname Yu, fish | Kiokun"
    }
   },
   "named": {},
+  "provenance": {
+   "the sample": "read from the repository's sample (examples/kiokun/data/han-1char-3, its MANIFEST), which holds cleared fields alone; see NOTICE.md",
+   "title, description": "the word, and the meanings kiokun.com's buildDictionarySeo takes: Chinese definitions from CC-CEDICT (MDBG, CC BY-SA 4.0), through Dong Chinese's export (kiokun-data data/chinese_dictionary_word_2025-06-25.jsonl); Japanese glosses from JMdict (EDRDG, CC BY-SA 4.0), through jmdict-simplified 3.6.1 (kiokun-data data/jmdict-examples-eng-3.6.1.json); Korean definitions from KRDICT (National Institute of Korean Language, CC BY-SA 2.0 KR), through Lyroxide's Yomitan export (kiokun-data data/krdict-en)"
+  },
   "read": 28,
   "stride": 1
  },
- "pleris_commit": "3312fb727a8f315002d51a4da918858fc8f51e16",
+ "pleris_commit": "7bcb08d843922e02f9031fcd7145bba238162265",
  "produced_by": "just e14-kiokun-seo"
 }
