@@ -128,7 +128,8 @@ test("a document of another schema reads the page again, once (ADR-0300)", async
   // Told by the table, never by the document; and its recovery named in
   // `pw-resume`'s order, a session's region rendered again (ADR-0155).
   const told = await page.evaluate(() => window.__pw.log.join("\n"));
-  expect(told).toMatch(/knows store\.page\.StorePage's documents: \S+ session:/);
+  // A user's page since track `store-accounts`: its documents are its user's.
+  expect(told).toMatch(/knows store\.page\.StorePage's documents: \S+ user:/);
   expect(told).toMatch(/refused \S+: code \d+ recovery rerender-private-slot/);
   await expect(page.locator("#cart-count")).toHaveText("0");
   const reloaded = page.waitForEvent("load");
