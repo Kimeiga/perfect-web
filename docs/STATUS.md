@@ -23,6 +23,21 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0304, 2026-10-10: what a page shows by the clock is told when the
+clock passes it** (the integrator's, the first of the store hours' steps;
+track `time`, merged from `4c079dc`). The clock was a stub answering 0. Now
+the wall clock is read only by comparing it (`clock.passed(at)`,
+`clock.today_in(zone)`, effect `clock.compare`): the host notes the earliest
+instant each read compared, keeps the value until then, and at that instant
+reads each live document that shows it again and tells it what changed, as
+Materialize's temporal filters do. Refused where nothing would tell (a page
+built once, a public materialization). Time zones come from the host's own
+tz database (`pw-time`: TZif, RFC 8536, a skipped or repeated local time
+read as RFC 5545 does). Found: a host function whose effect needs no
+authority was never linked. 9 pw-time tests (vectors from Python's
+zoneinfo, tz 2026c), 15 compiler tests, 10 host tests, 25 of 25 mutants
+(verify 38022822226).
+
 **ADR-0243 amended, 2026-10-10: markup written on one line is one region,
 and no operand** (found writing ADR-0303's refusals; track `siblings`,
 merged from `31eeb3c`). `<h1>a</h1><p>b</p>` at a view's top was PW0009 at

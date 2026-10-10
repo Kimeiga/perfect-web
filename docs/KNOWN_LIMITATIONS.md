@@ -582,6 +582,14 @@ awaited in order. What remains:
   binding named `line` beside the cart's `{#each cart.lines as line}` was
   read for `line.name` inside the loop, and the build refused. The checker
   accepts the shadowing; the binding is named `summary`.
+- **The clock is read by comparison alone** (ADR-0304): no value of "now"
+  is kept or shown, so a countdown ("closes in 12 minutes") is not
+  written; a handler reads no clock; a page built once and a public
+  materialization are refused a comparison, since nothing would tell them
+  when it changes. One host's clock, moved forward only (`/bench/clock`);
+  a tz database that changes under a kept value is not noticed until the
+  value is read again. A host function whose effect needs no authority is
+  never linked (`pw-host`'s `linkable`), so the zone reads are granted.
 - **A layout is one, unnested, and given nothing** (ADR-0303): a page names
   one layout; a layout is shown in no other, is given none of the page's
   parameters, has no title template of its own, and holds one slot. A

@@ -716,7 +716,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
              integrator's ruling, a change to every program that says it
              (the feed's notifications and messages);
           4. **store hours**: open and closed by the platform's clock
-             effect, ordering refused while closed, and orders scheduled;
+             effect, ordering refused while closed, and orders scheduled.
+             In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
+             the store's hours (after W8's merge: the stores' rows in both
+             layers, the pages, `place_order` refused while closed, with a
+             last-order cut-off); orders scheduled;
           5. **idempotency committed with the writes** (PW0348, ADR-0246's
              Not claimed), before a payment depends on it: an interaction's
              answer kept in the transaction that commits its command, in

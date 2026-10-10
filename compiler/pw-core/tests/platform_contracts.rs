@@ -443,7 +443,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // places its cart as an order and follows it (ADR-0193).
     // ADR-0208 declared `outbox.write`, the effect of emitting an event, and
     // ADR-0214 renamed `LayoutSnapshot`'s accessor from `value` to `measured`.
-    const EXPECTED: u64 = 0x37769cace0f350fa;
+    // ADR-0304: `clock` declares `TimeZone`, `LocalDate`, `LocalTime` and
+    // `Weekday`, the host's `passed`, `today_in`, `at`, `date_of` and
+    // `time_of`, and `clock.compare` and `clock.zone`, the wall clock read by
+    // comparing it and the host's tz database.
+    const EXPECTED: u64 = 0xfcb54248ad64350b;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

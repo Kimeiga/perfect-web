@@ -905,3 +905,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
   The planner now deals no shard of more than one recipe past 13,800 s and
   takes more shards where a track's 9 would; their jobs past the Free plan's
   20 wait. Both tracks run again on it.
+- **2026-10-10, the clock merged** as ADR-0304, from `4c079dc` (verify
+  38022822226 green, 25 of 25 mutants), ahead of the command order and the
+  soft navigation, whose verifies run again on the planner's ceiling: they
+  take 0305 and 0306. Its host read is merged with ADR-0303's: a document's
+  bindings are read once each, inside the clock's noting of what they
+  compared. Store hours' step 2 waits for W8's merge.
