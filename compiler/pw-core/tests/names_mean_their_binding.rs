@@ -184,3 +184,63 @@ fn a_handlers_call_through_a_local_is_no_commands_request() {
     )]);
     assert!(browser(&found), "{found:#?}");
 }
+
+/// A shared query whose body calls `current_session`: the platform's, a
+/// session's handle, or a local of that name.
+fn shared_session(local: bool) -> String {
+    let (ty, body) = if local {
+        (
+            "Int",
+            "    let current_session = fn() 1\n    current_session()\n",
+        )
+    } else {
+        ("Session<SessionId>", "    current_session()\n")
+    };
+    format!(
+        "module t\n\nimport context.{{ current_session }}\nimport capability.{{ Session, SessionId }}\n\n\
+         public query Shown() -> {ty}\n    freshness   0.seconds\n    \
+         consistency snapshot\n    cache       shared\n{{\n{body}}}\n"
+    )
+}
+
+#[test]
+fn a_call_through_a_local_is_labelled_as_the_local() {
+    // A declaration's label joins what its body's calls are labelled: a
+    // local `current_session` is not the platform's session handle.
+    let session = |found: &[String]| found.iter().any(|d| d.contains("Session<SessionId>"));
+    let found = reported(&[("t.pw", &shared_session(true))]);
+    assert!(!session(&found), "{found:#?}");
+    // The control: the platform's, called, is the session's.
+    let found = reported(&[("t.pw", &shared_session(false))]);
+    assert!(session(&found), "{found:#?}");
+}
+
+/// Each diagnostic's explanation, in the test's own files.
+fn explained(src: &[(&str, &str)]) -> Vec<String> {
+    let own: Vec<&str> = src.iter().map(|(n, _)| *n).collect();
+    check_sources(&program(src))
+        .into_iter()
+        .filter(|(n, _)| own.contains(&n.as_str()))
+        .flat_map(|(_, ds)| ds.into_iter().filter_map(|d| d.explanation))
+        .collect()
+}
+
+#[test]
+fn a_labels_cause_is_what_was_read_not_a_locals_namesake() {
+    // The cause a shared cache's refusal names is the read that makes the
+    // value a session's: the cart, not a local `mine` called first, though a
+    // `fn mine` that reads the cart is the module's.
+    let src = "module t\n\nimport Carts\nimport context.{ current_session }\n\
+               import domain.{ Cart, CartError }\n\n\
+               fn mine() -> Result<Cart, CartError> {\n    Carts.current(current_session())\n}\n\n\
+               public query Shown() -> Result<Cart, CartError>\n    freshness   0.seconds\n    \
+               consistency snapshot\n    cache       shared\n{\n    \
+               let mine = fn() Ok(Cart { lines: [] })\n    let _first = mine()\n    \
+               Carts.current(current_session())\n}\n";
+    let found = explained(&[("t.pw", src)]);
+    assert!(
+        found.iter().any(|e| e.contains("The cause chain")),
+        "{found:#?}"
+    );
+    assert!(!found.iter().any(|e| e.contains("`mine`")), "{found:#?}");
+}

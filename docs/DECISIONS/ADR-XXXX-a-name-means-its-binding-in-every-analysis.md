@@ -84,6 +84,10 @@ the analyses after it did not all ask which.
   - a handler's local `add_to_cart` beside the command: its argument's read
     of the cart is the browser's, and refused (PW5005), as the same read
     outside any call is;
+  - a shared query whose local `current_session` is called: not the
+    session's, where the platform's, called, is;
+  - a shared query that reads the cart after calling a local `mine`: the
+    cause its refusal names is not `mine`;
 - pw-core's tests and the corpus, unchanged;
 - `scripts/name_binding_mutations.py`: 7 mutants.
 
