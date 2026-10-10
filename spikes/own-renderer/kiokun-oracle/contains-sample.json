@@ -10223,6 +10223,6 @@
   "stride": 1,
   "trimmed": "each list's length, and its first 20 and last 5 items, each with its place"
  },
- "pleris_commit": "15202ec15cb5a7844211836578eb8df2bcc7116c",
+ "pleris_commit": "56e67766c64ae9e80ad87c7809d6cab24bc22dec",
  "produced_by": "just e14-kiokun-contains"
 }
