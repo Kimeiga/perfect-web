@@ -8,7 +8,9 @@
 //! or on PostgreSQL where `PW_STORE_TEST_LAYER=postgres` names one
 //! (`store::layer_for_tests`), so each holds on both.
 
-use super::sign_in::{REDIRECT, TestProvider, get, location, set_cookie, signed_in, text};
+use super::sign_in::{
+    REDIRECT, TestProvider, exchanged, get, location, set_cookie, signed_in, text,
+};
 use super::*;
 
 /// **The canonical store, its readers signed in through `provider`**: the
@@ -382,4 +384,83 @@ fn an_order_is_no_other_users_to_read() {
     }
     // The cart it was placed from is empty, in each of ada's sessions.
     assert!(s.cart_lines(&ada_again).is_empty());
+}
+
+/// The store's Add, POSTed as `session` as the runtime sends it, naming the
+/// page it was pressed on (`pw-document`) where `document` says.
+fn pressed_on(s: &Server, session: &str, document: Option<u64>, interaction: &str) -> String {
+    let body = serde_json::json!([shown("cortado"), 1]).to_string();
+    let named = document
+        .map(|d| format!("pw-document: {d}\r\n"))
+        .unwrap_or_default();
+    exchanged(
+        s,
+        &format!(
+            "POST /command/{ADD} HTTP/1.1\r\nHost: t\r\nCookie: pw-session={session}\r\n\
+             Sec-Fetch-Site: same-origin\r\npw-interaction: {interaction}\r\n{named}\
+             content-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        ),
+    )
+}
+
+/// **A command is answered for the reader its page was shown to** (Q3, a
+/// rule of the platform): a tab whose reader signed in in another, so that
+/// the browser now sends another session, is refused at its next press,
+/// before the command runs, and told so; one whose page the host no longer
+/// holds is told the page is out of date. A press from the page's own
+/// session runs, and a request that names no page is answered as before.
+#[test]
+fn a_command_is_answered_for_the_reader_its_page_was_shown_to() {
+    let provider = Arc::new(TestProvider::default());
+    let s = store_with(provider.clone());
+    // A guest's page, pressed from its own session: it runs.
+    s.serve_document_settled(
+        "came-ada",
+        "store.page.StorePage",
+        &store_params(STORE_ID),
+        &[],
+    )
+    .expect("served");
+    let guests = latest(&s.pending.lock().expect("pending"), "came-ada").1;
+    let answer = pressed_on(&s, "came-ada", Some(guests), "i-1");
+    assert!(answer.contains("\"committed\":true"), "{answer}");
+    // Signed in in another tab: the browser sends the new session, and the
+    // guest's page is not its page.
+    let ada = signed_in(&s, &provider, "came-ada", "ada");
+    let held = s.cart_lines(&ada);
+    let refused = pressed_on(&s, &ada, Some(guests), "i-2");
+    assert!(refused.starts_with("HTTP/1.1 403"), "{refused}");
+    assert!(
+        refused.contains("\"refused\":\"another-reader\"")
+            && refused.contains(
+                "\"says\":\"You signed in or out in another tab. Reload this page to go on.\""
+            ),
+        "{refused}"
+    );
+    assert_eq!(s.cart_lines(&ada), held, "and nothing ran");
+    // A page the host does not hold: never served, or forgotten.
+    let gone = pressed_on(&s, &ada, Some(9_999_999), "i-3");
+    assert!(gone.starts_with("HTTP/1.1 403"), "{gone}");
+    assert!(
+        gone.contains("\"refused\":\"out-of-date\"")
+            && gone.contains("\"says\":\"This page is out of date. Reload it to go on.\""),
+        "{gone}"
+    );
+    assert_eq!(s.cart_lines(&ada), held, "and nothing ran");
+    // A request from no page, or from a page the host did not number, as
+    // before.
+    for (document, interaction) in [(None, "i-4"), (Some(0), "i-5")] {
+        let answer = pressed_on(&s, &ada, document, interaction);
+        assert!(
+            answer.contains("\"committed\":true"),
+            "{document:?}: {answer}"
+        );
+    }
+    // Ada's own page, read after the sign-in, runs.
+    s.serve_document_settled(&ada, "store.page.StorePage", &store_params(STORE_ID), &[])
+        .expect("served");
+    let hers = latest(&s.pending.lock().expect("pending"), &ada).1;
+    let answer = pressed_on(&s, &ada, Some(hers), "i-6");
+    assert!(answer.contains("\"committed\":true"), "{answer}");
 }

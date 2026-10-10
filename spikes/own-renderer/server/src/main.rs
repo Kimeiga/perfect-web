@@ -372,6 +372,23 @@ const DOCUMENT_ATTEMPTS: u32 = 3;
 /// far more often than this.
 const IDLE: std::time::Duration = std::time::Duration::from_secs(120);
 
+/// **A command whose page was shown to another reader** (track
+/// `store-accounts`, Q3): the reader signed in or out in another tab, so the
+/// session the browser now sends is not the one the page was served to.
+/// What the 403 names, and what the reader is told.
+const ANOTHER_READER: (&str, &str) = (
+    "another-reader",
+    "You signed in or out in another tab. Reload this page to go on.",
+);
+
+/// **A command whose page this host no longer holds** (track
+/// `store-accounts`, Q3): forgotten while idle (`IDLE`), or served by a host
+/// before this one. ADR-0302's words for a page out of date.
+const PAGE_NOT_HELD: (&str, &str) = (
+    "out-of-date",
+    "This page is out of date. Reload it to go on.",
+);
+
 /// `{"cursor":..,"frames":[reload]}`: the batch a forgotten subscriber gets.
 fn reload_batch(cursor: u64) -> String {
     let frame = StreamFrame::Recovery {
@@ -2637,6 +2654,26 @@ impl Server {
                 .lock()
                 .expect("speculated versions")
                 .retain(|(s, ..), _| *s != session);
+        }
+    }
+
+    /// **Why a command from `document` is not `session`'s to send** (track
+    /// `store-accounts`, Q3), or nothing where it is: a document this host
+    /// served to another session, whose reader signed in or out in another
+    /// tab since, or one it no longer holds, forgotten while idle or served
+    /// by a host before this one. Document numbers are the host's own, one
+    /// per document served, so one names one session's document. The words
+    /// are the platform's, as ADR-0302's for a page out of date.
+    fn stale_document(&self, session: &str, document: u64) -> Option<(&'static str, &'static str)> {
+        // No document: a page the host did not serve, or no page.
+        if document == 0 {
+            return None;
+        }
+        let pages = self.pages.lock().expect("pages");
+        match pages.keys().find(|(_, n)| *n == document) {
+            Some((shown_to, _)) if shown_to == session => None,
+            Some(_) => Some(ANOTHER_READER),
+            None => Some(PAGE_NOT_HELD),
         }
     }
 
@@ -7166,6 +7203,32 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                     .eq_ignore_ascii_case("pw-interaction")
                     .then(|| v.trim().to_string())
             });
+            // TRACK SEAM (store-accounts): **a command is answered for the
+            // reader its page was shown to** (Q3, a rule of the platform).
+            // The runtime names its document (`pw-document`); one this host
+            // served to another session, the reader having signed in or out
+            // in another tab, or one it no longer holds, is refused before
+            // the command runs, in the platform's words, as a `requires`
+            // refusal is told (ADR-0302). A command from no page names none
+            // and is answered as before.
+            let document = headers.lines().find_map(|l| {
+                let (k, v) = l.split_once(':')?;
+                k.trim()
+                    .eq_ignore_ascii_case("pw-document")
+                    .then(|| v.trim().parse::<u64>().ok())
+                    .flatten()
+            });
+            if let Some((refused, words)) =
+                document.and_then(|document| server.stale_document(&session, document))
+            {
+                let refused = serde_json::json!({
+                    "committed": false,
+                    "refused": refused,
+                    "says": words,
+                });
+                respond_json(&mut stream, 403, &session, fresh, &refused.to_string());
+                return;
+            }
             // Charter §15.5's one-shot network error (ADR-0175): the
             // connection closed with no answer, before the command runs, or
             // after it has committed.

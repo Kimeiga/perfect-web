@@ -108,8 +108,10 @@ MUTANTS = [
         "a request is sent again under another interaction",
         "browser",
         RUNTIME,
-        '        headers: { "content-type": "application/json", "pw-interaction": interaction },\n',
-        '        headers: { "content-type": "application/json", "pw-interaction": attempt === 0 ? interaction : `${interaction}-${attempt}` },\n',
+        # Re-anchored by track store-accounts: the headers on lines of their
+        # own, the page's document beside the interaction (Q3).
+        '          "pw-interaction": interaction,\n',
+        '          "pw-interaction": attempt === 0 ? interaction : `${interaction}-${attempt}`,\n',
     ),
 ]
 

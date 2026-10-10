@@ -155,9 +155,12 @@ test("a tab whose reader signed out in another is told so at its next post", asy
   const refused = here.waitForResponse((r) => r.url().includes("/command/feed.app.post"));
   await here.getByRole("button", { name: "Post" }).click();
   expect((await refused).status()).toBe(403);
-  // Told beside the form, the post taken back, what was typed kept.
+  // Told beside the form, the post taken back, what was typed kept. The
+  // sign-out gave the browser a new session, and the page was shown to the
+  // old one: the host refuses the press as a page another reader's, before
+  // `requires` is read (track `store-accounts`, Q3).
   await expect(here.locator("form + .pw-refusal").first()).toHaveText(
-    "Sign in to post, reply, like or follow.",
+    "You signed in or out in another tab. Reload this page to go on.",
   );
   await expect(post(here, text)).toHaveCount(0);
   await expect(here.getByLabel("What's happening?")).toHaveValue(text);

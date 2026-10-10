@@ -4,7 +4,8 @@
 // (`PW_IDENTITY=dev-accounts`).
 //   - milestone 1: a guest's cart follows them in at sign-up; a user's cart is
 //     theirs in each of their sessions, live, and another user's page shows
-//     none of it;
+//     none of it; a tab whose reader signed in or out in another is refused
+//     at its next press, and told so where the press was (Q3);
 //   - milestone 2: a store out of reach of the chosen address says so where
 //     the menu is, and refuses its Add;
 //   - milestone 3, the owner's Next.js bug as acceptance: an address saved,
@@ -177,4 +178,38 @@ test("an address chosen goes back to the store, its estimate the chosen one's", 
   await page.waitForURL(/\/stores\/47$/);
   await expect(delivery(page)).toHaveText(/Delivery in 40 to 50 min/);
   await expect(page.locator("#deliver-to")).toContainText("Delivering to Home");
+});
+
+test("a tab whose reader signed in or out in another is refused at its next press, and told so", async ({
+  browser,
+}, testInfo) => {
+  const context = await browser.newContext();
+  const [here, there] = [await context.newPage(), await context.newPage()];
+  const words = "You signed in or out in another tab. Reload this page to go on.";
+  const told = (name) => here.locator(`button[aria-label="Add ${name}"] + .pw-refusal`);
+  // A guest's page, and the reader signs up in another tab.
+  await ready(here, "/stores/47");
+  await signUp(there, handle(testInfo, "tab"));
+  const refused = await add(here, "Espresso");
+  expect(refused.status()).toBe(403);
+  // Told beside the button and by the page's announcer, the speculation
+  // taken back, before the command ran.
+  await expect(told("Espresso")).toHaveText(words);
+  await expect(here.locator(".pw-announcer[role=status]")).toHaveText(words);
+  await expect(here.getByRole("button", { name: "Add Espresso" })).toHaveAttribute(
+    "data-pw-handler-error",
+    "refused:another-reader",
+  );
+  await expect(here.locator("#cart-count")).toHaveText("0");
+  // Read again, the page is the new reader's, and the press runs.
+  await ready(here, "/stores/47");
+  expect((await add(here, "Espresso")).status()).toBe(202);
+  await expect(here.locator("#cart-count")).toHaveText("1");
+  // Signed out in the other tab: refused again, the cart as it was.
+  await there.evaluate(() => fetch("/sign-out", { method: "POST" }));
+  const again = await add(here, "Cortado");
+  expect(again.status()).toBe(403);
+  await expect(told("Cortado")).toHaveText(words);
+  await expect(here.locator("#cart-count")).toHaveText("1");
+  await context.close();
 });

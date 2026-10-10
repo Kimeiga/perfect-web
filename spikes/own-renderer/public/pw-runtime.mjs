@@ -590,7 +590,17 @@ async function command(component, args, interaction, retry) {
         // handler, and carried unchanged by any retry of this request: a
         // command declared `idempotent_by InteractionId` runs once for it
         // however many times the request is sent.
-        headers: { "content-type": "application/json", "pw-interaction": interaction },
+        //
+        // TRACK SEAM (store-accounts): and the document this page is (Q3),
+        // so the host answers the command for the reader the page was shown
+        // to, and refuses it, in words told as a refusal is, where the
+        // reader signed in or out in another tab or the host no longer holds
+        // the page. A page the host did not serve has none to name.
+        headers: {
+          "content-type": "application/json",
+          "pw-interaction": interaction,
+          ...(documentCursor > 0 ? { "pw-document": String(documentCursor) } : {}),
+        },
         body: sent,
         keepalive,
       });
