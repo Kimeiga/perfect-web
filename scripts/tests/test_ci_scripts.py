@@ -247,12 +247,37 @@ class Plan(unittest.TestCase):
         seconds = {"a": 10.4, "b": 30, "c": 20}
         costs = plan.estimated(["a", "new", "m"], body, seconds)
         self.assertEqual(costs["a"], 10)
-        # One not yet measured: itself and its mutants, each at the median
-        # of what a measured recipe took one.
-        self.assertEqual(costs["new"], 20)
-        self.assertEqual(costs["m"], 20 * plan.cost(body["m"]))
+        # One not yet measured: itself and its mutants, each at the upper
+        # quartile of what a measured recipe of its kind took one.
+        self.assertEqual(costs["new"], 30)
+        self.assertEqual(costs["m"], 30 * plan.cost(body["m"]))
         # Where none is measured, at `RATE`.
         self.assertEqual(plan.estimated(["new"], body, {}), {"new": plan.RATE})
+
+    def test_a_recipe_not_yet_measured_costs_what_its_kind_does(self) -> None:
+        # `e14-refusal`'s first run was planned at the median of every
+        # recipe, 24 s a mutant, took about 420 s a mutant, and its shard ran
+        # out of time: what a browser's mutant costs is not what a type
+        # check's does.
+        browser = "    cd spikes/own-renderer && pnpm exec playwright test e2e/a.spec.mjs\n"
+        host = "    cargo test --locked -p pw-dev-server -- a\n"
+        core = "    cargo test --locked -p pw-core --test a\n"
+        self.assertEqual(
+            [plan.kind(b) for b in (browser, host, core)], ["browser", "host", "core"]
+        )
+        # A script's kind is what it runs.
+        self.assertEqual(plan.kind("    python3 scripts/navigate_mutations.py\n"), "browser")
+        self.assertEqual(plan.kind("    python3 scripts/redirects_mutations.py\n"), "host")
+        body = {"b1": browser, "b2": browser, "b3": browser, "b4": browser, "c1": core}
+        body.update({"new-browser": browser, "new-core": core, "new-host": host})
+        seconds = {"b1": 100, "b2": 200, "b3": 400, "b4": 800, "c1": 10}
+        costs = plan.estimated(["new-browser", "new-core", "new-host"], body, seconds)
+        # The browser's upper quartile, not the median of every recipe.
+        self.assertEqual(costs["new-browser"], 800)
+        self.assertEqual(costs["new-core"], 10)
+        # A kind none of whose recipes is measured: every recipe's upper
+        # quartile, 400 of 10, 100, 200, 400 and 800.
+        self.assertEqual(costs["new-host"], 400)
 
     def test_a_run_is_planned_by_the_seconds_kept(self) -> None:
         # Three recipes that set up nothing, in two shards: whichever took

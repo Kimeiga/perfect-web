@@ -939,10 +939,12 @@ what it invalidates. **Its sandbox is checked, not
 enforced** (ADR-0124, E14-I): no hidden file is copied in, and a process in
 it can read the repository by absolute path.
 
-**Every page's resume manifest names the document schema `cart-doc`**
-(found by ADR-0220), and so does the browser's resume decision. The two
-agree for every program, so the check compares a constant with itself and
-tells no document from another.
+**An entry's generation is still the host's constant** (`BUILD`, ADR-0300's
+Not claimed): entries named by the build's name wait for the store's entries
+keyed by a user. The static store page `run.sh` renders, which no host serves,
+keeps `store-resume.json`'s constants. Until ADR-0300 every page's resume
+manifest named the document schema `cart-doc` (found by ADR-0220), and the
+decision compared that constant with itself.
 
 **A `<select>` is not bound to a signal, and a `<textarea>`'s value is a
 signal or text** (ADR-0221, PW5036). A select's chosen option is marked

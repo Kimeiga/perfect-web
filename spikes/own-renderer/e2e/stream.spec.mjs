@@ -135,6 +135,9 @@ test("a region Chrome fills while the runtime boots is bound", async ({
   // it was never read again, and its buttons were bound to nothing. Here
   // the boot is held at the network until Chrome has filled it, every time.
   test.skip(testInfo.project.name !== "chromium", "one run: it launches the host's Chrome");
+  // A browser of its own, launched in the test's time: a runner's cold
+  // start of Chrome took 23 of this test's 30 seconds (run 38005175833).
+  test.slow();
   let chrome;
   try {
     chrome = await chromium.launch({ channel: "chrome" });
@@ -173,6 +176,8 @@ test("Chrome 150 and later fills a region itself, with JavaScript off", async ({
   baseURL,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "one run: it launches the host's Chrome");
+  // A browser of its own, launched in the test's time, as above.
+  test.slow();
   let chrome;
   try {
     chrome = await chromium.launch({ channel: "chrome" });

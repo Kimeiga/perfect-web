@@ -1,23 +1,27 @@
 ADR-0140 - a page that reads queries holds signals too
 
 produced by: just e14-store-signals
-commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
+commit: e44173313ff4e815b5097c5c50f7af9c8cdfd9a7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37998533705 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the server (spikes/own-renderer/server)
 
-test tests::the_store_s_document_carries_its_signals ... ok
+test tests::store_pg::on_postgres_the_database_provides_what_the_store_states ... ok
+test tests::store_pg::on_postgres_the_stores_schema_is_its_own_beside_the_feeds ... ok
 test tests::a_line_records_the_stores_name_and_price_not_the_requests ... ok
+test tests::the_store_s_document_carries_its_signals ... ok
 test tests::the_store_renders_its_signals_at_their_first_values ... ok
+test tests::the_store_moving_an_order_along_reaches_its_open_page ... ok
 test tests::the_store_and_each_item_say_what_they_are ... ok
 test tests::the_stores_are_the_home_page ... ok
-test tests::the_store_moving_an_order_along_reaches_its_open_page ... ok
 test tests::the_store_sends_its_slots_after_its_own_content ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 143 filtered out; finished in 3.42s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 353 filtered out; finished in 6.28s
 
 == mutation controls (scripts/store_signals_mutations.py)
 
-baseline: 7 passed, 0 failed
-the store renders without its signals: KILLED (4 of 7 tests fail)
-the store's document carries no signals: KILLED (1 of 7 tests fail)
+baseline: 9 passed, 0 failed
+the store renders without its signals: KILLED (4 of 9 tests fail)
+the store's document carries no signals: KILLED (1 of 9 tests fail)
 2 of 2 mutants killed
+memory bound: no process was stopped

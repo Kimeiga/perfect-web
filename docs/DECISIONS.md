@@ -2382,8 +2382,10 @@ a verification run is dealt by the seconds its recipes last took (amends
 ADR-0249 and ADR-0278).
 - A recipe's cost is the seconds it last took to its end on CI, kept in
   `scripts/ci_seconds.json` by every evidence fetch (`--times-only` from any
-  completed run); one not yet measured costs its mutants at the measured
-  median. Each recipe, the longest first, goes to the shard where it ends
+  completed run); one not yet measured costs its mutants at the upper
+  quartile of the measured recipes of its kind, browser, host or core
+  (amended 2026-10-09: `e14-refusal`, planned at the median, ran its shard
+  out of time). Each recipe, the longest first, goes to the shard where it ends
   soonest, what it adds to that shard's setup counted; one that needs less
   may run where more is set up. The recipes run against a database keep
   shards of their own, as many as end the run soonest.
@@ -2468,3 +2470,17 @@ kiokun's examples and pitch accent (track `kiokun`, W6).
   oracle run locally, its CI fixture committed). Found: kiokun.com hashes
   its entries' files over code points and its pitch files over UTF-16
   units, which differ past U+FFFF.
+[ADR-0300](DECISIONS/ADR-0300-a-build-is-named-by-what-it-built.md): a build
+is named by what it built, and the decision holds a document to what its
+build says of its page (the integrator's; the first step to the parts two
+pages share kept in place).
+- `pw build` names a build by an FNV-1a hash over every file it writes
+  (`build-id`, `b` and sixteen hex digits); a host serves the build it was
+  given, refuses one that names none, and says its name on every document
+  and on its handler table (`pw-build`), with each page's document schema
+  and scope (`#page|...`); a page's plan carries its scope. The resume
+  decision holds a document to what the serving build says of its page,
+  never to the build's name, so a deployment that changed nothing a page
+  shows keeps the page working. Found: a runtime-recovery mutant survived
+  once pages had real scopes; a stale press's recovery is now held to its
+  name.

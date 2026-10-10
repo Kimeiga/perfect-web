@@ -1,13 +1,14 @@
 ADR-0135 - a handler's identity is its own file's
 
 produced by: just e14-handlers-by-file
-commit: 4310769be543b572da4cad5644b55f101cb803d1
+commit: e44173313ff4e815b5097c5c50f7af9c8cdfd9a7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37998533705 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the regression (compiler/pw-core/tests/handlers_by_file.rs)
 
 test two_pages_of_one_shape_in_two_files_keep_their_own_handlers ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
 
 == mutation controls (scripts/handlers_by_file_mutations.py)
 
@@ -15,3 +16,4 @@ baseline: 1 passed, 0 failed
 the build keys an identity without its file: KILLED (1 of 1 tests fail)
 the template looks an identity up without its file: KILLED (1 of 1 tests fail)
 2 of 2 mutants killed
+memory bound: no process was stopped

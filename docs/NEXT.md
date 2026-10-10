@@ -443,8 +443,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
              22's frames is the next thing to record, in the failure's
              attachment). ADR-0271 left 2 of 160 failing under loads past
              CI's; this one was on CI's own; and, open,
-             **a resume manifest's document and scope are constants**
-             (found writing the capability matrix, 2026-10-08): every
+             ~~**a resume manifest's document and scope are constants**~~
+             (ADR-0300, `just e14-build-id`, merged 2026-10-09: the build
+             named by what it built, `pw-build` on every document and on
+             the handler table, each page's document schema and scope on
+             it, and the decision holding a document to what the serving
+             build says of its page; ruled against comparing the build's
+             name, which would read every open page again at each
+             deployment that changed nothing it shows) (found writing the
+             capability matrix, 2026-10-08): every
              document's manifest says `"document": "cart-doc"` and `"scope":
              "public"` (`resume_manifest` in the server's `main.rs`), and the
              browser's decision holds them to the same constants
@@ -685,7 +692,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           before features. The merchant, courier and support apps are out of
           scope. The integrator's, in order:
           1. **the parts two pages share kept in place**, ADR-0280's next:
-             a soft navigation, which item 3's test needs;
+             a soft navigation, which item 3's test needs. In three steps:
+             ~~the build named~~ (ADR-0300, merged 2026-10-09); a page shown
+             in its layout (`track/layouts`, in CI); a navigation that keeps
+             the layout (`track/soft-navigation`, on the other two);
           2. ~~**accounts in the store**~~ and 3. ~~**delivery
              addresses**~~: **W8's since 2026-10-09** (the owner: DoorDash
              faster, with a third worker; PARALLEL.md, "the DoorDash track"),
@@ -719,6 +729,28 @@ E14 comes before E11-E13. Its plan, controls and task list are
              charged at most once, under `secret<Payments>`; a Stripe
              adapter in test mode only with the owner's approval of each
              crate, and with test keys only.
+
+          Then the language's, found on the way:
+          - **a template's bindings shadow module members** (W8's finding,
+            2026-10-09): `<ready as={estimate}>` resolved to an imported
+            module's function `estimate` (PW0401) though the page bound the
+            name. Names a template binds (`<ready as>`, `<failed as>`,
+            `{#each … as}`, a match arm's binders) shadow module members and
+            imports, as a `let` does: a test for each form.
+
+          The infrastructure follow-ups, after these (the owner's order of
+          2026-10-09):
+          - **the server's components compiled once a process** (W6's
+            finding, 2026-10-09): a kiokun test's server load is 7.7 s, 7.1
+            of them Wasmtime compiling the program's components in a debug
+            build (`pw-host`'s `Component::new`), once a server, and every
+            server test pays it. To measure, then rule: a per-process cache
+            of compiled components in `pw-host`, keyed by a hash of each
+            component's bytes, one `Engine`; and an opt-level for
+            `cranelift-codegen` and `regalloc2` in the dev profile, against
+            what it adds to a cold build and to `target/`;
+          - **a recipe not yet measured is planned at its kind's upper
+            quartile** (done, ADR-0290's amendment of 2026-10-09).
 
           The worker tracks, one at a time beside the integrator (the
           owner's budget rule), each launched under docs/PARALLEL.md when

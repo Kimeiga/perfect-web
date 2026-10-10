@@ -55,11 +55,51 @@ pub unsafe extern "C" fn know(ptr: *const u8, len: usize) -> u32 {
     let text = String::from_utf8_lossy(bytes);
     let mut known = KNOWN.lock().unwrap();
     known.clear();
-    for line in text.lines().filter(|l| !l.is_empty()) {
+    // A `#` line is the table's word on the build and its pages
+    // (ADR-0300), never a handler: no identity begins with one.
+    for line in text
+        .lines()
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+    {
         let (identity, capture) = line.split_once('|').unwrap_or((line, ""));
         known.push((identity.to_string(), capture.to_string()));
     }
     known.len() as u32
+}
+
+/// **What this build says of the page's documents** (ADR-0300): their
+/// document schema and their scope, from the handler table the runtime was
+/// served with, never from the document. `None` until told.
+static DOCUMENT: Mutex<Option<(String, String)>> = Mutex::new(None);
+
+/// **Tell the decision what this build says of this page's documents**:
+/// `schema|scope`, as the handler table's `#page` line gives them for the
+/// page the document is. Replaces what was known; returns 1.
+///
+/// Told nothing, a document's schema and scope are not compared, as no
+/// build has spoken for them.
+///
+/// # Safety
+///
+/// `ptr` must point at `len` bytes the caller obtained from [`alloc`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn know_document(ptr: *const u8, len: usize) -> u32 {
+    let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
+    let text = String::from_utf8_lossy(bytes);
+    let (schema, scope) = text.split_once('|').unwrap_or((&text, "public"));
+    *DOCUMENT.lock().unwrap() = Some((schema.to_string(), scope.trim().to_string()));
+    1
+}
+
+/// A scope as a manifest or the table writes it: `public`, `session:<id>`,
+/// `user:<id>`, and anything else an organization's.
+fn scope_of(s: &str) -> PrivacyScope {
+    match s {
+        "public" => PrivacyScope::Public,
+        s if s.starts_with("session:") => PrivacyScope::Session(s[8..].to_string()),
+        s if s.starts_with("user:") => PrivacyScope::User(s[5..].to_string()),
+        s => PrivacyScope::Organization(s.to_string()),
+    }
 }
 
 /// Bytes the caller may write a manifest into. Leaked deliberately: a page
@@ -171,12 +211,7 @@ fn parse(text: &str) -> (ResumeEntry, Runtime, Construct) {
 
     let scheme = HashScheme(field(0).parse().unwrap_or(0));
     let abi = PlatformAbi(field(1).parse().unwrap_or(0));
-    let scope = match field(6) {
-        "public" => PrivacyScope::Public,
-        s if s.starts_with("session:") => PrivacyScope::Session(s[8..].to_string()),
-        s if s.starts_with("user:") => PrivacyScope::User(s[5..].to_string()),
-        s => PrivacyScope::Organization(s.to_string()),
-    };
+    let scope = scope_of(field(6));
     let handler = HandlerId::derive(
         &ImplementationHash::new(scheme, field(3)),
         &DependencySet::of(&[["app", "store", "Term", field(3), "r1"]]),
@@ -209,6 +244,7 @@ fn parse(text: &str) -> (ResumeEntry, Runtime, Construct) {
         privacy_scope: scope,
         captures: field(7).as_bytes().to_vec(),
     };
+    let told = DOCUMENT.lock().unwrap().clone();
     let rt = Runtime {
         abi: vec![PlatformAbi(1)],
         build: Some(BuildId("B1".into())),
@@ -218,8 +254,11 @@ fn parse(text: &str) -> (ResumeEntry, Runtime, Construct) {
             .iter()
             .map(|(identity, capture)| known(identity, capture))
             .collect(),
-        document_schema: Some(schema("cart-doc")),
-        scope: Some(PrivacyScope::Public),
+        // What the build says of this page's documents (ADR-0300), and
+        // nothing where it has said nothing. Until ADR-0300 the constants
+        // `cart-doc` and `Public`, which every manifest also said.
+        document_schema: told.as_ref().map(|(s, _)| schema(s)),
+        scope: told.as_ref().map(|(_, scope)| scope_of(scope)),
         migrations: Vec::new(),
     };
     let construct = match field(8) {
@@ -275,5 +314,31 @@ mod tests {
         // Told again, the table is replaced, not added to.
         assert_eq!(know_text("5e53c6a9aaee307a|\n"), 1);
         assert_eq!(decide_text(&manifest("e1ab9fca1f6fc15b", "item.id")), 4);
+
+        // A table's `#` lines are no handlers (ADR-0300).
+        assert_eq!(
+            know_text("#build|b1\n#page|t.P|s1|public\n5e53c6a9aaee307a|\n"),
+            1
+        );
+
+        // ADR-0300: what the build says of the page's documents, compared.
+        // Told nothing, neither is: the manifest's own words pass.
+        let as_page = |document: &str, scope: &str| {
+            format!("2|1|b1|5e53c6a9aaee307a||{document}|{scope}||region")
+        };
+        assert_eq!(decide_text(&as_page("cart-doc", "public")), 0);
+        // Told a public page of schema `s1`: its documents resume.
+        assert_eq!(unsafe { know_document(b"s1|public".as_ptr(), 9) }, 1);
+        assert_eq!(decide_text(&as_page("s1", "public")), 0);
+        // A document of another schema is refused (6), its parts elsewhere.
+        assert_eq!(decide_text(&as_page("s2", "public")), 6);
+        // A session's document's handler, in a public page, is refused (5).
+        assert_eq!(decide_text(&as_page("s1", "session:")), 5);
+        // Told a session page: a session's document and a public one resume.
+        assert_eq!(unsafe { know_document(b"s1|session:".as_ptr(), 11) }, 1);
+        assert_eq!(decide_text(&as_page("s1", "session:")), 0);
+        assert_eq!(decide_text(&as_page("s1", "public")), 0);
+        // And a user's does not flow into a session's page.
+        assert_eq!(decide_text(&as_page("s1", "user:")), 5);
     }
 }

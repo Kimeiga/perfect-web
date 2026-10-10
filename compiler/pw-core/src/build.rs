@@ -85,9 +85,16 @@ impl Build {
     /// DIR/speculations/<page>.*     each page's speculations (ADR-0122)
     /// DIR/computed/<page>.mjs       what each page computes from its
     ///                               signals, in the browser (ADR-0227)
+    /// DIR/build-id                  the build's name, from all of the above
+    ///                               (ADR-0300), written last
     /// ```
     pub fn write(&self, dir: &std::path::Path) -> Result<Vec<String>, String> {
+        // **The build is named by what it built** (ADR-0300): FNV-1a, the
+        // resume artifacts' own hash, over each file written, its path and
+        // its bytes, in the order written.
+        let named = std::cell::Cell::new(FNV_OFFSET);
         let write = |rel: &str, bytes: &[u8]| -> Result<(), String> {
+            named.set(fnv1a(fnv1a(named.get(), rel.as_bytes()), bytes));
             let path = dir.join(rel);
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)
@@ -222,6 +229,10 @@ impl Build {
                 lines.push(format!("  computed   {}  {} bytes", c.page, source.len()));
             }
         }
+        // Its name, last, from everything above.
+        let id = build_id(named.get());
+        write("build-id", format!("{id}\n").as_bytes())?;
+        lines.push(format!("  build      {id}"));
         Ok(lines)
     }
 
@@ -416,4 +427,22 @@ pub fn templates(
         }
     }
     crate::template_ir::build_with(hirs, sigs, &identities)
+}
+
+/// FNV-1a's offset basis, where a build's name starts.
+const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+
+/// FNV-1a, 64 bits, `bytes` folded into `h`, and then a zero byte, so that
+/// `"ab", "c"` and `"a", "bc"` name two things.
+fn fnv1a(mut h: u64, bytes: &[u8]) -> u64 {
+    for b in bytes.iter().chain(std::iter::once(&0u8)) {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
+}
+
+/// **A build's name** (ADR-0300): `b` and sixteen hex digits.
+fn build_id(h: u64) -> String {
+    format!("b{h:016x}")
 }

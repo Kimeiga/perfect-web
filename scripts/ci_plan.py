@@ -372,13 +372,51 @@ def measured(path: pathlib.Path | None = None) -> dict[str, float]:
         return {}
 
 
+def kind(body: str) -> str:
+    """What a recipe's work runs, which decides what a unit of it costs:
+    `browser` where it, or a mutation script it runs, drives Playwright;
+    `host` where they run the development server's tests; `core`
+    otherwise."""
+    texts = [body]
+    for script in sorted(set(re.findall(r"scripts/([a-z0-9_]+_mutations\.py)", body))):
+        try:
+            texts.append((ROOT / "scripts" / script).read_text())
+        except OSError:
+            pass
+    text = "\n".join(texts)
+    if "playwright" in text:
+        return "browser"
+    if "pw-dev-server" in text:
+        return "host"
+    return "core"
+
+
 def estimated(names: list[str], body: dict[str, str], seconds: dict[str, float]) -> dict[str, int]:
     """Each recipe's cost, in seconds: as measured where it was; otherwise
-    itself and the mutants it plants (`cost`), each at the median of what
-    the measured recipes took a mutant, or at `RATE` where none was."""
-    rates = sorted(seconds[n] / cost(body[n]) for n in seconds if n in body)
-    rate = rates[len(rates) // 2] if rates else RATE
-    return {n: round(seconds[n]) if n in seconds else round(rate * cost(body.get(n, ""))) for n in names}
+    itself and the mutants it plants (`cost`), each at the upper quartile of
+    what a unit took the measured recipes of its kind (`kind`), or all of
+    them where none of its kind is measured, or at `RATE` where none is.
+
+    The upper quartile, not the median: what a unit costs spans two orders
+    of magnitude, a type check's mutant against a browser's, and a recipe
+    planned short runs past its shard's bound and is run again whole, where
+    one planned long only ends its shard early. `e14-refusal`'s first run,
+    planned at the median, 24 s a mutant, took about 420 s a mutant, and its
+    shard ran out of time with 27 of its 30 mutants killed."""
+    rates: dict[str, list[float]] = {}
+    for n in seconds:
+        if n in body:
+            rates.setdefault(kind(body[n]), []).append(seconds[n] / cost(body[n]))
+    every = [r for rs in rates.values() for r in rs]
+
+    def rate(k: str) -> float:
+        rs = sorted(rates.get(k) or every)
+        return rs[(3 * len(rs)) // 4] if rs else RATE
+
+    return {
+        n: round(seconds[n]) if n in seconds else round(rate(kind(body.get(n, ""))) * cost(body.get(n, "")))
+        for n in names
+    }
 
 
 def main() -> int:
