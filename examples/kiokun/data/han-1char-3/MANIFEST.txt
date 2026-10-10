@@ -1,30 +1,109 @@
-kiokun.com shard han-1char-3: 28 files copied byte for byte by scripts/kiokun_sample.py
+kiokun.com shard han-1char-3: 28 entries read from kiokun-data's output and written
+with only the fields below by scripts/kiokun_sample.py; see ../NOTICE.md.
 
-ba/人.json.deflate   19104  1f832f4e5f3a58d602c0447aecb2911cd56525d809d6de967baa7efd055fcfbc  entry
-02/市.json.deflate   18325  c8e98a3c530d75ad6d2f07f13e01422149511a944dc84f504cdd960ba2d49485  entry
-5a/魚.json.deflate   19214  4b8fac4d583802368a3492e8aa9c1d68766eff45712899af52821eeb8bea5b68  entry
-52/酒.json.deflate   16622  4938ce5573d983deaff0dcdacb88d17f7a2222fb3f42a411334411c259c4ab79  entry
-42/時.json.deflate   19698  831f1de403655f47acc61393b763688e15b2c8cbc3abf7e61506d932385fc40e  entry
-22/夢.json.deflate   12179  6c1cc37a8665ea0b493efac4dee6ddcc0b4d47cffe20c86ba94d88bf8ab59a39  entry
-7a/空.json.deflate   17303  f6f225a9c96782c79dd1612bf3b166e58ee0f41f4d139940935e18bd34042cf5  entry
-52/青.json.deflate   17415  76c100524e875e6cf6655899b9058ed83ba9182b100f9e457ff63d623e7f254b  entry
-0a/上.json.deflate   19076  c79880cc2b8cacc3c86846bd06fd381f7890f5a2341e8e0c0ddbea389ff111a7  entry
-1a/多.json.deflate   17253  96aea6ec479c969da243312a8b781c4124879d979ff93e5e5992d1222002b11d  entry
-62/面.json.deflate   18344  5962ff4930b07eb22db19a9bbdc8bf5260b3202b9533312479ec32c349d40df0  entry
-72/色.json.deflate   17297  ab6f4f26d5cec147aadbe49ffb059d8fb9fdeb642017589bd72d22519cd8d731  entry
-72/聲.json.deflate   13598  820d28609bca4c98d5e9b5ec849e3691acd7820a2dceb4d21d8216ef37e94397  entry
-02/樂.json.deflate   21218  0e24da07be38540afc05ab85afe4b6ce56470b7033ebeb2a940575bb290a35d7  entry
-22/錢.json.deflate   15221  a60af908ecda1b89d659c57f07db0f37fef9f99b5ed7c370aea0034b7f2e2c4e  entry
-12/園.json.deflate   15940  7e9c225332d91ac783be6766550ddcc9fe738f12379c14a84387cdbbbdf78fc7  entry
-42/終.json.deflate   14733  6b24464d8cedaf23f715362d20e9494092d96073fa2906ef9f14a0aca9bded49  entry
-4a/半.json.deflate   15162  efe376bcbce81bb324e0f513cb698c8fb50abd0134abb6697ab611dc67e095bf  entry
-62/形.json.deflate   16293  c630882aefa7cfcbf720347629f680910e16eec9947cf6e5f0b028973bde60a0  entry
-5a/博.json.deflate   14839  c15f972d24bb86b963e52dc33eed3df585707cdcd3b551031cf2a82bef2f55c3  entry
-1a/谚.json.deflate    2177  58209bf2a3540895b2db58ba2e544cd127913435e39c955e53a0a2d5af02fa9e  redirect -> 諺
-fa/諺.json.deflate    4507  b51e072ad770ee5ad1c3355c7c5f123c2af98959212a8485a514ba45bc12e9be  entry
-2a/贪.json.deflate    2715  1e08b38459611b47cfc2920bdb678c6fb5ad33cef4a3e191125b59ad648fc96a  redirect -> 貪
-aa/貪.json.deflate    6701  0429fe0a20656e3e905baaba985cbc611614a58a4c33476112cf6737df686d6d  entry
-12/攒.json.deflate    3260  f6221cf020680322231240c6753d380805716f33b97e3d8888809d03f6805118  redirect -> 攢
-22/攢.json.deflate    4179  3640827024f0dd92828ddf05068348c7917c3912287e2798ceb55ae85b2242e3  entry
-22/缢.json.deflate    2151  c1efdb7ceaa05bf414038c30e884792d4ba700c5189ad944c3cf20de868cfc50  redirect -> 縊
-0a/縊.json.deflate    3715  380f823648047d89751a2fb98c3a576c26f749b1ee42f7a2d610107bb3c52120  entry
+ba/人.json.deflate    9584  c16fd81b22ad2506053d4c48eeb15385c4fb6b255043b4279a8a807462edd9f0  entry
+02/市.json.deflate    7227  b435caf1dae6e9fa9b7c6f8eceec2cc3dd6187aaceff62e9cfb61a859c9af77a  entry
+5a/魚.json.deflate    7708  2189d9f8d33717c90c2f2e08050cb469b83b4839732e5d68c415d83169461ff3  entry
+52/酒.json.deflate    7055  f617ffad00e837ced73cc72a95286c8b6ceed542d1615d9566fbb4a0f0718e7a  entry
+42/時.json.deflate    8880  8737aae4ce8afc55dbd65b3e4a69b78dabc4df627bada58ba0cad3d3d080d10a  entry
+22/夢.json.deflate    4528  c239431c56e61ebf7a5bb4c79232e3d4e842fb2307de877c395216cb98b91d07  entry
+7a/空.json.deflate    8163  3fef4106eb37c0b88e080059eb610f8da0284ee589871ba74269fa096e2d248c  entry
+52/青.json.deflate    6886  190054286039ff0f9580f0233d5c66e1f8d1617e3aab393a97bc9a65b84c9559  entry
+0a/上.json.deflate    9966  9ce24a3c35c2b2424a8b5a6d00fde00fa840b6332198ef6604f2565f82d9fc41  entry
+1a/多.json.deflate    7782  131c4d36640444c893646a4aa4e03422dd0316b6460ea97459a423b39b07d782  entry
+62/面.json.deflate    8789  414b73342d728e0dc0362a16c8bc4340e1b078e7964cdfc9a3054e4e3dd58473  entry
+72/色.json.deflate    8404  7d829a633b5c0469a14b900793f8c4127766961bba840e31d34d577660dd593f  entry
+72/聲.json.deflate    3258  ec7c2c4a144763acb0585768d3142ef32b8b8be6cb7e650ad9798c24cec95760  entry
+02/樂.json.deflate    7817  87c780d3b4a188679fdcd364e9a2e05693c74428beecb4b30e98590f9a41a4ad  entry
+22/錢.json.deflate    5485  8639561d48da204d44dd53c8b12cc456c0ec81c2c04ee19148c7c8f364741b5b  entry
+12/園.json.deflate    6928  5eec0f170067dfe28b5e98ff78af11cb0f1c2f87107c4278653e663cbd286ba8  entry
+42/終.json.deflate    6523  388ac01af285b0208699ee7d72f20ae0979a7ba27117e83ce89b378366003e95  entry
+4a/半.json.deflate    7119  a72ffe22104e2f4acd950cd1039e38f72d7191ab6b5d39af27d39bdbf49bd8e8  entry
+62/形.json.deflate    8127  b8335ee863fbefa3719647cf72c26ce795612b8ee2df598468da781d748a1a41  entry
+5a/博.json.deflate    5165  a7d9a1696ed2e7da96406bbab04dd233028fc8adad4f7d577ae395dc719764c2  entry
+1a/谚.json.deflate      69  d1475e299595a32fc59cd3a235ed1a08633d3183057eaa8abe9aecdf0863fbbd  redirect -> 諺
+fa/諺.json.deflate     901  529a743431445b9ce1be635f9b12858f58494c7fcfc792ecfb88504965c223c9  entry
+2a/贪.json.deflate      68  2717e1ded561d0a2df0494d163209b93eac1819cfc1066754a2da70ea3965b0c  redirect -> 貪
+aa/貪.json.deflate    1630  7819afe10a5a80699b927c1bc72638dd05c4a28562de10b409b0870f38fe0f13  entry
+12/攒.json.deflate      68  212d6fd8dc4da8bd99143908b98b17cc75c377064a4ac5312bb3a8abda1502e5  redirect -> 攢
+22/攢.json.deflate     452  a86cccc31ce912000674a82891852122d54438c04c77fc7d32404eaa8b9a8e87  entry
+22/缢.json.deflate      67  b1067d02593222f94be2c9048ff4e15659d5276cff7cd785c72fb11e4b53fddc  redirect -> 縊
+0a/縊.json.deflate     602  7fc42d4b34b17ec537d9fbe8971b5dbf4dd7737940c557b38a70a3ae8b7c2b8d  entry
+
+The fields kept, and the source each is made from:
+
+  key                                                      builder
+  redirect                                                 builder
+  simplified_form_of                                       builder
+  chinese_words[]._id                                      cc-cedict
+  chinese_words[].simp                                     cc-cedict
+  chinese_words[].trad                                     cc-cedict
+  chinese_words[].pinyinSearchString                       cc-cedict
+  chinese_words[].items[].pinyin                           cc-cedict
+  chinese_words[].items[].definitions                      cc-cedict
+  chinese_words[].items[].jyutping                         cc-canto
+  chinese_char.char                                        builder
+  chinese_char.hkChar                                      unihan
+  chinese_char.cantonese                                   unihan
+  japanese_words[].id                                      jmdict
+  japanese_words[].kanji[].text                            jmdict
+  japanese_words[].kanji[].tags                            jmdict
+  japanese_words[].kanji[].common                          jmdict
+  japanese_words[].kana[].text                             jmdict
+  japanese_words[].kana[].tags                             jmdict
+  japanese_words[].kana[].common                           jmdict
+  japanese_words[].sense[].partOfSpeech                    jmdict
+  japanese_words[].sense[].field                           jmdict
+  japanese_words[].sense[].misc                            jmdict
+  japanese_words[].sense[].dialect                         jmdict
+  japanese_words[].sense[].info                            jmdict
+  japanese_words[].sense[].gloss[].text                    jmdict
+  japanese_words[].sense[].gloss[].type                    jmdict
+  japanese_words[].sense[].gloss[].lang                    jmdict
+  japanese_words[].sense[].examples[].source               tatoeba
+  japanese_words[].sense[].examples[].text                 tatoeba
+  japanese_words[].sense[].examples[].sentences[].land     tatoeba
+  japanese_words[].sense[].examples[].sentences[].lang     tatoeba
+  japanese_words[].sense[].examples[].sentences[].text     tatoeba
+  japanese_char.literal                                    kanjidic2
+  japanese_char.misc.grade                                 kanjidic2
+  japanese_char.misc.jlptLevel                             kanjidic2
+  japanese_char.misc.frequency                             kanjidic2
+  japanese_char.misc.strokeCounts                          kanjidic2
+  japanese_char.readingMeaning.groups[].readings[]         kanjidic2
+  japanese_char.readingMeaning.groups[].meanings[]         kanjidic2
+  japanese_names[].id                                      jmnedict
+  japanese_names[].kanji[].text                            jmnedict
+  japanese_names[].kana[].text                             jmnedict
+  japanese_names[].translation[].type                      jmnedict
+  japanese_names[].translation[].translation[].text        jmnedict
+  korean_words[].id                                        krdict
+  korean_words[].hangul                                    krdict
+  korean_words[].hanja                                     krdict
+  korean_words[].pos                                       krdict
+  korean_words[].definitions[].text                        krdict
+  korean_char.character                                    builder
+  korean_char.hanjaForm                                    unihan
+  korean_char.meaningsEn                                   kanjidic2
+  korean_char.readings[].hangul                            kanjidic2-muller
+  contained_in_chinese[].w                                 cc-cedict
+  contained_in_japanese[].w                                jmdict
+  contained_in_japanese[].jp                               jmdict
+  contained_in_japanese[].d                                jmdict
+  contained_in_japanese[].c                                jmdict
+  contained_in_korean[].w                                  krdict
+  contained_in_korean[].d                                  krdict
+  contained_in_korean[].fr                                 krdict
+
+The sources:
+
+  builder           kiokun-data's builder (MIT, Hakan Alpay): the entry's structure
+  cc-cedict         CC-CEDICT (MDBG), CC BY-SA 4.0, through Dong Chinese's export of it (data/chinese_dictionary_word_2025-06-25.jsonl, items tagged `cedict`)
+  cc-canto          Pleco's CC-Canto readings for CC-CEDICT, CC BY-SA 3.0 (data/cantonese/cc-cedict-canto, cc-canto: MarvNC's Yomitan conversion)
+  unihan            the Unicode Character Database's Unihan, Unicode License v3 (data/unihan/Unihan_Readings.txt, Unihan_Variants.txt, Unihan_IRGSources.txt)
+  jmdict            JMdict (EDRDG), CC BY-SA 4.0, through jmdict-simplified 3.6.1 (data/jmdict-examples-eng-3.6.1.json)
+  tatoeba           Tatoeba's sentences, CC BY 2.0 FR, each with its id, as JMdict's examples carry them (data/jmdict-examples-eng-3.6.1.json)
+  kanjidic2         KANJIDIC2 (EDRDG), CC BY-SA 4.0, through jmdict-simplified 3.6.1 (data/kanjidic2-en-3.6.1.json)
+  kanjidic2-muller  KANJIDIC2's Korean readings, Charles Muller's, under EDRDG's licence (its section 8), or Unihan's kHangul where KANJIDIC2 has none
+  jmnedict          JMnedict (EDRDG), CC BY-SA 4.0, through jmdict-simplified 3.6.1 (data/jmnedict-all-3.6.1.json)
+  krdict            KRDICT (National Institute of Korean Language), CC BY-SA 2.0 KR, through Lyroxide's Yomitan export (data/krdict-en)

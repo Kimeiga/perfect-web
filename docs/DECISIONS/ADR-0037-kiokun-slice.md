@@ -43,6 +43,10 @@ tokenizer or with kiokun's full alias table.
 
 `examples/kiokun/data/han-1char-3/` holds 28 files copied byte for byte from
 kiokun's build output by `scripts/kiokun_sample.py`, with a SHA-256 manifest.
+**Amended 2026-10-10** (ADR-XXXX, Contains and Appears in, "The repository's
+kiokun data, cleared"): the files are now written with only the fields a
+committed test reads, from cleared sources; they are no longer kiokun's
+bytes.
 The host reads kiokun's raw-DEFLATE layout with kiokun's shard rule, so the same
 loader serves the sample and the whole shard (`KIOKUN_DATA`).
 

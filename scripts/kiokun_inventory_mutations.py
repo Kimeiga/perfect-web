@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Mutation controls for kiokun.com's parity inventory check, and for the
-oracles' copy of kiokun.com's files.
+"""Mutation controls for kiokun.com's parity inventory check, for the
+oracles' copy of kiokun.com's files, and for the repository's sample.
 
 A test that passes with the check removed is not evidence for it. Each
 mutant undoes one thing `kiokun_inventory.py` holds the inventory to, or
@@ -22,6 +22,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts/kiokun_inventory.py"
 PLAN = ROOT / "scripts/ci_plan.py"
 SOURCE = ROOT / "scripts/kiokun_app_source.py"
+SAMPLE = ROOT / "scripts/kiokun_sample.py"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
@@ -66,6 +67,30 @@ MUTANTS = [
         SOURCE,
         '        digests.append(f"{path} {hashlib.sha256(shown.stdout).hexdigest()[:12]}")\n',
         '        digests.append(f"{path} {hashlib.sha256(b\"\").hexdigest()[:12]}")\n',
+    ),
+    (
+        "the sample keeps every Chinese item, Dong Chinese's too",
+        SAMPLE,
+        '        word["items"] = [i for i in word.get("items", []) if i.get("source") == "cedict"]\n',
+        '        word["items"] = list(word.get("items", []))\n',
+    ),
+    (
+        "the sample keeps KANJIDIC2's contributed readings",
+        SAMPLE,
+        '        group["readings"] = [r for r in group.get("readings", []) if r.get("type") in KANJI_READINGS]\n',
+        "        pass\n",
+    ),
+    (
+        "the sample keeps whole what it names a part of",
+        SAMPLE,
+        '        return {k: kept(value[k], sub) for k, sub in node.items() if k in value}\n',
+        "        return value\n",
+    ),
+    (
+        "the sample keeps the owner's mnemonics",
+        SAMPLE,
+        '    ("key", "builder"),\n',
+        '    ("key", "builder"),\n    ("semantic_mnemonic", "builder"),\n',
     ),
     (
         "a route listed twice passes",
@@ -118,6 +143,7 @@ TESTS = [
         "unittest",
         "scripts/tests/test_kiokun_inventory.py",
         "scripts/tests/test_kiokun_app_source.py",
+        "scripts/tests/test_kiokun_sample.py",
     ]
 ]
 
