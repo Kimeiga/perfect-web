@@ -96,16 +96,21 @@ test("two pending presses show two, and reconcile to the server's two", async ({
 
 test("one press rejected among two keeps the other's speculation", async ({ page }) => {
   await ready(page);
-  let first = true;
+  let sent = 0;
   const pending = [];
   await page.route("**/command/store.page.add_to_cart", async (route) => {
-    if (first) {
-      first = false;
+    sent += 1;
+    if (sent === 1) {
       // The first is held, then refused.
       await new Promise((resolve) => pending.push(resolve));
       await route.fulfill({ status: 202, contentType: "application/json", body: '{"committed":false}' });
-    } else {
+    } else if (sent === 2) {
       await new Promise((resolve) => pending.push(resolve));
+      await route.continue();
+    } else {
+      // The second sent again: the first, refused here, never reached the
+      // server, which answered the second early once it had waited for it
+      // (ADR-XXXX).
       await route.continue();
     }
   });
@@ -117,8 +122,13 @@ test("one press rejected among two keeps the other's speculation", async ({ page
   // Refuse the first: the second is still shown.
   pending.shift()();
   await expect(page.locator("#cart-count")).toHaveText("1");
-  // Commit the second: the server's value, which is one.
+  // Commit the second: the server's value, which is one. Answered before
+  // the page is read again.
+  const committed = page.waitForResponse(
+    (r) => new URL(r.url()).pathname === "/command/store.page.add_to_cart" && r.status() === 202,
+  );
   pending.shift()();
+  await committed;
   await expect(page.locator("#cart-count")).toHaveText("1");
   await page.unroute("**/command/store.page.add_to_cart");
   await page.reload();

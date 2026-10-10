@@ -5224,6 +5224,30 @@ e14-refusal:
      } > docs/evidence/E14/refusal.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/refusal.txt
 
+# ADR-XXXX: a page's commands run in the order it sent them. The server's
+# tests, the browser's in three engines, and the mutation controls.
+e14-command-order:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a page's commands run in the order it sent them"; echo; \
+       echo "produced by: just e14-command-order"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== a command runs once the one its page sent before it has (server/src/order.rs, the command route)"; echo; \
+       cargo test --locked -p pw-dev-server -- order:: a_pages_command a_session_forgotten_takes_its_commands_order 2>&1 \
+         | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== in three engines (e2e/command-order.spec.mjs; optimistic.spec, navigate.spec)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/command-order.spec.mjs --reporter=line 2>&1; \
+          pnpm exec playwright test e2e/optimistic.spec.mjs e2e/navigate.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/command_order_mutations.py)"; echo; \
+       python3 scripts/command_order_mutations.py; \
+     } > docs/evidence/E14/command-order.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/command-order.txt
+
 # ADR-0269: a resource is held by what takes it apart. The checker's tests,
 # and the mutation controls.
 e14-matched-resources:

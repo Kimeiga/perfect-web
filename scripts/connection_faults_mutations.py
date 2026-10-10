@@ -40,10 +40,16 @@ MUTANTS = [
         "            .and_then(|f| f.drop_command)\n",
     ),
     (
+        # Re-anchored by ADR-XXXX: a command closed unrun is not yet the one
+        # before what follows it.
         "`before` runs the command",
         "server",
         SERVER,
         "            if drop_at == Some(DropAt::Before) {\n"
+        "                // Never run: what follows it waits for it to be sent again.\n"
+        "                if let Some(arrival) = arrival {\n"
+        "                    arrival.vanish();\n"
+        "                }\n"
         "                return;\n"
         "            }\n",
         "",
