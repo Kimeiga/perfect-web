@@ -9238,8 +9238,8 @@ public query Store(",
                     Err(e) => panic!("the response is no UTF-8: {e}"),
                 };
                 if whole > 0 {
-                    let text = String::from_utf8(pending.drain(..whole).collect())
-                        .expect("decoded above");
+                    let text =
+                        String::from_utf8(pending.drain(..whole).collect()).expect("decoded above");
                     chunks.push((started.elapsed(), text));
                 }
             }
