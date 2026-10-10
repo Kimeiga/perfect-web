@@ -758,17 +758,19 @@ fn markup_as_an_operand(hir: &Hir) -> Vec<Diagnostic> {
         let body = hir.body(b);
         for e in body.walk() {
             let operands: Vec<ExprId> = match body.expr(e) {
-                Expr::Binary { op, lhs, rhs } => match op {
-                    BinOp::Add
-                    | BinOp::Sub
-                    | BinOp::Mul
-                    | BinOp::Div
-                    | BinOp::Rem
-                    | BinOp::Cmp(_)
-                    | BinOp::And
-                    | BinOp::Or => vec![*lhs, *rhs],
-                    _ => continue,
-                },
+                Expr::Binary {
+                    op:
+                        BinOp::Add
+                        | BinOp::Sub
+                        | BinOp::Mul
+                        | BinOp::Div
+                        | BinOp::Rem
+                        | BinOp::Cmp(_)
+                        | BinOp::And
+                        | BinOp::Or,
+                    lhs,
+                    rhs,
+                } => vec![*lhs, *rhs],
                 Expr::Unary {
                     op: UnOp::Neg | UnOp::Not,
                     operand,
