@@ -83,6 +83,8 @@ LOCAL_ONLY = {
     "e14-kiokun-moves",
     # And its Contains and Appears in against kiokun.com's own code.
     "e14-kiokun-contains",
+    # And its search against kiokun.com's own code and index.
+    "e14-kiokun-search",
 }
 
 # Recipes run against a database (ADR-0246). Each is a shard of its own,

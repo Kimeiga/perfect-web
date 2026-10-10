@@ -23,6 +23,7 @@ SCRIPT = ROOT / "scripts/kiokun_inventory.py"
 PLAN = ROOT / "scripts/ci_plan.py"
 SOURCE = ROOT / "scripts/kiokun_app_source.py"
 SAMPLE = ROOT / "scripts/kiokun_sample.py"
+SEARCH_SAMPLE = ROOT / "scripts/kiokun_search_sample.py"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
@@ -93,6 +94,18 @@ MUTANTS = [
         '    ("key", "builder"),\n    ("semantic_mnemonic", "builder"),\n',
     ),
     (
+        "the search sample keeps every Chinese row",
+        SEARCH_SAMPLE,
+        '        if language == "chinese" and (word, row[at["definition"]]) not in chinese:\n',
+        "        if False:\n",
+    ),
+    (
+        "the search sample keeps the Korean IPA",
+        SEARCH_SAMPLE,
+        '            row[at["pronunciation"]] = ""\n',
+        "            pass\n",
+    ),
+    (
         "a route listed twice passes",
         SCRIPT,
         "        if route in seen:",
@@ -144,6 +157,7 @@ TESTS = [
         "scripts/tests/test_kiokun_inventory.py",
         "scripts/tests/test_kiokun_app_source.py",
         "scripts/tests/test_kiokun_sample.py",
+        "scripts/tests/test_kiokun_search_sample.py",
     ]
 ]
 

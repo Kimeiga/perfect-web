@@ -156,6 +156,7 @@ class Recipe(unittest.TestCase):
         self.assertIn("e14-kiokun-examples", plan.LOCAL_ONLY)
         self.assertIn("e14-kiokun-moves", plan.LOCAL_ONLY)
         self.assertIn("e14-kiokun-contains", plan.LOCAL_ONLY)
+        self.assertIn("e14-kiokun-search", plan.LOCAL_ONLY)
         recipes = (SCRIPTS.parent / "just" / "kiokun.just").read_text()
         self.assertIn("\ne14-kiokun-inventory:\n", recipes)
 

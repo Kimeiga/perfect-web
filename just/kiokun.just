@@ -205,6 +205,50 @@ e14-kiokun-contains:
     @grep -q "unnamed differences: 0" docs/evidence/E14/kiokun-contains.txt
     @! grep -qE "panicked|FAILED" docs/evidence/E14/kiokun-contains.txt
 
+# The search page against kiokun.com's own `api/search` handler, run in Node
+# over its own FTS5 schema and kiokun-data's committed search index (each
+# copied from its commit at HEAD into a temporary directory), as the other
+# oracles hold their parts: every 8,000th row's queries over the whole
+# index, and the CI fixture over the repository's sample and its hand-made
+# aliases. The D1 stand-in's own test runs first. Local (scripts/ci_plan.py's
+# LOCAL_ONLY): it reads kiokun-data.
+e14-kiokun-search:
+    @test -n "${KIOKUN_DATA:-}" || { echo "KIOKUN_DATA must name a kiokun-data checkout's output_dictionary"; exit 1; }
+    @test -n "${KIOKUN_APP:-}" || { echo "KIOKUN_APP must name a kiokun-data checkout's sveltekit-app"; exit 1; }
+    @test "$(df -g / | awk 'NR==2{print $4}')" -ge 8 || { echo "under 8 GiB free: not building the index"; exit 1; }
+    @mkdir -p docs/evidence/E14
+    @lib="$(mktemp -d)"; sample="$(mktemp -d)"; \
+     python3 scripts/kiokun_app_source.py "$KIOKUN_APP" "$lib" 'src/routes/api/search/+server.ts=server.ts' \
+       src/lib/search-aliases.ts src/lib/search-aliases-core.ts \
+       migrations/0005_search_index_with_jyutping.sql=schema.sql \
+       src/lib/generated/search-aliases.json=aliases.json > "$lib/source.txt" || exit 1; \
+     python3 scripts/kiokun_app_source.py "$KIOKUN_DATA/.." "$lib" output_search_index.csv=index.csv > "$lib/index.txt" || exit 1; \
+     cp "$lib/server.ts" "$lib/search-aliases.ts" "$lib/search-aliases-core.ts" "$lib/schema.sql" "$sample/"; \
+     cp examples/kiokun/data/search-sample.csv "$sample/index.csv"; \
+     { echo "The search page, against kiokun.com's own api/search"; echo; \
+       echo "produced by: just e14-kiokun-search (local: reads a kiokun-data checkout)"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       cat "$lib/source.txt" "$lib/index.txt"; \
+       echo "node: $(node --version)"; echo "host: $(uname -sm), $(sysctl -n hw.ncpu 2>/dev/null || nproc) cores, $(uptime | sed 's/.*load/load/')"; echo; \
+       echo "== the D1 stand-in's own test (spikes/own-renderer/kiokun-oracle/d1.test.mjs)"; echo; \
+       node --test --no-warnings spikes/own-renderer/kiokun-oracle/d1.test.mjs 2>&1 | grep -E "^# (tests|pass|fail)"; \
+       echo; echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/search.mjs)"; echo; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/search.mjs "$lib" "$lib/aliases.json" 8000 "$lib/search.json"; \
+       echo; echo "== the rewrite's, compared (the index built under target/kiokun-search)"; echo; \
+       KIOKUN_SEARCH_ORACLE="$lib/search.json" cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::search_matches_kiokuns_own 2>&1 \
+         | grep -E '^(compared|named|unnamed|difference|  kiokun|  rewrite)|test result|panicked'; \
+       echo "after it: $(uptime | sed 's/.*load/load/')"; \
+       echo; echo "== the CI fixture: kiokun.com's answers over the repository's sample and its hand-made aliases"; echo; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/search.mjs "$sample" examples/kiokun/data/search-aliases-sample.json 97 "$sample/search.json" \
+         '["ヒト","学","学生","zzzzqq","\"","AND"]'; \
+       python3 scripts/kiokun_oracle_fixture.py "$sample/search.json" spikes/own-renderer/kiokun-oracle/search-sample.json \
+         "just e14-kiokun-search" "$(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD)" "$(git rev-parse HEAD)" "$(node --version)"; \
+     } > docs/evidence/E14/kiokun-search.txt; rm -rf "$lib" "$sample"
+    @cat docs/evidence/E14/kiokun-search.txt
+    @grep -q "unnamed differences: 0" docs/evidence/E14/kiokun-search.txt
+    @grep -q "# fail 0" docs/evidence/E14/kiokun-search.txt
+    @! grep -qE "panicked|FAILED" docs/evidence/E14/kiokun-search.txt
+
 # The word page (the track's step 1), served by the development server as a
 # third program beside the store and the feed (docs/PARALLEL.md, "W6's
 # inventory, answered", Q2): `examples/kiokun-site`, its entries read by the

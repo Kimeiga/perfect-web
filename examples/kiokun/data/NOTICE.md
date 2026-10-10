@@ -24,6 +24,21 @@ What was done to every source: extracted by kiokun-data's builder into
 kiokun's entry format; then trimmed by `scripts/kiokun_sample.py` to the
 fields named in the manifest, for 28 words.
 
+## The search index's sample
+
+`search-sample.csv` holds 2,765 rows of kiokun-data's search index CSV
+(`output_search_index.csv`, committed there at a47956fb), written by
+`scripts/kiokun_search_sample.py`: the rows whose word holds 人, 学 or 學 and
+is no longer than two characters, read with `git show HEAD:…`. A Chinese row
+is kept only where its definition is an item's that Dong Chinese's export
+tags `cedict` (CC-CEDICT) or `unicode` (Unihan) for that traditional form; a
+Japanese row is JMdict's. Its romanizations are the builder's. It is
+distributed under CC BY-SA 4.0, as the entries are.
+
+`search-aliases-sample.json` is not kiokun's: four script relations written
+for the tests (学 and 學, and two Japanese forms' canonical pages), in the
+shape of kiokun.com's `search-aliases.json`, which stays local.
+
 ## The sources
 
 Each was read at its primary source on **2026-10-10**.
