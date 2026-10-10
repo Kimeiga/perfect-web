@@ -374,15 +374,23 @@ fn kiokun() -> Vec<pw_core::check::Unit> {
     units(&borrowed)
 }
 
-/// [`fixed`], with whether an item can be ordered answered `available`.
-fn stocked(available: bool) -> impl FnMut(&mut Rng, &Types) -> Box<Answer> {
+/// [`fixed`], with whether an item can be ordered answered `available`, and
+/// whether its store reaches the reader's chosen address `reaches` (track
+/// `store-accounts`).
+fn stocked_within(available: bool, reaches: bool) -> impl FnMut(&mut Rng, &Types) -> Box<Answer> {
     move |rng, t| {
         let rest = fixed(rng, t);
         Box::new(move |op, args| match op {
             "store:data/menus#is-available" => Val::Bool(available),
+            "store:data/coverage#reaches" => Val::Bool(reaches),
             _ => rest(op, args),
         })
     }
+}
+
+/// [`stocked_within`], every store reaching the reader's address.
+fn stocked(available: bool) -> impl FnMut(&mut Rng, &Types) -> Box<Answer> {
+    stocked_within(available, true)
 }
 
 #[test]
@@ -406,6 +414,16 @@ fn the_stores_commands_agree_with_their_reference() {
                 Some(Box::new(id)),
             )))));
         }
+        // Whether the item's store reaches the reader's chosen address
+        // (track `store-accounts`), refused by name where it does not.
+        let store = field(&args[0], "store-id");
+        let reader = host("pw:host/principal#read", vec![]);
+        if host("store:data/coverage#reaches", vec![store.clone(), reader]) != Val::Bool(true) {
+            return Val::Result(Err(Some(Box::new(Val::Variant(
+                "out-of-range".to_string(),
+                Some(Box::new(store)),
+            )))));
+        }
         let reader = host("pw:host/principal#read", vec![]);
         host(
             "store:data/user-carts#add",
@@ -419,6 +437,12 @@ fn the_stores_commands_agree_with_their_reference() {
         &runnable,
         add,
         stocked(false),
+    );
+    differential(
+        "store.page.add_to_cart, out of reach",
+        &runnable,
+        add,
+        stocked_within(true, false),
     );
     // One more of a line's item (ADR-0172): its availability read again, as
     // `add_to_cart`'s is, and one added.

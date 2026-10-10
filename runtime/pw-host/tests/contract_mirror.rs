@@ -231,7 +231,12 @@ fn the_real_contracts_drive_a_real_admission() {
                 // `outbox.write` joined it on 2026-10-05 (ADR-0208): a
                 // command's events are committed with its writes, so a node
                 // runs it only where it keeps an outbox.
+                //
+                // `database.read<Addresses>` joined it with track
+                // `store-accounts`: `add_to_cart` reads whether the item's
+                // store reaches the reader's chosen address.
                 grants: BTreeSet::from([
+                    "database.read<Addresses>".to_string(),
                     "database.read<Carts>".to_string(),
                     "database.read<Menus>".to_string(),
                     "database.read<Stores>".to_string(),

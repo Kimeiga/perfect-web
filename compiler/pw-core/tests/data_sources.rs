@@ -341,15 +341,33 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             .map(|d| d.split('`').nth(1).expect("named"))
             .collect()
     };
-    // Each query but `Recommendations`, which asks `eventual`.
+    // Each query but `Recommendations`, which asks `eventual`; `Estimate`
+    // once for each resource it reads, the estimates and the reader's
+    // addresses (track `store-accounts`).
     assert_eq!(
         named("PW0344"),
-        ["Menu", "Store", "StoreList", "Cart", "Estimate", "Order"]
+        [
+            "Menu",
+            "Store",
+            "StoreList",
+            "Cart",
+            "Estimate",
+            "Estimate",
+            "SavedAddresses",
+            "Places",
+            "Reach",
+            "Order"
+        ]
     );
     // The commands that ask a serializable transaction.
     assert_eq!(
         named("PW0346"),
-        ["add_to_cart", "increase_in_cart", "place_order"]
+        [
+            "add_to_cart",
+            "increase_in_cart",
+            "place_order",
+            "add_address"
+        ]
     );
     // And every command emits its changes and is idempotent by its
     // interaction.
@@ -360,8 +378,13 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
         "remove_from_cart",
         "clear_cart",
         "place_order",
+        // A reader's addresses (track `store-accounts`).
+        "add_address",
+        "rename_address",
+        "remove_address",
+        "choose_address",
     ];
     assert_eq!(named("PW0347"), commands);
     assert_eq!(named("PW0348"), commands);
-    assert_eq!(found.len(), 21, "{found:#?}");
+    assert_eq!(found.len(), 34, "{found:#?}");
 }

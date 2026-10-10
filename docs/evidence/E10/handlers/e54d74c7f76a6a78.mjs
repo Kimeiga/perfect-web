@@ -9,7 +9,7 @@ export const handler = "e54d74c7f76a6a78";
 export async function run(context) {
   const v0 = context.captures["line"]["item_id"];
   const v1_answer = await context.command("store.page.increase_in_cart", [v0], { retry: { max: 2, jitter: true } });
-  const v1 = ((c) => { switch (c.$case) { case "ok": return { $case: "ok", value: undefined }; case "err": return { $case: "err", value: ((c) => { switch (c.$case) { case "item-unavailable": return { $case: "item-unavailable", value: c.value }; case "quantity-too-large": return { $case: "quantity-too-large" }; case "cart-expired": return { $case: "cart-expired" }; default: throw new Error("trap: no such case " + c.$case); } })(c.value) }; default: throw new Error("trap: no such case " + c.$case); } })(v1_answer);
+  const v1 = ((c) => { switch (c.$case) { case "ok": return { $case: "ok", value: undefined }; case "err": return { $case: "err", value: ((c) => { switch (c.$case) { case "item-unavailable": return { $case: "item-unavailable", value: c.value }; case "quantity-too-large": return { $case: "quantity-too-large" }; case "cart-expired": return { $case: "cart-expired" }; case "out-of-range": return { $case: "out-of-range", value: c.value }; default: throw new Error("trap: no such case " + c.$case); } })(c.value) }; default: throw new Error("trap: no such case " + c.$case); } })(v1_answer);
   let v12;
   switch (v1.$case) {
     case "ok": {
@@ -33,7 +33,8 @@ export async function run(context) {
           break;
         }
         case "quantity-too-large":
-        case "cart-expired": {
+        case "cart-expired":
+        case "out-of-range": {
           const v9 = "That line could not be changed.";
           context.set("notice", v9);
           const v10 = undefined;

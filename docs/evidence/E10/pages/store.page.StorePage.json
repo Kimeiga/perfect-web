@@ -88,6 +88,27 @@
         ],
         "on_key_change": "cancel"
       }
+    },
+    {
+      "binding": "reach",
+      "resource": "store.page.Reach",
+      "args": [
+        "id",
+        "current_user()"
+      ],
+      "policy": {
+        "cache": "private",
+        "privacy": "private",
+        "freshness_ms": 0,
+        "timeout_ms": 2000,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0,
+          1
+        ],
+        "on_key_change": "cancel"
+      }
     }
   ],
   "parts": [
@@ -118,7 +139,7 @@
       "steps": []
     },
     {
-      "part": 15,
+      "part": 21,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -128,7 +149,7 @@
       ]
     },
     {
-      "part": 27,
+      "part": 33,
       "path": "cart.subtotal.display",
       "binding": "cart",
       "steps": [
@@ -153,38 +174,42 @@
   ],
   "live": [
     {
-      "part": 29,
+      "part": 35,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
     }
   ],
   "blocks": [
-    28
+    3,
+    6,
+    34
   ],
   "streams": [
     {
-      "part": 3,
+      "part": 9,
       "resource": "store.page.Estimate",
       "args": [
-        "current_session()"
+        "id",
+        "current_user()"
       ],
       "policy": {
         "cache": "private",
-        "privacy": "session",
+        "privacy": "private",
         "freshness_ms": 0,
         "timeout_ms": 3000,
         "attempts": 1,
         "parallel": false,
         "key": [
-          0
+          0,
+          1
         ],
         "on_key_change": "cancel"
       },
       "streamed": true
     },
     {
-      "part": 31,
+      "part": 37,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -246,7 +271,7 @@
     }
   ],
   "attributes": [
-    16
+    22
   ],
-  "title": 34
+  "title": 40
 }

@@ -200,6 +200,8 @@ fn the_real_add_to_cart_lowers_to_its_import_calls() {
             "pw:host/principal#read",
             "pw:host/principal#read",
             "pw:host/principal#read",
+            "pw:host/principal#read",
+            "store:data/coverage#reaches",
             "store:data/menus#is-available",
             "store:data/user-carts#add"
         ],
@@ -219,6 +221,9 @@ fn the_real_add_to_cart_lowers_to_its_import_calls() {
     assert_eq!(
         declared,
         [
+            // Whether its store reaches the reader's address (track
+            // `store-accounts`).
+            "database.read<Addresses>",
             "database.read<Menus>",
             "database.write<Carts>",
             "outbox.write",

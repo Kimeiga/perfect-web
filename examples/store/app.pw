@@ -31,6 +31,7 @@ import Recommender
 import Estimates
 import UserCarts.{ UserCart }
 import UserOrders
+import Addresses.{ Address, AddressError, AddressId, AddressLabel, Coverage, Place, PlaceId, address_label }
 // The invocation context. `current_session()` was called and never imported
 // from E4 until 2026-08-10, and nothing said so: `unresolved_uses` examines
 // dotted paths whose head looks like a module, and a bare call to nothing
@@ -47,7 +48,7 @@ import domain.{ StoreId, Store, StoreError, CartError, MenuItem, MenuSection, In
     MenuItemId, PositiveInt, Recommendation, RecommendationError, DeliveryEstimate,
     EstimateError, OrderStatus, OrderError, TrackingError }
 import capability.{ Session, SessionId, User, UserId }
-import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged }
+import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged, AddressesChanged }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -190,20 +191,68 @@ user query Cart(reader: User<UserId>) -> Result<UserCart, CartError>
     UserCarts.current(reader)
 }
 
-// **The session's delivery estimate** (charter §15.2, §15.3, ADR-0165): the
-// session's alone, so private; slow, so streamed; and asked again for each
-// page, since the kitchen it depends on changes. T10's form.
-session query Estimate(session: Session<SessionId>) -> Result<DeliveryEstimate, EstimateError>
-    freshness     0.seconds
-    consistency   read_your_writes
-    cache         private
-    key           session
-    concurrency   one_per_key
-    on_key_change cancel
-    delivery      streamed
-    timeout       3.seconds
+// **The store's delivery estimate to the reader's chosen address**
+// (charter §15.2, §15.3, ADR-0165; track `store-accounts`, ADR-XXXX): the
+// kitchen's and the courier's minutes, or `NoCoverage` where the store does
+// not reach it, by the rule `add_to_cart` and `place_order` read. Private,
+// and kept for no time: each document's read is its own session's (its
+// estimator is a test's, by the session), never another session's of the
+// same user. Slow, so streamed; and asked again for each page, and when the
+// reader's addresses change.
+user query Estimate(id: StoreId, reader: User<UserId>) -> Result<DeliveryEstimate, EstimateError>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            id, reader
+    invalidates_on AddressesChanged(reader)
+    concurrency    one_per_key
+    on_key_change  cancel
+    delivery       streamed
+    timeout        3.seconds
 {
-    Estimates.current(session)
+    Addresses.estimate_to(id, reader)
+}
+
+// **The reader's saved addresses** (track `store-accounts`, ADR-XXXX): the
+// user's, or a guest's session's guest's, read again when they change.
+user query SavedAddresses(reader: User<UserId>) -> List<Address>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader
+    invalidates_on AddressesChanged(reader)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    Addresses.mine(reader)
+}
+
+// **The places an address may name**: the store's fixed table, every
+// reader's.
+public query Places() -> List<Place>
+    freshness   1.hours
+    consistency snapshot
+    cache       shared
+    concurrency one_per_key
+    timeout     2.seconds
+{
+    Addresses.places()
+}
+
+// **Whether the store reaches the reader's chosen address** (track
+// `store-accounts`): what its page says where the menu is.
+user query Reach(id: StoreId, reader: User<UserId>) -> Coverage
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            id, reader
+    invalidates_on AddressesChanged(reader)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    Addresses.coverage(id, reader)
 }
 
 // **The reader's order**, as the store last said of it (ADR-0193): the
@@ -249,6 +298,12 @@ command add_to_cart(item: MenuItem, quantity: PositiveInt)
 {
     if !Menus.is_available(item.id) {
         return Err(CartError.ItemUnavailable(item.id))
+    }
+    // The store's own rule about its own data (track `store-accounts`): an
+    // item from a store that does not reach the reader's chosen address is
+    // refused, by the rule the estimate reads.
+    if !Addresses.reaches(item.store_id, current_user()) {
+        return Err(CartError.OutOfRange(item.store_id))
     }
     UserCarts.add(current_user(), item.id, quantity)
 }
@@ -329,6 +384,53 @@ command place_order()
     UserOrders.place(current_user())
 }
 
+// **An address saved, and chosen as it is saved** (track `store-accounts`,
+// ADR-XXXX): a label and a place from the table. What a store reaches and its
+// estimate depend on it, in each of the reader's sessions.
+command add_address(label: AddressLabel, place: PlaceId)
+    -> Result<List<Address>, AddressError>
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    transaction   serializable
+    invalidates   SavedAddresses(current_user())
+    emits         AddressesChanged(current_user())
+{
+    Addresses.add(current_user(), label, place)
+}
+
+// **An address's label, changed.**
+command rename_address(id: AddressId, label: AddressLabel)
+    -> Result<List<Address>, AddressError>
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    invalidates   SavedAddresses(current_user())
+    emits         AddressesChanged(current_user())
+{
+    Addresses.rename(current_user(), id, label)
+}
+
+// **An address, gone**: the chosen one leaves none chosen.
+command remove_address(id: AddressId)
+    -> Result<List<Address>, AddressError>
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    invalidates   SavedAddresses(current_user())
+    emits         AddressesChanged(current_user())
+{
+    Addresses.remove(current_user(), id)
+}
+
+// **An address chosen for deliveries.**
+command choose_address(id: AddressId)
+    -> Result<List<Address>, AddressError>
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    invalidates   SavedAddresses(current_user())
+    emits         AddressesChanged(current_user())
+{
+    Addresses.choose(current_user(), id)
+}
+
 // Private to the reader's user (ADR-0172; track `store-accounts`): its cart's
 // lines are the user's, and its handlers capture them, so a resume manifest
 // must say to whom what it carries is private. `cache private` alone names no
@@ -345,6 +447,9 @@ user page StorePage(id: StoreId) {
     let menu = query Menu(id)
     let summary = query MenuLine(id)
     let cart = query Cart(current_user())
+    // Whether the store reaches the reader's chosen address (track
+    // `store-accounts`).
+    let reach = query Reach(id, current_user())
     // What the cart last had to say: a refusal of an add or a clear.
     signal notice: String = ""
     // Charter §15.3's slots (ADR-0165), the estimate and the recommendations,
@@ -366,8 +471,16 @@ user page StorePage(id: StoreId) {
             <p id="store-description">{store.description}</p>
             <p id="menu-line">{summary}</p>
 
+            <!-- Where deliveries go, and whether this store reaches it (track
+                 `store-accounts`), said where the menu is. -->
+            <p id="deliver-to">
+                {#if reach.chosen}Delivering to {reach.to}{:else}No delivery address yet{/if}
+                <a id="change-address" href="/stores/{id}/address">Change the address</a>
+            </p>
+            {#if reach.delivers}{:else}<p id="out-of-range">{store.name} doesn't deliver to {reach.to}.</p>{/if}
+
             <section aria-label="Delivery" aria-live="polite">
-                <stream query={Estimate(current_session())}>
+                <stream query={Estimate(id, current_user())}>
                     <placeholder><p>Estimating delivery</p></placeholder>
                     <ready as={estimate}><p>Delivery in {estimate.min_minutes} to {estimate.max_minutes} min</p></ready>
                     <failed><p>Delivery estimate unavailable</p></failed>
@@ -393,6 +506,7 @@ user page StorePage(id: StoreId) {
                                             on:press={resumable(captures = { item }) => match add_to_cart(item, PositiveInt(1)) {
                                                 Ok(_) => notice = "",
                                                 Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
+                                                Err(CartError.OutOfRange(_)) => notice = "This store doesn't deliver to your address.",
                                                 Err(_) => notice = "That item could not be added.",
                                             }}
                                         >
@@ -571,6 +685,7 @@ user page CartPage() {
                 on:press={resumable() => match place_order() {
                     Ok(_) => navigate OrderPage(),
                     Err(OrderError.NothingToOrder) => notice = "Your cart is empty: there is nothing to order.",
+                    Err(OrderError.NoCoverage) => notice = "A store in your cart doesn't deliver to your address.",
                 }}
             >
                 Place order
@@ -640,6 +755,99 @@ user page OrderPage() {
                 {/match}
             </section>
             <p><a href="/">Order from a store</a></p>
+        </main>
+    }
+}
+
+// **Where deliveries from a store go** (track `store-accounts`, ADR-XXXX):
+// the reader's saved addresses, each chosen, renamed or removed, and a new
+// one saved from the fixed table of places. Choosing or saving one goes back
+// to the store, whose page is read after the commit (ADR-0280): its estimate
+// is the new address's, as served, with no parameter to bust a cache and no
+// second load of the document.
+user page AddressPage(id: StoreId) {
+    route     "/stores/{id}/address"
+    placement origin
+    cache     private
+
+    let saved = query SavedAddresses(current_user())
+    let places = query Places()
+    // What the reader calls the address they save or rename.
+    signal label: String = ""
+    // What the page last had to say.
+    signal said: String = ""
+
+    view {
+        <title>Delivery address</title>
+        <main>
+            <h1>Delivery address</h1>
+            <label>Call it <input id="label" type="text" bind:value={label} /></label>
+            <p id="address-said" role="status">{said}</p>
+            <h2>Your addresses</h2>
+            <ul id="addresses">
+                {#each saved as a (a.id)}
+                    <li>
+                        <span class="address-label">{a.label}</span>
+                        <span class="address-place">{a.place}</span>
+                        {#if a.chosen}<span class="address-chosen">Chosen</span>{/if}
+                        <button
+                            type="button"
+                            aria-label="Deliver to {a.label}"
+                            on:press={resumable(captures = { a, id }) => match choose_address(a.id) {
+                                Ok(_) => navigate StorePage(id),
+                                Err(_) => said = "That address could not be chosen.",
+                            }}
+                        >
+                            Deliver here
+                        </button>
+                        <button
+                            type="button"
+                            aria-label="Rename {a.label}"
+                            on:press={resumable(captures = { a }) => match address_label(label) {
+                                Some(called) => match rename_address(a.id, called) {
+                                    Ok(_) => said = "Renamed.",
+                                    Err(_) => said = "That address could not be renamed.",
+                                },
+                                None => said = "Type a name of 1 to 40 characters first.",
+                            }}
+                        >
+                            Rename
+                        </button>
+                        <button
+                            type="button"
+                            aria-label="Remove {a.label}"
+                            on:press={resumable(captures = { a }) => match remove_address(a.id) {
+                                Ok(_) => said = "Removed.",
+                                Err(_) => said = "That address could not be removed.",
+                            }}
+                        >
+                            Remove
+                        </button>
+                    </li>
+                {/each}
+            </ul>
+            <h2>Save a new address</h2>
+            <ul id="places">
+                {#each places as p (p.id)}
+                    <li>
+                        <span class="place-name">{p.name}</span>
+                        <button
+                            type="button"
+                            aria-label="Save {p.name}"
+                            on:press={resumable(captures = { p, id }) => match address_label(label) {
+                                Some(called) => match add_address(called, p.id) {
+                                    Ok(_) => navigate StorePage(id),
+                                    Err(AddressError.TooMany) => said = "You have saved as many addresses as you can.",
+                                    Err(_) => said = "That address could not be saved.",
+                                },
+                                None => said = "Type a name of 1 to 40 characters first.",
+                            }}
+                        >
+                            Save and deliver here
+                        </button>
+                    </li>
+                {/each}
+            </ul>
         </main>
     }
 }

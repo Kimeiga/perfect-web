@@ -155,6 +155,9 @@ fn the_component_imports_exactly_the_operations_the_function_calls() {
             "pw:host/invalidations#store-page-cart",
             "pw:host/outbox#user-cart-changed",
             "store:data/menus#is-available",
+            // Whether the item's store reaches the reader's chosen address
+            // (track `store-accounts`, milestone 2).
+            "store:data/coverage#reaches",
             "store:data/user-carts#add"
         ],
         "the core module's own import list"
@@ -167,9 +170,10 @@ fn the_component_has_exactly_the_types_its_world_fixed() {
     let compared = component::audit(&component.bytes, &c.wit, &component.world)
         .unwrap_or_else(|wrong| panic!("the component disagrees with its world: {wrong:#?}"));
     // `menus#is-available`, `principal#read`, `invalidations#store-page-cart`,
-    // `outbox#user-cart-changed`, `user-carts#add` and `add-to-cart`: an audit that
-    // compared nothing would agree with anything.
-    assert_eq!(compared, 6, "the audit compared {compared} functions");
+    // `outbox#user-cart-changed`, `coverage#reaches` (track `store-accounts`),
+    // `user-carts#add` and `add-to-cart`: an audit that compared nothing
+    // would agree with anything.
+    assert_eq!(compared, 7, "the audit compared {compared} functions");
 }
 
 /// The WIT with `user-carts#add` returning a store instead of a cart. At the core

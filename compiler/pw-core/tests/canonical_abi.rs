@@ -385,29 +385,39 @@ fn a_privacy_qualifier_is_transparent_to_the_type_it_qualifies() {
         !read.contains("session<") && !read.to_lowercase().contains("-session:"),
         "and the qualifier itself has no WIT form: {read}"
     );
+    // And a user's, the store's reader since track `store-accounts`.
+    let reader = rendered["pw:host/principal#read"]
+        .as_ref()
+        .unwrap_or_else(|e| panic!("`User<UserId>` must render: {e}"));
+    assert!(
+        reader.contains("user-id") && !reader.contains("user<"),
+        "{reader}"
+    );
 
     // **The semantic contract still remembers the restriction.** This is the
     // half that makes the erasure honest rather than lossy: the label is not
     // discarded, it is kept where it can be checked.
     let sigs = Signatures::build(&ws, &refs);
     let cs = contracts(&refs, &sigs, &ws);
+    // The store reads its reader's user since track `store-accounts`, and
+    // no session: the user's handle is what its contracts import.
     let semantic = cs
         .iter()
         .flat_map(|c| &c.imports)
-        .find(|i| i.key() == "pw:host/session#read")
+        .find(|i| i.key() == "pw:host/principal#read")
         .and_then(|i| i.signature.as_ref())
         .expect("the contract carries its semantic signature");
     assert_eq!(
         semantic.result,
         pw_core::resolved::StableTypeId::Declared {
-            path: "capability.Session".into(),
+            path: "capability.User".into(),
             args: vec![pw_core::resolved::StableTypeId::Declared {
-                path: "capability.SessionId".into(),
+                path: "capability.UserId".into(),
                 args: vec![]
             }]
         },
         "the restriction survives in the semantic signature, which is what \
-         `Session<A> -> Session<B>` is decided against"
+         `User<A> -> User<B>` is decided against"
     );
 }
 

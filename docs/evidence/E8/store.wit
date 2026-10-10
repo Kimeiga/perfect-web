@@ -62,6 +62,11 @@ interface domain-total-api {
     total: func(arg0: domain-cart-line) -> domain-money;
 }
 
+interface store-page-address-page-api {
+    use pw:types/types.{domain-store-id};
+    address-page: func(arg0: domain-store-id);
+}
+
 interface store-page-cart-api {
     use pw:types/types.{user-carts-user-cart, capability-user-id, domain-cart-error};
     cart: func(arg0: capability-user-id) -> result<user-carts-user-cart, domain-cart-error>;
@@ -72,8 +77,8 @@ interface store-page-cart-page-api {
 }
 
 interface store-page-estimate-api {
-    use pw:types/types.{capability-session-id, domain-delivery-estimate, domain-estimate-error};
-    estimate: func(arg0: capability-session-id) -> result<domain-delivery-estimate, domain-estimate-error>;
+    use pw:types/types.{capability-user-id, domain-delivery-estimate, domain-estimate-error, domain-store-id};
+    estimate: func(arg0: domain-store-id, arg1: capability-user-id) -> result<domain-delivery-estimate, domain-estimate-error>;
 }
 
 interface store-page-home-page-api {
@@ -104,9 +109,24 @@ interface store-page-order-page-api {
     order-page: func();
 }
 
+interface store-page-places-api {
+    use pw:types/types.{addresses-place};
+    places: func() -> list<addresses-place>;
+}
+
+interface store-page-reach-api {
+    use pw:types/types.{addresses-coverage, capability-user-id, domain-store-id};
+    reach: func(arg0: domain-store-id, arg1: capability-user-id) -> addresses-coverage;
+}
+
 interface store-page-recommendations-api {
     use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};
     recommendations: func(arg0: domain-store-id) -> result<list<domain-recommendation>, domain-recommendation-error>;
+}
+
+interface store-page-saved-addresses-api {
+    use pw:types/types.{addresses-address, capability-user-id};
+    saved-addresses: func(arg0: capability-user-id) -> list<addresses-address>;
 }
 
 interface store-page-store-api {
@@ -124,9 +144,19 @@ interface store-page-store-page-api {
     store-page: func(arg0: domain-store-id);
 }
 
+interface store-page-add-address-api {
+    use pw:types/types.{addresses-address, addresses-address-error, addresses-address-label, addresses-place-id};
+    add-address: func(arg0: addresses-address-label, arg1: addresses-place-id) -> result<list<addresses-address>, addresses-address-error>;
+}
+
 interface store-page-add-to-cart-api {
     use pw:types/types.{user-carts-user-cart, domain-cart-error, domain-menu-item, domain-positive-int};
     add-to-cart: func(arg0: domain-menu-item, arg1: domain-positive-int) -> result<user-carts-user-cart, domain-cart-error>;
+}
+
+interface store-page-choose-address-api {
+    use pw:types/types.{addresses-address, addresses-address-error, addresses-address-id};
+    choose-address: func(arg0: addresses-address-id) -> result<list<addresses-address>, addresses-address-error>;
 }
 
 interface store-page-clear-cart-api {
@@ -149,9 +179,19 @@ interface store-page-place-order-api {
     place-order: func() -> result<domain-order-status, domain-order-error>;
 }
 
+interface store-page-remove-address-api {
+    use pw:types/types.{addresses-address, addresses-address-error, addresses-address-id};
+    remove-address: func(arg0: addresses-address-id) -> result<list<addresses-address>, addresses-address-error>;
+}
+
 interface store-page-remove-from-cart-api {
     use pw:types/types.{user-carts-user-cart, domain-cart-error, domain-menu-item-id};
     remove-from-cart: func(arg0: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
+}
+
+interface store-page-rename-address-api {
+    use pw:types/types.{addresses-address, addresses-address-error, addresses-address-id, addresses-address-label};
+    rename-address: func(arg0: addresses-address-id, arg1: addresses-address-label) -> result<list<addresses-address>, addresses-address-error>;
 }
 
 world resources-cart {
@@ -194,6 +234,17 @@ world domain-total {
     export domain-total-api;
 }
 
+world store-page-address-page {
+    import pw:host/principal;
+    import store-page-add-address-api;
+    import store-page-choose-address-api;
+    import store-page-places-api;
+    import store-page-remove-address-api;
+    import store-page-rename-address-api;
+    import store-page-saved-addresses-api;
+    export store-page-address-page-api;
+}
+
 world store-page-cart {
     import store:data/user-carts;
     export store-page-cart-api;
@@ -212,7 +263,7 @@ world store-page-cart-page {
 }
 
 world store-page-estimate {
-    import store:data/estimates;
+    import store:data/user-estimates;
     export store-page-estimate-api;
 }
 
@@ -251,9 +302,24 @@ world store-page-order-page {
     export store-page-order-page-api;
 }
 
+world store-page-places {
+    import store:data/places;
+    export store-page-places-api;
+}
+
+world store-page-reach {
+    import store:data/coverage;
+    export store-page-reach-api;
+}
+
 world store-page-recommendations {
     import store:data/recommendations;
     export store-page-recommendations-api;
+}
+
+world store-page-saved-addresses {
+    import store:data/addresses;
+    export store-page-saved-addresses-api;
 }
 
 world store-page-store {
@@ -268,7 +334,6 @@ world store-page-store-list {
 
 world store-page-store-page {
     import pw:host/principal;
-    import pw:host/session;
     import store-page-add-to-cart-api;
     import store-page-cart-api;
     import store-page-clear-cart-api;
@@ -277,19 +342,37 @@ world store-page-store-page {
     import store-page-increase-in-cart-api;
     import store-page-menu-api;
     import store-page-menu-line-api;
+    import store-page-reach-api;
     import store-page-recommendations-api;
     import store-page-remove-from-cart-api;
     import store-page-store-api;
     export store-page-store-page-api;
 }
 
+world store-page-add-address {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/addresses;
+    export store-page-add-address-api;
+}
+
 world store-page-add-to-cart {
     import pw:host/invalidations;
     import pw:host/outbox;
     import pw:host/principal;
+    import store:data/coverage;
     import store:data/menus;
     import store:data/user-carts;
     export store-page-add-to-cart-api;
+}
+
+world store-page-choose-address {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/addresses;
+    export store-page-choose-address-api;
 }
 
 world store-page-clear-cart {
@@ -325,12 +408,28 @@ world store-page-place-order {
     export store-page-place-order-api;
 }
 
+world store-page-remove-address {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/addresses;
+    export store-page-remove-address-api;
+}
+
 world store-page-remove-from-cart {
     import pw:host/invalidations;
     import pw:host/outbox;
     import pw:host/principal;
     import store:data/user-carts;
     export store-page-remove-from-cart-api;
+}
+
+world store-page-rename-address {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/addresses;
+    export store-page-rename-address-api;
 }
 
 package pw:types {
@@ -391,6 +490,7 @@ package pw:types {
             item-unavailable(domain-menu-item-id),
             quantity-too-large,
             cart-expired,
+            out-of-range(domain-store-id),
         }
         variant domain-order-status {
             placed,
@@ -400,6 +500,7 @@ package pw:types {
         }
         variant domain-order-error {
             nothing-to-order,
+            no-coverage,
         }
         record domain-order-progress {
             stage-label: string,
@@ -428,6 +529,30 @@ package pw:types {
             none-available,
             timeout,
         }
+        type addresses-address-id = string;
+        type addresses-place-id = string;
+        type addresses-address-label = string;
+        record addresses-address {
+            id: addresses-address-id,
+            label: string,
+            place: string,
+            chosen: bool,
+        }
+        record addresses-place {
+            id: addresses-place-id,
+            name: string,
+        }
+        record addresses-coverage {
+            chosen: bool,
+            delivers: bool,
+            to: string,
+            travel-minutes: s64,
+        }
+        variant addresses-address-error {
+            unknown-place,
+            too-many,
+            no-such-address,
+        }
         record saved-saved-items {
             items: list<domain-menu-item-id>,
             count: s64,
@@ -447,9 +572,11 @@ package pw:host {
         use pw:types/types.{capability-user-id};
         store-page-cart: func(arg0: capability-user-id);
         store-page-order: func(arg0: capability-user-id);
+        store-page-saved-addresses: func(arg0: capability-user-id);
     }
     interface outbox {
         use pw:types/types.{capability-user-id};
+        addresses-changed: func(arg0: capability-user-id);
         user-cart-changed: func(arg0: capability-user-id);
         user-order-changed: func(arg0: capability-user-id);
     }
@@ -462,21 +589,30 @@ package pw:host {
         store-page-menu-size: func(arg0: domain-store-id) -> store-page-menu-count;
         store-page-menu: func(arg0: domain-store-id) -> list<domain-menu-section>;
     }
-    interface session {
-        use pw:types/types.{capability-session-id};
-        read: func() -> capability-session-id;
-    }
 }
 
 package store:data {
-    interface estimates {
-        use pw:types/types.{capability-session-id, domain-delivery-estimate, domain-estimate-error};
-        current: func(arg0: capability-session-id) -> result<domain-delivery-estimate, domain-estimate-error>;
+    interface addresses {
+        use pw:types/types.{addresses-address, addresses-address-error, addresses-address-id, addresses-address-label, addresses-place-id, capability-user-id};
+        %list: func(arg0: capability-user-id) -> list<addresses-address>;
+        add: func(arg0: capability-user-id, arg1: addresses-address-label, arg2: addresses-place-id) -> result<list<addresses-address>, addresses-address-error>;
+        choose: func(arg0: capability-user-id, arg1: addresses-address-id) -> result<list<addresses-address>, addresses-address-error>;
+        remove: func(arg0: capability-user-id, arg1: addresses-address-id) -> result<list<addresses-address>, addresses-address-error>;
+        rename: func(arg0: capability-user-id, arg1: addresses-address-id, arg2: addresses-address-label) -> result<list<addresses-address>, addresses-address-error>;
+    }
+    interface coverage {
+        use pw:types/types.{addresses-coverage, capability-user-id, domain-store-id};
+        for-store: func(arg0: domain-store-id, arg1: capability-user-id) -> addresses-coverage;
+        reaches: func(arg0: domain-store-id, arg1: capability-user-id) -> bool;
     }
     interface menus {
         use pw:types/types.{domain-menu-item-id, domain-menu-section, domain-store-error, domain-store-id};
         is-available: func(arg0: domain-menu-item-id) -> bool;
         sections: func(arg0: domain-store-id) -> result<list<domain-menu-section>, domain-store-error>;
+    }
+    interface places {
+        use pw:types/types.{addresses-place};
+        %list: func() -> list<addresses-place>;
     }
     interface recommendations {
         use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};
@@ -494,6 +630,10 @@ package store:data {
         current: func(arg0: capability-user-id) -> result<user-carts-user-cart, domain-cart-error>;
         decrease: func(arg0: capability-user-id, arg1: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
         remove: func(arg0: capability-user-id, arg1: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
+    }
+    interface user-estimates {
+        use pw:types/types.{capability-user-id, domain-delivery-estimate, domain-estimate-error, domain-store-id};
+        for-store: func(arg0: domain-store-id, arg1: capability-user-id) -> result<domain-delivery-estimate, domain-estimate-error>;
     }
     interface user-orders {
         use pw:types/types.{capability-user-id, domain-order-error, domain-order-status, domain-tracking-error};

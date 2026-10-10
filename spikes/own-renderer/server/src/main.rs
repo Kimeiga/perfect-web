@@ -655,6 +655,9 @@ mod identity;
 // TRACK SEAM (identity): the development identity provider.
 mod accounts;
 mod store;
+// TRACK SEAM (store-accounts): where a delivery goes, and whether a store
+// reaches it.
+mod places;
 // Track `store-pg`: the store's data in PostgreSQL.
 mod store_pg;
 mod uploads;
@@ -1050,6 +1053,9 @@ fn components() -> BTreeMap<String, Loaded> {
         "store.page.Store",
         "store.page.Menu",
         "store.page.Cart",
+        // Whether the store reaches the reader's address (track
+        // `store-accounts`).
+        "store.page.Reach",
         // A user's cart's count (track `store-accounts`).
         "UserCarts.line_count",
         // What a menu's row reads its price through (ADR-0169).
@@ -5757,11 +5763,14 @@ struct StreamRun {
 }
 
 /// **Each stream a plan names, with what this request gives its query**
-/// (ADR-0148): a page parameter as `params` holds it, and
-/// `current_session()` as the request's session.
+/// (ADR-0148): a page parameter as `params` holds it, `current_session()`
+/// as the request's session, and `current_user()` as its reader's user
+/// (track `store-accounts`: a store's estimate to the reader's address;
+/// ADR-0270 left a stream's `current_user()` unclaimed).
 fn stream_runs(
     plan: &serde_json::Value,
     session: &str,
+    user: &str,
     params: &BTreeMap<String, String>,
 ) -> Result<Vec<StreamRun>, String> {
     let mut out = Vec::new();
@@ -5772,6 +5781,7 @@ fn stream_runs(
             .flatten()
             .map(|a| match a.as_str() {
                 Some("current_session()") => Ok(Val::String(session.into())),
+                Some(arg) if notifications::is_current_user(arg) => Ok(Val::String(user.into())),
                 Some(name) => params
                     .get(name)
                     .map(|v| Val::String(v.clone()))
@@ -8154,7 +8164,8 @@ fn serve_bound(
     // Each stream's query, started before the document is rendered
     // (ADR-0148): the page waits for the ones it is declared to wait
     // for, and the rest fill their regions in the same response.
-    let runs = match stream_runs(server.plan_of(page), session, &params) {
+    let reader = notifications::user_of(&server.identity.principals(), session);
+    let runs = match stream_runs(server.plan_of(page), session, &reader, &params) {
         Ok(runs) => runs,
         Err(why) => return unavailable(stream, Unread::Failed(why)),
     };
@@ -8326,8 +8337,10 @@ fn serve_page(
         .plans
         .get(path)
         .ok_or_else(|| format!("no page `{path}` in this build"))
-        .and_then(|plan| stream_runs(plan, session, &params))
-    {
+        .and_then(|plan| {
+            let reader = notifications::user_of(&server.identity.principals(), session);
+            stream_runs(plan, session, &reader, &params)
+        }) {
         Ok(runs) => runs,
         Err(why) => return not_found(stream, why),
     };
@@ -11833,6 +11846,9 @@ public query Store(",
     // layer the server's tests serve the store on.
     mod store_accounts;
 
+    // TRACK SEAM (store-accounts): delivery addresses, and a store's reach.
+    mod addresses;
+
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
     mod kiokun;
@@ -13569,11 +13585,13 @@ public query Store(",
         let s = rendering_server();
         let named = s.handler_identities();
         // The cart's own page's handlers are the store's, as their code is
-        // (ADR-0190); placing an order is one more (ADR-0193).
+        // (ADR-0190); placing an order is one more (ADR-0193); and the
+        // address page's five, an address chosen, renamed, removed and saved
+        // (track `store-accounts`).
         assert_eq!(
             named.len(),
-            6,
-            "add_to_cart, clear_cart, a line's three (ADR-0172) and place_order: {named:?}"
+            11,
+            "add_to_cart, clear_cart, a line's three (ADR-0172), place_order and an address's five: {named:?}"
         );
         assert_eq!(
             s.uncompiled_handlers(),
@@ -15503,7 +15521,8 @@ public query Store(",
         // Each arm with the comment after it (ADR-0223).
         assert!(
             // ADR-0277: the menu counted is a part of the page's, before them.
-            whole.ends_with("</template><!--/pw-31--></body>\n</html>\n"),
+            // Track `store-accounts`: and where deliveries go, before them.
+            whole.ends_with("</template><!--/pw-37--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the

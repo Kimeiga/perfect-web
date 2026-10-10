@@ -173,7 +173,18 @@ fn stocked(calls: &Calls, add_result: Val, available: bool) -> BTreeMap<String, 
         ));
         Ok(Vec::new())
     });
+    // Whether the item's store reaches the reader's chosen address (track
+    // `store-accounts`): it does.
+    let reach_calls = calls.clone();
+    let reaches: HostFn = Arc::new(move |args: &[Val]| {
+        reach_calls
+            .lock()
+            .unwrap()
+            .push(("store:data/coverage#reaches".into(), args.to_vec()));
+        Ok(vec![Val::Bool(true)])
+    });
     BTreeMap::from([
+        ("store:data/coverage#reaches".to_string(), reaches),
         ("store:data/menus#is-available".to_string(), stock),
         ("pw:host/principal#read".to_string(), read),
         ("pw:host/invalidations#store-page-cart".to_string(), entry),
@@ -188,9 +199,10 @@ fn admitted(c: &ComponentContract, bytes: &[u8], grants: &[&str]) -> Result<Gran
     Granted::from(&admission, &BTreeMap::new()).ok_or_else(|| format!("{admission:?}"))
 }
 
-/// What the command needs granted: the menu read, the cart write and the
-/// session.
-const ALL: [&str; 4] = [
+/// What the command needs granted: the menu read, the cart write, the
+/// reader's addresses (track `store-accounts`) and the session.
+const ALL: [&str; 5] = [
+    "database.read<Addresses>",
     "database.read<Menus>",
     "database.write<Carts>",
     "outbox.write",
@@ -243,6 +255,7 @@ fn the_artifact_imports_exactly_what_its_contract_allows() {
             "pw:host/invalidations#store-page-cart",
             "pw:host/outbox#user-cart-changed",
             "pw:host/principal#read",
+            "store:data/coverage#reaches",
             "store:data/menus#is-available",
             "store:data/user-carts#add",
         ]
@@ -375,9 +388,10 @@ fn the_compiled_command_runs_through_the_host() {
 
     // The COMPONENT read the session for its event's key and handed the event
     // to the outbox (ADR-0208), asked whether the item can be ordered, read
-    // the session, then called the data layer with it and with its own
-    // arguments, in that order.
-    assert_eq!(seen.len(), 7, "{seen:?}");
+    // the reader and asked whether the item's store reaches their address
+    // (track `store-accounts`), read the reader, then called the data layer
+    // with it and with its own arguments, in that order.
+    assert_eq!(seen.len(), 9, "{seen:?}");
     let session = || ("pw:host/principal#read".to_string(), vec![]);
     let given = |op: &str| (op.to_string(), vec![Val::String("session-7".into())]);
     assert_eq!(seen[0], session());
@@ -394,6 +408,14 @@ fn the_compiled_command_runs_through_the_host() {
     assert_eq!(seen[5], session());
     assert_eq!(
         seen[6],
+        (
+            "store:data/coverage#reaches".to_string(),
+            vec![Val::String("47".into()), Val::String("session-7".into())]
+        )
+    );
+    assert_eq!(seen[7], session());
+    assert_eq!(
+        seen[8],
         (
             "store:data/user-carts#add".to_string(),
             vec![

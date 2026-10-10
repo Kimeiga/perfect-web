@@ -51,3 +51,8 @@ event UserCartChanged(user: User<UserId>)
 
 // A user's order, placed or moved along (ADR-0193, ADR-XXXX).
 event UserOrderChanged(user: User<UserId>)
+
+// A user's addresses, saved, renamed, removed or chosen (track
+// `store-accounts`, ADR-XXXX): what a store's reach and its estimate there
+// depend on.
+event AddressesChanged(user: User<UserId>)

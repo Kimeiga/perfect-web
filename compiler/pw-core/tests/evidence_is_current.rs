@@ -185,6 +185,9 @@ fn the_committed_components_are_what_the_compiler_builds_now() {
         "store.page.Store",
         "store.page.Menu",
         "store.page.Cart",
+        // Whether the store reaches the reader's address (track
+        // `store-accounts`).
+        "store.page.Reach",
         // The member function the page reads `cart.line_count` through: a
         // user's cart's since track `store-accounts` (ADR-XXXX).
         "UserCarts.line_count",

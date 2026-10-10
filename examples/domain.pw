@@ -199,6 +199,9 @@ type CartError =
     | ItemUnavailable(MenuItemId)
     | QuantityTooLarge
     | CartExpired
+    // The store does not deliver to the reader's chosen address (track
+    // `store-accounts`, ADR-XXXX).
+    | OutOfRange(StoreId)
 
 // --- orders ---------------------------------------------------------------
 
@@ -213,6 +216,9 @@ type OrderStatus =
 // **Why an order was not placed** (ADR-0193).
 type OrderError =
     | NothingToOrder
+    // A store an item is from does not deliver to the reader's chosen address
+    // (track `store-accounts`, ADR-XXXX).
+    | NoCoverage
 
 type OrderDraft = OrderDraft {
     id: OrderId,

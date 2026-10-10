@@ -1,0 +1,111 @@
+// @corpus: fixture
+// @id: LIB-Addresses
+// @category: application service — a reader's delivery addresses
+// @charter: §15.1, §15.6
+// @milestone: E14
+//
+// **Where a delivery goes** (track `store-accounts`, ADR-XXXX, milestone 2):
+// a reader's saved addresses, each a label they give and a place from the
+// store's fixed table of places, one of them chosen; whether a store reaches
+// the chosen one, and its estimate there. Read and written by the reader's
+// handle, `User<UserId>`, which only the host makes: a user's addresses, or
+// a guest's session's guest's.
+//
+// The places are a fixture with stated coordinates, not a geocoder: an
+// address names one of them, and nothing finds one the table does not hold.
+module Addresses
+
+import List
+import String
+import domain.{ StoreId, DeliveryEstimate, EstimateError }
+import capability.{ User, UserId }
+// The resource the estimate reads, which its module names.
+import Estimates
+
+// An address's id, as the data layer gives it.
+opaque type AddressId = String
+
+// A place's id, from the fixed table.
+opaque type PlaceId = String
+
+// **What a reader calls an address**: one to forty code points.
+opaque type AddressLabel = String where String.length(value) >= 1 & String.length(value) <= 40
+
+// **A label from what was typed, or none** (ADR-0225): the program's own
+// checked constructor, as ADR-0179 asks.
+fn address_label(text: String) -> Option<AddressLabel> !{} {
+    if String.length(text) >= 1 & String.length(text) <= 40 {
+        Some(AddressLabel(text))
+    } else {
+        None
+    }
+}
+
+// **A saved address**: its id, its label, the place it names, by its name,
+// and whether it is the one deliveries go to.
+type Address = Address {
+    id: AddressId,
+    label: String,
+    place: String,
+    chosen: Bool,
+}
+
+// **A place an address may name.**
+type Place = Place {
+    id: PlaceId,
+    name: String,
+}
+
+// **Whether a store reaches the reader's chosen address**: whether one is
+// chosen, whether the store delivers there, its label, and the courier's
+// minutes to it.
+type Coverage = Coverage {
+    chosen: Bool,
+    delivers: Bool,
+    to: String,
+    travel_minutes: Int,
+}
+
+// **Why an address was not saved or changed.**
+type AddressError =
+    | UnknownPlace
+    | TooMany
+    | NoSuchAddress
+
+// The reader's saved addresses, in the order they were saved.
+fn mine(reader: User<UserId>) -> List<Address> !{ database.read<Addresses> }
+    host "store:data/addresses#list"
+
+// An address saved, and chosen as it is saved.
+fn add(reader: User<UserId>, label: AddressLabel, place: PlaceId) -> Result<List<Address>, AddressError> !{ database.write<Addresses> }
+    host "store:data/addresses#add"
+
+// An address's label, changed.
+fn rename(reader: User<UserId>, id: AddressId, label: AddressLabel) -> Result<List<Address>, AddressError> !{ database.write<Addresses> }
+    host "store:data/addresses#rename"
+
+// An address, gone; the chosen one leaves none chosen.
+fn remove(reader: User<UserId>, id: AddressId) -> Result<List<Address>, AddressError> !{ database.write<Addresses> }
+    host "store:data/addresses#remove"
+
+// An address chosen for deliveries.
+fn choose(reader: User<UserId>, id: AddressId) -> Result<List<Address>, AddressError> !{ database.write<Addresses> }
+    host "store:data/addresses#choose"
+
+// The places an address may name.
+fn places() -> List<Place> !{ database.read<Addresses> }
+    host "store:data/places#list"
+
+// Whether a store reaches the reader's chosen address, for a page.
+fn coverage(store: StoreId, reader: User<UserId>) -> Coverage !{ database.read<Addresses> }
+    host "store:data/coverage#for-store"
+
+// Whether a store reaches the reader's chosen address, for a command: true
+// where none is chosen.
+fn reaches(store: StoreId, reader: User<UserId>) -> Bool !{ database.read<Addresses> }
+    host "store:data/coverage#reaches"
+
+// A store's estimate to the reader's chosen address: the kitchen's and the
+// courier's, or `NoCoverage` where the store does not reach it.
+fn estimate_to(store: StoreId, reader: User<UserId>) -> Result<DeliveryEstimate, EstimateError> !{ database.read<Estimates>, database.read<Addresses> }
+    host "store:data/user-estimates#for-store"

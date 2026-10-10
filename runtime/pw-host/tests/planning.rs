@@ -57,6 +57,9 @@ fn full() -> Topology {
                     // A session's order, read and placed (ADR-0193).
                     "database.read<Orders>".to_string(),
                     "database.write<Orders>".to_string(),
+                    // A reader's addresses (track `store-accounts`).
+                    "database.read<Addresses>".to_string(),
+                    "database.write<Addresses>".to_string(),
                 ]),
             },
         ],

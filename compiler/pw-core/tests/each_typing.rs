@@ -220,11 +220,13 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
     // E7-L needed a second handler: with one, "the exact handler was fetched"
     // is satisfied by any fetch at all.
     // And the cart's own page's five: a line's three, its clear (ADR-0190)
-    // and its place_order (ADR-0193).
+    // and its place_order (ADR-0193). And the address page's five (track
+    // `store-accounts`): an address chosen, renamed, removed, and one saved
+    // from a place.
     assert_eq!(
         pairs.len(),
-        10,
-        "the store's page declares five resumable handlers, its cart's page five"
+        15,
+        "the store's page declares five resumable handlers, its cart's page five, its address page's five"
     );
     for (m, a) in &pairs {
         assert_eq!(
@@ -242,9 +244,11 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
         );
     }
 
-    // Three schemas, which is what makes a loop-bound capture observable:
+    // Six schemas, which is what makes a loop-bound capture observable:
     // one handler captures an `item`, three a line's `item_id`, and one
-    // nothing. If a capture never reached the schema, they would hash the
+    // nothing; and on the address page (track `store-accounts`) one captures
+    // an address, two an address and the store's id, and one a place and the
+    // store's id. If a capture never reached the schema, they would hash the
     // same.
     let schemas: std::collections::BTreeSet<&str> = pairs
         .iter()
@@ -252,13 +256,18 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
         .collect();
     assert_eq!(
         schemas.len(),
-        3,
+        6,
         "a loop-bound capture must reach the schema"
     );
 
     let handlers: std::collections::BTreeSet<&str> =
         pairs.iter().map(|(m, _)| m.handler.as_str()).collect();
     // The cart's own page's line handlers are the store's, as their code
-    // is (ADR-0190); its place_order is a sixth (ADR-0193).
-    assert_eq!(handlers.len(), 6, "and six handlers are six identities");
+    // is (ADR-0190); its place_order is a sixth (ADR-0193); and the address
+    // page's five are five more (track `store-accounts`).
+    assert_eq!(
+        handlers.len(),
+        11,
+        "and eleven handlers are eleven identities"
+    );
 }

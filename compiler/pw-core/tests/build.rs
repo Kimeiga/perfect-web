@@ -86,18 +86,28 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.MenuSize",
             // A session's order (ADR-0193).
             "store.page.Order",
+            // The places an address may name, and whether the store reaches
+            // the reader's (track `store-accounts`).
+            "store.page.Places",
+            "store.page.Reach",
             "store.page.Recommendations",
+            // The reader's addresses (track `store-accounts`).
+            "store.page.SavedAddresses",
             "store.page.Store",
             // The stores the home page lists (ADR-0192).
             "store.page.StoreList",
+            "store.page.add_address",
             "store.page.add_to_cart",
+            "store.page.choose_address",
             "store.page.clear_cart",
             // A line's controls (ADR-0172).
             "store.page.decrease_in_cart",
             "store.page.increase_in_cart",
             // The cart, placed as an order (ADR-0193).
             "store.page.place_order",
+            "store.page.remove_address",
             "store.page.remove_from_cart",
+            "store.page.rename_address",
         ],
         "every command, query and materialization the page reaches, compiled and audited"
     );
@@ -136,15 +146,17 @@ fn the_store_builds_every_artifact_from_source() {
 
     assert_eq!(
         b.templates.len(),
-        4,
-        "StorePage, CartPage (ADR-0190), HomePage (ADR-0192) and OrderPage (ADR-0193)"
+        5,
+        "StorePage, CartPage (ADR-0190), HomePage (ADR-0192), OrderPage (ADR-0193) and \
+         AddressPage (track `store-accounts`)"
     );
     assert_eq!(
         b.handlers.len(),
-        10,
+        15,
         "add_to_cart, clear_cart, and a line's three (ADR-0172); the cart \
          page's clear and a line's three (ADR-0190), and its place_order \
-         (ADR-0193)"
+         (ADR-0193); the address page's label and its four (track \
+         `store-accounts`)"
     );
     assert_eq!(
         b.contracts.len(),

@@ -54,6 +54,18 @@ domain.total  abi 646f52dd5992d40d
   runs at   build, browser, edge, origin
   exports   function total
 
+store.page.AddressPage  abi 770e51c96051ba77
+  runs at   origin
+  needs     session.read
+  component pw:app/store.page.Places#Places
+  component pw:app/store.page.SavedAddresses#SavedAddresses
+  component pw:app/store.page.add_address#add_address
+  component pw:app/store.page.choose_address#choose_address
+  component pw:app/store.page.remove_address#remove_address
+  component pw:app/store.page.rename_address#rename_address
+  host      pw:host/principal#read  (session.read)
+  exports   page AddressPage
+
 store.page.Cart  abi 37cb9e8b9dc1738c
   runs at   origin
   needs     database.read<Carts>
@@ -73,10 +85,11 @@ store.page.CartPage  abi f00a4fe14eeded6f
   host      pw:host/principal#read  (session.read)
   exports   page CartPage
 
-store.page.Estimate  abi 415fdfe738cf5f70
+store.page.Estimate  abi 94da90c7ccd7e563
   runs at   origin
+  needs     database.read<Addresses>
   needs     database.read<Estimates>
-  host      store:data/estimates#current  (database.read<Estimates>)
+  host      store:data/user-estimates#for-store  (database.read<Estimates>)
   exports   query Estimate
 
 store.page.HomePage  abi 2c950586f6696763
@@ -118,11 +131,29 @@ store.page.OrderPage  abi ba1334c5a2f7dee7
   host      pw:host/principal#read  (session.read)
   exports   page OrderPage
 
+store.page.Places  abi ba2d7c89e5f43181
+  runs at   origin
+  needs     database.read<Addresses>
+  host      store:data/places#list  (database.read<Addresses>)
+  exports   query Places
+
+store.page.Reach  abi 587ae3fe18bd6205
+  runs at   origin
+  needs     database.read<Addresses>
+  host      store:data/coverage#for-store  (database.read<Addresses>)
+  exports   query Reach
+
 store.page.Recommendations  abi 362c2dcd203e1e3f
   runs at   browser, edge, origin
   needs     network.fetch
   host      store:data/recommendations#for-store  (network.fetch)
   exports   query Recommendations
+
+store.page.SavedAddresses  abi 3c0d9f17c9097f9f
+  runs at   origin
+  needs     database.read<Addresses>
+  host      store:data/addresses#list  (database.read<Addresses>)
+  exports   query SavedAddresses
 
 store.page.Store  abi 4aedcc2febb0861f
   runs at   origin
@@ -143,6 +174,7 @@ store.page.StorePage  abi d803b26130c7cf49
   component pw:app/store.page.Estimate#Estimate
   component pw:app/store.page.Menu#Menu
   component pw:app/store.page.MenuLine#MenuLine
+  component pw:app/store.page.Reach#Reach
   component pw:app/store.page.Recommendations#Recommendations
   component pw:app/store.page.Store#Store
   component pw:app/store.page.add_to_cart#add_to_cart
@@ -151,11 +183,22 @@ store.page.StorePage  abi d803b26130c7cf49
   component pw:app/store.page.increase_in_cart#increase_in_cart
   component pw:app/store.page.remove_from_cart#remove_from_cart
   host      pw:host/principal#read  (session.read)
-  host      pw:host/session#read  (session.read)
   exports   page StorePage
 
-store.page.add_to_cart  abi 1eaa4c8c525099ec
+store.page.add_address  abi 083883ce01812277
   runs at   origin
+  needs     database.write<Addresses>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-page-saved-addresses  (outbox.write)
+  host      pw:host/outbox#addresses-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/addresses#add  (database.write<Addresses>)
+  exports   command add_address
+
+store.page.add_to_cart  abi 092247a3cf92e683
+  runs at   origin
+  needs     database.read<Addresses>
   needs     database.read<Menus>
   needs     database.write<Carts>
   needs     outbox.write
@@ -163,9 +206,21 @@ store.page.add_to_cart  abi 1eaa4c8c525099ec
   host      pw:host/invalidations#store-page-cart  (outbox.write)
   host      pw:host/outbox#user-cart-changed  (outbox.write)
   host      pw:host/principal#read  (session.read)
+  host      store:data/coverage#reaches  (database.read<Addresses>)
   host      store:data/menus#is-available  (database.read<Menus>)
   host      store:data/user-carts#add  (database.write<Carts>)
   exports   command add_to_cart
+
+store.page.choose_address  abi 336d5d3e75e83603
+  runs at   origin
+  needs     database.write<Addresses>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-page-saved-addresses  (outbox.write)
+  host      pw:host/outbox#addresses-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/addresses#choose  (database.write<Addresses>)
+  exports   command choose_address
 
 store.page.clear_cart  abi e46a1824e8426ac2
   runs at   origin
@@ -217,6 +272,17 @@ store.page.place_order  abi fb6bec6c5ebf1383
   exports   command place_order
   requires  SignedIn
 
+store.page.remove_address  abi b915ad172ccb24ed
+  runs at   origin
+  needs     database.write<Addresses>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-page-saved-addresses  (outbox.write)
+  host      pw:host/outbox#addresses-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/addresses#remove  (database.write<Addresses>)
+  exports   command remove_address
+
 store.page.remove_from_cart  abi d68c7826ead9ab7e
   runs at   origin
   needs     database.write<Carts>
@@ -227,4 +293,15 @@ store.page.remove_from_cart  abi d68c7826ead9ab7e
   host      pw:host/principal#read  (session.read)
   host      store:data/user-carts#remove  (database.write<Carts>)
   exports   command remove_from_cart
+
+store.page.rename_address  abi 7e1a5f55cd7ee9c6
+  runs at   origin
+  needs     database.write<Addresses>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-page-saved-addresses  (outbox.write)
+  host      pw:host/outbox#addresses-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/addresses#rename  (database.write<Addresses>)
+  exports   command rename_address
 

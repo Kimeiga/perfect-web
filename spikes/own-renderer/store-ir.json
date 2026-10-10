@@ -1,9 +1,327 @@
 [
   {
+    "path": "store.page.AddressPage",
+    "name": "AddressPage",
+    "params": [
+      "id"
+    ],
+    "schema": "a337b89d8d4521fd",
+    "chunks": [
+      {
+        "chunk": "static",
+        "value": "<main>\n            <h1>Delivery address</h1>\n            <label>Call it <input data-pw=\"0\" id=\"label\" type=\"text\" "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "attribute",
+          "id": 0,
+          "owner": 0,
+          "name": "value",
+          "value": "label",
+          "context": "attribute"
+        }
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "event",
+          "id": 1,
+          "owner": 0,
+          "event": "input",
+          "handler": "8ef712ee855dff03",
+          "name": ""
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "></label>\n            <p id=\"address-said\" role=\"status\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 2,
+          "value": "said",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</p>\n            <h2>Your addresses</h2>\n            <ul id=\"addresses\">\n                "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "each",
+          "id": 3,
+          "collection": "saved",
+          "binding": "a",
+          "key": "id",
+          "body": [
+            {
+              "chunk": "static",
+              "value": "\n                    <li>\n                        <span class=\"address-label\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 4,
+                "value": "a.label",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span>\n                        <span class=\"address-place\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 5,
+                "value": "a.place",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span>\n                        "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "conditional",
+                "id": 6,
+                "value": "a.chosen",
+                "then": [
+                  {
+                    "chunk": "static",
+                    "value": "<span class=\"address-chosen\">Chosen</span>"
+                  }
+                ],
+                "otherwise": []
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "\n                        <button data-pw=\"1\" type=\"button\" "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "interpolated_attribute",
+                "id": 7,
+                "owner": 1,
+                "name": "aria-label",
+                "segments": [
+                  {
+                    "segment": "static",
+                    "value": "Deliver to "
+                  },
+                  {
+                    "segment": "value",
+                    "value": "a.label"
+                  }
+                ],
+                "context": "attribute"
+              }
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "event",
+                "id": 8,
+                "owner": 1,
+                "event": "press",
+                "handler": "8d96aa03266aae5b",
+                "name": "choose_address",
+                "captures": [
+                  "a.id",
+                  "id"
+                ]
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">\n                            Deliver here\n                        </button>\n                        <button data-pw=\"2\" type=\"button\" "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "interpolated_attribute",
+                "id": 9,
+                "owner": 2,
+                "name": "aria-label",
+                "segments": [
+                  {
+                    "segment": "static",
+                    "value": "Rename "
+                  },
+                  {
+                    "segment": "value",
+                    "value": "a.label"
+                  }
+                ],
+                "context": "attribute"
+              }
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "event",
+                "id": 10,
+                "owner": 2,
+                "event": "press",
+                "handler": "26058453d2c7def8",
+                "name": "address_label",
+                "captures": [
+                  "a.id"
+                ]
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">\n                            Rename\n                        </button>\n                        <button data-pw=\"3\" type=\"button\" "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "interpolated_attribute",
+                "id": 11,
+                "owner": 3,
+                "name": "aria-label",
+                "segments": [
+                  {
+                    "segment": "static",
+                    "value": "Remove "
+                  },
+                  {
+                    "segment": "value",
+                    "value": "a.label"
+                  }
+                ],
+                "context": "attribute"
+              }
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "event",
+                "id": 12,
+                "owner": 3,
+                "event": "press",
+                "handler": "2a2607ad200b08c0",
+                "name": "remove_address",
+                "captures": [
+                  "a.id"
+                ]
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">\n                            Remove\n                        </button>\n                    </li>\n                "
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n            </ul>\n            <h2>Save a new address</h2>\n            <ul id=\"places\">\n                "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "each",
+          "id": 13,
+          "collection": "places",
+          "binding": "p",
+          "key": "id",
+          "body": [
+            {
+              "chunk": "static",
+              "value": "\n                    <li>\n                        <span class=\"place-name\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 14,
+                "value": "p.name",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span>\n                        <button data-pw=\"4\" type=\"button\" "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "interpolated_attribute",
+                "id": 15,
+                "owner": 4,
+                "name": "aria-label",
+                "segments": [
+                  {
+                    "segment": "static",
+                    "value": "Save "
+                  },
+                  {
+                    "segment": "value",
+                    "value": "p.name"
+                  }
+                ],
+                "context": "attribute"
+              }
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "event",
+                "id": 16,
+                "owner": 4,
+                "event": "press",
+                "handler": "9b11646e3891a94e",
+                "name": "address_label",
+                "captures": [
+                  "id",
+                  "p.id"
+                ]
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">\n                            Save and deliver here\n                        </button>\n                    </li>\n                "
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n            </ul>\n        </main>"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "title",
+          "id": 17,
+          "pieces": [
+            {
+              "piece": "text",
+              "value": "Delivery address"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
     "path": "store.page.CartPage",
     "name": "CartPage",
     "params": [],
-    "schema": "95fe67fb33f312bd",
+    "schema": "675e6011599b0dac",
     "chunks": [
       {
         "chunk": "static",
@@ -276,7 +594,7 @@
           "id": 16,
           "owner": 5,
           "event": "press",
-          "handler": "578d00c93ecefccd",
+          "handler": "1fcfca1cde1b9a61",
           "name": "place_order"
         }
       },
@@ -569,7 +887,7 @@
     "params": [
       "id"
     ],
-    "schema": "a0ad75fb7f099282",
+    "schema": "681f0e5867cbcebf",
     "chunks": [
       {
         "chunk": "static",
@@ -612,16 +930,123 @@
       },
       {
         "chunk": "static",
-        "value": "</p>\n\n            <section aria-label=\"Delivery\" aria-live=\"polite\">\n                "
+        "value": "</p>\n\n            \n            <p id=\"deliver-to\">\n                "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "conditional",
+          "id": 3,
+          "value": "reach.chosen",
+          "then": [
+            {
+              "chunk": "static",
+              "value": "Delivering to "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 4,
+                "value": "reach.to",
+                "context": "text"
+              }
+            }
+          ],
+          "otherwise": [
+            {
+              "chunk": "static",
+              "value": "No delivery address yet"
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n                <a data-pw=\"0\" id=\"change-address\" "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "interpolated_attribute",
+          "id": 5,
+          "owner": 0,
+          "name": "href",
+          "segments": [
+            {
+              "segment": "static",
+              "value": "/stores/"
+            },
+            {
+              "segment": "value",
+              "value": "id"
+            },
+            {
+              "segment": "static",
+              "value": "/address"
+            }
+          ],
+          "context": "url"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": ">Change the address</a>\n            </p>\n            "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "conditional",
+          "id": 6,
+          "value": "reach.delivers",
+          "then": [],
+          "otherwise": [
+            {
+              "chunk": "static",
+              "value": "<p id=\"out-of-range\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 7,
+                "value": "store.name",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": " doesn't deliver to "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 8,
+                "value": "reach.to",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ".</p>"
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n\n            <section aria-label=\"Delivery\" aria-live=\"polite\">\n                "
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "stream",
-          "id": 3,
+          "id": 9,
           "query": "store.page.Estimate",
           "args": [
-            "current_session()"
+            "id",
+            "current_user()"
           ],
           "streamed": true,
           "placeholder": [
@@ -641,7 +1066,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "text",
-                  "id": 4,
+                  "id": 10,
                   "value": "estimate.min_minutes",
                   "context": "text"
                 }
@@ -654,7 +1079,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "text",
-                  "id": 5,
+                  "id": 11,
                   "value": "estimate.max_minutes",
                   "context": "text"
                 }
@@ -683,7 +1108,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "each",
-          "id": 6,
+          "id": 12,
           "collection": "menu",
           "binding": "section",
           "key": "category.id",
@@ -696,7 +1121,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 7,
+                "id": 13,
                 "value": "section.category.name",
                 "context": "text"
               }
@@ -709,7 +1134,7 @@
               "chunk": "dynamic",
               "value": {
                 "part": "each",
-                "id": 8,
+                "id": 14,
                 "collection": "section.items",
                 "binding": "item",
                 "key": "id",
@@ -722,7 +1147,7 @@
                     "chunk": "dynamic",
                     "value": {
                       "part": "text",
-                      "id": 9,
+                      "id": 15,
                       "value": "item.name",
                       "context": "text"
                     }
@@ -735,7 +1160,7 @@
                     "chunk": "dynamic",
                     "value": {
                       "part": "text",
-                      "id": 10,
+                      "id": 16,
                       "value": "item.description",
                       "context": "text"
                     }
@@ -748,7 +1173,7 @@
                     "chunk": "dynamic",
                     "value": {
                       "part": "text",
-                      "id": 11,
+                      "id": 17,
                       "value": "item.price.display",
                       "context": "text"
                     }
@@ -761,19 +1186,19 @@
                     "chunk": "dynamic",
                     "value": {
                       "part": "conditional",
-                      "id": 12,
+                      "id": 18,
                       "value": "item.available",
                       "then": [
                         {
                           "chunk": "static",
-                          "value": "\n                                        <button data-pw=\"0\" type=\"button\" "
+                          "value": "\n                                        <button data-pw=\"1\" type=\"button\" "
                         },
                         {
                           "chunk": "dynamic",
                           "value": {
                             "part": "interpolated_attribute",
-                            "id": 13,
-                            "owner": 0,
+                            "id": 19,
+                            "owner": 1,
                             "name": "aria-label",
                             "segments": [
                               {
@@ -792,10 +1217,10 @@
                           "chunk": "dynamic",
                           "value": {
                             "part": "event",
-                            "id": 14,
-                            "owner": 0,
+                            "id": 20,
+                            "owner": 1,
                             "event": "press",
-                            "handler": "96bcd53ac130238d",
+                            "handler": "ce4501910ab2a49a",
                             "name": "add_to_cart",
                             "captures": [
                               "item"
@@ -837,21 +1262,21 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 15,
+          "id": 21,
           "value": "cart.line_count",
           "context": "text"
         }
       },
       {
         "chunk": "static",
-        "value": "</span></p>\n                <p data-pw=\"1\" id=\"cart-empty\" "
+        "value": "</span></p>\n                <p data-pw=\"2\" id=\"cart-empty\" "
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "boolean_attribute",
-          "id": 16,
-          "owner": 1,
+          "id": 22,
+          "owner": 2,
           "name": "hidden",
           "value": "cart.lines"
         }
@@ -864,7 +1289,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "each",
-          "id": 17,
+          "id": 23,
           "collection": "cart.lines",
           "binding": "line",
           "key": "item_id",
@@ -877,21 +1302,21 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 18,
+                "id": 24,
                 "value": "line.name",
                 "context": "text"
               }
             },
             {
               "chunk": "static",
-              "value": "</span>\n                            <button data-pw=\"2\" type=\"button\" "
+              "value": "</span>\n                            <button data-pw=\"3\" type=\"button\" "
             },
             {
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 19,
-                "owner": 2,
+                "id": 25,
+                "owner": 3,
                 "name": "aria-label",
                 "segments": [
                   {
@@ -910,8 +1335,8 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 20,
-                "owner": 2,
+                "id": 26,
+                "owner": 3,
                 "event": "press",
                 "handler": "15483a28f370066a",
                 "name": "decrease_in_cart",
@@ -928,21 +1353,21 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 21,
+                "id": 27,
                 "value": "line.quantity.count",
                 "context": "text"
               }
             },
             {
               "chunk": "static",
-              "value": "</span>\n                            <button data-pw=\"3\" type=\"button\" "
+              "value": "</span>\n                            <button data-pw=\"4\" type=\"button\" "
             },
             {
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 22,
-                "owner": 3,
+                "id": 28,
+                "owner": 4,
                 "name": "aria-label",
                 "segments": [
                   {
@@ -961,8 +1386,8 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 23,
-                "owner": 3,
+                "id": 29,
+                "owner": 4,
                 "event": "press",
                 "handler": "e54d74c7f76a6a78",
                 "name": "increase_in_cart",
@@ -979,21 +1404,21 @@
               "chunk": "dynamic",
               "value": {
                 "part": "text",
-                "id": 24,
+                "id": 30,
                 "value": "line.total.display",
                 "context": "text"
               }
             },
             {
               "chunk": "static",
-              "value": "</span>\n                            <button data-pw=\"4\" type=\"button\" "
+              "value": "</span>\n                            <button data-pw=\"5\" type=\"button\" "
             },
             {
               "chunk": "dynamic",
               "value": {
                 "part": "interpolated_attribute",
-                "id": 25,
-                "owner": 4,
+                "id": 31,
+                "owner": 5,
                 "name": "aria-label",
                 "segments": [
                   {
@@ -1012,8 +1437,8 @@
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 26,
-                "owner": 4,
+                "id": 32,
+                "owner": 5,
                 "event": "press",
                 "handler": "0884d13a19812a03",
                 "name": "remove_from_cart",
@@ -1037,7 +1462,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 27,
+          "id": 33,
           "value": "cart.subtotal.display",
           "context": "text"
         }
@@ -1050,7 +1475,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "conditional",
-          "id": 28,
+          "id": 34,
           "value": "cart.lines",
           "then": [
             {
@@ -1069,21 +1494,21 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 29,
+          "id": 35,
           "value": "notice",
           "context": "text"
         }
       },
       {
         "chunk": "static",
-        "value": "</p>\n                <button data-pw=\"5\" id=\"clear-cart\" type=\"button\""
+        "value": "</p>\n                <button data-pw=\"6\" id=\"clear-cart\" type=\"button\""
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "event",
-          "id": 30,
-          "owner": 5,
+          "id": 36,
+          "owner": 6,
           "event": "press",
           "handler": "b5c3e56ff370a6a8",
           "name": "clear_cart"
@@ -1097,7 +1522,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "stream",
-          "id": 31,
+          "id": 37,
           "query": "store.page.Recommendations",
           "args": [
             "id"
@@ -1120,7 +1545,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "each",
-                  "id": 32,
+                  "id": 38,
                   "collection": "items",
                   "binding": "item",
                   "key": "id",
@@ -1133,7 +1558,7 @@
                       "chunk": "dynamic",
                       "value": {
                         "part": "text",
-                        "id": 33,
+                        "id": 39,
                         "value": "item.name",
                         "context": "text"
                       }
@@ -1169,7 +1594,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 34,
+          "id": 40,
           "pieces": [
             {
               "piece": "value",
@@ -1182,7 +1607,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "meta",
-          "id": 35,
+          "id": 41,
           "attribute": "name",
           "key": "description",
           "content": [

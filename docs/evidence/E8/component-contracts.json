@@ -377,6 +377,102 @@
     ]
   },
   {
+    "component_id": "store.page.AddressPage",
+    "capability_mapping": 1,
+    "abi_schema": "770e51c96051ba77",
+    "required_capabilities": [
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.page.Places",
+        "name": "Places",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.SavedAddresses",
+        "name": "SavedAddresses",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.add_address",
+        "name": "add_address",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.choose_address",
+        "name": "choose_address",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.remove_address",
+        "name": "remove_address",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.rename_address",
+        "name": "rename_address",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "AddressPage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-address-page-api@0.1.0",
+          "function": "address-page"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.Cart",
     "capability_mapping": 1,
     "abi_schema": "37cb9e8b9dc1738c",
@@ -589,8 +685,13 @@
   {
     "component_id": "store.page.Estimate",
     "capability_mapping": 1,
-    "abi_schema": "415fdfe738cf5f70",
+    "abi_schema": "94da90c7ccd7e563",
     "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      },
       {
         "family": "database",
         "operation": "read",
@@ -602,25 +703,35 @@
     ],
     "imports": [
       {
-        "interface": "store:data/estimates",
-        "name": "current",
+        "interface": "store:data/user-estimates",
+        "name": "for-store",
         "capability": "database.read<Estimates>",
         "capabilities": [
           {
             "family": "database",
             "operation": "read",
             "argument": "Estimates"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
           }
         ],
         "signature": {
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "domain.StoreId"
+              }
+            },
+            {
+              "declared": {
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -682,13 +793,13 @@
             "obligations": [
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
-                "position": "argument 0",
-                "ty": "Session<SessionId>"
+                "principal": "User<UserId>",
+                "position": "argument 1",
+                "ty": "User<UserId>"
               },
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "result",
                 "ty": "DeliveryEstimate"
               }
@@ -1143,6 +1254,155 @@
     ]
   },
   {
+    "component_id": "store.page.Places",
+    "capability_mapping": 1,
+    "abi_schema": "ba2d7c89e5f43181",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/places",
+        "name": "list",
+        "capability": "database.read<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "Addresses.Place"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "Places",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-places-api@0.1.0",
+          "function": "places"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.Reach",
+    "capability_mapping": 1,
+    "abi_schema": "587ae3fe18bd6205",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/coverage",
+        "name": "for-store",
+        "capability": "database.read<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            },
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "Addresses.Coverage"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "Reach",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 1",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "Coverage"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-reach-api@0.1.0",
+          "function": "reach"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.Recommendations",
     "capability_mapping": 1,
     "abi_schema": "362c2dcd203e1e3f",
@@ -1218,6 +1478,95 @@
         "component": {
           "interface": "pw:app/store-page-recommendations-api@0.1.0",
           "function": "recommendations"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.SavedAddresses",
+    "capability_mapping": 1,
+    "abi_schema": "3c0d9f17c9097f9f",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/addresses",
+        "name": "list",
+        "capability": "database.read<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "Addresses.Address"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "SavedAddresses",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<Address>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-saved-addresses-api@0.1.0",
+          "function": "saved-addresses"
         }
       }
     ]
@@ -1396,6 +1745,12 @@
         "kind": "component"
       },
       {
+        "interface": "pw:app/store.page.Reach",
+        "name": "Reach",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
         "interface": "pw:app/store.page.Recommendations",
         "name": "Recommendations",
         "owner": "external",
@@ -1464,34 +1819,6 @@
         },
         "owner": "platform",
         "kind": "host_capability"
-      },
-      {
-        "interface": "pw:host/session",
-        "name": "read",
-        "capability": "session.read",
-        "capabilities": [
-          {
-            "family": "session",
-            "operation": "read"
-          }
-        ],
-        "signature": {
-          "params": [],
-          "result": {
-            "declared": {
-              "path": "capability.Session",
-              "args": [
-                {
-                  "declared": {
-                    "path": "capability.SessionId"
-                  }
-                }
-              ]
-            }
-          }
-        },
-        "owner": "platform",
-        "kind": "host_capability"
       }
     ],
     "exports": [
@@ -1512,10 +1839,233 @@
     ]
   },
   {
+    "component_id": "store.page.add_address",
+    "capability_mapping": 1,
+    "abi_schema": "083883ce01812277",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Addresses"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-saved-addresses",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.SavedAddresses"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "addresses-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.AddressesChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/addresses",
+        "name": "add",
+        "capability": "database.write<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.AddressLabel"
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.PlaceId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "List",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "Addresses.Address"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "Addresses.AddressError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "add_address",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<Address>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-add-address-api@0.1.0",
+          "function": "add-address",
+          "idempotent_by": "InteractionId",
+          "bounded": [
+            {
+              "argument": 0,
+              "type": "Addresses.AddressLabel",
+              "holds": "String.length(value) >= 1 & String.length(value) <= 40",
+              "measure": "length",
+              "at_least": 1,
+              "at_most": 40
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.add_to_cart",
     "capability_mapping": 1,
-    "abi_schema": "1eaa4c8c525099ec",
+    "abi_schema": "092247a3cf92e683",
     "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      },
       {
         "family": "database",
         "operation": "read",
@@ -1631,6 +2181,44 @@
           }
         },
         "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/coverage",
+        "name": "reaches",
+        "capability": "database.read<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            },
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "external",
         "kind": "host_capability"
       },
       {
@@ -1761,6 +2349,209 @@
               "at_least": 1
             }
           ]
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.choose_address",
+    "capability_mapping": 1,
+    "abi_schema": "336d5d3e75e83603",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Addresses"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-saved-addresses",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.SavedAddresses"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "addresses-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.AddressesChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/addresses",
+        "name": "choose",
+        "capability": "database.write<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.AddressId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "List",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "Addresses.Address"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "Addresses.AddressError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "choose_address",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<Address>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-choose-address-api@0.1.0",
+          "function": "choose-address",
+          "idempotent_by": "InteractionId"
         }
       }
     ]
@@ -2691,6 +3482,209 @@
     ]
   },
   {
+    "component_id": "store.page.remove_address",
+    "capability_mapping": 1,
+    "abi_schema": "b915ad172ccb24ed",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Addresses"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-saved-addresses",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.SavedAddresses"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "addresses-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.AddressesChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/addresses",
+        "name": "remove",
+        "capability": "database.write<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.AddressId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "List",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "Addresses.Address"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "Addresses.AddressError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "remove_address",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<Address>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-remove-address-api@0.1.0",
+          "function": "remove-address",
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.remove_from_cart",
     "capability_mapping": 1,
     "abi_schema": "d68c7826ead9ab7e",
@@ -2896,6 +3890,224 @@
           "interface": "pw:app/store-page-remove-from-cart-api@0.1.0",
           "function": "remove-from-cart",
           "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.rename_address",
+    "capability_mapping": 1,
+    "abi_schema": "7e1a5f55cd7ee9c6",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Addresses"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-saved-addresses",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.SavedAddresses"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "addresses-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.AddressesChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/addresses",
+        "name": "rename",
+        "capability": "database.write<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.AddressId"
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.AddressLabel"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "List",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "Addresses.Address"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "Addresses.AddressError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "rename_address",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<Address>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-rename-address-api@0.1.0",
+          "function": "rename-address",
+          "idempotent_by": "InteractionId",
+          "bounded": [
+            {
+              "argument": 1,
+              "type": "Addresses.AddressLabel",
+              "holds": "String.length(value) >= 1 & String.length(value) <= 40",
+              "measure": "length",
+              "at_least": 1,
+              "at_most": 40
+            }
+          ]
         }
       }
     ]

@@ -2,6 +2,14 @@
   "compatibility": "dev",
   "nodes": [
     {
+      "path": "Events.AddressesChanged",
+      "name": "AddressesChanged",
+      "node": "event",
+      "params": [
+        "user"
+      ]
+    },
+    {
       "path": "Events.CartChanged",
       "name": "CartChanged",
       "node": "event",
@@ -151,6 +159,14 @@
       ]
     },
     {
+      "path": "store.page.AddressPage",
+      "name": "AddressPage",
+      "node": "page",
+      "params": [
+        "id"
+      ]
+    },
+    {
       "path": "store.page.Cart",
       "name": "Cart",
       "node": "resource",
@@ -174,12 +190,14 @@
       "name": "Estimate",
       "node": "resource",
       "partition": "private",
-      "privacy": "session",
+      "privacy": "user",
       "key": [
-        "session"
+        "id",
+        "reader"
       ],
       "params": [
-        "session"
+        "id",
+        "reader"
       ]
     },
     {
@@ -253,6 +271,30 @@
       "params": []
     },
     {
+      "path": "store.page.Places",
+      "name": "Places",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "key": [],
+      "params": []
+    },
+    {
+      "path": "store.page.Reach",
+      "name": "Reach",
+      "node": "resource",
+      "partition": "private",
+      "privacy": "user",
+      "key": [
+        "id",
+        "reader"
+      ],
+      "params": [
+        "id",
+        "reader"
+      ]
+    },
+    {
       "path": "store.page.Recommendations",
       "name": "Recommendations",
       "node": "resource",
@@ -263,6 +305,19 @@
       ],
       "params": [
         "id"
+      ]
+    },
+    {
+      "path": "store.page.SavedAddresses",
+      "name": "SavedAddresses",
+      "node": "resource",
+      "partition": "private",
+      "privacy": "user",
+      "key": [
+        "reader"
+      ],
+      "params": [
+        "reader"
       ]
     },
     {
@@ -296,12 +351,29 @@
       ]
     },
     {
+      "path": "store.page.add_address",
+      "name": "add_address",
+      "node": "command",
+      "params": [
+        "label",
+        "place"
+      ]
+    },
+    {
       "path": "store.page.add_to_cart",
       "name": "add_to_cart",
       "node": "command",
       "params": [
         "item",
         "quantity"
+      ]
+    },
+    {
+      "path": "store.page.choose_address",
+      "name": "choose_address",
+      "node": "command",
+      "params": [
+        "id"
       ]
     },
     {
@@ -333,11 +405,28 @@
       "params": []
     },
     {
+      "path": "store.page.remove_address",
+      "name": "remove_address",
+      "node": "command",
+      "params": [
+        "id"
+      ]
+    },
+    {
       "path": "store.page.remove_from_cart",
       "name": "remove_from_cart",
       "node": "command",
       "params": [
         "item"
+      ]
+    },
+    {
+      "path": "store.page.rename_address",
+      "name": "rename_address",
+      "node": "command",
+      "params": [
+        "id",
+        "label"
       ]
     }
   ],
@@ -400,6 +489,20 @@
       ]
     },
     {
+      "from": "store.page.AddressPage",
+      "to": "store.page.Places",
+      "kind": "reads",
+      "key": []
+    },
+    {
+      "from": "store.page.AddressPage",
+      "to": "store.page.SavedAddresses",
+      "kind": "reads",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
       "from": "store.page.Cart",
       "to": "Events.UserCartChanged",
       "kind": "invalidated_by",
@@ -421,6 +524,14 @@
       "kind": "reads",
       "key": [
         "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.Estimate",
+      "to": "Events.AddressesChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "reader"
       ]
     },
     {
@@ -504,11 +615,27 @@
       ]
     },
     {
+      "from": "store.page.Reach",
+      "to": "Events.AddressesChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "reader"
+      ]
+    },
+    {
       "from": "store.page.Recommendations",
       "to": "Events.MenuChanged",
       "kind": "invalidated_by",
       "key": [
         "id"
+      ]
+    },
+    {
+      "from": "store.page.SavedAddresses",
+      "to": "Events.AddressesChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "reader"
       ]
     },
     {
@@ -537,10 +664,35 @@
     },
     {
       "from": "store.page.StorePage",
+      "to": "store.page.Reach",
+      "kind": "reads",
+      "key": [
+        "id",
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.StorePage",
       "to": "store.page.Store",
       "kind": "reads",
       "key": [
         "id"
+      ]
+    },
+    {
+      "from": "store.page.add_address",
+      "to": "Events.AddressesChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.add_address",
+      "to": "store.page.SavedAddresses",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
       ]
     },
     {
@@ -554,6 +706,22 @@
     {
       "from": "store.page.add_to_cart",
       "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.choose_address",
+      "to": "Events.AddressesChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.choose_address",
+      "to": "store.page.SavedAddresses",
       "kind": "invalidates",
       "key": [
         "current_user()"
@@ -640,6 +808,22 @@
       ]
     },
     {
+      "from": "store.page.remove_address",
+      "to": "Events.AddressesChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.remove_address",
+      "to": "store.page.SavedAddresses",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
       "from": "store.page.remove_from_cart",
       "to": "Events.UserCartChanged",
       "kind": "emits",
@@ -650,6 +834,22 @@
     {
       "from": "store.page.remove_from_cart",
       "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.rename_address",
+      "to": "Events.AddressesChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.rename_address",
+      "to": "store.page.SavedAddresses",
       "kind": "invalidates",
       "key": [
         "current_user()"

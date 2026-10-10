@@ -193,12 +193,19 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
     assert_eq!(
         modules.keys().collect::<Vec<_>>(),
         [
+            // The address page's label, bound (ADR-0142), and its handlers
+            // (track `store-accounts`): a rename and a save each test the
+            // label first (`address_label`), one name here for two modules.
+            "",
             "add_to_cart",
+            "address_label",
+            "choose_address",
             "clear_cart",
             "decrease_in_cart",
             "increase_in_cart",
             // The cart's own page places it as an order (ADR-0193).
             "place_order",
+            "remove_address",
             "remove_from_cart"
         ]
     );
@@ -375,11 +382,25 @@ fn a_module_and_its_event_part_name_one_handler() {
     let modules = modules(&units);
     let parts = event_parts(&units);
     // The store's page's five, and its cart's page's five (ADR-0190,
-    // ADR-0193).
-    assert_eq!(parts.len(), 10, "{parts:?}");
+    // ADR-0193), and the address page's five (track `store-accounts`): its
+    // label's binding, an address chosen, renamed and removed, and one saved.
+    assert_eq!(parts.len(), 15, "{parts:?}");
+    // By identity: two of the address page's handlers have one name (both
+    // test the label first, `address_label`), and each is its own module.
+    let _ = &modules;
+    let by_identity: BTreeMap<String, HandlerModule> = js::compile(&units)
+        .expect("the program checks")
+        .into_iter()
+        .map(|c| match c.module {
+            Encoding::Encoded(m) => (m.identity.clone(), m),
+            other => panic!("a handler in `{}` was not compiled: {other}", c.declaration),
+        })
+        .collect();
     for (name, identity, captures) in &parts {
-        let m = &modules[name];
-        assert_eq!(&m.identity, identity, "{name}: one identity");
+        let m = by_identity
+            .get(identity)
+            .unwrap_or_else(|| panic!("{name}: no module {identity}"));
+        assert_eq!(&m.name, name, "{name}: one name");
         for path in captures {
             let read: String = path.split('.').map(|s| format!("[\"{s}\"]")).collect();
             assert!(
