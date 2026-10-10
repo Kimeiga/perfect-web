@@ -490,7 +490,7 @@ impl Subscriber {
 /// The build this server serves. One value, used as the compatibility
 /// generation everywhere it is needed, so nothing derives a second one.
 /// **Entries' generation** in this host's materializer and resources. Not
-/// the build's name (ADR-XXXX), which a host reads from its build: entries
+/// the build's name (ADR-0300), which a host reads from its build: entries
 /// named by it wait for the store's entries keyed by a user (W8's track),
 /// which change the same functions.
 const BUILD: &str = "B1";
@@ -677,7 +677,7 @@ mod messages;
 mod kiokun;
 
 struct Server {
-    /// **The build this host serves, by its name** (ADR-XXXX): on each
+    /// **The build this host serves, by its name** (ADR-0300): on each
     /// document's resume manifest, the handler table and the documents it
     /// answers (`pw-build`).
     build_id: String,
@@ -1094,7 +1094,7 @@ fn components() -> BTreeMap<String, Loaded> {
 /// browser artifacts are, and what it runs the store by.
 struct Built {
     artifacts: std::path::PathBuf,
-    /// **The build's name** (ADR-XXXX), as `pw build` wrote it (`build-id`).
+    /// **The build's name** (ADR-0300), as `pw build` wrote it (`build-id`).
     build_id: String,
     templates: Vec<Template>,
     contracts: Vec<ComponentContract>,
@@ -1222,7 +1222,7 @@ impl Server {
         };
         let templates: Vec<Template> = serde_json::from_str(&read("templates.json")?)
             .map_err(|e| format!("templates.json: {e}"))?;
-        // **The build's name** (ADR-XXXX): a build that names none was
+        // **The build's name** (ADR-0300): a build that names none was
         // written before builds were named, and is built again.
         let build_id = read("build-id")
             .map_err(|e| format!("{e}: the build names no build; run `pw build` again"))?
@@ -5273,7 +5273,7 @@ impl Server {
         } else {
             String::new()
         };
-        // **The build that served it** (ADR-XXXX), which a page that keeps
+        // **The build that served it** (ADR-0300), which a page that keeps
         // its parts across a navigation holds the next document to.
         let build = format!("pw-build: {}\r\n", self.build_id);
         if settling.waiting.is_empty() && settling.settled.is_empty() {
@@ -7707,7 +7707,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // for a handler this one lacks.
         ("GET", "/pw-handlers") => {
             // The build's name, and each page's document: its schema and its
-            // scope (ADR-XXXX), which the browser's decision holds a document
+            // scope (ADR-0300), which the browser's decision holds a document
             // of that page to. `#` lines, as no handler's identity begins.
             let mut table = format!("#build|{}\n", server.build_id);
             for (page, plan) in &server.plans {
@@ -8575,7 +8575,7 @@ fn handler_table(templates: &[Template]) -> BTreeMap<String, String> {
 /// The document's resume manifest (ADR-0132): one base, and one entry per
 /// handler, keyed by its identity, presenting its capture schema. The base
 /// names no handler, so a part with no entry of its own authorises nothing.
-/// **The document's resume manifest** (ADR-0132, ADR-XXXX): its base names
+/// **The document's resume manifest** (ADR-0132, ADR-0300): its base names
 /// the build that served it, its page's document schema (the template's,
 /// which closes over each template its instances reach, ADR-0203) and its
 /// page's scope (`resume::page_scope`, carried in its plan), each of which
@@ -12213,7 +12213,7 @@ public query Store(",
         assert_eq!(sets_of(&s, &theirs).len(), 1);
     }
 
-    /// **A host serves the build it was given, by its name** (ADR-XXXX): on
+    /// **A host serves the build it was given, by its name** (ADR-0300): on
     /// each document it answers (`pw-build`) and in the document's resume
     /// manifest, beside its page's document schema and scope; and in its
     /// handler table, with each page's.
@@ -12254,7 +12254,7 @@ public query Store(",
         assert_eq!(manifest["resume"]["scope"], "session:");
     }
 
-    /// **A build that names no build is not served** (ADR-XXXX): it was
+    /// **A build that names no build is not served** (ADR-0300): it was
     /// written before builds were named, and is built again.
     #[test]
     fn a_build_that_names_no_build_is_not_served() {

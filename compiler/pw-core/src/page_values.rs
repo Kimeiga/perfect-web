@@ -710,7 +710,7 @@ pub struct PageValues {
     /// what it reads changes, as it sets a text part.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<u32>,
-    /// **Its documents' scope** (ADR-XXXX), as their resume manifest says it
+    /// **Its documents' scope** (ADR-0300), as their resume manifest says it
     /// and the browser's decision holds a capture to: `public`, `session:`,
     /// `user:`, `organization:` or `private:` (`resume::page_scope`).
     #[serde(default = "public_scope", skip_serializing_if = "is_public_scope")]

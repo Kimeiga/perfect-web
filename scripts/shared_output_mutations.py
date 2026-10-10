@@ -41,7 +41,7 @@ MUTANTS = [
         "a streamed page may be kept by any cache",
         "server",
         SERVER,
-        # Re-anchored by ADR-XXXX, which names the build after it.
+        # Re-anchored by ADR-0300, which names the build after it.
         '            "HTTP/1.1 200 OK\\r\\ncontent-type: text/html; charset=utf-8\\r\\n{PRIVATE}{cookie}{build}\\\n',
         '            "HTTP/1.1 200 OK\\r\\ncontent-type: text/html; charset=utf-8\\r\\n{cookie}{build}\\\n',
     ),

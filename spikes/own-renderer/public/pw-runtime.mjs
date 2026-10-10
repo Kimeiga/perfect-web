@@ -379,7 +379,7 @@ function applyList(key, scope, op) {
 
 let decide = null;
 
-/** **The build that served this runtime** (ADR-XXXX), by its name, from its
+/** **The build that served this runtime** (ADR-0300), by its name, from its
  * handler table: empty until the table is read. */
 let servedBuild = "";
 
@@ -402,7 +402,7 @@ async function bootDecision() {
   const table = await fetch("/pw-handlers").then((r) => (r.ok ? r.text() : ""));
   const known = know(...write(table));
   log.push(`knows ${known} handler(s)`);
-  // **What this build says of this page's documents** (ADR-XXXX): its name,
+  // **What this build says of this page's documents** (ADR-0300): its name,
   // and this page's document schema and scope, from the same table and never
   // from the document; the decision holds each handler's document to them.
   const lines = table.split("\n");
@@ -462,7 +462,7 @@ window.__pw = {
   /** A page's address from its route and its parameters' values, as a
    * navigation goes to it (ADR-0280). */
   pageAddress: (route, args) => pageAddress(route, args),
-  /** The build that served this runtime (ADR-XXXX). */
+  /** The build that served this runtime (ADR-0300). */
   build: () => servedBuild,
   indexSize: () => index.size,
   /** The bytes of command bodies kept alive and not yet answered, and what

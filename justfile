@@ -5553,7 +5553,7 @@ e14-layouts:
      } > docs/evidence/E14/layouts.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/layouts.txt
 
-# ADR-XXXX: a build is named by what it built, and the browser's decision
+# ADR-0300: a build is named by what it built, and the browser's decision
 # holds a document to what its build says of its page. The compiler's tests,
 # the host's, the decision's, the browser's in three engines, and the
 # mutation controls.
@@ -5561,7 +5561,7 @@ e14-build-id:
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - a build is named by what it built"; echo; \
+    @{ echo "ADR-0300 - a build is named by what it built"; echo; \
        echo "produced by: just e14-build-id"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \

@@ -56,7 +56,7 @@ pub unsafe extern "C" fn know(ptr: *const u8, len: usize) -> u32 {
     let mut known = KNOWN.lock().unwrap();
     known.clear();
     // A `#` line is the table's word on the build and its pages
-    // (ADR-XXXX), never a handler: no identity begins with one.
+    // (ADR-0300), never a handler: no identity begins with one.
     for line in text
         .lines()
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn know(ptr: *const u8, len: usize) -> u32 {
     known.len() as u32
 }
 
-/// **What this build says of the page's documents** (ADR-XXXX): their
+/// **What this build says of the page's documents** (ADR-0300): their
 /// document schema and their scope, from the handler table the runtime was
 /// served with, never from the document. `None` until told.
 static DOCUMENT: Mutex<Option<(String, String)>> = Mutex::new(None);
@@ -254,8 +254,8 @@ fn parse(text: &str) -> (ResumeEntry, Runtime, Construct) {
             .iter()
             .map(|(identity, capture)| known(identity, capture))
             .collect(),
-        // What the build says of this page's documents (ADR-XXXX), and
-        // nothing where it has said nothing. Until ADR-XXXX the constants
+        // What the build says of this page's documents (ADR-0300), and
+        // nothing where it has said nothing. Until ADR-0300 the constants
         // `cart-doc` and `Public`, which every manifest also said.
         document_schema: told.as_ref().map(|(s, _)| schema(s)),
         scope: told.as_ref().map(|(_, scope)| scope_of(scope)),
@@ -315,13 +315,13 @@ mod tests {
         assert_eq!(know_text("5e53c6a9aaee307a|\n"), 1);
         assert_eq!(decide_text(&manifest("e1ab9fca1f6fc15b", "item.id")), 4);
 
-        // A table's `#` lines are no handlers (ADR-XXXX).
+        // A table's `#` lines are no handlers (ADR-0300).
         assert_eq!(
             know_text("#build|b1\n#page|t.P|s1|public\n5e53c6a9aaee307a|\n"),
             1
         );
 
-        // ADR-XXXX: what the build says of the page's documents, compared.
+        // ADR-0300: what the build says of the page's documents, compared.
         // Told nothing, neither is: the manifest's own words pass.
         let as_page = |document: &str, scope: &str| {
             format!("2|1|b1|5e53c6a9aaee307a||{document}|{scope}||region")

@@ -108,11 +108,11 @@ test("a press on a handler from another build reads the page again, once (charte
   await expect(page.locator("#cart-count")).toHaveText("1");
 });
 
-test("a document of another schema reads the page again, once (ADR-XXXX)", async ({ page }) => {
+test("a document of another schema reads the page again, once (ADR-0300)", async ({ page }) => {
   // The decision holds a handler's document to what this build says of its
   // page, from its handler table: its document schema. A document that says
   // another, its parts' places another build's, is refused and read again.
-  // Until ADR-XXXX every manifest and the decision said `cart-doc`, so this
+  // Until ADR-0300 every manifest and the decision said `cart-doc`, so this
   // document attached.
   let stale = true;
   await page.route("**/StorePage.html", async (route) => {

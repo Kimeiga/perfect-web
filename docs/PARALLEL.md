@@ -759,7 +759,7 @@ Each a decision for a track, with its date; a track's ADR records it too.
     to another session ("You signed in or out in another tab. Reload this
     page to go on.") or no longer holds ("This page is out of date. Reload
     it to go on."), and the runtime tells it where the press was, as
-    ADR-0299 (the refusal ruling, at its merge) tells a refusal, the
+    the refusal ruling's ADR (numbered at its merge) tells a refusal, the
     speculation taken back. A command with no document, from no page, is
     answered as before. W8 builds it in milestone 1 once the refusal ruling
     is merged, a `TRACK SEAM (store-accounts)` at each of the runtime's and
@@ -812,3 +812,27 @@ Each a decision for a track, with its date; a track's ADR records it too.
   compiled once per distinct source instead of once per test, which also
   cuts how many compile at once (the 4 GiB bound). A mutant that still
   takes long is given the tests that can see its rule.
+- **2026-10-09, W8's milestone 2 questions (delivery addresses),
+  answered.** Q-M2a: whether a store delivers to the reader's chosen address
+  is no host predicate (no TRACK SEAM in identity.rs): `requires` answers who
+  may act, and this is the store's own rule about its data, a declared error
+  the command answers from its transaction (as `ItemUnavailable` is), from the
+  same `delivers_to` the estimate's NoCoverage uses, so the two cannot
+  disagree; `place_order` refuses an address the store does not reach
+  whatever `add_to_cart` does, since a cart outlives an address. Q-M2b: the
+  estimator's test controls stay keyed by session, the travel term the
+  model's, provided the Estimate entry is kept for no time and never shared
+  across a user's sessions; places are a seeded fixture, not a geocoder,
+  said in its Not claimed. W8's finding: a template's `<ready as={x}>`
+  resolved to an imported module's function of that name (PW0401); the
+  integrator's resolver fix, queued (NEXT).
+- **2026-10-09, W6's cache accepted** (1f0be09): CPU-s 487 to 261 at one
+  thread per core; but the whole run crossed the 4 GiB bound (19 of 69
+  mutants' runs stopped by it), so the script runs on four threads again
+  (269d9f3), the run's evidence discarded. The Wasmtime compile per server
+  load is the integrator's (NEXT, infrastructure). W6 records
+  e14-kiokun-word on its branch's verify, not locally: the disk fell to 3.8
+  GiB with three sessions' targets (the shared one 35 GB), freed to 31 GiB.
+- **2026-10-09, ADR-0300 (the build id) merged** before the refusal ruling,
+  whose verify still ran: the numbers follow merge order, so the refusal
+  ruling takes the next.

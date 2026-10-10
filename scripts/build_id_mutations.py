@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-XXXX: a build is named by what it built, and
+"""Mutation controls for ADR-0300: a build is named by what it built, and
 the browser's decision holds a document to what its build says of its page.
 
 Each mutant undoes one piece:

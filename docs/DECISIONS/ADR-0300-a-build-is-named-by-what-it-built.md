@@ -1,4 +1,4 @@
-# ADR-XXXX: a build is named by what it built, and the decision holds a document to what its build says of its page
+# ADR-0300: a build is named by what it built, and the decision holds a document to what its build says of its page
 
 Status: accepted under the owner's delegation of 2026-10-02, on the
 capability matrix's finding (2026-10-08) and ADR-0132's "Not claimed".

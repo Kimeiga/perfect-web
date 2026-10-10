@@ -470,7 +470,7 @@ pub(crate) fn capture_names_and_types(
 /// renders into the shared shell, and a session value in that shell is served
 /// to whoever the shell is served to.
 /// **A page's scope, as its documents' resume manifest says it**
-/// (ADR-XXXX): `public`, or the principal its documents are partitioned by
+/// (ADR-0300): `public`, or the principal its documents are partitioned by
 /// (`session:`, `user:`, `organization:`), or `private:` where it is cached
 /// privately and names none. Read from [`manifest_scope`], so the two cannot
 /// say different things; the browser's decision holds a capture to it.

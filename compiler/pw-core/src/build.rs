@@ -86,10 +86,10 @@ impl Build {
     /// DIR/computed/<page>.mjs       what each page computes from its
     ///                               signals, in the browser (ADR-0227)
     /// DIR/build-id                  the build's name, from all of the above
-    ///                               (ADR-XXXX), written last
+    ///                               (ADR-0300), written last
     /// ```
     pub fn write(&self, dir: &std::path::Path) -> Result<Vec<String>, String> {
-        // **The build is named by what it built** (ADR-XXXX): FNV-1a, the
+        // **The build is named by what it built** (ADR-0300): FNV-1a, the
         // resume artifacts' own hash, over each file written, its path and
         // its bytes, in the order written.
         let named = std::cell::Cell::new(FNV_OFFSET);
@@ -446,7 +446,7 @@ fn fnv1a(mut h: u64, bytes: &[u8]) -> u64 {
     h
 }
 
-/// **A build's name** (ADR-XXXX): `b` and sixteen hex digits.
+/// **A build's name** (ADR-0300): `b` and sixteen hex digits.
 fn build_id(h: u64) -> String {
     format!("b{h:016x}")
 }

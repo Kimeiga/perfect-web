@@ -1,4 +1,4 @@
-//! **A build is named by what it built** (ADR-XXXX).
+//! **A build is named by what it built** (ADR-0300).
 //!
 //! `pw build` writes `build-id` last: an FNV-1a hash over every file it
 //! wrote, by path and bytes, in the order written. The same sources build the
