@@ -306,3 +306,24 @@ test("a reader's next choice abandons a navigation still in flight", async ({ pa
   await expect(page).toHaveURL(/\/$/);
   expect(await kept(page)).toEqual({ window: true, header: true, soft: 1 });
 });
+
+test("the document left is asked for nothing more", async ({ page }) => {
+  // Its runtime's life ended with the hand-over: its subscription asks the
+  // server for its document no more, as a page closed would not.
+  await ready(page, "/");
+  const left = await page.evaluate(() => window.__pw.parts.cursor);
+  await page.locator("#header-cart").click();
+  await expect(page).toHaveURL(/\/cart$/);
+  await settled(page);
+  const asked = [];
+  page.on("request", (r) => {
+    const url = new URL(r.url());
+    if (url.pathname === "/stream" && url.searchParams.get("doc") === String(left)) {
+      asked.push(r.url());
+    }
+  });
+  // Longer than the server holds a stream open (about 2.5 s): a
+  // subscription still going would have asked again.
+  await page.waitForTimeout(4000);
+  expect(asked).toEqual([]);
+});

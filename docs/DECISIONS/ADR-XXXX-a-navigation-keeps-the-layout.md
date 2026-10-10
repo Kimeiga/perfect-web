@@ -140,7 +140,11 @@ told), ADR-0122 (speculation), and the refusal ruling's announcer. Date:
     nothing;
   - what a leaving page is told is applied to nothing;
   - a page shown again from the back-forward cache listens again;
-  - a reader's next choice abandons a navigation in flight.
+  - a reader's next choice abandons a navigation in flight;
+  - the document left is asked for nothing more (its runtime's life ended:
+    the first run of the mutation controls found that mutant alive, the
+    leaving page's guard hiding it, and the old subscription asking the
+    server for its document every few seconds).
 - **`e2e/navigate.spec.mjs`** (ADR-0280), in three engines: its order placed
   goes to its page softly, read after the commit; its presses before the
   navigation answered first; a press while the page leaves not taken; a
