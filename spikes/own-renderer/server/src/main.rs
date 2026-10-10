@@ -10979,23 +10979,7 @@ public query Store(",
     /// over", once.
     #[test]
     fn a_page_is_told_when_the_instant_it_compared_passes() {
-        let s = served_from_patches_in(
-            "examples",
-            |app| {
-                let page = "    let stores = query StoreList()\n    let cart = query Cart(current_session())\n";
-                let shown = "            <h1>Stores</h1>\n";
-                assert!(app.contains(page) && app.contains(shown), "the home page");
-                app.replacen("import List\n", "import List\nimport clock\n", 1)
-                    .replacen(
-                        "public query StoreList() -> List<Store>\n",
-                        "public query Sale() -> String\n    freshness   30.seconds\n    consistency snapshot\n    cache       shared\n    concurrency one_per_key\n    timeout     2.seconds\n{\n    let utc = clock.zone(\"UTC\")\n    match clock.time(21, 0) {\n        Some(nine) => if clock.passed(clock.at(clock.today_in(utc), nine, utc)) { \"Sale over\" } else { \"On sale\" },\n        None => \"No sale\",\n    }\n}\n\npublic query StoreList() -> List<Store>\n",
-                        1,
-                    )
-                    .replacen(page, &format!("{page}    let sale = query Sale()\n"), 1)
-                    .replacen(shown, &format!("{shown}            <p id=\"sale\">{{sale}}</p>\n"), 1)
-            },
-            &[],
-        );
+        let s = on_sale_until_nine();
         // 20:59:30 UTC, on a day ahead of the host's.
         let now = s.now();
         let day = now.div_euclid(86_400_000) + 1;
@@ -11029,6 +11013,92 @@ public query Store(",
             Some((day + 1) * 86_400_000),
             "held until the next day begins"
         );
+    }
+
+    /// The store's home page with a sale on until 21:00 UTC each day
+    /// (ADR-XXXX): a shared query, kept ten minutes, so only the instant it
+    /// compared makes it be read again sooner.
+    fn on_sale_until_nine() -> Served {
+        served_from_patches_in(
+            "examples",
+            |app| {
+                let page = "    let stores = query StoreList()\n    let cart = query Cart(current_session())\n";
+                let shown = "            <h1>Stores</h1>\n";
+                assert!(app.contains(page) && app.contains(shown), "the home page");
+                app.replacen("import List\n", "import List\nimport clock\n", 1)
+                    .replacen(
+                        "public query StoreList() -> List<Store>\n",
+                        "public query Sale() -> String\n    freshness   10.minutes\n    consistency snapshot\n    cache       shared\n    concurrency one_per_key\n    timeout     2.seconds\n{\n    let utc = clock.zone(\"UTC\")\n    match clock.time(21, 0) {\n        Some(nine) => if clock.passed(clock.at(clock.today_in(utc), nine, utc)) { \"Sale over\" } else { \"On sale\" },\n        None => \"No sale\",\n    }\n}\n\npublic query StoreList() -> List<Store>\n",
+                        1,
+                    )
+                    .replacen(page, &format!("{page}    let sale = query Sale()\n"), 1)
+                    .replacen(shown, &format!("{shown}            <p id=\"sale\">{{sale}}</p>\n"), 1)
+            },
+            &[],
+        )
+    }
+
+    /// **A value kept past the instant it compared is read again**
+    /// (ADR-XXXX): the sale's entry is kept ten minutes, and a page served a
+    /// second after 21:00 is not served the value from 20:59:30. A second
+    /// session's page, served from the kept entry, is held to its instant
+    /// too.
+    #[test]
+    fn a_kept_value_past_its_instant_is_read_again() {
+        let s = on_sale_until_nine();
+        let now = s.now();
+        let day = now.div_euclid(86_400_000) + 1;
+        let nine = day * 86_400_000 + 21 * 3_600_000;
+        s.query_clock
+            .0
+            .advance(u64::try_from(nine - 30_000 - now).unwrap());
+        let home = |session: &str| {
+            let (html, _, _, _) = s
+                .serve_document_settled(session, "store.page.HomePage", &Params::new(), &[])
+                .expect("served");
+            visible(&html)
+        };
+        assert!(home("a").contains("On sale"));
+        // From the kept entry, and held to 21:00 as the first was.
+        assert!(home("b").contains("On sale"));
+        let b = latest(&s.pending.lock().expect("pending"), "b");
+        assert_eq!(s.timers.at(&b), Some(nine), "a kept value's instant");
+        s.query_clock.0.advance(31_000);
+        assert!(
+            home("c").contains("Sale over"),
+            "not the value from before 21:00"
+        );
+    }
+
+    /// **A page that compares no clock is held by nothing** (ADR-XXXX): the
+    /// store's own home page is read again only when something changes.
+    #[test]
+    fn a_page_that_compares_no_clock_holds_nothing() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let _ = s
+            .serve_document_settled("a", "store.page.HomePage", &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        assert_eq!(s.timers.at(&doc), None);
+    }
+
+    /// **The host's clock, as a test moves it** (ADR-XXXX): the system's,
+    /// moved forward by `advance` or to `at`, never back.
+    #[test]
+    fn the_hosts_clock_moves_forward_as_a_test_says() {
+        let s = rendering_server();
+        let now = s.now();
+        assert!((now - wall_millis()).abs() < 5_000, "the system's: {now}");
+        let moved = posted(&s, "/bench/clock?advance=60000", "clock", "c-1", "");
+        assert!(moved.starts_with("HTTP/1.1 200"), "{moved}");
+        assert!(s.now() >= now + 60_000);
+        let to = s.now() + 3_600_000;
+        let moved = posted(&s, &format!("/bench/clock?at={to}"), "clock", "c-2", "");
+        assert!(moved.starts_with("HTTP/1.1 200"), "{moved}");
+        assert!(s.now() >= to && s.now() < to + 5_000);
+        let back = posted(&s, &format!("/bench/clock?at={now}"), "clock", "c-3", "");
+        assert!(back.starts_with("HTTP/1.1 400"), "never back: {back}");
+        assert!(s.now() >= to, "and not moved");
     }
 
     /// **A forced reconnect** (charter §15.5, ADR-0175): the session's open
