@@ -29,13 +29,22 @@ Each mutant undoes one piece:
   address kept; a place the table does not hold saved; on PostgreSQL, a
   reader's addresses read whoever saved them, or store 48 delivering as far
   as store 47; and the store's reach not told when the reader's addresses
-  change.
+  change;
+- milestone 1's rest, the stale tab (Q3): the host reading no document a
+  command names; a page shown to another session, or one the host no
+  longer holds, answered; a request from no numbered page refused; the
+  predicate's words told for the platform's; and the runtime naming no
+  document.
 
-The tests then fail: the store's accounts tests (tests/store_accounts.rs),
-its addresses tests (tests/addresses.rs), the places' unit tests and the
-join's, in memory and with the store on PostgreSQL
-(PW_STORE_TEST_LAYER=postgres); identity's sign-in tests; and the
-compiler's boundary tests (boundary_matrix.rs, boundary.rs's own).
+Each mutant names its suite, and runs that suite's tests alone (W6's ruling
+of 2026-10-09, as `refusal_mutations.py` does): `server`, the store's
+accounts tests (tests/store_accounts.rs), its addresses tests
+(tests/addresses.rs), the places' unit tests and the join's, in memory and
+with the store on PostgreSQL (PW_STORE_TEST_LAYER=postgres), and identity's
+sign-in tests; `core`, the compiler's boundary and visibility tests
+(boundary_matrix.rs, boundary.rs's own, user_visibility.rs); `browser`, the
+stale tab in Chromium (e2e/store-accounts.spec.mjs), after the store's page
+and the servers are built.
 
 They need a database: `PW_STORE_DATABASE_URL`, a throwaway one, which each
 test uses in a schema of its own (and `PW_FEED_DATABASE_URL`, the feed's,
@@ -63,6 +72,7 @@ BOUNDARY = ROOT / "compiler/pw-core/src/boundary.rs"
 GRAMMAR = ROOT / "compiler/pw-syntax/src/grammar.rs"
 RESOLVE = ROOT / "compiler/pw-core/src/resolve.rs"
 LOWER = ROOT / "compiler/pw-core/src/lower.rs"
+RUNTIME = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
 PLACES = ROOT / "spikes/own-renderer/server/src/places.rs"
 ADDRESSES_SQL = ROOT / "spikes/own-renderer/server/migrations/store/0004_addresses.sql"
 APP = ROOT / "examples/store/app.pw"
@@ -71,6 +81,7 @@ APP = ROOT / "examples/store/app.pw"
 MUTANTS = [
     (
         "a user's cart is read and written by the session",
+        "server",
         STORE,
         "                    let (owner, rest) = if by_reader {\n"
         "                        reader_of(&op, args)?\n"
@@ -87,6 +98,7 @@ MUTANTS = [
     ),
     (
         "a user's order is read for another owner than the reader",
+        "server",
         STORE,
         "                let owner = if by_reader {\n"
         "                    reader_of(&op, args)?.0\n"
@@ -108,48 +120,56 @@ MUTANTS = [
     ),
     (
         "the store keys a session's cart by the session where the program reads it by the reader",
+        "server",
         SERVER,
         "            Some(true) => notifications::user_of(&self.identity.principals(), session),\n",
         "            Some(true) => session.to_string(),\n",
     ),
     (
         "a session's cart entry is keyed by the session",
+        "server",
         SERVER,
         "        \"store.page.Cart\",\n        &[owner],\n",
         "        \"store.page.Cart\",\n        &[session],\n",
     ),
     (
         "a guest's lines are joined without summing one item's quantities",
+        "server",
         STORE,
         "                held.quantity = held.quantity.checked_add(line.quantity).ok_or_else(|| {\n",
         "                held.quantity = held.quantity.checked_add(0).ok_or_else(|| {\n",
     ),
     (
         "the guest's cart is left as it was after joining",
+        "server",
         STORE,
         "            r.set_cart(user, &lines)?;\n            r.set_cart(guest, &[])?;\n",
         "            r.set_cart(user, &lines)?;\n",
     ),
     (
         "a sum past a bigint is wrapped rather than refused",
+        "server",
         STORE,
         "                held.quantity = held.quantity.checked_add(line.quantity).ok_or_else(|| {\n",
         "                held.quantity = Some(held.quantity.wrapping_add(line.quantity)).ok_or_else(|| {\n",
     ),
     (
         "a signed-in session that signs in again is joined to the next user",
+        "server",
         IDENTITY,
         "        let was_guest = self.principals.of(session).is_none_or(|p| p.is_guest());\n",
         "        let was_guest = true;\n",
     ),
     (
         "the deployment is not told of a guest's sign-in",
+        "server",
         IDENTITY,
         "        if was_guest && !session.is_empty() {\n            on_sign_in(",
         "        if was_guest && session.is_empty() {\n            on_sign_in(",
     ),
     (
         "on PostgreSQL, a cart is read whoever owns it",
+        "server",
         LAYER,
         "                \"SELECT item, name, quantity, price FROM cart_lines \\\n"
         "                 WHERE owner = $1 ORDER BY position\",\n",
@@ -158,12 +178,14 @@ MUTANTS = [
     ),
     (
         "in the compiler, `private` gives a record no scope",
+        "core",
         BOUNDARY,
         '                    Some("user") | Some("private") => Restriction::User("UserId".into()),\n',
         '                    Some("user") => Restriction::User("UserId".into()),\n',
     ),
     (
         "in the compiler, disagreeing producers keep the last one's scope",
+        "core",
         BOUNDARY,
         "                let held = f.scoped.entry(produced.semantic_key()).or_default();\n"
         "                *held = held.join(&Label::of(restriction));\n",
@@ -171,30 +193,35 @@ MUTANTS = [
     ),
     (
         "the key's user is not read, and every reader is told",
+        "server",
         SERVER,
         "                .filter(|_| entry_is_private(&policy));\n",
         "                .filter(|_| false);\n",
     ),
     (
         "the user's other session is not told",
+        "server",
         SERVER,
         "                        .is_none_or(|user| notifications::user_of(&principals, other) == user)\n",
         "                        .is_none_or(|_| false)\n",
     ),
     (
         "`user` is not a visibility",
+        "core",
         GRAMMAR,
         '        if !self.at_kw("user") {\n            return false;\n        }\n',
         '        if !self.at_kw("user") || true {\n            return false;\n        }\n',
     ),
     (
         "`user` is not lowered as the declaration's visibility",
+        "core",
         LOWER,
         '    matches!(first.as_str(), "public" | "session" | "private" | "user").then_some(first)\n',
         '    matches!(first.as_str(), "public" | "session" | "private").then_some(first)\n',
     ),
     (
         "`user` is not importable",
+        "core",
         RESOLVE,
         '                    if decl.is_some_and(|d| d.visibility.as_deref() == Some("private")) {\n',
         '                    if decl.is_some_and(|d| matches!(d.visibility.as_deref(), Some("private") | Some("user"))) {\n',
@@ -202,6 +229,7 @@ MUTANTS = [
     # Milestone 2: delivery addresses.
     (
         "a store's radius is read in kilometres where it is metres",
+        "server",
         PLACES,
         "    distance_km(zone.lat_e6, zone.lon_e6, place.lat_e6, place.lon_e6) * 1000.0\n"
         "        <= zone.radius_m as f64\n",
@@ -210,54 +238,63 @@ MUTANTS = [
     ),
     (
         "the estimate leaves out the courier's travel",
+        "server",
         STORE,
         "                    Some(Reach { minutes, .. }) => minutes,\n",
         "                    Some(Reach { .. }) => 0,\n",
     ),
     (
         "the estimate answers for a store out of reach",
+        "server",
         STORE,
         "                    }) => return Ok(declared(\"no-coverage\")),\n",
         "                    }) => 0,\n",
     ),
     (
         "an Add to a store out of reach is let through",
+        "server",
         STORE,
         "                    coverage(r, store, reader)?.is_none_or(|c| c.delivers),\n",
         "                    coverage(r, store, reader)?.is_none_or(|_| true),\n",
     ),
     (
         "an order a store out of reach is in is placed",
+        "server",
         STORE,
         "                    if by_reader && !cart_reaches(r, &lines, owner)? {\n",
         "                    if by_reader && !cart_reaches(r, &lines, owner)? && false {\n",
     ),
     (
         "a saved address is not chosen",
+        "server",
         STORE,
         "            place: place.clone(),\n            chosen: true,\n",
         "            place: place.clone(),\n            chosen: false,\n",
     ),
     (
         "choosing an address leaves the last one chosen",
+        "server",
         STORE,
         "            a.chosen = a.id == *id;\n",
         "            a.chosen |= a.id == *id;\n",
     ),
     (
         "an eleventh address is kept",
+        "server",
         STORE,
         "        if rows.len() >= MOST_ADDRESSES {\n",
         "        if rows.len() > MOST_ADDRESSES {\n",
     ),
     (
         "a place the table does not hold is saved",
+        "server",
         STORE,
         "        if crate::places::place(place).is_none() {\n            return Ok(Err(\"unknown-place\"));\n",
         "        if crate::places::place(place).is_none() && false {\n            return Ok(Err(\"unknown-place\"));\n",
     ),
     (
         "on PostgreSQL, a reader's addresses are read whoever saved them",
+        "server",
         LAYER,
         "                \"SELECT id, label, place, chosen FROM addresses \\\n"
         "                 WHERE owner = $1 ORDER BY position\",\n",
@@ -266,12 +303,14 @@ MUTANTS = [
     ),
     (
         "on PostgreSQL, store 48 delivers as far as store 47",
+        "server",
         ADDRESSES_SQL,
         "radius_m = 2000 WHERE id = '48';\n",
         "radius_m = 4000 WHERE id = '48';\n",
     ),
     (
         "the store's reach is not told when the reader's addresses change",
+        "server",
         APP,
         "    key            id, reader\n"
         "    invalidates_on AddressesChanged(reader)\n"
@@ -286,6 +325,50 @@ MUTANTS = [
         "    timeout        2.seconds\n"
         "{\n"
         "    Addresses.coverage(id, reader)\n",
+    ),
+    # Milestone 1's rest, the stale tab (Q3): a command is answered for the
+    # reader its page was shown to.
+    (
+        "the host reads no document a command names",
+        "server",
+        SERVER,
+        '                    .eq_ignore_ascii_case("pw-document")\n',
+        '                    .eq_ignore_ascii_case("pw-documents")\n',
+    ),
+    (
+        "a page shown to another session is answered as the reader's",
+        "server",
+        SERVER,
+        "            Some((shown_to, _)) if shown_to == session => None,\n",
+        "            Some((shown_to, _)) if shown_to == session || !session.is_empty() => None,\n",
+    ),
+    (
+        "a page the host no longer holds is answered",
+        "server",
+        SERVER,
+        "            None => Some(PAGE_NOT_HELD),\n",
+        "            None => None,\n",
+    ),
+    (
+        "a request from a page the host did not number is refused",
+        "server",
+        SERVER,
+        "        if document == 0 {\n            return None;\n        }\n",
+        "",
+    ),
+    (
+        "the reader is told the predicate's words, not the platform's",
+        "server",
+        SERVER,
+        '    "You signed in or out in another tab. Reload this page to go on.",\n',
+        '    "Sign in to do this.",\n',
+    ),
+    (
+        "the runtime names no document",
+        "browser",
+        RUNTIME,
+        '          ...(documentCursor > 0 ? { "pw-document": String(documentCursor) } : {}),\n',
+        "",
     ),
 ]
 
@@ -304,38 +387,57 @@ STORE_TESTS = [
 
 CARGO = ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--"]
 
-# (what runs, the environment it adds)
-TESTS = [
-    (CARGO + STORE_TESTS + ["tests::sign_in::"], {"PW_STORE_TEST_LAYER": "memory"}),
-    (CARGO + STORE_TESTS, {"PW_STORE_TEST_LAYER": "postgres"}),
-    (
-        ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "boundary_matrix"],
-        {},
-    ),
-    (["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--lib", "boundary"], {}),
-    (
-        ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "user_visibility"],
-        {},
-    ),
-]
+# Each suite's commands: (what runs, the environment it adds). A mutant runs
+# its own suite's (W6's ruling of 2026-10-09, as `refusal_mutations.py`
+# does: a mutant is given the tests that can see its rule). Until
+# 2026-10-10 every mutant ran every command, and the recipe took 1 h 51 min
+# of CI.
+SUITES = {
+    "server": [
+        (CARGO + STORE_TESTS + ["tests::sign_in::"], {"PW_STORE_TEST_LAYER": "memory"}),
+        (CARGO + STORE_TESTS, {"PW_STORE_TEST_LAYER": "postgres"}),
+    ],
+    "core": [
+        (
+            ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "boundary_matrix"],
+            {},
+        ),
+        (["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--lib", "boundary"], {}),
+        (
+            ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "user_visibility"],
+            {},
+        ),
+    ],
+}
+
+# The browser's: the stale tab in Chromium, after the store's page and the
+# server are built from the source as it is.
+SPEC = ["e2e/store-accounts.spec.mjs", "-g", "signed in or out", "--project=chromium"]
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
 BOUND = 1200
 
 
-def run_tests():
-    """(built, passed, failed) over every test command."""
+def bounded(cmd, **kw):
+    """(output, returncode), or (output, None) when it ran past the bound."""
+    p = subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, text=True, **kw)
+    try:
+        out, _ = p.communicate(timeout=BOUND)
+        return out, p.returncode
+    except subprocess.TimeoutExpired:
+        os.killpg(p.pid, signal.SIGKILL)
+        out, _ = p.communicate()
+        return out, None
+
+
+def cargo_tests(suite):
+    """(built, passed, failed) over the suite's commands."""
     built, passed, failed = True, 0, 0
-    for cmd, extra in TESTS:
-        env = dict(os.environ, **extra)
-        p = subprocess.Popen(cmd, cwd=ROOT, env=env, start_new_session=True,
-                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        try:
-            out, _ = p.communicate(timeout=BOUND)
-        except subprocess.TimeoutExpired:
-            os.killpg(p.pid, signal.SIGKILL)
-            p.communicate()
+    for cmd, extra in SUITES[suite]:
+        out, code = bounded(cmd, cwd=ROOT, env=dict(os.environ, **extra))
+        if code is None:
             failed += 1
             continue
         found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
@@ -348,6 +450,42 @@ def run_tests():
     return built, passed, failed
 
 
+def browser_tests(_suite="browser"):
+    """(built, passed, failed), after a build of the store's page, which
+    serves the runtime it was built with, and of the servers the suite
+    starts, which the script does not build."""
+    built = subprocess.run(
+        ["bash", "spikes/own-renderer/run.sh"],
+        cwd=ROOT,
+        env={**os.environ, "BUILD_ONLY": "1"},
+        capture_output=True,
+        text=True,
+    )
+    if built.returncode != 0:
+        return False, 0, 0
+    servers = subprocess.run(
+        ["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server", "-p", "kiokun-server"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if servers.returncode != 0:
+        return False, 0, 0
+    out, code = bounded(
+        ["pnpm", "exec", "playwright", "test", *SPEC, "--reporter=line"],
+        cwd=ROOT / "spikes/own-renderer",
+    )
+    if code is None:
+        return True, 0, 1
+    out = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", out)
+    passed = sum(int(n) for n in re.findall(r"(\d+) passed", out))
+    failed = sum(int(n) for n in re.findall(r"(\d+) failed", out))
+    return passed + failed > 0, passed, failed
+
+
+RUN = {"server": cargo_tests, "core": cargo_tests, "browser": browser_tests}
+
+
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
     # Stopped from outside, the source is still restored: SIGTERM raises
@@ -357,15 +495,16 @@ def main():
         print("FAIL: PW_STORE_DATABASE_URL is not set; without a database the PostgreSQL")
         print("runs read the in-memory layer, and no PostgreSQL mutant can mean anything")
         return 2
-    built, passed, failed = run_tests()
-    print(f"baseline: {passed} passed, {failed} failed", flush=True)
-    if not built or failed or not passed:
-        print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
-        mutation_baseline.explain()
-        return 1
+    for suite, run in RUN.items():
+        built, passed, failed = run(suite)
+        print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
+        if not built or failed or not passed:
+            print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+            mutation_baseline.explain()
+            return 1
 
     survivors = 0
-    for what, path, anchor, replacement in MUTANTS:
+    for what, suite, path, anchor, replacement in MUTANTS:
         original = path.read_text()
         if original.count(anchor) != 1:
             print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}", flush=True)
@@ -373,7 +512,7 @@ def main():
             continue
         try:
             path.write_text(original.replace(anchor, replacement, 1))
-            built, passed, failed = run_tests()
+            built, passed, failed = RUN[suite](suite)
         finally:
             path.write_text(original)
         if not built:
@@ -383,7 +522,9 @@ def main():
         else:
             verdict = "SURVIVED"
             survivors += 1
-        print(f"{what}: {verdict}", flush=True)
+        print(f"{what} [{suite}]: {verdict}", flush=True)
+    # The page and the servers are built again from the restored source.
+    browser_tests()
 
     print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
     return 1 if survivors else 0

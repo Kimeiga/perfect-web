@@ -12,7 +12,8 @@
 # and store.rs's joins), in memory and with the store on PostgreSQL; identity's
 # sign-in, which tells the store of a guest signed in; telling by principal,
 # which the feed's notifications share; milestone 2's delivery addresses
-# (tests/addresses.rs, places.rs's own); and the mutation controls
+# (tests/addresses.rs, places.rs's own); the stale tab (Q3) and milestone 3
+# in three engines (e2e/store-accounts.spec.mjs); and the mutation controls
 # (scripts/store_accounts_mutations.py). It needs a throwaway
 # PostgreSQL database, PW_STORE_DATABASE_URL (or PW_FEED_DATABASE_URL), each
 # test in a schema of its own, as e14-store-postgres does.
@@ -25,7 +26,7 @@ e14-store-accounts:
      export PW_STORE_DATABASE_URL="$url"; \
      export PW_FEED_DATABASE_URL="${PW_FEED_DATABASE_URL:-$url}"; \
      mkdir -p docs/evidence/E14; \
-     { echo "Track store-accounts - a cart and an order a user's (milestone 1), delivery addresses (milestone 2)"; echo; \
+     { echo "Track store-accounts - a cart and an order a user's (milestone 1), delivery addresses (milestone 2), the owner's bug as acceptance (milestone 3)"; echo; \
        echo "produced by: just e14-store-accounts"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; \
@@ -40,7 +41,13 @@ e14-store-accounts:
        PW_STORE_TEST_LAYER=memory cargo test --locked -p pw-dev-server -- tests::store_accounts:: store::joins:: tests::sign_in:: tests::notifications:: a_sessions_own_change_reaches_no_other_session tests::addresses:: places:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the server, the store on PostgreSQL (PW_STORE_TEST_LAYER=postgres)"; echo; \
        PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- tests::store_accounts:: store::joins:: tests::addresses:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the store's customer side in three engines (e2e/store-accounts.spec.mjs)"; echo; \
+       BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null 2>&1; \
+       cargo build --quiet --locked -p pw-dev-server -p kiokun-server; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/store-accounts.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
        echo; echo "== mutation controls (scripts/store_accounts_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/store_accounts_mutations.py; \
      } > docs/evidence/E14/store-accounts.txt; \
-     grep -E "^test result|mutants killed|^---- |panicked at|memory bound" docs/evidence/E14/store-accounts.txt
+     grep -E "^test result|mutants killed|^---- |panicked at|memory bound|^ +[0-9]+ (passed|failed)" docs/evidence/E14/store-accounts.txt
