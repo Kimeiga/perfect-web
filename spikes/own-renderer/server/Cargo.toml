@@ -25,6 +25,8 @@ pw-materialize = { path = "../../../runtime/pw-materialize" }
 pw-protocol = { path = "../../../runtime/pw-protocol" }
 pw-render = { path = "../../../runtime/pw-render" }
 pw-resource = { path = "../../../runtime/pw-resource" }
+# ADR-XXXX: the host's tz database, read for the platform's clock.
+pw-time = { path = "../../../runtime/pw-time" }
 # The feed's data in PostgreSQL, where the deployment names one
 # (`PW_FEED_DATABASE_URL`); the in-memory layer otherwise.
 postgres.workspace = true

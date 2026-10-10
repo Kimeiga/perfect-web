@@ -1157,6 +1157,17 @@ pub fn forbidden_in(
         });
     }
 
+    // ADR-XXXX: a value that compares the wall clock holds until the
+    // earliest instant it compared, and is read again, and told, then: one
+    // entry may serve every reader. A file generated once is told nothing.
+    if reuse == Reuse::Build && effect.starts_with("clock.compare") {
+        return Some(
+            "static generation cannot compare the clock: the output is generated once \
+             and shipped as a file, and nothing tells a file when the instant it \
+             compared passes",
+        );
+    }
+
     // A painter is identified by what it declares, not by a declaration kind:
     // `paint.custom` in the row *is* the statement "this runs inside the paint
     // pipeline". Charter §7.5A gives it inputs precisely so it can be replayed
@@ -1561,5 +1572,15 @@ mod tests {
             forbidden_in(&page, Reuse::Build, None, "clock.read").is_none(),
             "a duration measurement does not make a build artifact irreproducible"
         );
+
+        // A clock compared (ADR-XXXX) is true until a known instant, the
+        // same for every reader: one entry may serve them all. A file
+        // generated once is told nothing when that instant passes.
+        assert!(forbidden_in(&page, Reuse::PerReader, None, "clock.compare").is_none());
+        assert!(
+            forbidden_in(&page, Reuse::SharedPartition, None, "clock.compare").is_none(),
+            "an entry held until the instant it compared may serve every reader"
+        );
+        assert!(forbidden_in(&page, Reuse::Build, None, "clock.compare").is_some());
     }
 }
