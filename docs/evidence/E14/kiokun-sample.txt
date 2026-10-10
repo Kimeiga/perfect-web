@@ -1,35 +1,37 @@
 A sample of the whole dictionary, served by the development server and timed
 
 produced by: just e14-kiokun-sample (local: reads a kiokun-data checkout)
-commit: c2fd245ed07ce4684aaf98b8e7d487795a027f12
+commit: 9efb7c01212e8c23fc0650e022c837361738e183
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
-host: Darwin arm64, 12 cores, load averages: 16.55 38.58 53.03
+host: Darwin arm64, 12 cores, load averages: 4.33 7.10 14.02
 KIOKUN_APP: /Users/haki/code/kiokun-data/sveltekit-app
 
 == this branch's word page
 
-server built in 1.7 s (the program compiled and loaded); the Word component 177871 bytes; KIOKUN_APP set
+server built in 1.5 s (the program compiled and loaded); the Word component 236566 bytes; KIOKUN_APP set
 files: 1485890; sampled: 5938 (every 256th)
 status: HTTP/1.1 200 OK: 5938
-per request, ms: mean 3.1, p50 2.3, p90 5.6, p99 13.8, max 311.1
-slowest: さえこ: 311.1 ms
-slowest: よしやす: 83.2 ms
-slowest: かつお: 62.4 ms
-slowest: たけとし: 45.5 ms
-slowest: 实: 43.0 ms
+per request, ms: mean 1.3, p50 1.1, p90 2.1, p99 3.7, max 11.6
+slowest: 实: 11.6 ms
+slowest: 意う: 9.7 ms
+slowest: 본국: 9.3 ms
+slowest: 君: 9.2 ms
+slowest: 匣: 9.1 ms
 defects: 0
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 322 filtered out; finished in 28.55s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 364 filtered out; finished in 16.93s
+after it: load averages: 4.69 7.04 13.88
 
 == the word page's first milestone (ADR-0286), the same sample
 
-server built in 0.4 s (the program compiled and loaded); the Word component 45906 bytes; KIOKUN_APP set
+server built in 0.3 s (the program compiled and loaded); the Word component 45906 bytes; KIOKUN_APP set
 files: 1485890; sampled: 5938 (every 256th)
 status: HTTP/1.1 200 OK: 5938
-per request, ms: mean 2.7, p50 1.9, p90 4.6, p99 12.6, max 279.9
-slowest: さえこ: 279.9 ms
-slowest: よしやす: 85.1 ms
-slowest: かつお: 59.4 ms
-slowest: さとか: 47.6 ms
-slowest: 实: 37.2 ms
+per request, ms: mean 1.0, p50 0.7, p90 2.0, p99 3.5, max 11.4
+slowest: 意う: 11.4 ms
+slowest: 君: 9.8 ms
+slowest: 馬鹿: 9.6 ms
+slowest: 殊荣: 9.5 ms
+slowest: 匣: 9.5 ms
 defects: 0
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 322 filtered out; finished in 24.91s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 364 filtered out; finished in 12.54s
+after it: load averages: 4.31 6.84 13.69
