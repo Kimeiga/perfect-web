@@ -185,34 +185,27 @@ fn a_handlers_call_through_a_local_is_no_commands_request() {
     assert!(browser(&found), "{found:#?}");
 }
 
-/// A shared query whose body calls `current_session`: the platform's, a
-/// session's handle, or a local of that name.
-fn shared_session(local: bool) -> String {
-    let (ty, body) = if local {
-        (
-            "Int",
-            "    let current_session = fn() 1\n    current_session()\n",
-        )
-    } else {
-        ("Session<SessionId>", "    current_session()\n")
-    };
+/// A shared query whose body calls `mine`: the module's `private fn mine`,
+/// a value only its reader may see, or a local of that name.
+fn shared_private(local: bool) -> String {
+    let own = if local { "    let mine = fn() 2\n" } else { "" };
     format!(
-        "module t\n\nimport context.{{ current_session }}\nimport capability.{{ Session, SessionId }}\n\n\
-         public query Shown() -> {ty}\n    freshness   0.seconds\n    \
-         consistency snapshot\n    cache       shared\n{{\n{body}}}\n"
+        "module t\n\nprivate fn mine() -> Int {{\n    1\n}}\n\n\
+         public query Shown() -> Int\n    freshness   0.seconds\n    \
+         consistency snapshot\n    cache       shared\n{{\n{own}    mine()\n}}\n"
     )
 }
 
 #[test]
 fn a_call_through_a_local_is_labelled_as_the_local() {
-    // A declaration's label joins what its body's calls are labelled: a
-    // local `current_session` is not the platform's session handle.
-    let session = |found: &[String]| found.iter().any(|d| d.contains("Session<SessionId>"));
-    let found = reported(&[("t.pw", &shared_session(true))]);
-    assert!(!session(&found), "{found:#?}");
-    // The control: the platform's, called, is the session's.
-    let found = reported(&[("t.pw", &shared_session(false))]);
-    assert!(session(&found), "{found:#?}");
+    // A declaration's label joins the labels its body's calls declare: a
+    // local `mine` is not the module's `private fn mine`.
+    let private = |found: &[String]| found.iter().any(|d| d.starts_with("PW5001"));
+    let found = reported(&[("t.pw", &shared_private(true))]);
+    assert!(!private(&found), "{found:#?}");
+    // The control: the module's, called, makes the value its reader's.
+    let found = reported(&[("t.pw", &shared_private(false))]);
+    assert!(private(&found), "{found:#?}");
 }
 
 /// Each diagnostic's explanation, in the test's own files.
