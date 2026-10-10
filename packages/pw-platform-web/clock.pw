@@ -116,4 +116,3 @@ fn time(hour: Int, minute: Int) -> Option<LocalTime> !{} {
 fn next_day(date: LocalDate) -> LocalDate !{} {
     LocalDate(date.value + 1)
 }
-
