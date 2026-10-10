@@ -173,6 +173,7 @@ impl Timers {
     }
 
     /// The instant `doc` is to be read again at, where one is set.
+    #[cfg(test)]
     pub fn at(&self, doc: &Doc) -> Option<i64> {
         self.due.lock().expect("timers").at.get(doc).copied()
     }
