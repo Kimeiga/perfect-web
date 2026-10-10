@@ -103,6 +103,14 @@ told), ADR-0122 (speculation), and the refusal ruling's announcer. Date:
    the button had been, focused it, and clicked nothing (Firefox, under
    load): the order's answer, held by the test until that press, never came.
    The presses are made from the keyboard now. Found running the suite whole.
+4. **And then a press made was run out of its turn.** From the keyboard,
+   "its answer first" timed out once more, in Chromium, in this ADR's first
+   evidence run: the clear's request reached the server before the order's,
+   the cart was emptied first, and the order was refused as nothing to
+   order. Not this ADR's, nor the test's: two presses' commands committed
+   in the order the network brought them. Ruled by the command order's ADR
+   (a page's commands run in the order it sent them), merged here before
+   this ADR's evidence was recorded again.
 
 ## Alternatives
 
