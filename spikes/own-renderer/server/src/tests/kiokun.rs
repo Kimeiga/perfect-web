@@ -1191,9 +1191,11 @@ fn appears_in_column(html: &str, id: &str) -> Vec<String> {
         .into_iter()
         .map(|card| {
             let word_at = card.find("class=\"word-text\"").expect("the word");
+            // The word's span ends before its reading, or with its header
+            // where it has none: never past it, into a disclosure's count.
             let word_end = card[word_at..]
                 .find("class=\"pronunciation\"")
-                .or_else(|| card[word_at..].find("class=\"definition-row\""))
+                .or_else(|| card[word_at..].find("</div>"))
                 .map_or(card.len(), |e| word_at + e);
             let word = unescaped(&visible(&format!("<{}", &card[word_at..word_end])));
             format!(
