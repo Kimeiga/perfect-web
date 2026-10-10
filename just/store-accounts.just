@@ -11,8 +11,9 @@
 # own); the corpus (R-063, A-033, R-064); the server's (tests/store_accounts.rs
 # and store.rs's joins), in memory and with the store on PostgreSQL; identity's
 # sign-in, which tells the store of a guest signed in; telling by principal,
-# which the feed's notifications share; and the mutation
-# controls (scripts/store_accounts_mutations.py). It needs a throwaway
+# which the feed's notifications share; milestone 2's delivery addresses
+# (tests/addresses.rs, places.rs's own); and the mutation controls
+# (scripts/store_accounts_mutations.py). It needs a throwaway
 # PostgreSQL database, PW_STORE_DATABASE_URL (or PW_FEED_DATABASE_URL), each
 # test in a schema of its own, as e14-store-postgres does.
 e14-store-accounts:
@@ -24,7 +25,7 @@ e14-store-accounts:
      export PW_STORE_DATABASE_URL="$url"; \
      export PW_FEED_DATABASE_URL="${PW_FEED_DATABASE_URL:-$url}"; \
      mkdir -p docs/evidence/E14; \
-     { echo "Track store-accounts - a cart and an order a user's (milestone 1)"; echo; \
+     { echo "Track store-accounts - a cart and an order a user's (milestone 1), delivery addresses (milestone 2)"; echo; \
        echo "produced by: just e14-store-accounts"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; \
@@ -35,10 +36,10 @@ e14-store-accounts:
        cargo test --locked -p pw-core --lib boundary 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the corpus (corpus-check; R-063, A-033, R-064)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
-       echo; echo "== the server, the store in memory (tests/store_accounts.rs, store.rs's joins, tests/sign_in.rs)"; echo; \
-       PW_STORE_TEST_LAYER=memory cargo test --locked -p pw-dev-server -- tests::store_accounts:: store::joins:: tests::sign_in:: tests::notifications:: a_sessions_own_change_reaches_no_other_session 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the server, the store in memory (tests/store_accounts.rs, store.rs's joins, tests/sign_in.rs, tests/addresses.rs, places.rs)"; echo; \
+       PW_STORE_TEST_LAYER=memory cargo test --locked -p pw-dev-server -- tests::store_accounts:: store::joins:: tests::sign_in:: tests::notifications:: a_sessions_own_change_reaches_no_other_session tests::addresses:: places:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the server, the store on PostgreSQL (PW_STORE_TEST_LAYER=postgres)"; echo; \
-       PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- tests::store_accounts:: store::joins:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- tests::store_accounts:: store::joins:: tests::addresses:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== mutation controls (scripts/store_accounts_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/store_accounts_mutations.py; \
      } > docs/evidence/E14/store-accounts.txt; \

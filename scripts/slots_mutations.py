@@ -55,8 +55,12 @@ MUTANTS = [
         "the page waits for the estimate",
         "server",
         STORE,
-        "    on_key_change cancel\n    delivery      streamed\n    timeout       3.seconds\n",
-        "    on_key_change cancel\n    timeout       3.seconds\n",
+        # Re-anchored by track store-accounts: the estimate is the reader's,
+        # its clauses aligned to `invalidates_on`.
+        "    invalidates_on AddressesChanged(reader)\n    concurrency    one_per_key\n"
+        "    on_key_change  cancel\n    delivery       streamed\n    timeout        3.seconds\n",
+        "    invalidates_on AddressesChanged(reader)\n    concurrency    one_per_key\n"
+        "    on_key_change  cancel\n    timeout        3.seconds\n",
     ),
     (
         "an event never reaches a stream's kept answer",

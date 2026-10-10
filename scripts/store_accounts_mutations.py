@@ -21,10 +21,19 @@ Each mutant undoes one piece:
 - `user` not a visibility (the parse refuses `user query`), not lowered as
   the declaration's visibility, and not importable;
 - telling by principal undone: the key's user not read, so every reader of
-  the query is told, or the user's other sessions not told.
+  the query is told, or the user's other sessions not told;
+- milestone 2, delivery addresses: a store's radius read in kilometres; the
+  estimate without the courier's travel, or answering a store out of
+  reach; an Add or an order to a store out of reach let through; a saved
+  address not chosen, or a choice leaving the last one chosen; an eleventh
+  address kept; a place the table does not hold saved; on PostgreSQL, a
+  reader's addresses read whoever saved them, or store 48 delivering as far
+  as store 47; and the store's reach not told when the reader's addresses
+  change.
 
-The tests then fail: the store's accounts tests (tests/store_accounts.rs)
-and the join's unit tests, in memory and with the store on PostgreSQL
+The tests then fail: the store's accounts tests (tests/store_accounts.rs),
+its addresses tests (tests/addresses.rs), the places' unit tests and the
+join's, in memory and with the store on PostgreSQL
 (PW_STORE_TEST_LAYER=postgres); identity's sign-in tests; and the
 compiler's boundary tests (boundary_matrix.rs, boundary.rs's own).
 
@@ -54,6 +63,9 @@ BOUNDARY = ROOT / "compiler/pw-core/src/boundary.rs"
 GRAMMAR = ROOT / "compiler/pw-syntax/src/grammar.rs"
 RESOLVE = ROOT / "compiler/pw-core/src/resolve.rs"
 LOWER = ROOT / "compiler/pw-core/src/lower.rs"
+PLACES = ROOT / "spikes/own-renderer/server/src/places.rs"
+ADDRESSES_SQL = ROOT / "spikes/own-renderer/server/migrations/store/0004_addresses.sql"
+APP = ROOT / "examples/store/app.pw"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
@@ -187,12 +199,103 @@ MUTANTS = [
         '                    if decl.is_some_and(|d| d.visibility.as_deref() == Some("private")) {\n',
         '                    if decl.is_some_and(|d| matches!(d.visibility.as_deref(), Some("private") | Some("user"))) {\n',
     ),
+    # Milestone 2: delivery addresses.
+    (
+        "a store's radius is read in kilometres where it is metres",
+        PLACES,
+        "    distance_km(zone.lat_e6, zone.lon_e6, place.lat_e6, place.lon_e6) * 1000.0\n"
+        "        <= zone.radius_m as f64\n",
+        "    distance_km(zone.lat_e6, zone.lon_e6, place.lat_e6, place.lon_e6)\n"
+        "        <= zone.radius_m as f64\n",
+    ),
+    (
+        "the estimate leaves out the courier's travel",
+        STORE,
+        "                    Some(Reach { minutes, .. }) => minutes,\n",
+        "                    Some(Reach { .. }) => 0,\n",
+    ),
+    (
+        "the estimate answers for a store out of reach",
+        STORE,
+        "                    }) => return Ok(declared(\"no-coverage\")),\n",
+        "                    }) => 0,\n",
+    ),
+    (
+        "an Add to a store out of reach is let through",
+        STORE,
+        "                    coverage(r, store, reader)?.is_none_or(|c| c.delivers),\n",
+        "                    coverage(r, store, reader)?.is_none_or(|_| true),\n",
+    ),
+    (
+        "an order a store out of reach is in is placed",
+        STORE,
+        "                    if by_reader && !cart_reaches(r, &lines, owner)? {\n",
+        "                    if by_reader && !cart_reaches(r, &lines, owner)? && false {\n",
+    ),
+    (
+        "a saved address is not chosen",
+        STORE,
+        "            place: place.clone(),\n            chosen: true,\n",
+        "            place: place.clone(),\n            chosen: false,\n",
+    ),
+    (
+        "choosing an address leaves the last one chosen",
+        STORE,
+        "            a.chosen = a.id == *id;\n",
+        "            a.chosen |= a.id == *id;\n",
+    ),
+    (
+        "an eleventh address is kept",
+        STORE,
+        "        if rows.len() >= MOST_ADDRESSES {\n",
+        "        if rows.len() > MOST_ADDRESSES {\n",
+    ),
+    (
+        "a place the table does not hold is saved",
+        STORE,
+        "        if crate::places::place(place).is_none() {\n            return Ok(Err(\"unknown-place\"));\n",
+        "        if crate::places::place(place).is_none() && false {\n            return Ok(Err(\"unknown-place\"));\n",
+    ),
+    (
+        "on PostgreSQL, a reader's addresses are read whoever saved them",
+        LAYER,
+        "                \"SELECT id, label, place, chosen FROM addresses \\\n"
+        "                 WHERE owner = $1 ORDER BY position\",\n",
+        "                \"SELECT id, label, place, chosen FROM addresses \\\n"
+        "                 WHERE owner = $1 OR true ORDER BY position\",\n",
+    ),
+    (
+        "on PostgreSQL, store 48 delivers as far as store 47",
+        ADDRESSES_SQL,
+        "radius_m = 2000 WHERE id = '48';\n",
+        "radius_m = 4000 WHERE id = '48';\n",
+    ),
+    (
+        "the store's reach is not told when the reader's addresses change",
+        APP,
+        "    key            id, reader\n"
+        "    invalidates_on AddressesChanged(reader)\n"
+        "    concurrency    one_per_key\n"
+        "    on_key_change  cancel\n"
+        "    timeout        2.seconds\n"
+        "{\n"
+        "    Addresses.coverage(id, reader)\n",
+        "    key            id, reader\n"
+        "    concurrency    one_per_key\n"
+        "    on_key_change  cancel\n"
+        "    timeout        2.seconds\n"
+        "{\n"
+        "    Addresses.coverage(id, reader)\n",
+    ),
 ]
 
 # The store's accounts tests, and the join's own, which run on either layer.
 STORE_TESTS = [
     "tests::store_accounts::",
     "store::joins::",
+    # Milestone 2: a reader's addresses, and the places' rule.
+    "tests::addresses::",
+    "places::",
     # Telling by principal reaches the feed's notifications too.
     "tests::notifications::reading_them_tells_no_other_users_page",
     "tests::notifications::on_postgres_reading_them_tells_no_other_users_page",

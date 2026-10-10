@@ -44,9 +44,11 @@ MUTANTS = [
         "server",
         STORE_DATA,
         # Re-anchored by track store-pg: the store's operations, built once
-        # over either layer's rows.
+        # over either layer's rows; and by track store-accounts, the store's
+        # page reading the estimate to the reader's chosen address.
+        '                    ("max-minutes".into(), Val::S64(max + travel)),\n'
         '                    ("generated-at".into(), Val::S64(wall_millis())),\n',
-        "",
+        '                    ("max-minutes".into(), Val::S64(max + travel)),\n',
     ),
     (
         "the benchmark's own `minutes` is no longer answered",
