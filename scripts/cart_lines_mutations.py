@@ -49,7 +49,9 @@ SPECULATION = ROOT / "compiler/pw-core/src/backend/speculation.rs"
 LOWER = ROOT / "compiler/pw-core/src/backend/lower.rs"
 INFER = ROOT / "compiler/pw-core/src/infer.rs"
 DOMAIN = ROOT / "examples/domain.pw"
-CARTS = ROOT / "examples/lib/Carts.pw"
+# The store's cart is a user's since track store-accounts: its transitions
+# and its subtotal are UserCarts'.
+USER_CARTS = ROOT / "examples/lib/UserCarts.pw"
 RENDER = ROOT / "runtime/pw-render/src/lib.rs"
 RENDER_WASM = ROOT / "runtime/pw-render-wasm/src/lib.rs"
 HOST = ROOT / "runtime/pw-host/src/lib.rs"
@@ -146,7 +148,9 @@ MUTANTS = [
     (
         "a new line is named by its item's description",
         "conformance",
-        CARTS,
+        USER_CARTS,
+        # Re-anchored by track store-accounts: the store's cart is a user's,
+        # its transitions UserCarts'.
         "[CartLine { item_id: item.id, name: item.name, quantity: quantity, unit_price: item.price }]",
         "[CartLine { item_id: item.id, name: item.description, quantity: quantity, unit_price: item.price }]",
     ),
@@ -160,28 +164,36 @@ MUTANTS = [
     (
         "the cart's subtotal is its last line's",
         "conformance",
-        DOMAIN,
+        USER_CARTS,
+        # Re-anchored by track store-accounts: the store's cart is a user's,
+        # its transitions UserCarts'.
         "fn(n, line) n + total(line).minor_units",
         "fn(n, line) total(line).minor_units",
     ),
     (
         "one fewer keeps a line at one",
         "conformance",
-        CARTS,
+        USER_CARTS,
+        # Re-anchored by track store-accounts: the store's cart is a user's,
+        # its transitions UserCarts'.
         "fn(line) !(same_item(line.item_id, item) & line.quantity.count == 1))",
         "fn(line) true)",
     ),
     (
         "one more adds two",
         "conformance",
-        CARTS,
-        "fn(line) grown(line, item, PositiveInt(1))",
-        "fn(line) grown(line, item, PositiveInt(2))",
+        USER_CARTS,
+        # Re-anchored by track store-accounts: the store's cart is a user's,
+        # its transitions UserCarts'.
+        "fn(line) Carts.grown(line, item, PositiveInt(1))",
+        "fn(line) Carts.grown(line, item, PositiveInt(2))",
     ),
     (
         "a line's removal removes nothing",
         "conformance",
-        CARTS,
+        USER_CARTS,
+        # Re-anchored by track store-accounts: the store's cart is a user's,
+        # its transitions UserCarts'.
         "fn(line) !same_item(line.item_id, item))",
         "fn(line) true)",
     ),

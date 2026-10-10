@@ -20,7 +20,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 LOWER = ROOT / "compiler/pw-core/src/backend/lower.rs"
 SPECULATION = ROOT / "compiler/pw-core/src/backend/speculation.rs"
 JS_PURE = ROOT / "compiler/pw-core/src/backend/js_pure.rs"
-CARTS = ROOT / "examples/lib/Carts.pw"
+# The store's cart is a user's since track store-accounts: its transitions
+# are UserCarts'.
+USER_CARTS = ROOT / "examples/lib/UserCarts.pw"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 
 # (what is undone, file, anchor, replacement)
@@ -46,8 +48,10 @@ MUTANTS = [
     ),
     (
         "the transition drops a new item",
-        CARTS,
+        USER_CARTS,
         # Re-anchored by ADR-0172: a new line takes the item's name and price.
+        # And by track store-accounts: the store's cart is a user's, its
+        # transitions UserCarts'.
         "            lines: List.concat(cart.lines, [CartLine { item_id: item.id, name: item.name, quantity: quantity, unit_price: item.price }]),\n",
         "            lines: cart.lines,\n",
     ),

@@ -35,9 +35,11 @@ MUTANTS = [
         "server",
         STORE_DATA,
         # Re-anchored by track store-pg: the store's operations, built once
-        # over either layer's rows.
-        '                    ("max-minutes".into(), Val::S64(max.unwrap_or(minutes + 10))),\n',
-        '                    ("max-minutes".into(), Val::S64(max.unwrap_or(minutes))),\n',
+        # over either layer's rows; and by track store-accounts, the store's
+        # page reading the estimate to the reader's chosen address, whose
+        # range this is.
+        '                let max = max.unwrap_or(minutes + 10);\n',
+        '                let max = max.unwrap_or(minutes);\n',
     ),
     (
         "no `generated_at` is answered",
