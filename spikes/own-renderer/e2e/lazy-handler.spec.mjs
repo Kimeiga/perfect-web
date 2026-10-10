@@ -200,7 +200,7 @@ test("a handler this build did not compile is refused, whatever the document say
     const response = await route.fetch();
     const body = await response.text();
     const manifest = JSON.parse(body.match(/id="pw-parts">(.*?)<\/script>/s)[1]);
-    const add = manifest.parts.find((p) => p.kind === "event" && p.owner === 0).value;
+    const add = manifest.parts.find((p) => p.kind === "event" && p.name === "add_to_cart").value;
     await route.fulfill({ response, body: body.replaceAll(add, "ffffffffffffffff") });
   });
 

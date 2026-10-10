@@ -80,7 +80,7 @@ test("a press on a handler from another build reads the page again, once (charte
     if (stale) {
       stale = false;
       const manifest = JSON.parse(body.match(/id="pw-parts">(.*?)<\/script>/s)[1]);
-      const add = manifest.parts.find((p) => p.kind === "event" && p.owner === 0).value;
+      const add = manifest.parts.find((p) => p.kind === "event" && p.name === "add_to_cart").value;
       body = body.replaceAll(add, "ffffffffffffffff");
     }
     await route.fulfill({ response, body });
@@ -106,7 +106,7 @@ test("a page still stale after being read again is not read again", async ({ pag
     const response = await route.fetch();
     const body = await response.text();
     const manifest = JSON.parse(body.match(/id="pw-parts">(.*?)<\/script>/s)[1]);
-    const add = manifest.parts.find((p) => p.kind === "event" && p.owner === 0).value;
+    const add = manifest.parts.find((p) => p.kind === "event" && p.name === "add_to_cart").value;
     await route.fulfill({ response, body: body.replaceAll(add, "ffffffffffffffff") });
   });
   await ready(page);
