@@ -454,14 +454,22 @@ fn passes_unchanged(
         })
 }
 
-/// A page binding `let b = query R(k..)`.
-struct PageBinding {
+/// A page binding `let b = query R(k..)`: the page's own, or its layout's
+/// (ADR-0303), whose key is written in the layout's body.
+struct PageBinding<'b> {
     name: String,
     resource: DefId,
     key: Vec<ExprId>,
+    /// The file and the body its key is written in.
+    unit: usize,
+    body: &'b crate::hir::Body,
 }
 
-fn page_bindings(ws: &Workspace, unit: usize, body: &crate::hir::Body) -> Vec<PageBinding> {
+fn page_bindings<'b>(
+    ws: &Workspace,
+    unit: usize,
+    body: &'b crate::hir::Body,
+) -> Vec<PageBinding<'b>> {
     let mut out = Vec::new();
     for e in body.walk() {
         let Expr::Let {
@@ -494,9 +502,37 @@ fn page_bindings(ws: &Workspace, unit: usize, body: &crate::hir::Body) -> Vec<Pa
             name: name.clone(),
             resource,
             key: args.clone(),
+            unit,
+            body,
         });
     }
     out
+}
+
+/// **The bindings a page's layout gives it** (ADR-0303), by the names its
+/// plan reads them by, `cart~StoreLayout`: a layout's count of the cart is
+/// speculated on with the page's, so the two never show two values.
+fn layout_bindings<'b>(
+    hirs: &[&'b Hir],
+    ws: &Workspace,
+    unit: usize,
+    page: &crate::hir::Decl,
+) -> Vec<PageBinding<'b>> {
+    let Some(def) = crate::layouts::of(hirs, ws, unit, page) else {
+        return Vec::new();
+    };
+    let hir = hirs[def.unit];
+    let decl = hir.decl(DeclId(def.decl));
+    let Some(body) = decl.body else {
+        return Vec::new();
+    };
+    page_bindings(ws, def.unit, hir.body(body))
+        .into_iter()
+        .map(|mut b| {
+            b.name = crate::layouts::bound(&decl.name, &b.name);
+            b
+        })
+        .collect()
 }
 
 /// The value a resource's entry holds: its result, or `Ok`'s payload.
@@ -563,7 +599,8 @@ fn page_module(
         };
     };
     let body = hir.body(body_id);
-    let bindings = page_bindings(cx.ws, unit, body);
+    let mut bindings = page_bindings(cx.ws, unit, body);
+    bindings.extend(layout_bindings(cx.hirs, cx.ws, unit, hir.decl(page_id)));
 
     let mut functions: Vec<Function> = Vec::new();
     let mut transitions: Vec<Transition> = Vec::new();
@@ -621,29 +658,36 @@ fn page_module(
                 unit: cu,
                 decl: cid.0,
             };
-            let shown = bindings.iter().find(|b| {
-                b.resource == resource
-                    && b.key.len() == target_key.len()
-                    && b.key.iter().zip(&target_key).all(|(k, t)| match t {
-                        Some(KeyArg::Any) => true,
-                        Some(KeyArg::Context(call)) => {
-                            context_call(cx.ws, unit, body, *k) == Some(*call)
-                        }
-                        Some(KeyArg::Param(i)) => {
-                            page_parameter(hir, page_id, *k).is_some_and(|p| {
-                                passes_unchanged(
-                                    cx,
-                                    (unit, page_id),
-                                    command_def,
-                                    (*i, &cdecl.params[*i].name),
-                                    p,
-                                )
-                            })
-                        }
-                        None => false,
-                    })
-            });
-            let Some(shown) = shown else {
+            // Every binding that shows the entry: the page's, and its
+            // layout's (ADR-0303), each told the speculation.
+            let shown: Vec<&PageBinding> = bindings
+                .iter()
+                .filter(|b| {
+                    b.resource == resource
+                        && b.key.len() == target_key.len()
+                        && b.key.iter().zip(&target_key).all(|(k, t)| match t {
+                            Some(KeyArg::Any) => true,
+                            Some(KeyArg::Context(call)) => {
+                                context_call(cx.ws, b.unit, b.body, *k) == Some(*call)
+                            }
+                            // A page's parameter: a layout is given none.
+                            Some(KeyArg::Param(i)) => {
+                                std::ptr::eq(b.body, body)
+                                    && page_parameter(hir, page_id, *k).is_some_and(|p| {
+                                        passes_unchanged(
+                                            cx,
+                                            (unit, page_id),
+                                            command_def,
+                                            (*i, &cdecl.params[*i].name),
+                                            p,
+                                        )
+                                    })
+                            }
+                            None => false,
+                        })
+                })
+                .collect();
+            if shown.is_empty() {
                 // **An arm whose target the page does not show** (ADR-0238):
                 // not the page's to speculate. The clause's other arms may
                 // be, and a page that shows none of its targets waits for the
@@ -661,7 +705,7 @@ fn page_module(
                          each of its handlers passes the command unchanged (ruling 0122-d)"
                     ),
                 };
-            };
+            }
             let value = lowered!(value_type(cx, resource, &span));
             // The command's parameters, typed as its signature declares.
             let Some(def) = cx.sigs.iter().map(|(_, s)| s).find(|s| {
@@ -705,26 +749,28 @@ fn page_module(
                 cbody.expr_span(transition.root),
             ));
             functions.push(f);
-            transitions.push(Transition {
-                command: command.clone(),
-                binding: shown.name.clone(),
-                function: functions.len() - 1,
-                params,
-            });
-            if !speculated.iter().any(|(n, ..)| *n == shown.name) {
-                // Each key is an invocation-context call (`context_call`
-                // matched it), written as the server computes it.
-                let key = shown
-                    .key
-                    .iter()
-                    .map(|k| match body.expr(*k) {
-                        Expr::Call { callee, .. } => {
-                            format!("{}()", crate::infer::path_of(body, *callee))
-                        }
-                        _ => crate::infer::path_of(body, *k),
-                    })
-                    .collect();
-                speculated.push((shown.name.clone(), resource, key, value));
+            for shown in &shown {
+                transitions.push(Transition {
+                    command: command.clone(),
+                    binding: shown.name.clone(),
+                    function: functions.len() - 1,
+                    params: params.clone(),
+                });
+                if !speculated.iter().any(|(n, ..)| *n == shown.name) {
+                    // Each key is an invocation-context call (`context_call`
+                    // matched it), written as the server computes it.
+                    let key = shown
+                        .key
+                        .iter()
+                        .map(|k| match shown.body.expr(*k) {
+                            Expr::Call { callee, .. } => {
+                                format!("{}()", crate::infer::path_of(shown.body, *callee))
+                            }
+                            _ => crate::infer::path_of(shown.body, *k),
+                        })
+                        .collect();
+                    speculated.push((shown.name.clone(), resource, key, value.clone()));
+                }
             }
         }
     }

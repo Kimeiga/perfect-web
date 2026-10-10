@@ -887,3 +887,10 @@ Each a decision for a track, with its date; a track's ADR records it too.
   a character a read ended inside became U+FFFD ("に��める" under load).
   Fixed on master: the incomplete sequence is carried to the next read,
   and bytes that are no UTF-8 are refused, not replaced.
+- **2026-10-10, the layouts merged** as ADR-0303, from `328720e`: verify
+  38006542533 green but for Firefox's navigate.spec "its answer first" (the
+  command order's finding, named known), 23 of 23 mutants; the store's page
+  plan made again over the build id (`just e10-component`). **W8:**
+  `StoreLayout` binds `Cart(current_session())`; at `track/store-accounts`'
+  next master merge, the layout's cart is its pages' (the user's), and the
+  layout is declared `user` (PW5046 holds a page to its layout's audience).

@@ -94,23 +94,25 @@ MUTANTS = [
         "core",
         TEMPLATE,
         "    for root in rest {\n"
-        "        lower_node(body, root, &ctx, &mut ix, &mut chunks);\n"
-        "    }\n"
-        "    for title in titles {\n"
-        "        chunks.push(Chunk::Dynamic(lower_title(body, title, &ctx, &mut ix)));\n"
+        "        lower_node(body, root, &ctx, &mut ix, &mut own);\n"
         "    }\n",
-        "    for title in titles {\n"
-        "        chunks.push(Chunk::Dynamic(lower_title(body, title, &ctx, &mut ix)));\n"
-        "    }\n"
+        # The page's title numbered before its own markup, the layout's
+        # first (ADR-0303): the titles taken, lowered, and none left after.
+        "    let titles: Vec<NodeId> = titles\n"
+        "        .into_iter()\n"
+        "        .inspect(|t| chunks.push(Chunk::Dynamic(lower_title(body, *t, &ctx, &mut ix))))\n"
+        "        .filter(|_| false)\n"
+        "        .collect();\n"
         "    for root in rest {\n"
-        "        lower_node(body, root, &ctx, &mut ix, &mut chunks);\n"
+        "        lower_node(body, root, &ctx, &mut ix, &mut own);\n"
         "    }\n",
     ),
     (
         "the plan does not name the title",
         "core",
         PLAN,
-        # Re-anchored by ADR-0300, whose plan names its scope after it.
+        # Re-anchored by ADR-0300, whose plan names its scope after the
+        # title, and by the layouts' ADR, whose plan names its layout after it.
         "            title,\n            scope: crate::resume::page_scope(hir, decl).to_string(),\n",
         "            title: None,\n            scope: crate::resume::page_scope(hir, decl).to_string(),\n",
     ),

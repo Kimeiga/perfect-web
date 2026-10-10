@@ -376,6 +376,10 @@ test("every control is reached from the keyboard, in the order it is read, and s
   const [forward, back] = browserName === "webkit" ? ["Alt+Tab", "Alt+Shift+Tab"] : ["Tab", "Shift+Tab"];
   const stops = await page.evaluate(tabStops);
   expect(stops).toEqual([
+    // The layout the page is shown in, read first (ADR-0303): the way home,
+    // and the cart, counted.
+    "Stores",
+    "Cart 1",
     "Add Espresso",
     "Add Cortado",
     "Add Cold Brew",

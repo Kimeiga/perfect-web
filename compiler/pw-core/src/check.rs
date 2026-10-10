@@ -241,6 +241,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
             // ADR-0280: a handler navigates once its command commits.
             out.extend(navigations(&workspace, &u.hir, i, &sigs));
+            // ADR-0303: a page is shown in its layout.
+            out.extend(crate::layouts::check(&hirs, &workspace, i));
             out.extend(check_unit_with(
                 &labels,
                 &reads,
@@ -1280,6 +1282,10 @@ fn not_a_term(
         Some(DeclKind::Page) => (
             "a page",
             "A page is reached by its route; it is not called.",
+        ),
+        Some(DeclKind::Layout) => (
+            "a layout",
+            "A page is shown in its layout, which it names with `layout`; it is not called.",
         ),
         Some(DeclKind::Materialize) => (
             "a materialization",
@@ -3165,7 +3171,7 @@ fn capitalized(text: &str) -> String {
 }
 
 /// What a declaration of `kind` is, for a message.
-fn described(kind: DeclKind) -> &'static str {
+pub(crate) fn described(kind: DeclKind) -> &'static str {
     match kind {
         DeclKind::Query => "a query",
         DeclKind::Command => "a command",
@@ -3175,6 +3181,7 @@ fn described(kind: DeclKind) -> &'static str {
         DeclKind::View => "a view",
         DeclKind::Component => "a component",
         DeclKind::Page => "a page",
+        DeclKind::Layout => "a layout",
         DeclKind::Task => "a task",
         DeclKind::Event => "an event",
         DeclKind::Source => "a data source",
@@ -4272,6 +4279,7 @@ fn metadata(hir: &Hir) -> Vec<Diagnostic> {
                 let kind = match decl.kind {
                     DeclKind::View => "view",
                     DeclKind::Component => "component",
+                    DeclKind::Layout => "layout",
                     _ => "declaration",
                 };
                 Some(format!(
@@ -4551,6 +4559,7 @@ fn titles(hir: &Hir) -> Vec<Diagnostic> {
                 let kind = match decl.kind {
                     DeclKind::View => "view",
                     DeclKind::Component => "component",
+                    DeclKind::Layout => "layout",
                     _ => "declaration",
                 };
                 Some(format!(
@@ -5061,6 +5070,15 @@ fn view_elements(
                 continue;
             }
             let (message, repair) = match named {
+                // A page is shown in its layout (ADR-0303): the page names
+                // it, and no markup uses it.
+                Some(DeclKind::Layout) => (
+                    format!(
+                        "`<{tag}>` uses the layout `{tag}` as an element, and a page is shown \
+                         in a layout by naming it"
+                    ),
+                    format!("write `layout {tag}` in the page"),
+                ),
                 Some(DeclKind::Component | DeclKind::Page) => (
                     format!(
                         "`<{tag}>` uses `{tag}` inside another view, and only a view is used \
@@ -6286,6 +6304,16 @@ fn check_unit_with(
     out.extend(values);
 
     for (id, decl) in unit.hir.all_decls() {
+        // The layout a page is shown in (ADR-0303), whose values its
+        // document holds.
+        let layout = (decl.kind == DeclKind::Page)
+            .then(|| crate::layouts::written(&unit.hir, decl))
+            .flatten()
+            .and_then(|(name, _)| {
+                crate::layouts::named(ws, at, &name)
+                    .filter(|d| sigs.kind_of(*d) == Some(DeclKind::Layout))
+                    .map(|d| (d, name))
+            });
         privacy_and_placement(
             &unit.hir,
             &unit.src,
@@ -6300,6 +6328,7 @@ fn check_unit_with(
             id,
             decl,
             inherited.get(&id.0).copied(),
+            layout.as_ref().map(|(d, n)| (*d, n.as_str())),
             &mut out,
         );
         privacy_flow(
@@ -7389,7 +7418,8 @@ pub fn declares_a_type(kind: DeclKind) -> bool {
 fn ambient_scope(decl: &Decl) -> ScopeKind {
     match decl.kind {
         DeclKind::View | DeclKind::Component => ScopeKind::Component,
-        DeclKind::Page => ScopeKind::Route,
+        // A layout lives for as long as the pages shown in it (ADR-0303).
+        DeclKind::Page | DeclKind::Layout => ScopeKind::Route,
         DeclKind::Query | DeclKind::Command => ScopeKind::Request,
         DeclKind::Subscription => ScopeKind::Session,
         _ => ScopeKind::Block,
@@ -7655,6 +7685,8 @@ fn privacy_and_placement(
     id: crate::hir::DeclId,
     decl: &Decl,
     inherited: Option<World>,
+    // The layout a page is shown in (ADR-0303), and its name.
+    layout: Option<(crate::resolve::DefId, &str)>,
     out: &mut Vec<Diagnostic>,
 ) {
     // The declaration's own visibility, joined with everything its body reads.
@@ -7662,7 +7694,12 @@ fn privacy_and_placement(
     // session materialization — which is the corpus's canonical case, and is
     // invisible to a rule that only reads the header.
     let (read, read_from) = reads_label_with_source(hir, labels, inference, at, decl);
-    let label = label_of(decl).join(&read);
+    // **And everything its layout observes** (ADR-0303): the layout's markup
+    // is rendered into the page's document, so an unlabelled layout that
+    // reads a session's cart makes the page a session's, as a read of its
+    // own would.
+    let shown = layout.map_or_else(Label::public, |(l, _)| reads.observed(l));
+    let label = label_of(decl).join(&read).join(&shown);
 
     // 1. A reader's value in a shared cache. Charter §7.8's canonical case.
     //
@@ -7690,6 +7727,11 @@ fn privacy_and_placement(
         let read_from = read_from
             .map(|v| format!("`{v}`"))
             .or_else(|| param.map(|p| format!("its parameter `{}`", p.name)))
+            .or_else(|| {
+                layout
+                    .filter(|_| !shown.is_public())
+                    .map(|(_, name)| format!("what its layout `{name}` shows"))
+            })
             .or_else(|| observed_from(hir, reads, inference, at, decl).map(|v| format!("`{v}`")));
         {
             let cache = crate::hir::Policy {
@@ -10830,6 +10872,7 @@ fn kind_noun(kind: DeclKind) -> &'static str {
         DeclKind::View => "view",
         DeclKind::Component => "component",
         DeclKind::Page => "page",
+        DeclKind::Layout => "layout",
         DeclKind::Query => "query",
         DeclKind::Command => "command",
         _ => "declaration",

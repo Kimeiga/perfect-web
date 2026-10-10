@@ -2507,3 +2507,19 @@ hand).
   `role="status"` every document holds from its first byte; an unreachable
   command, a stale page and a failed handler are told in the platform's
   words. The feed's composer is a signed-in reader's.
+
+[ADR-0303](DECISIONS/ADR-0303-a-page-is-shown-in-its-layout.md): a page is
+shown in its layout, which the pages that name it share (the integrator's,
+the second step to the parts two pages share kept in place).
+- `layout Name { bindings; view { … <slot /> … } }` and a page's `layout
+  Name` clause, each only where a name follows the word (`layout.measure` is
+  an effect's). Composed into each page as a view is (ADR-0136), the
+  layout's parts and elements numbered first, so the same on every page that
+  names it, the page's markup between `<!--pw-slot-->` markers; its bindings
+  and signals under `~` names, its handlers one module, its speculation the
+  page's with it. A page declares at least its layout's audience (PW5046),
+  its privacy label and its graph reads join the layout's, and a query a
+  page and its layout both bind is read once for the document. PW0352,
+  PW0353, PW5044, PW5045. Found: two roots on one line did not parse; a
+  page and its layout read one query twice; a speculation found one binding
+  per entry. The store's four pages share `StoreLayout`.

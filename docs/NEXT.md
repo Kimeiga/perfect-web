@@ -693,9 +693,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           scope. The integrator's, in order:
           1. **the parts two pages share kept in place**, ADR-0280's next:
              a soft navigation, which item 3's test needs. In three steps:
-             ~~the build named~~ (ADR-0300, merged 2026-10-09); a page shown
-             in its layout (`track/layouts`, in CI); a navigation that keeps
-             the layout (`track/soft-navigation`, on the other two);
+             ~~the build named~~ (ADR-0300, merged 2026-10-09); ~~a page
+             shown in its layout~~ (ADR-0303, merged 2026-10-10); a
+             navigation that keeps the layout (`track/soft-navigation`, in
+             CI);
           2. ~~**accounts in the store**~~ and 3. ~~**delivery
              addresses**~~: **W8's since 2026-10-09** (the owner: DoorDash
              faster, with a third worker; PARALLEL.md, "the DoorDash track"),

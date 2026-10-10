@@ -37,8 +37,8 @@ MUTANTS = [
         "a key from the command's parameter matches no binding",
         "cargo",
         SPECULATION,
-        "                            page_parameter(hir, page_id, *k).is_some_and(|p| {\n",
-        "                            page_parameter(hir, page_id, *k).filter(|_| false).is_some_and(|p| {\n",
+        "                                    && page_parameter(hir, page_id, *k).is_some_and(|p| {\n",
+        "                                    && page_parameter(hir, page_id, *k).filter(|_| false).is_some_and(|p| {\n",
     ),
     (
         "a name the handler binds passes the page's parameter",

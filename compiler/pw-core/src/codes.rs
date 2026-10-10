@@ -279,6 +279,12 @@ codes! {
         "a predicate a program declares says, in one string with no hole, what a reader is told when it refuses, is declared once, and is given its parameters by type wherever a `requires` names it";
     RETRY_UNBOUNDED = "PW0313" / retry_unbounded / 1, DeclarationRules,
         "a retry policy must be bounded";
+    // ADR-0303: a page is shown in its layout, which the pages that name it
+    // share.
+    LAYOUT_NAMES_A_LAYOUT = "PW0352" / layout_names_a_layout / 1, DeclarationRules,
+        "a page's `layout` clause names a layout, once";
+    LAYOUT_TAKES_NOTHING = "PW0353" / layout_takes_nothing / 1, DeclarationRules,
+        "a layout is given nothing by the page it shows: it declares no parameters";
 
     STALE_KEY_POLICY = "PW0325" / stale_key_policy / 1, DeclarationRules,
         "a keyed query must say what happens when its key changes";
@@ -643,6 +649,14 @@ codes! {
         "a `navigate` names a page by its declaration";
     NAVIGATE_BEFORE_A_COMMIT = "PW5043" / navigate_before_a_commit / 1, Markup,
         "a `navigate` is a handler's, last in the `Ok` arm of the command's answer nearest it: a page is left only once a command has committed";
+    // ADR-0303: where a layout shows the page that names it.
+    SLOT_MISPLACED = "PW5044" / slot_misplaced / 1, Markup,
+        "a `<slot />` is its layout's: once, at the top of the layout's own view, outside any block, loop, match or stream, with nothing in it";
+    LAYOUT_WITHOUT_SLOT = "PW5045" / layout_without_slot / 1, Markup,
+        "a layout shows the page that names it in a `<slot />`";
+    // ADR-0303: a page's document holds its layout's values and captures.
+    LAYOUT_AUDIENCE = "PW5046" / layout_audience / 1, Privacy,
+        "a page declares at least its layout's audience: its document holds what its layout shows and its resume manifest what the layout's handlers capture";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

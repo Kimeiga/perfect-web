@@ -139,6 +139,10 @@ pub enum DeclKind {
     View,
     Component,
     Page,
+    /// `layout StoreLayout { .. }`: the markup and the bindings the pages
+    /// that name it share (`layout StoreLayout` in a page), the page shown in
+    /// its `<slot />`. Composed into each page, its parts numbered first.
+    Layout,
     Query,
     Command,
     Subscription,

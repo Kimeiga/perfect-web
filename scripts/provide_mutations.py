@@ -86,8 +86,16 @@ MUTANTS = [
         "a view's `provide` gives nothing to what it contains",
         "compiler",
         IR,
-        "        provided.insert(signal, fresh);\n",
-        "        let _ = (&mut provided, signal, fresh);\n",
+        "        names.insert(name.clone(), fresh.clone());\n"
+        "        provided.insert(signal, fresh);\n"
+        "        signals.insert(name);\n"
+        "    }\n"
+        "    // A signal provided around it is the nearest `provide`'s instance.",
+        "        names.insert(name.clone(), fresh.clone());\n"
+        "        let _ = (&mut provided, signal, fresh);\n"
+        "        signals.insert(name);\n"
+        "    }\n"
+        "    // A signal provided around it is the nearest `provide`'s instance.",
     ),
     (
         "an element does not say which instance a handler's signal is",

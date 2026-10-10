@@ -1,7 +1,8 @@
 ADR-0091 - a listener binds its entry's key
 
 produced by: just e10-listeners
-commit: 581bae422183350bf415e2e47ba06d15b3cfc233
+commit: 328720e89d73f343c9e671077dfc0fd51e1fed46
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38006542533 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == listener keys (compiler/pw-core/tests/listener_keys.rs)
@@ -30,3 +31,4 @@ an event's values are read as a set: KILLED (3 of 5 tests fail)
 a position `_` binds must match: KILLED (2 of 5 tests fail)
 a value matches any part of the key: KILLED (1 of 5 tests fail)
 9 of 9 mutants killed
+memory bound: no process was stopped

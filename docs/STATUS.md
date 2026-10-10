@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0303, 2026-10-10: a page is shown in its layout** (the integrator's,
+the second of three steps to the parts two pages share kept in place; track
+`layouts`, merged from `328720e`). `layout Name { … <slot /> … }`, and a
+page's `layout Name`: composed into each page as a view is, its parts and
+elements numbered first so they are the same on every page that names it,
+the page's markup in its slot, its bindings and signals under names no
+source writes; a page declares at least its layout's audience (PW5046).
+Found: two sibling elements on one line at a view's top did not parse
+(track `siblings`); a page and its layout that bind one query read it
+twice for one document, now once; a speculation moved one binding per
+entry, now every binding that shows it, the layout's among them. The
+store's four pages share `StoreLayout`. 13 compiler tests, the host's, 12
+in three engines, 23 of 23 mutants (verify 38006542533, whose one Firefox
+failure, navigate.spec's "its answer first", is the command order's
+finding, on `track/command-order`).
+
 **ADR-0302, 2026-10-10: a refusal is told where the press was** (the
 owner's finding, using the feed by hand; track `refusals`, merged from
 `6964ee7`). Signed out, the owner typed into the feed's composer and pressed
