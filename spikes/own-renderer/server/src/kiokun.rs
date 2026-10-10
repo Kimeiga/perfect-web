@@ -20,6 +20,9 @@
 use super::*;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
+mod search;
 
 /// What a node grants the program: reading entries, and nothing else.
 pub(crate) const GRANTS: &[&str] = &[
@@ -27,6 +30,8 @@ pub(crate) const GRANTS: &[&str] = &[
     "database.read<Label>",
     "database.read<CharGloss>",
     "database.read<PitchReading>",
+    "database.read<SearchRow>",
+    "database.read<AliasSet>",
 ];
 
 /// The sample the repository carries (ADR-0037): 28 files of one shard.
@@ -37,6 +42,97 @@ fn sample() -> PathBuf {
 pub(crate) struct KiokunData {
     root: PathBuf,
     app: Arc<App>,
+    search: Arc<Search>,
+}
+
+/// **kiokun.com's search index and aliases**, each opened when a page first
+/// searches: `KIOKUN_DATA`'s `../output_search_index.csv` and `KIOKUN_APP`'s
+/// `src/lib/generated/search-aliases.json`, or else the repository's sample
+/// CSV and its hand-made aliases (`examples/kiokun/data/search-*`).
+pub(crate) struct Search {
+    csv: PathBuf,
+    aliases: Option<PathBuf>,
+    index: OnceLock<Result<search::Index, String>>,
+    alias: OnceLock<Result<search::Aliases, String>>,
+}
+
+/// Where the index's cache goes: the workspace's `target/`, gone with
+/// `cargo clean` (the integrator's ruling of 2026-10-10, B5).
+fn search_cache() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../target/kiokun-search")
+}
+
+impl Search {
+    pub(crate) fn at(csv: PathBuf, aliases: Option<PathBuf>) -> Search {
+        Search {
+            csv,
+            aliases,
+            index: OnceLock::new(),
+            alias: OnceLock::new(),
+        }
+    }
+
+    /// The repository's sample: its CSV and its hand-made aliases.
+    fn sample() -> Search {
+        let data = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/kiokun/data");
+        Search::at(
+            data.join("search-sample.csv"),
+            Some(data.join("search-aliases-sample.json")),
+        )
+    }
+
+    fn index(&self) -> Result<&search::Index, String> {
+        self.index
+            .get_or_init(|| search::Index::open(&self.csv, &search_cache()))
+            .as_ref()
+            .map_err(|e| e.clone())
+    }
+
+    fn aliases(&self) -> Result<&search::Aliases, String> {
+        self.alias
+            .get_or_init(|| match &self.aliases {
+                Some(path) => search::Aliases::read(path),
+                None => Ok(search::Aliases::default()),
+            })
+            .as_ref()
+            .map_err(|e| e.clone())
+    }
+}
+
+/// A row as the program's `SearchRow` declares it.
+fn search_row(r: search::Row) -> Val {
+    record(vec![
+        ("word", Val::String(r.word)),
+        ("language", Val::String(r.language)),
+        ("definition", Val::String(r.definition)),
+        ("pronunciation", Val::String(r.pronunciation)),
+        ("reading-search", Val::String(r.reading_search)),
+        ("is-common", Val::S64(r.is_common)),
+    ])
+}
+
+/// Each asked key `values` gives a list for, as the program's `AliasSet`
+/// declares it: those with none are left out.
+fn alias_sets(keys: &[Val], values: impl Fn(&str) -> Vec<String>) -> Val {
+    Val::List(
+        keys.iter()
+            .filter_map(|k| match k {
+                Val::String(k) => {
+                    let found = values(k);
+                    (!found.is_empty()).then(|| {
+                        record(vec![
+                            ("term", Val::String(k.clone())),
+                            (
+                                "values",
+                                Val::List(found.into_iter().map(Val::String).collect()),
+                            ),
+                        ])
+                    })
+                }
+                _ => None,
+            })
+            .collect(),
+    )
 }
 
 /// **kiokun.com's own data, as its app keeps it**: its labels for JMdict's
@@ -169,9 +265,18 @@ impl KiokunData {
             Some(app) => app_of(&PathBuf::from(app))?,
             None => App::default(),
         };
+        let search = match std::env::var_os("KIOKUN_DATA") {
+            Some(data) => Search::at(
+                PathBuf::from(data).join("../output_search_index.csv"),
+                std::env::var_os("KIOKUN_APP")
+                    .map(|a| PathBuf::from(a).join("src/lib/generated/search-aliases.json")),
+            ),
+            None => Search::sample(),
+        };
         Ok(KiokunData {
             root,
             app: Arc::new(app),
+            search: Arc::new(search),
         })
     }
 
@@ -183,7 +288,15 @@ impl KiokunData {
         KiokunData {
             root,
             app: Arc::new(app),
+            search: Arc::new(Search::sample()),
         }
+    }
+
+    /// This layer, its search index and aliases given.
+    #[cfg(test)]
+    pub(crate) fn with_search(mut self, search: Search) -> KiokunData {
+        self.search = Arc::new(search);
+        self
     }
 }
 
@@ -714,8 +827,80 @@ fn place_fields(v: &Val) -> Result<(String, String), String> {
     Ok((field("subdirectory")?, field("file")?))
 }
 
-fn reads_of(root: PathBuf, app: Arc<App>) -> data::Ops {
+fn reads_of(root: PathBuf, app: Arc<App>, search: Arc<Search>) -> data::Ops {
     let mut ops: data::Ops = BTreeMap::new();
+    let f = search.clone();
+    ops.insert(
+        "kiokun:data/search#cjk".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::List(terms), Val::String(reading), Val::S64(limit)] => {
+                let terms: Vec<String> = terms
+                    .iter()
+                    .filter_map(|t| match t {
+                        Val::String(t) => Some(t.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                let rows = f.index()?.cjk(&terms, reading, *limit)?;
+                Ok(vec![Val::List(rows.into_iter().map(search_row).collect())])
+            }
+            other => Err(format!("search#cjk received {other:?}")),
+        }),
+    );
+    let f = search.clone();
+    ops.insert(
+        "kiokun:data/search#latin".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(query), Val::S64(limit)] => {
+                let rows = f.index()?.latin(query, *limit)?;
+                Ok(vec![Val::List(rows.into_iter().map(search_row).collect())])
+            }
+            other => Err(format!("search#latin received {other:?}")),
+        }),
+    );
+    let f = search.clone();
+    ops.insert(
+        "kiokun:data/search#aliases".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::List(terms)] => {
+                let a = f.aliases()?;
+                Ok(vec![alias_sets(terms, |t| {
+                    a.aliases.get(t).cloned().unwrap_or_default()
+                })])
+            }
+            other => Err(format!("search#aliases received {other:?}")),
+        }),
+    );
+    let f = search.clone();
+    ops.insert(
+        "kiokun:data/search#variants".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::List(characters)] => {
+                let a = f.aliases()?;
+                Ok(vec![alias_sets(characters, |c| {
+                    a.character_variants.get(c).cloned().unwrap_or_default()
+                })])
+            }
+            other => Err(format!("search#variants received {other:?}")),
+        }),
+    );
+    let f = search;
+    ops.insert(
+        "kiokun:data/search#canonical".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::List(words)] => {
+                let a = f.aliases()?;
+                Ok(vec![alias_sets(words, |w| {
+                    a.japanese_to_canonical
+                        .get(w)
+                        .cloned()
+                        .into_iter()
+                        .collect()
+                })])
+            }
+            other => Err(format!("search#canonical received {other:?}")),
+        }),
+    );
     let a = app.clone();
     ops.insert(
         "kiokun:data/pitch#of".to_string(),
@@ -797,11 +982,15 @@ impl data::Staged for Nothing {
 
 impl data::DataLayer for KiokunData {
     fn reads(&self, _session: &str, _stopped: Option<Stopped>) -> data::Ops {
-        reads_of(self.root.clone(), self.app.clone())
+        reads_of(self.root.clone(), self.app.clone(), self.search.clone())
     }
 
     fn begin<'a>(&'a self, _session: &str) -> Box<dyn data::Staged + 'a> {
-        Box::new(Nothing(reads_of(self.root.clone(), self.app.clone())))
+        Box::new(Nothing(reads_of(
+            self.root.clone(),
+            self.app.clone(),
+            self.search.clone(),
+        )))
     }
 
     fn grants(&self) -> Vec<&'static str> {
