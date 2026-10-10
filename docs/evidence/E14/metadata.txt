@@ -1,8 +1,8 @@
 ADR-0186 - a page states its description
 
 produced by: just e14-metadata
-commit: 1759043f085600066bbdc6f81cd719578a049263
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37912147550 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: e44173313ff4e815b5097c5c50f7af9c8cdfd9a7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37998533705 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -14,7 +14,7 @@ test a_page_s_metadata_reads_no_signal ... ok
 test a_page_s_metadata_is_the_page_s_at_the_top_of_its_view ... ok
 test an_item_s_property_is_written_where_it_is ... ok
 test a_page_s_metadata_may_read_what_a_press_speculates ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.49s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.86s
 
 == the renderer and its document (runtime/pw-render/tests/metadata.rs, titles.rs)
 
@@ -33,35 +33,35 @@ test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 test tests::a_signal_page_s_head_holds_its_title_and_metadata ... ok
 test tests::a_store_s_page_describes_itself_in_its_head ... ok
-test result: ok. 327 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 353.78s
+test result: ok. 359 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 837.16s
 
 == each store's page, in three engines (e2e/stores.spec.mjs)
 
-  ✓   1 [firefox] › e2e/stores.spec.mjs:24:1 › each store is served at its route (3.1s)
-  ✓   2 [chromium] › e2e/stores.spec.mjs:24:1 › each store is served at its route (2.6s)
-  ✓   3 [firefox] › e2e/stores.spec.mjs:33:1 › a store's menu is grouped by its category (1.1s)
-  ✓   4 [chromium] › e2e/stores.spec.mjs:33:1 › a store's menu is grouped by its category (946ms)
-  ✓   5 [firefox] › e2e/stores.spec.mjs:48:1 › each store's page describes itself, for what reads it unshown (1.0s)
-  ✓   6 [chromium] › e2e/stores.spec.mjs:48:1 › each store's page describes itself, for what reads it unshown (916ms)
-  ✓   8 [chromium] › e2e/stores.spec.mjs:59:1 › a store that is not there is not found (464ms)
-  ✓   7 [firefox] › e2e/stores.spec.mjs:59:1 › a store that is not there is not found (613ms)
-  ✓   9 [chromium] › e2e/stores.spec.mjs:73:1 › each Add is named by its item, and a rename renames it (614ms)
-  ✓  10 [firefox] › e2e/stores.spec.mjs:73:1 › each Add is named by its item, and a rename renames it (689ms)
-  ✓  11 [chromium] › e2e/stores.spec.mjs:95:1 › each item shows its price, and an item inserted arrives with its own (1.8s)
-  ✓  12 [firefox] › e2e/stores.spec.mjs:95:1 › each item shows its price, and an item inserted arrives with its own (1.9s)
-  ✓  13 [chromium] › e2e/stores.spec.mjs:123:1 › the second store's Add adds to the session's cart (629ms)
-  ✓  14 [firefox] › e2e/stores.spec.mjs:123:1 › the second store's Add adds to the session's cart (750ms)
-  ✓  15 [chromium] › e2e/stores.spec.mjs:130:1 › a change to one store's menu reaches its page, and not another store's (test 11) (2.3s)
-  ✓  16 [firefox] › e2e/stores.spec.mjs:130:1 › a change to one store's menu reaches its page, and not another store's (test 11) (2.6s)
-  ✓  17 [webkit] › e2e/stores.spec.mjs:24:1 › each store is served at its route (6.3s)
-  ✓  18 [webkit] › e2e/stores.spec.mjs:33:1 › a store's menu is grouped by its category (1.1s)
-  ✓  19 [webkit] › e2e/stores.spec.mjs:48:1 › each store's page describes itself, for what reads it unshown (1.0s)
-  ✓  20 [webkit] › e2e/stores.spec.mjs:59:1 › a store that is not there is not found (586ms)
-  ✓  21 [webkit] › e2e/stores.spec.mjs:73:1 › each Add is named by its item, and a rename renames it (729ms)
-  ✓  22 [webkit] › e2e/stores.spec.mjs:95:1 › each item shows its price, and an item inserted arrives with its own (1.9s)
-  ✓  23 [webkit] › e2e/stores.spec.mjs:123:1 › the second store's Add adds to the session's cart (676ms)
-  ✓  24 [webkit] › e2e/stores.spec.mjs:130:1 › a change to one store's menu reaches its page, and not another store's (test 11) (2.5s)
-  24 passed (1.5m)
+  ✓   2 [chromium] › e2e/stores.spec.mjs:24:1 › each store is served at its route (2.7s)
+  ✓   3 [chromium] › e2e/stores.spec.mjs:33:1 › a store's menu is grouped by its category (981ms)
+  ✓   1 [firefox] › e2e/stores.spec.mjs:24:1 › each store is served at its route (3.5s)
+  ✓   4 [chromium] › e2e/stores.spec.mjs:48:1 › each store's page describes itself, for what reads it unshown (975ms)
+  ✓   5 [firefox] › e2e/stores.spec.mjs:33:1 › a store's menu is grouped by its category (1.2s)
+  ✓   6 [chromium] › e2e/stores.spec.mjs:59:1 › a store that is not there is not found (464ms)
+  ✓   8 [chromium] › e2e/stores.spec.mjs:73:1 › each Add is named by its item, and a rename renames it (608ms)
+  ✓   7 [firefox] › e2e/stores.spec.mjs:48:1 › each store's page describes itself, for what reads it unshown (1.3s)
+  ✓  10 [firefox] › e2e/stores.spec.mjs:59:1 › a store that is not there is not found (593ms)
+  ✓   9 [chromium] › e2e/stores.spec.mjs:95:1 › each item shows its price, and an item inserted arrives with its own (2.0s)
+  ✓  11 [firefox] › e2e/stores.spec.mjs:73:1 › each Add is named by its item, and a rename renames it (807ms)
+  ✓  12 [chromium] › e2e/stores.spec.mjs:123:1 › the second store's Add adds to the session's cart (673ms)
+  ✓  13 [firefox] › e2e/stores.spec.mjs:95:1 › each item shows its price, and an item inserted arrives with its own (2.2s)
+  ✓  14 [chromium] › e2e/stores.spec.mjs:130:1 › a change to one store's menu reaches its page, and not another store's (test 11) (2.4s)
+  ✓  15 [firefox] › e2e/stores.spec.mjs:123:1 › the second store's Add adds to the session's cart (885ms)
+  ✓  16 [firefox] › e2e/stores.spec.mjs:130:1 › a change to one store's menu reaches its page, and not another store's (test 11) (2.8s)
+  ✓  17 [webkit] › e2e/stores.spec.mjs:24:1 › each store is served at its route (3.3s)
+  ✓  18 [webkit] › e2e/stores.spec.mjs:33:1 › a store's menu is grouped by its category (1.2s)
+  ✓  19 [webkit] › e2e/stores.spec.mjs:48:1 › each store's page describes itself, for what reads it unshown (1.2s)
+  ✓  20 [webkit] › e2e/stores.spec.mjs:59:1 › a store that is not there is not found (621ms)
+  ✓  21 [webkit] › e2e/stores.spec.mjs:73:1 › each Add is named by its item, and a rename renames it (767ms)
+  ✓  22 [webkit] › e2e/stores.spec.mjs:95:1 › each item shows its price, and an item inserted arrives with its own (2.1s)
+  ✓  23 [webkit] › e2e/stores.spec.mjs:123:1 › the second store's Add adds to the session's cart (831ms)
+  ✓  24 [webkit] › e2e/stores.spec.mjs:130:1 › a change to one store's menu reaches its page, and not another store's (test 11) (2.7s)
+  24 passed (2.4m)
 
 == the corpus at C11 (corpus-check, generality.rs, checking_source.rs)
 
@@ -73,9 +73,9 @@ corpus-check: OK
 test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
 test every_rejected_fixture_emits_only_its_own_defect ... ok
 test every_diagnostic_carries_what_charter_16_3_requires ... ok
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.69s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 66.81s
 test generality_is_reported_separately_from_conformance ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.39s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 71.09s
 
 == every program the repository checks
 
