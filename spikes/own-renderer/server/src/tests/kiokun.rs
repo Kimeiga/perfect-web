@@ -667,35 +667,25 @@ fn text_of(html: &str, id: &str) -> String {
 
 /// **The character header** (`[word]/+page.svelte:572-690`): the learner
 /// gloss with the HSK and former JLPT levels beside it, and the readings,
-/// each labelled. 人's Mandarin is the frequency list's `rén` alone, since
-/// its words read `rén` and not `ren`.
+/// each labelled.
+///
+/// The repository's sample holds the cleared fields only (the integrator's
+/// ruling of 2026-10-10): KANJIDIC2's readings, Unihan's Cantonese, the
+/// Korean reading. The levels are shown beside a gloss, and the gloss, the
+/// HSK level and the
+/// frequency list are Dong Chinese's and the mnemonics the owner's, so a
+/// hand-made entry holds them: its Mandarin is the frequency list's `rén`
+/// alone, since its words read `rén` and not `ren`; and where the card has
+/// no keyword, its meaning is the gloss.
 #[test]
 fn the_character_header_shows_its_gloss_levels_and_readings() {
     let s = served_kiokun();
-    let person = fetched(&s, &path_of("人"));
-    assert_eq!(text_of(&person, "entry-gloss"), "person");
-    let header = header_of(&person);
-    for shown in [
-        "HSK 1",
-        "N4",
-        "Mandarin",
-        "rén",
-        "Cantonese",
-        "jan4",
-        "Korean",
-        "인",
-    ] {
+    let header = header_of(&fetched(&s, &path_of("人")));
+    for shown in ["Mandarin", "rén", "Cantonese", "jan4", "Korean", "인"] {
         assert!(header.contains(shown), "{shown}: {header}");
     }
-    assert!(!header.contains("rén, ren"), "{header}");
-    let music = fetched(&s, &path_of("樂"));
-    // No keyword: the mnemonic's meaning.
-    assert_eq!(text_of(&music, "entry-gloss"), "music");
-    let header = header_of(&music);
+    let header = header_of(&fetched(&s, &path_of("樂")));
     for shown in [
-        "HSK 10",
-        "N3",
-        "lè, yuè",
         "lok6",
         "ガク、ラク、ゴウ",
         "たの.しい、たの.しむ、この.む",
@@ -703,6 +693,40 @@ fn the_character_header_shows_its_gloss_levels_and_readings() {
     ] {
         assert!(header.contains(shown), "{shown}: {header}");
     }
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "人",
+        r#"{"key":"人","chinese_char":{"char":"人","gloss":"person","statistics":{"hskLevel":1},
+            "pinyinFrequencies":[{"pinyin":"rén"},{"pinyin":"ren"}]},
+            "japanese_char":{"literal":"人","misc":{"jlptLevel":4}},
+            "chinese_words":[{"_id":"1","simp":"人","trad":"人","items":[{"pinyin":"rén","definitions":["person"]}]}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "樂",
+        r#"{"key":"樂","chinese_char":{"char":"樂","gloss":"happy, music","statistics":{"hskLevel":10},
+            "pinyinFrequencies":[{"pinyin":"lè"},{"pinyin":"yuè"},{"pinyin":"yào"}]},
+            "japanese_char":{"literal":"樂","misc":{"jlptLevel":3}},
+            "semantic_mnemonic":{"character":"樂","meaning":"music"},
+            "chinese_words":[{"_id":"1","simp":"乐","trad":"樂","items":[{"pinyin":"lè","definitions":["happy"]},{"pinyin":"yuè","definitions":["music"]}]}]}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    let person = fetched(&s, &path_of("人"));
+    assert_eq!(text_of(&person, "entry-gloss"), "person");
+    let header = header_of(&person);
+    for shown in ["HSK 1", "N4", "rén"] {
+        assert!(header.contains(shown), "{shown}: {header}");
+    }
+    assert!(!header.contains("rén, ren"), "{header}");
+    let music = fetched(&s, &path_of("樂"));
+    // No keyword: the mnemonic's meaning.
+    assert_eq!(text_of(&music, "entry-gloss"), "music");
+    let header = header_of(&music);
+    for shown in ["HSK 10", "N3", "lè, yuè"] {
+        assert!(header.contains(shown), "{shown}: {header}");
+    }
+    assert!(!header.contains("yào"), "{header}");
 }
 
 /// **The header's own rules**, each with its control: no header for an
@@ -829,12 +853,25 @@ fn text_of_class(html: &str, open: &str) -> String {
 /// Japanese form; and the hanja table's form, U+F914, the compatibility
 /// ideograph, a code point of its own and so a form of its own, as
 /// kiokun.com shows it. Each form's meaning is its card's, else kiokun.com's
-/// component gloss, its source marker removed.
+/// component gloss, its source marker removed. The variants are Dong
+/// Chinese's fields, which the repository's sample leaves out, so the entry
+/// is made here with kiokun's own deciding fields for 樂.
 #[test]
 fn the_header_shows_each_written_form_with_its_roles() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "樂",
+        "{\"key\":\"樂\",\"chinese_char\":{\"char\":\"樂\",\"simpVariants\":[\"乐\"]},\
+         \"japanese_char\":{\"literal\":\"楽\"},\"korean_char\":{\"character\":\"樂\",\"hanjaForm\":\"\u{F914}\"},\
+         \"chinese_words\":[{\"_id\":\"1\",\"simp\":\"乐\",\"trad\":\"樂\",\"items\":[{\"pinyin\":\"lè\",\"definitions\":[\"happy\"]}]}]}",
+    );
     let app = app_with("{}", r#"{"乐":"music (simp)","楽":"fun (jp)"}"#);
     let mut s = served_kiokun();
-    s.server.data = Arc::new(crate::kiokun::KiokunData::at(sample(), Some(app.path())));
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        Some(app.path()),
+    ));
     let music = fetched(&s, &path_of("樂"));
     assert_eq!(
         forms_of(&music),
@@ -858,10 +895,25 @@ fn the_header_shows_each_written_form_with_its_roles() {
 
 /// **A stub's page shows its target's forms and its own** (the related
 /// forms, `+page.ts:236-280`): 谚 is 諺's simplified form, read as the
-/// related form it is. 諺 is the hanja table's character too.
+/// related form it is. 諺 is the hanja table's character too. The entries
+/// are made here with kiokun's own deciding fields, the variants being Dong
+/// Chinese's, which the repository's sample leaves out.
 #[test]
 fn a_stubs_page_shows_its_targets_forms_and_its_own() {
-    let s = served_kiokun();
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "谚",
+        r#"{"key":"谚","redirect":"諺","chinese_char":{"char":"谚","tradVariants":["諺"]}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "諺",
+        r#"{"key":"諺","chinese_char":{"char":"諺","simpVariants":["谚"]},"japanese_char":{"literal":"諺"},
+            "korean_char":{"character":"諺"},
+            "chinese_words":[{"_id":"1","simp":"谚","trad":"諺","items":[{"pinyin":"yàn","definitions":["proverb"]}]}]}"#,
+    );
+    let s = served_kiokun_on(dir.path());
     let proverb = fetched(&s, &path_of("谚"));
     assert_eq!(forms_of(&proverb), ["諺 Trad · HK · JP · KR", "谚 Simp"]);
 }
@@ -1699,10 +1751,30 @@ fn title(html: &str) -> String {
 
 /// **The page's description of itself** (`buildDictionarySeo`): 人's title
 /// is the word and its first three meanings, the learner gloss first, and
-/// its description says so; Open Graph and Twitter repeat them.
+/// its description says so; Open Graph and Twitter repeat them. The gloss
+/// and the variants are Dong Chinese's, which the repository's sample leaves
+/// out, so the entries are made here.
 #[test]
 fn the_page_describes_itself_as_kiokun_com_does() {
-    let s = served_kiokun();
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "人",
+        r#"{"key":"人","chinese_char":{"char":"人","gloss":"person"},
+            "chinese_words":[{"_id":"1","simp":"人","trad":"人","items":[{"pinyin":"rén","definitions":["man","person","people"]}]}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "谚",
+        r#"{"key":"谚","redirect":"諺","chinese_char":{"char":"谚","tradVariants":["諺"]}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "諺",
+        r#"{"key":"諺","chinese_char":{"char":"諺","simpVariants":["谚"]},
+            "chinese_words":[{"_id":"1","simp":"谚","trad":"諺","items":[{"pinyin":"yàn","definitions":["proverb"]}]}]}"#,
+    );
+    let s = served_kiokun_on(dir.path());
     let page = fetched(&s, &path_of("人"));
     assert_eq!(title(&page), "人 — person, man, people | Kiokun");
     let described = "人 means person, man, people. Character readings, definitions, examples, \
@@ -2049,6 +2121,12 @@ fn the_japanese_examples_match_kiokuns_answers_for_the_sample() {
         oracle["answered"].as_u64().unwrap_or_default() > 0,
         "{fixture}"
     );
+    // Each example committed carries its Tatoeba sentence id, which
+    // attributes it to its author (CC BY 2.0 FR; kiokun-oracle/NOTICE.md).
+    for (word, examples) in oracle["answers"].as_object().expect("the answers") {
+        let ids = oracle["tatoeba"][word].as_array().map(Vec::len);
+        assert_eq!(ids, examples.as_array().map(Vec::len), "{word}: {fixture}");
+    }
     let s = served_kiokun_on(&sample());
     let differ = examples_held_to_oracle(&s, oracle);
     assert!(differ.is_empty(), "{differ:#?}");

@@ -17,7 +17,7 @@
 //   DATA    a directory of kiokun's entries in its build's layout: the whole
 //           `output_dictionary`, or the repository's sample
 //   STRIDE  every how manyth file of each subdirectory, in name order
-//   OUT     where the JSON goes: { stride, read, answered, named, answers },
+//   OUT     where the JSON goes: { stride, read, answered, named, provenance, trimmed, answers },
 //           `answers` mapping each word to its Contains cards and its three
 //           Appears in columns
 //   TRIM    `HEAD,TAIL` for the CI fixture: each list kept as its length and
@@ -189,8 +189,17 @@ for (const sub of readdirSync(data).filter((d) => /^[0-9a-f]{2}$/.test(d)).sort(
 }
 const trimmed =
   head === null ? null : `each list's length, and its first ${head} and last ${tail} items, each with its place`;
+// What each field of the answers is made from, which the fixture carries
+// (kiokun-oracle/NOTICE.md; the integrator's ruling of 2026-10-10).
+const provenance = {
+  'contains': 'none in the sample; held locally',
+  'chinese': "w: CC-CEDICT (MDBG, CC BY-SA 4.0), through Dong Chinese's export (kiokun-data data/chinese_dictionary_word_2025-06-25.jsonl); reading, Jyutping and definition held locally",
+  'japanese': 'w, reading, c, d: JMdict (EDRDG, CC BY-SA 4.0), through jmdict-simplified 3.6.1 (kiokun-data data/jmdict-examples-eng-3.6.1.json)',
+  'korean': "w, d: KRDICT (National Institute of Korean Language, CC BY-SA 2.0 KR), through Lyroxide's Yomitan export (kiokun-data data/krdict-en); reading held locally",
+  'the sample': "read from the repository's sample (examples/kiokun/data/han-1char-3, its MANIFEST), which holds cleared fields alone; see NOTICE.md",
+};
 writeFileSync(
   out,
-  JSON.stringify({ stride: step, read, answered: Object.keys(answers).length, named: {}, trimmed, answers }, null, 1),
+  JSON.stringify({ stride: step, read, answered: Object.keys(answers).length, named: {}, provenance, trimmed, answers }, null, 1),
 );
 console.log(`stride ${step}: read ${read} entries; ${Object.keys(answers).length} answered`);

@@ -94,6 +94,12 @@ Numbered after ADR-0301's 20.
     to a reader who has set none (`stores/languages.svelte.ts`: Chinese,
     Japanese, Korean and Cantonese, all on). A reader who turns one off
     there sees less.
+24. **The page acknowledges EDRDG**, at its foot, wherever it shows JMdict's,
+    JMnedict's or KANJIDIC2's data, as the Group's licence asks of a web
+    dictionary "on each screen display"
+    (<https://www.edrdg.org/edrdg/licence.html>, read 2026-10-10).
+    kiokun.com's pages at HEAD carry no such acknowledgement: the owner's to
+    add.
 
 ## Found
 
@@ -206,6 +212,55 @@ integrator's ruling, 2026-10-10).
   `KIOKUN_APP`'s label table, component glosses and pitch data from the
   tree, as a deployment reads its files. The oracles read the committed
   ones, so a difference between the two would show as a difference.
+
+## The repository's kiokun data, cleared
+
+**The repository is public, and committed data is the minimum a committed
+test reads, from cleared sources only** (the integrator's rulings of
+2026-10-10). A source is cleared when its terms were read at the source and
+permit its redistribution here.
+
+- **Provenance from the builder's source at kiokun-data HEAD (`abf71a89`)**,
+  never from its output. The sample, a byte-for-byte copy since 4a5cbae,
+  held much more than tests read:
+  - Dong Chinese's own content: its character glosses, statistics, pinyin
+    frequencies, Shuowen text, comments and variant tables;
+  - Baxter–Sagart's reconstructions, CHISE's IDS, images and scans;
+  - KANJIDIC2's codes and references (SKIP, Four Corner, De Roo,
+    Spahn–Hadamitzky, Morohashi) and its pinyin and Korean readings;
+  - JPDB's ranks and the owner's AI-authored mnemonics.
+- **The sample is regenerated** by `scripts/kiokun_sample.py`, which reads
+  kiokun-data's output and writes each entry with only the fields its
+  `FIELDS` names, each with its source. The output's 28 files were identical
+  to the committed ones, so nothing but fields left out changed.
+  - It keeps CC-CEDICT's words (only the items Dong Chinese's export tags
+    `cedict`), CC-Canto's Jyutping, Unihan's Cantonese, Hong Kong and Korean
+    forms, JMdict with its Tatoeba examples and their ids, KANJIDIC2's
+    levels, readings and meanings, JMnedict and KRDICT.
+  - Chinese previews keep their form alone: their readings and definitions
+    cannot be traced to one source per item.
+  - `MANIFEST.txt` lists each file, field and source, and `NOTICE.md` each
+    source's rights holder, licence, URL and the date it was read.
+  - The files are distributed under CC BY-SA 4.0.
+  - ADR-0037's "copied byte for byte" no longer holds.
+- **Tests that read a field left out moved onto entries made for them**:
+  - the character header's gloss, HSK and JLPT levels and frequency-list
+    Mandarin (the JLPT badge sits beside the gloss, as on kiokun.com);
+  - the written forms and a stub's forms (Dong Chinese's variants);
+  - the page head's gloss-led title.
+  - The hand-made entries hold kiokun's deciding fields for each word. The
+    mutant "Mandarin keeps the readings the words do not read" is killed
+    there.
+  - The browser spec reads the sample's cleared fields alone: no gloss or
+    level badges, and the title from the definitions.
+- **The fixtures** hold only the fields their tests compare, each fixture's
+  `provenance` naming each field's source.
+  - `examples-sample.json` carries each sentence's Tatoeba id, and its test
+    requires one per example.
+  - Fields from uncleared sources are held locally by the same recipes.
+- **EDRDG's acknowledgement**: the word page acknowledges JMdict, JMnedict
+  and KANJIDIC2 at its foot wherever it shows their data, in the licence's
+  sample wording, linked (Difference 24).
 
 ## Not claimed
 

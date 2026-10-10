@@ -10,7 +10,7 @@
 //           (`scripts/kiokun_app_source.py`; never committed here)
 //   DATA    a directory of kiokun's entries in its build's layout
 //   STRIDE  every how manyth file of each subdirectory, in name order
-//   OUT     where the JSON goes: { stride, read, answered, named, answers },
+//   OUT     where the JSON goes: { stride, read, answered, named, provenance, answers, tatoeba },
 //           `answers` mapping each word to the examples its Japanese words'
 //           senses show, in order, each `text / translation`
 //
@@ -34,6 +34,10 @@ const { japaneseExamplesForSense } = await import(
 );
 const step = Number(stride);
 const answers = {};
+// Each shown example's Tatoeba sentence id, as JMdict's example records carry
+// it (`source: { type: "tatoeba", value }`): Tatoeba's licence (CC BY 2.0 FR)
+// attributes a sentence to its author, at tatoeba.org/sentences/show/<id>.
+const tatoeba = {};
 let read = 0;
 for (const sub of readdirSync(data).filter((d) => /^[0-9a-f]{2}$/.test(d)).sort()) {
   const files = readdirSync(join(data, sub)).filter((f) => f.endsWith(".json.deflate")).sort();
@@ -42,15 +46,32 @@ for (const sub of readdirSync(data).filter((d) => /^[0-9a-f]{2}$/.test(d)).sort(
     read += 1;
     const merges = entry.chinese_char?.simpVariants?.length || entry.simplified_form_of;
     if (entry.redirect || merges || !entry.key || !entry.japanese_words?.length) continue;
-    answers[entry.key] = entry.japanese_words.flatMap((word) =>
+    const shown = entry.japanese_words.flatMap((word) =>
       (word.sense || []).flatMap((sense) =>
-        japaneseExamplesForSense(sense).map((e) => `${e.text} / ${e.translation ?? ""}`),
+        japaneseExamplesForSense(sense).map((e) => {
+          const record = (sense.examples || []).find((x) =>
+            (x.sentences || []).some((t) => (t.land === "jpn" || t.lang === "jpn") && t.text === e.text),
+          );
+          if (record?.source?.type !== "tatoeba" || !record.source.value) {
+            throw new Error(`${entry.key}: an example without its Tatoeba id: ${e.text}`);
+          }
+          return { shown: `${e.text} / ${e.translation ?? ""}`, id: String(record.source.value) };
+        }),
       ),
     );
+    answers[entry.key] = shown.map((e) => e.shown);
+    tatoeba[entry.key] = shown.map((e) => e.id);
   }
 }
+// What each field of the answers is made from, which the fixture carries
+// (kiokun-oracle/NOTICE.md; the integrator's ruling of 2026-10-10).
+const provenance = {
+  'answers (sentence / translation)': "Tatoeba (CC BY 2.0 FR), each sentence with its id, as JMdict's examples carry them (kiokun-data data/jmdict-examples-eng-3.6.1.json)",
+  'tatoeba': "each shown sentence's Tatoeba id, attributing it to its author at tatoeba.org/sentences/show/<id>",
+  'the sample': "read from the repository's sample (examples/kiokun/data/han-1char-3, its MANIFEST), which holds cleared fields alone; see NOTICE.md",
+};
 writeFileSync(
   out,
-  JSON.stringify({ stride: step, read, answered: Object.keys(answers).length, named: {}, answers }, null, 1),
+  JSON.stringify({ stride: step, read, answered: Object.keys(answers).length, named: {}, provenance, answers, tatoeba }, null, 1),
 );
 console.log(`stride ${step}: read ${read} entries; ${Object.keys(answers).length} answered; named differences {}`);

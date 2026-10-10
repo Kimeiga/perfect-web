@@ -12,7 +12,7 @@
 //           `output_dictionary`, or the repository's sample
 //   STRIDE  every how manyth control, in name order
 //   OUT     where the JSON goes: { stride, read, candidates, controls,
-//           answered, moved, named, answers }, `answers` mapping each word to
+//           answered, moved, named, provenance, answers }, `answers` mapping each word to
 //           the word its page moves to, or null
 //
 // kiokun.com's page answers 308 to `equivalentTraditionalTarget(data)` where
@@ -72,10 +72,16 @@ for (const sub of readdirSync(data).filter((d) => /^[0-9a-f]{2}$/.test(d)).sort(
     answers[entry.key] = to;
   }
 }
+// What each field of the answers is made from, which the fixture carries
+// (kiokun-oracle/NOTICE.md; the integrator's ruling of 2026-10-10).
+const provenance = {
+  'answers': "written forms alone, and the word each moves to, from the entries' structure (kiokun-data's builder)",
+  'the sample': "read from the repository's sample (examples/kiokun/data/han-1char-3, its MANIFEST), which holds cleared fields alone; see NOTICE.md",
+};
 writeFileSync(
   out,
   JSON.stringify(
-    { stride: step, read, candidates, controls, answered: Object.keys(answers).length, moved, named: {}, answers },
+    { stride: step, read, candidates, controls, answered: Object.keys(answers).length, moved, named: {}, provenance, answers },
     null,
     1,
   ),

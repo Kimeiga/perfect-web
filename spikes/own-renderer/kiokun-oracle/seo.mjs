@@ -10,7 +10,7 @@
 //   DATA    a directory of kiokun's entries in its build's layout: the whole
 //           `output_dictionary`, or the repository's sample
 //   STRIDE  every how manyth file of each subdirectory, in name order
-//   OUT     where the JSON goes: { stride, read, answered, named, answers },
+//   OUT     where the JSON goes: { stride, read, answered, named, provenance, answers },
 //           `answers` mapping each word to its { title, description } and the
 //           differences named for it
 //
@@ -78,8 +78,14 @@ for (const sub of readdirSync(data).filter((d) => /^[0-9a-f]{2}$/.test(d)).sort(
     answers[entry.key] = answer;
   }
 }
+// What each field of the answers is made from, which the fixture carries
+// (kiokun-oracle/NOTICE.md; the integrator's ruling of 2026-10-10).
+const provenance = {
+  'title, description': "the word, and the meanings kiokun.com's buildDictionarySeo takes: Chinese definitions from CC-CEDICT (MDBG, CC BY-SA 4.0), through Dong Chinese's export (kiokun-data data/chinese_dictionary_word_2025-06-25.jsonl); Japanese glosses from JMdict (EDRDG, CC BY-SA 4.0), through jmdict-simplified 3.6.1 (kiokun-data data/jmdict-examples-eng-3.6.1.json); Korean definitions from KRDICT (National Institute of Korean Language, CC BY-SA 2.0 KR), through Lyroxide's Yomitan export (kiokun-data data/krdict-en)",
+  'the sample': "read from the repository's sample (examples/kiokun/data/han-1char-3, its MANIFEST), which holds cleared fields alone; see NOTICE.md",
+};
 writeFileSync(
   out,
-  JSON.stringify({ stride: step, read, answered: Object.keys(answers).length, named, answers }, null, 1),
+  JSON.stringify({ stride: step, read, answered: Object.keys(answers).length, named, provenance, answers }, null, 1),
 );
 console.log(`stride ${step}: read ${read} entries; ${Object.keys(answers).length} answered; named differences ${JSON.stringify(named)}`);
