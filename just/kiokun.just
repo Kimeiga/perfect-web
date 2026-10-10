@@ -54,10 +54,12 @@ e14-kiokun-sample:
        echo "== this branch's word page"; echo; \
        cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::a_sample 2>&1 \
          | grep -E '^(server|files|status|per request|slowest|defect|test result)|panicked'; \
+       echo "after it: $(uptime | sed 's/.*load/load/')"; \
        echo; echo "== the word page's first milestone (ADR-0286), the same sample"; echo; \
        KIOKUN_SAMPLE_APP="${TMPDIR:-/tmp}/kiokun-site-0286.pw" \
          cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::a_sample 2>&1 \
          | grep -E '^(server|files|status|per request|slowest|defect|test result)|panicked'; \
+       echo "after it: $(uptime | sed 's/.*load/load/')"; \
      } > docs/evidence/E14/kiokun-sample.txt
     @cat docs/evidence/E14/kiokun-sample.txt
     @! grep -qE "panicked|FAILED" docs/evidence/E14/kiokun-sample.txt
