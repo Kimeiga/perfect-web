@@ -22,6 +22,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = ROOT / "examples/kiokun-site/app.pw"
 LAYER = ROOT / "spikes/own-renderer/server/src/kiokun.rs"
 HOST = ROOT / "spikes/own-renderer/server/src/main.rs"
+SEARCH = ROOT / "spikes/own-renderer/server/src/kiokun/search.rs"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
@@ -594,6 +595,66 @@ MUTANTS = [
         APP,
         "        edrdg: edrdg_shown(e),\n",
         "        edrdg: true,\n",
+    ),
+    (
+        "a CJK query is searched as typed alone",
+        APP,
+        "add_terms(add_terms(add_term(none, trimmed), values_of(aliases, trimmed)), spellings(trimmed, variants))",
+        "add_term(none, trimmed)",
+    ),
+    (
+        "a katakana query is not read as hiragana",
+        APP,
+        "if c >= 12449 & c <= 12534 { c - 96 } else { c }",
+        "c",
+    ),
+    (
+        "a Japanese form names its own page",
+        APP,
+        '    if row.language == "japanese" {\n        match List.get(values_of(canonical, row.word), 0) {',
+        '    if false {\n        match List.get(values_of(canonical, row.word), 0) {',
+    ),
+    (
+        "the query's own row never names its group",
+        APP,
+        "    if row.word == asked { 1000 } else {",
+        "    if false { 1000 } else {",
+    ),
+    (
+        "pronunciations join Chinese first",
+        APP,
+        "    let parts = List.filter([g.japanese, g.chinese, g.korean], p => p != \"\")",
+        "    let parts = List.filter([g.chinese, g.japanese, g.korean], p => p != \"\")",
+    ),
+    (
+        "a hit shows every definition",
+        APP,
+        "    let lines = List.fold(List.take(g.definitions, 3), none,",
+        "    let lines = List.fold(g.definitions, none,",
+    ),
+    (
+        "every query is searched as Latin",
+        APP,
+        "fn is_cjk(asked: String) -> Bool {\n    List.any(",
+        "fn is_cjk(asked: String) -> Bool {\n    false & List.any(",
+    ),
+    (
+        "a column shows every hit at once",
+        APP,
+        "        first: List.take(mine, 8),\n        rest: List.drop(mine, 8),",
+        "        first: mine,\n        rest: List.drop(mine, 100000),",
+    ),
+    (
+        "the CJK statement ranks the query's word as any prefix",
+        SEARCH,
+        '.map(|i| format!("WHEN word = ? THEN {}", if i == 0 { 1000 } else { 900 }))',
+        '.map(|i| format!("WHEN word = ? THEN {}", if i == 0 { 400 } else { 900 }))',
+    ),
+    (
+        "a kana query's reading is never searched",
+        SEARCH,
+        "        if !reading.is_empty() {\n            clauses.push(",
+        "        if false {\n            clauses.push(",
     ),
 ]
 

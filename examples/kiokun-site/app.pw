@@ -2883,3 +2883,396 @@ page WordPage(word: String) {
         </main>
     }
 }
+
+// ---------------------------------------------------------------------------
+// Search (`src/routes/api/search/+server.ts`, `src/lib/search-aliases-core.ts`,
+// `src/routes/search/+page.svelte`): the whole dictionary's index, as
+// kiokun.com's D1 holds it, searched with kiokun.com's two statements; what
+// to search for, how hits group and how the page shows them, the program's.
+
+// A row of kiokun.com's search index (migration 0005's `dictionary_search`):
+// a word, its language, one definition, its pronunciation and romanization,
+// and whether its dictionary calls it common.
+type SearchRow = SearchRow {
+    word: String,
+    language: String,
+    definition: String,
+    pronunciation: String,
+    reading_search: String,
+    is_common: Int,
+}
+
+// One key and what kiokun.com's aliases give for it (`search-aliases.json`).
+type AliasSet = AliasSet {
+    term: String,
+    values: List<String>,
+}
+
+// kiokun.com's search index and aliases: read, never written; every read
+// sees the one index the deployment opened.
+source KiokunSearch
+    holds        SearchRow, AliasSet
+    transactions none
+    reads        strong
+    changes      none
+
+// The CJK statement (`buildCjkSearchSql`): each term a word prefix, ranked
+// exact, then a Japanese reading, then a prefix.
+fn search_cjk(terms: List<String>, reading: String, limit: Int) -> List<SearchRow> !{ database.read<SearchRow> }
+    host "kiokun:data/search#cjk"
+
+// The Latin statement: the query over every column.
+fn search_latin(asked: String, limit: Int) -> List<SearchRow> !{ database.read<SearchRow> }
+    host "kiokun:data/search#latin"
+
+// Each term's whole-word aliases (`aliases`).
+fn search_aliases(terms: List<String>) -> List<AliasSet> !{ database.read<AliasSet> }
+    host "kiokun:data/search#aliases"
+
+// Each character's script variants (`characterVariants`).
+fn search_variants(characters: List<String>) -> List<AliasSet> !{ database.read<AliasSet> }
+    host "kiokun:data/search#variants"
+
+// Each Japanese form's canonical page (`japaneseToCanonical`).
+fn search_canonical(words: List<String>) -> List<AliasSet> !{ database.read<AliasSet> }
+    host "kiokun:data/search#canonical"
+
+fn values_of(sets: List<AliasSet>, key: String) -> List<String> {
+    let none: List<String> = []
+    match List.find(sets, s => s.term == key) {
+        Some(s) => s.values,
+        None => none,
+    }
+}
+
+// `isCJK` (`/[　-鿿가-힯豈-﫿]/`, without the `u`
+// flag): a UTF-16 unit in those ranges, so a character past U+FFFF, two
+// surrogates, is none.
+fn is_cjk(asked: String) -> Bool {
+    List.any(String.codepoints(asked), c => (c >= 12288 & c <= 40959) | (c >= 44032 & c <= 55215) | (c >= 63744 & c <= 64255))
+}
+
+// `isJapaneseKanaQuery` (`/^[぀-ヿ]+$/u`, trimmed).
+fn is_kana(asked: String) -> Bool {
+    let points = String.codepoints(String.trim(asked))
+    List.length(points) > 0 & List.all(points, c => c >= 12352 & c <= 12543)
+}
+
+// `normalizeJapaneseReading`: katakana (U+30A1 to U+30F6) as hiragana.
+fn hiragana(asked: String) -> String {
+    String.from_codepoints(List.map(String.codepoints(String.trim(asked)), c => if c >= 12449 & c <= 12534 { c - 96 } else { c }))
+}
+
+// `addTerm`: a term trimmed, added where it is not empty, not there yet,
+// and the terms are fewer than 24.
+fn add_term(terms: List<String>, term: String) -> List<String> {
+    let t = String.trim(term)
+    if t == "" | List.any(terms, s => s == t) | List.length(terms) >= 24 { terms } else { List.concat(terms, [t]) }
+}
+
+fn add_terms(terms: List<String>, more: List<String>) -> List<String> {
+    List.fold(more, terms, (out, t) => add_term(out, t))
+}
+
+// One character's step of `expandCharacterVariants`: each prefix with each
+// of the character's forms, no more than 24 in all.
+fn combined(prefixes: List<String>, options: List<String>) -> List<String> {
+    let none: List<String> = []
+    List.fold(prefixes, none, (out, p) => List.fold(options, out, (o, x) => if List.length(o) >= 24 { o } else { List.concat(o, ["{p}{x}"]) }))
+}
+
+// `expandCharacterVariants`: every way to write the query, each character as
+// itself or a variant, in order, no more than 24.
+fn spellings(asked: String, variants: List<AliasSet>) -> List<String> {
+    List.fold(characters(asked), [""], (prefixes, c) => combined(prefixes, distinct_keep(List.concat([c], values_of(variants, c)))))
+}
+
+// Each value once, in order, the empty one kept (`[...new Set(options)]`).
+fn distinct_keep(values: List<String>) -> List<String> {
+    let none: List<String> = []
+    List.fold(values, none, (out, v) => if List.any(out, s => s == v) { out } else { List.concat(out, [v]) })
+}
+
+// `getCjkSearchTermsFromData`: the query, its aliases, its spellings, and
+// each term's aliases, no more than 24.
+fn cjk_terms(before: List<String>, later_aliases: List<AliasSet>) -> List<String> {
+    List.fold(before, before, (out, t) => add_terms(out, values_of(later_aliases, t)))
+}
+
+fn first_terms(asked: String, aliases: List<AliasSet>, variants: List<AliasSet>) -> List<String> {
+    let none: List<String> = []
+    let trimmed = String.trim(asked)
+    if trimmed == "" { none } else { add_terms(add_terms(add_term(none, trimmed), values_of(aliases, trimmed)), spellings(trimmed, variants)) }
+}
+
+// `getSearchTarget`: a Japanese form's canonical page, else the word.
+fn page_of_row(row: SearchRow, canonical: List<AliasSet>) -> String {
+    if row.language == "japanese" {
+        match List.get(values_of(canonical, row.word), 0) {
+            Some(t) => t,
+            None => row.word,
+        }
+    } else {
+        row.word
+    }
+}
+
+// `displayScore`: which row of a group names it.
+fn display_score(row: SearchRow, target: String, asked: String, terms: List<String>) -> Int {
+    let is_term = List.any(terms, t => t == row.word)
+    if row.word == asked { 1000 } else { if row.word == target & target == asked { 950 } else { if row.word == target & is_term { 900 } else { if is_term { 850 } else { if row.word == target { 700 } else { if row.language == "japanese" & target != row.word { 650 } else { 500 } } } } } }
+}
+
+// A group of rows naming one page, as the endpoint builds it.
+type Group = Group {
+    target: String,
+    word: String,
+    forms: List<String>,
+    language: String,
+    definitions: List<String>,
+    japanese: String,
+    chinese: String,
+    korean: String,
+    common: Bool,
+    score: Int,
+}
+
+fn first_pronunciation(now: String, row: SearchRow, language: String) -> String {
+    if now == "" & row.language == language & row.pronunciation != "" { row.pronunciation } else { now }
+}
+
+fn grouped(group: Group, row: SearchRow, score: Int) -> Group {
+    let better = score > group.score
+    Group {
+        target: group.target,
+        word: if better { row.word } else { group.word },
+        forms: if List.any(group.forms, f => f == row.word) { group.forms } else { List.concat(group.forms, [row.word]) },
+        language: if better { row.language } else { group.language },
+        definitions: if List.any(group.definitions, d => d == row.definition) { group.definitions } else { List.concat(group.definitions, [row.definition]) },
+        japanese: first_pronunciation(group.japanese, row, "japanese"),
+        chinese: first_pronunciation(group.chinese, row, "chinese"),
+        korean: first_pronunciation(group.korean, row, "korean"),
+        common: group.common | row.is_common != 0,
+        score: if better { score } else { group.score },
+    }
+}
+
+fn started(row: SearchRow, target: String, score: Int) -> Group {
+    let none: List<String> = []
+    Group {
+        target: target,
+        word: row.word,
+        forms: distinct(if row.word == target { [row.word] } else { [row.word, target] }),
+        language: row.language,
+        definitions: none,
+        japanese: "",
+        chinese: "",
+        korean: "",
+        common: false,
+        score: score,
+    }
+}
+
+// One row into the groups: a new group where its page has none, else the
+// group's, each in the order its page was first met.
+fn group_row(groups: List<Group>, row: SearchRow, canonical: List<AliasSet>, asked: String, terms: List<String>) -> List<Group> {
+    let target = page_of_row(row, canonical)
+    let score = display_score(row, target, asked, terms)
+    if List.any(groups, g => g.target == target) {
+        List.map(groups, g => if g.target == target { grouped(g, row, score) } else { g })
+    } else {
+        List.concat(groups, [grouped(started(row, target, score), row, score)])
+    }
+}
+
+// A hit as the search page shows it (`search/+page.svelte`).
+type ShownHit = ShownHit {
+    id: String,
+    target: String,
+    text: String,
+    pronunciation: String,
+    common: Bool,
+    definitions: List<ShownLine>,
+    more: String,
+}
+
+// One numbered definition of a hit.
+type ShownLine = ShownLine {
+    id: String,
+    text: String,
+}
+
+fn hit_shown(g: Group, n: Int) -> ShownHit {
+    let parts = List.filter([g.japanese, g.chinese, g.korean], p => p != "")
+    let none: List<ShownLine> = []
+    let lines = List.fold(List.take(g.definitions, 3), none, (out, d) => List.concat(out, [ShownLine { id: "{n}:{List.length(out)}", text: "{List.length(out) + 1}. {d}" }]))
+    let extra = List.length(g.definitions) - 3
+    ShownHit {
+        id: "hit:{n}",
+        target: g.target,
+        text: if g.language == "chinese" { String.join(List.take(g.forms, 3), " / ") } else { g.word },
+        pronunciation: String.join(parts, " · "),
+        common: g.common,
+        definitions: lines,
+        more: if extra <= 0 { "" } else { if extra == 1 { "+1 more definition" } else { "+{extra} more definitions" } },
+    }
+}
+
+// One language's column: its first eight hits, and the rest behind a
+// disclosure (`visibleChinese`, eight, and "Show more").
+type HitColumn = HitColumn {
+    id: String,
+    heading: String,
+    first: List<ShownHit>,
+    rest: List<ShownHit>,
+    more: String,
+}
+
+fn column_of(hits: List<ShownHit>, groups: List<Group>, language: String, heading: String) -> HitColumn {
+    let mine = List.filter(hits, h => List.any(groups, g => g.target == h.target & g.language == language))
+    HitColumn {
+        id: "{language}-results",
+        heading: heading,
+        first: List.take(mine, 8),
+        rest: List.drop(mine, 8),
+        more: "Show more {heading} results",
+    }
+}
+
+// The search page's content.
+type SearchShown = SearchShown {
+    asked: String,
+    found: String,
+    any: Bool,
+    chinese: HitColumn,
+    japanese: HitColumn,
+    korean: HitColumn,
+}
+
+fn search_shown(asked: String, groups: List<Group>) -> SearchShown {
+    let none: List<ShownHit> = []
+    let hits = List.fold(groups, none, (out, g) => List.concat(out, [hit_shown(g, List.length(out))]))
+    let total = List.length(groups)
+    SearchShown {
+        asked: asked,
+        found: if total == 1 { "Found 1 result" } else { "Found {total} results" },
+        any: total > 0,
+        chinese: column_of(hits, groups, "chinese", "Chinese"),
+        japanese: column_of(hits, groups, "japanese", "Japanese"),
+        korean: column_of(hits, groups, "korean", "Korean"),
+    }
+}
+
+// The page asks for 60 (`limit=60`).
+fn search_limit() -> Int {
+    60
+}
+
+// **A search** (`GET /api/search?q=…&limit=60`, as the search page asks
+// it): a CJK query's terms, the query and its variants and aliases; a Latin
+// one as typed; the rows kiokun.com's statements return, grouped by the page
+// each names, the first 60.
+public query Search(q: String) -> SearchShown
+    freshness   1.hours
+    consistency snapshot
+    cache       shared
+    key         q
+{
+    let none: List<String> = []
+    let cjk = is_cjk(q)
+    let trimmed = String.trim(q)
+    let first_aliases = if cjk { search_aliases([trimmed]) } else { search_aliases(none) }
+    let variants = if cjk { search_variants(characters(trimmed)) } else { search_variants(none) }
+    let early = if cjk { first_terms(q, first_aliases, variants) } else { none }
+    let later = search_aliases(early)
+    let terms = if cjk { cjk_terms(early, later) } else { [q] }
+    let kana = cjk & is_kana(q)
+    let rows = if cjk {
+        search_cjk(terms, if kana { hiragana(q) } else { "" }, if 1000 < search_limit() * max_of(4, min_of(List.length(terms), 12)) { 1000 } else { search_limit() * max_of(4, min_of(List.length(terms), 12)) })
+    } else {
+        search_latin(q, search_limit() * 3)
+    }
+    let canonical = search_canonical(List.map(List.filter(rows, r => r.language == "japanese"), r => r.word))
+    let empty: List<Group> = []
+    let groups = List.fold(rows, empty, (gs, r) => group_row(gs, r, canonical, q, terms))
+    search_shown(q, List.take(groups, search_limit()))
+}
+
+fn max_of(a: Int, b: Int) -> Int {
+    if a > b { a } else { b }
+}
+
+fn min_of(a: Int, b: Int) -> Int {
+    if a < b { a } else { b }
+}
+
+// One hit of the search page (`search/+page.svelte`): a link to its word's
+// page, its written forms, its pronunciation, a Common badge, three
+// definitions numbered, and how many more.
+view HitCard(hit: ShownHit) {
+    <a href="/word/{hit.target}" class="result-card divider-cell">
+        <div class="result-header">
+            <span class="word">{hit.text}</span>
+            {#if hit.pronunciation}<span class="pronunciation">[{hit.pronunciation}]</span>{/if}
+            {#if hit.common}<span class="common-badge">Common</span>{/if}
+        </div>
+        <div class="definitions">
+            {#each hit.definitions as d (d.id)}<div class="definition">{d.text}</div>{/each}
+            {#if hit.more}<div class="more-definitions">{hit.more}</div>{/if}
+        </div>
+    </a>
+}
+
+// One language's column: eight hits, and the rest behind a disclosure.
+view HitColumnView(column: HitColumn) {
+    {#if column.first}
+        <div class="results-column" id={column.id}>
+            <h2 class="column-title section-bar-label">{column.heading}</h2>
+            <div class="results-list divider-grid">
+                {#each column.first as h (h.id)}<HitCard hit={h} />{/each}
+            </div>
+            {#if column.rest}
+                <details class="show-more">
+                    <summary>{column.more}</summary>
+                    <div class="results-list divider-grid">
+                        {#each column.rest as h (h.id)}<HitCard hit={h} />{/each}
+                    </div>
+                </details>
+            {/if}
+        </div>
+    {/if}
+}
+
+// The search page. Its route is `/search/{q}` until a page can read a
+// query string (kiokun.com's `/search?q=`), which is the integrator's.
+page SearchPage(q: String) {
+    route     "/search/{q}"
+    placement origin
+    cache     shared
+
+    let found = query Search(q)
+
+    view {
+        <title>Search Results | Kiokun</title>
+        <meta name="robots" content="noindex, follow" />
+        <main id="main-content" class="search-page">
+            <div class="search-header">
+                <h1>Search Results</h1>
+                <p class="search-asked">Results across Chinese, Japanese, and Korean for <strong>{found.asked}</strong></p>
+            </div>
+            {#if found.any}
+                <div class="results-header"><p>{found.found}</p></div>
+                <div class="results-container">
+                    <HitColumnView column={found.chinese} />
+                    <HitColumnView column={found.japanese} />
+                    <HitColumnView column={found.korean} />
+                </div>
+            {:else}
+                <div class="no-results">
+                    <h2>No results for “{found.asked}”</h2>
+                    <p class="hint">Try a shorter spelling, a dictionary form, or an English meaning.</p>
+                </div>
+            {/if}
+        </main>
+    }
+}

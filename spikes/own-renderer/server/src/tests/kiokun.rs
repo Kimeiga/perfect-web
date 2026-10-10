@@ -208,7 +208,7 @@ fn section<'a>(html: &'a str, id: &str) -> &'a str {
 
 /// **The development server serves kiokun's program from kiokun's files**:
 /// its contracts import `kiokun:data/…`, so the host chooses the kiokun
-/// layer, which supplies `entries#read` and grants reading entries alone.
+/// layer, which supplies `entries#read` and grants reading kiokun's data alone.
 #[test]
 fn kiokun_is_served_by_the_host_its_entries_read_from_kiokuns_files() {
     let s = served_kiokun();
@@ -218,7 +218,9 @@ fn kiokun_is_served_by_the_host_its_entries_read_from_kiokuns_files() {
             "database.read<Entry>",
             "database.read<Label>",
             "database.read<CharGloss>",
-            "database.read<PitchReading>"
+            "database.read<PitchReading>",
+            "database.read<SearchRow>",
+            "database.read<AliasSet>"
         ]
     );
     assert!(s.data.operations().contains("kiokun:data/entries#read"));
@@ -1609,6 +1611,263 @@ fn a_page_with_edrdg_data_acknowledges_the_group() {
     let computer = fetched(&served_kiokun_on(dir.path()), &path_of("电脑"));
     assert!(computer.starts_with("HTTP/1.1 200"), "{computer}");
     assert!(!computer.contains("data-sources"), "{computer}");
+}
+
+/// The search page's path for `q`, its one segment percent-encoded.
+fn search_path(q: &str) -> String {
+    path_of(q).replacen("/word/", "/search/", 1)
+}
+
+/// **One language's column of the search page** (`search/+page.svelte`):
+/// each hit, shown first or behind the disclosure, as `text | [pronunciation]
+/// | Common | 1. a ; 2. b ; 3. c | +N more | target`; none where the page has
+/// no such column.
+fn search_hits_in(html: &str, language: &str) -> Vec<String> {
+    let Some(at) = html.find(&format!(" id=\"{language}-results\"")) else {
+        return Vec::new();
+    };
+    let column = &html[at..];
+    let end = column[1..]
+        .find("class=\"results-column\"")
+        .map_or(column.find("</main>").unwrap_or(column.len()), |e| e + 1);
+    // Each hit from its link's tag, whose `href` comes before its class.
+    pieces(&column[..end], "<a ")
+        .into_iter()
+        .filter(|card| card.contains("class=\"result-card"))
+        .map(|card| {
+            let href = card
+                .find("href=\"/word/")
+                .map(|h| {
+                    let rest = &card[h + 12..];
+                    rest[..rest.find('"').unwrap_or(rest.len())].to_string()
+                })
+                .unwrap_or_default();
+            let definitions: Vec<String> = pieces(card, "class=\"definition\"")
+                .into_iter()
+                .map(|d| unescaped(&text_of_class(&format!("x{d}"), "x")))
+                .collect();
+            format!(
+                "{} | {} | {} | {} | {} | {}",
+                class_text(card, "word"),
+                class_text(card, "pronunciation"),
+                if card.contains("class=\"common-badge\"") {
+                    "Common"
+                } else {
+                    ""
+                },
+                definitions.join(" ; "),
+                class_text(card, "more-definitions"),
+                href
+            )
+        })
+        .collect()
+}
+
+/// kiokun.com's response for a query, in the form the page reader gives,
+/// each language's hits in the response's order.
+fn search_wanted(answer: &serde_json::Value, language: &str) -> Vec<String> {
+    let s = |v: &serde_json::Value| v.as_str().unwrap_or_default().to_string();
+    answer["results"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|r| r["language"] == language)
+        .map(|r| {
+            let forms: Vec<String> = r["forms"].as_array().into_iter().flatten().map(s).collect();
+            let text = if language == "chinese" && !forms.is_empty() {
+                forms
+                    .iter()
+                    .take(3)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" / ")
+            } else {
+                s(&r["word"])
+            };
+            let pronunciation = s(&r["pronunciation"]);
+            let definitions: Vec<String> = r["definitions"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(s)
+                .collect();
+            let extra = definitions.len().saturating_sub(3);
+            let target = match s(&r["targetWord"]) {
+                t if t.is_empty() => s(&r["word"]),
+                t => t,
+            };
+            format!(
+                "{} | {} | {} | {} | {} | {}",
+                text,
+                if pronunciation.is_empty() {
+                    String::new()
+                } else {
+                    format!("[{pronunciation}]")
+                },
+                if r["is_common"].as_bool() == Some(true) {
+                    "Common"
+                } else {
+                    ""
+                },
+                definitions
+                    .iter()
+                    .take(3)
+                    .enumerate()
+                    .map(|(i, d)| format!("{}. {d}", i + 1))
+                    .collect::<Vec<_>>()
+                    .join(" ; "),
+                match extra {
+                    0 => String::new(),
+                    1 => "+1 more definition".to_string(),
+                    n => format!("+{n} more definitions"),
+                },
+                path_of(&target).trim_start_matches("/word/")
+            )
+        })
+        .collect()
+}
+
+/// **The search page against kiokun.com's answers**: each query's hits, in
+/// each language's column, beside the oracle's. A query kiokun.com answers
+/// with an error is counted by name where the page fails too (Difference
+/// 27); any other difference is listed.
+fn search_held_to_oracle(
+    s: &Server,
+    oracle: &serde_json::Value,
+) -> (BTreeMap<String, usize>, Vec<String>) {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut named: BTreeMap<String, usize> = BTreeMap::new();
+    let mut differ: Vec<String> = Vec::new();
+    for (q, answer) in answers {
+        let page = fetched(s, &search_path(q));
+        if answer.get("error").is_some() {
+            if page.starts_with("HTTP/1.1 200") {
+                differ.push(format!("{q}: kiokun.com {}, the page 200", answer["error"]));
+            } else {
+                *named.entry("a failed search".to_string()).or_default() += 1;
+            }
+            continue;
+        }
+        if !page.starts_with("HTTP/1.1 200") {
+            differ.push(format!("{q}: {}", page.lines().next().unwrap_or_default()));
+            continue;
+        }
+        let html = page.split("<script").next().unwrap_or_default();
+        for language in ["chinese", "japanese", "korean"] {
+            let want = search_wanted(answer, language);
+            let got = search_hits_in(html, language);
+            if got != want {
+                differ.push(format!(
+                    "{q} {language}:\n  kiokun.com: {want:?}\n  rewrite:    {got:?}"
+                ));
+            }
+        }
+    }
+    (named, differ)
+}
+
+/// **Search against kiokun.com's own code** (local: `just e14-kiokun-search`
+/// runs kiokun.com's `api/search` handler, copied from `KIOKUN_APP`'s HEAD,
+/// over kiokun-data's committed index, and names its answers in
+/// `KIOKUN_SEARCH_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-search`"]
+fn search_matches_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_SEARCH_ORACLE").expect("KIOKUN_SEARCH_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let (named, differ) = search_held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} queries (stride {}, {} rows)",
+        oracle["queries"], oracle["stride"], oracle["rows"]
+    );
+    println!("named differences: {named:?}");
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(30) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
+}
+
+/// **Search against kiokun.com's answers for the repository's sample**
+/// (`kiokun-oracle/search-sample.json`, written by `just e14-kiokun-search`
+/// over `examples/kiokun/data/search-sample.csv` and its hand-made aliases):
+/// what CI holds.
+#[test]
+fn search_matches_kiokuns_answers_for_the_sample() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../kiokun-oracle/search-sample.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the fixture")).expect("JSON");
+    assert!(
+        fixture["kiokun_commit"]
+            .as_str()
+            .is_some_and(|c| c.len() == 40),
+        "{fixture}"
+    );
+    let oracle = &fixture["oracle"];
+    assert!(
+        oracle["queries"].as_u64().is_some_and(|n| n > 20),
+        "{fixture}"
+    );
+    let s = served_kiokun();
+    let (_, differ) = search_held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+}
+
+/// **Search's edges** (`api/search/+server.ts`, `search-aliases-core.ts`),
+/// over the repository's sample index and its hand-made aliases; each answer
+/// is kiokun.com's own for the same query (`search.mjs`):
+/// - a katakana query also searches its hiragana reading: ヒト finds 人, read
+///   ひと;
+/// - a CJK query searches each character's variants: 学 finds 學;
+/// - a Japanese form groups under its canonical page: 学生 is one hit,
+///   written 学生, linking 學生, read in Japanese and Chinese;
+/// - a query nothing matches says so;
+/// - a query FTS5 cannot read fails, as kiokun.com's does.
+#[test]
+fn search_reads_kana_variants_and_canonical_pages() {
+    let s = served_kiokun();
+    let html = |q: &str| {
+        let page = fetched(&s, &search_path(q));
+        assert!(page.starts_with("HTTP/1.1 200"), "{q}: {page}");
+        page.split("<script").next().unwrap_or_default().to_string()
+    };
+    let kana = html("ヒト");
+    let first = search_hits_in(&kana, "japanese");
+    assert!(
+        first[0].starts_with("人 | [ひと] | Common | 1. person"),
+        "{first:?}"
+    );
+    let study = html("学");
+    // Eight hits a column, and the rest behind a disclosure.
+    let japanese = &study[study.find(" id=\"japanese-results\"").expect("the column")..];
+    let shown = &japanese[..japanese.find("<details").expect("the disclosure")];
+    assert_eq!(shown.matches("class=\"result-card").count(), 8, "{study}");
+    assert!(japanese.contains(">Show more Japanese results<"), "{study}");
+    assert!(
+        search_hits_in(&study, "chinese")
+            .iter()
+            .any(|h| h.starts_with("學 | [xué]")),
+        "{study}"
+    );
+    let student = html("学生");
+    assert_eq!(search_hits_in(&student, "chinese"), Vec::<String>::new());
+    let hits = search_hits_in(&student, "japanese");
+    assert_eq!(hits.len(), 1, "{hits:?}");
+    assert!(
+        hits[0].starts_with("学生 | [がくせい · xué\u{200b}sheng] | Common"),
+        "{hits:?}"
+    );
+    assert!(hits[0].ends_with("| %E5%AD%B8%E7%94%9F"), "{hits:?}");
+    assert!(student.contains("Found 1 result<"), "{student}");
+    let none = html("zzzzqq");
+    assert!(none.contains("No results for “zzzzqq”"), "{none}");
+    for unreadable in ["\"", "AND"] {
+        let page = fetched(&s, &search_path(unreadable));
+        assert!(!page.starts_with("HTTP/1.1 200"), "{unreadable}: {page}");
+    }
 }
 
 /// The value at fraction `q` of sorted `values` (nearest rank).
