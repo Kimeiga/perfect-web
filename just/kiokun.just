@@ -178,7 +178,8 @@ e14-kiokun-contains:
      { echo "The word page's Contains and Appears in, against kiokun.com's own code"; echo; \
        echo "produced by: just e14-kiokun-contains (local: reads a kiokun-data checkout)"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
-       echo "kiokun.com's source: $(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD) ($(cd "$KIOKUN_APP" && shasum -a 256 src/lib/contains-order.ts src/lib/appears-in-order.ts src/lib/character-support.ts src/lib/word-character-learning.ts src/lib/Contains.svelte 'src/routes/[word]/+page.svelte' | awk '{printf "%s %s; ", $2, substr($1,1,12)}'))"; \
+       dirty="$(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" status --porcelain -- src/lib/contains-order.ts src/lib/appears-in-order.ts src/lib/character-support.ts src/lib/word-character-learning.ts src/lib/Contains.svelte 'src/routes/[word]/+page.svelte' | wc -l | tr -d ' ')"; \
+       echo "kiokun.com's source: $(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD)$([ "$dirty" = 0 ] || echo " + uncommitted changes to $dirty of the copied files") ($(cd "$KIOKUN_APP" && shasum -a 256 src/lib/contains-order.ts src/lib/appears-in-order.ts src/lib/character-support.ts src/lib/word-character-learning.ts src/lib/Contains.svelte 'src/routes/[word]/+page.svelte' | awk '{printf "%s %s; ", $2, substr($1,1,12)}'))"; \
        echo "node: $(node --version)"; echo "host: $(uname -sm), $(sysctl -n hw.ncpu 2>/dev/null || nproc) cores, $(uptime | sed 's/.*load/load/')"; echo; \
        echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/contains.mjs)"; echo; \
        node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/contains.mjs "$lib" "$KIOKUN_APP" "$KIOKUN_DATA" 256 "$lib/contains.json"; \
