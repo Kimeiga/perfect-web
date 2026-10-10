@@ -243,6 +243,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             out.extend(navigations(&workspace, &u.hir, i, &sigs));
             // ADR-0303: a page is shown in its layout.
             out.extend(crate::layouts::check(&hirs, &workspace, i));
+            // ADR-0243's amendment: markup is no operand.
+            out.extend(markup_as_an_operand(&u.hir));
             out.extend(check_unit_with(
                 &labels,
                 &reads,
@@ -750,6 +752,73 @@ fn ok_payloads(body: &Body, p: hir::PatternId) -> Vec<hir::PatternId> {
 /// command's answer nearest it (PW5043). An `Ok` is a commit, so the page is
 /// left only once one is made; an `Err` arm, a speculation, or code before
 /// the answer would leave it on a refusal or before it.
+/// **Markup is no operand** (ADR-0243's amendment of 2026-10-09). A view's
+/// markup is shown where it is written: `<p>a</p> + 1` checked, rendered the
+/// paragraph, and dropped the sum, and `<h1>a</h1><p>b</p>` was read as that
+/// until two roots on one line became one region. An arithmetic, comparison
+/// or logical operator over markup is refused where it is written.
+fn markup_as_an_operand(hir: &Hir) -> Vec<Diagnostic> {
+    use crate::hir::{BinOp, UnOp};
+    let mut out = Vec::new();
+    for (_, decl) in hir.all_decls() {
+        let Some(b) = decl.body else { continue };
+        let body = hir.body(b);
+        for e in body.walk() {
+            let operands: Vec<ExprId> = match body.expr(e) {
+                Expr::Binary {
+                    op:
+                        BinOp::Add
+                        | BinOp::Sub
+                        | BinOp::Mul
+                        | BinOp::Div
+                        | BinOp::Rem
+                        | BinOp::Cmp(_)
+                        | BinOp::And
+                        | BinOp::Or,
+                    lhs,
+                    rhs,
+                } => vec![*lhs, *rhs],
+                Expr::Unary {
+                    op: UnOp::Neg | UnOp::Not,
+                    operand,
+                } => vec![*operand],
+                _ => continue,
+            };
+            if !operands
+                .iter()
+                .any(|o| matches!(body.expr(*o), Expr::Template { .. }))
+            {
+                continue;
+            }
+            let code = crate::codes::MARKUP_AS_AN_OPERAND;
+            out.push(Diagnostic {
+                code: code.id,
+                invariant: code.invariant,
+                reason: "markup_as_an_operand",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: "markup is an operand here: it is shown where it is written, and \
+                          what it is combined with is dropped"
+                    .to_string(),
+                primary_span: body.expr_span(e),
+                related: Vec::new(),
+                explanation: Some(
+                    "A view's markup is not a value: the renderer shows each region where \
+                     the view writes it, and an operator over one computes nothing anyone \
+                     sees. Two elements on one line are one region (`<h1>a</h1><p>b</p>`); \
+                     a value is shown inside markup, `<p>{a + 1}</p>`."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "write the value inside the markup, in braces".to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
 fn navigations(
     ws: &crate::resolve::Workspace,
     hir: &Hir,

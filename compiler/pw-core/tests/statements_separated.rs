@@ -168,3 +168,30 @@ fn a_clauses_word_where_no_clause_is_is_a_statement() {
         ]
     );
 }
+
+#[test]
+fn markup_written_on_one_line_after_a_root_is_one_statement() {
+    // `<h1>a</h1><p>b</p>`, as HTML writes two roots: until 2026-10-09 the
+    // second `<` was a comparison with the first, PW0009 at its `/` (found
+    // writing ADR-XXXX's refusals). A block's marker and a comment go on a
+    // line as an element does, and the space between two is kept.
+    let view = |markup: &str| format!("module m\n\nview V() !{{}} {{\n    {markup}\n}}\n");
+    for markup in [
+        "<h1>a</h1><p>b</p>",
+        "<h1>a</h1><hr />",
+        "<span>a</span> <span>b</span>",
+        "<p>a</p><!-- note --><p>b</p>",
+    ] {
+        assert_eq!(codes(&found(&view(markup))), [], "{markup}");
+    }
+    // Control: an operator after markup is no markup, and markup is no
+    // operand (PW5047): it was checked, and the sum dropped.
+    assert_eq!(
+        codes(&found(&view("<p>a</p> + 1"))),
+        [("PW5047", "<p>a</p> + 1")]
+    );
+    assert_eq!(
+        codes(&found(&view("<p>a</p> == <p>b</p>"))),
+        [("PW5047", "<p>a</p> == <p>b</p>")]
+    );
+}

@@ -23,6 +23,16 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0243 amended, 2026-10-10: markup written on one line is one region,
+and no operand** (found writing ADR-0303's refusals; track `siblings`,
+merged from `31eeb3c`). `<h1>a</h1><p>b</p>` at a view's top was PW0009 at
+the second element: the template region ended after its first root, and the
+next `<` was read as a comparison. Probing it, `<p>a</p> + 1` checked and
+rendered the paragraph, the sum dropped. Markup after a root on its line
+now goes on as one region, and an operator over markup is refused (PW5047).
+The checker's 5 tests, the parser's, the corpus's 18, 32 of 32 mutants
+(verify 38013103417).
+
 **ADR-0303, 2026-10-10: a page is shown in its layout** (the integrator's,
 the second of three steps to the parts two pages share kept in place; track
 `layouts`, merged from `328720e`). `layout Name { … <slot /> … }`, and a

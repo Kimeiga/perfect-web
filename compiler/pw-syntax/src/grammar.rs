@@ -1341,6 +1341,30 @@ impl<'a> P<'a> {
         }
     }
 
+    /// **Does the markup go on, on this line, after a root?** A view's
+    /// roots are statements, one a line (ADR-0243), and two written on one
+    /// line, `<h1>a</h1><p>b</p>`, as HTML writes them, were a root and then
+    /// a comparison with the second: PW0009 at its `/` or `>`. What follows a
+    /// finished element on its line is markup if it begins as markup does,
+    /// an element, a comment or a block, since markup is never compared. The
+    /// space between them is kept as text, as it is between two elements
+    /// inside one (`<span>a</span> <span>b</span>`).
+    fn sibling_on_line(&mut self) -> bool {
+        let next = (self.at(Kind::LAngle)
+            && (self.nth_is(1, Kind::Ident)
+                || self.src[self.cur_span().start..].starts_with("<!--")))
+            || (self.at(Kind::LBrace) && self.nth_is(1, Kind::Hash));
+        if !next || self.newline_ahead() {
+            return false;
+        }
+        if self.trivia_pending() {
+            self.start_keeping_trivia(K::Text);
+            self.eat_trivia();
+            self.finish();
+        }
+        true
+    }
+
     /// A template region: `<main>...</main>`, `{#each ..}`, `{/each}`.
     ///
     /// Charter §14 M2 task 9 asks for "only enough template parsing to
@@ -1417,6 +1441,9 @@ impl<'a> P<'a> {
                         self.finish(); // Element
                     }
                     if depth <= 0 {
+                        if self.sibling_on_line() {
+                            continue;
+                        }
                         break;
                     }
                 }
@@ -1431,6 +1458,9 @@ impl<'a> P<'a> {
                         open.push(Open::Element);
                     }
                     if depth <= 0 {
+                        if self.sibling_on_line() {
+                            continue;
+                        }
                         break;
                     }
                 }
@@ -1443,6 +1473,9 @@ impl<'a> P<'a> {
                         self.finish(); // MarkupBlock
                     }
                     if depth <= 0 {
+                        if self.sibling_on_line() {
+                            continue;
+                        }
                         break;
                     }
                 }
@@ -3674,6 +3707,58 @@ mod tests {
         // Positive control: on the SAME line `<` is still a comparison.
         let cmp = parse_ok("fn f() { a < b }");
         assert_eq!(first_text(&cmp, K::BinaryExpr).unwrap().trim(), "a < b");
+    }
+
+    #[test]
+    fn markup_written_on_one_line_after_a_root_is_one_region() {
+        // Two roots on one line, as HTML writes them: until 2026-10-09 the
+        // second `<` was a comparison with the first, PW0009 at its `/`.
+        for line in [
+            "<h1>a</h1><p>b</p>",
+            "<h1>a</h1><hr />",
+            "<hr /><hr />",
+            "<p>a</p><!-- note --><p>b</p>",
+            "<p>a</p>{#if x}<b>y</b>{/if}",
+            "{#if x}<b>y</b>{/if}<p>a</p>",
+        ] {
+            let src = format!("view V() !{{}} {{\n    {line}\n}}\n");
+            let p = parse_ok(&src);
+            assert_lossless(&src, &p);
+            assert_eq!(texts(&p, K::TemplateRegion), [line], "{line}");
+            let found = p
+                .green
+                .descendants()
+                .filter(|n| n.kind() == K::Element)
+                .count();
+            assert_eq!(found, 2, "{line}: each element its own");
+            assert!(
+                !kinds(&p.green).contains(&K::BinaryExpr),
+                "{line}: no comparison"
+            );
+        }
+        // The space between two on one line is text, as inside an element.
+        let src = "view V() !{} {\n    <span>a</span> <span>b</span>\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let region = p
+            .green
+            .descendants()
+            .find(|n| n.kind() == K::TemplateRegion)
+            .expect("a region");
+        let spaces: Vec<String> = region
+            .children()
+            .filter(|n| n.kind() == K::Text)
+            .map(|n| n.text().to_string())
+            .collect();
+        assert_eq!(spaces, [" "], "the space between the two roots");
+        // Controls: on the next line, a second region, as before; and what
+        // follows markup on its line and is no markup is left to the
+        // expression it is, an operator here, as before.
+        let two = parse_ok("view V() !{} {\n    <h1>a</h1>\n    <p>b</p>\n}\n");
+        assert_eq!(texts(&two, K::TemplateRegion), ["<h1>a</h1>", "<p>b</p>"]);
+        let sum = parse_ok("view V() !{} {\n    <p>a</p> + 1\n}\n");
+        assert_eq!(texts(&sum, K::TemplateRegion), ["<p>a</p>"]);
+        assert!(kinds(&sum.green).contains(&K::BinaryExpr));
     }
 
     #[test]

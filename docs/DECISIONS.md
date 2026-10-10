@@ -2044,6 +2044,11 @@ a block's statements are separated, by `;` or a line (a correction).
   and a block after a statement. A clause's word that is no clause where it
   is written, a binding's name or a word in a code body, is refused by the
   names check, and a `;` ends a clause's value there as in the grammar.
+- Amended 2026-10-10: markup written on one line is one region, and no
+  operand. Two roots on a line at a view's top were PW0009 (found writing
+  ADR-0303's refusals), and `<p>a</p> + 1` checked, the sum dropped: a root
+  followed on its line by markup goes on as one region, and an operator
+  over markup is PW5047.
 [ADR-0244](DECISIONS/ADR-0244-wasmtime-48-0-5-and-a-host-that-enables-only-what-it-runs.md):
 Wasmtime 48.0.5, and a host that enables only what it runs (a correction).
 - CI's advisory job had failed since 2026-10-05 on three Wasmtime

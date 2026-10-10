@@ -23,10 +23,37 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 GRAMMAR = ROOT / "compiler/pw-syntax/src/grammar.rs"
+CHECK = ROOT / "compiler/pw-core/src/check.rs"
 NAMES = ROOT / "compiler/pw-core/src/names.rs"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
+    # The amendment of 2026-10-09: markup written on one line after a root
+    # is the same region, and the space between is text.
+    (
+        "markup after a root on its line is a comparison again",
+        GRAMMAR,
+        "        if !next || self.newline_ahead() {\n            return false;\n        }\n",
+        "        if true {\n            return false;\n        }\n",
+    ),
+    (
+        "markup is an operand again",
+        CHECK,
+        "                .any(|o| matches!(body.expr(*o), Expr::Template { .. }))\n",
+        "                .any(|_| false)\n",
+    ),
+    (
+        "the space between two roots on one line is dropped",
+        GRAMMAR,
+        "        if self.trivia_pending() {\n"
+        "            self.start_keeping_trivia(K::Text);\n"
+        "            self.eat_trivia();\n"
+        "            self.finish();\n"
+        "        }\n"
+        "        true\n"
+        "    }\n",
+        "        true\n    }\n",
+    ),
     (
         "two statements on one line are not refused",
         GRAMMAR,
@@ -212,6 +239,7 @@ TESTS = [
     [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-syntax", "--lib", "--",
         "two_statements_on_one_line_are_separated",
+        "markup_written_on_one_line_after_a_root_is_one_region",
     ],
     [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-core",

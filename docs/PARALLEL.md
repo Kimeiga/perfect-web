@@ -894,3 +894,6 @@ Each a decision for a track, with its date; a track's ADR records it too.
   `StoreLayout` binds `Cart(current_session())`; at `track/store-accounts`'
   next master merge, the layout's cart is its pages' (the user's), and the
   layout is declared `user` (PW5046 holds a page to its layout's audience).
+- **2026-10-10, ADR-0243's amendment merged** (markup on one line is one
+  region, and no operand), from `31eeb3c`: verify 38013103417 green, 32 of
+  32 mutants; its PW5047 beside ADR-0303's PW5046.

@@ -657,6 +657,10 @@ codes! {
     // ADR-0303: a page's document holds its layout's values and captures.
     LAYOUT_AUDIENCE = "PW5046" / layout_audience / 1, Privacy,
         "a page declares at least its layout's audience: its document holds what its layout shows and its resume manifest what the layout's handlers capture";
+    // ADR-0243's amendment of 2026-10-09: `<p>a</p> + 1` checked, rendered
+    // the paragraph and dropped the sum.
+    MARKUP_AS_AN_OPERAND = "PW5047" / markup_as_an_operand / 1, Markup,
+        "markup is shown where it is written, and is no operand of an arithmetic, comparison or logical operator";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //
