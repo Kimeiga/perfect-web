@@ -1,7 +1,7 @@
 ADR-0290 - a verification run is dealt by the seconds its recipes last took
 
 produced by: just e14-dealt-by-time
-commit: dee3a10898e765eead7ba7d87e09f1592c3985f3
+commit: e5ad4b72d193775880b759eee9e55f2e877dce7c
 python: Python 3.12.8
 
 == the plan and the fetch (scripts/tests/test_ci_scripts.py)
@@ -19,15 +19,19 @@ test_a_measurement_of_the_machine_is_not_planned (scripts.tests.test_ci_scripts.
 test_a_plan_is_the_same_every_time (scripts.tests.test_ci_scripts.Plan.test_a_plan_is_the_same_every_time) ... ok
 test_a_recipe_costs_the_seconds_it_last_took (scripts.tests.test_ci_scripts.Plan.test_a_recipe_costs_the_seconds_it_last_took) ... ok
 test_a_recipe_in_an_imported_file_is_read_and_planned (scripts.tests.test_ci_scripts.Plan.test_a_recipe_in_an_imported_file_is_read_and_planned) ... ok
+test_a_recipe_longer_than_the_ceiling_alone_is_not_paid_for_in_shards (scripts.tests.test_ci_scripts.Plan.test_a_recipe_longer_than_the_ceiling_alone_is_not_paid_for_in_shards) ... ok
 test_a_recipe_needing_less_may_run_where_more_is_set_up (scripts.tests.test_ci_scripts.Plan.test_a_recipe_needing_less_may_run_where_more_is_set_up) ... ok
 test_a_recipe_not_yet_measured_costs_what_its_kind_does (scripts.tests.test_ci_scripts.Plan.test_a_recipe_not_yet_measured_costs_what_its_kind_does) ... ok
 test_a_recipe_run_against_a_database_is_a_shard_of_its_own (scripts.tests.test_ci_scripts.Plan.test_a_recipe_run_against_a_database_is_a_shard_of_its_own) ... ok
 test_a_recipes_cost_counts_the_mutants_it_plants (scripts.tests.test_ci_scripts.Plan.test_a_recipes_cost_counts_the_mutants_it_plants) ... ok
 test_a_run_is_planned_by_the_seconds_kept (scripts.tests.test_ci_scripts.Plan.test_a_run_is_planned_by_the_seconds_kept) ... ok
+test_a_run_takes_more_shards_than_it_asks_where_its_would_end_past_the_ceiling (scripts.tests.test_ci_scripts.Plan.test_a_run_takes_more_shards_than_it_asks_where_its_would_end_past_the_ceiling) ... ok
 test_a_shard_with_a_database_sets_up_what_its_recipe_needs (scripts.tests.test_ci_scripts.Plan.test_a_shard_with_a_database_sets_up_what_its_recipe_needs) ... ok
+test_main_deals_a_run_within_the_ceiling (scripts.tests.test_ci_scripts.Plan.test_main_deals_a_run_within_the_ceiling) ... ok
 test_no_shard_is_planned_empty (scripts.tests.test_ci_scripts.Plan.test_no_shard_is_planned_empty) ... ok
 test_recipes_run_against_a_database_take_the_shards_that_end_the_run_soonest (scripts.tests.test_ci_scripts.Plan.test_recipes_run_against_a_database_take_the_shards_that_end_the_run_soonest) ... ok
 test_short_recipes_run_against_a_database_share_one (scripts.tests.test_ci_scripts.Plan.test_short_recipes_run_against_a_database_share_one) ... ok
+test_the_ceiling_is_within_the_shards_limit (scripts.tests.test_ci_scripts.Plan.test_the_ceiling_is_within_the_shards_limit) ... ok
 test_the_costliest_go_first_each_to_where_it_ends_soonest (scripts.tests.test_ci_scripts.Plan.test_the_costliest_go_first_each_to_where_it_ends_soonest) ... ok
 test_the_seconds_are_read_where_the_fetch_keeps_them (scripts.tests.test_ci_scripts.Plan.test_the_seconds_are_read_where_the_fetch_keeps_them) ... ok
 test_what_a_recipe_adds_to_a_shards_setup_counts (scripts.tests.test_ci_scripts.Plan.test_what_a_recipe_adds_to_a_shards_setup_counts) ... ok
@@ -42,24 +46,28 @@ test_a_run_of_one_shard_is_read_where_it_was_extracted (scripts.tests.test_ci_sc
 test_a_run_whose_recipes_passed_passes (scripts.tests.test_ci_scripts.Summary.test_a_run_whose_recipes_passed_passes) ... ok
 test_a_shard_that_reported_nothing_fails_the_run (scripts.tests.test_ci_scripts.Summary.test_a_shard_that_reported_nothing_fails_the_run) ... ok
 test_a_surviving_mutant_fails_the_run (scripts.tests.test_ci_scripts.Summary.test_a_surviving_mutant_fails_the_run) ... ok
-Ran 36 tests in 7.347s
+Ran 40 tests in 2.838s
 OK
 
 == mutation controls (scripts/dealt_by_time_mutations.py)
 
-baseline: 36 passed, 0 failed
-a recipe costs its mutants again: KILLED (1 of 36 tests fail)
-a shard's setup is not counted: KILLED (1 of 36 tests fail)
-a recipe not yet measured is estimated at the rate where none is: KILLED (2 of 36 tests fail)
-a recipe not yet measured is estimated at the median: KILLED (2 of 36 tests fail)
-a recipe not yet measured is estimated at every recipe's rate: KILLED (1 of 36 tests fail)
-a script a recipe runs is not read for its kind: KILLED (1 of 36 tests fail)
-the host's tests are taken for a type check's: KILLED (1 of 36 tests fail)
-the recipes run against a database take a shard each: KILLED (1 of 36 tests fail)
-the recipes run against a database share one shard: KILLED (2 of 36 tests fail)
-more shards are taken where fewer end the run as soon: KILLED (1 of 36 tests fail)
-a plan of nothing takes the longest of no shards: KILLED (1 of 36 tests fail)
-a recipe that failed has its seconds kept: KILLED (1 of 36 tests fail)
-the seconds kept replace every other recipe's: KILLED (1 of 36 tests fail)
-13 of 13 mutants killed
+baseline: 40 passed, 0 failed
+a recipe costs its mutants again: KILLED (2 of 40 tests fail)
+a shard's setup is not counted: KILLED (1 of 40 tests fail)
+a recipe not yet measured is estimated at the rate where none is: KILLED (2 of 40 tests fail)
+a recipe not yet measured is estimated at the median: KILLED (2 of 40 tests fail)
+a recipe not yet measured is estimated at every recipe's rate: KILLED (1 of 40 tests fail)
+a script a recipe runs is not read for its kind: KILLED (1 of 40 tests fail)
+the host's tests are taken for a type check's: KILLED (1 of 40 tests fail)
+the recipes run against a database take a shard each: KILLED (1 of 40 tests fail)
+the recipes run against a database share one shard: KILLED (2 of 40 tests fail)
+more shards are taken where fewer end the run as soon: KILLED (1 of 40 tests fail)
+a plan of nothing takes the longest of no shards: KILLED (1 of 40 tests fail)
+a recipe that failed has its seconds kept: KILLED (1 of 40 tests fail)
+the seconds kept replace every other recipe's: KILLED (1 of 40 tests fail)
+a run is dealt into the shards it asks for, past the ceiling: KILLED (3 of 40 tests fail)
+a recipe longer than the ceiling alone is paid for in shards: KILLED (1 of 40 tests fail)
+a run's plan is its asked shards' again: KILLED (1 of 40 tests fail)
+the ceiling is a shard's limit: KILLED (4 of 40 tests fail)
+17 of 17 mutants killed
 memory bound: no process was stopped
