@@ -1,24 +1,24 @@
 ADR-XXXX - a name means its binding, in every analysis
 
 produced by: just e14-name-bindings
-commit: 91bde000bf3e24a6c0eeab0b57ab2973dd2e1b52
+commit: d1acf715473dd343e773e82669e3eb4073ae5ffb
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the checker's cases (compiler/pw-core/tests/names_mean_their_binding.rs)
 
 test a_labels_cause_is_what_was_read_not_a_locals_namesake ... ok
 test a_call_through_a_local_is_labelled_as_the_local ... ok
-test a_handlers_call_through_a_local_is_no_commands_request ... ok
 test a_stream_parts_name_is_the_answer_not_a_namesake_function ... ok
 test a_call_through_a_local_is_not_charged_its_namesakes_row ... ok
+test a_handlers_call_through_a_local_is_no_commands_request ... ok
 test a_call_through_a_local_reads_nothing_of_its_namesakes ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
 
 == pw-core's library and the corpus (checking_source, every_name_resolves)
 
-test result: ok. 184 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.42s
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 46.96s
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+test result: ok. 184 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.90s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.44s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
 
 == mutation controls (scripts/name_binding_mutations.py)
 
@@ -27,8 +27,8 @@ a stream part's name is left unbound where it binds: KILLED (1 of 6 tests fail)
 a call through a local is resolved by its spelling: KILLED (1 of 6 tests fail)
 no body's scopes are kept to ask: KILLED (4 of 6 tests fail)
 a handler's call through a local is a command's request: KILLED (1 of 6 tests fail)
-a declaration's label reads a local's namesake: SURVIVED
+a declaration's label reads a local's namesake: KILLED (1 of 6 tests fail)
 the reads a body makes read a local's namesake: KILLED (2 of 6 tests fail)
 the cause a label names is a local's namesake: KILLED (1 of 6 tests fail)
-6 of 7 mutants killed
+7 of 7 mutants killed
 memory bound: no process was stopped
