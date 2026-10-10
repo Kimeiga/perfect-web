@@ -540,7 +540,37 @@ pub(crate) fn entry(json: &serde_json::Value) -> Val {
             "simplified-form-of",
             Val::String(text(json, "simplified_form_of")),
         ),
+        ("contains", previews(json, "contains")),
+        ("in-chinese", previews(json, "contained_in_chinese")),
+        ("in-japanese", previews(json, "contained_in_japanese")),
+        ("in-korean", previews(json, "contained_in_korean")),
     ])
+}
+
+/// A list of kiokun's word previews (`WordPreview`, kiokun-data
+/// `src/word_preview_types.rs`): each field the builder leaves out when it
+/// has none read as empty, `false` or `None`.
+fn previews(json: &serde_json::Value, key: &str) -> Val {
+    Val::List(
+        list(json, key)
+            .map(|p| {
+                record(vec![
+                    ("w", Val::String(text(p, "w"))),
+                    ("p", Val::String(text(p, "p"))),
+                    ("ct", Val::String(text(p, "ct"))),
+                    ("jp", Val::String(text(p, "jp"))),
+                    ("jo", Val::String(text(p, "jo"))),
+                    ("kr", Val::String(text(p, "kr"))),
+                    ("d", Val::String(text(p, "d"))),
+                    (
+                        "c",
+                        Val::Bool(p.get("c").and_then(|c| c.as_bool()) == Some(true)),
+                    ),
+                    ("fr", maybe_int(p.get("fr"))),
+                ])
+            })
+            .collect(),
+    )
 }
 
 /// A field the file may not have, or may have as `null`, as an `Option`.

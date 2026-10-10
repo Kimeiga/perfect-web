@@ -154,14 +154,38 @@ fn path_of(word: &str) -> String {
     out
 }
 
+/// The response to `GET path` as the server sent it, its bytes read to the
+/// close and decoded once, as UTF-8 or not at all. `fetched_as` decodes
+/// each read on its own, so a character a read boundary splits comes out as
+/// U+FFFD: a reader's error, not the server's, and one that depends on
+/// timing (on a loaded machine the oracle once found "に��める" for
+/// "にしめる").
+fn fetched_whole(s: &Server, path: &str) -> String {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+    let at = listener.local_addr().expect("address");
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            let (stream, _) = listener.accept().expect("accept");
+            handle(s, stream);
+        });
+        let mut client = TcpStream::connect(at).expect("connect");
+        client
+            .write_all(
+                format!("GET {path} HTTP/1.1\r\nHost: t\r\nCookie: pw-session=a\r\n\r\n")
+                    .as_bytes(),
+            )
+            .expect("request");
+        let mut bytes = Vec::new();
+        client.read_to_end(&mut bytes).expect("read");
+        String::from_utf8(bytes).expect("the response is UTF-8")
+    })
+}
+
 /// The response to `GET path`, whole: its status line, headers and body,
 /// without the renderer's part markers (`<!--pw:s0-->`), which a reader
 /// does not see.
 fn fetched(s: &Server, path: &str) -> String {
-    let whole: String = fetched_as(s, path, Some("a"))
-        .into_iter()
-        .map(|(_, c)| c)
-        .collect();
+    let whole = fetched_whole(s, path);
     let mut out = String::with_capacity(whole.len());
     let mut rest = whole.as_str();
     while let Some(at) = rest.find("<!--pw:") {
@@ -919,7 +943,9 @@ fn an_equivalent_forms_words_are_shown_on_the_canonical_page() {
         dir.path(),
         "後",
         r#"{"key":"後","chinese_char":{"char":"後","simpVariants":["后","余"]},
-            "chinese_words":[{"_id":"t","simp":"后","trad":"後","items":[{"pinyin":"hòu","definitions":["behind"]}]}]}"#,
+            "chinese_words":[{"_id":"t","simp":"后","trad":"後","items":[{"pinyin":"hòu","definitions":["behind"]}]}],
+            "contains":[{"w":"後","d":"behind"}],
+            "contained_in_chinese":[{"w":"後面","p":"hòu miàn","d":"behind","fr":10},{"w":"然後","p":"rán hòu","d":"then"}]}"#,
     );
     write_entry(
         dir.path(),
@@ -927,7 +953,9 @@ fn an_equivalent_forms_words_are_shown_on_the_canonical_page() {
         r#"{"key":"后","simplified_form_of":"後","chinese_char":{"char":"后","tradVariants":["後"]},
             "semantic_mnemonic":{"character":"后","meaning":"Back"},
             "semantic_mnemonic_variants":[{"character":"後","meaning":"back "}],
-            "chinese_words":[{"_id":"s","simp":"后","trad":"后","items":[{"pinyin":"hòu","definitions":["queen"]}]}]}"#,
+            "chinese_words":[{"_id":"s","simp":"后","trad":"后","items":[{"pinyin":"hòu","definitions":["queen"]}]}],
+            "contains":[{"w":"后","p":"hòu","d":"queen"},{"w":"後","d":"behind"}],
+            "contained_in_chinese":[{"w":"後面","p":"hòu mian","d":"x"},{"w":"后来","p":"hòu lái","d":"afterwards","fr":20}]}"#,
     );
     write_entry(
         dir.path(),
@@ -935,12 +963,27 @@ fn an_equivalent_forms_words_are_shown_on_the_canonical_page() {
         r#"{"key":"余","simplified_form_of":"後","chinese_char":{"char":"余","tradVariants":["後"]},
             "semantic_mnemonic":{"character":"余","meaning":"surplus"},
             "semantic_mnemonic_variants":[{"character":"後","meaning":"back"}],
-            "chinese_words":[{"_id":"r","simp":"余","trad":"余","items":[{"pinyin":"yú","definitions":["surplus"]}]}]}"#,
+            "chinese_words":[{"_id":"r","simp":"余","trad":"余","items":[{"pinyin":"yú","definitions":["surplus"]}]}],
+            "contained_in_chinese":[{"w":"多余","p":"duō yú","d":"surplus"}]}"#,
     );
     let s = served_kiokun_on(dir.path());
-    let back = visible(section(&fetched(&s, &path_of("後")), "chinese"));
+    let page = fetched(&s, &path_of("後"));
+    let back = visible(section(&page, "chinese"));
     assert!(back.contains("behind") && back.contains("queen"), "{back}");
     assert!(!back.contains("surplus"), "{back}");
+    // Its lists too (`+page.ts:198-217`): Appears in by form, 後面 once,
+    // ranked; Contains by form and readings, 後 once, and 后/後 one card,
+    // since the page's forms are 后 and 後. 余's are not merged.
+    let html = page.split("<script").next().unwrap_or_default();
+    assert_eq!(
+        appears_in_column(html, "chinese-words"),
+        [
+            "後面 | hòu miàn |  | behind",
+            "后来 | hòu lái |  | afterwards",
+            "然後 | rán hòu |  | then"
+        ]
+    );
+    assert_eq!(contains_in(html), ["后/後 | hòu |  |  |  |  | queen"]);
 }
 
 /// **A simplified form that equals its one traditional form in meaning is
@@ -1024,6 +1067,449 @@ fn an_equivalent_simplified_form_is_moved_to_its_traditional_page() {
     for word in ["寧", "餘", "后", "後", "甲"] {
         let page = fetched(&s, &path_of(word));
         assert!(page.starts_with("HTTP/1.1 200 OK\r\n"), "{word}: {page}");
+    }
+}
+
+/// The text of the first element whose class is `class` in `html`,
+/// unescaped, or empty where there is none.
+fn class_text(html: &str, class: &str) -> String {
+    match html.find(&format!("class=\"{class}\"")) {
+        Some(at) => unescaped(&text_of_class(&html[at..], &format!("class=\"{class}\""))),
+        None => String::new(),
+    }
+}
+
+/// The pieces of `html` that begin where `open` does, each to the next.
+fn pieces<'a>(html: &'a str, open: &str) -> Vec<&'a str> {
+    let mut out = Vec::new();
+    let mut rest = html;
+    while let Some(at) = rest.find(open) {
+        rest = &rest[at + 1..];
+        let end = rest.find(open).unwrap_or(rest.len());
+        out.push(&rest[..end]);
+    }
+    out
+}
+
+/// **Contains as the page shows it** (`Contains.svelte:146-195`): each card,
+/// shown first or behind the disclosure, as `text | pinyin | Jyutping |
+/// Japanese | on'yomi | Korean | definition`; none where the page has no
+/// section.
+fn contains_in(html: &str) -> Vec<String> {
+    if !html.contains("<section id=\"contains\"") {
+        return Vec::new();
+    }
+    pieces(section(html, "contains"), "class=\"character-card\"")
+        .into_iter()
+        .map(|card| {
+            let jp = match card.find("class=\"japanese-reading kunyomi-reading\"") {
+                Some(at) => class_text(&card[at..], "japanese-reading kunyomi-reading"),
+                None => class_text(card, "japanese-reading"),
+            };
+            format!(
+                "{} | {} | {} | {} | {} | {} | {}",
+                class_text(card, "character"),
+                class_text(card, "chinese-reading"),
+                class_text(card, "cantonese-reading"),
+                jp,
+                class_text(card, "japanese-onyomi-reading"),
+                class_text(card, "korean-reading"),
+                class_text(card, "definition"),
+            )
+        })
+        .collect()
+}
+
+/// **One column of Appears in as the page shows it**
+/// (`AppearsIn.svelte:160-290`): each word, shown first or behind the
+/// disclosure, as `word | reading | Jyutping | definition`, a common
+/// Japanese word's star before it; none where the page has no such column.
+fn appears_in_column(html: &str, id: &str) -> Vec<String> {
+    // The heading's id is a hole, so the renderer marks the element before
+    // it (`data-pw`): it is found by the id alone.
+    let Some(at) = html.find(&format!(" id=\"{id}\"")) else {
+        return Vec::new();
+    };
+    let column = &html[at..];
+    let end = column
+        .find("class=\"column\"")
+        .or_else(|| column.find("</section>"))
+        .unwrap_or(column.len());
+    pieces(&column[..end], "class=\"word-card\"")
+        .into_iter()
+        .map(|card| {
+            let word_at = card.find("class=\"word-text\"").expect("the word");
+            let word_end = card[word_at..]
+                .find("class=\"pronunciation\"")
+                .or_else(|| card[word_at..].find("class=\"definition-row\""))
+                .map_or(card.len(), |e| word_at + e);
+            let word = unescaped(&visible(&format!("<{}", &card[word_at..word_end])));
+            format!(
+                "{} | {} | {} | {}",
+                word,
+                class_text(card, "pronunciation"),
+                class_text(card, "cantonese-pronunciation"),
+                class_text(card, "definition"),
+            )
+        })
+        .collect()
+}
+
+/// One list of the oracle's answer: its length where the oracle kept only
+/// part of it (the CI fixture's trim), else none; and the items it kept,
+/// each with its place, in the forms the page readers give.
+type Wanted = (Option<usize>, Vec<(usize, String)>);
+
+/// The oracle's answer for a word: each list, whole or trimmed.
+fn oracle_lists(answer: &serde_json::Value) -> Vec<(String, Wanted)> {
+    let s = |v: &serde_json::Value, k: &str| v[k].as_str().unwrap_or_default().to_string();
+    let card = |c: &serde_json::Value| {
+        format!(
+            "{} | {} | {} | {} | {} | {} | {}",
+            s(c, "text"),
+            s(c, "p"),
+            s(c, "ct"),
+            s(c, "jp"),
+            s(c, "jo"),
+            s(c, "kr"),
+            s(c, "definition")
+        )
+    };
+    let word = |w: &serde_json::Value| {
+        let star = if w["c"].as_bool() == Some(true) {
+            "⭐"
+        } else {
+            ""
+        };
+        format!(
+            "{star}{} | {} | {} | {}",
+            s(w, "w"),
+            s(w, "reading"),
+            s(w, "ct"),
+            s(w, "d")
+        )
+    };
+    let list = |v: &serde_json::Value, shown: &dyn Fn(&serde_json::Value) -> String| -> Wanted {
+        match v.as_array() {
+            Some(items) => (None, items.iter().map(shown).enumerate().collect()),
+            None => (
+                Some(v["length"].as_u64().expect("a trimmed list's length") as usize),
+                v["kept"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|i| (i["at"].as_u64().expect("its place") as usize, shown(i)))
+                    .collect(),
+            ),
+        }
+    };
+    vec![
+        ("contains".to_string(), list(&answer["contains"], &card)),
+        ("chinese-words".to_string(), list(&answer["chinese"], &word)),
+        (
+            "japanese-words".to_string(),
+            list(&answer["japanese"], &word),
+        ),
+        ("korean-words".to_string(), list(&answer["korean"], &word)),
+    ]
+}
+
+/// Does the page's list hold what the oracle kept: the whole list, or a
+/// trimmed list's length and each kept item at its place?
+fn holds(got: &[String], (length, kept): &Wanted) -> bool {
+    got.len() == length.unwrap_or(kept.len()) && kept.iter().all(|(at, w)| got.get(*at) == Some(w))
+}
+
+/// **Contains and Appears in against kiokun.com's answers**: each word's
+/// lists, as the page shows them in order, beside the oracle's. No
+/// difference is named for them; each is listed.
+fn contains_held_to_oracle(s: &Server, oracle: &serde_json::Value) -> Vec<String> {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut differ: Vec<String> = Vec::new();
+    for (word, answer) in answers {
+        let page = fetched(s, &path_of(word));
+        if !page.starts_with("HTTP/1.1 200") {
+            differ.push(format!(
+                "{word}: {}",
+                page.lines().next().unwrap_or_default()
+            ));
+            continue;
+        }
+        let html = page.split("<script").next().unwrap_or_default();
+        for (list, want) in oracle_lists(answer) {
+            let got = if list == "contains" {
+                contains_in(html)
+            } else {
+                appears_in_column(html, &list)
+            };
+            if !holds(&got, &want) {
+                differ.push(format!(
+                    "{word} {list}:\n  kiokun.com: {want:?}\n  rewrite:    {got:?}"
+                ));
+            }
+        }
+    }
+    differ
+}
+
+/// **Contains and Appears in against kiokun.com's own code** (local: `just
+/// e14-kiokun-contains` runs `orderContainsWords`, `rankAppearsIn` and the
+/// page's and `Contains.svelte`'s own functions, copied from `KIOKUN_APP`,
+/// over a stated sample of `KIOKUN_DATA`, and names its answers in
+/// `KIOKUN_CONTAINS_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-contains`"]
+fn contains_and_appears_in_match_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_CONTAINS_ORACLE").expect("KIOKUN_CONTAINS_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let differ = contains_held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} words (stride {}, {} entries read)",
+        oracle["answered"], oracle["stride"], oracle["read"]
+    );
+    println!("named differences: {{}}");
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(30) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
+}
+
+/// **Contains** (`Contains.svelte`, `contains-order.ts`): a multi-character
+/// word's previews, broken down breadth first (学生 + 会, then 学 and 生),
+/// then the rest, the longer and earlier first. Where the word has forms of
+/// one length (学生会/學生會), the one-character previews at one place are
+/// one card written with each form's character (会/會, 学/學). A card's
+/// definition is the first of its characters' component glosses, its marker
+/// taken off ("assemble (TRAD)" is 會's, the card's second form), else the
+/// preview's; an on'yomi the same as the reading is not shown. The expected
+/// cards are kiokun.com's own answers for these entries (`contains.mjs`).
+#[test]
+fn contains_breaks_the_word_down_and_cards_its_forms() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "学生会",
+        r#"{"key":"学生会","chinese_words":[{"_id":"1","simp":"学生会","trad":"學生會","items":[{"pinyin":"xué shēng huì","definitions":["student union"]}]}],
+            "contains":[{"w":"会","p":"huì","ct":"wui5","d":"can"},{"w":"学生","p":"xué shēng","d":"student","fr":120},
+            {"w":"會","p":"huì","d":"meeting","fr":30},{"w":"学","p":"xué","jp":"まなぶ","jo":"ガク","kr":"학","d":"learn"},
+            {"w":"生会","d":""},{"w":"生","p":"shēng","jp":"せい","jo":"せい","d":"life","c":true},
+            {"w":"學","p":"xué","d":"study"},{"w":"x","d":"unrelated"},{"w":"學生","p":"xué shēng","d":"pupil"}]}"#,
+    );
+    let app = app_with(
+        "{}",
+        r#"{"学":"to study (simp)","會":"assemble (TRAD)","生":""}"#,
+    );
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        Some(app.path()),
+    ));
+    let page = fetched(&s, &path_of("学生会"));
+    let html = page.split("<script").next().unwrap_or_default();
+    assert_eq!(
+        contains_in(html),
+        [
+            "学生 | xué shēng |  |  |  |  | student",
+            "会/會 | huì | wui5 |  |  |  | assemble",
+            "学/學 | xué |  | まなぶ | ガク | 학 | to study",
+            "生 | shēng |  | せい |  |  | life",
+            "生会 |  |  |  |  |  | ",
+            "學生 | xué shēng |  |  |  |  | pupil",
+            "x |  |  |  |  |  | unrelated",
+        ]
+    );
+    // 学's on'yomi differs from its reading: both shown, the reading as the
+    // kun'yomi. Each card links to its word's page.
+    let study = section(html, "contains");
+    assert!(
+        study.contains("aria-label=\"Japanese kun’yomi: まなぶ\""),
+        "{study}"
+    );
+    assert!(
+        study.contains("href=\"/word/%E5%AD%A6%E7%94%9F\""),
+        "{study}"
+    );
+    // Seven cards: none behind the disclosure.
+    assert!(!study.contains("<details"), "{study}");
+    // Where nothing breaks a form down, the previews tie on where they sit
+    // in the form chosen (the first, 丁乙丙, where neither is), and the
+    // word's own order decides: 甲 is in 甲乙丙, 戊 is not
+    // (`sortContainsWords`), whatever the file's order.
+    write_entry(
+        dir.path(),
+        "甲乙丙",
+        r#"{"key":"甲乙丙","chinese_words":[{"_id":"1","simp":"丁乙丙","trad":"丁乙丙","items":[{"pinyin":"x","definitions":["x"]}]}],
+            "contains":[{"w":"戊","d":"fifth"},{"w":"甲","d":"first"}]}"#,
+    );
+    let tie = fetched(&s, &path_of("甲乙丙"));
+    assert_eq!(
+        contains_in(tie.split("<script").next().unwrap_or_default()),
+        ["丁/甲 |  |  |  |  |  | first", "戊 |  |  |  |  |  | fifth"]
+    );
+    // Control: a word whose file has no previews, 人 in the repository's
+    // sample, has no section.
+    let person = fetched(&served_kiokun(), &path_of("人"));
+    assert!(person.starts_with("HTTP/1.1 200"), "{person}");
+    assert!(!person.contains("<section id=\"contains\""), "{person}");
+}
+
+/// **Appears in** (`AppearsIn.svelte`, `appears-in-order.ts`): each
+/// language's words that contain this one. Chinese words before names
+/// (pinyin that begins with a capital, its zero-width spaces not counted),
+/// each by frequency rank, a rank of 0 counted as none; Japanese common
+/// words first; Korean as the file lists them. A word read and defined as
+/// another is shown once; one without a form, not at all. Ten are shown,
+/// and the rest behind a disclosure that counts them. The expected words
+/// are kiokun.com's own answers for this entry (`contains.mjs`).
+#[test]
+fn appears_in_ranks_each_languages_words_ten_at_a_time() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "子",
+        "{\"key\":\"子\",\"contained_in_chinese\":[\
+         {\"w\":\"孩子\",\"p\":\"hái zi\",\"d\":\"child\",\"fr\":900},{\"w\":\"老子\",\"p\":\"Lǎo zǐ\",\"d\":\"Laozi\",\"fr\":5},\
+         {\"w\":\"儿子\",\"p\":\"ér zi\",\"d\":\"son\",\"fr\":300},{\"w\":\"儿子\",\"p\":\"ér\u{200b}zi\",\"d\":\"son \"},\
+         {\"w\":\"子弹\",\"p\":\"zǐ dàn\",\"ct\":\"zi2 daan2\",\"d\":\"bullet\"},{\"w\":\"孙子\",\"p\":\"\u{200b}Sūn\u{200b}zǐ\",\"d\":\"Sunzi\"},\
+         {\"w\":\"桌子\",\"p\":\"zhuō zi\",\"d\":\"table\",\"fr\":0},{\"w\":\"\",\"p\":\"x\",\"d\":\"nothing\"},\
+         {\"w\":\"椅子\",\"p\":\"yǐ zi\",\"d\":\"chair\",\"fr\":1200},{\"w\":\"瓶子\",\"p\":\"píng zi\",\"d\":\"bottle\",\"fr\":2000},\
+         {\"w\":\"房子\",\"p\":\"fáng zi\",\"d\":\"house\",\"fr\":700},{\"w\":\"日子\",\"p\":\"rì zi\",\"d\":\"day\",\"fr\":400},\
+         {\"w\":\"样子\",\"p\":\"yàng zi\",\"d\":\"look\",\"fr\":350},{\"w\":\"妻子\",\"p\":\"qī zi\",\"d\":\"wife\",\"fr\":800}],\
+         \"contained_in_japanese\":[{\"w\":\"子供\",\"jp\":\"こども\",\"d\":\"child\",\"fr\":50},\
+         {\"w\":\"帽子\",\"jp\":\"ぼうし\",\"d\":\"hat\",\"c\":true,\"fr\":900},{\"w\":\"様子\",\"jp\":\"ようす\",\"d\":\"state\",\"c\":true,\"fr\":100},\
+         {\"w\":\"子音\",\"p\":\"zǐ yīn\",\"d\":\"consonant\"}],\
+         \"contained_in_korean\":[{\"w\":\"자손\",\"kr\":\"자손\",\"d\":\"descendant\",\"fr\":9},{\"w\":\"모자\",\"d\":\"hat\",\"fr\":1}]}",
+    );
+    let s = served_kiokun_on(dir.path());
+    let page = fetched(&s, &path_of("子"));
+    let html = page.split("<script").next().unwrap_or_default();
+    assert_eq!(
+        appears_in_column(html, "chinese-words"),
+        [
+            "儿子 | ér zi |  | son",
+            "样子 | yàng zi |  | look",
+            "日子 | rì zi |  | day",
+            "房子 | fáng zi |  | house",
+            "妻子 | qī zi |  | wife",
+            "孩子 | hái zi |  | child",
+            "椅子 | yǐ zi |  | chair",
+            "瓶子 | píng zi |  | bottle",
+            "子弹 | zǐ dàn | zi2 daan2 | bullet",
+            "桌子 | zhuō zi |  | table",
+            "老子 | Lǎo zǐ |  | Laozi",
+            "孙子 | \u{200b}Sūn\u{200b}zǐ |  | Sunzi",
+        ]
+    );
+    assert_eq!(
+        appears_in_column(html, "japanese-words"),
+        [
+            "⭐様子 | ようす |  | state",
+            "⭐帽子 | ぼうし |  | hat",
+            "子供 | こども |  | child",
+            "子音 | zǐ yīn |  | consonant",
+        ]
+    );
+    assert_eq!(
+        appears_in_column(html, "korean-words"),
+        ["자손 | 자손 |  | descendant", "모자 |  |  | hat"]
+    );
+    // Twelve Chinese words: ten shown, two behind the disclosure.
+    let chinese = &html[html.find(" id=\"chinese-words\"").expect("the column")..];
+    let chinese = &chinese[..chinese.find("class=\"column\"").unwrap_or(chinese.len())];
+    let disclosed = &chinese[chinese.find("<details").expect("the disclosure")..];
+    assert_eq!(chinese.matches("class=\"word-card\"").count(), 12);
+    assert_eq!(disclosed.matches("class=\"word-card\"").count(), 2);
+    assert!(disclosed.contains(">2 more items<"), "{disclosed}");
+    // Three columns.
+    assert!(html.contains("word-columns three-columns"), "{html}");
+}
+
+/// **Contains and Appears in against kiokun.com's answers for the
+/// repository's sample** (`kiokun-oracle/contains-sample.json`, written by
+/// `just e14-kiokun-contains`): what CI holds. The sample's words are single
+/// characters, with no Contains; its Appears in lists are kiokun's own, up
+/// to 200 words each. The fixture keeps each list's length and its first 20
+/// and last 5 words, each with its place (the integrator's ruling of
+/// 2026-10-10): the head, where the order shows, and the tail, where the
+/// unranked words and the names go. The whole lists are held locally.
+#[test]
+fn contains_and_appears_in_match_kiokuns_answers_for_the_sample() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../kiokun-oracle/contains-sample.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the fixture")).expect("JSON");
+    assert!(
+        fixture["kiokun_commit"]
+            .as_str()
+            .is_some_and(|c| c.len() == 40),
+        "{fixture}"
+    );
+    let oracle = &fixture["oracle"];
+    assert_eq!(
+        oracle["trimmed"],
+        "each list's length, and its first 20 and last 5 items, each with its place",
+        "{fixture}"
+    );
+    let chinese = &oracle["answers"]["人"]["chinese"];
+    assert!(chinese["length"].as_u64().is_some_and(|n| n > 25), "{fixture}");
+    assert_eq!(chinese["kept"].as_array().map(Vec::len), Some(25), "{fixture}");
+    let s = served_kiokun();
+    let differ = contains_held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+}
+
+/// **Word pages with long lists, timed** (local: it reads the owner's
+/// kiokun-data checkout through `KIOKUN_DATA`; run in release by `just
+/// e14-kiokun-contains`). Each word in `KIOKUN_TIME_WORDS` is asked for
+/// `KIOKUN_TIME_REPEAT` times (30 by default), each time of a server just
+/// started from the one build, since the word's page is kept in the shared
+/// cache once read: the time from the request to the response's last byte.
+/// `KIOKUN_SAMPLE_APP` names another `app.pw` to serve, for a baseline.
+#[test]
+#[ignore = "reads a kiokun-data checkout named by KIOKUN_DATA; a measurement, run by `just e14-kiokun-contains`"]
+fn word_pages_with_long_lists_are_timed() {
+    assert!(
+        std::env::var_os("KIOKUN_DATA").is_some(),
+        "KIOKUN_DATA must name a kiokun-data checkout's output_dictionary"
+    );
+    let words = std::env::var("KIOKUN_TIME_WORDS").expect("KIOKUN_TIME_WORDS");
+    let repeat: usize = std::env::var("KIOKUN_TIME_REPEAT")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(30);
+    let (_dir, out) = built_kiokun_with(|app| match std::env::var_os("KIOKUN_SAMPLE_APP") {
+        Some(other) => std::fs::read_to_string(other).expect("KIOKUN_SAMPLE_APP"),
+        None => app.to_string(),
+    });
+    for word in words.split(',') {
+        let mut times: Vec<f64> = Vec::new();
+        let mut page = String::new();
+        for _ in 0..repeat {
+            let s = Server::from_build(out.clone(), out.clone()).expect("served");
+            let at = std::time::Instant::now();
+            page = fetched_as(&s, &path_of(word), Some("timed"))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect();
+            times.push(at.elapsed().as_secs_f64() * 1e3);
+        }
+        assert!(page.starts_with("HTTP/1.1 200"), "{word}: {page}");
+        times.sort_by(|a, b| a.partial_cmp(b).expect("a time"));
+        let html = page.split("<script").next().unwrap_or_default();
+        println!(
+            "word {word}: {} bytes; Contains {}, Chinese {}, Japanese {}, Korean {}; per request, ms: p50 {:.1}, p90 {:.1}, max {:.1} ({repeat} requests)",
+            page.len(),
+            contains_in(html).len(),
+            appears_in_column(html, "chinese-words").len(),
+            appears_in_column(html, "japanese-words").len(),
+            appears_in_column(html, "korean-words").len(),
+            quantile(&times, 0.5),
+            quantile(&times, 0.9),
+            quantile(&times, 1.0)
+        );
     }
 }
 

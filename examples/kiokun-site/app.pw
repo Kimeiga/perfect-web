@@ -216,6 +216,22 @@ type Card = Card {
 }
 
 // An entry. A stub carries only `key` and `redirect`, the entry it names.
+// A word kiokun's builder previews in another's entry (`WordPreview`,
+// kiokun-data `src/word_preview_types.rs`): its written form, pinyin,
+// Jyutping, Japanese reading and on'yomi, Korean reading, first definition,
+// whether JMdict calls it common, and its frequency rank.
+type Preview = Preview {
+    w: String,
+    p: String,
+    ct: String,
+    jp: String,
+    jo: String,
+    kr: String,
+    d: String,
+    c: Bool,
+    fr: Option<Int>,
+}
+
 type Entry = Entry {
     key: String,
     redirect: Option<String>,
@@ -229,6 +245,10 @@ type Entry = Entry {
     mnemonic: Option<Card>,
     variants: List<Card>,
     simplified_form_of: String,
+    contains: List<Preview>,
+    in_chinese: List<Preview>,
+    in_japanese: List<Preview>,
+    in_korean: List<Preview>,
 }
 
 // One of kiokun.com's labels for JMdict's codes
@@ -1047,6 +1067,10 @@ fn with_card(e: Entry, card: Option<Card>, variants: List<Card>) -> Entry {
         mnemonic: card,
         variants: variants,
         simplified_form_of: e.simplified_form_of,
+        contains: e.contains,
+        in_chinese: e.in_chinese,
+        in_japanese: e.in_japanese,
+        in_korean: e.in_korean,
     }
 }
 
@@ -1082,6 +1106,18 @@ fn more_names(into: List<JapaneseName>, more: List<JapaneseName>) -> List<Japane
     List.fold(more, into, (out, w) => if List.any(out, s => s.id == w.id) { out } else { List.concat(out, [w]) })
 }
 
+// Contains' previews not yet in `into` by form and readings, appended
+// (`mergeUniqueBy`, `+page.ts:198-202`).
+fn more_contains(into: List<Preview>, more: List<Preview>) -> List<Preview> {
+    List.fold(more, into, (out, p) => if List.any(out, s => s.w == p.w & s.p == p.p & s.jp == p.jp & s.kr == p.kr) { out } else { List.concat(out, [p]) })
+}
+
+// Appears in's previews not yet in `into` by form, appended; none without a
+// form (`+page.ts:203-217`).
+fn more_previews(into: List<Preview>, more: List<Preview>) -> List<Preview> {
+    List.fold(more, into, (out, p) => if p.w == "" | List.any(out, s => s.w == p.w) { out } else { List.concat(out, [p]) })
+}
+
 fn with_chinese(e: Entry, chinese: List<ChineseWord>) -> Entry {
     Entry {
         key: e.key,
@@ -1096,6 +1132,10 @@ fn with_chinese(e: Entry, chinese: List<ChineseWord>) -> Entry {
         mnemonic: e.mnemonic,
         variants: e.variants,
         simplified_form_of: e.simplified_form_of,
+        contains: e.contains,
+        in_chinese: e.in_chinese,
+        in_japanese: e.in_japanese,
+        in_korean: e.in_korean,
     }
 }
 
@@ -1119,6 +1159,10 @@ fn merged_form(into: Entry, related: Entry) -> Entry {
         mnemonic: into.mnemonic,
         variants: other_cards(related_cards, into.mnemonic),
         simplified_form_of: into.simplified_form_of,
+        contains: more_contains(into.contains, related.contains),
+        in_chinese: more_previews(into.in_chinese, related.in_chinese),
+        in_japanese: more_previews(into.in_japanese, related.in_japanese),
+        in_korean: more_previews(into.in_korean, related.in_korean),
     }
 }
 
@@ -1820,8 +1864,564 @@ fn words_for(data: Option<Entry>, stub: Option<Entry>) -> List<String> {
 fn characters_for(word: String, page: Option<Loaded>) -> List<String> {
     let none: List<String> = []
     match page {
-        Some(l) => support_characters(word, l.data, l.stub, header_cards(l.data, l.stub)),
+        Some(l) => distinct(List.concat(support_characters(word, l.data, l.stub, header_cards(l.data, l.stub)), List.map(l.data.contains, p => p.w))),
         None => none,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Contains and Appears in (`src/lib/Contains.svelte`, `src/lib/AppearsIn.svelte`,
+// `src/lib/contains-order.ts`, `src/lib/appears-in-order.ts`).
+
+// The characters `[...text]` gives: one string a code point.
+fn characters(text: String) -> List<String> {
+    List.map(String.codepoints(text), c => String.from_codepoints([c]))
+}
+
+// Where `part` first begins in `text`, or -1 (`String.indexOf`). Counted in
+// code points, not UTF-16 units: each use compares two places in one text,
+// and their order is the same either way.
+fn index_of(text: String, part: String) -> Int {
+    match found_at(text, part, 0) {
+        Some(at) => at,
+        None => -1,
+    }
+}
+
+// `sortContainsWords` (`[word]/+page.svelte:140-150`): previews found in the
+// word first, by where; the rest after, as they were. The sort is stable.
+fn by_place(word: String, a: Preview, b: Preview) -> Int {
+    let at_a = index_of(word, a.w)
+    let at_b = index_of(word, b.w)
+    if at_a == -1 & at_b == -1 { 0 } else { if at_a == -1 { 1 } else { if at_b == -1 { -1 } else { at_a - at_b } } }
+}
+
+// `buildContainsWordForms` (`[word]/+page.svelte:152-178`): the Chinese
+// words' forms, the Japanese words' written forms, the Korean words' hanja,
+// the word and the entry's key, each once. kiokun.com also adds a Korean
+// word's `hanjaForm`, which its builder never writes.
+fn contains_forms(e: Entry, word: String) -> List<String> {
+    let none: List<String> = []
+    let chinese = List.fold(e.chinese, none, (out, w) => List.concat(out, [w.simp, w.trad]))
+    let japanese = List.fold(e.japanese, none, (out, w) => List.concat(out, List.map(w.kanji, k => k.text)))
+    let korean = List.map(e.korean, w => w.hanja)
+    distinct(List.concat(List.concat(chinese, japanese), List.concat(korean, [word, e.key])))
+}
+
+// One preview as `orderContainsWords` places it: its place among the
+// previews, and its characters.
+type Candidate = Candidate {
+    item: Preview,
+    index: Int,
+    chars: List<String>,
+}
+
+// A candidate placed in a form, from `start` to `end`.
+type Placed = Placed {
+    candidate: Candidate,
+    start: Int,
+    end: Int,
+}
+
+// Does `chars` begin at `at` in `form`?
+fn matches_at(form: List<String>, chars: List<String>, at: Int) -> Bool {
+    match List.get(chars, 0) {
+        Some(c) => match List.get(form, at) {
+            Some(f) => if f == c { matches_at(form, List.drop(chars, 1), at + 1) } else { false },
+            None => false,
+        },
+        None => true,
+    }
+}
+
+// `lexicalQuality`: a definition 4, common 2, a frequency rank 1.
+fn quality(p: Preview) -> Int {
+    let defined = if p.d != "" { 4 } else { 0 }
+    let common = if p.c { 2 } else { 0 }
+    let ranked = match p.fr {
+        Some(_) => 1,
+        None => 0,
+    }
+    defined + common + ranked
+}
+
+fn quality_of(placed: List<Placed>) -> Int {
+    List.fold(placed, 0, (total, p) => total + quality(p.candidate.item))
+}
+
+// `lengthImbalance`: the longest piece's length less the shortest's.
+fn imbalance(placed: List<Placed>) -> Int {
+    let lengths = List.map(placed, p => p.end - p.start)
+    let longest = List.fold(lengths, 0, (m, n) => if n > m { n } else { m })
+    let shortest = List.fold(lengths, 1000000000, (m, n) => if n < m { n } else { m })
+    longest - shortest
+}
+
+// The first place the two breakdowns' previews differ: -1 where `a`'s comes
+// first, 1 where `b`'s does, 0 where none differs.
+fn first_difference(a: List<Placed>, b: List<Placed>) -> Int {
+    match List.get(a, 0) {
+        Some(x) => match List.get(b, 0) {
+            Some(y) => if x.candidate.index != y.candidate.index {
+                if x.candidate.index < y.candidate.index { -1 } else { 1 }
+            } else {
+                first_difference(List.drop(a, 1), List.drop(b, 1))
+            },
+            None => 0,
+        },
+        None => 0,
+    }
+}
+
+// `isBetterBreakdown`: fewer pieces; then better words; then pieces nearer
+// one length; then the earlier previews.
+fn better_breakdown(candidate: List<Placed>, current: Option<List<Placed>>) -> Bool {
+    match current {
+        Some(now) => if List.length(candidate) != List.length(now) {
+            List.length(candidate) < List.length(now)
+        } else {
+            if quality_of(candidate) != quality_of(now) {
+                quality_of(candidate) > quality_of(now)
+            } else {
+                if imbalance(candidate) != imbalance(now) { imbalance(candidate) < imbalance(now) } else { first_difference(candidate, now) < 0 }
+            }
+        },
+        None => true,
+    }
+}
+
+// The best breakdown from `stop` to the range's end, as `table` holds it:
+// `table[i]` is the best from `end - i`.
+fn best_at(table: List<Option<List<Placed>>>, end: Int, stop: Int) -> Option<List<Placed>> {
+    match List.get(table, end - stop) {
+        Some(best) => best,
+        None => None,
+    }
+}
+
+// One candidate tried at `cursor`: where it fits, with the best breakdown
+// after it, kept where it beats `best`.
+fn tried(form: List<String>, start: Int, end: Int, cursor: Int, table: List<Option<List<Placed>>>, best: Option<List<Placed>>, c: Candidate) -> Option<List<Placed>> {
+    let stop = cursor + List.length(c.chars)
+    if stop > end | (cursor == start & stop == end) | !matches_at(form, c.chars, cursor) {
+        best
+    } else {
+        match best_at(table, end, stop) {
+            Some(tail) => if better_breakdown(List.concat([Placed { candidate: c, start: cursor, end: stop }], tail), best) {
+                Some(List.concat([Placed { candidate: c, start: cursor, end: stop }], tail))
+            } else {
+                best
+            },
+            None => best,
+        }
+    }
+}
+
+// Each cursor's best breakdown, from the range's end back to `cursor`.
+fn table_from(form: List<String>, candidates: List<Candidate>, start: Int, end: Int, cursor: Int, table: List<Option<List<Placed>>>) -> List<Option<List<Placed>>> {
+    let none: Option<List<Placed>> = None
+    if cursor < start {
+        table
+    } else {
+        table_from(form, candidates, start, end, cursor - 1, List.concat(table, [List.fold(candidates, none, (best, c) => tried(form, start, end, cursor, table, best, c))]))
+    }
+}
+
+// `bestBreakdown`: the best way to write `form` from `start` to `end` in
+// previews, never the whole range in one. kiokun.com finds each cursor's
+// best once (its `memo`); so does this, from the end back.
+fn breakdown(form: List<String>, candidates: List<Candidate>, start: Int, end: Int) -> Option<List<Placed>> {
+    let done: List<Placed> = []
+    best_at(table_from(form, candidates, start, end, end - 1, [Some(done)]), end, start)
+}
+
+// A range of a form, from `start` to `end`.
+type Range = Range {
+    start: Int,
+    end: Int,
+}
+
+// `buildHierarchy`'s result: the pieces placed, breadth first, each once,
+// and how many the whole form broke into.
+type Hierarchy = Hierarchy {
+    ordered: List<Placed>,
+    top: Int,
+}
+
+// One level of `buildHierarchy`: each range's breakdown, its pieces kept
+// once each, and the pieces longer than one character the next level's
+// ranges.
+type Level = Level {
+    ordered: List<Placed>,
+    next: List<Range>,
+    top: Int,
+}
+
+fn placed_once(ordered: List<Placed>, pieces: List<Placed>) -> List<Placed> {
+    List.fold(pieces, ordered, (out, p) => if List.any(out, q => q.candidate.index == p.candidate.index) { out } else { List.concat(out, [p]) })
+}
+
+fn level_of(form: List<String>, candidates: List<Candidate>, ranges: List<Range>, ordered: List<Placed>, top: Int, first: Bool) -> Level {
+    let none: List<Range> = []
+    List.fold(ranges, Level { ordered: ordered, next: none, top: top }, (l, r) => match breakdown(form, candidates, r.start, r.end) {
+        Some(pieces) => Level {
+            ordered: placed_once(l.ordered, pieces),
+            next: List.concat(l.next, List.map(List.filter(pieces, p => p.end - p.start > 1), p => Range { start: p.start, end: p.end })),
+            top: if first { List.length(pieces) } else { l.top },
+        },
+        None => l,
+    })
+}
+
+fn levels(form: List<String>, candidates: List<Candidate>, ranges: List<Range>, ordered: List<Placed>, top: Int, first: Bool) -> Hierarchy {
+    if List.length(ranges) == 0 {
+        Hierarchy { ordered: ordered, top: top }
+    } else {
+        let l = level_of(form, candidates, ranges, ordered, top, first)
+        levels(form, candidates, l.next, l.ordered, l.top, false)
+    }
+}
+
+// `buildHierarchy`: the form broken into previews, breadth first. A count
+// of 1000000000 stands for kiokun.com's `Infinity`: no form has as many
+// characters.
+fn hierarchy(form: List<String>, candidates: List<Candidate>) -> Hierarchy {
+    let none: List<Placed> = []
+    if List.length(form) < 2 { Hierarchy { ordered: none, top: 1000000000 } } else { levels(form, candidates, [Range { start: 0, end: List.length(form) }], none, 1000000000, true) }
+}
+
+// `isBetterHierarchy`: fewer pieces at the top; then more pieces placed.
+fn better_hierarchy(candidate: Hierarchy, current: Hierarchy) -> Bool {
+    if candidate.top != current.top { candidate.top < current.top } else { List.length(candidate.ordered) > List.length(current.ordered) }
+}
+
+// The form whose hierarchy is best so far.
+type Chosen = Chosen {
+    form: String,
+    hierarchy: Hierarchy,
+}
+
+fn chosen_of(candidates: List<Candidate>, best: Chosen, form: String) -> Chosen {
+    let h = hierarchy(characters(form), candidates)
+    if better_hierarchy(h, best.hierarchy) { Chosen { form: form, hierarchy: h } } else { best }
+}
+
+// `compareRemaining`: the longer preview first; then the earlier in the
+// form; then the earlier preview.
+fn by_remaining(form: String, a: Candidate, b: Candidate) -> Int {
+    let at_a = if index_of(form, a.item.w) == -1 { 1000000000 } else { index_of(form, a.item.w) }
+    let at_b = if index_of(form, b.item.w) == -1 { 1000000000 } else { index_of(form, b.item.w) }
+    if List.length(a.chars) != List.length(b.chars) {
+        List.length(b.chars) - List.length(a.chars)
+    } else {
+        if at_a != at_b { at_a - at_b } else { a.index - b.index }
+    }
+}
+
+// `orderContainsWords` (`contains-order.ts:29-57`): the previews that break
+// the word down, breadth first, in reading order; then the rest.
+fn ordered_contains(words: List<Preview>, forms: List<String>) -> List<Candidate> {
+    let none: List<Candidate> = []
+    let candidates = List.filter(List.fold(words, none, (out, p) => List.concat(out, [Candidate { item: p, index: List.length(out), chars: characters(p.w) }])), c => List.length(c.chars) > 0)
+    let unique = distinct(forms)
+    let first = match List.get(unique, 0) {
+        Some(f) => f,
+        None => "",
+    }
+    let nothing: List<Placed> = []
+    let chosen = List.fold(unique, Chosen { form: first, hierarchy: Hierarchy { ordered: nothing, top: 1000000000 } }, (best, f) => chosen_of(candidates, best, f))
+    let placed = List.map(chosen.hierarchy.ordered, p => p.candidate)
+    let rest = List.filter(candidates, c => !List.any(placed, p => p.index == c.index))
+    List.concat(placed, List.sort_by(rest, (a, b) => by_remaining(chosen.form, a, b)))
+}
+
+// A card of Contains: a preview, and the written forms it stands for where
+// the word's forms differ at its place (`buildContainsCards`).
+type ContainsCard = ContainsCard {
+    candidate: Candidate,
+    forms: List<String>,
+}
+
+// The forms' characters at `position`, each once.
+fn at_position(forms: List<List<String>>, position: Int) -> List<String> {
+    distinct(List.map(forms, chars => match List.get(chars, position) {
+        Some(c) => c,
+        None => "",
+    }))
+}
+
+// Is `w` the character at `at`?
+fn has_at(chars: List<String>, at: Int, w: String) -> Bool {
+    match List.get(chars, at) {
+        Some(c) => c == w,
+        None => false,
+    }
+}
+
+// The first place where one of the forms has the character `w`.
+fn position_of(forms: List<List<String>>, w: String, at: Int, length: Int) -> Int {
+    if at >= length { -1 } else { if List.any(forms, chars => has_at(chars, at, w)) { at } else { position_of(forms, w, at + 1, length) } }
+}
+
+type Carded = Carded {
+    cards: List<ContainsCard>,
+    used: List<Int>,
+}
+
+fn carded(previews: List<Candidate>, forms: List<List<String>>, length: Int, state: Carded, c: Candidate) -> Carded {
+    let position = if List.length(c.chars) == 1 { position_of(forms, c.item.w, 0, length) } else { -1 }
+    if List.any(state.used, u => u == c.index) {
+        state
+    } else {
+        if position == -1 {
+            Carded { cards: List.concat(state.cards, [ContainsCard { candidate: c, forms: [] }]), used: List.concat(state.used, [c.index]) }
+        } else {
+            let variants = at_position(forms, position)
+            let matched = List.filter(previews, p => List.length(p.chars) == 1 & List.any(variants, v => v == p.item.w))
+            match List.get(matched, 0) {
+                Some(m) => Carded {
+                    cards: List.concat(state.cards, [ContainsCard { candidate: m, forms: variants }]),
+                    used: List.concat(state.used, List.map(matched, p => p.index)),
+                },
+                None => state,
+            }
+        }
+    }
+}
+
+// `buildContainsCards` (`Contains.svelte:47-85`): where the word has
+// several forms of one length, the one-character previews at one place are
+// one card, written with each form's character there (学/學).
+fn contains_cards(previews: List<Candidate>, word_forms: List<String>) -> List<ContainsCard> {
+    let plain = List.map(previews, c => ContainsCard { candidate: c, forms: [] })
+    let forms = List.map(distinct(word_forms), characters)
+    let length = match List.get(forms, 0) {
+        Some(f) => List.length(f),
+        None => 0,
+    }
+    let none: List<ContainsCard> = []
+    let nobody: List<Int> = []
+    if List.length(forms) < 2 | length == 0 | List.any(forms, f => List.length(f) != length) {
+        plain
+    } else {
+        let cards = List.fold(previews, Carded { cards: none, used: nobody }, (state, c) => carded(previews, forms, length, state, c)).cards
+        if List.length(cards) > 0 { cards } else { plain }
+    }
+}
+
+// `cleanGloss` (`Contains.svelte:104-108`): one source marker taken off the
+// end, matched ignoring ASCII case.
+fn clean_gloss(gloss: String) -> String {
+    let t = String.trim(gloss)
+    let lower = String.to_lower_ascii(t)
+    let marker = match List.find(["(simp)", "(trad/jp)", "(trad)", "(jp)"], m => String.ends_with(lower, m)) {
+        Some(m) => m,
+        None => "",
+    }
+    if marker == "" { t } else { String.trim(String.slice(t, 0, String.length(t) - String.length(marker))) }
+}
+
+// One card of Contains as the page shows it (`Contains.svelte:140-200`):
+// its written forms, each reading kiokun.com shows, and its definition.
+type ShownContains = ShownContains {
+    id: String,
+    w: String,
+    text: String,
+    p: String,
+    ct: String,
+    jp: String,
+    jo: String,
+    kr: String,
+    readings: Bool,
+    japanese: Bool,
+    on_and_kun: Bool,
+    jp_class: String,
+    kun_label: String,
+    definition: String,
+}
+
+// `displayDefinition`: the first of the card's characters with a component
+// gloss, cleaned; else the preview's definition.
+fn contains_definition(card: ContainsCard, glosses: List<CharGloss>) -> String {
+    let p = card.candidate.item
+    match List.find(distinct(List.concat([p.w], card.forms)), c => List.any(glosses, g => g.character == c & g.gloss != "")) {
+        Some(c) => match List.find(glosses, g => g.character == c & g.gloss != "") {
+            Some(g) => clean_gloss(g.gloss),
+            None => p.d,
+        },
+        None => p.d,
+    }
+}
+
+fn contains_shown(card: ContainsCard, glosses: List<CharGloss>, n: Int) -> ShownContains {
+    let p = card.candidate.item
+    let jo = if p.jo != p.jp { p.jo } else { "" }
+    ShownContains {
+        id: "contains:{n}",
+        w: p.w,
+        text: if List.length(card.forms) > 0 { String.join(card.forms, "/") } else { p.w },
+        p: p.p,
+        ct: p.ct,
+        jp: p.jp,
+        jo: jo,
+        kr: p.kr,
+        readings: p.p != "" | p.ct != "" | p.jp != "" | jo != "" | p.kr != "",
+        japanese: p.jp != "" | jo != "",
+        on_and_kun: p.jp != "" & jo != "",
+        jp_class: if jo != "" { "japanese-reading kunyomi-reading" } else { "japanese-reading" },
+        kun_label: if jo != "" { "Japanese kun’yomi: {p.jp}" } else { "Japanese reading: {p.jp}" },
+        definition: contains_definition(card, glosses),
+    }
+}
+
+// A list shown ten at a time (`displayCount`, `pageSize` 10): the first
+// ten, and the rest behind a disclosure, which needs no script.
+type ContainsList = ContainsList {
+    first: List<ShownContains>,
+    rest: List<ShownContains>,
+    more: String,
+}
+
+// Contains (`[word]/+page.svelte:916-925`, `Contains.svelte`): the word's
+// previews ordered by where they sit, broken down, carded, and shown.
+fn contains_of(e: Entry, word: String, glosses: List<CharGloss>) -> ContainsList {
+    let sorted = List.sort_by(e.contains, (a, b) => by_place(word, a, b))
+    let forms = contains_forms(e, word)
+    let cards = contains_cards(ordered_contains(sorted, forms), forms)
+    let none: List<ShownContains> = []
+    let shown = List.fold(cards, none, (out, c) => List.concat(out, [contains_shown(c, glosses, List.length(out))]))
+    ContainsList {
+        first: List.take(shown, 10),
+        rest: List.drop(shown, 10),
+        more: "{List.length(shown) - 10} more",
+    }
+}
+
+// INVISIBLE (`appears-in-order.ts:14`): zero-width characters and white
+// space taken out.
+fn visible_text(text: String) -> String {
+    String.from_codepoints(List.filter(String.codepoints(text), c => c != 8203 & c != 8204 & c != 8205 & c != 8288 & c != 65279 & String.trim(String.from_codepoints([c])) != ""))
+}
+
+// `readingOf`: the pinyin, else the Japanese reading, else the Korean, seen
+// and lower-cased.
+fn reading_of(p: Preview) -> String {
+    String.to_lower(visible_text(if p.p != "" { p.p } else { if p.jp != "" { p.jp } else { p.kr } }))
+}
+
+// `isChineseProperNoun`: pinyin that begins with an upper-case letter
+// (`/^\p{Lu}/u`): one that upper-cases to itself and lower-cases to
+// another.
+fn proper_noun(p: Preview) -> Bool {
+    let first = String.slice(visible_text(p.p), 0, 1)
+    first != "" & String.to_upper(first) == first & String.to_lower(first) != first
+}
+
+// `dedupeAppearsIn`: the first preview of each written form, reading and
+// definition; none without a form.
+fn deduped(words: List<Preview>) -> List<Preview> {
+    let none: List<Preview> = []
+    List.fold(words, none, (out, p) => if p.w == "" | List.any(out, q => q.w == p.w & reading_of(q) == reading_of(p) & String.trim(q.d) == String.trim(p.d)) { out } else { List.concat(out, [p]) })
+}
+
+// `rankOf`: a rank above zero, else last.
+fn rank_of(p: Preview) -> Int {
+    match p.fr {
+        Some(n) => if n > 0 { n } else { 1000000000 },
+        None => 1000000000,
+    }
+}
+
+type Ranked = Ranked {
+    item: Preview,
+    index: Int,
+}
+
+fn by_appearance(chinese: Bool, a: Ranked, b: Ranked) -> Int {
+    let proper = (if proper_noun(a.item) { 1 } else { 0 }) - (if proper_noun(b.item) { 1 } else { 0 })
+    let common = (if b.item.c { 1 } else { 0 }) - (if a.item.c { 1 } else { 0 })
+    let first = if chinese { proper } else { common }
+    if first != 0 {
+        first
+    } else {
+        if rank_of(a.item) != rank_of(b.item) { if rank_of(a.item) < rank_of(b.item) { -1 } else { 1 } } else { a.index - b.index }
+    }
+}
+
+// `rankAppearsIn` (`appears-in-order.ts:59-82`): Chinese words before names,
+// Japanese common words first, each by frequency rank; Korean as the file
+// lists them.
+fn ranked(words: List<Preview>, language: String) -> List<Preview> {
+    let unique = deduped(words)
+    let none: List<Ranked> = []
+    if language == "korean" {
+        unique
+    } else {
+        List.map(List.sort_by(List.fold(unique, none, (out, p) => List.concat(out, [Ranked { item: p, index: List.length(out) }])), (a, b) => by_appearance(language == "chinese", a, b)), r => r.item)
+    }
+}
+
+// One word of Appears in as the page shows it (`AppearsIn.svelte:160-290`):
+// its reading the column's own, else the pinyin.
+type ShownAppears = ShownAppears {
+    id: String,
+    w: String,
+    reading: String,
+    ct: String,
+    d: String,
+    c: Bool,
+}
+
+type AppearsList = AppearsList {
+    id: String,
+    heading: String,
+    lang: String,
+    first: List<ShownAppears>,
+    rest: List<ShownAppears>,
+    more: String,
+}
+
+fn appears_of(words: List<Preview>, language: String, heading: String, lang: String) -> AppearsList {
+    let none: List<ShownAppears> = []
+    let shown = List.fold(ranked(words, language), none, (out, p) => List.concat(out, [ShownAppears {
+        id: "{language}-words:{List.length(out)}",
+        w: p.w,
+        reading: if language == "japanese" & p.jp != "" { p.jp } else { if language == "korean" & p.kr != "" { p.kr } else { p.p } },
+        ct: if language == "chinese" { p.ct } else { "" },
+        d: p.d,
+        c: language == "japanese" & p.c,
+    }]))
+    AppearsList {
+        id: "{language}-words",
+        heading: heading,
+        lang: lang,
+        first: List.take(shown, 10),
+        rest: List.drop(shown, 10),
+        more: "{List.length(shown) - 10} more items",
+    }
+}
+
+// Appears in (`[word]/+page.svelte:927-936`): each language's words that
+// contain this one.
+type Appears = Appears {
+    chinese: AppearsList,
+    japanese: AppearsList,
+    korean: AppearsList,
+    shown: Bool,
+    columns: String,
+}
+
+fn appears_in(e: Entry) -> Appears {
+    let chinese = appears_of(e.in_chinese, "chinese", "Chinese Words", "zh")
+    let japanese = appears_of(e.in_japanese, "japanese", "Japanese Words", "ja")
+    let korean = appears_of(e.in_korean, "korean", "Korean Words", "ko")
+    let count = List.length(List.filter([List.length(chinese.first), List.length(japanese.first), List.length(korean.first)], n => n > 0))
+    Appears {
+        chinese: chinese,
+        japanese: japanese,
+        korean: korean,
+        shown: count > 0,
+        columns: if count == 3 { "word-columns three-columns" } else { if count == 2 { "word-columns two-columns" } else { "word-columns" } },
     }
 }
 
@@ -1835,6 +2435,8 @@ type WordShown = WordShown {
     japanese: List<ShownJapanese>,
     korean: List<ShownKorean>,
     names: List<ShownName>,
+    contains: ContainsList,
+    appears: Appears,
 }
 
 // Each Japanese word's pitch readings, by its place among the words.
@@ -1862,6 +2464,8 @@ fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>,
         japanese: japanese_all(e.japanese, labels, pitches),
         korean: List.map(e.korean, korean_shown),
         names: List.map(e.names, name_shown),
+        contains: contains_of(e, word, glosses),
+        appears: appears_in(e),
     }
 }
 
@@ -1943,6 +2547,98 @@ view SenseExamples(examples: ShownExamples) {
                 {/if}
             </div>
         </div>
+    {/if}
+}
+
+// One card of Contains (`Contains.svelte:146-195`): a link to the word's
+// page, its forms, each reading, and its definition.
+view ContainsCardView(card: ShownContains) {
+    <a href="/word/{card.w}" class="character-card">
+        <div class="character">{card.text}</div>
+        {#if card.readings}
+            <div class="pronunciations">
+                {#if card.p}<span class="chinese-reading">{card.p}</span>{/if}
+                {#if card.ct}<span class="cantonese-reading">{card.ct}</span>{/if}
+                {#if card.japanese}
+                    <span class="japanese-readings" lang="ja">
+                        {#if card.jp}<span class={card.jp_class} aria-label={card.kun_label}>{card.jp}</span>{/if}
+                        {#if card.on_and_kun}<span class="japanese-reading-separator" aria-hidden="true">·</span>{/if}
+                        {#if card.jo}<span class="japanese-onyomi-reading" aria-label="Japanese on’yomi: {card.jo}">{card.jo}</span>{/if}
+                    </span>
+                {/if}
+                {#if card.kr}<span class="korean-reading">{card.kr}</span>{/if}
+            </div>
+        {/if}
+        {#if card.definition}<div class="definition">{card.definition}</div>{/if}
+    </a>
+}
+
+// Contains (`Contains.svelte:140-205`): the first ten cards, and the rest
+// behind a disclosure saying how many there are.
+view ContainsSection(list: ContainsList) {
+    {#if list.first}
+        <section id="contains" aria-labelledby="contains-heading">
+            <h2 id="contains-heading">Contains</h2>
+            <div class="characters-row">
+                {#each list.first as c (c.id)}<ContainsCardView card={c} />{/each}
+            </div>
+            {#if list.rest}
+                <details class="remaining">
+                    <summary class="remaining-count">{list.more}</summary>
+                    <div class="characters-row">
+                        {#each list.rest as c (c.id)}<ContainsCardView card={c} />{/each}
+                    </div>
+                </details>
+            {/if}
+        </section>
+    {/if}
+}
+
+// One word of Appears in (`AppearsIn.svelte:160-290`): a link to its page,
+// JMdict's star for a common Japanese word, its reading, and its definition.
+view AppearsCard(item: ShownAppears) {
+    <a href="/word/{item.w}" class="word-card">
+        <div class="word-header">
+            <span class="word-text">{#if item.c}<span class="common-star" title="Common word">⭐</span>{/if}{item.w}</span>
+            {#if item.reading}<span class="pronunciation" title={item.reading}>{item.reading}</span>{/if}
+            {#if item.ct}<span class="cantonese-pronunciation" title="Cantonese (Jyutping)">{item.ct}</span>{/if}
+        </div>
+        {#if item.d}
+            <div class="definition-row"><div class="definition" title={item.d}>{item.d}</div></div>
+        {/if}
+    </a>
+}
+
+// One column of Appears in: its heading, its first ten words, and the rest
+// behind a disclosure saying how many there are.
+view AppearsColumn(list: AppearsList) {
+    {#if list.first}
+        <div class="column" lang={list.lang}>
+            <h2 id={list.id}>{list.heading}</h2>
+            <div class="word-list">
+                {#each list.first as w (w.id)}<AppearsCard item={w} />{/each}
+            </div>
+            {#if list.rest}
+                <details class="remaining">
+                    <summary class="remaining-count">{list.more}</summary>
+                    <div class="word-list">
+                        {#each list.rest as w (w.id)}<AppearsCard item={w} />{/each}
+                    </div>
+                </details>
+            {/if}
+        </div>
+    {/if}
+}
+
+// Appears in (`AppearsIn.svelte:150-300`): a column for each language's
+// words that contain this one.
+view AppearsSection(appears: Appears) {
+    {#if appears.shown}
+        <section id="appears-in" class={appears.columns}>
+            <AppearsColumn list={appears.chinese} />
+            <AppearsColumn list={appears.japanese} />
+            <AppearsColumn list={appears.korean} />
+        </section>
     {/if}
 }
 
@@ -2161,6 +2857,8 @@ page WordPage(word: String) {
                     </div>
                 </section>
             {/if}
+            <ContainsSection list={page.contains} />
+            <AppearsSection appears={page.appears} />
         </main>
     }
 }
