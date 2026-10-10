@@ -1454,8 +1454,15 @@ fn contains_and_appears_in_match_kiokuns_answers_for_the_sample() {
         "{fixture}"
     );
     let chinese = &oracle["answers"]["人"]["chinese"];
-    assert!(chinese["length"].as_u64().is_some_and(|n| n > 25), "{fixture}");
-    assert_eq!(chinese["kept"].as_array().map(Vec::len), Some(25), "{fixture}");
+    assert!(
+        chinese["length"].as_u64().is_some_and(|n| n > 25),
+        "{fixture}"
+    );
+    assert_eq!(
+        chinese["kept"].as_array().map(Vec::len),
+        Some(25),
+        "{fixture}"
+    );
     let s = served_kiokun();
     let differ = contains_held_to_oracle(&s, oracle);
     assert!(differ.is_empty(), "{differ:#?}");
