@@ -28,7 +28,7 @@ MUTANTS = [
     (
         "a failed subscription request ends the subscription",
         RUNTIME,
-        "    } catch {\n      if (leaving) return;\n      failures += 1;\n",
+        "    } catch {\n      if (leaving || life.signal.aborted) return;\n      failures += 1;\n",
         "    } catch {\n      return;\n      failures += 1;\n",
     ),
     (

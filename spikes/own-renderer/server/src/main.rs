@@ -8506,6 +8506,9 @@ fn signal_document(
         manifest["computed"] = serde_json::Value::String(module);
     }
     with_instance_templates(&mut manifest, template, templates);
+    if let Some(layout) = plan.get("layout").filter(|l| !l.is_null()) {
+        manifest["layout"] = layout.clone();
+    }
     // No `<` in a script element's text (ADR-0097).
     let json =
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
@@ -8663,6 +8666,11 @@ fn document(
     // A private page's own session's values: this document is `cache private`.
     let mut manifest = manifest;
     with_instance_templates(&mut manifest, template, templates);
+    // **The layout it is shown in** (ADR-XXXX, the layouts' ADR): what a
+    // navigation compares, to keep the layout in place.
+    if let Some(layout) = plan.get("layout").filter(|l| !l.is_null()) {
+        manifest["layout"] = layout.clone();
+    }
     // And its signals (ADR-0140): a page that reads queries holds UI state
     // too, and the browser renders what they decide, as on a page of
     // signals alone.

@@ -133,8 +133,9 @@ MUTANTS = [
         "a navigation goes before the presses made before it",
         BROWSER,
         RUNTIME,
-        "  await Promise.allSettled([...pressing].filter((p) => p !== mine));\n",
-        "",
+        "  navigating = true;\n  await Promise.allSettled([...pressing].filter((p) => p !== mine));\n"
+        "  log.push(`navigating to ${url}`);\n",
+        "  navigating = true;\n  log.push(`navigating to ${url}`);\n",
     ),
     (
         "a press is not counted while it runs",
@@ -161,8 +162,8 @@ MUTANTS = [
         "a page shown again stays leaving",
         BROWSER,
         RUNTIME,
-        "  if (e.persisted) navigating = false;\n",
-        "",
+        "    if (!e.persisted) return;\n    navigating = false;\n",
+        "    if (!e.persisted) return;\n",
     ),
     (
         "an address carries a value as written",

@@ -5580,3 +5580,28 @@ e14-build-id:
        python3 scripts/build_id_mutations.py; \
      } > docs/evidence/E14/build-id.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/build-id.txt
+
+# The soft navigation's ADR: a navigation keeps the layout, and shows the next
+# page in it. The browser's tests in three engines, ADR-0280's navigation as
+# it is now, and the mutation controls.
+e14-soft-navigation:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a navigation keeps the layout, and shows the next page in it"; echo; \
+       echo "produced by: just e14-soft-navigation"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the store's pages, followed softly, in three engines (e2e/soft-navigation.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/soft-navigation.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== a handler's navigation after its commit, in three engines (e2e/navigate.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/navigate.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/soft_navigation_mutations.py)"; echo; \
+       python3 scripts/soft_navigation_mutations.py; \
+     } > docs/evidence/E14/soft-navigation.txt
+    @grep -E "passed|failed|mutants killed|Error:" docs/evidence/E14/soft-navigation.txt

@@ -212,8 +212,8 @@ MUTANTS = [
         "the announcer is not emptied first",
         "browser",
         RUNTIME,
-        '  status.textContent = "";\n',
-        "",
+        '  status.textContent = "";\n  clearTimeout(saying);\n',
+        "  clearTimeout(saying);\n",
     ),
     (
         "the announcer says nothing",

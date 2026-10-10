@@ -27,9 +27,32 @@ async function oneEspresso(page) {
   await ready(page, "/cart");
 }
 
-/** Whether a request is the order page's document. */
+/** Whether a request is the order page's document: a load's, or, since the
+ * cart and the order are shown in one layout, the fetch of a navigation that
+ * keeps it (the soft navigation's ADR). */
 const orderPage = (request) =>
-  request.resourceType() === "document" && new URL(request.url()).pathname === "/order";
+  ["document", "fetch"].includes(request.resourceType()) &&
+  new URL(request.url()).pathname === "/order";
+
+/** The order's page, answered as another build's once: the navigation that
+ * would keep the layout loads it whole, as ADR-0280 made every navigation,
+ * so a browser's Stop and its back-forward cache can be tried on it. */
+async function wholeOrderPage(page, hold) {
+  let foreign = true;
+  await page.route("**/order", async (route) => {
+    if (route.request().resourceType() === "fetch" && foreign) {
+      foreign = false;
+      const response = await route.fetch();
+      return route.fulfill({
+        response,
+        headers: { ...response.headers(), "pw-build": "b0000000000000000" },
+      });
+    }
+    if (route.request().resourceType() !== "document") return route.continue();
+    await hold();
+    await route.continue();
+  });
+}
 
 const PLACED = "Placed: the store has your order.";
 
@@ -55,7 +78,9 @@ test("an order placed goes to its page, read after the commit", async ({ page })
   });
   await expect(page).toHaveTitle("Your order");
   await expect(page.locator("#order-status")).toHaveText(PLACED);
-  // A navigation to another page, not a reload of this one.
+  // A navigation to another page, not a reload of this one: the cart's
+  // layout kept, its window the one loaded first (the soft navigation's ADR).
+  expect(await page.evaluate(() => window.__pwSoftNavigations)).toBe(1);
   expect(await page.evaluate(() => performance.getEntriesByType("navigation")[0].type)).toBe(
     "navigate",
   );
@@ -116,7 +141,10 @@ async function placedWithAPressMeanwhile(page, first) {
     if (orderPage(r)) at.document = Date.now();
   });
   await page.getByRole("button", { name: "Place order" }).click();
-  await page.locator("#clear-cart").click();
+  // Pressed from the keyboard: the order's commit removes the cart's lines
+  // while the press is made, and a pointer's press could land where the
+  // button was, focus it, and click nothing (Firefox, under load).
+  await page.locator("#clear-cart").press("Enter");
   await page.waitForURL(/\/order$/);
   return at;
 }
@@ -141,9 +169,12 @@ test("a press made before the navigation is answered first, its answer first", a
 
 test("a press made while the page leaves is not taken", async ({ page }) => {
   await oneEspresso(page);
-  // The order's page is slow to come: the cart stays, leaving, meanwhile.
+  // The order's page is slow to come: the cart stays, leaving, meanwhile,
+  // its next page being fetched to be shown in its layout.
+  let asked;
+  const requested = new Promise((r) => (asked = r));
   await page.route("**/order", async (route) => {
-    if (route.request().resourceType() !== "document") return route.continue();
+    asked();
     await new Promise((r) => setTimeout(r, 500));
     await route.continue();
   });
@@ -151,14 +182,9 @@ test("a press made while the page leaves is not taken", async ({ page }) => {
   page.on("request", (r) => {
     if (new URL(r.url()).pathname === "/command/store.page.clear_cart") cleared.push(r.url());
   });
-  // Pressed as the page starts to leave, from within it: Playwright's own
-  // click and evaluate wait for a navigation they see pending.
-  await page.evaluate(() =>
-    addEventListener("beforeunload", () => document.getElementById("clear-cart").click(), {
-      once: true,
-    }),
-  );
   await page.getByRole("button", { name: "Place order" }).click();
+  await requested;
+  await page.locator("#clear-cart").click();
   await page.waitForURL(/\/order$/);
   // The page was leaving: the press sent nothing.
   expect(cleared).toEqual([]);
@@ -196,7 +222,9 @@ test("a second navigation, made while the page leaves, is not taken", async ({ p
   const button = page.getByRole("button", { name: "Place order" });
   await button.click();
   await firstRequested;
-  await button.click();
+  // From the keyboard, as the press above: no pointer to miss a button the
+  // first command's frames may move.
+  await button.press("Enter");
   // The first decides; the second, waiting on it as it waits on the second,
   // would hold both for ever.
   await page.waitForURL(/\/order$/, { timeout: 10_000 });
@@ -208,11 +236,10 @@ test("a navigation stopped takes presses again where the browser says it stopped
   browserName,
 }) => {
   await oneEspresso(page);
-  // The order's page never comes; the navigation is stopped instead.
-  await page.route("**/order", async (route) => {
-    if (route.request().resourceType() !== "document") return route.continue();
-    await new Promise(() => {});
-  });
+  // The order's page never comes; the navigation is stopped instead. Loaded
+  // whole, as another build's: a navigation that keeps the layout is no
+  // browser's to stop.
+  await wholeOrderPage(page, () => new Promise(() => {}));
   const cleared = [];
   page.on("request", (r) => {
     if (new URL(r.url()).pathname === "/command/store.page.clear_cart") cleared.push(r.url());
@@ -254,11 +281,9 @@ test("a page shown again from the back-forward cache takes a press again", async
   // press made as the page unloads does not finish before it goes.
   test.skip(browserName !== "chromium", "covered by the stopped navigation's test");
   await oneEspresso(page);
-  await page.route("**/order", async (route) => {
-    if (route.request().resourceType() !== "document") return route.continue();
-    await new Promise((r) => setTimeout(r, 500));
-    await route.continue();
-  });
+  // Loaded whole, as another build's (the soft navigation's ADR keeps the
+  // layout otherwise, and unloads nothing).
+  await wholeOrderPage(page, () => new Promise((r) => setTimeout(r, 500)));
   const cleared = [];
   page.on("request", (r) => {
     if (new URL(r.url()).pathname === "/command/store.page.clear_cart") cleared.push(r.url());
