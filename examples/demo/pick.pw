@@ -29,8 +29,10 @@ command pick(item: MenuItemId) -> Result<MenuItemId, CartError>
 
 // One button, for one item. What the press is answered is discarded by
 // name (ADR-0159): `pick` never refuses, and this demo is about the view.
+// Shown to every reader, its refusal told (ADR-XXXX): the demo is not about
+// who may press it.
 view PickOne(item: MenuItemId) !{} {
-    <button type="button" on:press={() => { let _picked = pick(item) }}>Pick</button>
+    <button type="button" on:press|refusable={() => { let _picked = pick(item) }}>Pick</button>
 }
 
 page PickPage(first: MenuItemId, second: MenuItemId) {

@@ -80,7 +80,7 @@ command keep(outline: Comment) -> Result<Int, CartError>
 view Thread(c: Comment) !{} {
     <li>
         <p><b>{c.author}</b>: {c.text}</p>
-        <button type="button" on:press={() => { let _voted = upvote(c.id) }}>Upvote</button>
+        <button type="button" on:press|refusable={() => { let _voted = upvote(c.id) }}>Upvote</button>
         <ul>
             {#each c.replies as r (r.id)}
                 <Thread c={r} />
@@ -144,7 +144,7 @@ page ThreadPage() {
                 }
                 added = added + 1
             }}>Add a heading</button>
-            <button id="keep" type="button" on:press={() => { let _kept = keep(outline) }}>Keep</button>
+            <button id="keep" type="button" on:press|refusable={() => { let _kept = keep(outline) }}>Keep</button>
             <button id="toggle" type="button" on:press={() => shown = !shown}>Summary</button>
             {#if shown}
                 <section id="summary" aria-label="Summary">

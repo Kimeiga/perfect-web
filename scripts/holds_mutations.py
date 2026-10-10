@@ -234,19 +234,22 @@ def cargo_tests(suite):
 
 
 def browser_tests(_suite="browser"):
-    """(built, passed, failed), after a build: the feed's pages, which serve
-    the runtime they were built with, and the server the suite runs."""
-    built = subprocess.run(
-        ["bash", "spikes/own-renderer/feed.sh"],
-        cwd=ROOT,
-        env={**os.environ, "BUILD_ONLY": "1"},
-        capture_output=True,
-        text=True,
-    )
-    if built.returncode != 0:
-        return False, 0, 0
+    """(built, passed, failed), after a build: the store's pages and the
+    feed's, each of which serves the runtime it was built with (the suite's
+    servers start both), and the server the suite runs."""
+    for script in ["run.sh", "feed.sh"]:
+        built = subprocess.run(
+            ["bash", f"spikes/own-renderer/{script}"],
+            cwd=ROOT,
+            env={**os.environ, "BUILD_ONLY": "1"},
+            capture_output=True,
+            text=True,
+        )
+        if built.returncode != 0:
+            return False, 0, 0
+    # The servers the suite starts: the development server and kiokun's.
     server = subprocess.run(
-        ["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server"],
+        ["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server", "-p", "kiokun-server"],
         cwd=ROOT,
         capture_output=True,
         text=True,

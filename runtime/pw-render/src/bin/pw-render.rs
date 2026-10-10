@@ -157,6 +157,16 @@ fn main() -> std::process::ExitCode {
                                 env = env.set(path, Value::Text(String::new()));
                             }
                         }
+                        // What the page asks of its reader (ADR-XXXX), the
+                        // values not giving it: this render is no session's,
+                        // and no principal holds a predicate.
+                        for p in plan["predicates"].as_array().into_iter().flatten() {
+                            let Some(p) = p.as_str() else { continue };
+                            let name = format!("{p}~holds");
+                            if !given.contains(name.as_str()) {
+                                env = env.set(&name, Value::Bool(false));
+                            }
+                        }
                         let page = plan["page"].as_str().unwrap_or_default();
                         for b in plan["blocks"].as_array().into_iter().flatten() {
                             let id = b.as_u64().unwrap_or_default() as u32;

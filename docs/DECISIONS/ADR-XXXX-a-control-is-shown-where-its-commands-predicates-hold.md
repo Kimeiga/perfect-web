@@ -39,7 +39,9 @@ the page can already tell it would be refused.
    (`predicates`); the host answers each when it reads the document's
    values, and a value computed from an answer is computed by the host from
    it; the document carries the answers to the browser (`holds`), which
-   renders a speculated region with them. Not a witness the program
+   renders a speculated region with them. A render that is no session's
+   (`pw-render`'s, for the build's static pages) answers each `false`: no
+   principal holds a predicate. Not a witness the program
    declares (`me.signed_in`): a second fact that can disagree with the
    first, as a deployment of guests, where every session is `SignedIn`,
    shows.
@@ -52,7 +54,8 @@ the page can already tell it would be refused.
    in the view's own markup.
 3. **`|refusable`**, an event modifier the runtime does nothing for: the
    control is shown to every reader and its refusal told (ADR-0302). For a
-   control no reader's answer can decide: the store's Add, in a menu every
+   control no reader's answer can decide, or a program that does not ask:
+   the demo's Pick, Upvote and Keep, and the store's Add, in a menu every
    reader is served alike (E7-P), and every control of a program that asks
    no predicate it requires (one the deployment alone declares). So no
    press is speculated that the page knows will be refused: a guarded
