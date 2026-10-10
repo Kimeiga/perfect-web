@@ -1198,6 +1198,19 @@ pub fn lowered(
         provided.insert(signal, name.clone());
         signals.insert(name);
     }
+    // The names its markup can read outside any block (ADR-XXXX): its
+    // parameters, its query bindings and its signals.
+    let around: BTreeSet<String> = decl
+        .params
+        .iter()
+        .map(|p| p.name.clone())
+        .chain(
+            crate::page_values::query_bindings(ws, unit, body)
+                .into_iter()
+                .map(|(name, ..)| name),
+        )
+        .chain(signals.iter().cloned())
+        .collect();
     let ctx = Lowering {
         handlers,
         hirs,
@@ -1207,6 +1220,8 @@ pub fn lowered(
         unit,
         decl: id,
         names: BTreeMap::new(),
+        around,
+        in_layout: false,
         provided,
         signals,
     };
@@ -1372,6 +1387,8 @@ fn lower_layout(
         unit: def.unit,
         decl: id,
         names,
+        around: BTreeSet::new(),
+        in_layout: true,
         provided,
         signals,
     };
@@ -1423,9 +1440,22 @@ struct Lowering<'a> {
     decl: DeclId,
     /// **How a name this body writes is read where the template renders it**
     /// (ADR-0136): a composed view's parameter as the path it was given, and
-    /// a name the view binds renamed where it would hide one of those paths.
-    /// Empty in a declaration's own markup, whose names are its own.
+    /// a name a block binds renamed where the template could already read
+    /// one of its spelling (see `around`). Empty at the top of a
+    /// declaration's own markup, whose names are its own.
     names: BTreeMap<String, String>,
+    /// **The names the template can read here** (ADR-XXXX), as it writes
+    /// them: the page's parameters, its query bindings and its signals, and
+    /// the binding of each block around the node. A block that binds one of
+    /// these is given a name no source writes, as a composed view's is
+    /// (ADR-0136), so each name the template reads is one binding's: until
+    /// 2026-10-10 the page plan read a loop's `line` as the page's binding
+    /// `line` (ADR-0277's limitation).
+    around: BTreeSet<String>,
+    /// **In a layout's markup** (ADR-XXXX), every block's binding is renamed:
+    /// the markup is the same on every page that names the layout, whatever
+    /// the page binds, and a soft navigation compares it by its schema.
+    in_layout: bool,
     /// **The instance each provided signal is, here** (ADR-0144): the
     /// nearest `provide` around this body, by the signal's declaration.
     provided: BTreeMap<DefId, String>,
@@ -1460,32 +1490,37 @@ impl<'a> Lowering<'a> {
     }
 
     /// **The scope inside a block that binds `bound`**, and each name as
-    /// the template binds it (ADR-0136). A bound name hides a parameter of
-    /// its own name. In a composed view, one that is the first name of a
-    /// path the view was given would hide it too: `{#each item.tags as
-    /// entry}` given `item={entry}` would read the tag where it meant the
-    /// page's `entry`. Such a name is renamed, to one no source can write.
+    /// the template binds it (ADR-0136). A bound name hides a parameter, or
+    /// a signal, of its own name. One the template could already read here
+    /// would hide that, where the page plan reads the template by name: a
+    /// loop's `line` beside the page's binding `line`, or, in a composed
+    /// view, `{#each item.tags as entry}` given `item={entry}`, which would
+    /// read the tag where it meant the page's `entry`. Such a name is
+    /// renamed, to one no source can write (ADR-XXXX), as is every one a
+    /// layout binds.
     fn binding(&self, bound: &[String], ix: &mut Indexer) -> (Lowering<'a>, Vec<String>) {
         let mut inner = self.clone();
-        if self.names.is_empty() {
-            return (inner, bound.to_vec());
-        }
         for b in bound {
             inner.names.remove(b);
+            inner.signals.remove(b);
         }
         let mut written = Vec::new();
         for b in bound {
-            let hides = inner
-                .names
-                .values()
-                .any(|p| p.split('.').next() == Some(b.as_str()));
-            if hides {
+            let hides = self.in_layout
+                || self.around.contains(b)
+                || inner
+                    .names
+                    .values()
+                    .any(|p| p.split('.').next() == Some(b.as_str()));
+            let name = if hides {
                 let fresh = ix.rename(b);
                 inner.names.insert(b.clone(), fresh.clone());
-                written.push(fresh);
+                fresh
             } else {
-                written.push(b.clone());
-            }
+                b.clone()
+            };
+            inner.around.insert(name.clone());
+            written.push(name);
         }
         (inner, written)
     }
@@ -2695,6 +2730,8 @@ fn compose(
         unit: def.unit,
         decl: DeclId(def.decl),
         names,
+        around: ctx.around.clone(),
+        in_layout: ctx.in_layout,
         provided,
         signals,
     };

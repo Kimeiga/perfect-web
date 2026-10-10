@@ -9,7 +9,11 @@ Each mutant undoes one piece:
 - the handler's requests: a call through a local counted as a command's;
 - privacy's reads: a call through a local read as its namesake's, in a
   declaration's label, in the reads a body makes, and in the cause a label
-  names.
+  names;
+- the template's lowering: a block that binds a name the template can
+  already read keeps it, where the page's names, a composed view's use's,
+  or the blocks around it are not known, or in a layout; and a block's
+  binding does not hide a signal of its spelling.
 
 Each must fail `compiler/pw-core/tests/names_mean_their_binding.rs`. Run
 from the repository root; `just e14-name-bindings` records the output. The source
@@ -27,6 +31,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 LEXICAL = ROOT / "compiler/pw-core/src/lexical.rs"
 EFFECTS = ROOT / "compiler/pw-core/src/effects.rs"
 CHECK = ROOT / "compiler/pw-core/src/check.rs"
+TEMPLATE = ROOT / "compiler/pw-core/src/template_ir.rs"
 
 GUARD = (
     "            // A call through a local is the local's, never a declaration\n"
@@ -91,6 +96,48 @@ MUTANTS = [
         "    let body = hir.body(decl.body?);\n"
         "    for id in body.walk() {\n"
         "        let called = match body.expr(id) {\n",
+    ),
+    (
+        "a page's names are not around its markup",
+        TEMPLATE,
+        "        around,\n        in_layout: false,\n",
+        "        around: { let _ = around; BTreeSet::new() },\n        in_layout: false,\n",
+    ),
+    (
+        "a composed view is not given what its use can read",
+        TEMPLATE,
+        "        around: ctx.around.clone(),\n",
+        "        around: BTreeSet::new(),\n",
+    ),
+    (
+        "a layout's blocks keep their names",
+        TEMPLATE,
+        "        around: BTreeSet::new(),\n        in_layout: true,\n",
+        "        around: BTreeSet::new(),\n        in_layout: false,\n",
+    ),
+    (
+        "a view in a layout keeps its blocks' names",
+        TEMPLATE,
+        "        in_layout: ctx.in_layout,\n",
+        "        in_layout: false,\n",
+    ),
+    (
+        "a block's binding is not around the blocks inside it",
+        TEMPLATE,
+        "            inner.around.insert(name.clone());\n",
+        "",
+    ),
+    (
+        "a block that binds a name the template can read keeps it",
+        TEMPLATE,
+        "            let hides = self.in_layout\n                || self.around.contains(b)\n",
+        "            let hides = self.in_layout\n",
+    ),
+    (
+        "a block's binding does not hide a signal of its spelling",
+        TEMPLATE,
+        "            inner.signals.remove(b);\n",
+        "",
     ),
 ]
 

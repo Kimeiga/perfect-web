@@ -350,7 +350,7 @@ session page StorePage(id: StoreId) {
 
     let store = query Store(id)
     let menu = query Menu(id)
-    let summary = query MenuLine(id)
+    let line = query MenuLine(id)
     let cart = query Cart(current_session())
     // What the cart last had to say: a refusal of an add or a clear.
     signal notice: String = ""
@@ -371,7 +371,7 @@ session page StorePage(id: StoreId) {
         <main>
             <h1 id="store-name">{store.name}</h1>
             <p id="store-description">{store.description}</p>
-            <p id="menu-line">{summary}</p>
+            <p id="menu-line">{line}</p>
 
             <section aria-label="Delivery" aria-live="polite">
                 <stream query={Estimate(current_session())}>

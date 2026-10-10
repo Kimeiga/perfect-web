@@ -576,12 +576,6 @@ awaited in order. What remains:
   making recomputes its body whole, asking it again for each read it
   lacks; `regenerate on_read` is not run. One that declares no type is a
   fragment the host renders, the store's still wired by hand.
-- **A loop's name that shadows a page's binding is read as the binding**
-  (found 2026-10-08, ADR-0277). The page plan types a read by its root's
-  name among the page's bindings before its loops: on the store's page, a
-  binding named `line` beside the cart's `{#each cart.lines as line}` was
-  read for `line.name` inside the loop, and the build refused. The checker
-  accepts the shadowing; the binding is named `summary`.
 - **A navigation is a document load** (ADR-0280): the page a handler goes
   to replaces this one whole, so the parts the two share are rendered
   again, not kept in place with their focus and scroll; a soft navigation
