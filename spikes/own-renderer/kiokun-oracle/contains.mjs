@@ -7,11 +7,13 @@
 //   LIB     a directory holding copies of kiokun.com's `src/lib/contains-order.ts`,
 //           `appears-in-order.ts`, `character-support.ts`,
 //           `word-character-learning.ts`, `Contains.svelte` and
-//           `routes/[word]/+page.svelte` (as `page.svelte`), made by the
-//           recipe from KIOKUN_APP each run (never committed here: the
+//           `routes/[word]/+page.svelte` (as `page.svelte`), copied by
+//           the recipe from KIOKUN_APP's commit at HEAD each run
+//           (`scripts/kiokun_app_source.py`; never committed here: the
 //           owner's source stays in kiokun-data)
-//   APP     KIOKUN_APP, for the component glosses, taxonomy and uses
-//           (`static/game_data/`) that kiokun.com's character support reads
+//   APP     a directory holding the app's `static/game_data/` component
+//           glosses, taxonomy and uses, which kiokun.com's character
+//           support reads, copied from the same commit
 //   DATA    a directory of kiokun's entries in its build's layout: the whole
 //           `output_dictionary`, or the repository's sample
 //   STRIDE  every how manyth file of each subdirectory, in name order

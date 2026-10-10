@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Mutation controls for kiokun.com's parity inventory check.
+"""Mutation controls for kiokun.com's parity inventory check, and for the
+oracles' copy of kiokun.com's files.
 
 A test that passes with the check removed is not evidence for it. Each
-mutant undoes one thing `kiokun_inventory.py` holds the inventory to, and
-at least one of its tests (scripts/tests/test_kiokun_inventory.py) must
+mutant undoes one thing `kiokun_inventory.py` holds the inventory to, or
+one thing `kiokun_app_source.py` holds an oracle's copy to (the commit at
+HEAD, never the working tree), and at least one of their tests
+(scripts/tests/test_kiokun_inventory.py, test_kiokun_app_source.py) must
 then fail.
 
 Run from the repository root. The sources are restored after every mutant,
@@ -18,6 +21,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts/kiokun_inventory.py"
 PLAN = ROOT / "scripts/ci_plan.py"
+SOURCE = ROOT / "scripts/kiokun_app_source.py"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
@@ -30,8 +34,38 @@ MUTANTS = [
     (
         "an endpoint is not a route",
         SCRIPT,
-        '        endpoint = "+server.ts" in names or "+server.js" in names',
+        '        endpoint = "+server.ts" in names[directory] or "+server.js" in names[directory]',
         "        endpoint = False",
+    ),
+    (
+        "the index is read, which holds files staged and not committed",
+        SCRIPT,
+        '    r = git(app, "ls-tree", "-r", "--name-only", "HEAD", "--", "src/routes")',
+        '    r = git(app, "ls-files", "--", "src/routes")',
+    ),
+    (
+        "the owner's work is not named as not read",
+        SCRIPT,
+        '    return [line[3:] for line in git(app, "status", "--porcelain", "--", "src/routes").stdout.splitlines()]',
+        "    return []",
+    ),
+    (
+        "an oracle copies the working tree",
+        SOURCE,
+        '        shown = git(app, "show", f"HEAD:./{path}")\n',
+        '        shown = subprocess.run(["cat", str(app / path)], capture_output=True)\n',
+    ),
+    (
+        "an oracle's copy names no uncommitted work",
+        SOURCE,
+        "    if unread:\n",
+        "    if False:\n",
+    ),
+    (
+        "an oracle's digest is of nothing",
+        SOURCE,
+        '        digests.append(f"{path} {hashlib.sha256(shown.stdout).hexdigest()[:12]}")\n',
+        '        digests.append(f"{path} {hashlib.sha256(b\"\").hexdigest()[:12]}")\n',
     ),
     (
         "a route listed twice passes",
@@ -77,7 +111,15 @@ MUTANTS = [
     ),
 ]
 
-TESTS = [[sys.executable, "-m", "unittest", "scripts/tests/test_kiokun_inventory.py"]]
+TESTS = [
+    [
+        sys.executable,
+        "-m",
+        "unittest",
+        "scripts/tests/test_kiokun_inventory.py",
+        "scripts/tests/test_kiokun_app_source.py",
+    ]
+]
 
 
 def run_tests():

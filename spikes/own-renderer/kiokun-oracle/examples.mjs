@@ -5,8 +5,9 @@
 //
 // usage: node --experimental-strip-types examples.mjs LIB DATA STRIDE OUT
 //   LIB     a directory holding a copy of kiokun.com's
-//           `src/lib/japanese-examples.ts`, made by the recipe from
-//           KIOKUN_APP each run (never committed here)
+//           `src/lib/japanese-examples.ts`, copied by the recipe from
+//           KIOKUN_APP's commit at HEAD each run
+//           (`scripts/kiokun_app_source.py`; never committed here)
 //   DATA    a directory of kiokun's entries in its build's layout
 //   STRIDE  every how manyth file of each subdirectory, in name order
 //   OUT     where the JSON goes: { stride, read, answered, named, answers },

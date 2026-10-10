@@ -76,12 +76,12 @@ e14-kiokun-seo:
     @test -n "${KIOKUN_APP:-}" || { echo "KIOKUN_APP must name a kiokun-data checkout's sveltekit-app"; exit 1; }
     @mkdir -p docs/evidence/E14
     @lib="$(mktemp -d)"; \
-     cp "$KIOKUN_APP/src/lib/seo.ts" "$KIOKUN_APP/src/lib/character-forms.ts" "$lib/"; \
+     python3 scripts/kiokun_app_source.py "$KIOKUN_APP" "$lib" src/lib/seo.ts src/lib/character-forms.ts > "$lib/source.txt" || exit 1; \
      sed -i.bak "s#from './character-forms'#from './character-forms.ts'#" "$lib/seo.ts"; \
      { echo "The word page's head, against kiokun.com's own buildDictionarySeo"; echo; \
        echo "produced by: just e14-kiokun-seo (local: reads a kiokun-data checkout)"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
-       echo "kiokun.com's source: $(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD) (seo.ts $(shasum -a 256 "$KIOKUN_APP/src/lib/seo.ts" | cut -c1-12), character-forms.ts $(shasum -a 256 "$KIOKUN_APP/src/lib/character-forms.ts" | cut -c1-12))"; \
+       cat "$lib/source.txt"; \
        echo "node: $(node --version)"; echo; \
        echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/seo.mjs)"; echo; \
        node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/seo.mjs "$lib" "$KIOKUN_DATA" 256 "$lib/seo.json"; \
@@ -106,11 +106,11 @@ e14-kiokun-examples:
     @test -n "${KIOKUN_APP:-}" || { echo "KIOKUN_APP must name a kiokun-data checkout's sveltekit-app"; exit 1; }
     @mkdir -p docs/evidence/E14
     @lib="$(mktemp -d)"; \
-     cp "$KIOKUN_APP/src/lib/japanese-examples.ts" "$lib/"; \
+     python3 scripts/kiokun_app_source.py "$KIOKUN_APP" "$lib" src/lib/japanese-examples.ts > "$lib/source.txt" || exit 1; \
      { echo "The word page's Japanese examples, against kiokun.com's own japaneseExamplesForSense"; echo; \
        echo "produced by: just e14-kiokun-examples (local: reads a kiokun-data checkout)"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
-       echo "kiokun.com's source: $(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD) (japanese-examples.ts $(shasum -a 256 "$KIOKUN_APP/src/lib/japanese-examples.ts" | cut -c1-12))"; \
+       cat "$lib/source.txt"; \
        echo "node: $(node --version)"; echo; \
        echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/examples.mjs)"; echo; \
        node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/examples.mjs "$lib" "$KIOKUN_DATA" 256 "$lib/examples.json"; \
@@ -136,11 +136,11 @@ e14-kiokun-moves:
     @test -n "${KIOKUN_APP:-}" || { echo "KIOKUN_APP must name a kiokun-data checkout's sveltekit-app"; exit 1; }
     @mkdir -p docs/evidence/E14
     @lib="$(mktemp -d)"; \
-     cp "$KIOKUN_APP/src/lib/character-forms.ts" "$lib/"; \
+     python3 scripts/kiokun_app_source.py "$KIOKUN_APP" "$lib" src/lib/character-forms.ts > "$lib/source.txt" || exit 1; \
      { echo "The word page's moves, against kiokun.com's own equivalentTraditionalTarget"; echo; \
        echo "produced by: just e14-kiokun-moves (local: reads a kiokun-data checkout)"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
-       echo "kiokun.com's source: $(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD) (character-forms.ts $(shasum -a 256 "$KIOKUN_APP/src/lib/character-forms.ts" | cut -c1-12))"; \
+       cat "$lib/source.txt"; \
        echo "node: $(node --version)"; echo; \
        echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/moves.mjs)"; echo; \
        node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/moves.mjs "$lib" "$KIOKUN_DATA" 64 "$lib/moves.json"; \
@@ -169,8 +169,11 @@ e14-kiokun-contains:
     @test -n "${KIOKUN_APP:-}" || { echo "KIOKUN_APP must name a kiokun-data checkout's sveltekit-app"; exit 1; }
     @mkdir -p docs/evidence/E14
     @lib="$(mktemp -d)"; \
-     for f in contains-order.ts appears-in-order.ts character-support.ts word-character-learning.ts Contains.svelte; do cp "$KIOKUN_APP/src/lib/$f" "$lib/"; done; \
-     cp "$KIOKUN_APP/src/routes/[word]/+page.svelte" "$lib/page.svelte"; \
+     python3 scripts/kiokun_app_source.py "$KIOKUN_APP" "$lib" src/lib/contains-order.ts src/lib/appears-in-order.ts src/lib/character-support.ts \
+       src/lib/word-character-learning.ts src/lib/Contains.svelte 'src/routes/[word]/+page.svelte=page.svelte' \
+       static/game_data/component_glosses.json=app/static/game_data/component_glosses.json \
+       static/game_data/char_taxonomy.json=app/static/game_data/char_taxonomy.json \
+       static/game_data/component_uses.json=app/static/game_data/component_uses.json > "$lib/source.txt" || exit 1; \
      sed -e 's/List.sort_by(e.contains, /List.sort_by(List.take(e.contains, 0), /' \
          -e 's/appears_of(e.in_\([a-z]*\), /appears_of(List.take(e.in_\1, 0), /' \
          examples/kiokun-site/app.pw > "$lib/empty-lists.pw"; \
@@ -178,11 +181,10 @@ e14-kiokun-contains:
      { echo "The word page's Contains and Appears in, against kiokun.com's own code"; echo; \
        echo "produced by: just e14-kiokun-contains (local: reads a kiokun-data checkout)"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
-       dirty="$(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" status --porcelain -- src/lib/contains-order.ts src/lib/appears-in-order.ts src/lib/character-support.ts src/lib/word-character-learning.ts src/lib/Contains.svelte 'src/routes/[word]/+page.svelte' | wc -l | tr -d ' ')"; \
-       echo "kiokun.com's source: $(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD)$([ "$dirty" = 0 ] || echo " + uncommitted changes to $dirty of the copied files") ($(cd "$KIOKUN_APP" && shasum -a 256 src/lib/contains-order.ts src/lib/appears-in-order.ts src/lib/character-support.ts src/lib/word-character-learning.ts src/lib/Contains.svelte 'src/routes/[word]/+page.svelte' | awk '{printf "%s %s; ", $2, substr($1,1,12)}'))"; \
+       cat "$lib/source.txt"; \
        echo "node: $(node --version)"; echo "host: $(uname -sm), $(sysctl -n hw.ncpu 2>/dev/null || nproc) cores, $(uptime | sed 's/.*load/load/')"; echo; \
        echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/contains.mjs)"; echo; \
-       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/contains.mjs "$lib" "$KIOKUN_APP" "$KIOKUN_DATA" 256 "$lib/contains.json"; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/contains.mjs "$lib" "$lib/app" "$KIOKUN_DATA" 256 "$lib/contains.json"; \
        echo; echo "== the rewrite's, compared"; echo; \
        KIOKUN_CONTAINS_ORACLE="$lib/contains.json" cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::contains_and_appears_in_match_kiokuns_own 2>&1 \
          | grep -E '^(compared|named|unnamed|difference|  kiokun|  rewrite)|test result|panicked'; \
@@ -195,7 +197,7 @@ e14-kiokun-contains:
          | grep -E '^word |test result|panicked'; \
        echo "after it: $(uptime | sed 's/.*load/load/')"; \
        echo; echo "== the CI fixture: kiokun.com's answers for the repository's sample"; echo; \
-       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/contains.mjs "$lib" "$KIOKUN_APP" examples/kiokun/data/han-1char-3 1 "$lib/sample.json" 20,5; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/contains.mjs "$lib" "$lib/app" examples/kiokun/data/han-1char-3 1 "$lib/sample.json" 20,5; \
        python3 scripts/kiokun_oracle_fixture.py "$lib/sample.json" spikes/own-renderer/kiokun-oracle/contains-sample.json \
          "just e14-kiokun-contains" "$(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD)" "$(git rev-parse HEAD)" "$(node --version)"; \
      } > docs/evidence/E14/kiokun-contains.txt; rm -rf "$lib"

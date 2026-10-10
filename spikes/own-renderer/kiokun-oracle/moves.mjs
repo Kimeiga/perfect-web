@@ -5,9 +5,9 @@
 //
 // usage: node --experimental-strip-types moves.mjs LIB DATA STRIDE OUT
 //   LIB     a directory holding a copy of kiokun.com's
-//           `src/lib/character-forms.ts`, made by the recipe from KIOKUN_APP
-//           each run (never committed here: the owner's source stays in
-//           kiokun-data)
+//           `src/lib/character-forms.ts`, copied by the recipe from KIOKUN_APP's
+//           commit at HEAD each run (`scripts/kiokun_app_source.py`; never
+//           committed here: the owner's source stays in kiokun-data)
 //   DATA    a directory of kiokun's entries in its build's layout: the whole
 //           `output_dictionary`, or the repository's sample
 //   STRIDE  every how manyth control, in name order
