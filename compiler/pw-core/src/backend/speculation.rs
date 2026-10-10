@@ -973,6 +973,9 @@ fn page_module(
                 || bound.contains(root)
                 || signals.contains(root)
                 || params.contains(root)
+                // And what the page asked of its reader (ADR-XXXX), which
+                // its document gives the browser beside its parameters.
+                || root.ends_with("~holds")
         };
         // And a value the module computes from the region's binding whole
         // (ADR-0235), by its whole path.

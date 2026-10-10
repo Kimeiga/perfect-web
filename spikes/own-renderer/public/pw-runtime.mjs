@@ -875,7 +875,10 @@ function regionValues(module, binding, value) {
   ]);
   // And the page's parameters (ADR-0236), which the document carries.
   const params = Object.entries(parts.params ?? {});
-  return `{${[[binding, value], ...computed, ...params, ...signals]
+  // And what the page asked of its reader (ADR-XXXX), as the host answered
+  // it for the document: `SignedIn~holds`, a boolean.
+  const holds = Object.entries(parts.holds ?? {});
+  return `{${[[binding, value], ...computed, ...params, ...holds, ...signals]
     .map(([k, v]) => `${JSON.stringify(k)}:${wire(v)}`)
     .join(",")}}`;
 }

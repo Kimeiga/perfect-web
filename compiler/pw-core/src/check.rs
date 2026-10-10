@@ -238,6 +238,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // ADR-0302: a predicate the program declares says what a refusal
             // by it is told, and is given what it takes.
             out.extend(crate::predicates::check(&u.hir, i, &sigs, &workspace));
+            // ADR-XXXX: a control is shown where its command's predicates hold.
+            out.extend(crate::holds::check(&hirs, &workspace, &sigs, i));
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
             // ADR-0280: a handler navigates once its command commits.
             out.extend(navigations(&workspace, &u.hir, i, &sigs));

@@ -119,8 +119,8 @@ session page P() {{
         <main>
             {markup}
             <p id="count">{{List.length(thread.replies)}}</p>
-            <button type="button" on:press={{() => reply("new")}}>Reply</button>
-            <button type="button" on:press={{() => open = !open}}>Toggle</button>
+            <button type="button" on:press|refusable={{() => reply("new")}}>Reply</button>
+            <button type="button" on:press|refusable={{() => open = !open}}>Toggle</button>
         </main>
     }}
 }}

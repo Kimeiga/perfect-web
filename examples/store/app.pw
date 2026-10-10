@@ -215,6 +215,13 @@ session query Order(session: Session<SessionId>) -> Result<Option<OrderStatus>, 
     Orders.current(session)
 }
 
+// **Who may change a cart** (ADR-XXXX): the deployment's `SignedIn`, every
+// session in a deployment of guests, declared here so the store's pages ask
+// it of their reader and show each control where it holds, in the
+// deployment's own words.
+predicate SignedIn
+    says "Sign in to do this."
+
 // The mutation, as charter §15.4 asks. Idempotent by interaction id, so a
 // double-tap is one add. Transactional. Optimistic, so the count moves before
 // the round trip, and moves back if the add is refused. And the item's
@@ -394,10 +401,13 @@ session page StorePage(id: StoreId) {
                                     <p>{item.price.display}</p>
                                     <!-- Whether it can be ordered, before the press (ADR-0178). -->
                                     {#if item.available}
+                                        <!-- In the menu every reader is served alike (E7-P), so
+                                             no reader's answer decides it: shown to each, and a
+                                             refusal told where the press was (ADR-XXXX). -->
                                         <button
                                             type="button"
                                             aria-label="Add {item.name}"
-                                            on:press={resumable(captures = { item }) => match add_to_cart(item, PositiveInt(1)) {
+                                            on:press|refusable={resumable(captures = { item }) => match add_to_cart(item, PositiveInt(1)) {
                                                 Ok(_) => notice = "",
                                                 Err(CartError.ItemUnavailable(_)) => notice = "That item just sold out.",
                                                 Err(_) => notice = "That item could not be added.",
@@ -424,7 +434,7 @@ session page StorePage(id: StoreId) {
                     {#each cart.lines as line (line.item_id)}
                         <li>
                             <span>{line.name}</span>
-                            <button
+                            {#if SignedIn}<button
                                 type="button"
                                 aria-label="Decrease quantity of {line.name}"
                                 on:press={resumable(captures = { line }) => match decrease_in_cart(line.item_id) {
@@ -433,9 +443,9 @@ session page StorePage(id: StoreId) {
                                 }}
                             >
                                 −
-                            </button>
+                            </button>{/if}
                             <span>{line.quantity.count}</span>
-                            <button
+                            {#if SignedIn}<button
                                 type="button"
                                 aria-label="Increase quantity of {line.name}"
                                 on:press={resumable(captures = { line }) => match increase_in_cart(line.item_id) {
@@ -445,9 +455,9 @@ session page StorePage(id: StoreId) {
                                 }}
                             >
                                 +
-                            </button>
+                            </button>{/if}
                             <span>{line.total.display}</span>
-                            <button
+                            {#if SignedIn}<button
                                 type="button"
                                 aria-label="Remove {line.name}"
                                 on:press={resumable(captures = { line }) => match remove_from_cart(line.item_id) {
@@ -456,14 +466,14 @@ session page StorePage(id: StoreId) {
                                 }}
                             >
                                 Remove
-                            </button>
+                            </button>{/if}
                         </li>
                     {/each}
                 </ul>
                 <p>Subtotal: <span id="cart-subtotal">{cart.subtotal.display}</span></p>
                 {#if cart.lines}<p id="cart-fees">Delivery fee and taxes are added at checkout.</p>{/if}
                 <p id="cart-notice" role="status">{notice}</p>
-                <button
+                {#if SignedIn}<button
                     id="clear-cart"
                     type="button"
                     on:press={resumable() => match clear_cart() {
@@ -472,7 +482,7 @@ session page StorePage(id: StoreId) {
                     }}
                 >
                     Clear
-                </button>
+                </button>{/if}
                 <!-- The cart as a page of its own (ADR-0190). -->
                 <p><a id="cart-page" href="/cart">Go to your cart</a></p>
             </section>
@@ -523,7 +533,7 @@ session page CartPage() {
                 {#each cart.lines as line (line.item_id)}
                     <li>
                         <span>{line.name}</span>
-                        <button
+                        {#if SignedIn}<button
                             type="button"
                             aria-label="Decrease quantity of {line.name}"
                             on:press={resumable(captures = { line }) => match decrease_in_cart(line.item_id) {
@@ -532,9 +542,9 @@ session page CartPage() {
                             }}
                         >
                             −
-                        </button>
+                        </button>{/if}
                         <span>{line.quantity.count}</span>
-                        <button
+                        {#if SignedIn}<button
                             type="button"
                             aria-label="Increase quantity of {line.name}"
                             on:press={resumable(captures = { line }) => match increase_in_cart(line.item_id) {
@@ -544,9 +554,9 @@ session page CartPage() {
                             }}
                         >
                             +
-                        </button>
+                        </button>{/if}
                         <span>{line.total.display}</span>
-                        <button
+                        {#if SignedIn}<button
                             type="button"
                             aria-label="Remove {line.name}"
                             on:press={resumable(captures = { line }) => match remove_from_cart(line.item_id) {
@@ -555,14 +565,14 @@ session page CartPage() {
                             }}
                         >
                             Remove
-                        </button>
+                        </button>{/if}
                     </li>
                 {/each}
             </ul>
             <p>Subtotal: <span id="cart-subtotal">{cart.subtotal.display}</span></p>
             {#if cart.lines}<p id="cart-fees">Delivery fee and taxes are added at checkout.</p>{/if}
             <p id="cart-notice" role="status">{notice}</p>
-            <button
+            {#if SignedIn}<button
                 id="clear-cart"
                 type="button"
                 on:press={resumable() => match clear_cart() {
@@ -571,9 +581,9 @@ session page CartPage() {
                 }}
             >
                 Clear
-            </button>
+            </button>{/if}
             <!-- The cart, placed as an order (ADR-0193). -->
-            <button
+            {#if SignedIn}<button
                 id="place-order"
                 type="button"
                 on:press={resumable() => match place_order() {
@@ -582,7 +592,7 @@ session page CartPage() {
                 }}
             >
                 Place order
-            </button>
+            </button>{/if}
             {#match order}
             {:Some(_)}<p id="order-link"><a href="/order">Follow your order</a></p>
             {:None}

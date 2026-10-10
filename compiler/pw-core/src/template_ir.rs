@@ -1206,7 +1206,7 @@ pub fn lowered(
         sigs,
         unit,
         decl: id,
-        names: BTreeMap::new(),
+        names: asked_predicates(hirs, ws, sigs, unit),
         provided,
         signals,
     };
@@ -1302,6 +1302,44 @@ pub fn lowered(
     })
 }
 
+/// **The predicates a body in `unit` asks of its reader** (ADR-XXXX), each
+/// by the name the template writes and the one it is read by, `SignedIn` as
+/// `SignedIn~holds`, which no source can write: a host answers each for the
+/// document, as it answers `requires`. A predicate with parameters is asked of
+/// nothing yet (PW0629).
+fn asked_predicates(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    sigs: &Signatures,
+    unit: usize,
+) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    for (u, hir) in hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind != crate::hir::DeclKind::Predicate {
+                continue;
+            }
+            let def = DefId {
+                unit: u,
+                decl: id.0,
+            };
+            let seen = matches!(
+                ws.resolve_in(unit, crate::resolve::Namespace::Predicate, &decl.name),
+                Resolution::Local(d) | Resolution::Imported { def: d, .. } if d == def
+            );
+            if seen && sigs.by_def(def).is_some_and(|s| s.params.is_empty()) {
+                out.insert(decl.name.clone(), asked_name(&decl.name));
+            }
+        }
+    }
+    out
+}
+
+/// The name a template reads a predicate's answer by.
+pub fn asked_name(predicate: &str) -> String {
+    format!("{predicate}~holds")
+}
+
 /// **A page's layout, lowered into its template first** (ADR-0303), as a
 /// view used in it is (ADR-0136): its bindings and its signals the page's,
 /// each under the name [`crate::layouts::bound`] gives it, which no source
@@ -1326,7 +1364,7 @@ fn lower_layout(
     } else {
         format!("{module}.{}", decl.name)
     };
-    let mut names = BTreeMap::new();
+    let mut names = asked_predicates(hirs, ws, sigs, def.unit);
     for (name, _, _) in crate::page_values::query_bindings(ws, def.unit, body) {
         names.insert(name.clone(), crate::layouts::bound(&decl.name, &name));
     }
@@ -2024,7 +2062,11 @@ fn inputs_of(body: &Body, e: ExprId, ctx: &Lowering<'_>) -> Vec<(String, String)
         let outside = match lexical.binder(x) {
             Some(crate::lexical::Binder::Pattern(p)) => !inner.contains(&p),
             Some(_) => true,
-            None => ctx.signals.contains(n),
+            // A signal, or a predicate the page asks of its reader, read by
+            // the name its scope gives it (ADR-XXXX).
+            None => {
+                ctx.signals.contains(n) || ctx.names.get(n).is_some_and(|to| to.ends_with("~holds"))
+            }
         };
         if outside && !out.iter().any(|(m, _)| m == n) {
             out.push((n.clone(), ctx.read(n.clone())));

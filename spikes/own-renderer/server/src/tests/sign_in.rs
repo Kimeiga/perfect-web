@@ -381,6 +381,79 @@ fn signing_out_forgets_the_principal() {
     );
 }
 
+/// **A control is shown where its command's predicate holds for the reader**
+/// (ADR-XXXX): the feed's pages ask `SignedIn` of their reader, and the
+/// deployment answers it as it answers `requires`. Signed out, a post is
+/// shown without its Like and the composer is hidden; signed in, both are
+/// there; and the document carries the answer to the browser, which renders
+/// a speculated region with it. Until ADR-XXXX the composer's guard was the
+/// program's own `me.signed_in`, and Like was shown to every reader.
+#[test]
+fn a_control_is_shown_where_its_commands_predicate_holds() {
+    let provider = Arc::new(TestProvider::default());
+    let s = feed_with(provider.clone());
+    let session = signed_in(&s, &provider, "s-a", "ada");
+    let posted = command(&s, "feed.app.post", &session, "i-1", "[\"Shown to both\"]");
+    assert!(posted.starts_with("HTTP/1.1 2"), "{posted}");
+    let served = |session: &str| {
+        let answer = get(&s, "/", &format!("pw-session={session}"));
+        answer
+            .split_once("\r\n\r\n")
+            .map_or(String::new(), |(_, b)| b.to_string())
+    };
+    let (signed, out) = (served(&session), served("s-out"));
+    for html in [&signed, &out] {
+        assert!(html.contains("Shown to both"), "{html}");
+    }
+    assert!(signed.contains(">Like</button>"), "{signed}");
+    assert!(!out.contains(">Like</button>"), "{out}");
+    // The composer, by its textarea's draft: hidden from the reader the
+    // deployment does not hold signed in.
+    let composer = |html: &str| {
+        let at = html
+            .find("bind:value")
+            .or_else(|| html.find("<textarea"))
+            .unwrap_or(0);
+        html[..at]
+            .rfind("<form")
+            .map(|f| html[f..at].to_string())
+            .unwrap_or_default()
+    };
+    assert!(composer(&out).contains(" hidden"), "{}", composer(&out));
+    assert!(
+        !composer(&signed).contains(" hidden"),
+        "{}",
+        composer(&signed)
+    );
+    // The answer the document was rendered with, which the browser renders a
+    // speculated region with.
+    let manifest = |html: &str| -> serde_json::Value {
+        let start = html
+            .find("id=\"pw-parts\"")
+            .and_then(|i| html[i..].find('>').map(|j| i + j + 1));
+        let start = start.expect("a parts manifest");
+        let end = start + html[start..].find("</script>").expect("its end");
+        serde_json::from_str(&html[start..end]).expect("the manifest is JSON")
+    };
+    assert_eq!(
+        manifest(&signed)["holds"],
+        serde_json::json!({ "SignedIn~holds": true })
+    );
+    assert_eq!(
+        manifest(&out)["holds"],
+        serde_json::json!({ "SignedIn~holds": false })
+    );
+}
+
+/// The host reads an answer by the name the compiler gives it (ADR-XXXX).
+#[test]
+fn an_answer_is_read_by_the_compilers_name_for_it() {
+    assert_eq!(
+        asked_name("SignedIn"),
+        pw_core::template_ir::asked_name("SignedIn")
+    );
+}
+
 /// **A signed-out reader reads, and cannot post** (ADR-0115): the home page
 /// shows the timeline and, where the form's guard is, "Sign in to post"
 /// with a way to; a post sent anyway is refused by `requires SignedIn`
@@ -437,11 +510,18 @@ fn a_refusal_says_the_programs_words_for_its_predicate() {
 /// words too.
 #[test]
 fn a_refusal_the_program_gives_no_words_is_told_in_the_deployments() {
+    // With no `SignedIn` declared, no page can ask it (ADR-XXXX): every
+    // control is shown to each reader, `|refusable`, its refusal told.
     let s = served_feed_with(|app| {
-        app.replace(
-            "predicate SignedIn\n    says \"Sign in to post, reply, like or follow.\"\n",
-            "",
+        not_asked(
+            &app.replace(
+                "predicate SignedIn\n    says \"Sign in to post, reply, like or follow.\"\n",
+                "",
+            ),
+            "SignedIn",
         )
+        .replace("on:press=", "on:press|refusable=")
+        .replace("on:submit|prevent=", "on:submit|prevent|refusable=")
     });
     s.identity
         .use_provider(Arc::new(TestProvider::default()), REDIRECT);
@@ -488,10 +568,17 @@ fn a_predicate_the_deployment_cannot_evaluate_is_refused_at_start() {
     for (change, unknown) in [
         (
             (|app: &str| {
+                // `Verified` is no predicate the program declares, so no page
+                // asks it: the composer that sends `post` is `|refusable`
+                // (ADR-XXXX), and the host is what refuses it.
                 app.replacen(
                     "    requires      SignedIn\n",
                     "    requires      SignedIn, Verified\n",
                     1,
+                )
+                .replace(
+                    "<form hidden={!SignedIn} on:submit|prevent={() => match post_text(draft) {",
+                    "<form hidden={!SignedIn} on:submit|prevent|refusable={() => match post_text(draft) {",
                 )
             }) as fn(&str) -> String,
             "`Verified`",
@@ -1026,4 +1113,34 @@ fn the_relying_party_answers_the_routes_the_compiler_knows() {
             "{other} {route}: {answer}"
         );
     }
+}
+
+/// `app` with nothing asked of `predicate` (ADR-XXXX): each `{#if P}` block
+/// its first branch alone, and each `hidden={!P}` gone.
+fn not_asked(app: &str, predicate: &str) -> String {
+    let open = format!("{{#if {predicate}}}");
+    let mut out = app.replace(&format!(" hidden={{!{predicate}}}"), "");
+    while let Some(at) = out.find(&open) {
+        let body = at + open.len();
+        // The block's own `{:else}` and `{/if}`, past any block inside it.
+        let (mut depth, mut i, mut els) = (0usize, body, None);
+        let end = loop {
+            let rest = &out[i..];
+            if rest.starts_with("{#") {
+                depth += 1;
+            } else if rest.starts_with("{/") {
+                if depth == 0 {
+                    break i;
+                }
+                depth -= 1;
+            } else if rest.starts_with("{:else}") && depth == 0 && els.is_none() {
+                els = Some(i);
+            }
+            i += rest.chars().next().map_or(1, char::len_utf8);
+        };
+        let first = &out[body..els.unwrap_or(end)];
+        let close = end + out[end..].find('}').map_or(0, |c| c + 1);
+        out = format!("{}{}{}", &out[..at], first, &out[close..]);
+    }
+    out
 }

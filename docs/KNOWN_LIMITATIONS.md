@@ -587,6 +587,13 @@ awaited in order. What remains:
   parameters, has no title template of its own, and holds one slot. A
   navigation between two pages of one layout does not keep it yet (the soft
   navigation, next).
+- **A page asks only a predicate with no parameters of its reader**
+  (ADR-XXXX): a control whose command requires one with parameters
+  (`OwnsPost(post)`, `MayMessage(to)`) is not held to where it stands, and
+  the feed's Delete is shown where the program's own `mine` says. A view's
+  control is held in the view's own markup, not by a page's `{#if}` around
+  its use. An answer is the document's for its life: a reader signed out in
+  another tab is told at the next press (ADR-0302).
 - **A navigation is a document load** (ADR-0280): the page a handler goes
   to replaces this one whole, so the parts the two share are rendered
   again, not kept in place with their focus and scroll; a soft navigation

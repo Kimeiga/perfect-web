@@ -116,7 +116,7 @@ fn any_other_flow_to_the_key_is_refused_by_name() {
             Box::new(|s: &str| {
                 s.replace(
                     "// A post and its replies, each a post with its own, as deep as they go",
-                    "view Plus(to: PostId) {\n    <button type=\"button\" on:press={resumable(captures = { to }) => match post_text(\"+1\") {\n        Some(t) => match reply(to, t) {\n            Ok(_) => (),\n            Err(_) => (),\n        },\n        None => (),\n    }}>+1</button>\n}\n\n// A post and its replies, each a post with its own, as deep as they go",
+                    "view Plus(to: PostId) {\n    <button type=\"button\" on:press|refusable={resumable(captures = { to }) => match post_text(\"+1\") {\n        Some(t) => match reply(to, t) {\n            Ok(_) => (),\n            Err(_) => (),\n        },\n        None => (),\n    }}>+1</button>\n}\n\n// A post and its replies, each a post with its own, as deep as they go",
                 )
                 .replace(
                     "            <Replies post={thread} />\n",

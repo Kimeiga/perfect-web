@@ -725,6 +725,14 @@ impl Identity {
         held
     }
 
+    /// **What a page asks of its reader** (ADR-XXXX): whether `predicate`,
+    /// one with no parameters, holds for `session`'s principal, answered as
+    /// `requires` answers it, and told to no refusal: the page is rendered
+    /// with the answer, before any press.
+    pub fn answers(&self, predicate: &str, session: &str) -> Result<bool, String> {
+        self.holds(predicate, &[], session, &std::collections::BTreeMap::new())
+    }
+
     fn holds(
         &self,
         predicate: &str,

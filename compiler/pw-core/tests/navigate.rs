@@ -78,7 +78,7 @@ fn program(extra: &str, handler: &str) -> String {
          </main>\n    }}\n}}\n\n\
          page P() {{\n    cache private\n\n    signal note: String = \"\"\n\n    \
          view {{\n        <main>\n            \
-         <button type=\"button\" on:press={{() => {handler}}}>Add</button>\n        \
+         <button type=\"button\" on:press|refusable={{() => {handler}}}>Add</button>\n        \
          </main>\n    }}\n}}\n"
     )
 }

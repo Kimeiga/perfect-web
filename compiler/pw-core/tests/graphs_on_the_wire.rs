@@ -46,8 +46,8 @@ page P() {
 
     view {
         <main>
-            <button id="nest" type="button" on:press={() => draft = Comment { id: draft.id + 10, text: "wrapped", replies: [draft] }}>Nest</button>
-            <button id="send" type="button" on:press={() => { let _saved = save(draft) }}>Send</button>
+            <button id="nest" type="button" on:press|refusable={() => draft = Comment { id: draft.id + 10, text: "wrapped", replies: [draft] }}>Nest</button>
+            <button id="send" type="button" on:press|refusable={() => { let _saved = save(draft) }}>Send</button>
         </main>
     }
 }
@@ -273,7 +273,7 @@ fn what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused() {
          cache shared\n    concurrency one_per_key\n    timeout 2.seconds\n{\n    \
          Comment { id: 1, text: \"t\", replies: [] }\n}\n\n\
          page Q() {\n    cache private\n\n    let thread = query Thread()\n\n    view {\n        \
-         <main><button type=\"button\" on:press={() => { let _s = save(thread) }}>Go</button></main>\n    \
+         <main><button type=\"button\" on:press|refusable={() => { let _s = save(thread) }}>Go</button></main>\n    \
          }\n}\n\npage P() {",
     );
     let refused: Vec<String> = handlers(&captured)
@@ -304,7 +304,7 @@ fn what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused() {
     // Two types that hold each other: nodes of either.
     let mutual = "module m\n\ntype A = A { n: Int, bs: List<B> }\n\ntype B = B { as: List<A> }\n\n\
         page P() {\n    cache private\n\n    signal a: A = A { n: 1, bs: [] }\n\n    view {\n        \
-        <main><button type=\"button\" on:press={() => a = A { n: a.n + 1, bs: [] }}>Go</button></main>\n    \
+        <main><button type=\"button\" on:press|refusable={() => a = A { n: a.n + 1, bs: [] }}>Go</button></main>\n    \
         }\n}\n";
     let refused: Vec<String> = handlers(mutual)
         .into_iter()
@@ -328,7 +328,7 @@ fn each_node_holds_the_next_run_in_the_order_its_fields_are_declared() {
         page P() {\n    cache private\n\n    \
         signal tree: Node = Node { n: 1, left: [Node { n: 2, left: [], right: [] }], \
         right: [Node { n: 3, left: [Node { n: 4, left: [], right: [] }], right: [] }] }\n\n    \
-        view {\n        <main><button type=\"button\" on:press={() => tree = \
+        view {\n        <main><button type=\"button\" on:press|refusable={() => tree = \
         Node { n: 0, left: [tree], right: [tree] }}>Twice</button></main>\n    }\n}\n";
     let first = json!({ "$graph": [
         { "n": 1, "left": [{ "$node": 1 }], "right": [{ "$node": 2 }] },

@@ -39,6 +39,7 @@ pub mod effects;
 pub mod exhaust;
 pub mod graph;
 pub mod hir;
+pub mod holds;
 pub mod infer;
 pub mod koka;
 pub mod labels;

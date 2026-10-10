@@ -577,10 +577,10 @@ session page Home() {
                         <img class="attached-image" src={a.src} width={a.width} height={a.height} alt="The image you attached">
                         <figcaption>Attached, and posted with what you write next.</figcaption>
                     </figure>
-                    <button class="remove-image" type="button" on:press={() => match discard_image() {
+                    {#if SignedIn}<button class="remove-image" type="button" on:press={() => match discard_image() {
                         Ok(_) => alt = "",
                         Err(_) => alt = alt,
-                    }}>Remove image</button>
+                    }}>Remove image</button>{/if}
                 {/each}
                 <form id="attach" method="post" action="/uploads/post-image" enctype="multipart/form-data">
                     <label>An image to attach <input type="file" name="image" accept="image/png,image/jpeg,image/webp,image/gif"></label>
@@ -591,7 +591,7 @@ session page Home() {
                  composer to be refused at. Hidden, not in a block: a bound draft in
                  a block a query decides is not rendered again (ADR-0137), as the
                  conversation's composer is (ADR-0279). -->
-            <form hidden={!me.signed_in} on:submit|prevent={() => match post_text(draft) {
+            <form hidden={!SignedIn} on:submit|prevent={() => match post_text(draft) {
                 Some(text) => if List.length(staged) > 0 {
                     match alt_text(alt) {
                         Some(words) => match post_image(text, words) {
@@ -628,15 +628,15 @@ session page Home() {
                         {#each p.images as shown_image (shown_image.src)}
                             <img class="photo" src={shown_image.src} width={shown_image.width} height={shown_image.height} alt={shown_image.alt}>
                         {/each}
-                        <button type="button" disabled={waits(p.id)} on:press={resumable(captures = { p }) => match like(p.id) {
+                        {#if SignedIn}<button type="button" disabled={waits(p.id)} on:press={resumable(captures = { p }) => match like(p.id) {
                             Ok(_) => draft = draft,
                             Err(_) => draft = draft,
-                        }}>Like</button>
+                        }}>Like</button>{/if}
                         <span class="likes">{counted(p.likes, "like", "likes")}</span>
-                        {#if p.mine}<button type="button" class="delete" disabled={waits(p.id)} on:press={resumable(captures = { p }) => match delete(p.id) {
+                        {#if SignedIn}{#if p.mine}<button type="button" class="delete" disabled={waits(p.id)} on:press={resumable(captures = { p }) => match delete(p.id) {
                             Ok(_) => draft = draft,
                             Err(_) => draft = draft,
-                        }}>Delete</button>{/if}
+                        }}>Delete</button>{/if}{/if}
                     </li>
                 {/each}
             </ul>
@@ -676,12 +676,12 @@ page PostPage(id: PostId) {
         <main>
             <Replies post={thread} />
             <p id="counts">{counted(List.length(thread.replies), "reply", "replies")} · {counted(thread.likes, "like", "likes")}</p>
-            <button id="like" type="button" on:press={resumable(captures = { id }) => match like(id) {
+            {#if SignedIn}<button id="like" type="button" on:press={resumable(captures = { id }) => match like(id) {
                 Ok(_) => answer = answer,
                 Err(_) => answer = answer,
-            }}>Like</button>
+            }}>Like</button>{/if}
             {#if List.length(thread.replies) == 0}<p id="quiet">No replies yet.</p>{/if}
-            <form on:submit|prevent={resumable(captures = { id }) => match post_text(answer) {
+            <form hidden={!SignedIn} on:submit|prevent={resumable(captures = { id }) => match post_text(answer) {
                 Some(text) => match reply(id, text) {
                     Ok(_) => answer = "",
                     Err(_) => answer = answer,
@@ -719,15 +719,15 @@ session page FollowingPage() {
                         {#each item.images as followed_image (followed_image.src)}
                             <img class="photo" src={followed_image.src} width={followed_image.width} height={followed_image.height} alt={followed_image.alt}>
                         {/each}
-                        <button type="button" on:press={resumable(captures = { item }) => match like(item.id) {
+                        {#if SignedIn}<button type="button" on:press={resumable(captures = { item }) => match like(item.id) {
                             Ok(_) => shown = shown,
                             Err(_) => shown = shown,
-                        }}>Like</button>
+                        }}>Like</button>{/if}
                         <span class="likes">{counted(item.likes, "like", "likes")}</span>
-                        {#if item.mine}<button type="button" class="delete" on:press={resumable(captures = { item }) => match delete(item.id) {
+                        {#if SignedIn}{#if item.mine}<button type="button" class="delete" on:press={resumable(captures = { item }) => match delete(item.id) {
                             Ok(_) => shown = shown,
                             Err(_) => shown = shown,
-                        }}>Delete</button>{/if}
+                        }}>Delete</button>{/if}{/if}
                     </li>
                 {/each}
             </ul>
@@ -758,15 +758,15 @@ session page ProfilePage(id: UserId) {
                 {:Yourself}
                     <p id="you">This is you.</p>
                 {:Following}
-                    <button id="unfollow" type="button" on:press={resumable(captures = { id }) => match unfollow(id) {
+                    {#if SignedIn}<button id="unfollow" type="button" on:press={resumable(captures = { id }) => match unfollow(id) {
                         Ok(_) => pressed = pressed + 1,
                         Err(_) => pressed = pressed,
-                    }}>Unfollow</button>
+                    }}>Unfollow</button>{/if}
                 {:NotFollowing}
-                    <button id="follow" type="button" on:press={resumable(captures = { id }) => match follow(id) {
+                    {#if SignedIn}<button id="follow" type="button" on:press={resumable(captures = { id }) => match follow(id) {
                         Ok(_) => pressed = pressed + 1,
                         Err(_) => pressed = pressed,
-                    }}>Follow</button>
+                    }}>Follow</button>{/if}
             {/match}
             <p id="message-them"><a href="/messages/{id}">Message</a></p>
             <ul>
@@ -901,10 +901,10 @@ session page NotificationsPage() {
             <h1>Notifications</h1>
             <nav aria-label="Timelines"><a href="/">Everyone</a> <a href="/following">Following</a></nav>
             <p id="unread-here" role="status">{counted(unread, "unread", "unread")}</p>
-            <button id="mark-read" type="button" on:press={() => match mark_read() {
+            {#if SignedIn}<button id="mark-read" type="button" on:press={() => match mark_read() {
                 Ok(_) => listed = listed,
                 Err(_) => listed = listed,
-            }}>Mark all read</button>
+            }}>Mark all read</button>{/if}
             {#if List.length(notes) == 0}<p id="no-notifications">Nothing yet: a like or a reply to a post of yours, or a follow, is shown here.</p>{/if}
             <ul id="notifications">
                 {#each notes as note (note.id)}
@@ -1160,11 +1160,11 @@ session page ConversationPage(with: UserId) {
                     </li>
                 {/each}
             </ol>
-            <button id="mark-conversation-read" type="button" on:press={resumable(captures = { with }) => match read_conversation(with) {
+            {#if SignedIn}<button id="mark-conversation-read" type="button" on:press={resumable(captures = { with }) => match read_conversation(with) {
                 Ok(_) => earlier = earlier,
                 Err(_) => earlier = earlier,
-            }}>Mark read</button>
-            <form id="composer" hidden={talk.closed} on:submit|prevent={resumable(captures = { with }) => match message_text(message_draft) {
+            }}>Mark read</button>{/if}
+            <div hidden={!SignedIn}><form id="composer" hidden={talk.closed} on:submit|prevent={resumable(captures = { with }) => match message_text(message_draft) {
                 Some(text) => match send(with, text) {
                     Ok(_) => message_draft = "",
                     Err(_) => message_draft = message_draft,
@@ -1173,9 +1173,9 @@ session page ConversationPage(with: UserId) {
             }}>
                 <label>Your message <textarea bind:value={message_draft}></textarea></label>
                 <button type="submit" disabled={String.length(message_draft) == 0 | String.length(message_draft) > 10_000}>Send</button>
-            </form>
+            </form></div>
             {#if talk.closed}<p id="may-not-send" role="status">{why_not(talk)}</p>{/if}
-            {#if me.signed_in}{:else}<p id="sign-in-to-send" role="status">Sign in to send messages.</p>{/if}
+            {#if SignedIn}{:else}<p id="sign-in-to-send" role="status">Sign in to send messages.</p>{/if}
         </main>
     }
 }

@@ -720,6 +720,11 @@ pub struct PageValues {
     /// navigation between two pages that record the same keeps it in place.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layout: Option<crate::template_ir::PageLayout>,
+    /// **The predicates the page asks of its reader** (ADR-XXXX), by name: a
+    /// host answers each for the document, as it answers `requires`, and
+    /// the template reads the answer as `SignedIn~holds`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub predicates: Vec<String>,
 }
 
 fn public_scope() -> String {
@@ -728,6 +733,26 @@ fn public_scope() -> String {
 
 fn is_public_scope(scope: &String) -> bool {
     scope == "public"
+}
+
+/// **The predicates a template reads the answers of**, by name (ADR-XXXX).
+fn asked_in(chunks: &[crate::template_ir::Chunk]) -> BTreeSet<String> {
+    let text = serde_json::to_string(chunks).unwrap_or_default();
+    let mut out = BTreeSet::new();
+    for (at, _) in text.match_indices("~holds") {
+        let name: String = text[..at]
+            .chars()
+            .rev()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        if !name.is_empty() {
+            out.insert(name);
+        }
+    }
+    out
 }
 
 /// **A row's read through a member function** (ADR-0169): `{item.price.display}`
@@ -1405,6 +1430,11 @@ fn plan(
         ..
     } = crate::template_ir::lowered(hirs, ws, sigs, captures, unit, id)
         .ok_or_else(|| format!("`{}` has no template", decl.name))?;
+    // **What the page asks of its reader** (ADR-XXXX): every predicate whose
+    // answer its template reads, in a hole, a condition, an attribute or a
+    // computed value. `~holds` is a name no source writes, so each one the
+    // template holds is a predicate's answer.
+    let mut asked: BTreeSet<String> = asked_in(&template.chunks);
     // The signals the browser holds: the page's own, and each one the views
     // composed in it hold and are provided (ADR-0144).
     let signals: Vec<String> = instances.iter().map(|i| i.name.clone()).collect();
@@ -1513,6 +1543,12 @@ fn plan(
                 owns: Vec::new(),
                 derived: String::new(),
             });
+            continue;
+        }
+        // **A predicate the page asks of its reader** (ADR-XXXX): a host
+        // answers it for the document, which is rendered with the answer.
+        if let Some(predicate) = root.strip_suffix("~holds") {
+            asked.insert(predicate.to_string());
             continue;
         }
         let Some((_, resource, _)) = found.iter().find(|(n, ..)| *n == root) else {
@@ -1705,8 +1741,12 @@ fn plan(
     let mut attributes = Vec::new();
     for read in &others {
         let root = read.path.split('.').next().unwrap_or_default();
-        // A computed one too (ADR-0226), whose value a host computes.
-        let computed_here = derived_values.iter().any(|d| d.part == read.part.0);
+        // A computed one too (ADR-0226), whose value a host computes; not
+        // one computed from what the page asks of its reader, which is the
+        // document's for its life, as a parameter is (ADR-XXXX).
+        let computed_here = derived_values
+            .iter()
+            .any(|d| d.part == read.part.0 && !d.binding.ends_with("~holds"));
         if read.kind == crate::template_ir::ReadKind::Attribute
             && !read.nested
             && (found.iter().any(|(n, ..)| n == root) || computed_here)
@@ -1918,6 +1958,7 @@ fn plan(
             title,
             scope: crate::resume::page_scope(hir, decl).to_string(),
             layout,
+            predicates: asked.into_iter().collect(),
         },
         members,
         computed,
@@ -2001,13 +2042,25 @@ fn computed_part(
             ),
         });
     };
-    // Its input's type, where its expression reads it, and its result's.
-    let input = body
-        .walk_from(expr)
-        .into_iter()
-        .find(|x| matches!(body.expr(*x), Expr::Name(n) if n == name))
-        .and_then(|x| types.of(body, x))
-        .ok_or_else(|| format!("part {part}'s `{name}` has no type"))?;
+    // Its input's type, where its expression reads it, and its result's: a
+    // predicate's answer is a `Bool` (ADR-XXXX).
+    let asks = read
+        .split('.')
+        .next()
+        .is_some_and(|r| r.ends_with("~holds"));
+    let input = if asks {
+        crate::resolved::ResolvedType::inferred(
+            &crate::resolved::TypeKey::Primitive(crate::resolved::Primitive::Bool),
+            &|_| None,
+            &body.expr_span(expr),
+        )
+    } else {
+        body.walk_from(expr)
+            .into_iter()
+            .find(|x| matches!(body.expr(*x), Expr::Name(n) if n == name))
+            .and_then(|x| types.of(body, x))
+    }
+    .ok_or_else(|| format!("part {part}'s `{name}` has no type"))?;
     // What it computes, as the checker's value relations type it: any
     // expression they check, where `Types` knows a name, a field and a call.
     let result = crate::values::type_of(
@@ -2073,6 +2126,19 @@ fn computed_part(
                 signal: root.to_string(),
                 path: read.clone(),
             },
+        ));
+    }
+    // **From a predicate's answer** (ADR-XXXX): a host computes it from the
+    // answer it gave the document, as from a query's value.
+    if root.ends_with("~holds") && reads.is_empty() {
+        return Ok((
+            derived,
+            Computes::Host(Part {
+                part,
+                path: path.to_string(),
+                binding: root.to_string(),
+                steps: vec![Step::Derived(component_id)],
+            }),
         ));
     }
     let Some((_, resource, _)) = found.iter().find(|(n, ..)| n == root) else {

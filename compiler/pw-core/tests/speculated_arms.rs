@@ -143,7 +143,7 @@ fn a_page_that_shows_no_target_has_no_speculation() {
         format!(
             "{s}\npage Likes() {{\n    route \"/likes\"\n    cache private\n\n    signal n: Int = 0\n\n    \
              view {{\n        <title>Likes</title>\n        <main>\n            \
-             <button type=\"button\" on:press={{() => match like(PostId(\"p1\")) {{\n                \
+             <button type=\"button\" on:press|refusable={{() => match like(PostId(\"p1\")) {{\n                \
              Ok(_) => n = n + 1,\n                Err(_) => n = n,\n            }}}}>Like</button>\n        \
              </main>\n    }}\n}}\n"
         )

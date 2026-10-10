@@ -1132,8 +1132,12 @@ impl Attr {
 /// **What an event's modifiers may say** (ADR-0131): what the runtime does
 /// before any code loads, in the listener. `prevent` stops the browser's own
 /// action, a form's submission or a link's navigation; `stop` keeps the event
-/// from reaching an enclosing element's handler.
-pub const EVENT_MODIFIERS: &[&str] = &["prevent", "stop"];
+/// from reaching an enclosing element's handler. And `refusable` (ADR-XXXX),
+/// which the runtime does nothing for: the control is shown to every reader,
+/// though its command requires a predicate the page does not ask (a part
+/// served to everyone cannot), and a refusal is told where the press was
+/// (ADR-0302).
+pub const EVENT_MODIFIERS: &[&str] = &["prevent", "stop", "refusable"];
 
 #[derive(Debug, Clone)]
 pub enum Node {

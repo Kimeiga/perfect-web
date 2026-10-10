@@ -436,6 +436,11 @@ codes! {
     // another was refused whole, and its props were checked by nothing.
     VIEW_PROPS = "PW0619" / view_props / 1, Types,
         "a view is given each of its parameters, and nothing else";
+    // ADR-XXXX: `{#if InteractionId}` (a type), `{#if P}` (a page) and
+    // `{#if SignedIn}` (a predicate) checked and built, and the page failed
+    // where it was served: "no value for `SignedIn`".
+    NAMES_NO_VALUE = "PW0629" / names_no_value / 1, Types,
+        "a name a template reads is a value: a binding, a parameter, a signal, a constant, or a predicate the page asks of its reader";
     // ADR-0099: a statement's `Result` was discarded, and its failure with
     // it, until 2026-09-26.
     RESULT_DROPPED = "PW0618" / result_dropped / 1, Types,
@@ -661,6 +666,12 @@ codes! {
     // the paragraph and dropped the sum.
     MARKUP_AS_AN_OPERAND = "PW5047" / markup_as_an_operand / 1, Markup,
         "markup is shown where it is written, and is no operand of an arithmetic, comparison or logical operator";
+    // ADR-XXXX: the owner's finding of 2026-10-08, a press refused in
+    // silence; the compiler holds what the page can tell before the press.
+    CONTROL_WHERE_REFUSED = "PW5048" / control_where_refused / 1, Markup,
+        "a control whose command requires a predicate is shown where the page asks that predicate of its reader and it holds";
+    READER_PREDICATE_SHARED = "PW5049" / reader_predicate_shared / 1, Privacy,
+        "a page that asks a predicate of its reader is its reader's: a page served to everyone asks none";
 
     // --- the resource dependency graph (PW51xx, E6) -----------------------
     //

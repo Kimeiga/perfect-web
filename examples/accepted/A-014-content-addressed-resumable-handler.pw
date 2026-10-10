@@ -21,18 +21,19 @@ import domain.{ MenuItem, PositiveInt }
 //
 //   The handler's reference to `add_to_cart` should become a component import
 //   identified by DefId, not `view requires database.write<Carts>`.
-import cart.commands.{ add_to_cart }
+import cart.commands.{ add_to_cart, SignedIn }
 
 view AddToCartButton(item: MenuItem, available: Bool) !{} {
     // The handler captures `item`, the item the page shows, and nothing else:
     // a record of what it shows (ADR-0172). No DOM node, no connection, no
     // closure over server state.
-    <button
+    // Shown where its command's predicate holds for the reader (ADR-XXXX).
+    {#if SignedIn}<button
         disabled={!available}
         on:press={resumable(captures = { item }) => { let _added = add_to_cart(item, PositiveInt(1)) }}
     >
         Add
-    </button>
+    </button>{/if}
 }
 
 handler_policy {

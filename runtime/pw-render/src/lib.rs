@@ -553,6 +553,12 @@ impl Env {
         self
     }
 
+    /// **The value set at `path`**, as it was set: what a host reads back
+    /// of a document it rendered, such as a predicate's answer (ADR-XXXX).
+    pub fn value(&self, path: &str) -> Option<&Value> {
+        self.values.get(path).map(|v| &**v)
+    }
+
     /// Present a capability. Without it, a `RawHtml` part is refused.
     pub fn grant(mut self, capability: &str) -> Env {
         Arc::make_mut(&mut self.granted).push(capability.to_string());

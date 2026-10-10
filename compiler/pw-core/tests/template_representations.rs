@@ -258,7 +258,7 @@ session page P() {
         <main>
             <Shown tally={t} />
             <p id=\"direct\">{t.n.value}</p>
-            <button type=\"button\" on:press={() => bump()}>Bump</button>
+            <button type=\"button\" on:press|refusable={() => bump()}>Bump</button>
         </main>
     }
 }

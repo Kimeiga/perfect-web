@@ -54,7 +54,9 @@ fn with(code: &str, reported: &[String]) -> Vec<String> {
 
 /// A program with two commands a page's handler can send, one declaring a
 /// `Result` and one not, a function that returns a `Result`, `extra`
-/// declarations, and a button whose handler is `handler`.
+/// declarations, and a button whose handler is `handler`: shown to every
+/// reader, `|refusable`, since what it tests is not who may press it
+/// (ADR-XXXX).
 fn program(extra: &str, handler: &str) -> String {
     format!(
         "module t\n\n\
@@ -69,7 +71,7 @@ fn program(extra: &str, handler: &str) -> String {
          {extra}\n\n\
          page P() {{\n    cache private\n\n    signal note: String = \"\"\n\n    \
          view {{\n        <main>\n            \
-         <button type=\"button\" on:press={{() => {handler}}}>Add</button>\n        \
+         <button type=\"button\" on:press|refusable={{() => {handler}}}>Add</button>\n        \
          </main>\n    }}\n}}\n"
     )
 }

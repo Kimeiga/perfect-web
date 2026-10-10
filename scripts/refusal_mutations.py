@@ -261,7 +261,9 @@ MUTANTS = [
         "the feed's composer is shown to a reader signed out",
         "browser",
         FEED,
-        "            <form hidden={!me.signed_in} on:submit|prevent={() => match post_text(draft) {\n",
+        # Re-anchored by ADR-XXXX, whose composer asks the deployment's `SignedIn`:
+        # without its guard the build now refuses it (PW5048).
+        "            <form hidden={!SignedIn} on:submit|prevent={() => match post_text(draft) {\n",
         "            <form on:submit|prevent={() => match post_text(draft) {\n",
     ),
 ]

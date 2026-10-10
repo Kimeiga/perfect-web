@@ -18,13 +18,13 @@ module cart.add_view
 // subject is an inaccessible element was carrying two silent resolution
 // defects as well.
 import domain.{ MenuItem, PositiveInt }
-import cart.commands.{ add_to_cart }
+import cart.commands.{ add_to_cart, SignedIn }
 
 view AddButton(item: MenuItem) !{} {
     // ERROR: interactive behavior on a non-interactive element. The add's
     // answer is discarded by name (ADR-0159), so the element is this
     // fixture's one defect.
-    <div class="btn" on:press={() => { let _added = add_to_cart(item, PositiveInt(1)) }}>
+    {#if SignedIn}<div class="btn" on:press={() => { let _added = add_to_cart(item, PositiveInt(1)) }}>
         Add
-    </div>
+    </div>{/if}
 }

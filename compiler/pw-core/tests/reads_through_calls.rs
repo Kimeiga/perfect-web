@@ -255,7 +255,7 @@ fn a_shared_page_reads_through_a_public_query() {
          page ShopPage(id: StoreId) {\n    placement origin\n    cache shared\n\n    \
          let menu = query Menu(id)\n\n    view {\n        <ul>\n            \
          {#each menu as item (item.id)}\n                <li>\n                    \
-         <button type=\"button\" on:press={resumable(captures = { item }) => \
+         <button type=\"button\" on:press|refusable={resumable(captures = { item }) => \
          { let _added = add_to_cart(item.id, PositiveInt(1)) }}>Add</button>\n                </li>\n            \
          {/each}\n        </ul>\n    }\n}\n",
     );

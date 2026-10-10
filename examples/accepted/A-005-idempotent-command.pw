@@ -28,6 +28,12 @@ import context.{ current_session }
 // told A-004's cart that it had changed (ADR-0101).
 import Events.{ CartChanged }
 
+// Who may add to a cart: the deployment's `SignedIn`, declared so a page
+// or a view asks it of its reader and shows the control where it holds
+// (ADR-XXXX).
+predicate SignedIn
+    says "Sign in to do this."
+
 // The item as the page showed it (ADR-0172): its transition makes a new line
 // from the item's name and price, and the command writes by its id alone.
 command add_to_cart(item: MenuItem, quantity: PositiveInt)

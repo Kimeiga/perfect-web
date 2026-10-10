@@ -5580,3 +5580,29 @@ e14-layouts:
        python3 scripts/layouts_mutations.py; \
      } > docs/evidence/E14/layouts.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/layouts.txt
+
+# ADR-XXXX: a control is shown where its command's predicates hold. The
+# checker's, the lowering's and the plan's tests, the host's, the feed and
+# the store in three engines, and the mutation controls.
+e14-holds:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @BUILD_ONLY=1 bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a control is shown where its command's predicates hold"; echo; \
+       echo "produced by: just e14-holds"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== what a template reads, where a control stands, and the plan (compiler/pw-core/tests/controls_where_they_hold.rs)"; echo; \
+       cargo test --locked -p pw-core --test controls_where_they_hold 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host answers what a page asks of its reader"; echo; \
+       cargo test --locked -p pw-dev-server -- sign_in:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the feed and the store, in three engines (e2e/feed.spec.mjs, e2e/identity.spec.mjs, e2e/store.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs e2e/identity.spec.mjs e2e/store.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/holds_mutations.py)"; echo; \
+       python3 scripts/holds_mutations.py; \
+     } > docs/evidence/E14/holds.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/holds.txt

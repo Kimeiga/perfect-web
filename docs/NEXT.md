@@ -575,13 +575,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
                 declare (`predicate P says "…"`); a press no answer came
                 for, a stale page's and a failed handler's in the
                 platform's;
-             3. the compiler holds what the page can tell: a control whose
-                handler sends a command `requires P` is rendered only where
-                the page shows `P` holds, through the predicate's declared
-                witness on the page's principal (ADR-0270), or it is
-                refused; and speculation is never made for a press the page
-                knows will be refused. Ruled with research, the witness's
-                form first.
+             3. ~~the compiler holds what the page can tell~~ (ADR-XXXX,
+                2026-10-10): a page asks a predicate of its reader by naming
+                it, the deployment answering it as it answers `requires`,
+                and a control whose command requires one with no parameters
+                stands where the page asks it and it holds, or is
+                `|refusable`. Next, **a predicate with parameters asked of
+                each row** (`{#if OwnsPost(post.id)}`), ruled with how a
+                deployment answers many at once: the feed's Delete is still
+                guarded by the program's own `mine`.
 
              And for the tests: a kept-alive `/command` request is not
              listed among the page's resource-timing entries, so no

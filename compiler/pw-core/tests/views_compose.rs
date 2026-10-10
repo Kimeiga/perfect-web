@@ -180,7 +180,7 @@ fn a_view_used_twice_has_parts_of_its_own_each_time() {
 #[test]
 fn a_handler_in_a_view_captures_what_the_page_gave_it() {
     let views = ui("view AddButton(entry: MenuItem) !{} {\n    \
-         <button type=\"button\" on:press={() => { let _added = increase_in_cart(entry.id) }}>More</button>\n}\n");
+         <button type=\"button\" on:press|refusable={() => { let _added = increase_in_cart(entry.id) }}>More</button>\n}\n");
     // The page shows the cart `increase_in_cart` speculates on (ADR-0120).
     let src = page(
         &["AddButton"],
@@ -362,13 +362,13 @@ fn cart_count_page(inline: bool) -> (String, String) {
         "{}\nimport domain.{{ Cart }}\n\n\
          public view CartCount(c: Cart) !{{}} {{\n    <p id=\"cart-count\">{{c.line_count}}</p>\n}}\n\n\
          public view AddButton(entry: MenuItem) !{{}} {{\n    \
-         <button type=\"button\" on:press={{() => {{ let _added = add_to_cart(entry, PositiveInt(1)) }}}}>Add</button>\n}}\n",
+         <button type=\"button\" on:press|refusable={{() => {{ let _added = add_to_cart(entry, PositiveInt(1)) }}}}>Add</button>\n}}\n",
         ui("")
     );
     let (count, add) = match inline {
         true => (
             "<p id=\"cart-count\">{cart.line_count}</p>",
-            "<button type=\"button\" on:press={() => { let _added = add_to_cart(item, PositiveInt(1)) }}>Add</button>",
+            "<button type=\"button\" on:press|refusable={() => { let _added = add_to_cart(item, PositiveInt(1)) }}>Add</button>",
         ),
         false => ("<CartCount c={cart} />", "<AddButton entry={item} />"),
     };

@@ -1549,6 +1549,16 @@ impl<'a> Typer<'a> {
                 _ => Ty::Unknown,
             };
         }
+        // A predicate a page asks of its reader (ADR-XXXX): `{#if SignedIn}`
+        // is whether the deployment holds it for the page's principal.
+        if matches!(term, Resolution::Unresolved)
+            && self.is_ui()
+            && let Resolution::Local(d) | Resolution::Imported { def: d, .. } =
+                self.ws.resolve_in(self.at, Namespace::Predicate, n)
+            && self.sigs.by_def(d).is_some_and(|s| s.params.is_empty())
+        {
+            return Ty::Primitive(Primitive::Bool);
+        }
         // The language's own values, only where the program has not declared
         // something of that name; then a sum type's case (ADR-0059).
         let own = matches!(term, Resolution::Unresolved);
