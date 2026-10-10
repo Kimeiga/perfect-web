@@ -235,7 +235,11 @@ test("a handler that fails to load is visible and recoverable", async ({ page })
   await button.click();
   await expect(button, "the failure is on the element").toHaveAttribute(
     "data-pw-handler-error",
-    "1",
+    "failed",
+  );
+  // And told beside it (ADR-0302).
+  await expect(page.locator("#menu .pw-refusal").first()).toHaveText(
+    "This did not work. Try again.",
   );
   await expect(page.locator("#cart-count"), "and nothing happened").toHaveText("0");
 

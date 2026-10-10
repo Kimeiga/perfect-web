@@ -226,6 +226,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // parameters, and one route is one page's.
             out.extend(crate::routes::parameters_agree(&u.hir, i, &sigs));
             out.extend(crate::routes::declared_twice(&hirs, i));
+            // ADR-0302: a predicate is declared once, with one set of words.
+            out.extend(crate::predicates::declared_twice(&hirs, i));
             // Track `uploads` (ADR-0260): an upload's clauses, its paths, and
             // the forms that post a file.
             out.extend(crate::uploads::check(&hirs, i));
@@ -233,9 +235,16 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
             // ADR-0295: and when it is another address of the page.
             out.extend(redirect_names_a_case(&u.hir, i, &sigs, &workspace));
+            // ADR-0302: a predicate the program declares says what a refusal
+            // by it is told, and is given what it takes.
+            out.extend(crate::predicates::check(&u.hir, i, &sigs, &workspace));
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
             // ADR-0280: a handler navigates once its command commits.
             out.extend(navigations(&workspace, &u.hir, i, &sigs));
+            // ADR-0303: a page is shown in its layout.
+            out.extend(crate::layouts::check(&hirs, &workspace, i));
+            // ADR-0243's amendment: markup is no operand.
+            out.extend(markup_as_an_operand(&u.hir));
             out.extend(check_unit_with(
                 &labels,
                 &reads,
@@ -743,6 +752,73 @@ fn ok_payloads(body: &Body, p: hir::PatternId) -> Vec<hir::PatternId> {
 /// command's answer nearest it (PW5043). An `Ok` is a commit, so the page is
 /// left only once one is made; an `Err` arm, a speculation, or code before
 /// the answer would leave it on a refusal or before it.
+/// **Markup is no operand** (ADR-0243's amendment of 2026-10-09). A view's
+/// markup is shown where it is written: `<p>a</p> + 1` checked, rendered the
+/// paragraph, and dropped the sum, and `<h1>a</h1><p>b</p>` was read as that
+/// until two roots on one line became one region. An arithmetic, comparison
+/// or logical operator over markup is refused where it is written.
+fn markup_as_an_operand(hir: &Hir) -> Vec<Diagnostic> {
+    use crate::hir::{BinOp, UnOp};
+    let mut out = Vec::new();
+    for (_, decl) in hir.all_decls() {
+        let Some(b) = decl.body else { continue };
+        let body = hir.body(b);
+        for e in body.walk() {
+            let operands: Vec<ExprId> = match body.expr(e) {
+                Expr::Binary {
+                    op:
+                        BinOp::Add
+                        | BinOp::Sub
+                        | BinOp::Mul
+                        | BinOp::Div
+                        | BinOp::Rem
+                        | BinOp::Cmp(_)
+                        | BinOp::And
+                        | BinOp::Or,
+                    lhs,
+                    rhs,
+                } => vec![*lhs, *rhs],
+                Expr::Unary {
+                    op: UnOp::Neg | UnOp::Not,
+                    operand,
+                } => vec![*operand],
+                _ => continue,
+            };
+            if !operands
+                .iter()
+                .any(|o| matches!(body.expr(*o), Expr::Template { .. }))
+            {
+                continue;
+            }
+            let code = crate::codes::MARKUP_AS_AN_OPERAND;
+            out.push(Diagnostic {
+                code: code.id,
+                invariant: code.invariant,
+                reason: "markup_as_an_operand",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message: "markup is an operand here: it is shown where it is written, and \
+                          what it is combined with is dropped"
+                    .to_string(),
+                primary_span: body.expr_span(e),
+                related: Vec::new(),
+                explanation: Some(
+                    "A view's markup is not a value: the renderer shows each region where \
+                     the view writes it, and an operator over one computes nothing anyone \
+                     sees. Two elements on one line are one region (`<h1>a</h1><p>b</p>`); \
+                     a value is shown inside markup, `<p>{a + 1}</p>`."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "write the value inside the markup, in braces".to_string(),
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
 fn navigations(
     ws: &crate::resolve::Workspace,
     hir: &Hir,
@@ -1275,6 +1351,10 @@ fn not_a_term(
         Some(DeclKind::Page) => (
             "a page",
             "A page is reached by its route; it is not called.",
+        ),
+        Some(DeclKind::Layout) => (
+            "a layout",
+            "A page is shown in its layout, which it names with `layout`; it is not called.",
         ),
         Some(DeclKind::Materialize) => (
             "a materialization",
@@ -3160,7 +3240,7 @@ fn capitalized(text: &str) -> String {
 }
 
 /// What a declaration of `kind` is, for a message.
-fn described(kind: DeclKind) -> &'static str {
+pub(crate) fn described(kind: DeclKind) -> &'static str {
     match kind {
         DeclKind::Query => "a query",
         DeclKind::Command => "a command",
@@ -3170,10 +3250,12 @@ fn described(kind: DeclKind) -> &'static str {
         DeclKind::View => "a view",
         DeclKind::Component => "a component",
         DeclKind::Page => "a page",
+        DeclKind::Layout => "a layout",
         DeclKind::Task => "a task",
         DeclKind::Event => "an event",
         DeclKind::Source => "a data source",
         DeclKind::Upload => "an upload",
+        DeclKind::Predicate => "a predicate",
         DeclKind::Effect => "an effect",
         DeclKind::Prelude => "a prelude",
         DeclKind::Fn => "a function",
@@ -4266,6 +4348,7 @@ fn metadata(hir: &Hir) -> Vec<Diagnostic> {
                 let kind = match decl.kind {
                     DeclKind::View => "view",
                     DeclKind::Component => "component",
+                    DeclKind::Layout => "layout",
                     _ => "declaration",
                 };
                 Some(format!(
@@ -4545,6 +4628,7 @@ fn titles(hir: &Hir) -> Vec<Diagnostic> {
                 let kind = match decl.kind {
                     DeclKind::View => "view",
                     DeclKind::Component => "component",
+                    DeclKind::Layout => "layout",
                     _ => "declaration",
                 };
                 Some(format!(
@@ -5055,6 +5139,15 @@ fn view_elements(
                 continue;
             }
             let (message, repair) = match named {
+                // A page is shown in its layout (ADR-0303): the page names
+                // it, and no markup uses it.
+                Some(DeclKind::Layout) => (
+                    format!(
+                        "`<{tag}>` uses the layout `{tag}` as an element, and a page is shown \
+                         in a layout by naming it"
+                    ),
+                    format!("write `layout {tag}` in the page"),
+                ),
                 Some(DeclKind::Component | DeclKind::Page) => (
                     format!(
                         "`<{tag}>` uses `{tag}` inside another view, and only a view is used \
@@ -6280,6 +6373,16 @@ fn check_unit_with(
     out.extend(values);
 
     for (id, decl) in unit.hir.all_decls() {
+        // The layout a page is shown in (ADR-0303), whose values its
+        // document holds.
+        let layout = (decl.kind == DeclKind::Page)
+            .then(|| crate::layouts::written(&unit.hir, decl))
+            .flatten()
+            .and_then(|(name, _)| {
+                crate::layouts::named(ws, at, &name)
+                    .filter(|d| sigs.kind_of(*d) == Some(DeclKind::Layout))
+                    .map(|d| (d, name))
+            });
         privacy_and_placement(
             &unit.hir,
             &unit.src,
@@ -6294,6 +6397,7 @@ fn check_unit_with(
             id,
             decl,
             inherited.get(&id.0).copied(),
+            layout.as_ref().map(|(d, n)| (*d, n.as_str())),
             &mut out,
         );
         privacy_flow(
@@ -7383,7 +7487,8 @@ pub fn declares_a_type(kind: DeclKind) -> bool {
 fn ambient_scope(decl: &Decl) -> ScopeKind {
     match decl.kind {
         DeclKind::View | DeclKind::Component => ScopeKind::Component,
-        DeclKind::Page => ScopeKind::Route,
+        // A layout lives for as long as the pages shown in it (ADR-0303).
+        DeclKind::Page | DeclKind::Layout => ScopeKind::Route,
         DeclKind::Query | DeclKind::Command => ScopeKind::Request,
         DeclKind::Subscription => ScopeKind::Session,
         _ => ScopeKind::Block,
@@ -7649,6 +7754,8 @@ fn privacy_and_placement(
     id: crate::hir::DeclId,
     decl: &Decl,
     inherited: Option<World>,
+    // The layout a page is shown in (ADR-0303), and its name.
+    layout: Option<(crate::resolve::DefId, &str)>,
     out: &mut Vec<Diagnostic>,
 ) {
     // The declaration's own visibility, joined with everything its body reads.
@@ -7656,7 +7763,12 @@ fn privacy_and_placement(
     // session materialization — which is the corpus's canonical case, and is
     // invisible to a rule that only reads the header.
     let (read, read_from) = reads_label_with_source(hir, labels, inference, at, decl);
-    let label = label_of(decl).join(&read);
+    // **And everything its layout observes** (ADR-0303): the layout's markup
+    // is rendered into the page's document, so an unlabelled layout that
+    // reads a session's cart makes the page a session's, as a read of its
+    // own would.
+    let shown = layout.map_or_else(Label::public, |(l, _)| reads.observed(l));
+    let label = label_of(decl).join(&read).join(&shown);
 
     // 1. A reader's value in a shared cache. Charter §7.8's canonical case.
     //
@@ -7684,6 +7796,11 @@ fn privacy_and_placement(
         let read_from = read_from
             .map(|v| format!("`{v}`"))
             .or_else(|| param.map(|p| format!("its parameter `{}`", p.name)))
+            .or_else(|| {
+                layout
+                    .filter(|_| !shown.is_public())
+                    .map(|(_, name)| format!("what its layout `{name}` shows"))
+            })
             .or_else(|| observed_from(hir, reads, inference, at, decl).map(|v| format!("`{v}`")));
         {
             let cache = crate::hir::Policy {
@@ -10824,6 +10941,7 @@ fn kind_noun(kind: DeclKind) -> &'static str {
         DeclKind::View => "view",
         DeclKind::Component => "component",
         DeclKind::Page => "page",
+        DeclKind::Layout => "layout",
         DeclKind::Query => "query",
         DeclKind::Command => "command",
         _ => "declaration",

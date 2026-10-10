@@ -142,7 +142,7 @@ impl<'a> Types<'a> {
         // `self` is the declaration's own element, and that is a language fact
         // about UI declarations rather than something a library declares.
         let self_type = match decl.kind {
-            DeclKind::View | DeclKind::Component | DeclKind::Page => {
+            DeclKind::View | DeclKind::Component | DeclKind::Page | DeclKind::Layout => {
                 sigs.language_type("browser", "ElementRef")
             }
             _ => None,

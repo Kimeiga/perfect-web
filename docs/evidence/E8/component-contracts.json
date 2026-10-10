@@ -1254,6 +1254,74 @@
     ]
   },
   {
+    "component_id": "store.page.StoreLayout",
+    "capability_mapping": 1,
+    "abi_schema": "b337b80a218b9741",
+    "required_capabilities": [
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.page.Cart",
+        "name": "Cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:host/session",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.Session",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.SessionId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "StoreLayout",
+        "kind": "layout",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-store-layout-api@0.1.0",
+          "function": "store-layout"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.StoreList",
     "capability_mapping": 1,
     "abi_schema": "7fad5df1af8cdb8f",

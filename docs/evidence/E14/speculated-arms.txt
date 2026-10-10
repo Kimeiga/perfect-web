@@ -1,8 +1,8 @@
 ADR-0238 - a command speculates on several entries, a page on those it shows
 
 produced by: just e14-speculated-arms
-commit: 0efa5cad088d29a44297f6c100228b6726551de1
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 328720e89d73f343c9e671077dfc0fd51e1fed46
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38006542533 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -14,7 +14,7 @@ test arms_are_separated_by_commas ... ok
 test an_arm_whose_target_a_page_shows_under_another_key_is_refused ... ok
 test a_page_that_shows_no_target_has_no_speculation ... ok
 test each_page_speculates_on_the_arm_whose_target_it_shows ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.15s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.04s
 
 == the parser (compiler/pw-syntax/src/grammar.rs)
 
@@ -23,7 +23,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 91 filtered out; fin
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  66 passed (2.9m)
+  66 passed (3.0m)
 
 == mutation controls (scripts/speculated_arms_mutations.py)
 

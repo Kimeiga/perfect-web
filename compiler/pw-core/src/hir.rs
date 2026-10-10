@@ -139,6 +139,10 @@ pub enum DeclKind {
     View,
     Component,
     Page,
+    /// `layout StoreLayout { .. }`: the markup and the bindings the pages
+    /// that name it share (`layout StoreLayout` in a page), the page shown in
+    /// its `<slot />`. Composed into each page, its parts numbered first.
+    Layout,
     Query,
     Command,
     Subscription,
@@ -160,6 +164,10 @@ pub enum DeclKind {
     /// its `route`, served once committed under `serves`, and its limits.
     /// Named by nothing a program writes; `pw build` writes it for the host.
     Upload,
+    /// `predicate OwnsPost(post: PostId)  says "…"` (ADR-0302): a predicate a
+    /// command's `requires` names, its parameters, and the words a refusal
+    /// by it is told in. Its meaning is the deployment's (ADR-0115).
+    Predicate,
     /// `prelude Effect` — this module exports its declarations in one
     /// namespace to every unit in the program. The namespace is the `name`.
     Prelude,

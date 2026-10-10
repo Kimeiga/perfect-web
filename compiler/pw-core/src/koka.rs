@@ -94,6 +94,7 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
         DeclKind::Source => Err("a data source — what a database guarantees, no body"),
         // Track `uploads`: what a form may post, and its limits.
         DeclKind::Upload => Err("an upload — a file's limits, no body"),
+        DeclKind::Predicate => Err("a predicate — the deployment's, with its words, no body"),
 
         DeclKind::Type => {
             // A record: `type CartLine = CartLine { item_id: .., .. }`.
@@ -181,7 +182,9 @@ fn lower_decl(hir: &Hir, decl: &Decl) -> Result<Option<String>, &'static str> {
         }
 
         DeclKind::Opaque => Err("an opaque type is erased by Koka (E0 finding F-4)"),
-        DeclKind::View | DeclKind::Component | DeclKind::Page => Err("a UI declaration"),
+        DeclKind::View | DeclKind::Component | DeclKind::Page | DeclKind::Layout => {
+            Err("a UI declaration")
+        }
         DeclKind::Query | DeclKind::Command | DeclKind::Subscription => {
             Err("a data operation carries policies Koka cannot express")
         }

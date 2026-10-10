@@ -468,6 +468,14 @@
     },
     {
       "from": "store.page.OrderPage",
+      "to": "store.page.Cart",
+      "kind": "reads",
+      "key": [
+        "current_session()"
+      ]
+    },
+    {
+      "from": "store.page.OrderPage",
       "to": "store.page.Order",
       "kind": "reads",
       "key": [

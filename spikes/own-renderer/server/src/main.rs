@@ -268,6 +268,12 @@ struct Answered {
     committed: bool,
     result: Option<serde_json::Value>,
     why: Option<String>,
+    /// **The predicate its `requires` refused it by** (ADR-0302), kept with
+    /// the interaction, so a resent press is answered as the press was:
+    /// until ADR-0302 the refusal lived only on the thread that ran
+    /// `requires`, and a resend, answered from what was kept, was answered
+    /// as a command that did not commit, with nothing to tell.
+    refused: Option<String>,
 }
 
 impl Answered {
@@ -276,7 +282,11 @@ impl Answered {
     /// one: a command declaring no `Result` answers `null`, which is an
     /// answer, and a command that trapped answers none.
     fn kept(&self) -> String {
-        let mut kept = serde_json::json!({ "committed": self.committed, "why": self.why });
+        let mut kept = serde_json::json!({
+            "committed": self.committed,
+            "why": self.why,
+            "refused": self.refused,
+        });
         if let Some(result) = &self.result {
             kept["result"] = result.clone();
         }
@@ -289,6 +299,7 @@ impl Answered {
             committed: v["committed"] == true,
             result: v.get("result").cloned(),
             why: v["why"].as_str().map(str::to_string),
+            refused: v["refused"].as_str().map(str::to_string),
         }
     }
 }
@@ -799,6 +810,10 @@ struct Server {
     /// meanwhile** (ADR-0271): one telling of a session at a time, and one
     /// more after it for every commit that came while it ran.
     told: Mutex<BTreeMap<String, bool>>,
+    /// **The words a program declares for its predicates** (ADR-0302,
+    /// `predicates.json`): what a reader is told when one refuses, in place
+    /// of the deployment's.
+    words: BTreeMap<String, String>,
     /// **The version each speculated value was last sent at** (ADR-0222), by
     /// session, page, binding and the page's parameters its key reads
     /// (ADR-0236): what a commit's answer names, so the page keeps its
@@ -1299,6 +1314,38 @@ impl Server {
                 short.join("; ")
             ));
         }
+        // **Every predicate the program requires, this deployment
+        // evaluates** (ADR-0302): one it cannot would answer each press of
+        // its commands with nothing to tell, so it is refused here, before
+        // anything is served. And the words the program declares for them.
+        let words: BTreeMap<String, String> =
+            match std::fs::read_to_string(build.join("predicates.json")) {
+                Ok(text) => {
+                    serde_json::from_str(&text).map_err(|e| format!("predicates.json: {e}"))?
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => BTreeMap::new(),
+                Err(e) => return Err(format!("predicates.json: {e}")),
+            };
+        let unknown: std::collections::BTreeSet<&str> = contracts
+            .iter()
+            .flat_map(|c| c.exports.iter())
+            .filter_map(|e| e.component.as_ref())
+            .flat_map(|e| e.authorization.iter())
+            .map(|a| a.predicate.as_str())
+            .chain(words.keys().map(String::as_str))
+            .filter(|p| identity::says(p).is_none())
+            .collect();
+        if !unknown.is_empty() {
+            return Err(format!(
+                "this deployment cannot evaluate the predicate{} the program requires: {}",
+                if unknown.len() == 1 { "" } else { "s" },
+                unknown
+                    .iter()
+                    .map(|p| format!("`{p}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
         // The page a document with none recorded is, where the layer has one.
         let plan = data
             .default_page()
@@ -1326,6 +1373,7 @@ impl Server {
         // the identity's principals say.
         uploads.identified_by(server.identity.principals());
         server.uploads = uploads;
+        server.words = words;
         // **What the program imports, its data layer supplies** (ADR-0218):
         // refused here, as uncompiled handlers are, rather than when a press
         // first reaches the operation.
@@ -1458,6 +1506,7 @@ impl Server {
             pages: Mutex::new(BTreeMap::new()),
             telling: Mutex::new(Vec::new()),
             told: Mutex::new(BTreeMap::new()),
+            words: BTreeMap::new(),
             speculated_versions: Mutex::new(BTreeMap::new()),
             split_fills: std::sync::atomic::AtomicU64::new(0),
             #[cfg(test)]
@@ -1941,6 +1990,7 @@ impl Server {
                     committed: false,
                     result,
                     why: None,
+                    refused: None,
                 };
                 return Ok((answered, Vec::new()));
             }
@@ -1956,6 +2006,7 @@ impl Server {
                     committed: true,
                     result,
                     why: None,
+                    refused: None,
                 };
                 return Ok((answered, Vec::new()));
             };
@@ -1993,6 +2044,7 @@ impl Server {
                 committed: true,
                 result,
                 why: None,
+                refused: None,
             };
             Ok((answered, reached))
         }
@@ -2236,13 +2288,21 @@ impl Server {
         // Typed by the export's parameters, and held to the invariants its
         // contract states (ADR-0179): a forged quantity of 0 is refused here.
         let args = loaded.prepared.arguments_for(&export, json)?;
-        let answered = |run: Result<Answered, String>| match run {
-            Ok(answered) => answered,
-            Err(why) => Answered {
-                committed: false,
-                result: None,
-                why: Some(why),
-            },
+        // With the predicate `requires` refused it by, where one did
+        // (ADR-0302): taken on the thread that ran it, as it ends, so it is
+        // kept with the interaction.
+        let answered = |run: Result<Answered, String>| {
+            let mut answered = match run {
+                Ok(answered) => answered,
+                Err(why) => Answered {
+                    committed: false,
+                    result: None,
+                    why: Some(why),
+                    refused: None,
+                },
+            };
+            answered.refused = identity::take_refusal();
+            answered
         };
         let Some(key_type) = &export.idempotent_by else {
             return Ok(answered(self.command_answered(
@@ -3182,15 +3242,25 @@ impl Server {
         );
         let plan = self.plan_of(&page);
         let mut out = BTreeMap::new();
+        // **One query with one key is read once for its document**
+        // (ADR-0303): a page and its layout that each bind `Cart` of the
+        // session's read it once, and show one value of it.
+        let mut read: Vec<(&str, Vec<Val>, Val)> = Vec::new();
         for b in plan["bindings"].as_array().into_iter().flatten() {
             if !wanted(b["binding"].as_str().unwrap_or_default()) {
                 continue;
             }
             let args = self.args_of(plan, session, document, b, keys)?;
-            out.insert(
-                b["binding"].as_str().unwrap_or_default().to_string(),
-                self.fetch_binding(session, b, &args)?,
-            );
+            let resource = b["resource"].as_str().unwrap_or_default();
+            let value = match read.iter().find(|(r, a, _)| *r == resource && *a == args) {
+                Some((_, _, v)) => v.clone(),
+                None => {
+                    let v = self.fetch_binding(session, b, &args)?;
+                    read.push((resource, args, v.clone()));
+                    v
+                }
+            };
+            out.insert(b["binding"].as_str().unwrap_or_default().to_string(), value);
         }
         Ok(out)
     }
@@ -6793,9 +6863,27 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             if drop_at == Some(DropAt::After) {
                 return;
             }
-            // TRACK SEAM (identity): the refusal, where `requires` refused.
-            if let Some(predicate) = identity::take_refusal() {
-                let refused = serde_json::json!({ "committed": false, "refused": predicate });
+            // TRACK SEAM (identity): the refusal, where `requires` refused,
+            // kept with the interaction (ADR-0302), and what a reader is
+            // told of it: the program's words for the predicate where it
+            // declares them, the deployment's where it does not. Never
+            // what the predicate read.
+            if let Ok(Answered {
+                refused: Some(predicate),
+                ..
+            }) = &answer
+            {
+                let says = server
+                    .words
+                    .get(predicate)
+                    .map(String::as_str)
+                    .or_else(|| identity::says(predicate))
+                    .unwrap_or_default();
+                let refused = serde_json::json!({
+                    "committed": false,
+                    "refused": predicate,
+                    "says": says,
+                });
                 respond_json(&mut stream, 403, &session, fresh, &refused.to_string());
                 return;
             }
@@ -8421,11 +8509,13 @@ fn signal_document(
     // No `<` in a script element's text (ADR-0097).
     let json =
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
+    // Where a failed press is said (ADR-0302), from the first byte.
+    let announcer = pw_render::ANNOUNCER;
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{}</title>\n{metadata}</head>\n<body>\n{body}\n\
-         <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
+         {announcer}\n<script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         pw_render::escape::text(title)
     )
@@ -8655,11 +8745,13 @@ fn document(
         "" => String::new(),
         css => format!("<style>{css}</style>\n"),
     };
+    // Where a failed press is said (ADR-0302), from the first byte.
+    let announcer = pw_render::ANNOUNCER;
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{title}</title>\n{metadata}{style}</head>\n<body>\n{body}\n\
-         <script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
+         {announcer}\n<script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         title = pw_render::escape::text(title)
     )
@@ -9122,18 +9214,34 @@ public query Store(",
                 .expect("request");
             let mut chunks = Vec::new();
             let mut buf = [0u8; 65536];
+            // A character a read ends inside is told with the read that
+            // completes it. Decoded alone, its first bytes were U+FFFD, and a
+            // test comparing the page's text failed by where the reads fell:
+            // under load, 煮's "にしめる" read as "に\u{fffd}\u{fffd}める" (W6's
+            // finding, 2026-10-10). Bytes that are no UTF-8 are refused, not
+            // replaced.
+            let mut pending: Vec<u8> = Vec::new();
             loop {
                 let n = client.read(&mut buf).expect("read");
                 if n == 0 {
+                    assert!(pending.is_empty(), "the response ends inside a character");
                     // The close, which is what tells a browser the document
                     // is complete: the last chunk, empty, when it came.
                     chunks.push((started.elapsed(), String::new()));
                     break;
                 }
-                chunks.push((
-                    started.elapsed(),
-                    String::from_utf8_lossy(&buf[..n]).into_owned(),
-                ));
+                pending.extend_from_slice(&buf[..n]);
+                let whole = match std::str::from_utf8(&pending) {
+                    Ok(text) => text.len(),
+                    // Ends inside a character: the rest comes next.
+                    Err(e) if e.error_len().is_none() => e.valid_up_to(),
+                    Err(e) => panic!("the response is no UTF-8: {e}"),
+                };
+                if whole > 0 {
+                    let text =
+                        String::from_utf8(pending.drain(..whole).collect()).expect("decoded above");
+                    chunks.push((started.elapsed(), text));
+                }
             }
             chunks
         })
@@ -11416,8 +11524,10 @@ public query Store(",
     #[test]
     fn a_command_drops_the_entry_it_invalidates_and_no_other() {
         let mut s = rendering_server();
+        // The cart's every binding, the page's and its layout's (ADR-0303):
+        // a query's policy is its declaration's.
         for b in s.plan["bindings"].as_array_mut().expect("bindings") {
-            if b["binding"] == "cart" {
+            if b["resource"] == "store.page.Cart" {
                 b["policy"]["freshness_ms"] = serde_json::json!(60_000);
             }
         }
@@ -14053,6 +14163,49 @@ public query Store(",
             .collect()
     }
 
+    /// **A page is shown in its layout** (ADR-0303): the store's four pages
+    /// in `StoreLayout`, its header the same markup on each, the page's own
+    /// in its slot; and its count told as the cart changes on a page that
+    /// reads no cart of its own, the order's, as any part's value is
+    /// (ADR-0219).
+    #[test]
+    fn a_store_page_is_shown_in_its_layout_and_its_count_is_told() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let page = |path: &str| -> String {
+            fetched_as(&s, path, Some("a"))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        let header = |html: &str| -> String {
+            html.split_once("<header>")
+                .and_then(|(_, rest)| rest.split_once("</header>"))
+                .map(|(h, _)| h.to_string())
+                .unwrap_or_default()
+        };
+        let shared = header(&page("/"));
+        assert!(shared.contains("id=\"header-cart-count\""), "{shared}");
+        for path in ["/", "/stores/47", "/cart", "/order"] {
+            let html = page(path);
+            assert!(html.starts_with("HTTP/1.1 200"), "{path}: {html}");
+            assert_eq!(header(&html), shared, "{path}");
+            // The page's own markup is in the slot, after the header.
+            let (before, rest) = html.split_once("<!--pw-slot-->").expect("a slot");
+            let (inside, _) = rest.split_once("<!--/pw-slot-->").expect("closed");
+            assert!(before.contains("</header>"), "{path}: {before}");
+            assert!(inside.contains("<main"), "{path}: {inside}");
+        }
+        // The order's page reads only its order; its layout reads the cart.
+        let _ = s
+            .serve_document_settled("a", ORDER_PAGE, &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        s.command(ADD, "a", &add_shown("espresso", 2), false)
+            .expect("added");
+        let told: String = sets_of(&s, &doc).iter().map(written).collect();
+        assert_eq!(told, "2", "the header's count, and nothing else");
+    }
+
     /// **What a handler at the top of the page captures is set again when it
     /// changes** (ADR-0217, ADR-0210's urgent defect 2). A button on the
     /// cart's page that captures the cart: after a line is added, the patch
@@ -15295,6 +15448,33 @@ public query Store(",
         );
     }
 
+    /// **A page that binds no query holds the announcer too** (ADR-0302):
+    /// once, empty, before the runtime that says what a failed press is told.
+    #[test]
+    fn a_signal_page_holds_its_announcer() {
+        let template = Template {
+            path: "t.P".into(),
+            name: "P".into(),
+            params: vec![],
+            schema: "s".into(),
+            chunks: vec![],
+        };
+        let page = signal_document(
+            "<main></main>",
+            "P",
+            "",
+            &template,
+            &serde_json::json!({}),
+            &[],
+            COMMITTED_ARTIFACTS,
+        );
+        assert_eq!(page.matches(pw_render::ANNOUNCER).count(), 1, "{page}");
+        let (before, _) = page
+            .split_once("id=\"pw-parts\"")
+            .expect("a parts manifest");
+        assert!(before.contains(pw_render::ANNOUNCER), "{page}");
+    }
+
     /// **A title that changed is set as text** (ADR-0183), at the title's
     /// address, which the browser sets as `document.title`. One that did not
     /// change is not set.
@@ -15403,8 +15583,9 @@ public query Store(",
         assert_eq!(slot(&whole, "Recommendations"), "Cortado Cold Brew");
         // Each arm with the comment after it (ADR-0223).
         assert!(
-            // ADR-0277: the menu counted is a part of the page's, before them.
-            whole.ends_with("</template><!--/pw-31--></body>\n</html>\n"),
+            // ADR-0277: the menu counted is a part of the page's, before
+            // them; and ADR-0303: the layout's count is part 0, before all.
+            whole.ends_with("</template><!--/pw-32--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the
@@ -15698,6 +15879,7 @@ public query Store(",
                 committed: true,
                 result: Some(serde_json::json!({ "$case": "ok" })),
                 why: None,
+                refused: None,
             },
             Answered {
                 committed: false,
@@ -15706,18 +15888,21 @@ public query Store(",
                     "value": { "$case": "item-unavailable", "value": "cortado" }
                 })),
                 why: None,
+                refused: None,
             },
             // A command declaring no `Result`: answered, with nothing.
             Answered {
                 committed: true,
                 result: Some(serde_json::Value::Null),
                 why: None,
+                refused: None,
             },
             // A command that trapped: no answer at all.
             Answered {
                 committed: false,
                 result: None,
                 why: Some("trapped".to_string()),
+                refused: None,
             },
         ] {
             assert_eq!(Answered::from_kept(&answered.kept()), answered);

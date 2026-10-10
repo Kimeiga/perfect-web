@@ -102,10 +102,14 @@ fn the_stores_transitions_run_and_its_parts_read_the_result() {
         ],
         "clear_cart declares no optimistic clause, so it has no speculation"
     );
-    assert_eq!(m.bindings.len(), 1);
-    assert_eq!(m.bindings[0].binding, "cart");
-    assert_eq!(m.bindings[0].resource, "store.page.Cart");
-    assert_eq!(m.bindings[0].key, ["current_session()"]);
+    // The page's cart, and its layout's (ADR-0303, the layouts'): one entry
+    // by one key, each binding moved by each command's transition.
+    let names: Vec<&str> = m.bindings.iter().map(|b| b.binding.as_str()).collect();
+    assert_eq!(names, ["cart", "cart~StoreLayout"]);
+    for b in &m.bindings {
+        assert_eq!(b.resource, "store.page.Cart");
+        assert_eq!(b.key, ["current_session()"]);
+    }
 
     let temp = tempfile::TempDir::with_prefix("pw-speculation-").expect("a temporary directory");
     let dir = temp.path().to_path_buf();
@@ -121,6 +125,13 @@ const run = (command, value, args) => m.commands[command][0].transition(value, a
 // The cart's text at the top of the page: its count, then its subtotal.
 const reads = Object.values(m.parts.cart);
 if (reads.length !== 2) throw new Error(`the cart has ${reads.length} parts`);
+// The layout's count of it, moved with the page's (ADR-0303, the layouts').
+const theirs = Object.values(m.parts["cart~StoreLayout"]);
+if (theirs.length !== 1) throw new Error(`the layout's cart has ${theirs.length} parts`);
+for (const c of Object.keys(m.commands)) {
+  const moved = m.commands[c].map((t) => t.binding).sort().join(",");
+  if (moved !== "cart,cart~StoreLayout") throw new Error(`${c} moves ${moved}`);
+}
 const [count, subtotal] = reads;
 // What a row of the cart's lines reads through a member (ADR-0172).
 const list = m.regions.cart.find((r) => r.kind === "list");

@@ -85,8 +85,8 @@ MUTANTS = [
         "an instance is used at no depth",
         "cargo",
         IR,
-        "            elements: ix.elements,\n",
-        "            elements: 0,\n",
+        "            elements: ix.elements,\n            deepest: 0,\n",
+        "            elements: 0,\n            deepest: 0,\n",
     ),
     (
         "a template nests one element less than it does",

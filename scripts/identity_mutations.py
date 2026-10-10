@@ -86,10 +86,12 @@ MUTANTS = [
         "                    [Val::Result(Ok(Some(found)))] => Ok(author_of(found) != Some(&principal.user)),\n",
     ),
     (
+        # Re-anchored by ADR-0302: the refusal is kept with the interaction's
+        # answer, and a refused command never commits, so this never matches.
         "a refusal is answered as a command that did not commit",
         SERVER,
-        "            if let Some(predicate) = identity::take_refusal() {\n",
-        "            if let Some(predicate) = None::<String> {\n",
+        "                refused: Some(predicate),\n",
+        "                refused: Some(predicate),\n                committed: true,\n",
     ),
     (
         "the session cookie is readable by scripts",

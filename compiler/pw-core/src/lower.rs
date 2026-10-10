@@ -151,6 +151,7 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
                 "view" => DeclKind::View,
                 "component" => DeclKind::Component,
                 "page" => DeclKind::Page,
+                "layout" => DeclKind::Layout,
                 "query" => DeclKind::Query,
                 "command" => DeclKind::Command,
                 "subscription" => DeclKind::Subscription,
@@ -159,6 +160,7 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
                 "event" => DeclKind::Event,
                 "source" => DeclKind::Source,
                 "upload" => DeclKind::Upload,
+                "predicate" => DeclKind::Predicate,
                 "task" => DeclKind::Task,
                 _ => {
                     let _ = src;

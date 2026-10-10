@@ -161,6 +161,35 @@ fn rendered(chunks: serde_json::Value, values: serde_json::Value, runtime: bool)
     std::fs::read_to_string(out.join("P.html")).expect("written")
 }
 
+/// **A page the build renders holds the page's announcer** (ADR-0302):
+/// where its runtime says what a failed press is told, once, empty, before
+/// the runtime, from the first byte. A page that ships no runtime has none.
+#[test]
+fn a_page_with_a_runtime_holds_the_announcer_from_its_first_byte() {
+    let page = rendered(
+        serde_json::json!([
+            { "chunk": "static", "value": "<main><h1>" },
+            { "chunk": "dynamic", "value": {
+                "part": "text", "id": 0, "value": "store.name", "context": "text",
+            }},
+            { "chunk": "static", "value": "</h1></main>" },
+        ]),
+        serde_json::json!({ "store": { "name": "Blue Bottle" } }),
+        true,
+    );
+    assert_eq!(page.matches(pw_render::ANNOUNCER).count(), 1, "{page}");
+    let (before, _) = page
+        .split_once("id=\"pw-parts\"")
+        .expect("a parts manifest");
+    assert!(before.contains(pw_render::ANNOUNCER), "{page}");
+    // The control: a page with no part the runtime changes ships no runtime,
+    // and no announcer.
+    let still = document(serde_json::json!([
+        { "chunk": "static", "value": "<main><h1>Terms</h1></main>" }
+    ]));
+    assert!(!still.contains("pw-announcer"), "{still}");
+}
+
 #[test]
 fn a_page_s_document_is_titled_as_the_page_states_and_a_view_s_by_its_name() {
     let main = serde_json::json!({ "chunk": "static", "value": "<main><h1>Terms</h1></main>" });

@@ -2044,6 +2044,11 @@ a block's statements are separated, by `;` or a line (a correction).
   and a block after a statement. A clause's word that is no clause where it
   is written, a binding's name or a word in a code body, is refused by the
   names check, and a `;` ends a clause's value there as in the grammar.
+- Amended 2026-10-10: markup written on one line is one region, and no
+  operand. Two roots on a line at a view's top were PW0009 (found writing
+  ADR-0303's refusals), and `<p>a</p> + 1` checked, the sum dropped: a root
+  followed on its line by markup goes on as one region, and an operator
+  over markup is PW5047.
 [ADR-0244](DECISIONS/ADR-0244-wasmtime-48-0-5-and-a-host-that-enables-only-what-it-runs.md):
 Wasmtime 48.0.5, and a host that enables only what it runs (a correction).
 - CI's advisory job had failed since 2026-10-05 on three Wasmtime
@@ -2494,3 +2499,32 @@ moves an equivalent simplified form (track `kiokun`, W6).
   unexplained, each target a page. ADR-0295's five tests keep every
   assertion, their helpers asserting the clause before they patch it. And
   the word page's tests compile each distinct program once per test process.
+[ADR-0302](DECISIONS/ADR-0302-a-refusal-is-told-where-the-press-was.md): a
+refusal is told where the press was (the owner's finding, using the feed by
+hand).
+- A predicate has words: the deployment's (`SignedIn`: "Sign in to do
+  this."), or the program's, where it declares them (`predicate SignedIn
+  says "…"`, PW0351: one string, not empty, no hole; a `requires` held to a
+  declared one's parameters; declared once). The host answers a refusal 403
+  with them, keeps it with its press, and refuses to start for a predicate it
+  cannot evaluate. The runtime tells it beside the control, named by its
+  `aria-describedby`, and says it through the page's announcer, a
+  `role="status"` every document holds from its first byte; an unreachable
+  command, a stale page and a failed handler are told in the platform's
+  words. The feed's composer is a signed-in reader's.
+
+[ADR-0303](DECISIONS/ADR-0303-a-page-is-shown-in-its-layout.md): a page is
+shown in its layout, which the pages that name it share (the integrator's,
+the second step to the parts two pages share kept in place).
+- `layout Name { bindings; view { … <slot /> … } }` and a page's `layout
+  Name` clause, each only where a name follows the word (`layout.measure` is
+  an effect's). Composed into each page as a view is (ADR-0136), the
+  layout's parts and elements numbered first, so the same on every page that
+  names it, the page's markup between `<!--pw-slot-->` markers; its bindings
+  and signals under `~` names, its handlers one module, its speculation the
+  page's with it. A page declares at least its layout's audience (PW5046),
+  its privacy label and its graph reads join the layout's, and a query a
+  page and its layout both bind is read once for the document. PW0352,
+  PW0353, PW5044, PW5045. Found: two roots on one line did not parse; a
+  page and its layout read one query twice; a speculation found one binding
+  per entry. The store's four pages share `StoreLayout`.
