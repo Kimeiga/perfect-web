@@ -2,7 +2,7 @@
  "kiokun_commit": "abf71a89af1111f4039578cd1fde58e06f14c4bf",
  "node": "v22.21.1",
  "oracle": {
-  "answered": 11,
+  "answered": 21,
   "answers": {
    "上": [
     "飛行機は山の上を飛んだ。 / The plane flew over the mountain.",
@@ -27,7 +27,13 @@
     "半時間したら彼はここに来るでしょう。 / He will be here in half an hour."
    ],
    "博": [],
+   "園": [
+    "彼らは私の果実園を荒らした。 / They robbed my orchard."
+   ],
    "多": [],
+   "夢": [
+    "あなたの夢がみんな実現されますように。 / May all your dreams come true!"
+   ],
    "市": [
     "市は月曜ごとに立つ。 / The market is held every Monday.",
     "ワシントン市の友人宅に泊まります。 / I'm staying at my friend's house in Washington City."
@@ -38,26 +44,144 @@
     "君なりのやり方で仕事しなさい。 / Do your work in your own way.",
     "進行形の文では、動詞のing形、つまり現在分詞となります。 / In a progressive tense sentence it becomes the -ing form verb, that is the present participle."
    ],
+   "時": [
+    "１２才の時彼は声変わりした。 / His voice broke when he was twelve.",
+    "車を運転する時はいくら注意してもしすぎることはない。 / You cannot be too careful when you drive a car.",
+    "私は１０時ごろ寝ついた。 / I went to sleep about 10 o'clock.",
+    "新車時３００万円した車も今では３０万円位だそうですから、もう少し乗ろうと思います。 / Cars that, when new, cost 3,000,000 yen are apparently now worth 300,000, so I think I'll use mine a little longer."
+   ],
+   "樂": [
+    "近頃は旅行は楽だ。 / Travelling is easy these days."
+   ],
    "空": [
     "警棒で空をなぐりつけ、よろめいて体勢をたてなおしたガードマンは、自分に向かって突進してくる金網づくりのクズカゴを見た。 / The guard's truncheon hit air. Off balance, he regained his posture to see a metal-mesh rubbish bin flying towards him.",
     "ワシが空を飛んでいる。 / An eagle is flying in the sky.",
     "ほとんど空なのでガソリンを入れなくてはなりません。 / I need to put some gas in the car, as it's almost empty."
    ],
+   "終": [
+    "それは授業の終わりだった。 / That was the end of the class."
+   ],
+   "聲": [
+    "あなたの声が聞けてうれしいわ。 / I am happy to hear your voice.",
+    "日本人は鳥や虫の声を楽しむ。 / The Japanese enjoy the songs of birds and insects.",
+    "どこの国でも、何時の時代でも、子供は親の価値観を見習って育つものである。いわゆる「教育ママ」の教育に対する考え方が、子供を精神的にいびつに育ててしまっていると指摘する声もある。 / As children are known to emulate the values of adults, it is often pointed out such \"education mamas\" instill a warped sense of values in their children."
+   ],
    "色": [
     "その色は彼女の髪の毛とよく合った。 / The color went beautifully with her hair.",
     "満足の色が彼の顔に浮かんだ。 / A look of contentment appeared on his face."
    ],
+   "諺": [
+    "このことわざが使われるのを聞いた事があります。 / I have heard this proverb used."
+   ],
+   "貪": [],
    "酒": [
     "僕は酒も煙草もやらないんだ。 / I neither drink nor smoke."
    ],
+   "錢": [
+    "銭厘を大切にすれば大金はおのずとたまる。 / Take care of the pence, and the pounds will take care of themselves.",
+    "彼のビジネスプランは立派だけど、勘定あって銭足らず、という気もするけどね。 / His business plan looks good on paper but I get the feeling it would never work in practice."
+   ],
    "青": [
     "信号が青に変わったわよ。 / The traffic light turned green."
+   ],
+   "魚": [
+    "こうして私はいつも魚を料理する。 / This is how I usually cook fish."
    ]
   },
   "named": {},
+  "provenance": {
+   "answers (sentence / translation)": "Tatoeba (CC BY 2.0 FR), each sentence with its id, as JMdict's examples carry them (kiokun-data data/jmdict-examples-eng-3.6.1.json)",
+   "tatoeba": "each shown sentence's Tatoeba id, attributing it to its author at tatoeba.org/sentences/show/<id>",
+   "the sample": "read from the repository's sample (examples/kiokun/data/han-1char-3, its MANIFEST), which holds cleared fields alone; see NOTICE.md"
+  },
   "read": 28,
-  "stride": 1
+  "stride": 1,
+  "tatoeba": {
+   "上": [
+    "85643",
+    "81574",
+    "2351690",
+    "118310",
+    "163778",
+    "106634",
+    "184023",
+    "97156",
+    "107971",
+    "126850"
+   ],
+   "人": [
+    "221002",
+    "144530",
+    "144697",
+    "184568",
+    "235600"
+   ],
+   "半": [
+    "121264"
+   ],
+   "博": [],
+   "園": [
+    "97010"
+   ],
+   "多": [],
+   "夢": [
+    "233006"
+   ],
+   "市": [
+    "168369",
+    "191974"
+   ],
+   "形": [
+    "83744",
+    "182344",
+    "236838",
+    "75170"
+   ],
+   "時": [
+    "235958",
+    "148966",
+    "162111",
+    "74855"
+   ],
+   "樂": [
+    "179829"
+   ],
+   "空": [
+    "76207",
+    "191980",
+    "196121"
+   ],
+   "終": [
+    "205089"
+   ],
+   "聲": [
+    "1142225",
+    "122235",
+    "200907"
+   ],
+   "色": [
+    "208887",
+    "81073"
+   ],
+   "諺": [
+    "223759"
+   ],
+   "貪": [],
+   "酒": [
+    "196311"
+   ],
+   "錢": [
+    "141007",
+    "118264"
+   ],
+   "青": [
+    "145720"
+   ],
+   "魚": [
+    "225005"
+   ]
+  }
  },
- "pleris_commit": "07b8ea45d587aa2a7732396b6752d770e8367544",
+ "pleris_commit": "cbc3a93d518b538d61d5a5c2bf2ec33c66ffd712",
  "produced_by": "just e14-kiokun-examples"
 }

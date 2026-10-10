@@ -1,7 +1,7 @@
 The word page's Japanese examples, against kiokun.com's own japaneseExamplesForSense
 
 produced by: just e14-kiokun-examples (local: reads a kiokun-data checkout)
-commit: 07b8ea45d587aa2a7732396b6752d770e8367544
+commit: cbc3a93d518b538d61d5a5c2bf2ec33c66ffd712
 kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree (src/lib/japanese-examples.ts 8885c37ebf9a)
 node: v22.21.1
 
@@ -14,9 +14,9 @@ stride 256: read 5938 entries; 1082 answered; named differences {}
 compared: 1082 words (stride 256, 5938 entries read)
 named differences: {}
 unnamed differences: 0
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 369 filtered out; finished in 13.28s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 370 filtered out; finished in 6.95s
 
 == the CI fixture: kiokun.com's answers for the repository's sample
 
-stride 1: read 28 entries; 11 answered; named differences {}
-fixture: spikes/own-renderer/kiokun-oracle/examples-sample.json: 11 answers, named {}
+stride 1: read 28 entries; 21 answered; named differences {}
+fixture: spikes/own-renderer/kiokun-oracle/examples-sample.json: 21 answers, named {}
