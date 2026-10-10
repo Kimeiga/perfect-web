@@ -265,6 +265,11 @@ Recorded by `just e14-store-accounts` in
 
 ### Merge notes
 
+- `origin/master` merged at `7a701c2` (build-id, ADR-0300). One conflict,
+  in `main.rs`: `Server`'s fields, where both `cart_by_reader` and
+  `build_id` are kept. ADR-0300's new recovery test now expects the store
+  page's documents to be its user's (`3b1a516`). The recording is from
+  `ce4c300`, before that merge; CI's verification records it again.
 - **Shared files**: `main.rs` (`mod places`, `TRACK SEAM (store-accounts)`;
   `stream_runs`), `spikes/own-renderer/store-values.json` (the address
   page's signals and the document's `id`, which the static render needs),
