@@ -1,0 +1,31 @@
+The search page, against kiokun.com's own api/search
+
+produced by: just e14-kiokun-search (local: reads a kiokun-data checkout)
+commit: 131f089b2eb19f2c56e5078780e850009253ec31
+kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree (src/routes/api/search/+server.ts 9f42e0748d7e; src/lib/search-aliases.ts edaf48e4fc5d; src/lib/search-aliases-core.ts a706514b31d6; migrations/0005_search_index_with_jyutping.sql 004a33675a53; src/lib/generated/search-aliases.json e0e33a86ef77)
+kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree (output_search_index.csv 0d5523b5cc3a)
+node: v22.21.1
+host: Darwin arm64, 12 cores, load averages: 9.95 10.13 9.54
+
+== the D1 stand-in's own test (spikes/own-renderer/kiokun-oracle/d1.test.mjs)
+
+# tests 4
+# pass 4
+# fail 0
+
+== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/search.mjs)
+
+stride 8000: 834036 rows; 355 queries
+
+== the rewrite's, compared (the index built under target/kiokun-search)
+
+compared: 355 queries (stride 8000, 834036 rows)
+named differences: {"a failed search": 4}
+unnamed differences: 0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 381 filtered out; finished in 3.91s
+after it: load averages: 13.40 11.48 10.13
+
+== the CI fixture: kiokun.com's answers over the repository's sample and its hand-made aliases
+
+stride 97: 2765 rows; 103 queries
+fixture: spikes/own-renderer/kiokun-oracle/search-sample.json: 103 answers, named {}
