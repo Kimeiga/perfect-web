@@ -489,7 +489,16 @@ impl Subscriber {
 
 /// The build this server serves. One value, used as the compatibility
 /// generation everywhere it is needed, so nothing derives a second one.
+/// **Entries' generation** in this host's materializer and resources. Not
+/// the build's name (ADR-0300), which a host reads from its build: entries
+/// named by it wait for the store's entries keyed by a user (W8's track),
+/// which change the same functions.
 const BUILD: &str = "B1";
+
+/// The build id of the committed artifacts a test serves, which no `pw
+/// build` wrote.
+#[cfg(test)]
+const COMMITTED_ARTIFACTS: &str = "b-committed-artifacts";
 
 /// The deployment's PRF key, from a provider rather than a literal.
 const IDENTITY: DevelopmentIdentityKey = DevelopmentIdentityKey;
@@ -671,6 +680,10 @@ mod messages;
 mod kiokun;
 
 struct Server {
+    /// **The build this host serves, by its name** (ADR-0300): on each
+    /// document's resume manifest, the handler table and the documents it
+    /// answers (`pw-build`).
+    build_id: String,
     /// The templates the compiler emitted, deserialized once.
     templates: Vec<Template>,
     /// **The program's data layer** (ADR-0218): what its contracts import,
@@ -1093,6 +1106,8 @@ fn components() -> BTreeMap<String, Loaded> {
 /// browser artifacts are, and what it runs the store by.
 struct Built {
     artifacts: std::path::PathBuf,
+    /// **The build's name** (ADR-0300), as `pw build` wrote it (`build-id`).
+    build_id: String,
     templates: Vec<Template>,
     contracts: Vec<ComponentContract>,
     components: BTreeMap<String, Loaded>,
@@ -1219,6 +1234,12 @@ impl Server {
         };
         let templates: Vec<Template> = serde_json::from_str(&read("templates.json")?)
             .map_err(|e| format!("templates.json: {e}"))?;
+        // **The build's name** (ADR-0300): a build that names none was
+        // written before builds were named, and is built again.
+        let build_id = read("build-id")
+            .map_err(|e| format!("{e}: the build names no build; run `pw build` again"))?
+            .trim()
+            .to_string();
         let contracts = ComponentContract::from_json(&read("contracts.json")?)
             .map_err(|e| format!("contracts.json: {e}"))?;
         let graph = pw_materialize::Graph::from_json(&read("graph.json")?)
@@ -1317,6 +1338,7 @@ impl Server {
             topology,
             Built {
                 artifacts: build,
+                build_id,
                 templates,
                 contracts,
                 components,
@@ -1374,6 +1396,8 @@ impl Server {
             topology,
             Built {
                 artifacts: dist,
+                // The committed artifacts are no `pw build`'s output.
+                build_id: COMMITTED_ARTIFACTS.into(),
                 templates,
                 contracts: contracts(),
                 components: components(),
@@ -1401,6 +1425,7 @@ impl Server {
         topology: Topology,
         Built {
             artifacts,
+            build_id,
             templates,
             contracts,
             components,
@@ -1449,6 +1474,7 @@ impl Server {
             });
         Server {
             cart_by_reader,
+            build_id,
             templates,
             data,
             store,
@@ -4799,7 +4825,15 @@ impl Server {
         let metadata = pw_render::head_metadata(template, &env)
             .map_err(|e| format!("`{path}`'s metadata does not render: {e:?}"))?;
         Ok((
-            signal_document(&body, &title, &metadata, template, plan, &self.templates),
+            signal_document(
+                &body,
+                &title,
+                &metadata,
+                template,
+                plan,
+                &self.templates,
+                &self.build_id,
+            ),
             env,
             template,
         ))
@@ -5349,17 +5383,6 @@ impl Server {
         env: &Env,
         settling: &mut Settling,
     ) {
-        if settling.waiting.is_empty() && settling.settled.is_empty() {
-            respond(
-                stream,
-                200,
-                "text/html; charset=utf-8",
-                session,
-                fresh,
-                page.as_bytes(),
-            );
-            return;
-        }
         let cookie = if fresh {
             // TRACK SEAM (identity): the session cookie, HttpOnly and Secure
             // outside this machine.
@@ -5367,8 +5390,21 @@ impl Server {
         } else {
             String::new()
         };
+        // **The build that served it** (ADR-0300), which a page that keeps
+        // its parts across a navigation holds the next document to.
+        let build = format!("pw-build: {}\r\n", self.build_id);
+        if settling.waiting.is_empty() && settling.settled.is_empty() {
+            write_response(
+                stream,
+                200,
+                "text/html; charset=utf-8",
+                &format!("{PRIVATE}{cookie}{build}"),
+                page.as_bytes(),
+            );
+            return;
+        }
         let head = format!(
-            "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\n{PRIVATE}{cookie}\
+            "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\n{PRIVATE}{cookie}{build}\
              connection: close\r\n\r\n"
         );
         let shell = page.strip_suffix(DOCUMENT_END).unwrap_or(page);
@@ -7785,15 +7821,27 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // the build, so a document cached from another build cannot vouch
         // for a handler this one lacks.
         ("GET", "/pw-handlers") => {
-            let table: String = server
-                .handler_table()
-                .into_iter()
-                .map(|(identity, capture)| format!("{identity}|{capture}\n"))
-                .collect();
-            respond_build(
+            // The build's name, and each page's document: its schema and its
+            // scope (ADR-0300), which the browser's decision holds a document
+            // of that page to. `#` lines, as no handler's identity begins.
+            let mut table = format!("#build|{}\n", server.build_id);
+            for (page, plan) in &server.plans {
+                if let Some(template) = server.templates.iter().find(|t| &t.path == page) {
+                    table.push_str(&format!(
+                        "#page|{page}|{}|{}\n",
+                        template.schema,
+                        plan["scope"].as_str().unwrap_or("public")
+                    ));
+                }
+            }
+            for (identity, capture) in server.handler_table() {
+                table.push_str(&format!("{identity}|{capture}\n"));
+            }
+            write_response(
                 &mut stream,
                 200,
                 "text/plain; charset=utf-8",
+                &format!("pw-build: {}\r\n", server.build_id),
                 table.as_bytes(),
             );
         }
@@ -8232,6 +8280,7 @@ fn serve_bound(
             server.plan_of(page),
             cursor,
             speculation,
+            &server.build_id,
         );
         server.respond_streaming(stream, session, fresh, &html, template, &env, &mut settling);
     });
@@ -8554,6 +8603,7 @@ fn signal_document(
     template: &Template,
     plan: &serde_json::Value,
     templates: &[Template],
+    build: &str,
 ) -> String {
     let (signals, _, blocks) = signal_manifest(plan, template);
     let manifest = serde_json::json!({
@@ -8561,7 +8611,7 @@ fn signal_document(
         "schema": template.schema,
         "cursor": 0,
         "parts": template.manifest(),
-        "resume": resume_manifest(templates),
+        "resume": resume_manifest(templates, build, template, plan),
         "signals": signals,
         "live": plan["live"].clone(),
         "blocks": blocks,
@@ -8638,7 +8688,17 @@ fn handler_table(templates: &[Template]) -> BTreeMap<String, String> {
 /// The document's resume manifest (ADR-0132): one base, and one entry per
 /// handler, keyed by its identity, presenting its capture schema. The base
 /// names no handler, so a part with no entry of its own authorises nothing.
-fn resume_manifest(templates: &[Template]) -> serde_json::Value {
+/// **The document's resume manifest** (ADR-0132, ADR-0300): its base names
+/// the build that served it, its page's document schema (the template's,
+/// which closes over each template its instances reach, ADR-0203) and its
+/// page's scope (`resume::page_scope`, carried in its plan), each of which
+/// the browser's decision holds a handler to.
+fn resume_manifest(
+    templates: &[Template],
+    build: &str,
+    template: &Template,
+    plan: &serde_json::Value,
+) -> serde_json::Value {
     let handlers: serde_json::Map<String, serde_json::Value> = handler_table(templates)
         .into_iter()
         .map(|(identity, capture)| {
@@ -8650,8 +8710,9 @@ fn resume_manifest(templates: &[Template]) -> serde_json::Value {
         })
         .collect();
     serde_json::json!({
-        "scheme": "2", "abi": "1", "build": BUILD, "handler": "",
-        "capture": "", "document": "cart-doc", "scope": "public",
+        "scheme": "2", "abi": "1", "build": build, "handler": "",
+        "capture": "", "document": template.schema,
+        "scope": plan["scope"].as_str().unwrap_or("public"),
         "captures": "", "construct": "region",
         "handlers": handlers,
     })
@@ -8695,6 +8756,7 @@ fn document(
     plan: &serde_json::Value,
     cursor: u64,
     speculation: Option<(String, serde_json::Value, Vec<u32>, Params)>,
+    build: &str,
 ) -> String {
     let manifest = serde_json::json!({
         "template": template.path,
@@ -8711,7 +8773,7 @@ fn document(
         // one the page-wide manifest described. `clear_cart` captures nothing,
         // so its capture schema is the schema of nothing — which is still a
         // schema, and still has to match.
-        "resume": resume_manifest(templates),
+        "resume": resume_manifest(templates, build, template, plan),
     });
     // The page's speculation module and the values it starts from (ADR-0122).
     // A private page's own session's values: this document is `cache private`.
@@ -12266,6 +12328,59 @@ public query Store(",
         assert_eq!(sets_of(&s, &theirs).len(), 1);
     }
 
+    /// **A host serves the build it was given, by its name** (ADR-0300): on
+    /// each document it answers (`pw-build`) and in the document's resume
+    /// manifest, beside its page's document schema and scope; and in its
+    /// handler table, with each page's.
+    #[test]
+    fn a_host_serves_its_build_by_its_name() {
+        let s = served_feed();
+        assert!(
+            s.build_id.len() == 17 && s.build_id.starts_with('b'),
+            "{}",
+            s.build_id
+        );
+        let home = s
+            .templates
+            .iter()
+            .find(|t| t.path == "feed.app.Home")
+            .expect("the home page");
+        let table = get_as(&s, "a", "/pw-handlers");
+        assert!(
+            table.contains(&format!("pw-build: {}\r\n", s.build_id)),
+            "{table}"
+        );
+        assert!(
+            table.contains(&format!("#build|{}\n", s.build_id)),
+            "{table}"
+        );
+        assert!(
+            table.contains(&format!("#page|feed.app.Home|{}|session:\n", home.schema)),
+            "{table}"
+        );
+        let page = get_as(&s, "a", "/");
+        assert!(
+            page.contains(&format!("pw-build: {}\r\n", s.build_id)),
+            "{page}"
+        );
+        let manifest = manifest_of(page.split_once("\r\n\r\n").map_or("", |(_, b)| b));
+        assert_eq!(manifest["resume"]["build"], s.build_id.as_str());
+        assert_eq!(manifest["resume"]["document"], home.schema.as_str());
+        assert_eq!(manifest["resume"]["scope"], "session:");
+    }
+
+    /// **A build that names no build is not served** (ADR-0300): it was
+    /// written before builds were named, and is built again.
+    #[test]
+    fn a_build_that_names_no_build_is_not_served() {
+        let (_dir, out) = built_feed_with(|app| app.to_string());
+        std::fs::remove_file(out.join("build-id")).expect("named");
+        match Server::from_build(out.clone(), out) {
+            Ok(_) => panic!("served a build that names none"),
+            Err(why) => assert!(why.contains("names no build"), "{why}"),
+        }
+    }
+
     /// One GET of `path` by `session`, through the server's own handling,
     /// and the whole answer.
     fn get_as(s: &Server, session: &str, path: &str) -> String {
@@ -15398,6 +15513,7 @@ public query Store(",
             &template,
             &serde_json::json!({}),
             &[],
+            COMMITTED_ARTIFACTS,
         );
         let (head, body) = page.split_once("</head>").expect("a head");
         assert!(
@@ -15748,6 +15864,7 @@ public query Store(",
             &plan,
             3,
             None,
+            COMMITTED_ARTIFACTS,
         ));
         assert_eq!(manifest["signals"], serde_json::json!({ "open": true }));
         assert_eq!(manifest["live"][0]["part"], 0);
@@ -15763,6 +15880,7 @@ public query Store(",
             &serde_json::json!({}),
             3,
             None,
+            COMMITTED_ARTIFACTS,
         ));
         assert!(manifest.get("signals").is_none(), "{manifest}");
     }

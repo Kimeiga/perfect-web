@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0300, 2026-10-09: a build is named by what it built** (the
+integrator's, merged from `e441733`), the first of three steps to the parts
+two pages share kept in place. `pw build` writes `build-id`, a hash over every
+file it writes; a host refuses a build that names none and says the name on
+every document and on its handler table, beside each page's document schema
+and scope. The browser's resume decision holds a document to what the build
+that served the runtime says of its page: a document of another schema is
+refused (6), as is a capture of a scope that does not flow into the page's
+(5), each recovering as a stale handler does. Until then every manifest said
+`cart-doc` and `public` and the build `B1`, and the decision compared
+constants with themselves. Found on CI: a runtime-recovery mutant ("the
+recovery codes are read one place off") survived once the store's page had
+its real scope, a session's; the stale press's recovery is now held to its
+name (3 of 3). 12 of 12 mutants (verify 37998533705; its WebKit job's one
+failure, a sign-up setup timing out in the messages spec, passed on rerun).
+
 **ADR-0299, 2026-10-09: kiokun's examples and pitch accent** (track
 `kiokun`, W6, merged from `7e3cb51`). The word page shows each sense's
 examples as kiokun.com does, the first and the rest behind a disclosure

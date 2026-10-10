@@ -1,8 +1,8 @@
 ADR-0203 - a view that contains itself is an instance of its own template, made at run time
 
 produced by: just e14-view-instances
-commit: c423f24ec69f9003cddf205b5f4c894ae86f286b
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37899457744 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: e44173313ff4e815b5097c5c50f7af9c8cdfd9a7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37998533705 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
@@ -18,7 +18,7 @@ test a_templates_schema_closes_over_the_views_its_instances_reach ... ok
 test an_instance_is_rendered_again_whole_by_what_gives_it_its_value ... ok
 test the_renderer_goes_no_deeper_for_each_instance ... ok
 test past_what_a_browser_nests_it_is_refused ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
 
 == the renderer (runtime/pw-render/tests/properties.rs) and the browser's (runtime/pw-render-wasm)
 
@@ -26,8 +26,8 @@ test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 test tests::a_request_that_is_not_one_is_refused ... ok
 test tests::a_match_renders_the_case_it_is_given ... ok
 test tests::a_text_part_is_escaped_as_the_server_escapes_it ... ok
-test tests::an_elements_captures_are_written_as_the_server_writes_them ... ok
 test tests::an_attribute_is_written_as_the_document_writes_it ... ok
+test tests::an_elements_captures_are_written_as_the_server_writes_them ... ok
 test tests::an_instance_is_rendered_with_the_template_the_request_carries ... ok
 test tests::an_instance_is_rendered_as_the_server_renders_it ... ok
 test tests::what_changed_in_an_instance_is_each_part_set_where_it_is ... ok
@@ -70,3 +70,4 @@ a request to the in-browser renderer carries no view [runtime]: KILLED (3 of 6 t
 a page is sent without the views its instances reach [build]: KILLED (6 of 6 tests fail)
 an instance the page's signals give is not sent to be rendered again [build]: KILLED (3 of 6 tests fail)
 27 of 27 mutants killed
+memory bound: no process was stopped

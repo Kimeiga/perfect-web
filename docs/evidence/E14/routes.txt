@@ -1,18 +1,18 @@
 ADR-0160 - a page's route
 
 produced by: just e14-routes
-commit: 661c8a0b2294e82f23e01740a66e760d88114966
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37911914095 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: e44173313ff4e815b5097c5c50f7af9c8cdfd9a7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37998533705 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the tests (compiler/pw-core/tests/routes.rs)
 
-test a_route_names_each_parameter_once_and_nothing_else ... ok
 test a_routes_parameter_is_text ... ok
-test the_plan_carries_the_route ... ok
-test a_route_that_names_its_parameters_is_the_control ... ok
-test a_route_is_slash_and_segments ... ok
 test one_route_is_one_pages ... ok
+test a_route_names_each_parameter_once_and_nothing_else ... ok
+test a_route_is_slash_and_segments ... ok
+test a_route_that_names_its_parameters_is_the_control ... ok
+test the_plan_carries_the_route ... ok
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 == the store declares its route, and checks
