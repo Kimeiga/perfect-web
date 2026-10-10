@@ -85,6 +85,9 @@ TESTS = [
         "a_post_over_http_reaches_another_reader_after_its_answer",
         "a_page_reading_nothing_dropped_is_told_nothing",
         "a_sessions_own_change_reaches_no_other_session",
+        # The canonical store's cart is a user's since track store-accounts,
+        # told by principal; a session's own entry, the benchmark's cart.
+        "a_session_keyed_carts_change_reaches_no_other_session",
         "the_feed_is_served_by_the_host_its_data_the_deployments",
     ],
 ]

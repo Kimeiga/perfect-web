@@ -263,6 +263,45 @@ fn a_signed_in_sessions_cart_is_not_joined_to_the_next_user() {
     assert_eq!(s.cart_lines(&ada), [("espresso".to_string(), 1)]);
 }
 
+/// **On a program that keys its cart by the session, a session's own change
+/// reaches no other session** (the benchmark's copy of the store): an entry
+/// pinned to a session is that session's alone, though its key names no
+/// user. The canonical store's cart is a user's, and telling by principal
+/// holds it there; this is the rule for a session's own entries, which the
+/// canonical store no longer reads.
+#[test]
+fn a_session_keyed_carts_change_reaches_no_other_session() {
+    let provider = Arc::new(TestProvider::default());
+    let s = served_from_patches(|app| app.to_string(), &[]);
+    s.identity.use_provider(provider.clone(), REDIRECT);
+    let ada = signed_in(&s, &provider, "came-ada", "ada");
+    let ben = signed_in(&s, &provider, "came-ben", "ben");
+    for session in [&ada, &ben] {
+        s.serve_document_settled(
+            session,
+            "store.page.StorePage",
+            &store_params(STORE_ID),
+            &[],
+        )
+        .expect("served");
+    }
+    s.tell_waiting();
+    let (mine, theirs) = {
+        let pending = s.pending.lock().expect("pending");
+        (latest(&pending, &ada), latest(&pending, &ben))
+    };
+    let frames = |doc: &Doc| s.pending.lock().expect("pending")[doc].frames.len();
+    let (mine_before, theirs_before) = (frames(&mine), frames(&theirs));
+    s.command(ADD, &ada, &add("espresso", 1), false)
+        .expect("ada adds");
+    s.tell_waiting();
+    assert!(
+        frames(&mine) > mine_before,
+        "the session's own page is told"
+    );
+    assert_eq!(frames(&theirs), theirs_before, "another session's is not");
+}
+
 /// **A join past what a line can hold is refused, and the sign-in still
 /// completes** (Q2): the guest's lines stay the guest's, the user's cart is as
 /// it was, and the browser is signed in.
