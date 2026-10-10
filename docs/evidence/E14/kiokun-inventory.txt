@@ -1,13 +1,13 @@
 kiokun.com's parity inventory, held to the SvelteKit app it inventories
 
 produced by: just e14-kiokun-inventory (local: reads a kiokun-data checkout)
-commit: 6164629c65841bcc0aa6cec3d2de15d85c724354
+commit: 2aee4a770d4ded0c5aeed0778a93d8ff31fa19a3
 python: Python 3.12.8
 
 == the inventory against the app (scripts/kiokun_inventory.py)
 
 the app: /Users/haki/code/kiokun-data/output_dictionary/../sveltekit-app at abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree
-the checkout has uncommitted work, not read: sveltekit-app/src/routes/[word]/+page.svelte, sveltekit-app/src/routes/api/character-lesson/, sveltekit-app/src/routes/api/character-narrative/
+the checkout has uncommitted work, not read: sveltekit-app/src/routes/[word]/+page.svelte, sveltekit-app/src/routes/[word]/+page.ts, sveltekit-app/src/routes/api/character-lesson/, sveltekit-app/src/routes/api/character-narrative/
 the inventory: ADR-0285-kiokun-parity-inventory.md
 routes: 101 (49 pages, 52 endpoints)
 marked: 0 built, 4 partial, 97 missing
@@ -16,20 +16,24 @@ inventory: OK
 
 == mutation controls (scripts/kiokun_inventory_mutations.py)
 
-baseline: 13 passed, 0 failed
-any directory is a route: KILLED (8 of 13 tests fail)
-an endpoint is not a route: KILLED (8 of 13 tests fail)
-the index is read, which holds files staged and not committed: KILLED (1 of 13 tests fail)
-the owner's work is not named as not read: KILLED (1 of 13 tests fail)
-an oracle copies the working tree: KILLED (2 of 13 tests fail)
-an oracle's copy names no uncommitted work: KILLED (1 of 13 tests fail)
-an oracle's digest is of nothing: KILLED (1 of 13 tests fail)
-a route listed twice passes: KILLED (1 of 13 tests fail)
-a row's status may be any word: KILLED (1 of 13 tests fail)
-a route the app does not have passes: KILLED (1 of 13 tests fail)
-a route the inventory leaves out passes: KILLED (2 of 13 tests fail)
-a route row is counted as a feature: KILLED (1 of 13 tests fail)
-the check passes whatever it finds: KILLED (1 of 13 tests fail)
-the recipe is planned on a runner, which has no checkout: KILLED (1 of 13 tests fail)
-14 of 14 mutants killed
+baseline: 21 passed, 0 failed
+any directory is a route: KILLED (8 of 21 tests fail)
+an endpoint is not a route: KILLED (8 of 21 tests fail)
+the index is read, which holds files staged and not committed: KILLED (1 of 21 tests fail)
+the owner's work is not named as not read: KILLED (1 of 21 tests fail)
+an oracle copies the working tree: KILLED (2 of 21 tests fail)
+an oracle's copy names no uncommitted work: KILLED (1 of 21 tests fail)
+an oracle's digest is of nothing: KILLED (1 of 21 tests fail)
+the sample keeps every Chinese item, Dong Chinese's too: KILLED (1 of 21 tests fail)
+the sample keeps KANJIDIC2's contributed readings: KILLED (1 of 21 tests fail)
+the sample keeps whole what it names a part of: KILLED (7 of 21 tests fail)
+the sample keeps the owner's mnemonics: KILLED (1 of 21 tests fail)
+a route listed twice passes: KILLED (1 of 21 tests fail)
+a row's status may be any word: KILLED (1 of 21 tests fail)
+a route the app does not have passes: KILLED (1 of 21 tests fail)
+a route the inventory leaves out passes: KILLED (2 of 21 tests fail)
+a route row is counted as a feature: KILLED (1 of 21 tests fail)
+the check passes whatever it finds: KILLED (1 of 21 tests fail)
+the recipe is planned on a runner, which has no checkout: KILLED (1 of 21 tests fail)
+18 of 18 mutants killed
 memory bound: no process was stopped
