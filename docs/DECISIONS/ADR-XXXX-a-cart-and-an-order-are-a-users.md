@@ -368,10 +368,13 @@ Recorded by `just e14-store-accounts` in
   `e10-component` list, `e10-build`'s note), `tools/corpus-check`,
   `docs/CORPUS.md`.
 - **Codes**: `Owner::StoreAccounts => "PW62"`, no code yet.
-- **Ports**: the browser suite here ran at `PORT=7700` and `7600`, outside
-  the track's range: at `PORT=7741` its hosts would take 7768, which Spotify
-  holds on this machine, and its feed's hosts 7801, which a Python process
-  holds. No port in 7741 to 7778 avoids both. CI runs at its default.
+- **Ports**: milestone 1's browser suite ran at `PORT=7700` and `7600`,
+  outside the track's range: at `PORT=7741` its hosts would take 7768, which
+  the owner's Spotify holds, and 7801, which an orphaned Python server held
+  then (the coordinator has since stopped it). Its hosts reach `PORT+162`, so
+  a PORT in the range is 7741 to 7778; `PORT=7769` is the first whose hosts
+  miss 7768, and the suite runs there now (milestone 2's ADR). CI runs at its
+  default.
 - **Not yet built, the rest of milestone 1**: the stale tab (6), after the
   refusal ruling merges.
 - **The four status documents are untouched.**

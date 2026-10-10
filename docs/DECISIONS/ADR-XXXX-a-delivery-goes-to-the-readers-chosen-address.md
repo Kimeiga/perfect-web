@@ -253,7 +253,8 @@ Recorded by `just e14-store-accounts` in
   `ce4c300`.
 - The workspace's tests (311 result lines, none failed); the server's whole
   suite, 379 tests, in memory and on PostgreSQL; the browser suite in three
-  engines at `PORT=7300`, 901 passed, and the feed's spec 66; the conformance
+  engines at `PORT=7300` (901 passed) and the feed's spec (66); after the
+  merge of master, at `PORT=7769`, 904 passed, the feed's included; the conformance
   oracle.
 - `just fmt-check`, `lint`, `case-check`, `evidence-gates`,
   `mutation-anchors`, `test-compile` and `audit` green.
@@ -278,6 +279,10 @@ Recorded by `just e14-store-accounts` in
   `examples/store/app.pw`, `examples/lib/Events.pw`, `StoreData.pw`, the
   compiler's and the host's tests that pin the store's text, the
   conformance oracle, `playwright.config.mjs` (`STORE_ACCOUNTS_PORTS`).
+- **Ports**: `PORT=7769`, inside the track's range (7741 to 7940). The
+  hosts reach `PORT+162`, and 7769 is the first PORT in range whose hosts
+  miss 7768, which the owner's Spotify holds. The runs before the merge were
+  at 7300, outside the range.
 - **Two ADRs, both `ADR-XXXX`**: this one and "a cart and an order are a
   user's". Where milestone 2's files name `ADR-XXXX` (`places.rs`,
   `0004_addresses.sql`, `Addresses.pw`, the store's address queries and
