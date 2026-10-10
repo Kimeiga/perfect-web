@@ -291,13 +291,6 @@ impl KiokunData {
             search: Arc::new(Search::sample()),
         }
     }
-
-    /// This layer, its search index and aliases given.
-    #[cfg(test)]
-    pub(crate) fn with_search(mut self, search: Search) -> KiokunData {
-        self.search = Arc::new(search);
-        self
-    }
 }
 
 /// The longest file name, in bytes, on macOS (APFS) and Linux (ext4).
