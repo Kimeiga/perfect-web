@@ -1,4 +1,4 @@
-# ADR-XXXX: kiokun's word page moves an equivalent simplified form
+# ADR-0301: kiokun's word page moves an equivalent simplified form
 
 Status: accepted under the owner's delegation of 2026-10-02, on the
 integrator's rulings for track `kiokun` (docs/PARALLEL.md). Date:

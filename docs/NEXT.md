@@ -837,8 +837,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           builder, and the 1.49 million files of `output_dictionary`),
           rewritten in Pleris and served, from the kiokun slice (ADR-0037,
           ADR-0041). Its inventory and its word page are merged (ADR-0285,
-          ADR-0286, 2026-10-09); next, Japanese labels through `KIOKUN_APP`
-          and the character header, then `/{word}` once `/_pw/` lands. Real
+          ADR-0286, ADR-0288, ADR-0289, ADR-0293, ADR-0299, and the page's
+          moves, ADR-0301, 2026-10-10); next (W6), the whole dictionary's
+          sample timed again, Contains and Appears-in, then step 2, search;
+          `/{word}` once `/_pw/` lands. Real
           users, data, devices and deploys are the strongest
           evidence there is. Its conditions: parity with the live site,
           measured; served first on a preview origin beside the live site;

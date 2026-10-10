@@ -23,6 +23,23 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0301, 2026-10-10: kiokun's word page moves an equivalent simplified
+form** (track `kiokun`, W6, merged from `4cbe3aa`). Where a word's own file
+is a simplified form that equals its one traditional form in meaning, the
+page answers 308 to that form's page, the query kept, as kiokun.com does:
+`redirect_on KiokunError.Moved permanent`, ADR-0295's clause, now the
+program's own. Held to kiokun.com's own `equivalentTraditionalTarget` over
+1,643 words, every one with a simplified form among them: 3 moves in the
+whole dictionary, nothing unexplained, each target a page. ADR-0295's five
+tests keep every assertion. And the word page's tests compile each distinct
+program once per test process, its files kept in memory and written into
+each test's own directory (ADR-0158): `e14-kiokun-word` took 3 h 06 m on CI,
+about 160 s a mutant where it took 220. 69 of 69 mutants killed, and
+`e14-redirects` 15 of 15, on CI (run 38006256503). What remains of the
+recipe's time is the server's load, Wasmtime compiling the program's
+components in a debug build, 7.7 s a test: the integrator's, queued (NEXT,
+the infrastructure follow-ups).
+
 **ADR-0300, 2026-10-09: a build is named by what it built** (the
 integrator's, merged from `e441733`), the first of three steps to the parts
 two pages share kept in place. `pw build` writes `build-id`, a hash over every
