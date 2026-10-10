@@ -120,6 +120,41 @@ pub(crate) struct StoreRow {
     pub(crate) description: String,
     pub(crate) opens_minute: i64,
     pub(crate) closes_minute: i64,
+    /// **Where it is and how far it delivers** (track `store-accounts`,
+    /// milestone 2): what `places::delivers_to` reads.
+    pub(crate) zone: crate::places::Zone,
+}
+
+/// **A reader's saved address, as the data layer holds it** (track
+/// `store-accounts`, milestone 2): its id, the label the reader gave it, the
+/// place it names (`places::PLACES`), and whether it is the one chosen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AddressRow {
+    pub(crate) id: String,
+    pub(crate) label: String,
+    pub(crate) place: String,
+    pub(crate) chosen: bool,
+}
+
+/// **The most addresses one reader keeps** (track `store-accounts`).
+pub(crate) const MOST_ADDRESSES: usize = 10;
+
+/// **Where each store is, and how far it delivers** (track `store-accounts`):
+/// store 47 at Union Square, four kilometres around it; store 48 at the Ferry
+/// Building, two. `migrations/store/0004_addresses.sql` is the same rows.
+pub(crate) fn zone_of(store: &str) -> crate::places::Zone {
+    let at = |place: &str, radius_m: i64| {
+        let p = crate::places::place(place).expect("a store's place is in the table");
+        crate::places::Zone {
+            lat_e6: p.lat_e6,
+            lon_e6: p.lon_e6,
+            radius_m,
+        }
+    };
+    match store {
+        "48" => at("ferry-building", 2_000),
+        _ => at("union-square", 4_000),
+    }
 }
 
 /// **One item of a store's menu, as the data layer holds it** (ADR-0166,
@@ -193,6 +228,10 @@ pub(crate) trait Rows {
     /// session (`store:data/carts`, the benchmark's copy of the store).
     fn cart(&mut self, owner: &str) -> Result<Lines, String>;
     fn set_cart(&mut self, owner: &str, lines: &[Line]) -> Result<(), String>;
+    /// **An owner's saved addresses** (track `store-accounts`), in the order
+    /// they were saved.
+    fn addresses(&mut self, owner: &str) -> Result<Vec<AddressRow>, String>;
+    fn set_addresses(&mut self, owner: &str, rows: &[AddressRow]) -> Result<(), String>;
     /// An owner's order, its latest.
     fn order(&mut self, owner: &str) -> Result<Option<Order>, String>;
     /// An owner's order, placed with `lines`.
@@ -553,7 +592,195 @@ fn unfaulted(with: With, session: &str, faults: &Faults) -> Ops {
             })
         }),
     );
+    // **A store's estimate to the reader's chosen address** (track
+    // `store-accounts`, milestone 2): the session's estimator, as above, and
+    // the courier's minutes from the store to the place on top; a store that
+    // does not reach it answers `no-coverage`, by the one rule a command's
+    // refusal reads (`places::delivers_to`). No address chosen, no travel.
+    // The estimator's faults are the session's, a test's: the query is kept
+    // for no time and privately, so each document's read is its session's.
+    let estimator = faults
+        .estimators
+        .lock()
+        .expect("estimators")
+        .get(session)
+        .cloned()
+        .unwrap_or_default();
+    let (this, w) = (session.to_string(), with.clone());
+    ops.insert(
+        "store:data/user-estimates#for-store".to_string(),
+        Arc::new(move |args: &[Val]| {
+            let [Val::String(store), Val::String(reader)] = args else {
+                return Err(format!("user-estimates#for-store received {args:?}"));
+            };
+            std::thread::sleep(std::time::Duration::from_millis(estimator.delay_ms));
+            match estimator.fail.as_deref() {
+                Some("declared") => return Ok(declared("location-unavailable")),
+                Some(_) => return Err("the estimator is down".to_string()),
+                None => {}
+            }
+            w(&mut |r| {
+                let travel = match coverage(r, store, reader)? {
+                    None => 0,
+                    Some(Reach {
+                        delivers: false, ..
+                    }) => return Ok(declared("no-coverage")),
+                    Some(Reach { minutes, .. }) => minutes,
+                };
+                let (minutes, max) = r.estimate(&this)?.unwrap_or(DEFAULT_ESTIMATE);
+                let max = max.unwrap_or(minutes + 10);
+                Ok(ok(Val::Record(vec![
+                    ("minutes".into(), Val::S64(minutes + travel)),
+                    ("min-minutes".into(), Val::S64(minutes + travel)),
+                    ("max-minutes".into(), Val::S64(max + travel)),
+                    ("generated-at".into(), Val::S64(wall_millis())),
+                ])))
+            })
+        }),
+    );
+    // **Whether a store reaches the reader's chosen address** (track
+    // `store-accounts`): what the store's page says where the menu is.
+    let w = with.clone();
+    ops.insert(
+        "store:data/coverage#for-store".to_string(),
+        Arc::new(move |args: &[Val]| {
+            let [Val::String(store), Val::String(reader)] = args else {
+                return Err(format!("coverage#for-store received {args:?}"));
+            };
+            w(&mut |r| {
+                let reach = coverage(r, store, reader)?;
+                Ok(vec![Val::Record(vec![
+                    ("chosen".into(), Val::Bool(reach.is_some())),
+                    (
+                        "delivers".into(),
+                        Val::Bool(reach.as_ref().is_none_or(|r| r.delivers)),
+                    ),
+                    (
+                        "to".into(),
+                        Val::String(reach.as_ref().map(|r| r.label.clone()).unwrap_or_default()),
+                    ),
+                    (
+                        "travel-minutes".into(),
+                        Val::S64(reach.as_ref().map_or(0, |r| r.minutes)),
+                    ),
+                ])])
+            })
+        }),
+    );
+    // **The reader's saved addresses** (track `store-accounts`), by their
+    // handle: the user's, or the session's guest's.
+    let w = with.clone();
+    ops.insert(
+        "store:data/addresses#list".to_string(),
+        Arc::new(move |args: &[Val]| {
+            let (reader, _) = reader_of("addresses#list", args)?;
+            w(&mut |r| Ok(vec![addresses_val(&r.addresses(reader)?)]))
+        }),
+    );
+    // **The places an address may name** (track `store-accounts`): the
+    // fixed table, `places::PLACES`.
+    ops.insert(
+        "store:data/places#list".to_string(),
+        Arc::new(move |args: &[Val]| {
+            if !args.is_empty() {
+                return Err(format!("places#list received {args:?}"));
+            }
+            Ok(vec![Val::List(
+                crate::places::PLACES
+                    .iter()
+                    .map(|p| named(p.id, p.name))
+                    .collect(),
+            )])
+        }),
+    );
     ops
+}
+
+/// **Whether a store reaches a reader's chosen address** (track
+/// `store-accounts`): none where no address is chosen; else whether
+/// `places::delivers_to`, the courier's minutes, and the address's label. A
+/// store the layer does not hold reaches nowhere.
+pub(crate) struct Reach {
+    pub(crate) delivers: bool,
+    pub(crate) minutes: i64,
+    pub(crate) label: String,
+}
+
+pub(crate) fn coverage(
+    r: &mut dyn Rows,
+    store: &str,
+    owner: &str,
+) -> Result<Option<Reach>, String> {
+    let Some(chosen) = r.addresses(owner)?.into_iter().find(|a| a.chosen) else {
+        return Ok(None);
+    };
+    let place = crate::places::place(&chosen.place)
+        .ok_or_else(|| format!("address `{}` names no place `{}`", chosen.id, chosen.place))?;
+    let zone = r
+        .stores()?
+        .into_iter()
+        .find(|s| s.id == store)
+        .map(|s| s.zone);
+    Ok(Some(match zone {
+        Some(zone) => Reach {
+            delivers: crate::places::delivers_to(&zone, place),
+            minutes: crate::places::travel_minutes(&zone, place),
+            label: chosen.label,
+        },
+        None => Reach {
+            delivers: false,
+            minutes: 0,
+            label: chosen.label,
+        },
+    }))
+}
+
+/// **Whether every line of a cart is delivered to the owner's chosen
+/// address** (track `store-accounts`): a line's item from some store that
+/// lists it and reaches the address. True where no address is chosen.
+fn cart_reaches(r: &mut dyn Rows, lines: &[Line], owner: &str) -> Result<bool, String> {
+    if !r.addresses(owner)?.iter().any(|a| a.chosen) {
+        return Ok(true);
+    }
+    let stores = r.stores()?;
+    for line in lines {
+        let mut reached = false;
+        for store in &stores {
+            if r.menu(&store.id)?.iter().any(|i| i.id == line.item)
+                && coverage(r, &store.id, owner)?.is_some_and(|c| c.delivers)
+            {
+                reached = true;
+                break;
+            }
+        }
+        if !reached {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// A reader's addresses as the program's `List<Address>` is.
+fn addresses_val(rows: &[AddressRow]) -> Val {
+    Val::List(
+        rows.iter()
+            .map(|a| {
+                Val::Record(vec![
+                    ("id".into(), Val::String(a.id.clone())),
+                    ("label".into(), Val::String(a.label.clone())),
+                    (
+                        "place".into(),
+                        Val::String(
+                            crate::places::place(&a.place)
+                                .map(|p| p.name.to_string())
+                                .unwrap_or_default(),
+                        ),
+                    ),
+                    ("chosen".into(), Val::Bool(a.chosen)),
+                ])
+            })
+            .collect(),
+    )
 }
 
 /// What a session no test gave an estimate is estimated (ADR-0180).
@@ -889,6 +1116,12 @@ pub(crate) fn writes(
                     if lines.is_empty() {
                         return Ok(declared("nothing-to-order"));
                     }
+                    // **An order the chosen address is out of reach of is
+                    // refused** (track `store-accounts`): a cart can outlive
+                    // an address's change, so the order is held to it too.
+                    if by_reader && !cart_reaches(r, &lines, owner)? {
+                        return Ok(declared("no-coverage"));
+                    }
                     r.place(owner, &lines)?;
                     r.set_cart(owner, &[])?;
                     let mut written = placed.lock().expect("written");
@@ -899,6 +1132,108 @@ pub(crate) fn writes(
             }),
         );
     }
+    // **A reader's addresses, written** (track `store-accounts`, milestone
+    // 2): add one (a label and a place from the table, chosen as it is
+    // saved), rename one, remove one (the chosen one leaves none chosen), or
+    // choose one. Each answers the reader's addresses, or why not.
+    type AddressChange =
+        fn(&mut Vec<AddressRow>, &[Val]) -> Result<Result<(), &'static str>, String>;
+    let mut address = |name: &'static str, change: AddressChange| {
+        let (w, written) = (with.clone(), written.clone());
+        ops.insert(
+            format!("store:data/addresses#{name}"),
+            Arc::new(move |args: &[Val]| {
+                let op = format!("addresses#{name}");
+                let (reader, rest) = reader_of(&op, args)?;
+                w(&mut |r| {
+                    let mut rows = r.addresses(reader)?;
+                    if let Err(why) = change(&mut rows, rest)? {
+                        return Ok(declared(why));
+                    }
+                    r.set_addresses(reader, &rows)?;
+                    written.lock().expect("written").wrote = true;
+                    Ok(ok(addresses_val(&rows)))
+                })
+            }),
+        );
+    };
+    address("add", |rows, args| {
+        let [Val::String(label), Val::String(place)] = args else {
+            return Err(format!("addresses#add received {args:?}"));
+        };
+        if crate::places::place(place).is_none() {
+            return Ok(Err("unknown-place"));
+        }
+        if rows.len() >= MOST_ADDRESSES {
+            return Ok(Err("too-many"));
+        }
+        let next = rows
+            .iter()
+            .filter_map(|a| a.id.strip_prefix("addr-")?.parse::<u64>().ok())
+            .max()
+            .unwrap_or(0)
+            + 1;
+        for a in rows.iter_mut() {
+            a.chosen = false;
+        }
+        rows.push(AddressRow {
+            id: format!("addr-{next}"),
+            label: label.clone(),
+            place: place.clone(),
+            chosen: true,
+        });
+        Ok(Ok(()))
+    });
+    address("rename", |rows, args| {
+        let [Val::String(id), Val::String(label)] = args else {
+            return Err(format!("addresses#rename received {args:?}"));
+        };
+        let Some(a) = rows.iter_mut().find(|a| a.id == *id) else {
+            return Ok(Err("no-such-address"));
+        };
+        a.label = label.clone();
+        Ok(Ok(()))
+    });
+    address("remove", |rows, args| {
+        let [Val::String(id)] = args else {
+            return Err(format!("addresses#remove received {args:?}"));
+        };
+        let before = rows.len();
+        rows.retain(|a| a.id != *id);
+        if rows.len() == before {
+            return Ok(Err("no-such-address"));
+        }
+        Ok(Ok(()))
+    });
+    address("choose", |rows, args| {
+        let [Val::String(id)] = args else {
+            return Err(format!("addresses#choose received {args:?}"));
+        };
+        if !rows.iter().any(|a| a.id == *id) {
+            return Ok(Err("no-such-address"));
+        }
+        for a in rows.iter_mut() {
+            a.chosen = a.id == *id;
+        }
+        Ok(Ok(()))
+    });
+    // **Whether a store reaches the reader's chosen address, in a command**
+    // (track `store-accounts`): what `add_to_cart` reads in its own
+    // transaction, by the rule the estimate reads. True where none is chosen.
+    let w = with.clone();
+    ops.insert(
+        "store:data/coverage#reaches".to_string(),
+        Arc::new(move |args: &[Val]| {
+            let [Val::String(store), Val::String(reader)] = args else {
+                return Err(format!("coverage#reaches received {args:?}"));
+            };
+            w(&mut |r| {
+                Ok(vec![Val::Bool(
+                    coverage(r, store, reader)?.is_none_or(|c| c.delivers),
+                )])
+            })
+        }),
+    );
     // Whether an item can be ordered now (charter §15.4), read inside the
     // command that adds it. One no store's menu has is not (ADR-0172): a page
     // sends the item it showed, and a request can name any.
@@ -1209,6 +1544,9 @@ pub(crate) fn grants() -> &'static [&'static str] {
         "network.fetch",
         // A session's delivery estimate (E14, T10).
         "database.read<Estimates>",
+        // A reader's addresses (track `store-accounts`).
+        "database.read<Addresses>",
+        "database.write<Addresses>",
         // The store's notice board (E14, T09).
         "database.read<Notices>",
         // The kitchen's prep time (E14, T02).
@@ -1232,6 +1570,8 @@ pub(crate) struct State {
     prep: BTreeMap<String, i64>,
     curated: Option<Vec<(String, String)>>,
     estimates: BTreeMap<String, Estimate>,
+    /// Each owner's saved addresses (track `store-accounts`).
+    addresses: BTreeMap<String, Vec<AddressRow>>,
 }
 
 impl State {
@@ -1242,6 +1582,7 @@ impl State {
             description: store_description(id).to_string(),
             opens_minute: 7 * 60,
             closes_minute: 19 * 60,
+            zone: zone_of(id),
         };
         let menu = |id: &str, items: Vec<(String, String)>| {
             (
@@ -1263,6 +1604,7 @@ impl State {
             prep: BTreeMap::from([(STORE_ID.to_string(), 12)]),
             curated: None,
             estimates: BTreeMap::new(),
+            addresses: BTreeMap::new(),
         }
     }
 }
@@ -1331,6 +1673,15 @@ impl Rows for MemRows {
     }
     fn order(&mut self, session: &str) -> Result<Option<Order>, String> {
         Ok(self.state.orders.get(session).cloned())
+    }
+    fn addresses(&mut self, owner: &str) -> Result<Vec<AddressRow>, String> {
+        Ok(self.state.addresses.get(owner).cloned().unwrap_or_default())
+    }
+    fn set_addresses(&mut self, owner: &str, rows: &[AddressRow]) -> Result<(), String> {
+        self.state()
+            .addresses
+            .insert(owner.to_string(), rows.to_vec());
+        Ok(())
     }
     fn place(&mut self, session: &str, lines: &[Line]) -> Result<(), String> {
         let order = Order {

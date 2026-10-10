@@ -23,7 +23,7 @@
 use super::*;
 use crate::data::{Dropped, Handed, Ops, Outboxed, Provided};
 use crate::feed_pg::{Isolation, delivered, ident, json_of, pg};
-use crate::store::{Estimate, Faults, Item, Order, Rows, StoreRow, With, Written};
+use crate::store::{AddressRow, Estimate, Faults, Item, Order, Rows, StoreRow, With, Written};
 use postgres::{Client, NoTls};
 use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;
@@ -42,6 +42,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
     (
         "0003_owners",
         include_str!("../migrations/store/0003_owners.sql"),
+    ),
+    // And where a store delivers, and a reader's addresses.
+    (
+        "0004_addresses",
+        include_str!("../migrations/store/0004_addresses.sql"),
     ),
 ];
 
@@ -202,7 +207,8 @@ impl Rows for PgRows<'_> {
         let rows = self
             .0
             .query(
-                "SELECT id, name, description, opens_minute, closes_minute \
+                "SELECT id, name, description, opens_minute, closes_minute, \
+                        lat_e6, lon_e6, radius_m \
                  FROM stores ORDER BY position",
                 &[],
             )
@@ -215,6 +221,11 @@ impl Rows for PgRows<'_> {
                 description: r.get(2),
                 opens_minute: r.get(3),
                 closes_minute: r.get(4),
+                zone: crate::places::Zone {
+                    lat_e6: r.get(5),
+                    lon_e6: r.get(6),
+                    radius_m: r.get(7),
+                },
             })
             .collect())
     }
@@ -413,6 +424,49 @@ impl Rows for PgRows<'_> {
                 .execute(
                     "INSERT INTO orders (owner, status) VALUES ($1, $2)",
                     &[&owner, &status],
+                )
+                .map_err(pg)?;
+        }
+        Ok(())
+    }
+
+    fn addresses(&mut self, owner: &str) -> Result<Vec<AddressRow>, String> {
+        let rows = self
+            .0
+            .query(
+                "SELECT id, label, place, chosen FROM addresses \
+                 WHERE owner = $1 ORDER BY position",
+                &[&owner],
+            )
+            .map_err(pg)?;
+        Ok(rows
+            .iter()
+            .map(|r| AddressRow {
+                id: r.get(0),
+                label: r.get(1),
+                place: r.get(2),
+                chosen: r.get(3),
+            })
+            .collect())
+    }
+
+    fn set_addresses(&mut self, owner: &str, rows: &[AddressRow]) -> Result<(), String> {
+        self.0
+            .execute("DELETE FROM addresses WHERE owner = $1", &[&owner])
+            .map_err(pg)?;
+        for (position, a) in rows.iter().enumerate() {
+            self.0
+                .execute(
+                    "INSERT INTO addresses (owner, id, position, label, place, chosen) \
+                     VALUES ($1, $2, $3, $4, $5, $6)",
+                    &[
+                        &owner,
+                        &a.id,
+                        &(position as i32),
+                        &a.label,
+                        &a.place,
+                        &a.chosen,
+                    ],
                 )
                 .map_err(pg)?;
         }
