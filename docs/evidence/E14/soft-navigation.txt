@@ -1,0 +1,34 @@
+ADR-XXXX - a navigation keeps the layout, and shows the next page in it
+
+produced by: just e14-soft-navigation
+commit: 611314a1c4efa2e2aa3e8560111ab41f7a9aa173 + uncommitted changes
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the store's pages, followed softly, in three engines (e2e/soft-navigation.spec.mjs)
+
+  42 passed (1.0m)
+
+== a handler's navigation after its commit, in three engines (e2e/navigate.spec.mjs)
+
+  2 skipped
+  28 passed (48.7s)
+
+== mutation controls (scripts/soft_navigation_mutations.py)
+
+baseline: 14 passed, 0 failed
+every link loads its page whole: KILLED (7 of 14 tests fail)
+a handler's navigation after its commit loads its page whole: KILLED (1 of 14 tests fail)
+back and forward read nothing: KILLED (1 of 14 tests fail)
+a page of another build is kept: KILLED (1 of 14 tests fail)
+the page's markup is not shown in the slot: KILLED (6 of 14 tests fail)
+the layout's regions are not taken from the next document: KILLED (1 of 14 tests fail)
+focus is left where it was: KILLED (1 of 14 tests fail)
+the old runtime goes on after handing the page over: KILLED (1 of 14 tests fail)
+what a leaving page is told is applied: KILLED (1 of 14 tests fail)
+a reader's next choice waits for the navigation in flight: KILLED (1 of 14 tests fail)
+a page shown again from the back-forward cache does not listen: KILLED (1 of 14 tests fail)
+a page with no layout is shown in this one: KILLED (1 of 14 tests fail)
+12 of 12 mutants killed
+memory bound: no process was stopped
