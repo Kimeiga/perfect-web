@@ -51,6 +51,26 @@ class Killers(unittest.TestCase):
     def test_a_failing_test_is_named(self):
         self.assertEqual(killers.tests_failed(RUN), ["a_label_names_the_first_element_with_its_id"])
 
+    def test_the_command_is_what_follows_the_first_double_dash(self):
+        mine, command = killers.split_command(
+            ["s.py", "--suite", "core", "--", "cargo", "test", "-p", "pw-core", "--", "--exact"]
+        )
+        self.assertEqual(mine, ["s.py", "--suite", "core"])
+        self.assertEqual(command, ["cargo", "test", "-p", "pw-core", "--", "--exact"])
+
+    def test_a_cover_sees_each_mutant_twice_where_it_can(self):
+        report = {
+            "a": ["x", "y", "z"],
+            "b": ["y", "z"],
+            "c": ["w"],
+            "d": [],
+        }
+        chosen = killers.cover(report)
+        for what, ks in report.items():
+            self.assertGreaterEqual(len(set(chosen) & set(ks)), min(2, len(ks)), what)
+        # Fewer than every killer: y and z see a and b, w sees c.
+        self.assertEqual(chosen, ["w", "y", "z"])
+
     def test_a_run_that_built_nothing_ran_nothing(self):
         # A mutant that does not build: no result, and so no killer named.
         self.assertEqual(killers.targets_failed("error[E0308]: mismatched types\n"), ([], False))

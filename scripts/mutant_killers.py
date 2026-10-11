@@ -143,16 +143,46 @@ def mutants_of(script, suite):
     return chosen
 
 
+def cover(report, at_least=2):
+    """**A few targets that see every mutant**: each mutant is killed by at
+    least `at_least` of them, or by all its own killers where it has fewer.
+    Greedy: the target that meets most of what is still needed, first. Two,
+    so that one test changed later does not leave a mutant unseen by the
+    narrowed run without its run saying so (it says SURVIVED)."""
+    need = {what: min(at_least, len(ks)) for what, ks in report.items() if ks}
+    killers = {what: set(ks) for what, ks in report.items() if ks}
+    chosen = []
+    while any(n > 0 for n in need.values()):
+        candidates = {t for ks in killers.values() for t in ks} - set(chosen)
+        best = max(
+            sorted(candidates),
+            key=lambda t: sum(1 for w, ks in killers.items() if need[w] > 0 and t in ks),
+        )
+        chosen.append(best)
+        for what, ks in killers.items():
+            if best in ks and need[what] > 0:
+                need[what] -= 1
+    return sorted(chosen)
+
+
+def split_command(argv):
+    """(this tool's arguments, the command), at the first `--`. Not by
+    argparse's remainder, which after a positional takes the options too."""
+    if "--" not in argv:
+        return argv, []
+    at = argv.index("--")
+    return argv[:at], argv[at + 1 :]
+
+
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(usage="%(prog)s SCRIPT [--suite S] [--json F] -- COMMAND")
     parser.add_argument("script")
     parser.add_argument("--suite")
     parser.add_argument("--json", help="also write the killers here")
-    parser.add_argument("command", nargs=argparse.REMAINDER)
-    args = parser.parse_args()
-    command = [c for c in args.command if c != "--"]
+    mine, command = split_command(sys.argv[1:])
+    args = parser.parse_args(mine)
     if "test" not in command:
-        parser.error("the command is a `cargo test` command")
+        parser.error("give the `cargo test` command after `--`")
     # Every target runs, whatever fails before it.
     at = command.index("test") + 1
     command = command[:at] + ["--no-fail-fast"] + command[at:]
@@ -217,9 +247,14 @@ def main():
     if "*" in killers:
         print("narrowing: none (a mutant hung, and every target may be what sees it)")
     else:
-        names = sorted(k for k in killers if not k.startswith("--") and " " not in k)
-        others = sorted(k for k in killers if k.startswith("--") or " " in k)
-        print("narrowed: " + " ".join([f"--test {k}" for k in names] + others))
+        def as_args(ks):
+            names = [k for k in ks if not k.startswith("--") and " " not in k]
+            others = [k for k in ks if k.startswith("--") or " " in k]
+            return " ".join([f"--test {k}" for k in names] + others)
+
+        print(f"every killer ({len(killers)}): " + as_args(sorted(killers)))
+        small = cover({w: (r or {}).get("targets", []) for w, r in report.items()})
+        print(f"narrowed ({len(small)}, each mutant seen by two where it can be): " + as_args(small))
     if args.json:
         pathlib.Path(args.json).write_text(json.dumps(report, indent=2) + "\n")
     return 0
