@@ -932,10 +932,13 @@ Each a decision for a track, with its date; a track's ADR records it too.
     ADR) decides what it shows; these are the rules it holds to:
     1. **The address.** A search's text belongs in the page's query string,
        a typed page query parameter, which is the integrator's to build
-       (NEXT, as ruled for W6's `?q=`). Until it lands, `route
-       "/search/{q}"` with its form sent by `navigate`, `q` a page
-       parameter, both named temporary in the ADR, so the move changes the
-       route clause alone.
+       next (as ruled for W6's `?q=`). The search box is then a plain
+       `<form method="get">`, which needs no script. Until it lands, the
+       page is at `route "/search/{q}"`, reached by its address. It has no
+       form, since `navigate` follows only a committed command (ADR-0280).
+       `q` stays a page parameter, so the move changes only the route clause
+       and adds the form. Both are named temporary in the ADR (corrected
+       2026-10-11, W6's finding).
     2. **One meaning on both layers.** The search runs in the store's data
        layer, as its operations (as W6's runs in kiokun's), in memory and on
        PostgreSQL, and both hold one stated meaning, tested on the same
@@ -1009,4 +1012,19 @@ Each a decision for a track, with its date; a track's ADR records it too.
     5. **Research to cite**: DoorDash's store hours (`open_hours`,
        `special_hours`), schema.org's `OpeningHoursSpecification`, and RFC
        5545 §3.3.5.
+- **2026-10-11, W6: no search form before the route reads its query
+  part.** W6 found that "the form sent by `navigate`" cannot be written.
+  `navigate` goes only at the end of a command's `Ok` arm (ADR-0280, PW5043),
+  a command a page's handler calls declares `idempotent_by` (PW0338), and
+  kiokun's sources are `transactions none`, so no command could carry it.
+  Ruled **(c)**:
+  - no search box until a route reads its query part;
+  - then a plain `<form method="get" action="/search">` with `name="q"`,
+    which needs no script and is nearer kiokun.com.
+  Not (a), a navigation from a handler that calls no command. A link and a
+  GET form already say that, without script, and ADR-0280 keeps `navigate`
+  for a commit's consequence. Not (b), a placeholder command, which would be
+  a round trip and a write per search. Typed page query parameters are the
+  integrator's next work after the soft navigation's merge; W9's search
+  waits for them the same way.
 
