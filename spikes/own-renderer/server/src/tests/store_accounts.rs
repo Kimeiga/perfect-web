@@ -535,3 +535,44 @@ fn a_retry_of_a_press_that_committed_is_answered_from_what_was_kept() {
         "a press never answered is refused: {fresh}"
     );
 }
+
+/// **The stale tab's rule comes before the order's wait** (the integrator's
+/// ordering of 2026-10-11: a kept answer, the stale check, the order's wait,
+/// the command): a press on a page another reader's, naming a command
+/// before it that never comes (`pw-after`, ADR-0305), is refused at once as
+/// the page's, not held for the order and answered early.
+#[test]
+fn a_stale_press_is_refused_before_the_order_waits() {
+    let provider = Arc::new(TestProvider::default());
+    let s = store_with(provider.clone());
+    s.serve_document_settled(
+        "came-ada",
+        "store.page.StorePage",
+        &store_params(STORE_ID),
+        &[],
+    )
+    .expect("served");
+    let guests = latest(&s.pending.lock().expect("pending"), "came-ada").1;
+    let ada = signed_in(&s, &provider, "came-ada", "ada");
+    let body = serde_json::json!([shown("cortado"), 1]).to_string();
+    let started = std::time::Instant::now();
+    let answer = exchanged(
+        &s,
+        &format!(
+            "POST /command/{ADD} HTTP/1.1\r\nHost: t\r\nCookie: pw-session={ada}\r\n\
+             Sec-Fetch-Site: same-origin\r\npw-interaction: i-9\r\npw-after: never-sent\r\n\
+             pw-document: {guests}\r\ncontent-type: application/json\r\n\
+             content-length: {}\r\n\r\n{body}",
+            body.len()
+        ),
+    );
+    assert!(
+        answer.starts_with("HTTP/1.1 403") && answer.contains("\"refused\":\"another-reader\""),
+        "{answer}"
+    );
+    assert!(
+        started.elapsed() < crate::order::WAIT,
+        "not held for the order: {:?}",
+        started.elapsed()
+    );
+}

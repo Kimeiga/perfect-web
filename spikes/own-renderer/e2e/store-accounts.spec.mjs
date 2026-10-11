@@ -11,8 +11,8 @@
 //   - milestone 3, the owner's Next.js bug as acceptance: an address saved,
 //     the handler going to the store's page (`navigate StorePage(id)`,
 //     ADR-0280), whose estimate is the new address's as served, with no
-//     parameter to bust a cache and one load of the document. "No header
-//     remount" waits for the integrator's soft navigation.
+//     parameter to bust a cache, no load of the document, and the header
+//     not mounted again (the soft navigation, ADR-0306);
 import { expect, test } from "@playwright/test";
 import { STORE_ACCOUNTS_PORTS } from "../playwright.config.mjs";
 
@@ -115,6 +115,11 @@ test("an address saved goes to the store, whose estimate is the new address's as
   await expect(page).toHaveURL(/\/stores\/47\/address$/);
   await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
   await page.locator("#label").fill("Home");
+  // What a load would lose: the window, and the layout's header.
+  await page.evaluate(() => {
+    window.__kept = true;
+    document.querySelector("header").__kept = true;
+  });
   // Every load of the store's document from the press on.
   const documents = [];
   page.on("request", (r) => {
@@ -130,11 +135,19 @@ test("an address saved goes to the store, whose estimate is the new address's as
   // (places.rs): the kitchen's 25 to 35, and the courier's 15.
   await expect(delivery(page)).toHaveText(/Delivery in 40 to 50 min/);
   await expect(page.locator("#deliver-to")).toContainText("Delivering to Home");
-  // No parameter to bust a cache, and one load of the document: none after
-  // it arrived.
+  // No parameter to bust a cache, and no load of the document: the store's
+  // page shown in the layout kept, its header not mounted again (ADR-0306).
   expect(new URL(page.url()).search).toBe("");
   await page.waitForTimeout(500);
-  expect(documents).toEqual([new URL(page.url()).href]);
+  expect(documents).toEqual([]);
+  expect(
+    await page.evaluate(() => ({
+      window: window.__kept === true,
+      header: document.querySelector("header").__kept === true,
+      soft: window.__pwSoftNavigations ?? 0,
+    })),
+    // Two: the link to the address page was followed softly too.
+  ).toEqual({ window: true, header: true, soft: 2 });
 });
 
 test("a store out of reach of the chosen address says so, and refuses its Add", async ({
@@ -221,4 +234,28 @@ test("a tab whose reader signed in or out in another is refused at its next pres
   await expect(told("Cortado")).toHaveText(words);
   await expect(here.locator("#cart-count")).toHaveText("1");
   await context.close();
+});
+
+test("a press made after a soft navigation is the shown page's, and runs", async ({ page }) => {
+  // The runtime handed the next page names that page's document (ADR-0306's
+  // hand-over), so the host answers its press as the reader's (Q3).
+  await ready(page, "/");
+  await page.evaluate(() => {
+    window.__kept = true;
+  });
+  await page.getByRole("link", { name: "Blue Bottle" }).click();
+  await expect(page).toHaveURL(/\/stores\/47$/);
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1", null, {
+    polling: 50,
+  });
+  expect(
+    await page.evaluate(() => ({
+      window: window.__kept === true,
+      soft: window.__pwSoftNavigations ?? 0,
+    })),
+  ).toEqual({ window: true, soft: 1 });
+  const answered = await add(page, "Espresso");
+  expect(answered.status()).toBe(202);
+  await expect(page.locator("#cart-count")).toHaveText("1");
+  await expect(page.locator(".pw-refusal")).toHaveCount(0);
 });
