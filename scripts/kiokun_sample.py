@@ -14,6 +14,13 @@ reconstructions, JPDB's ranks, CHISE's IDS, images, KANJIDIC2's codes and
 references, the Korean IPA, and the owner's mnemonics, which the owner rules
 on. A field a test reads that is not here is read locally only.
 
+A stub's `redirect` and a character's `simplified_form_of` are the builder's,
+made from Dong Chinese's character data. Each is kept only where Unihan's
+kSimplifiedVariant or kTraditionalVariant (Unihan_Variants.txt at kiokun-data's
+HEAD) states the same relation, and the MANIFEST lists each kept one with the
+Unihan lines that state it, and counts those left out (the integrator's ruling
+of 2026-10-11).
+
 The files stay in kiokun's format: raw DEFLATE, one JSON entry per word, in
 the `<subdirectory>/<word>.json.deflate` layout its build writes, so the
 slice's host reads kiokun's own format, and the same loader serves this
@@ -28,8 +35,10 @@ usage: kiokun_sample.py /path/to/kiokun-data/output_dictionary
 """
 import hashlib
 import json
+import os
 import pathlib
 import shutil
+import subprocess
 import sys
 import zlib
 
@@ -47,6 +56,11 @@ SOURCES = {
     "(data/cantonese/cc-cedict-canto, cc-canto: MarvNC's Yomitan conversion)",
     "unihan": "the Unicode Character Database's Unihan, Unicode License v3 "
     "(data/unihan/Unihan_Readings.txt, Unihan_Variants.txt, Unihan_IRGSources.txt)",
+    "unihan-variants": "Unihan_Variants.txt's kSimplifiedVariant and kTraditionalVariant, "
+    "Unicode License v3: a stub's redirect, or a character's simplified_form_of, is kept "
+    "only where Unihan states that the entry is a simplified form of what it names. The "
+    "builder makes both from Dong Chinese's character data (its traditional variants), or "
+    "from its own Japanese variant map; the sample relies on neither",
     "jmdict": "JMdict (EDRDG), CC BY-SA 4.0, through jmdict-simplified 3.6.1 "
     "(data/jmdict-examples-eng-3.6.1.json)",
     "tatoeba": "Tatoeba's sentences, CC BY 2.0 FR, each with its id, as JMdict's "
@@ -65,8 +79,8 @@ SOURCES = {
 # source. Nothing else is written.
 FIELDS = [
     ("key", "builder"),
-    ("redirect", "builder"),
-    ("simplified_form_of", "builder"),
+    ("redirect", "unihan-variants"),
+    ("simplified_form_of", "unihan-variants"),
     ("chinese_words[]._id", "cc-cedict"),
     ("chinese_words[].simp", "cc-cedict"),
     ("chinese_words[].trad", "cc-cedict"),
@@ -128,6 +142,11 @@ FIELDS = [
     ("contained_in_korean[].fr", "krdict"),
 ]
 
+# The relations kept only where Unihan states them (the integrator's ruling of
+# 2026-10-11): each names the entry's traditional form, the entry being a
+# simplified form of it.
+RELATIONS = ("redirect", "simplified_form_of")
+
 # KANJIDIC2's readings kept: on'yomi and kun'yomi. Its pinyin (Wittern and
 # Yasuoka), Korean (Muller) and Vietnamese readings are not read from here.
 KANJI_READINGS = {"ja_on", "ja_kun"}
@@ -177,9 +196,55 @@ def kept(value, node):
     return value
 
 
-def cleared(entry):
+def unihan_pairs(text):
+    """{(simplified, traditional): the lines stating it} from Unihan_Variants.txt:
+    a kSimplifiedVariant line names its character's simplified forms, a
+    kTraditionalVariant line its traditional forms."""
+    pairs = {}
+    for line in text.splitlines():
+        if not line.startswith("U+"):
+            continue
+        cp, field, values = line.split("\t")
+        if field not in ("kSimplifiedVariant", "kTraditionalVariant"):
+            continue
+        c = chr(int(cp[2:], 16))
+        for v in values.split():
+            other = chr(int(v.split("<")[0][2:], 16))
+            pair = (other, c) if field == "kSimplifiedVariant" else (c, other)
+            pairs.setdefault(pair, []).append(line)
+    return pairs
+
+
+def relations(entry, pairs):
+    """Each relation the entry states, as (field, its value, the Unihan lines
+    stating it: none where Unihan does not)."""
+    out = []
+    for field in RELATIONS:
+        if field in entry:
+            value = entry[field]
+            stated = pairs.get((entry["key"], value), []) if isinstance(value, str) else []
+            out.append((field, value, stated))
+    return out
+
+
+def unihan_variants(data):
+    """Unihan_Variants.txt as kiokun-data's committed tree holds it at HEAD."""
+    return subprocess.run(
+        ["git", "-C", str(data), "show", "HEAD:data/unihan/Unihan_Variants.txt"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=dict(os.environ, GIT_OPTIONAL_LOCKS="0"),
+    ).stdout
+
+
+def cleared(entry, pairs):
     """The entry with only the kept fields, from cleared sources."""
     entry = json.loads(json.dumps(entry))
+    # A relation is kept only where Unihan states it.
+    for field, _, stated in relations(entry, pairs):
+        if not stated:
+            del entry[field]
     # A Chinese item is CC-CEDICT's only when its export tags it so.
     for word in entry.get("chinese_words", []):
         word["items"] = [i for i in word.get("items", []) if i.get("source") == "cedict"]
@@ -199,19 +264,26 @@ def main():
     out = root / "examples/kiokun/data" / SHARD
     if out.exists():
         shutil.rmtree(out)
-    lines = []
+    pairs = unihan_pairs(unihan_variants(source.parent))
+    lines, kept_relations, dropped = [], [], []
     for word in WORDS:
         assert shard(word) == SHARD, f"{word} is in {shard(word)}"
         sub = format(kiokun_hash(word) & 0xFF, "02x")
         src = source / sub / f"{word}.json.deflate"
         entry = json.loads(zlib.decompress(src.read_bytes(), -15))
         assert entry["key"] == word, src
-        text = json.dumps(cleared(entry), ensure_ascii=False, separators=(",", ":"))
+        for field, value, stated in relations(entry, pairs):
+            if stated:
+                kept_relations.append(f"  {word} {field} {value}: " + "; ".join(stated))
+            else:
+                dropped.append(f"  {word} {field} {value}")
+        out_entry = cleared(entry, pairs)
+        text = json.dumps(out_entry, ensure_ascii=False, separators=(",", ":"))
         c = zlib.compressobj(9, zlib.DEFLATED, -15)
         data = c.compress(text.encode()) + c.flush()
         (out / sub).mkdir(parents=True, exist_ok=True)
         (out / sub / src.name).write_bytes(data)
-        kind = f"redirect -> {entry['redirect']}" if "redirect" in entry else "entry"
+        kind = f"redirect -> {out_entry['redirect']}" if "redirect" in out_entry else "entry"
         lines.append(f"{sub}/{src.name}  {len(data):6d}  {hashlib.sha256(data).hexdigest()}  {kind}")
     fields = "\n".join(f"  {path:56s} {name}" for path, name in FIELDS)
     sources = "\n".join(f"  {name:17s} {text}" for name, text in SOURCES.items())
@@ -219,7 +291,12 @@ def main():
         f"kiokun.com shard {SHARD}: {len(lines)} entries read from kiokun-data's output and written\n"
         f"with only the fields below by scripts/kiokun_sample.py; see ../NOTICE.md.\n\n"
         + "\n".join(lines)
-        + "\n\nThe fields kept, and the source each is made from:\n\n"
+        + "\n\nThe relations kept, each with the Unihan_Variants.txt lines that state it\n"
+        + "(kiokun-data's committed tree at HEAD):\n\n"
+        + ("\n".join(kept_relations) or "  none")
+        + f"\n\nThe relations left out, Unihan stating none of them: {len(dropped)}\n"
+        + ("\n".join(dropped) + "\n" if dropped else "")
+        + "\nThe fields kept, and the source each is made from:\n\n"
         + fields
         + "\n\nThe sources:\n\n"
         + sources

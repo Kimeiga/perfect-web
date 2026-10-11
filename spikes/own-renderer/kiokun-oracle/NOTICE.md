@@ -58,6 +58,7 @@ the files they come through:
 - **Tatoeba**: CC BY 2.0 FR, each sentence credited to its author by its id.
 - **KRDICT**: CC BY-SA 2.0 KR, the National Institute of Korean Language
   (국립국어원); its text alone, no media.
-- **Unihan**: the Unicode License v3 (© 1991-2026 Unicode, Inc.,
-  <https://www.unicode.org/license.txt>), through Dong Chinese's export,
-  its items tagged `unicode`.
+- **Unihan**: the Unicode License v3 (© 1991-2026 Unicode, Inc.), through
+  Dong Chinese's export, its items tagged `unicode`, and the variant
+  relations of the sample's stubs. Its copyright and permission notice is
+  reproduced in full in `examples/kiokun/data/LICENSE-UNICODE.txt`.

@@ -65,12 +65,17 @@ Each was read at its primary source on **2026-10-10**.
   reading (`chinese_char.cantonese`, kCantonese), its Hong Kong form
   (`chinese_char.hkChar`, kSemanticVariant with kHKGlyph), its Korean
   compatibility form (`korean_char.hanjaForm`, kCompatibilityVariant), and a
-  Korean reading where KANJIDIC2 has none (`korean_char.readings`, kHangul).
+  Korean reading where KANJIDIC2 has none (`korean_char.readings`, kHangul);
+  and the relation a stub's `redirect` or a character's `simplified_form_of`
+  states (kSimplifiedVariant, kTraditionalVariant), the cleared source of
+  both fields (below).
   - Rights: © 1991-2026 Unicode, Inc.
-  - Licence: the Unicode License v3, <https://www.unicode.org/license.txt>,
-    which permits redistribution with its copyright and permission notice;
-    the files' own terms point to <https://www.unicode.org/terms_of_use.html>.
-    Read at both.
+  - Licence: the Unicode License v3, which permits redistribution with its
+    copyright and permission notice. **The notice is reproduced in full in
+    `LICENSE-UNICODE.txt`, beside this file**, as
+    <https://www.unicode.org/license.txt> gave it on 2026-10-11. The files'
+    own terms point to <https://www.unicode.org/terms_of_use.html>. Read at
+    both.
   - Files: `data/unihan/Unihan_Readings.txt`, `Unihan_Variants.txt`,
     `Unihan_IRGSources.txt` (Unicode 17.0.0).
 - **JMdict**: Japanese words, their readings, senses and glosses
@@ -114,12 +119,18 @@ Each was read at its primary source on **2026-10-10**.
     <https://krdict.korean.go.kr/kor/kboardPolicy/copyRightTermsInfo>.
   - Through Lyroxide's Yomitan export (`data/krdict-en`). Its Korean IPA
     (`data/krdict-ipa`), whose terms are not stated, is not here.
-- **kiokun-data's builder**: each entry's structure: its `key`, the
-  characters' own forms, and `redirect` and `simplified_form_of`, which name
-  the entry a word's page is. The builder computes these two from the
-  variant relations in Dong Chinese's export; they are kept as the entries'
-  structure, the relations themselves not (the integrator to confirm). MIT,
-  © Hakan Alpay (`kiokun-data/LICENSE`).
+- **kiokun-data's builder**: each entry's structure: its `key` and the
+  characters' own forms. MIT, © Hakan Alpay (`kiokun-data/LICENSE`).
+  - **`redirect` and `simplified_form_of`**, which name the entry a word's
+    page is, are the builder's output, and its input for them is Dong
+    Chinese's character data (its traditional variants, `src/main.rs`) or,
+    for a Japanese variant, its own variant map. **Their cleared source is
+    Unihan**: each is kept only where Unihan_Variants.txt's
+    kSimplifiedVariant or kTraditionalVariant states that the entry is a
+    simplified form of what the field names, and dropped otherwise (the
+    integrator's ruling of 2026-10-11). `han-1char-3/MANIFEST.txt` lists
+    each kept relation with the Unihan lines that state it: five, and none
+    dropped.
 
 ## Left out
 

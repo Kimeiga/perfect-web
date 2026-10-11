@@ -30,11 +30,22 @@ aa/貪.json.deflate    1630  7819afe10a5a80699b927c1bc72638dd05c4a28562de10b409b
 22/缢.json.deflate      67  b1067d02593222f94be2c9048ff4e15659d5276cff7cd785c72fb11e4b53fddc  redirect -> 縊
 0a/縊.json.deflate     602  7fc42d4b34b17ec537d9fbe8971b5dbf4dd7737940c557b38a70a3ae8b7c2b8d  entry
 
+The relations kept, each with the Unihan_Variants.txt lines that state it
+(kiokun-data's committed tree at HEAD):
+
+  面 simplified_form_of 麵: U+9762	kTraditionalVariant	U+9762 U+9EB5; U+9EB5	kSimplifiedVariant	U+9762
+  谚 redirect 諺: U+8AFA	kSimplifiedVariant	U+8C1A; U+8C1A	kTraditionalVariant	U+8AFA
+  贪 redirect 貪: U+8CAA	kSimplifiedVariant	U+8D2A; U+8D2A	kTraditionalVariant	U+8CAA
+  攒 redirect 攢: U+6512	kTraditionalVariant	U+6522; U+6522	kSimplifiedVariant	U+6512
+  缢 redirect 縊: U+7E0A	kSimplifiedVariant	U+7F22; U+7F22	kTraditionalVariant	U+7E0A
+
+The relations left out, Unihan stating none of them: 0
+
 The fields kept, and the source each is made from:
 
   key                                                      builder
-  redirect                                                 builder
-  simplified_form_of                                       builder
+  redirect                                                 unihan-variants
+  simplified_form_of                                       unihan-variants
   chinese_words[]._id                                      cc-cedict
   chinese_words[].simp                                     cc-cedict
   chinese_words[].trad                                     cc-cedict
@@ -101,6 +112,7 @@ The sources:
   cc-cedict         CC-CEDICT (MDBG), CC BY-SA 4.0, through Dong Chinese's export of it (data/chinese_dictionary_word_2025-06-25.jsonl, items tagged `cedict`)
   cc-canto          Pleco's CC-Canto readings for CC-CEDICT, CC BY-SA 3.0 (data/cantonese/cc-cedict-canto, cc-canto: MarvNC's Yomitan conversion)
   unihan            the Unicode Character Database's Unihan, Unicode License v3 (data/unihan/Unihan_Readings.txt, Unihan_Variants.txt, Unihan_IRGSources.txt)
+  unihan-variants   Unihan_Variants.txt's kSimplifiedVariant and kTraditionalVariant, Unicode License v3: a stub's redirect, or a character's simplified_form_of, is kept only where Unihan states that the entry is a simplified form of what it names. The builder makes both from Dong Chinese's character data (its traditional variants), or from its own Japanese variant map; the sample relies on neither
   jmdict            JMdict (EDRDG), CC BY-SA 4.0, through jmdict-simplified 3.6.1 (data/jmdict-examples-eng-3.6.1.json)
   tatoeba           Tatoeba's sentences, CC BY 2.0 FR, each with its id, as JMdict's examples carry them (data/jmdict-examples-eng-3.6.1.json)
   kanjidic2         KANJIDIC2 (EDRDG), CC BY-SA 4.0, through jmdict-simplified 3.6.1 (data/kanjidic2-en-3.6.1.json)

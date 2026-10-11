@@ -243,6 +243,28 @@ permit its redistribution here.
     source's rights holder, licence, URL and the date it was read.
   - The files are distributed under CC BY-SA 4.0.
   - ADR-0037's "copied byte for byte" no longer holds.
+- **A stub's `redirect` and a character's `simplified_form_of` are held to
+  Unihan** (the integrator's ruling of 2026-10-11, 1a). The builder makes both
+  from Dong Chinese's character data, which is not cleared.
+  - Each is kept only where Unihan_Variants.txt's kSimplifiedVariant or
+    kTraditionalVariant, read at kiokun-data's HEAD, states that the entry
+    is a simplified form of what it names.
+  - `NOTICE.md` names Unihan as the fields' cleared source and Dong Chinese
+    as the builder's input. `MANIFEST.txt` lists each kept relation with the
+    Unihan lines that state it.
+  - **Unihan states all five of the sample's relations; none is dropped**: 谚
+    → 諺, 贪 → 貪, 攒 → 攢, 缢 → 縊, and 面 as the simplified form of 麵. So
+    the 28 files are unchanged, and nothing that reads them was recorded
+    again.
+  - The generator's tests: the relation read from either side, one Unihan
+    states kept and one it does not dropped, and every relation in the
+    committed sample listed with Unihan lines that state it (CI). Three
+    mutants in `kiokun_inventory_mutations.py`.
+- **Unicode's notice in full** (1b): `examples/kiokun/data/LICENSE-UNICODE.txt`
+  is the Unicode License v3 as <https://www.unicode.org/license.txt> gave it
+  on 2026-10-11, from "UNICODE LICENSE V3" to its end. `NOTICE.md`'s Unihan
+  section names it, and so does the fixtures' `NOTICE.md`. "A link isn't the
+  notice." A test holds the file whole and named, with a mutant.
 - **Tests that read a field left out moved onto entries made for them**:
   - the character header's gloss, HSK and JLPT levels and frequency-list
     Mandarin (the JLPT badge sits beside the gloss, as on kiokun.com);

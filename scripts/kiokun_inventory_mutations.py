@@ -94,6 +94,30 @@ MUTANTS = [
         '    ("key", "builder"),\n    ("semantic_mnemonic", "builder"),\n',
     ),
     (
+        "the sample keeps a relation Unihan does not state",
+        SAMPLE,
+        "        if not stated:\n            del entry[field]\n",
+        "        if not stated:\n            pass\n",
+    ),
+    (
+        "Unihan's kSimplifiedVariant is read as naming traditional forms",
+        SAMPLE,
+        '            pair = (other, c) if field == "kSimplifiedVariant" else (c, other)\n',
+        "            pair = (c, other)\n",
+    ),
+    (
+        "the sample reads every variant field of Unihan's",
+        SAMPLE,
+        '        if field not in ("kSimplifiedVariant", "kTraditionalVariant"):\n            continue\n',
+        "        pass\n",
+    ),
+    (
+        "the NOTICE links Unicode's licence and reproduces none",
+        ROOT / "examples/kiokun/data/NOTICE.md",
+        "`LICENSE-UNICODE.txt`, beside this file",
+        "<https://www.unicode.org/license.txt>",
+    ),
+    (
         "the search sample keeps every Chinese row",
         SEARCH_SAMPLE,
         '        if language == "chinese" and (word, row[at["definition"]]) not in chinese:\n',

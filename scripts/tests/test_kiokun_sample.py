@@ -3,8 +3,10 @@ test reads, from cleared sources only (the integrator's ruling of
 2026-10-10)."""
 
 import importlib.util
+import json
 import pathlib
 import unittest
+import zlib
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("kiokun_sample", SCRIPTS / "kiokun_sample.py")
@@ -93,9 +95,75 @@ ENTRY = {
 }
 
 
+UNIHAN = (
+    "# Unihan_Variants.txt\n"
+    "U+8AFA\tkSimplifiedVariant\tU+8C1A\n"
+    "U+9762\tkTraditionalVariant\tU+9762 U+9EB5\n"
+    "U+9EB5\tkSemanticVariant\tU+9EAA<kMeyerWempe\n"
+)
+PAIRS = sample.unihan_pairs(UNIHAN)
+ROOT = SCRIPTS.parent
+
+
+class Relations(unittest.TestCase):
+    def test_unihan_states_a_simplified_form_from_either_side(self) -> None:
+        self.assertIn(("谚", "諺"), PAIRS)
+        self.assertIn(("面", "麵"), PAIRS)
+        self.assertNotIn(("諺", "谚"), PAIRS)
+        self.assertNotIn(("麵", "麪"), PAIRS)
+
+    def test_a_relation_unihan_states_is_kept(self) -> None:
+        self.assertEqual(sample.cleared({"key": "谚", "redirect": "諺"}, PAIRS), {"key": "谚", "redirect": "諺"})
+        self.assertEqual(
+            sample.cleared({"key": "面", "simplified_form_of": "麵"}, PAIRS),
+            {"key": "面", "simplified_form_of": "麵"},
+        )
+
+    def test_a_relation_unihan_does_not_state_is_left_out(self) -> None:
+        self.assertEqual(sample.cleared({"key": "谚", "redirect": "言"}, PAIRS), {"key": "谚"})
+        self.assertEqual(sample.cleared({"key": "諺", "simplified_form_of": "谚"}, PAIRS), {"key": "諺"})
+        self.assertEqual(sample.cleared({"key": "面", "redirect": ["麵"]}, PAIRS), {"key": "面"})
+
+    def test_every_relation_the_committed_sample_keeps_is_one_of_unihans(self) -> None:
+        """Each entry's relation is listed in the MANIFEST with Unihan's lines,
+        and those lines state it."""
+        data = ROOT / "examples/kiokun/data" / sample.SHARD
+        manifest = (data / "MANIFEST.txt").read_text()
+        listed = manifest.split("The relations kept,", 1)[1].split("The relations left out", 1)[0]
+        stated = {}
+        for line in listed.splitlines():
+            if ": U+" in line:
+                head, lines = line.strip().split(": ", 1)
+                stated[tuple(head.split(" "))] = sample.unihan_pairs("\n".join(lines.split("; ")))
+        seen = 0
+        for f in sorted(data.rglob("*.json.deflate")):
+            entry = json.loads(zlib.decompress(f.read_bytes(), -15))
+            for field in sample.RELATIONS:
+                if field in entry:
+                    seen += 1
+                    pairs = stated.get((entry["key"], field, entry[field]), {})
+                    self.assertIn((entry["key"], entry[field]), pairs, f.name)
+        self.assertGreater(seen, 0)
+
+
+class Notice(unittest.TestCase):
+    def test_unicodes_notice_is_reproduced_whole_and_named(self) -> None:
+        """The Unicode License v3 asks for its copyright and permission notice
+        with the data: in full, not a link (the integrator's ruling of
+        2026-10-11)."""
+        data = ROOT / "examples/kiokun/data"
+        notice = (data / "LICENSE-UNICODE.txt").read_text()
+        self.assertTrue(notice.startswith("UNICODE LICENSE V3\n\nCOPYRIGHT AND PERMISSION NOTICE\n\n"))
+        self.assertIn("Copyright © 1991-2026 Unicode, Inc.", notice)
+        for part in ["NOTICE TO USER:", "Permission is hereby granted", 'PROVIDED "AS IS"', "IN NO EVENT SHALL"]:
+            self.assertIn(part, notice)
+        self.assertTrue(notice.rstrip().endswith("authorization of the copyright holder."))
+        self.assertIn("`LICENSE-UNICODE.txt`, beside this file", (data / "NOTICE.md").read_text())
+
+
 class Cleared(unittest.TestCase):
     def setUp(self) -> None:
-        self.out = sample.cleared(ENTRY)
+        self.out = sample.cleared(ENTRY, PAIRS)
 
     def test_a_chinese_item_is_kept_only_where_the_export_tags_it_cedict(self) -> None:
         words = self.out["chinese_words"]
