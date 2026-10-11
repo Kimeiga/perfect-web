@@ -1054,4 +1054,13 @@ Each a decision for a track, with its date; a track's ADR records it too.
   groups in reading order, a Difference from kiokun.com's client-only
   fetches, whose order is whichever answers first; the oracle compares each
   reading's set.
+- **2026-10-11, the owner's answers** (relayed by the coordinator):
+  (1) **deinflection is (b)**: our own rules, written from a cited grammar
+  reference whose licence is cleared, in W6's own ADR after the reading
+  index and Homophones; the repository stays permissive (Apache-2.0, and
+  MIT where a source is), with no part of 10ten's table. W6 asks before
+  using a reference whose licence is unclear. (2) **`is_common`**: how
+  production loaded the index is not known to the owner; W6 keeps its plan
+  (integers, as the `.sql` writes them), and its oracle runs both loadings
+  once and records any difference, which the coordinator tells the owner.
 
