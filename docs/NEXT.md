@@ -716,7 +716,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
              integrator's ruling, a change to every program that says it
              (the feed's notifications and messages);
           4. **store hours**: open and closed by the platform's clock
-             effect, ordering refused while closed, and orders scheduled;
+             effect, ordering refused while closed, and orders scheduled.
+             In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
+             the store's hours (after W8's merge: the stores' rows in both
+             layers, the pages, `place_order` refused while closed, with a
+             last-order cut-off); orders scheduled;
           5. **idempotency committed with the writes** (PW0348, ADR-0246's
              Not claimed), before a payment depends on it: an interaction's
              answer kept in the transaction that commits its command, in
@@ -748,6 +752,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
             inventory names; Pleris has pages and uploads, and no form for
             a route whose answer is JSON.
 
+          - **one entry for a query a page and its layout both bind**
+            (found 2026-10-11, ADR-0191's amendment): read once for the
+            document (ADR-0303), but speculated as two bindings, `cart` and
+            `cart~StoreLayout`, each sent at its own entry and version, and
+            each given the press's transition. One entry for the two names,
+            in the speculation manifest, the host and the runtime. After
+            soft navigation, which changes the layout's runtime.
+
           The infrastructure follow-ups, after these (the owner's order of
           2026-10-09):
           - **the server's components compiled once a process** (W6's
@@ -764,7 +776,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
           - **a shard dealt within a ceiling under its limit** (done,
             ADR-0290's amendment of 2026-10-10: a track's verify was dealt
             21,900 s into nine shards, and command order's shard was stopped
-            at 345 minutes);
+            at 345 minutes; halved to 10,350 s 2026-10-11, a branch having
+            run its recipes up to twice their recorded seconds);
           - **each mutant given the tests that can see its rule** (W6's
             ruling of 2026-10-09, measured 2026-10-10): 45 mutation scripts
             run a crate's tests whole for each mutant, most of them the
@@ -772,7 +785,19 @@ E14 comes before E11-E13. Its plan, controls and task list are
             265,000 seconds, and `e14-command-answers` alone took 15,426 s,
             past the ceiling by itself. Each script narrowed is run whole
             first, every mutant still killed (done for `refusal_mutations`'
-            core suite, 8 of 8 in 103 s).
+            core suite, 8 of 8 in 103 s). First the nine scripts whose core
+            mutants run `pw-core`'s tests whole, relinking its 211 test
+            targets each: `e14-cart-lines` 16,552 s, `e14-availability`
+            12,125, `e14-row-reads` 5,879, `e14-invariants` 5,183,
+            `e14-last-known-good` 4,802, `e14-command-retry` 3,663,
+            `e14-nested-lists` 3,532, `e14-menu-categories` 3,260,
+            `e14-query-attributes` 3,199 (about 58,000 s together). A
+            mutant's killers are measured, not guessed: a tool applies each
+            mutant, runs its suite whole with `--no-fail-fast`, and records
+            the test targets that fail. The script is then given their union.
+            A target renamed later matches nothing, and a run of no tests is
+            a failure, not a survival. A task for a worker with a target of
+            its own.
 
           The worker tracks, one at a time beside the integrator (the
           owner's budget rule), each launched under docs/PARALLEL.md when

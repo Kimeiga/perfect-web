@@ -23,6 +23,53 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**Corrections, 2026-10-11: master's nightly verification had failed eight
+recipes for three days, unread** (found by the integrator, after W8 reported
+two of them). The nightlies of 2026-10-08, -09 and -10 each failed six to
+eight of master's recipes. A push plans only the recipes whose mutants sit
+near what it changed (ADR-0281), and no one read the nightlies' summaries.
+Each is fixed and recorded again:
+- survivors left by later rulings that changed what the tests could see:
+  `e10-callbacks` (ADR-0053 amended: a lambda parameter known only in part,
+  `List<?>`, was not checked at all), `e10-named-arguments` (ADR-0081: no
+  test named a secret key out of its place) and `e14-labels` (ADR-0143
+  amended: an `id` every row has now reaches the first row's element, so an
+  `aria-labelledby` through one is no longer reported twice);
+- `e14-case-and-delivery` checked the store and the accepted corpus as one
+  program, and both serve `/cart`. PW0341 now names two same-named pages by
+  their modules (ADR-0160);
+- `e9-parity` ran Koka as a program compiler, which wants a `main`, so no
+  module could ever agree (ADR-0015 amended: a library, and a positive
+  control);
+- `e8-host` never had its guests on a runner (ADR-0026: the audit builds
+  them);
+- `e14-contract` passed only in an agent's session: svelte-check writes its
+  machine summary by default only where `CLAUDECODE=1` (ADR-0120);
+- `e14-page-speculation` (ADR-0191 amended): since layouts, each store page
+  speculates on its layout's binding of the cart too, at an entry of its
+  own, which masked whether the page was sent its own. Found on the way:
+  one query a page and its layout bind is speculated as two entries (NEXT).
+The CI planner's ceiling is now half a shard's limit, 10,350 s (ADR-0290,
+amended again): a branch ran its recipes up to twice their recorded seconds.
+And a browser test that loaded the store's page, reloaded it only to its
+commit and loaded it again is now one load: WebKit once never reached the
+second's `load` (master's verify 38036676661).
+
+**ADR-0304, 2026-10-10: what a page shows by the clock is told when the
+clock passes it** (the integrator's, the first of the store hours' steps;
+track `time`, merged from `4c079dc`). The clock was a stub answering 0. Now
+the wall clock is read only by comparing it (`clock.passed(at)`,
+`clock.today_in(zone)`, effect `clock.compare`): the host notes the earliest
+instant each read compared, keeps the value until then, and at that instant
+reads each live document that shows it again and tells it what changed, as
+Materialize's temporal filters do. Refused where nothing would tell (a page
+built once, a public materialization). Time zones come from the host's own
+tz database (`pw-time`: TZif, RFC 8536, a skipped or repeated local time
+read as RFC 5545 does). Found: a host function whose effect needs no
+authority was never linked. 9 pw-time tests (vectors from Python's
+zoneinfo, tz 2026c), 15 compiler tests, 10 host tests, 25 of 25 mutants
+(verify 38022822226).
+
 **ADR-0243 amended, 2026-10-10: markup written on one line is one region,
 and no operand** (found writing ADR-0303's refusals; track `siblings`,
 merged from `31eeb3c`). `<h1>a</h1><p>b</p>` at a view's top was PW0009 at

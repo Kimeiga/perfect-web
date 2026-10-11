@@ -473,7 +473,8 @@ pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
             .collect::<Vec<_>>()
             .join("/")
     };
-    let mut first: std::collections::BTreeMap<String, (usize, String)> =
+    // Each route's first page: its unit, its name, and its module's.
+    let mut first: std::collections::BTreeMap<String, (usize, String, Option<String>)> =
         std::collections::BTreeMap::new();
     let mut out = Vec::new();
     for (u, hir) in hirs.iter().enumerate() {
@@ -484,11 +485,20 @@ pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
             let Some(route) = declared_route(hir, decl) else {
                 continue;
             };
+            let module = hir.module_of(id).map(str::to_string);
             match first.get(&shape(&route)) {
                 None => {
-                    first.insert(shape(&route), (u, decl.name.clone()));
+                    first.insert(shape(&route), (u, decl.name.clone(), module));
                 }
-                Some((_, other)) if u == unit => {
+                Some((_, other, theirs)) if u == unit => {
+                    // Two pages of one name each by its module, or the
+                    // message names one page twice. Until 2026-10-11 the
+                    // store's `CartPage` and a corpus file's were "`CartPage`
+                    // is served at `/cart`, and so is `CartPage`".
+                    let named = |name: &str, module: &Option<String>| match module {
+                        Some(m) if *other == decl.name => format!("{m}.{name}"),
+                        _ => name.to_string(),
+                    };
                     let code = codes::ROUTE_DECLARED_TWICE;
                     out.push(Diagnostic {
                         code: code.id,
@@ -497,8 +507,9 @@ pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
                         detector: Detector::DeclarationRule,
                         severity: Severity::Error,
                         message: format!(
-                            "`{}` is served at `{route}`, and so is `{other}`",
-                            decl.name
+                            "`{}` is served at `{route}`, and so is `{}`",
+                            named(&decl.name, &module),
+                            named(other, theirs)
                         ),
                         primary_span: hir.decl_span(id),
                         related: Vec::new(),

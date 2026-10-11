@@ -2367,6 +2367,29 @@ e14-invariants:
      } > docs/evidence/E14/invariants.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/invariants.txt
 
+# ADR-0304: what a page shows by the clock is told when the clock passes it.
+# The zones, the checker's cases, the host's clock and timers, and the
+# mutation controls.
+e14-clock:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0304 - what a page shows by the clock is told when the clock passes it"; echo; \
+       echo "produced by: just e14-clock"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "tz database: $(cat /usr/share/zoneinfo/+VERSION 2>/dev/null || sed -n 's/^# version //p' /usr/share/zoneinfo/tzdata.zi 2>/dev/null || echo unknown)"; echo; \
+       echo "== time zones, read from the host's own database (runtime/pw-time)"; echo; \
+       cargo test --locked -p pw-time 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== where a clock compared may be kept (compiler/pw-core: effects, tests/clock_compared.rs)"; echo; \
+       cargo test --locked -p pw-core --lib effects 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-core --test clock_compared 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host's clock, what a value holds until, and a page told then (spikes/own-renderer/server)"; echo; \
+       cargo test --locked -p pw-dev-server -- clock:: a_page_is_told_when a_kept_value_past a_page_that_compares_no the_hosts_clock 2>&1 \
+         | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/clock_mutations.py)"; echo; \
+       python3 scripts/clock_mutations.py; \
+     } > docs/evidence/E14/clock.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/clock.txt
+
 # ADR-0180: a delivery estimate is a range, and says when it was made. The
 # server's tests, the page in three engines, and the mutation controls.
 e14-estimate-range:
@@ -3529,10 +3552,17 @@ e14-case-and-delivery:
        echo "== the tests (compiler/pw-core/tests/case_and_delivery.rs)"; echo; \
        cargo test --locked -p pw-core --test case_and_delivery 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the store, the accepted corpus and the demos check as before"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/accepted/*.pw examples/demo/*.pw 2>&1 | tail -1; \
+       for program in store accepted demo; do \
+         printf '%s: ' "$program"; \
+         cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+           examples/domain.pw examples/lib/*.pw examples/$program/*.pw 2>&1 | tail -1; \
+       done; \
        echo; echo "== mutation controls (scripts/case_and_delivery_mutations.py)"; echo; \
        python3 scripts/case_and_delivery_mutations.py; \
+       echo; \
+       echo "Each program is checked as one: the store's pages and the corpus's both"; \
+       echo "serve \`/cart\`, which one program may not (PW0341). Until 2026-10-11 the"; \
+       echo "three were checked as one, and a route each serves was an error."; \
      } > docs/evidence/E14/case-and-delivery.txt
     @grep -E "^test result|mutants killed|pw check|^---- |panicked at" docs/evidence/E14/case-and-delivery.txt
 
@@ -4238,7 +4268,11 @@ e10-close-bench RUNS="8":
 # E14-A (ADR-0120): the benchmark's store in three stacks, one behavioural
 # contract. Each store builds and typechecks, the contract suite passes on all
 # three three times over, and each mutant store fails it. The Pleris one is
-# the benchmark's frozen copy (ADR-0156), as the other two are.
+# the benchmark's frozen copy (ADR-0156), as the other two are. svelte-check
+# is asked for its machine output, whose summary this reads: it writes that
+# by default only where `CLAUDECODE=1` (svelte-check 4.7.6), so until
+# 2026-10-11 the recipe passed in an agent's session and failed every
+# verification runner.
 e14-contract:
     @cargo build --quiet --locked -p pw-cli -p pw-dev-server
     @bash spikes/own-renderer/baseline-store.sh > /dev/null
@@ -4253,7 +4287,7 @@ e14-contract:
          done; done | sort -u; echo; \
        echo "== builds and typechecks"; \
        (cd benchmarks/baselines/next-react && pnpm --silent build > /dev/null && echo "  next-react: built" && pnpm --silent typecheck && echo "  next-react: tsc clean"); \
-       (cd benchmarks/baselines/sveltekit && pnpm --silent build > /dev/null 2>&1 && echo "  sveltekit: built" && pnpm --silent typecheck 2>&1 | grep -oE "[0-9]+ ERRORS [0-9]+ WARNINGS" | sed 's/^/  sveltekit: svelte-check /'); \
+       (cd benchmarks/baselines/sveltekit && pnpm --silent build > /dev/null 2>&1 && echo "  sveltekit: built" && pnpm --silent typecheck --output machine 2>&1 | grep -oE "[0-9]+ ERRORS [0-9]+ WARNINGS" | sed 's/^/  sveltekit: svelte-check /'); \
        ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw benchmarks/baselines/pleris/domain.pw benchmarks/baselines/pleris/lib/*.pw benchmarks/baselines/pleris/store/*.pw | sed 's/^/  pleris: /'; \
        echo; echo "== the contract, every stack, three times (benchmarks/harness/contract)"; echo; \
        (cd benchmarks/harness && pnpm exec playwright test --repeat-each=3 --reporter=list 2>&1 \

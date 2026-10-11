@@ -1157,6 +1157,26 @@ pub fn forbidden_in(
         });
     }
 
+    // ADR-0304: a value that compares the wall clock holds until the
+    // earliest instant it compared, and a query's entry, shared or not, is
+    // read again then. Nothing makes a file again, nor a materialization,
+    // which is made again when an event reaches it: no event says the
+    // instant passed.
+    if reuse != Reuse::PerReader && effect.starts_with("clock.compare") {
+        return Some(match reuse {
+            Reuse::Build => {
+                "static generation cannot compare the clock: the output is generated once \
+                 and shipped as a file, and nothing tells a file when the instant it \
+                 compared passes"
+            }
+            _ => {
+                "a shared materialized fragment cannot compare the clock: it is made again \
+                 when an event reaches it, and no event says the instant it compared has \
+                 passed"
+            }
+        });
+    }
+
     // A painter is identified by what it declares, not by a declaration kind:
     // `paint.custom` in the row *is* the statement "this runs inside the paint
     // pipeline". Charter §7.5A gives it inputs precisely so it can be replayed
@@ -1561,5 +1581,13 @@ mod tests {
             forbidden_in(&page, Reuse::Build, None, "clock.read").is_none(),
             "a duration measurement does not make a build artifact irreproducible"
         );
+
+        // A clock compared (ADR-0304) is true until a known instant: a
+        // query's entry, read again then, may hold it. A file generated once,
+        // and a materialization made again only when an event reaches it,
+        // are told nothing when that instant passes.
+        assert!(forbidden_in(&page, Reuse::PerReader, None, "clock.compare").is_none());
+        assert!(forbidden_in(&page, Reuse::SharedPartition, None, "clock.compare").is_some());
+        assert!(forbidden_in(&page, Reuse::Build, None, "clock.compare").is_some());
     }
 }

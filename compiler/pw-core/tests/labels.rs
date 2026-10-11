@@ -247,6 +247,15 @@ fn a_label_names_the_first_element_with_its_id() {
         )),
         ["PW5031 `q` names two elements of `V` | `q` is this element's too"]
     );
+    // The control first: the label names it, and only the `id` is the
+    // defect. Until 2026-10-11 nothing held the label to the first: a label
+    // naming the last element with its `id` passed every test.
+    assert_eq!(
+        reported(&view(
+            r#"<label for="q">Query</label><input id="q" type="text" name="q" /><p id="q">Note</p>"#
+        )),
+        ["PW5031 `q` names two elements of `V` | `q` is this element's too"]
+    );
     // A computed `id` cannot be matched to a `for`.
     refused(
         r#"<label for="q">Query</label><input id={caption} type="text" name="q" />"#,
@@ -267,6 +276,20 @@ fn an_id_inside_each_names_no_one_row() {
     );
     // Control: each row's label wraps its own control.
     clean(r#"{#each names as n (n)}<label>{n} <input type="text" name="qty" /></label>{/each}"#);
+}
+
+#[test]
+fn a_reference_to_an_id_every_row_has_is_its_ids_defect_alone() {
+    // `aria-labelledby` reaches the first row's element, as HTML's reference
+    // does, and that every row has `t` is PW5031's. Until 2026-10-11 such an
+    // `id` named no element, and the control was reported too (PW5014): the
+    // one defect twice, where ADR-0185 reports it once.
+    assert_eq!(
+        reported(&view(
+            r#"<input type="text" name="q" aria-labelledby="t" />{#each names as n (n)}<span id="t">{n}</span>{/each}"#
+        )),
+        ["PW5031 `t` names every row of a list in `V` | `V` renders this"]
+    );
 }
 
 #[test]

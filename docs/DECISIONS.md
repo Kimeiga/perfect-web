@@ -21,7 +21,7 @@ Status values: `Proposed` · `Accepted` · `Superseded by ADR-NNNN` · `Rejected
 | [0012](DECISIONS/ADR-0012-adopt-rowan-before-body-parsing.md) | Adopt `rowan` 0.17.0 before body parsing; analyses consume HIR, not syntax nodes | Accepted | reuse | rowan cannot express a needed property |
 | [0013](DECISIONS/ADR-0013-formatter-design.md) | Canonical formatting rules; implementation deferred until ADR-0012 lands | Accepted (design) | build | canonical examples drafted |
 | [0014](DECISIONS/ADR-0014-hir-representation.md) | HIR is id-indexed arenas per body, with a span on every node; only `lower.rs` sees syntax | Accepted | build | name resolution needs to interleave with lowering |
-| [0015](DECISIONS/ADR-0015-koka-backend-scope.md) | The Koka backend lowers a pure subset only, and states what that does not prove | Accepted | tape | the `pw` checker reaches corpus parity (ADR-0001) |
+| [0015](DECISIONS/ADR-0015-koka-backend-scope.md) | The Koka backend lowers a pure subset only, and states what that does not prove. Amended 2026-10-11: Koka checks a module as a library (`koka -l`); as a program it needed a `main` no module has, so none could agree, and a positive control now shows one can. | Accepted | tape | the `pw` checker reaches corpus parity (ADR-0001) |
 | [0016](DECISIONS/ADR-0016-e2a-r-runtime-shape.md) | E2A-R is a thread-scoped runtime on `std::thread::scope`; its results are behaviour, not guarantees | Accepted | build | E8 selects the host execution model |
 | [0017](DECISIONS/ADR-0017-marko-adapter-boundary.md) | The Marko adapter is a one-way lowering from HIR; generated files are build output, never authored | Accepted | tape | E7-R passes the golden suite (ADR-0002) |
 | [0018](DECISIONS/ADR-0018-manifest-is-the-compiler-runtime-boundary.md) | The resource manifest is a data artifact; neither compiler nor runtime depends on the other | Accepted | build | E8 selects the host execution model |
@@ -29,7 +29,7 @@ Status values: `Proposed` · `Accepted` · `Superseded by ADR-NNNN` · `Rejected
 | [0020](DECISIONS/ADR-0020-component-contract-is-the-compiler-host-boundary.md) | The compiler hands the host a six-field `ComponentContract`, one per declaration, and actual Wasm imports must be a SUBSET of what it allows | Accepted | build | E9 lowers capabilities and effects into it |
 | [0021](DECISIONS/ADR-0021-the-language-is-called-pleris.md) | The language is **Pleris**; Perfect Web stays the project, `.pw` the source format, `pw-*` the internal crates | Accepted | prose only | a public launch needs a formal trademark/organization clearance pass |
 | [0022](DECISIONS/ADR-0022-causal-analysis-validation.md) | **Coincidental correctness** has a name and a countermeasure: important conclusions must explain which resolved facts caused them, and fixtures grow from three checks to five | Accepted | E8 slice 2 is the first consumer | a provenance DAG that RECOMPUTES rather than RECORDS would be a second answer to the same question |
-| [0026](DECISIONS/ADR-0026-a-capability-authorizes-an-operation-it-does-not-identify-one.md) | A host dependency is a **callable import** — `ImportId` + ABI + a SET of capabilities + who defined it — and a capability is never the callable identity. A host implementation is explicit declaration metadata, never inferred from a `todo` body or an effect row. The audit is three separate layers, and operation authority ⊆ component authority | Accepted | E10 | the Wasm encoder could not encode `add_to_cart`: `Carts.add(s, item, qty)` and `Carts.clear(s)` share `database.write<Carts>` and a core import has one signature, so a capability-keyed import had no honest arity |
+| [0026](DECISIONS/ADR-0026-a-capability-authorizes-an-operation-it-does-not-identify-one.md) | A host dependency is a **callable import** — `ImportId` + ABI + a SET of capabilities + who defined it — and a capability is never the callable identity. A host implementation is explicit declaration metadata, never inferred from a `todo` body or an effect row. The audit is three separate layers, and operation authority ⊆ component authority. Amended 2026-10-11: the artifact audit builds the guests it reads, which no runner had. | Accepted | E10 | the Wasm encoder could not encode `add_to_cart`: `Carts.add(s, item, qty)` and `Carts.clear(s)` share `database.write<Carts>` and a core import has one signature, so a capability-keyed import had no honest arity |
 | [0025](DECISIONS/ADR-0025-an-optimistic-clause-targets-a-resource-entry.md) | An optimistic clause names the resource **entry** it updates, binds its current value, and applies a **pure** transition. There is no written `rollback`: the platform restores the value it held | Accepted | E10 | two entries can share a type, so a transition naming only the type does not say what it changed; and a hand-written inverse is generally false — `Apple × 3` optimistically `+2` is not restored by `remove(apple)` |
 | [0024](DECISIONS/ADR-0024-optimistic-and-rollback-bind-with-a-lambda.md) | *(rejected)* `optimistic` / `rollback` bind their subject with a bare lambda | Rejected, superseded by 0025 | E10 | the lambda said what transformation to perform and not which entry it applied to; and it kept a written inverse, which describes an operation the runtime will not use |
 | [0023](DECISIONS/ADR-0023-milestone-gates-prove-one-layer.md) | A milestone gate proves **one layer's** contract; a cross-layer end-to-end proof belongs at the milestone where both sides exist, as a recorded deferred obligation | Accepted | build | a SECOND gate item deferred for the same reason — one mistake is a patch, two is a structural inversion in the milestone order |
@@ -323,7 +323,10 @@ take the types its use declares. `infer.rs` reads them from the callee's
 declared function type, where it gave the first parameter the element type
 of any list beside it; `values.rs` keeps the types a solved call, an
 annotation or a declared result gives them. `fold`'s accumulator was typed
-as the element and refused.
+as the element and refused. Amended 2026-10-11: a parameter known only in
+part (`List<?>`) is checked by that part. Since ADR-0063 the guard against
+keeping it only left the parameter unchecked, and two mutants survived it
+unseen for two weeks.
 
 [ADR-0054](DECISIONS/ADR-0054-opaque-values.md): an opaque value is built and
 read inside a component, as its representation retyped (`Instr::Retype`),
@@ -555,7 +558,7 @@ backend passed arguments in written order, so `g(b = 1, a = 10)` computed
 `g(1, 10)`, a silent miscompile; the checker related no argument of a call
 that named one; and a generic result's label was carried from the argument
 in the wrong place. Signatures carry parameter names now, and one
-arrangement serves the checker, the labels and the backend (PW0617).
+arrangement serves the checker, the labels and the backend (PW0617). Amended 2026-10-11: a test names a secret key out of its place, the only call that tells one parameter from another since ADR-0129.
 
 ## 2026-09-26: a `derived` value performs no effect (E10)
 
@@ -879,7 +882,7 @@ models and budget.
 store in Next.js 16.3.8 and SvelteKit 2.70.3 (not the day-old 3.0.0) beside
 the Pleris store, held to one behavioural contract with mutant stores as
 negative controls. Found that the Pleris store's `optimistic` and
-`idempotent_by` are checked and not executed; the contract excludes both.
+`idempotent_by` are checked and not executed; the contract excludes both. Amended 2026-10-11: svelte-check is asked for its machine output, which it wrote by default only in an agent's session (`CLAUDECODE=1`), so every runner failed the recipe.
 
 ## 2026-10-02: an idempotent command runs once per interaction (E14)
 
@@ -1095,7 +1098,7 @@ that reaches it, as the HTML standard and accname 1.2 define:
 - a `<label for>` with text, naming the first element with that `id`;
 - a `<label>` with text wrapping it;
 - an `aria-labelledby` reaching text;
-- a non-blank `aria-label`.
+- a non-blank `aria-label`. Amended 2026-10-11: an `id` every row has reaches the first row's element, as HTML's reference does, and is PW5031's alone; an `aria-labelledby` through one was reported twice.
 
 Until then any `id` counted as a name, unchecked, so T06's unsafe store and
 `tricky.pw`'s field passed with no label, and a wrapping label was refused.
@@ -1297,7 +1300,7 @@ the audit's route gap.
   names each of its page's parameters once.
 - PW0621: a route's parameter is text.
 - PW0341: one route is one page's.
-- The canonical store declares `/stores/{id}`.
+- The canonical store declares `/stores/{id}`. Amended 2026-10-11: two pages of one name at one route are each named by its module.
 
 [ADR-0161](DECISIONS/ADR-0161-each-document-is-its-own-subscriber.md): the
 second step of the route gap.
@@ -1637,7 +1640,7 @@ every page speculates from its own module.
 - `pw build` wrote every page a speculation module; the server read the
   store's alone, so the cart's page showed a press only when the server
   answered. Now each page carries its own, and each document whose page
-  speculates on a value is sent it.
+  speculates on a value is sent it. Amended 2026-10-11: each page is held to its own entry's value, which a layout's binding of the same query had masked.
 
 [ADR-0192](DECISIONS/ADR-0192-the-stores-as-the-home-page.md): the stores,
 as the home page.
@@ -2394,10 +2397,11 @@ ADR-0249 and ADR-0278).
   soonest, what it adds to that shard's setup counted; one that needs less
   may run where more is set up. The recipes run against a database keep
   shards of their own, as many as end the run soonest. Amended 2026-10-10:
-  no shard of more than one recipe is dealt past 13,800 s, two thirds of a
-  shard's 345-minute limit; a run takes more shards than it asks for where
-  its own would (a track's 9 were dealt 21,900 s, and a shard stopped at
-  the limit throws the run away).
+  no shard of more than one recipe is dealt past a ceiling under a shard's
+  345-minute limit, 10,350 s, half of it since 2026-10-11 (a branch ran its
+  recipes up to twice their recorded seconds); a run takes more shards than
+  it asks for where its own would (a track's 9 were dealt 21,900 s, and a
+  shard stopped at the limit throws the run away).
 [ADR-0291](DECISIONS/ADR-0291-a-hosts-record-is-written-as-the-program-names-its-fields.md):
 a host's record is written as the program names its fields (extends
 ADR-0172 to the host).
@@ -2532,3 +2536,18 @@ the second step to the parts two pages share kept in place).
   PW0353, PW5044, PW5045. Found: two roots on one line did not parse; a
   page and its layout read one query twice; a speculation found one binding
   per entry. The store's four pages share `StoreLayout`.
+
+[ADR-0304](DECISIONS/ADR-0304-what-a-page-shows-by-the-clock-is-told-when-the-clock-passes-it.md):
+what a page shows by the clock is told when the clock passes it (the
+integrator's; the first of the store hours' steps).
+- `clock.passed(at)` and `clock.today_in(zone)`, effect `clock.compare`: the
+  wall clock read only by comparing it. The host notes the earliest instant
+  each read compared, holds a kept entry until then, and reads each live
+  document that shows one again at that instant and tells it what changed.
+  One clock (the system's, moved by `/bench/clock`, forward only). Refused
+  where nothing tells (a page built once, a public materialization). Time
+  zones from the host's own tz database (`pw-time`: TZif, RFC 8536, and
+  RFC 5545's reading of a skipped or repeated time), `TimeZone`,
+  `LocalDate`, `LocalTime`, `Weekday`, effect `clock.zone`. Found: the clock
+  was a stub answering 0; a host function whose effect needs no authority is
+  never linked.

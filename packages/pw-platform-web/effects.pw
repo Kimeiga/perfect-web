@@ -289,6 +289,22 @@ effect clock.read {
     capability none
 }
 
+// **The wall clock, read only by comparing it** (ADR-0304): whether an instant
+// has passed, and a zone's date. Unlike `clock.wall`, a value that reads it is
+// true until a known instant, the earliest it compared, and is read again
+// then: so one entry may serve every reader, and each page that shows it is
+// told when it changes. A file generated once is told nothing, and may not.
+effect clock.compare {
+    capability clock.compare
+}
+
+// **The host's time zone database**: a zone's rules, which a deployment's
+// tz data says and which change only with it. A capability, as a host
+// supplies the database: a host without one refuses what reads it.
+effect clock.zone {
+    capability clock.zone
+}
+
 // --- the escape hatches --------------------------------------------------------
 
 // Charter §16: an escape hatch is declared, audited and attributed. Declaring

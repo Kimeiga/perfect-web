@@ -44,12 +44,14 @@ MUTANTS = [
         "            .insert(doc.clone(), self.store_page().to_string());\n",
     ),
     (
+        # Re-anchored by ADR-0304: what a document's values hold until is
+        # noted as they are read.
         "a document's bindings are read by the store's plan",
         SERVER,
         "        let plan = self.plan_of(&page);\n"
-        "        let mut out = BTreeMap::new();\n",
+        "        // What the document's values hold until (ADR-0304): the earliest\n",
         "        let plan = &self.plan;\n"
-        "        let mut out = BTreeMap::new();\n",
+        "        // What the document's values hold until (ADR-0304): the earliest\n",
     ),
     (
         "a document is patched against the store's template",

@@ -375,6 +375,13 @@ refused by name:
   the backend types an argument by its parameter's declared type, and does
   not carry into it what the earlier arguments fixed. A list operation's
   function, and a non-generic declaration's, are typed.
+- **A lambda passed before the argument that fixes its type parameter is
+  typed by what came before it** (ADR-0053, amended 2026-10-11). In
+  `later(xs => xs + 1, w)`, where `fn later<T>(f: fn(List<T>) -> Int, x: T)`,
+  `xs` is a `List<?>` and not a `List<Word>`. It is checked by what is known,
+  so `xs + 1` is refused, but `xs`'s elements are not typed. TypeScript types
+  a context-sensitive argument after the others. Every callback in `pw-std`
+  is its function's last parameter.
 - **A statement keyword cannot name a value** (PW0013, ADR-0041, ruling
   needed). `let query = ..` is refused rather than read as a `query ..`
   statement at every use.
@@ -582,6 +589,14 @@ awaited in order. What remains:
   binding named `line` beside the cart's `{#each cart.lines as line}` was
   read for `line.name` inside the loop, and the build refused. The checker
   accepts the shadowing; the binding is named `summary`.
+- **The clock is read by comparison alone** (ADR-0304): no value of "now"
+  is kept or shown, so a countdown ("closes in 12 minutes") is not
+  written; a handler reads no clock; a page built once and a public
+  materialization are refused a comparison, since nothing would tell them
+  when it changes. One host's clock, moved forward only (`/bench/clock`);
+  a tz database that changes under a kept value is not noticed until the
+  value is read again. A host function whose effect needs no authority is
+  never linked (`pw-host`'s `linkable`), so the zone reads are granted.
 - **A layout is one, unnested, and given nothing** (ADR-0303): a page names
   one layout; a layout is shown in no other, is given none of the page's
   parameters, has no title template of its own, and holds one slot. A

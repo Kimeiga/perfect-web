@@ -59,10 +59,12 @@ MUTANTS = [
         "            by_id.insert(id, n);\n",
     ),
     (
-        "an `id` inside `{#each}` names its row",
+        "an `id` inside `{#each}` names no row",
         CHECK,
-        "    by_id.retain(|_, n| !rows.contains(n));\n",
-        "    by_id.retain(|_, n| !rows.contains(n) || true);\n",
+        "            by_id.entry(id).or_insert(n);\n        }\n    }\n    by_id\n",
+        "            by_id.entry(id).or_insert(n);\n        }\n    }\n"
+        "    let rows = inside_each(body, order);\n"
+        "    by_id.retain(|_, n| !rows.contains(n));\n    by_id\n",
     ),
     (
         "a control inside a block is a label's first",

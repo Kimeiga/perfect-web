@@ -1,7 +1,7 @@
 ADR-0290 - a verification run is dealt by the seconds its recipes last took
 
 produced by: just e14-dealt-by-time
-commit: e5ad4b72d193775880b759eee9e55f2e877dce7c
+commit: 4b41c524a619995eed7364318ff1f81f71191cd9
 python: Python 3.12.8
 
 == the plan and the fetch (scripts/tests/test_ci_scripts.py)
@@ -46,7 +46,7 @@ test_a_run_of_one_shard_is_read_where_it_was_extracted (scripts.tests.test_ci_sc
 test_a_run_whose_recipes_passed_passes (scripts.tests.test_ci_scripts.Summary.test_a_run_whose_recipes_passed_passes) ... ok
 test_a_shard_that_reported_nothing_fails_the_run (scripts.tests.test_ci_scripts.Summary.test_a_shard_that_reported_nothing_fails_the_run) ... ok
 test_a_surviving_mutant_fails_the_run (scripts.tests.test_ci_scripts.Summary.test_a_surviving_mutant_fails_the_run) ... ok
-Ran 40 tests in 2.838s
+Ran 40 tests in 2.939s
 OK
 
 == mutation controls (scripts/dealt_by_time_mutations.py)

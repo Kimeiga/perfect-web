@@ -67,8 +67,14 @@ MUTANTS = [
     (
         "two pages at one route pass",
         ROUTES,
-        "                Some((_, other)) if u == unit => {\n",
-        "                Some((_, other)) if u == unit && false => {\n",
+        "                Some((_, other, theirs)) if u == unit => {\n",
+        "                Some((_, other, theirs)) if u == unit && false => {\n",
+    ),
+    (
+        "two pages of one name are named alike",
+        ROUTES,
+        "                        Some(m) if *other == decl.name => format!(\"{m}.{name}\"),\n",
+        "                        Some(m) if false => format!(\"{m}.{name}\"),\n",
     ),
     (
         "parameters' names tell two routes apart",

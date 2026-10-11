@@ -166,3 +166,23 @@ fn a_lambda_over_a_bound_list_is_typed_once_the_binding_is() {
     assert_eq!(bad.len(), 1, "{bad:?}");
     assert!(bad[0].ends_with("this is `t.Word`"), "{bad:?}");
 }
+
+#[test]
+fn a_parameter_known_in_part_is_checked_by_that_part() {
+    // Nothing fixes `each_list`'s `T`, so `xs` is a `List<?>`: a list, of
+    // what no one says. Until 2026-10-11 a parameter was kept only where its
+    // type was known whole, and `xs + 1` was not checked at all.
+    let src = |body: &str| {
+        program(&format!(
+            "fn each_list<T>(f: fn(List<T>) -> Int) -> Int {{ 0 }}\n\n\
+             fn f() -> Int {{ each_list(xs => {body}) }}"
+        ))
+    };
+    assert_eq!(codes(&src("List.length(xs)")), CLEAN);
+    let sum = reported(&src("xs + 1"));
+    assert_eq!(
+        sum.first().map(String::as_str),
+        Some("PW0609 the left side of `+` must be `Int or Float`, and this is `List<?>`"),
+        "{sum:?}"
+    );
+}

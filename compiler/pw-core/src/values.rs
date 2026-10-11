@@ -637,8 +637,10 @@ struct Typer<'a> {
     locals: RefCell<BTreeMap<Binder, Ty>>,
     /// The expression each `|>` feeds, keyed by the call on its right.
     piped: BTreeMap<ExprId, ExprId>,
-    /// Lambda parameters given a closed type while their use was solved,
-    /// waiting to join `locals` (see [`Typer::solve_lambdas`]).
+    /// Lambda parameters given a type while their use was solved, known
+    /// whole or in part, waiting to join `locals` (see
+    /// [`Typer::solve_lambdas`]). A part a later round knows completes it
+    /// ([`Typer::bind`]).
     solved: RefCell<BTreeMap<Binder, Ty>>,
     /// The `if`s and `match`es whose value is used (ADR-0068).
     used: BTreeSet<ExprId>,
@@ -2017,6 +2019,13 @@ impl<'a> Typer<'a> {
     /// parameters take that type's parameter types, and its type is theirs
     /// with its body's type as the result. Without an expected function type
     /// a lambda has no type here — an unannotated parameter is not a claim.
+    ///
+    /// A parameter whose type is known only in part keeps that part, and is
+    /// checked by it (ADR-0053, amended 2026-10-11): `xs` in
+    /// `each_list(xs => xs + 1)` is a `List<?>`, and a list is no number.
+    /// Until then only a type known whole was kept, a guard from before
+    /// [`Typer::bind`] completed a type a later round knows more of, and
+    /// such a parameter was not checked at all.
     fn lambda(&self, params: &[crate::hir::PatternId], body: ExprId, expected: &[Ty]) -> Ty {
         let Some(params) = lambda_binders(self.body, params) else {
             return Ty::Unknown;
@@ -2034,7 +2043,7 @@ impl<'a> Typer<'a> {
         let mut saved = Vec::new();
         for (p, ty) in params.iter().zip(expected_params) {
             let b = Binder::Pattern(*p);
-            if ty.is_closed() && !ty.mentions_foreign_parameter(own) {
+            if !ty.mentions_foreign_parameter(own) {
                 self.solved.borrow_mut().insert(b, ty.clone());
             }
             let old = self.locals.borrow_mut().insert(b, ty.clone());

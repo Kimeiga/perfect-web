@@ -1271,6 +1271,7 @@ dependencies = [
  "pw-render",
  "pw-resource",
  "pw-syntax",
+ "pw-time",
  "rusqlite",
  "serde",
  "serde_json",
@@ -1380,6 +1381,10 @@ dependencies = [
 
 [[package]]
 name = "pw-tasks"
+version = "0.0.0"
+
+[[package]]
+name = "pw-time"
 version = "0.0.0"
 
 [[package]]
