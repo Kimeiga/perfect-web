@@ -14,8 +14,17 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 EVIDENCE="$REPO_ROOT/docs/evidence/E8"
 MINIMAL="$REPO_ROOT/spikes/wasmtime-component/guest-minimal/target/wasm32-wasip2/release/spike_wasmtime_guest_minimal.wasm"
 
+# The guests this audit reads, built here: `just spike-wasmtime` builds them
+# too, and writes E0's evidence besides. Until 2026-10-11 this refused where
+# they were not built, and a verification runner never had them: every nightly
+# verify failed `e8-host` without running it. Each into its own `target/`,
+# where the tests read it, whatever `CARGO_TARGET_DIR` says.
+for guest in guest guest-minimal; do
+  (cd "$REPO_ROOT/spikes/wasmtime-component/$guest" &&
+    cargo build --quiet --locked --release --target wasm32-wasip2 --target-dir target)
+done
 if [ ! -f "$MINIMAL" ]; then
-  echo "the guests are not built - run 'just spike-wasmtime' first" >&2
+  echo "the minimal guest was not built at $MINIMAL" >&2
   exit 1
 fi
 

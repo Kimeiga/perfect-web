@@ -89,6 +89,30 @@ fn a_function_values_parameters_have_no_names() {
     clean("fn h() -> Int !{} {\n    let g = f\n    g(1, \"b\")\n}");
 }
 
+/// **A key named out of its place is still the key** (ADR-0081, ADR-0129):
+/// an argument is given to the parameter of its name, and a secret that
+/// parameter states is not in what the call makes. Since ADR-0129 an argument
+/// carries its label whichever parameter it is given to, so until 2026-10-11
+/// no test told one parameter from another: every argument could have gone
+/// to the parameters in the order written, and every test passed.
+#[test]
+fn a_key_named_out_of_its_place_is_still_the_key() {
+    let src = |call: &str| {
+        format!(
+            "module t\n\nimport log\nimport secrets\nimport capability.{{ Payments, Public, Secret }}\n\n\
+             fn stamp(key: Secret<Payments>, n: Int) -> String !{{}} {{ \"stamped\" }}\n\n\
+             fn audit() -> () !{{ log<Public>, secret<Payments> }} {{\n    let v = {call}\n    log.public(v)\n}}\n"
+        )
+    };
+    for call in [
+        "stamp(key = secrets.payments(), n = 0)",
+        "stamp(n = 0, key = secrets.payments())",
+    ] {
+        let found = reported(&src(call));
+        assert!(found.is_empty(), "{call}: {found:#?}");
+    }
+}
+
 /// A generic result carries the label of the argument its type comes from
 /// (ADR-0064), found by name.
 #[test]

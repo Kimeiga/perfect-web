@@ -160,3 +160,14 @@ types. `docs/RISK_QUEUE.md` carries the classification and
 The answer appears to differ by `Ownership` — an operation the application
 declared is one the compiler should arguably publish; a platform facility is
 one the compiler must conform to — and it is with the architect.
+
+## Amended, 2026-10-11: the artifact audit builds the guests it reads
+
+`just e8-host` (`spikes/wasmtime-component/audit.sh`) refused where the two
+WebAssembly guests were not built, and pointed to `just spike-wasmtime`.
+That spike also rewrites E0's evidence. A verification runner never had the
+guests, so every nightly verification failed the recipe without running it.
+The audit now builds each guest itself
+(`cargo build --locked --release --target wasm32-wasip2`, each into its own
+`target/`, where the tests read it). `rust-toolchain.toml` already installs
+the target.

@@ -14813,12 +14813,20 @@ public query Store(",
                 && matches!(&p.operation, PatchOp::ReplaceText { text } if text == "2")),
             "{to_cart:?}"
         );
-        // And the speculated value to each, as each speculates (ADR-0191).
+        // And the speculated value to each, as each speculates (ADR-0191):
+        // at the cart's own entry, the one its patches are derived from.
+        // Since ADR-0303 each page speculates on its layout's binding of the
+        // cart too, sent at an entry of its own (ADR-0222), so a value at any
+        // entry did not say the page was sent its own: until 2026-10-11 a
+        // host that sent the cart's to the store's documents alone passed.
         let values = |doc: &Doc| {
+            let own = set(doc).basis.resources[0].entry.clone();
             s.pending.lock().expect("pending")[doc]
                 .frames
                 .iter()
-                .filter(|(_, f)| matches!(f, StreamFrame::EntryValue { .. }))
+                .filter(
+                    |(_, f)| matches!(f, StreamFrame::EntryValue { entry, .. } if *entry == own),
+                )
                 .count()
         };
         assert_eq!((values(&store) > 0, values(&cart) > 0), (true, true));

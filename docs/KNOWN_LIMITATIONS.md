@@ -375,6 +375,13 @@ refused by name:
   the backend types an argument by its parameter's declared type, and does
   not carry into it what the earlier arguments fixed. A list operation's
   function, and a non-generic declaration's, are typed.
+- **A lambda passed before the argument that fixes its type parameter is
+  typed by what came before it** (ADR-0053, amended 2026-10-11). In
+  `later(xs => xs + 1, w)`, where `fn later<T>(f: fn(List<T>) -> Int, x: T)`,
+  `xs` is a `List<?>` and not a `List<Word>`. It is checked by what is known,
+  so `xs + 1` is refused, but `xs`'s elements are not typed. TypeScript types
+  a context-sensitive argument after the others. Every callback in `pw-std`
+  is its function's last parameter.
 - **A statement keyword cannot name a value** (PW0013, ADR-0041, ruling
   needed). `let query = ..` is refused rather than read as a `query ..`
   statement at every use.

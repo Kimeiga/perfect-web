@@ -59,3 +59,15 @@ only in policy clauses and language forms, which this does not change.
   are byte-identical, apart from ADR-0058's two handlers.
 - **Mutation controls:** `scripts/named_argument_mutations.py`,
   `just e10-named-arguments`, 6 mutants.
+
+## Amended, 2026-10-11: a test holds a label to the parameter named
+
+Found by the nightly verifications of 2026-10-08 to -10, whose
+`e10-named-arguments` found "a label is carried from the argument in the
+parameter's place" surviving. Since ADR-0129, an argument carries its label
+whichever parameter it is given to, less a secret that its parameter states.
+So only a parameter that states a secret tells one parameter from another, and
+no test named one out of its place. `a_key_named_out_of_its_place_is_still_the_key`
+does: `stamp(n = 0, key = secrets.payments())`, where `key: Secret<Payments>`,
+makes a public value, and under that mutant the secret goes to `n` and is
+carried out.
