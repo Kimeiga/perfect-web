@@ -56,10 +56,10 @@ MUTANTS = [
         "let mut added = false;",
     ),
     (
-        "a parameter with a hole in its type is kept",
+        "a parameter known only in part is not typed",
         VALUES,
-        "if ty.is_closed() && !ty.mentions_foreign_parameter(own) {",
         "if !ty.mentions_foreign_parameter(own) {",
+        "if ty.is_closed() && !ty.mentions_foreign_parameter(own) {",
     ),
     (
         "a lambda bound with a written type is not typed by it",

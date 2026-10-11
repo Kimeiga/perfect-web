@@ -160,3 +160,34 @@ types. `docs/RISK_QUEUE.md` carries the classification and
 The answer appears to differ by `Ownership` — an operation the application
 declared is one the compiler should arguably publish; a platform facility is
 one the compiler must conform to — and it is with the architect.
+
+## Amended, 2026-10-11: the artifact audit builds the guests it reads
+
+`just e8-host` (`spikes/wasmtime-component/audit.sh`) refused where the two
+WebAssembly guests were not built, and pointed to `just spike-wasmtime`.
+That spike also rewrites E0's evidence. A verification runner never had the
+guests, so every nightly verification failed the recipe without running it.
+The audit now builds each guest itself
+(`cargo build --locked --release --target wasm32-wasip2`, each into its own
+`target/`, where the tests read it). `rust-toolchain.toml` already installs
+the target.
+
+Its first run since then failed, and so did the recipe: a test the rule of
+2026-10-01 (`e20caefc`, a call reaches only an export whose place in the
+component the contract names) had made a refusal. `tests/artifact.rs`'s
+contract declared `lookup` with no place, so its granted guest's call was
+refused as "not an export declared by component contract `spike.Store`".
+Every test that reads a guest is ignored where the guests are not built, and
+none was run for ten days. The test's contract now names the export's place.
+The evidence names its commit, and so does `e9-parity`'s, which named none.
+
+The E10 benchmark that the audit runs with them (`tests/bench.rs`, which
+`just e10-bench` runs in release) had rotted the same way. Its node granted
+the two capabilities the command required when the benchmark was written, so
+the command was refused admission: it has since read the menu (ADR-0178) and
+handed the outbox its event (ADR-0246). The benchmark also passed an id where
+the command now takes the item (ADR-0178), and a cart line without its name
+(ADR-0172). It now grants what the contract requires, read from the contract.
+It answers each import the contract declares, or names the one it does not.
+It passes the item and the line as their types declare them. All of
+`pw-host`'s tests pass with the guests built, ignored ones included.

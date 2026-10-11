@@ -10192,8 +10192,12 @@ fn inside_each(body: &Body, order: &[hir::NodeId]) -> BTreeSet<hir::NodeId> {
 }
 
 /// The first element, in tree order, with each `id` written as text: the one
-/// a `<label for>` and an IDREF name. An `id` inside an `{#each}` names no
-/// element: every row has it, and a reference reaches only the first row's.
+/// a `<label for>` and an IDREF name, as HTML's reference does. An `id` inside
+/// an `{#each}` names the first row's element. That every row has it is the
+/// defect, PW5031's (ADR-0185), and what the reference names is not reported
+/// again. Until 2026-10-11 such an `id` named no element, and a control an
+/// `aria-labelledby` named through one was reported too (PW5014), the one
+/// defect twice (ADR-0143, amended).
 fn first_with_id<'b>(body: &'b Body, order: &[hir::NodeId]) -> BTreeMap<&'b str, hir::NodeId> {
     let mut by_id = BTreeMap::new();
     for &n in order {
@@ -10203,8 +10207,6 @@ fn first_with_id<'b>(body: &'b Body, order: &[hir::NodeId]) -> BTreeMap<&'b str,
             by_id.entry(id).or_insert(n);
         }
     }
-    let rows = inside_each(body, order);
-    by_id.retain(|_, n| !rows.contains(n));
     by_id
 }
 

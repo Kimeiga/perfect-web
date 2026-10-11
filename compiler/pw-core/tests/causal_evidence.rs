@@ -229,6 +229,36 @@ fn widths(items: List<Rect>) -> Int !{} {
     );
 }
 
+/// The semantics-BREAKING control for a callback's later parameter: `fold`'s
+/// accumulator is its seed's type, `A`, which no list's element binds. Here
+/// it is an `Int`, so `total` is no `ElementRef`, and the member resolves
+/// nothing through it. Until 2026-10-11 nothing held this: every type
+/// parameter could have taken the list's element and every test passed.
+#[test]
+fn a_folds_accumulator_is_not_its_lists_element() {
+    let app = "\
+module app
+
+import List
+import browser
+
+fn widths(items: List<ElementRef>) -> Int !{} {
+    List.fold(items, 0, fn(total, el) total.getBoundingClientRect().width)
+}
+";
+    let e = evidence_in(app, "widths");
+    assert!(
+        !e.resolved_member_on("ElementRef", "getBoundingClientRect"),
+        "an `Int` accumulator must not resolve an `ElementRef` member: {:?}",
+        e.facts()
+    );
+    assert!(
+        e.effect_reached("layout.measure").is_none(),
+        "and the effect must not reach the body: {:?}",
+        e.facts()
+    );
+}
+
 #[test]
 fn a_callbacks_later_parameter_is_typed_by_the_callees_declaration() {
     for (what, app) in [

@@ -3552,10 +3552,17 @@ e14-case-and-delivery:
        echo "== the tests (compiler/pw-core/tests/case_and_delivery.rs)"; echo; \
        cargo test --locked -p pw-core --test case_and_delivery 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the store, the accepted corpus and the demos check as before"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/accepted/*.pw examples/demo/*.pw 2>&1 | tail -1; \
+       for program in store accepted demo; do \
+         printf '%s: ' "$program"; \
+         cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
+           examples/domain.pw examples/lib/*.pw examples/$program/*.pw 2>&1 | tail -1; \
+       done; \
        echo; echo "== mutation controls (scripts/case_and_delivery_mutations.py)"; echo; \
        python3 scripts/case_and_delivery_mutations.py; \
+       echo; \
+       echo "Each program is checked as one: the store's pages and the corpus's both"; \
+       echo "serve \`/cart\`, which one program may not (PW0341). Until 2026-10-11 the"; \
+       echo "three were checked as one, and a route each serves was an error."; \
      } > docs/evidence/E14/case-and-delivery.txt
     @grep -E "^test result|mutants killed|pw check|^---- |panicked at" docs/evidence/E14/case-and-delivery.txt
 
@@ -4261,7 +4268,11 @@ e10-close-bench RUNS="8":
 # E14-A (ADR-0120): the benchmark's store in three stacks, one behavioural
 # contract. Each store builds and typechecks, the contract suite passes on all
 # three three times over, and each mutant store fails it. The Pleris one is
-# the benchmark's frozen copy (ADR-0156), as the other two are.
+# the benchmark's frozen copy (ADR-0156), as the other two are. svelte-check
+# is asked for its machine output, whose summary this reads: it writes that
+# by default only where `CLAUDECODE=1` (svelte-check 4.7.6), so until
+# 2026-10-11 the recipe passed in an agent's session and failed every
+# verification runner.
 e14-contract:
     @cargo build --quiet --locked -p pw-cli -p pw-dev-server
     @bash spikes/own-renderer/baseline-store.sh > /dev/null
@@ -4276,7 +4287,7 @@ e14-contract:
          done; done | sort -u; echo; \
        echo "== builds and typechecks"; \
        (cd benchmarks/baselines/next-react && pnpm --silent build > /dev/null && echo "  next-react: built" && pnpm --silent typecheck && echo "  next-react: tsc clean"); \
-       (cd benchmarks/baselines/sveltekit && pnpm --silent build > /dev/null 2>&1 && echo "  sveltekit: built" && pnpm --silent typecheck 2>&1 | grep -oE "[0-9]+ ERRORS [0-9]+ WARNINGS" | sed 's/^/  sveltekit: svelte-check /'); \
+       (cd benchmarks/baselines/sveltekit && pnpm --silent build > /dev/null 2>&1 && echo "  sveltekit: built" && pnpm --silent typecheck --output machine 2>&1 | grep -oE "[0-9]+ ERRORS [0-9]+ WARNINGS" | sed 's/^/  sveltekit: svelte-check /'); \
        ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw benchmarks/baselines/pleris/domain.pw benchmarks/baselines/pleris/lib/*.pw benchmarks/baselines/pleris/store/*.pw | sed 's/^/  pleris: /'; \
        echo; echo "== the contract, every stack, three times (benchmarks/harness/contract)"; echo; \
        (cd benchmarks/harness && pnpm exec playwright test --repeat-each=3 --reporter=list 2>&1 \
@@ -5247,6 +5258,30 @@ e14-refusal:
      } > docs/evidence/E14/refusal.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/refusal.txt
 
+# ADR-0305: a page's commands run in the order it sent them. The server's
+# tests, the browser's in three engines, and the mutation controls.
+e14-command-order:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0305 - a page's commands run in the order it sent them"; echo; \
+       echo "produced by: just e14-command-order"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== a command runs once the one its page sent before it has (server/src/order.rs, the command route)"; echo; \
+       cargo test --locked -p pw-dev-server -- order:: a_pages_command a_session_forgotten_takes_its_commands_order 2>&1 \
+         | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== in three engines (e2e/command-order.spec.mjs; optimistic.spec, navigate.spec)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/command-order.spec.mjs --reporter=line 2>&1; \
+          pnpm exec playwright test e2e/optimistic.spec.mjs e2e/navigate.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/command_order_mutations.py)"; echo; \
+       python3 scripts/command_order_mutations.py; \
+     } > docs/evidence/E14/command-order.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/command-order.txt
+
 # ADR-0269: a resource is held by what takes it apart. The checker's tests,
 # and the mutation controls.
 e14-matched-resources:
@@ -5629,3 +5664,28 @@ e14-holds:
        python3 scripts/holds_mutations.py; \
      } > docs/evidence/E14/holds.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/holds.txt
+
+# The soft navigation's ADR: a navigation keeps the layout, and shows the next
+# page in it. The browser's tests in three engines, ADR-0280's navigation as
+# it is now, and the mutation controls.
+e14-soft-navigation:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0306 - a navigation keeps the layout, and shows the next page in it"; echo; \
+       echo "produced by: just e14-soft-navigation"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the store's pages, followed softly, in three engines (e2e/soft-navigation.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/soft-navigation.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== a handler's navigation after its commit, in three engines (e2e/navigate.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/navigate.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/soft_navigation_mutations.py)"; echo; \
+       python3 scripts/soft_navigation_mutations.py; \
+     } > docs/evidence/E14/soft-navigation.txt
+    @grep -E "passed|failed|mutants killed|Error:" docs/evidence/E14/soft-navigation.txt

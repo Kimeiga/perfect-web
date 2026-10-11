@@ -79,3 +79,15 @@ of defect the benchmark exists to count, and the contract caught it.
 `just e14-contract` (`docs/evidence/E14/contract.txt`): both baselines build
 and typecheck, `pw check` passes the Pleris store, the contract passes on all
 three stacks three times over, and every mutant is killed.
+
+## Amended, 2026-10-11: svelte-check is asked for the output it is read by
+
+The recipe reads svelte-check's summary in its machine format,
+`N ERRORS N WARNINGS`. svelte-check 4.7.6 writes that format by default only
+where `CLAUDECODE=1`, the variable an agent's session sets. So the recipe
+passed in an agent's session and failed on every verification runner (the
+nightlies of 2026-10-09 and -10), where svelte-check writes "svelte-check
+found 0 errors and 0 warnings". The recipe now passes `--output machine`.
+Next.js 16.3.8, Vite 8 and Marko read the same variable. Marko adds a guide to
+its error messages. Next.js and Vite only detect the agent. No other recipe
+reads their output.

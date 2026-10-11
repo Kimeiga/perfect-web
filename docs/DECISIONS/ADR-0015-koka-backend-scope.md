@@ -96,3 +96,20 @@ distinction survives being quoted out of this file.
 The `pw` checker reaches corpus parity (ADR-0001's deletion condition), or the
 subset needs effects — at which point ADR-0011's effects-only reading of Koka
 becomes the design question rather than this one.
+
+## Amended, 2026-10-11: a module is checked by Koka as a library
+
+`scripts/e9-parity.sh` compiles each accepted corpus file's lowering with the
+real Koka. It ran Koka as a program compiler (`koka -c`), which requires a
+`main`, and no module of the corpus has one. So no module could agree with
+Koka. Every file the bridge lowered with a body would have been counted as a
+disagreement, and none was lowered until A-032 (ADR-0226). Since that
+file, every nightly verification failed `e9-parity` (2026-10-08 to -10), on
+"identifier `main` cannot be found". The two controls are rejections, and
+both were rejected for their real type errors before the `main` lookup. So
+nothing showed that the harness could agree.
+
+The harness now checks a module as a library (`koka -l`). It adds a positive
+control: a well-typed module with a function and no `main` must be accepted.
+That control fails under `-c`. A-032's lowering is accepted, and both
+rejections still fire, on "effects do not match" and "types do not match".

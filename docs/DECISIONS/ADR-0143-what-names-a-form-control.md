@@ -139,3 +139,25 @@ was refused, because the rule never looked at the control's ancestors:
   control unnamed.
 - **A computed `for`/`id` pair**, such as `for="qty-{line.id}"`, is not
   matched. Wrapping is the repair.
+
+## Amended, 2026-10-11: an `id` every row has reaches the first row's element
+
+Accepted under the owner's delegation of 2026-10-02. Found by the nightly
+verifications of 2026-10-08 to -10, whose `e14-labels` found two survivors.
+
+- **A label names the first element with its `id`.** Since ADR-0185, an
+  `id` that two elements have is PW5031's defect. A test then held the label
+  only where the control was the second element, and a control the label
+  misses is not reported again there. So "the last element with an `id` is
+  the one a label names" survived. A test now puts the control first:
+  `<label for="q">` + `<input id="q">` + `<p id="q">` is PW5031 alone, and
+  under that mutant it is PW5014 too.
+- **An `id` inside an `{#each}` names the first row's element**, as HTML's
+  reference does. That every row has it is PW5031's (ADR-0185). Until now
+  such an `id` named no element. For a `<label for>`, ADR-0185's
+  suppression made that invisible, so "an `id` inside `{#each}` names its
+  row" survived. For an `aria-labelledby`, it reported the one defect twice:
+  `<input aria-labelledby="t">` beside `{#each ..}<span id="t">..{/each}` was
+  PW5031 for the `id` and PW5014 for the control. It is now PW5031 alone,
+  which is ADR-0185's rule. The mutant now restores the old rule: "an `id`
+  inside `{#each}` names no row".

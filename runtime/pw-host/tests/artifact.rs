@@ -80,7 +80,20 @@ fn contract(imports: Vec<Import>) -> ComponentContract {
             name: "lookup".into(),
             kind: "query".into(),
             binding: BindingSupport::default(),
-            component: None,
+            // Its place in the component: a function the world exports
+            // directly. Since 2026-10-01 a call reaches only an export whose
+            // place the contract names (`authorization_for`), and this one
+            // named none: the granted call below was refused, and no run saw
+            // it, every test here being ignored where the guests are not
+            // built, as no verification runner had them (ADR-0026, amended
+            // 2026-10-11).
+            component: Some(ComponentExport {
+                interface: String::new(),
+                function: "lookup".into(),
+                authorization: vec![],
+                idempotent_by: None,
+                bounded: vec![],
+            }),
         }],
     }
 }

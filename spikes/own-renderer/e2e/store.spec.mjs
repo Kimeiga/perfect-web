@@ -113,19 +113,13 @@ test.describe("decide() governs attachment", () => {
     // runtime is not edited and has no test-only branch. Without this, "the
     // handler attached" is consistent with a runtime that attaches whatever it
     // is given.
-    await page.goto("/StorePage.html");
-    await page.evaluate(() => {
-      const el = document.getElementById("pw-parts");
-      const data = JSON.parse(el.textContent);
-      // Hash scheme 1 — superseded, and refused as INCOMPARABLE rather than
-      // as different (E7V).
-      data.resume.scheme = "1";
-      el.textContent = JSON.stringify(data);
-    });
-    await page.reload({ waitUntil: "commit" });
-
-    // Re-serve the mutated manifest by intercepting the document instead: a
-    // reload discards the edit, so the mutation is applied to the response.
+    //
+    // The document is answered with hash scheme 1, superseded, and refused as
+    // INCOMPARABLE rather than as different (E7V). Until 2026-10-11 the page
+    // was first loaded, its manifest edited and the page reloaded only to the
+    // reload's commit: an edit the reload discards, and a navigation still
+    // loading as the next began, whose load WebKit once never reached
+    // (master's verify 38036676661).
     await page.route("**/StorePage.html", async (route) => {
       const response = await route.fetch();
       const body = (await response.text()).replace('"scheme":"2"', '"scheme":"1"');
