@@ -1909,18 +1909,39 @@ addEventListener(
  * navigation, made while the page leaves, is not taken: the first decides.
  */
 async function navigate(route, args, mine) {
-  if (navigating) {
-    log.push(`navigation to ${route} not taken: the page is already leaving`);
-    return;
-  }
   const url = pageAddress(route, args);
-  // A page shown in a layout keeps it (the soft navigation's ADR): each press
-  // made before this one answered first, as below.
+  // A page shown in a layout keeps it (the soft navigation's ADR), held to
+  // the same two rules, by the same two functions.
   if (parts.layout) return softNavigate(url, "push", mine);
+  if (!taken(url)) return;
   navigating = true;
-  await Promise.allSettled([...pressing].filter((p) => p !== mine));
+  await pressedBefore(mine);
   log.push(`navigating to ${url}`);
   leaveFor(url);
+}
+
+/**
+ * **Whether a navigation to `url` is taken** (ADR-0280): not while the page
+ * leaves, the first navigation deciding, unless it is a reader's own choice
+ * (a link, back or forward) replacing a soft navigation in flight (the soft
+ * navigation's ADR). One rule for both ways a page leaves, so a test of
+ * either holds it.
+ */
+function taken(url, chosen = false) {
+  if (navigating && !(chosen && pending)) {
+    log.push(`navigation to ${url} not taken: the page is already leaving`);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * **Each press made before `mine`, answered first** (ADR-0280): the page a
+ * navigation goes to is read after every commit this page was answered. One
+ * wait for both ways a page leaves.
+ */
+function pressedBefore(mine) {
+  return Promise.allSettled([...pressing].filter((p) => p !== mine));
 }
 
 /** Load `url` whole, the page leaving for it; `reload`: this address. */
@@ -2846,10 +2867,7 @@ let pending = null;
  * its commit never does, and is not taken while another is (ADR-0280).
  */
 async function softNavigate(url, how, mine, chosen = false) {
-  if (navigating && !(chosen && pending)) {
-    log.push(`navigation to ${url} not taken: the page is already leaving`);
-    return;
-  }
+  if (!taken(url, chosen)) return;
   pending?.abort();
   const going = new AbortController();
   pending = going;
@@ -2860,7 +2878,7 @@ async function softNavigate(url, how, mine, chosen = false) {
   document.documentElement.dataset.pwReady = "0";
   // Each press made before this answered first, so the page is read after
   // its commit (ADR-0280).
-  await Promise.allSettled([...pressing].filter((p) => p !== mine));
+  await pressedBefore(mine);
   if (going.signal.aborted) return;
   log.push(`navigating softly to ${url}`);
   let response, text;
