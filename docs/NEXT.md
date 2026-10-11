@@ -694,9 +694,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           1. **the parts two pages share kept in place**, ADR-0280's next:
              a soft navigation, which item 3's test needs. In three steps:
              ~~the build named~~ (ADR-0300, merged 2026-10-09); ~~a page
-             shown in its layout~~ (ADR-0303, merged 2026-10-10); a
-             navigation that keeps the layout (`track/soft-navigation`, in
-             CI);
+             shown in its layout~~ (ADR-0303, merged 2026-10-10); ~~a
+             navigation that keeps the layout~~ (ADR-0306, merged
+             2026-10-11, with ADR-0305, a page's commands in the order it
+             sent them);
           2. ~~**accounts in the store**~~ and 3. ~~**delivery
              addresses**~~: **W8's since 2026-10-09** (the owner: DoorDash
              faster, with a third worker; PARALLEL.md, "the DoorDash track"),
@@ -718,9 +719,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled.
              In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
-             the store's hours (after W8's merge: the stores' rows in both
-             layers, the pages, `place_order` refused while closed, with a
-             last-order cut-off); orders scheduled;
+             the store's hours (**W9's** `track/store-hours`, after W8's
+             merge, on the integrator's design: PARALLEL.md, 2026-10-11);
+             orders scheduled;
+          4a. **typed page query parameters, the integrator's next**
+             (2026-10-11): a route's query part, `route "/search{?q}"` as
+             RFC 6570's form-style expansion (to check at the RFC), each a
+             page parameter typed like a path's, an absent one an `Option`.
+             A plain `<form method="get">` and a link make the address. It
+             blocks W6's kiokun search box and W9's store search, which have
+             no form until it lands (PARALLEL.md, the ruling of 2026-10-11:
+             `navigate` follows only a commit);
           5. **idempotency committed with the writes** (PW0348, ADR-0246's
              Not claimed), before a payment depends on it: an interaction's
              answer kept in the transaction that commits its command, in

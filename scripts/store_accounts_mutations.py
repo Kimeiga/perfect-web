@@ -333,8 +333,8 @@ MUTANTS = [
         "the host reads no document a command names",
         "server",
         SERVER,
-        '                    .eq_ignore_ascii_case("pw-document")\n',
-        '                    .eq_ignore_ascii_case("pw-documents")\n',
+        '            let stale = header("pw-document")\n',
+        '            let stale = header("pw-documents")\n',
     ),
     (
         "a page shown to another session is answered as the reader's",
@@ -368,8 +368,8 @@ MUTANTS = [
         "a retry of a press that committed is refused as stale",
         "server",
         SERVER,
-        "                kept = server.kept_answer(&session, document, id, &args, interaction.as_deref());\n",
-        "                kept = None;\n",
+        "                server.kept_answer(&session, *document, id, &args, interaction.as_deref())\n",
+        "                {\n                    let _ = document;\n                    None\n                }\n",
     ),
     (
         "a press's kept answer is looked for under the session the retry came from",

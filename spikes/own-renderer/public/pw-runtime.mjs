@@ -21,6 +21,15 @@
 
 const parts = JSON.parse(document.getElementById("pw-parts")?.textContent ?? "{}");
 
+/**
+ * **This document's life** (the soft navigation's ADR). Every listener the
+ * runtime adds is added with its signal, and its subscription asks under it:
+ * a navigation that shows the next page in this one's layout hands the
+ * document to a runtime of the next document's, and aborting this ends all
+ * of this one's at once, no late batch of it applied to the next.
+ */
+const life = new AbortController();
+
 // --- addressing ----------------------------------------------------------
 //
 // Architect ruling, 2026-08-06:
@@ -552,6 +561,31 @@ function loadHandler(identity) {
 }
 
 /**
+ * **A page's commands run in the order it sent them** (ADR-0305). Each names
+ * the latest command this page sent and has not been answered (`pw-after`),
+ * and the server runs it only once that one has run, whichever request the
+ * network brings first. Until 2026-10-10 each went its own way, and under
+ * load "Clear", pressed after "Place order", arrived first: the cart was
+ * emptied, and the order refused as nothing to order.
+ */
+async function command(component, args, interaction, retry) {
+  const before = [...unanswered.values()];
+  const after = [...unanswered.keys()].at(-1);
+  let answered;
+  unanswered.set(interaction, new Promise((resolve) => (answered = resolve)));
+  try {
+    return await send(component, args, interaction, retry, after, before);
+  } finally {
+    unanswered.delete(interaction);
+    answered();
+  }
+}
+
+/** Each command this page has sent and not been answered, by interaction, in
+ * the order sent, as a promise of its answer (ADR-0305). */
+const unanswered = new Map();
+
+/**
  * A command, as a compiled handler calls one: the command's component id and
  * the arguments the handler computed.
  *
@@ -573,8 +607,13 @@ function loadHandler(identity) {
  * page and the request with it, a press shown taken and never made. A request
  * marked `keepalive` outlives its document (the Fetch standard), within 64 KiB
  * of such bodies in flight; one past what remains is sent as before.
+ *
+ * **Answered early** (ADR-0305): the one before it, `after`, had not reached
+ * the server in time, and this one ran nothing. That is no outcome: it is sent
+ * again once each command sent `before` it is answered, naming none, and it
+ * is no resend of the `retry` clause's.
  */
-async function command(component, args, interaction, retry) {
+async function send(component, args, interaction, retry, after, before) {
   const sent = JSON.stringify(args);
   const bytes = new Blob([sent]).size;
   for (let attempt = 0; ; attempt += 1) {
@@ -599,6 +638,7 @@ async function command(component, args, interaction, retry) {
         headers: {
           "content-type": "application/json",
           "pw-interaction": interaction,
+          ...(after && { "pw-after": after }),
           ...(documentCursor > 0 ? { "pw-document": String(documentCursor) } : {}),
         },
         body: sent,
@@ -614,6 +654,16 @@ async function command(component, args, interaction, retry) {
       continue;
     }
     if (keepalive) keptAlive -= bytes;
+    if (response.status === 409) {
+      const early = await response.json().catch(() => null);
+      if (early?.early) {
+        log.push(`${component} sent again: the one before it had not arrived`);
+        await Promise.all(before);
+        after = undefined;
+        attempt -= 1;
+        continue;
+      }
+    }
     if (!response.ok) {
       // **Refused by its `requires`** (ADR-0302): the predicate and the words
       // a reader is told, which the host that refused sends.
@@ -1293,7 +1343,7 @@ function showDialogs(nodes) {
     // back to what invoked a dialog (WAI-ARIA's dialog pattern).
     const focused = document.activeElement;
     openedFrom.set(d, focused && focused !== document.body ? focused : lastActed);
-    d.addEventListener("close", () => giveFocusBack(d), { once: true });
+    d.addEventListener("close", () => giveFocusBack(d), { once: true, signal: life.signal });
     d.showModal();
   }
 }
@@ -1424,7 +1474,7 @@ function watchStreams() {
       settleStreams();
       observer.disconnect();
     },
-    { once: true },
+    { once: true, signal: life.signal },
   );
 }
 
@@ -1654,9 +1704,13 @@ function busy(binding, waiting) {
 
 // Leaving the page stops its reads (charter §15.6, test 8): the server, finding
 // a read's request gone, lets go of a `cancel` read's flight.
-addEventListener("pagehide", () => {
+addEventListener("pagehide", endReads, { signal: life.signal });
+
+/** Each keyed read in flight let go of: the page is going, or handing over
+ * to the next document's runtime. */
+function endReads() {
   for (const read of keyedReads.values()) read.inflight?.abort();
-});
+}
 
 /** Each event part's decision, asked once (E7-L): before anything binds. */
 const verdicts = new Map();
@@ -1738,15 +1792,20 @@ function tell(el, words, kind) {
     el.setAttribute("aria-describedby", [...described, message.id].join(" "));
   }
   el.dataset.pwHandlerError = kind;
-  // Emptied, then written: the same words told twice are said twice. Words
-  // told before the last were written are not said at all: the last are.
+  say(words);
+  log.push(`told ${kind}: ${words}`);
+}
+
+/** **Said by the page's announcer**: emptied, then written, so the same
+ * words told twice are said twice. Words told before the last were
+ * written are not said at all: the last are. */
+function say(words) {
   const status = announcerOf();
   status.textContent = "";
   clearTimeout(saying);
   saying = setTimeout(() => {
     status.textContent = words;
   }, 50);
-  log.push(`told ${kind}: ${words}`);
 }
 
 /** What `el`'s last press was told, taken back: it is pressed again. */
@@ -1814,7 +1873,7 @@ function recoverOnPress(part, owners, verdict) {
       log.push(`press on refused ${part.id}: ${verdict.recovery}, reading the page again`);
       window.__pw.reloading = true;
       location.reload();
-    });
+    }, { signal: life.signal });
   }
 }
 /** When the latest press's handler started (ADR-0152): the next press's
@@ -1827,9 +1886,24 @@ const pressing = new Set();
  * takes no press and no second navigation. A page the browser brings back
  * from its back-forward cache takes them again. */
 let navigating = false;
-addEventListener("pageshow", (e) => {
-  if (e.persisted) navigating = false;
-});
+// **A page shown again from the back-forward cache** takes presses again,
+// and listens again: its subscription ended when it was hidden (`leaving`),
+// and until 2026-10-09 it was never asked again, so the page was told
+// nothing until reloaded (found mapping the runtime for the soft
+// navigation's ADR). A server that has forgotten the document answers with
+// a reload, as it does any document it does not know.
+addEventListener(
+  "pageshow",
+  (e) => {
+    if (!e.persisted) return;
+    navigating = false;
+    if (leaving && parts.listens !== false) {
+      leaving = false;
+      subscribe();
+    }
+  },
+  { signal: life.signal },
+);
 /**
  * **A handler goes to a page once its command commits** (ADR-0280). Its
  * module calls this last in the `Ok` arm of a command's answer, and an `Ok`
@@ -1842,14 +1916,43 @@ addEventListener("pageshow", (e) => {
  * navigation, made while the page leaves, is not taken: the first decides.
  */
 async function navigate(route, args, mine) {
-  if (navigating) {
-    log.push(`navigation to ${route} not taken: the page is already leaving`);
-    return;
-  }
   const url = pageAddress(route, args);
+  // A page shown in a layout keeps it (the soft navigation's ADR), held to
+  // the same two rules, by the same two functions.
+  if (parts.layout) return softNavigate(url, "push", mine);
+  if (!taken(url)) return;
   navigating = true;
-  await Promise.allSettled([...pressing].filter((p) => p !== mine));
+  await pressedBefore(mine);
   log.push(`navigating to ${url}`);
+  leaveFor(url);
+}
+
+/**
+ * **Whether a navigation to `url` is taken** (ADR-0280): not while the page
+ * leaves, the first navigation deciding, unless it is a reader's own choice
+ * (a link, back or forward) replacing a soft navigation in flight (the soft
+ * navigation's ADR). One rule for both ways a page leaves, so a test of
+ * either holds it.
+ */
+function taken(url, chosen = false) {
+  if (navigating && !(chosen && pending)) {
+    log.push(`navigation to ${url} not taken: the page is already leaving`);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * **Each press made before `mine`, answered first** (ADR-0280): the page a
+ * navigation goes to is read after every commit this page was answered. One
+ * wait for both ways a page leaves.
+ */
+function pressedBefore(mine) {
+  return Promise.allSettled([...pressing].filter((p) => p !== mine));
+}
+
+/** Load `url` whole, the page leaving for it; `reload`: this address. */
+function leaveFor(url, reload = false) {
   // A navigation stopped, by the user or `window.stop()`, leaves the page
   // where it was, and it takes presses again: where the browser says so.
   // The Navigation API's `navigate` event fires for this one too, and its
@@ -1862,7 +1965,8 @@ async function navigate(route, args, mine) {
       { once: true },
     );
   }
-  location.assign(url);
+  if (reload) location.reload();
+  else location.assign(url);
 }
 
 /**
@@ -2114,7 +2218,7 @@ function bindEvent(template, part) {
           },
           // Goes to a page once the command it follows commits (ADR-0280).
           navigate: (route, args) => navigate(route, args, done),
-        });
+        }, { signal: life.signal });
       } catch (error) {
         // A load or a refused command is VISIBLE and leaves the button
         // usable. A silent failure here is the worst outcome available: the
@@ -2368,7 +2472,7 @@ function applyFrame(frame) {
           log.push(`refused ${op.op} on ${key}: the document disagrees; reloading`);
           if (!window.__pw.reloading) {
             window.__pw.reloading = true;
-            location.reload();
+            showAgain();
           }
           return;
         }
@@ -2412,7 +2516,7 @@ function applyFrame(frame) {
       // second reload frame in the same batch does not queue a second one.
       if (frame.recovery?.recovery === "reload" && !window.__pw.reloading) {
         window.__pw.reloading = true;
-        location.reload();
+        showAgain();
       }
       return;
 
@@ -2440,6 +2544,11 @@ let cursor = parts.cursor ?? 0;
  * being a claim and becomes something a test can fail.
  */
 function applyBatch(batch) {
+  // A batch of a document this runtime has handed over is not the page's,
+  // and one that arrives while the page leaves, to be shown in its layout or
+  // loaded whole, is applied to nothing: a reload it asked for, or a patch
+  // that missed, would load this page again, and the navigation with it.
+  if (life.signal.aborted || navigating) return;
   window.__pw.updated = [];
   // The page's patches are derived from what it holds (ADR-0172), and focus
   // in a row stays with its row through them.
@@ -2463,7 +2572,9 @@ function applyBatch(batch) {
  */
 async function pollOnce() {
   // Which document this page is (ADR-0161): each is its own subscriber.
-  const response = await fetch(`/stream?doc=${documentCursor}&since=${cursor}`);
+  const response = await fetch(`/stream?doc=${documentCursor}&since=${cursor}`, {
+    signal: life.signal,
+  });
   applyBatch(await response.json());
 }
 
@@ -2475,7 +2586,9 @@ async function pollOnce() {
  * not an error, and parsing half of one would apply half a change.
  */
 async function streamOnce() {
-  const response = await fetch(`/stream?doc=${documentCursor}&since=${cursor}&mode=stream`);
+  const response = await fetch(`/stream?doc=${documentCursor}&since=${cursor}&mode=stream`, {
+    signal: life.signal,
+  });
   if (!response.body) throw new Error("no streaming body");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -2511,9 +2624,13 @@ function chosenTransport() {
 /** The page is going away: its requests fail because it is, and nothing is
  * asked again. */
 let leaving = false;
-addEventListener("pagehide", () => {
-  leaving = true;
-});
+addEventListener(
+  "pagehide",
+  () => {
+    leaving = true;
+  },
+  { signal: life.signal },
+);
 
 /**
  * **The subscription, kept** (charter §15.5's forced reconnect). A failed
@@ -2535,7 +2652,7 @@ async function subscribe() {
       else await pollOnce();
       failures = 0;
     } catch {
-      if (leaving) return;
+      if (leaving || life.signal.aborted) return;
       failures += 1;
       // A stream that fails twice in a row falls back to the long poll, and
       // says so: a silent fallback would make the streaming adapter
@@ -2549,7 +2666,7 @@ async function subscribe() {
       window.__pw.reconnects = (window.__pw.reconnects ?? 0) + 1;
       log.push(`subscription failed; asking again in ${pause} ms`);
       await new Promise((resolve) => setTimeout(resolve, pause));
-      if (leaving) return;
+      if (leaving || life.signal.aborted) return;
     }
   }
 }
@@ -2558,6 +2675,9 @@ async function subscribe() {
 // made to do that on demand, and the property is about the page's guard rather
 // than about the transport.
 window.__pwTestApply = applyFrame;
+// And a batch, as a transport delivers one: what a page leaving does with
+// it is the batch's guard, not a frame's (the soft navigation's ADR).
+window.__pwTestBatch = applyBatch;
 window.__pwHeld = () => Object.fromEntries(held);
 window.__pwKnown = () => Object.fromEntries(known);
 
@@ -2577,6 +2697,324 @@ function apply(values) {
     log.push(`updated ${window.__pw.updated.join(",")} at version ${values.version}`);
   }
 }
+
+// --- a navigation that keeps the layout (the soft navigation's ADR) ---------
+//
+// The owner's Next.js bug, its second half: save, go to a page, and see the
+// header mounted again. A page shown in a layout (the layouts' ADR) is shown
+// in it, and a navigation to another page of the same layout and the same
+// build keeps it: the next page's document is fetched as a load fetches it,
+// after the commit before it (ADR-0280), and only its slot shown in place of
+// this one's. The layout's markup stays; each region of it the next document
+// renders differently is taken from it, so what the host derives its next
+// patches from is what the page shows. Then this runtime hands the page to
+// a runtime of the next document's, and ends.
+
+/** The slot's markers, the page's markup between them. */
+const SLOT = ["pw-slot", "/pw-slot"];
+
+/** The markers in `doc`'s body, or `null`. */
+function slotIn(doc) {
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_COMMENT);
+  let start = null;
+  while (walker.nextNode()) {
+    const c = walker.currentNode;
+    if (c.data === SLOT[0]) start = c;
+    else if (c.data === SLOT[1] && start) return { start, end: c };
+  }
+  return null;
+}
+
+/** Whether `node` is between the slot's markers. */
+function inSlot(node, slot) {
+  return (
+    !!(slot.start.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+    !!(slot.end.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_PRECEDING)
+  );
+}
+
+/** The layout's top-level regions in `doc`, outside the slot, by part id:
+ * each start marker, `<!--pw:sN-->`, with its end. A region inside another
+ * is the other's. */
+function layoutRegions(doc, slot, layout) {
+  const out = new Map();
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_COMMENT);
+  let inside = null;
+  while (walker.nextNode()) {
+    const c = walker.currentNode;
+    if (inside) {
+      if (c.data === `pw:e${inside.id}`) {
+        inside.end = c;
+        out.set(inside.id, inside);
+        inside = null;
+      }
+      continue;
+    }
+    const m = /^pw:s(\d+)$/.exec(c.data);
+    if (!m || Number(m[1]) >= layout.parts || inSlot(c, slot)) continue;
+    inside = { id: m[1], start: c, end: null };
+  }
+  return out;
+}
+
+/** The nodes between two markers, as markup. */
+function markupBetween(start, end) {
+  let html = "";
+  for (let n = start.nextSibling; n && n !== end; n = n.nextSibling) {
+    html += n.nodeType === 1 ? n.outerHTML : n.nodeType === 3 ? n.data : `<!--${n.data}-->`;
+  }
+  return html;
+}
+
+/** Show `next`, a fetched document of the same layout, in this one: its
+ * slot's markup in place of this one's, each of the layout's regions it
+ * renders differently taken from it, and each of the layout's elements'
+ * attributes, its head's title, description and style, its parts manifest,
+ * and the regions its response filled after its body. */
+function showNext(next, nextParts, here, there) {
+  const layout = parts.layout;
+  // The page: this one's markup out, the next one's in.
+  for (let n = here.start.nextSibling; n && n !== here.end; ) {
+    const after = n.nextSibling;
+    n.remove();
+    n = after;
+  }
+  const page = document.createDocumentFragment();
+  for (let n = there.start.nextSibling; n && n !== there.end; n = n.nextSibling) {
+    page.append(document.importNode(n, true));
+  }
+  here.end.before(page);
+  // The layout's regions.
+  const mine = layoutRegions(document, here, layout);
+  for (const [id, theirs] of layoutRegions(next, there, layout)) {
+    const own = mine.get(id);
+    if (!own?.end || !theirs.end) continue;
+    if (markupBetween(own.start, own.end) === markupBetween(theirs.start, theirs.end)) continue;
+    for (let n = own.start.nextSibling; n && n !== own.end; ) {
+      const after = n.nextSibling;
+      n.remove();
+      n = after;
+    }
+    const fresh = document.createDocumentFragment();
+    for (let n = theirs.start.nextSibling; n && n !== theirs.end; n = n.nextSibling) {
+      fresh.append(document.importNode(n, true));
+    }
+    own.end.before(fresh);
+  }
+  // The layout's elements: each attribute as the next document has it,
+  // captures included, and none it does not.
+  for (const theirs of next.body.querySelectorAll("[data-pw]")) {
+    if (Number(theirs.dataset.pw) >= layout.elements || inSlot(theirs, there)) continue;
+    const own = [...document.body.querySelectorAll(`[data-pw="${theirs.dataset.pw}"]`)].find(
+      (el) => !inSlot(el, here),
+    );
+    if (!own) continue;
+    for (const a of [...own.attributes]) {
+      if (!theirs.hasAttribute(a.name)) own.removeAttribute(a.name);
+    }
+    for (const a of theirs.attributes) {
+      if (own.getAttribute(a.name) !== a.value) own.setAttribute(a.name, a.value);
+    }
+  }
+  // Its head.
+  document.title = next.title;
+  for (const sel of ['meta[name="description"]', "style"]) {
+    for (const el of document.head.querySelectorAll(sel)) el.remove();
+    for (const el of next.head.querySelectorAll(sel)) document.head.append(document.importNode(el, true));
+  }
+  // Its manifest, which the next runtime reads.
+  document.getElementById("pw-parts").textContent = JSON.stringify(nextParts);
+  // What its response filled after its body (ADR-0148), for the next
+  // runtime's streams to settle.
+  for (const t of next.body.querySelectorAll("template[for]")) {
+    document.body.append(document.importNode(t, true));
+  }
+}
+
+/** **Where the page's content begins**, given focus: its first heading,
+ * else its `main`, held focusable without a tab stop. A node that is gone
+ * holds no focus, and a reader by ear is told where they are. */
+function focusPage(slot) {
+  for (let n = slot.start.nextSibling; n && n !== slot.end; n = n.nextSibling) {
+    if (n.nodeType !== 1) continue;
+    const target = n.matches("h1") ? n : n.querySelector("h1") ?? (n.matches("main") ? n : n.querySelector("main"));
+    if (!target) continue;
+    if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+    target.focus({ preventScroll: true });
+    return true;
+  }
+  return false;
+}
+
+/** The page the address names, loaded whole, as the browser would have;
+ * nothing, where the browser is already loading another. */
+function loadWhole(url, how) {
+  log.push(`navigation to ${url} loaded whole`);
+  delete document.documentElement.dataset.pwNavigating;
+  if (!window.__pwUnloading) leaveFor(url, how === "pop");
+}
+
+/** The page shown again from what the server says now, unless the browser
+ * is already loading another: a reload then would stop that load. */
+function showAgain() {
+  if (!window.__pwUnloading) location.reload();
+}
+
+/** The soft navigation in flight, which a reader's next choice abandons. */
+let pending = null;
+
+/**
+ * **Go to `url`, keeping the layout** where the next page is of this
+ * build and this layout; otherwise load it whole. `how`: `push` (a link, or
+ * a handler after its commit), `pop` (back or forward to an entry this
+ * runtime made). `mine`: the press that asked for it, which does not wait
+ * for itself. `chosen`: a reader's own choice, a link or back and forward,
+ * which abandons a navigation in flight, as a link followed while a page
+ * loads does (Turbo, SvelteKit and React Router alike); a handler's after
+ * its commit never does, and is not taken while another is (ADR-0280).
+ */
+async function softNavigate(url, how, mine, chosen = false) {
+  if (!taken(url, chosen)) return;
+  pending?.abort();
+  const going = new AbortController();
+  pending = going;
+  navigating = true;
+  document.documentElement.dataset.pwNavigating = "1";
+  // Not ready from now until the next document's runtime is: what waits for
+  // a ready page waits for the page it went to.
+  document.documentElement.dataset.pwReady = "0";
+  // Each press made before this answered first, so the page is read after
+  // its commit (ADR-0280).
+  await pressedBefore(mine);
+  if (going.signal.aborted) return;
+  log.push(`navigating softly to ${url}`);
+  let response, text;
+  try {
+    response = await fetch(url, {
+      headers: { accept: "text/html" },
+      cache: "no-store",
+      credentials: "same-origin",
+      signal: going.signal,
+    });
+    text = await response.text();
+  } catch {
+    if (going.signal.aborted) return;
+    return loadWhole(url, how);
+  }
+  if (going.signal.aborted || window.__pwUnloading) return;
+  pending = null;
+  const at = response.url || url;
+  // The same build, by the name it says of itself (the build id's ADR).
+  if (!response.ok || !servedBuild || response.headers.get("pw-build") !== servedBuild) {
+    return loadWhole(at, how);
+  }
+  const next = new DOMParser().parseFromString(text, "text/html");
+  let nextParts = null;
+  try {
+    nextParts = JSON.parse(next.getElementById("pw-parts")?.textContent ?? "null");
+  } catch {}
+  const mineLayout = parts.layout;
+  const theirs = nextParts?.layout;
+  const here = slotIn(document);
+  const there = slotIn(next);
+  if (
+    !theirs ||
+    theirs.path !== mineLayout.path ||
+    theirs.schema !== mineLayout.schema ||
+    !here ||
+    !there
+  ) {
+    return loadWhole(at, how);
+  }
+  // From here the page is the next one's: a failure shows it whole.
+  try {
+    if (how === "push") {
+      history.replaceState({ ...history.state, pw: true, scroll: scrollY }, "");
+      if (at === location.href) history.replaceState({ pw: true, scroll: 0 }, "", at);
+      else history.pushState({ pw: true, scroll: 0 }, "", at);
+    }
+    showNext(next, nextParts, here, there);
+    // The reader's place: the top, or the fragment, or where they were on
+    // this entry before.
+    const hash = new URL(at).hash;
+    const target = hash && document.getElementById(decodeURIComponent(hash.slice(1)));
+    if (how === "pop") scrollTo(0, history.state?.scroll ?? 0);
+    else if (target) target.scrollIntoView();
+    else scrollTo(0, 0);
+    if (!focusPage(here)) say(document.title);
+  } catch (e) {
+    log.push(`navigation to ${at} failed in place: ${e}`);
+    showAgain();
+    return;
+  }
+  handOver();
+}
+
+/** This runtime ends, and one of the next document's begins. */
+function handOver() {
+  endReads();
+  window.__pwSoftNavigations = (window.__pwSoftNavigations ?? 0) + 1;
+  delete document.documentElement.dataset.pwNavigating;
+  document.documentElement.dataset.pwReady = "0";
+  life.abort();
+  import(`/pw-runtime.mjs?document=${window.__pwSoftNavigations}`).catch((e) => {
+    log.push(`the next runtime did not load: ${e}`);
+    showAgain();
+  });
+}
+
+// The page's scroll is the navigation's to keep, for each entry it makes.
+if (parts.layout && "scrollRestoration" in history) history.scrollRestoration = "manual";
+
+// **The browser's own navigation wins.** Once it begins one, an address
+// typed, a link it follows itself, a test's `goto`, a soft navigation in
+// flight is abandoned, and nothing this page does loads another: a
+// `pushState` or a reload then stops the browser's load (Firefox's
+// NS_BINDING_ABORTED, found by the accessibility spec's `goto` after a soft
+// navigation). The window keeps the mark, whichever runtime is current; a
+// page shown again from the back-forward cache clears it.
+if (!window.__pwUnloadWatched) {
+  window.__pwUnloadWatched = true;
+  addEventListener("beforeunload", () => (window.__pwUnloading = true));
+  addEventListener("pageshow", () => (window.__pwUnloading = false));
+}
+addEventListener("beforeunload", () => pending?.abort(), { signal: life.signal });
+
+// **A link to a page of this layout**, followed in place: the primary
+// button, no key held, nothing having claimed the click, an `<a href>` to
+// this origin, not a fragment of this page, not to be downloaded, opened
+// elsewhere, marked external or marked `data-pw-reload` (the consensus of
+// Turbo, Astro and SvelteKit, read 2026-10-09). A page with no layout keeps
+// nothing, and leaves every link to the browser.
+document.addEventListener(
+  "click",
+  (e) => {
+    if (!parts.layout || e.defaultPrevented || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
+    if (!a || !(a instanceof HTMLAnchorElement)) return;
+    if (a.hasAttribute("download") || a.hasAttribute("data-pw-reload")) return;
+    if (a.target && a.target !== "_self") return;
+    if (a.relList.contains("external")) return;
+    const url = new URL(a.href, location.href);
+    if (url.origin !== location.origin) return;
+    if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+    e.preventDefault();
+    softNavigate(url.href, "push", undefined, true);
+  },
+  { signal: life.signal },
+);
+
+// **Back and forward**, between entries a navigation made: read again, as
+// any navigation is, never a page kept from before (ADR-0280's rule).
+addEventListener(
+  "popstate",
+  (e) => {
+    if (!e.state?.pw || !parts.layout) return;
+    softNavigate(location.href, "pop", undefined, true);
+  },
+  { signal: life.signal },
+);
 
 attach().catch((e) => {
   log.push(`boot failed: ${e}`);

@@ -23,6 +23,30 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0306 and ADR-0305, 2026-10-11: a navigation keeps the layout, and a
+page's commands run in the order it sent them** (the integrator's; track
+`soft-navigation`, merged from `5ed759d` with track `command-order`). This
+completes the third of three steps to the parts two pages share kept in
+place: the build is named (ADR-0300), a page is shown in its layout
+(ADR-0303), and now a navigation between two pages of one layout and one
+build swaps only what differs. The layout and its live regions stay, and the
+address, scroll, focus, title and manifest are the next page's. Back and
+forward keep it too, and a page of another build, or no layout, is loaded
+whole.
+- ADR-0306's evidence run found two presses' commands committing in the
+  order the network brought them: "Clear" after "Place order" reached the
+  server first. Each command now names the one its page sent before it,
+  and the host runs it after that one (ADR-0305).
+- The branch's verify found two navigate mutants surviving. A rule had a
+  copy on each path out of a page, and the store's pages took the other
+  path. It is now one function on both paths.
+- Its tests press from the keyboard where a pointer could land on a moved
+  button. That ends master's Firefox and WebKit navigate.spec failures in
+  three of its last five pushes' verifies.
+Verify 38157805656 green: soft navigation 12 of 12 mutants, its browser
+tests in three engines; the command order's 12 server tests and 20 of 20;
+navigate 19 of 19.
+
 **Corrections, 2026-10-11: master's nightly verification had failed eight
 recipes for three days, unread** (found by the integrator, after W8 reported
 two of them). The nightlies of 2026-10-08, -09 and -10 each failed six to
@@ -54,6 +78,17 @@ amended again): a branch ran its recipes up to twice their recorded seconds.
 And a browser test that loaded the store's page, reloaded it only to its
 commit and loaded it again is now one load: WebKit once never reached the
 second's `load` (master's verify 38036676661).
+`e8-host`'s first run in ten days found two pw-host tests that later rulings
+had rotted, which nothing ran (each is ignored where the guests are not
+built). The artifact test's export named no place in its component, a rule
+of 2026-10-01. The E10 benchmark granted and answered only what
+`add_to_cart` needed before ADR-0178 and ADR-0246 (ADR-0026 amended). The
+nightly of 2026-10-11 also failed `e14-last-known-good`, on a server test
+that ordered its threads by sleeping 100 ms. It now waits for the query
+runtime's trace of the join (ADR-0152's test). The 10-09 nightly's four
+browser-baseline failures were WebKit's "Load more", fixed by ADR-0296 that
+afternoon. And `e14-cart-lines`' core mutants are narrowed to the four test
+targets measured to see them, from all 211 (`scripts/mutant_killers.py`).
 
 **ADR-0304, 2026-10-10: what a page shows by the clock is told when the
 clock passes it** (the integrator's, the first of the store hours' steps;

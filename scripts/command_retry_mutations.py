@@ -105,11 +105,12 @@ MUTANTS = [
         "      if (!retry) throw new Unreachable(component, error);\n",
     ),
     (
+        # Re-anchored by ADR-0305: a request names the one its page sent
+        # before it, on a line of its own.
         "a request is sent again under another interaction",
         "browser",
         RUNTIME,
-        # Re-anchored by track store-accounts: the headers on lines of their
-        # own, the page's document beside the interaction (Q3).
+        # And by track store-accounts: the page's document beside it (Q3).
         '          "pw-interaction": interaction,\n',
         '          "pw-interaction": attempt === 0 ? interaction : `${interaction}-${attempt}`,\n',
     ),
