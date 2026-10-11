@@ -32,6 +32,7 @@ pub(crate) const GRANTS: &[&str] = &[
     "database.read<PitchReading>",
     "database.read<SearchRow>",
     "database.read<AliasSet>",
+    "database.read<ReadingHit>",
 ];
 
 /// The sample the repository carries (ADR-0037): 28 files of one shard.
@@ -107,6 +108,15 @@ fn search_row(r: search::Row) -> Val {
         ("definition", Val::String(r.definition)),
         ("pronunciation", Val::String(r.pronunciation)),
         ("reading-search", Val::String(r.reading_search)),
+        ("is-common", Val::S64(r.is_common)),
+    ])
+}
+
+/// A row as the program's `ReadingHit` declares it.
+fn reading_row(r: search::ReadingRow) -> Val {
+    record(vec![
+        ("word", Val::String(r.word)),
+        ("pronunciation", Val::String(r.pronunciation)),
         ("is-common", Val::S64(r.is_common)),
     ])
 }
@@ -849,6 +859,17 @@ fn reads_of(root: PathBuf, app: Arc<App>, search: Arc<Search>) -> data::Ops {
                 Ok(vec![Val::List(rows.into_iter().map(search_row).collect())])
             }
             other => Err(format!("search#latin received {other:?}")),
+        }),
+    );
+    let f = search.clone();
+    ops.insert(
+        "kiokun:data/search#reading".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(reading), Val::S64(limit)] => {
+                let rows = f.index()?.reading(reading, *limit)?;
+                Ok(vec![Val::List(rows.into_iter().map(reading_row).collect())])
+            }
+            other => Err(format!("search#reading received {other:?}")),
         }),
     );
     let f = search.clone();

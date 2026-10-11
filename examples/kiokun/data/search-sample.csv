@@ -1135,6 +1135,36 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 驕人,chinese,enviable,jiāo​rén,jiaoren,0
 驕人,chinese,to show contempt for others,jiāo​rén,jiaoren,0
 驚人,chinese,astonishing,jīng​rén,jingren,0
+から,japanese,"from (e.g. time, place, numerical quantity)",から,kara,1
+から,japanese,since,から,kara,1
+から,japanese,from (originator),から,kara,1
+から,japanese,by,から,kara,1
+から,japanese,because,から,kara,1
+から,japanese,since,から,kara,1
+から,japanese,"out of (constituent, part)",から,kara,1
+から,japanese,"through (e.g. window, vestibule)",から,kara,1
+から,japanese,after,から,kara,1
+から,japanese,since,から,kara,1
+から,japanese,expresses sympathy or warning,から,kara,1
+其の,japanese,that,その,sono,1
+其の,japanese,the,その,sono,1
+其の,japanese,"part (as in ""part two"")",その,sono,1
+其の,japanese,um ...,その,sono,1
+其の,japanese,er ...,その,sono,1
+其の,japanese,uh ...,その,sono,1
+つい,japanese,just (now),つい,tsui,1
+つい,japanese,quite (near),つい,tsui,1
+つい,japanese,unintentionally,つい,tsui,1
+つい,japanese,subconsciously,つい,tsui,1
+つい,japanese,by mistake,つい,tsui,1
+つい,japanese,against one's better judgement (judgment),つい,tsui,1
+と,japanese,if,と,to,1
+と,japanese,when,と,to,1
+と,japanese,and,と,to,1
+と,japanese,with,と,to,1
+と,japanese,"used for quoting (thoughts, speech, etc.)",と,to,1
+と,japanese,promoted pawn,と,to,1
+と,japanese,indicates a question,と,to,1
 愛人,japanese,lover,あいじん,aijin,1
 愛人,japanese,mistress,あいじん,aijin,1
 悪人,japanese,bad person,あくにん,akunin,1
@@ -1147,14 +1177,50 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 夷人,japanese,barbarian,いじん,ijin,0
 夷人,japanese,savage,いじん,ijin,0
 夷人,japanese,foreigner,いじん,ijin,0
+尉,japanese,inspector (third highest of the four administrative ranks of the ritsuryō system),じょう,jou,0
+尉,japanese,old man,じょう,jou,0
+尉,japanese,white ash (of charcoal),じょう,jou,0
 易学,japanese,study of divination,えきがく,ekigaku,0
 異人,japanese,foreigner (esp. one of European ancestry),いじん,ijin,0
 異人,japanese,different person,いじん,ijin,0
 医学,japanese,medical science,いがく,igaku,1
 医学,japanese,medicine,いがく,igaku,1
+一,japanese,one,いち,ichi,1
+一,japanese,1,いち,ichi,1
+一,japanese,best,いち,ichi,1
+一,japanese,first,いち,ichi,1
+一,japanese,foremost,いち,ichi,1
+一,japanese,beginning,いち,ichi,1
+一,japanese,start,いち,ichi,1
+一,japanese,a (single),いち,ichi,1
+一,japanese,one (of many),いち,ichi,1
+一,japanese,ace,いち,ichi,1
+一,japanese,"bottom string (on a shamisen, etc.)",いち,ichi,1
+迂路,japanese,detour,うろ,uro,0
+迂路,japanese,diversion,うろ,uro,0
 疫学,japanese,epidemiology,えきがく,ekigaku,0
 厭人,japanese,misanthropy,えんじん,enjin,0
+円,japanese,yen (Japanese monetary unit),えん,en,1
+円,japanese,circle,えん,en,1
+園,japanese,garden,その,sono,1
+園,japanese,orchard,その,sono,1
+園,japanese,park,その,sono,1
+園,japanese,place,その,sono,1
+園,japanese,world,その,sono,1
+園,japanese,environment,その,sono,1
 猿人,japanese,ape man,えんじん,enjin,0
+縁,japanese,fate,えん,en,0
+縁,japanese,destiny (esp. as a mysterious force that binds two people together),えん,en,0
+縁,japanese,relationship (e.g. between two people),えん,en,0
+縁,japanese,bond,えん,en,0
+縁,japanese,link,えん,en,0
+縁,japanese,connection,えん,en,0
+縁,japanese,family ties,えん,en,0
+縁,japanese,affinity,えん,en,0
+縁,japanese,opportunity,えん,en,0
+縁,japanese,chance (to meet someone and start a relationship),えん,en,0
+縁,japanese,"pratyaya (indirect conditions, as opposed to direct causes)",えん,en,0
+縁,japanese,narrow open-air veranda,えん,en,0
 恩人,japanese,benefactor,おんじん,onjin,1
 恩人,japanese,patron,おんじん,onjin,1
 恩人,japanese,person to whom one owes a great deal,おんじん,onjin,1
@@ -1166,6 +1232,13 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 何人,japanese,a number of people,なんにん,nannin,1
 佳人,japanese,(female) beauty,かじん,kajin,0
 佳人,japanese,beautiful woman,かじん,kajin,0
+佳味,japanese,delicious taste,かみ,kami,0
+加味,japanese,seasoning,かみ,kami,1
+加味,japanese,flavoring,かみ,kami,1
+加味,japanese,flavouring,かみ,kami,1
+加味,japanese,addition,かみ,kami,1
+加味,japanese,inclusion,かみ,kami,1
+加味,japanese,taking into account,かみ,kami,1
 家学,japanese,hereditary learning,かがく,kagaku,0
 家人,japanese,occupant of a house,かじん,kajin,1
 家人,japanese,family member,かじん,kajin,1
@@ -1180,6 +1253,9 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 歌学,japanese,poetry,かがく,kagaku,0
 歌学,japanese,versification,かがく,kagaku,0
 歌人,japanese,poet (of tanka poems),かじん,kajin,1
+過多,japanese,excess,かた,kata,1
+過多,japanese,surplus,かた,kata,1
+過多,japanese,superabundance,かた,kata,1
 我人,japanese,myself and others,われひと,warehito,0
 画学,japanese,drawing,ががく,gagaku,0
 画人,japanese,painter,がじん,gajin,0
@@ -1189,6 +1265,11 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 外人,japanese,gaijin,がいじん,gaijin,1
 外人,japanese,outsider,がいじん,gaijin,1
 各人,japanese,each person,かくじん,kakujin,0
+殻,japanese,shell,から,kara,1
+殻,japanese,husk,から,kara,1
+殻,japanese,hull,から,kara,1
+殻,japanese,pod,から,kara,1
+殻,japanese,chaff,から,kara,1
 学ぶ,japanese,to learn,まなぶ,manabu,1
 学ぶ,japanese,to study,まなぶ,manabu,1
 学ぶ,japanese,to take lessons in,まなぶ,manabu,1
@@ -1313,11 +1394,35 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 学歴,japanese,academic background,がくれき,gakureki,1
 学歴,japanese,academic credentials,がくれき,gakureki,1
 学歴,japanese,academic record,がくれき,gakureki,1
+楽,japanese,comfort,らく,raku,1
+楽,japanese,ease,らく,raku,1
+楽,japanese,relief,らく,raku,1
+楽,japanese,(at) peace,らく,raku,1
+楽,japanese,relaxation,らく,raku,1
+楽,japanese,easy,らく,raku,1
+楽,japanese,simple,らく,raku,1
+楽,japanese,without trouble,らく,raku,1
+楽,japanese,without hardships,らく,raku,1
+楽,japanese,(economically) comfortable,らく,raku,1
+楽,japanese,raku pottery,らく,raku,1
+楽,japanese,sukha (happiness),らく,raku,1
+額,japanese,(picture) frame,がく,gaku,1
+額,japanese,framed picture,がく,gaku,1
+額,japanese,amount (esp. of money),がく,gaku,1
+額,japanese,sum,がく,gaku,1
+潟,japanese,lagoon,かた,kata,1
+潟,japanese,inlet,かた,kata,1
+潟,japanese,creek,かた,kata,1
+潟,japanese,tidal beach,かた,kata,1
+潟,japanese,tidal flat,かた,kata,1
+潟,japanese,tideland,かた,kata,1
 勧学,japanese,encouragement of learning,かんがく,kangaku,0
 姦人,japanese,villain,かんじん,kanjin,0
 姦人,japanese,scoundrel,かんじん,kanjin,0
 韓人,japanese,Korean person,かんじん,kanjin,0
 気学,japanese,fortune telling based on Chinese twelve year cycle,きがく,kigaku,0
+飢え,japanese,hunger,うえ,ue,1
+飢え,japanese,starvation,うえ,ue,1
 偽学,japanese,false science,ぎがく,gigaku,0
 偽学,japanese,science out of line with the world of thought,ぎがく,gigaku,0
 擬人,japanese,simulation of a person,ぎじん,gijin,0
@@ -1342,6 +1447,32 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 苦学,japanese,studying in harsh economic circumstances,くがく,kugaku,0
 愚人,japanese,fool,ぐじん,gujin,0
 愚人,japanese,idiot,ぐじん,gujin,0
+空,japanese,emptiness,から,kara,1
+空,japanese,being empty,から,kara,1
+空,japanese,not carrying anything,から,kara,1
+空,japanese,unburdened,から,kara,1
+空,japanese,empty-handed,から,kara,1
+空,japanese,"dishonoured (bill, promise, etc.)",から,kara,1
+空,japanese,false,から,kara,1
+空,japanese,no-show (reservation),から,kara,1
+空,japanese,"put-on (cheeriness, courage, etc.)",から,kara,1
+空,japanese,empty (compliments),から,kara,1
+空,japanese,insincere,から,kara,1
+空,japanese,sky,そら,sora,1
+空,japanese,the air,そら,sora,1
+空,japanese,the heavens,そら,sora,1
+空,japanese,weather,そら,sora,1
+空,japanese,far-off place,そら,sora,1
+空,japanese,distant place,そら,sora,1
+空,japanese,state of mind,そら,sora,1
+空,japanese,feeling,そら,sora,1
+空,japanese,(from) memory,そら,sora,1
+空,japanese,(by) heart,そら,sora,1
+空,japanese,falsehood,そら,sora,1
+空,japanese,lie,そら,sora,1
+空,japanese,somehow,そら,sora,1
+空,japanese,vaguely,そら,sora,1
+空,japanese,fake,そら,sora,1
 偶人,japanese,puppet,ぐうじん,guujin,0
 偶人,japanese,doll,ぐうじん,guujin,0
 軍学,japanese,military science,ぐんがく,gungaku,0
@@ -1352,6 +1483,45 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 軍人,japanese,soldier,ぐんじん,gunjin,1
 軍人,japanese,member of the armed forces,ぐんじん,gunjin,1
 軍人,japanese,military personnel,ぐんじん,gunjin,1
+刑,japanese,penalty,けい,kei,1
+刑,japanese,sentence,けい,kei,1
+刑,japanese,punishment,けい,kei,1
+型,japanese,type,かた,kata,1
+型,japanese,style,かた,kata,1
+型,japanese,model,かた,kata,1
+型,japanese,pattern,かた,kata,1
+型,japanese,mold,かた,kata,1
+型,japanese,mould,かた,kata,1
+型,japanese,model,かた,kata,1
+型,japanese,pattern,かた,kata,1
+型,japanese,template,かた,kata,1
+型,japanese,impression,かた,kata,1
+型,japanese,kata (set sequence of positions and movements in martial arts),かた,kata,1
+型,japanese,"style (in kabuki, noh, etc.)",かた,kata,1
+型,japanese,form,かた,kata,1
+型,japanese,convention,かた,kata,1
+型,japanese,tradition,かた,kata,1
+型,japanese,(standard) form,かた,kata,1
+型,japanese,formula,かた,kata,1
+型,japanese,usage,かた,kata,1
+型,japanese,(set) size,かた,kata,1
+型,japanese,"inches (in sizes of displays, disks, image sensors, etc.)",かた,kata,1
+型,japanese,(taxonomical) form,かた,kata,1
+形,japanese,form,かたち,katachi,1
+形,japanese,shape,かたち,katachi,1
+形,japanese,figure,かたち,katachi,1
+形,japanese,visage,かたち,katachi,1
+系,japanese,system,けい,kei,1
+系,japanese,lineage,けい,kei,1
+系,japanese,group,けい,kei,1
+系,japanese,corollary,けい,kei,1
+系,japanese,system (range of strata that correspond to a particular time period),けい,kei,1
+系,japanese,(taxonomical) series,けい,kei,1
+計,japanese,plan,けい,kei,1
+計,japanese,meter,けい,kei,1
+計,japanese,measuring device,けい,kei,1
+計,japanese,(in) total,けい,kei,1
+計,japanese,total (of),けい,kei,1
 芸人,japanese,(TV) comedian,げいにん,geinin,1
 芸人,japanese,performer (esp. of a traditional art),げいにん,geinin,1
 芸人,japanese,entertainer,げいにん,geinin,1
@@ -1361,6 +1531,7 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 傑人,japanese,distinguished person,けつじん,ketsujin,0
 傑人,japanese,person of high caliber,けつじん,ketsujin,0
 研学,japanese,study,けんがく,kengaku,0
+肩,japanese,shoulder,かた,kata,1
 見学,japanese,inspection,けんがく,kengaku,1
 見学,japanese,study by observation,けんがく,kengaku,1
 見学,japanese,field trip,けんがく,kengaku,1
@@ -1379,6 +1550,10 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 玄人,japanese,woman in the nightlife business,くろうと,kurouto,1
 玄人,japanese,demimondaine,くろうと,kurouto,1
 玄人,japanese,geisha and prostitutes,くろうと,kurouto,1
+諺,japanese,proverb,ことわざ,kotowaza,1
+諺,japanese,saying,ことわざ,kotowaza,1
+諺,japanese,aphorism,ことわざ,kotowaza,1
+諺,japanese,maxim,ことわざ,kotowaza,1
 個人,japanese,individual,こじん,kojin,1
 個人,japanese,private person,こじん,kojin,1
 個人,japanese,personal,こじん,kojin,1
@@ -1386,6 +1561,11 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 個人,japanese,natural person,こじん,kojin,1
 古学,japanese,classical studies,こがく,kogaku,0
 古人,japanese,ancient people,こじん,kojin,0
+戸,japanese,door (esp. Japanese-style),と,to,1
+戸,japanese,shutter,と,to,1
+戸,japanese,window shutter,と,to,1
+戸,japanese,entrance (to a home),と,to,1
+戸,japanese,narrows,と,to,1
 故人,japanese,the deceased,こじん,kojin,1
 故人,japanese,the departed,こじん,kojin,1
 故人,japanese,old friend,こじん,kojin,1
@@ -1408,6 +1588,7 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 才学,japanese,talent and education,さいがく,saigaku,0
 才人,japanese,talented person,さいじん,saijin,0
 才人,japanese,clever person,さいじん,saijin,0
+斎,japanese,meals exchanged by parishioners and priests,とき,toki,0
 在学,japanese,"attending (school, college, etc.)",ざいがく,zaigaku,1
 在学,japanese,being enrolled,ざいがく,zaigaku,1
 在学,japanese,being a student,ざいがく,zaigaku,1
@@ -1418,12 +1599,29 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 罪人,japanese,sinner,つみびと,tsumibito,0
 罪人,japanese,evildoer,つみびと,tsumibito,0
 罪人,japanese,wrongdoer,つみびと,tsumibito,0
+坂,japanese,slope,さか,saka,1
+坂,japanese,incline,さか,saka,1
+坂,japanese,hill,さか,saka,1
+坂,japanese,milestone,さか,saka,1
+坂,japanese,(age) mark,さか,saka,1
+肴,japanese,appetizer or snack served with drinks,さかな,sakana,0
+肴,japanese,performance to liven up a bar,さかな,sakana,0
+肴,japanese,conversation to liven up a party,さかな,sakana,0
 殺人,japanese,murder,さつじん,satsujin,1
 殺人,japanese,homicide,さつじん,satsujin,1
 殺人,japanese,manslaughter,さつじん,satsujin,1
 雑学,japanese,miscellaneous knowledge,ざつがく,zatsugaku,0
 三人,japanese,three people,さんにん,sannin,1
+仕,japanese,official,し,shi,0
+仕,japanese,civil service,し,shi,0
+刺,japanese,calling card,し,shi,0
 史学,japanese,study of history,しがく,shigaku,1
+四季,japanese,the four seasons,しき,shiki,1
+士気,japanese,"morale (of troops, team, etc.)",しき,shiki,1
+士気,japanese,esprit de corps,しき,shiki,1
+市,japanese,market,いち,ichi,1
+市,japanese,fair,いち,ichi,1
+市,japanese,city,し,shi,1
 市人,japanese,city market seller,いちびと,ichibito,0
 市人,japanese,merchant,いちびと,ichibito,0
 市人,japanese,city resident,いちびと,ichibito,0
@@ -1431,13 +1629,90 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 市人,japanese,resident (of a town),しじん,shijin,0
 市人,japanese,merchant,しじん,shijin,0
 志学,japanese,age 15,しがく,shigaku,0
+指揮,japanese,command,しき,shiki,1
+指揮,japanese,direction,しき,shiki,1
+指揮,japanese,supervision,しき,shiki,1
+指揮,japanese,"conducting (an orchestra, choir, etc.)",しき,shiki,1
+死,japanese,death,し,shi,1
+死,japanese,(an) out,し,shi,1
+死,japanese,death penalty (by strangulation or decapitation; most severe of the five ritsuryō punishments),し,shi,1
+死期,japanese,time of death,しき,shiki,0
+死期,japanese,one's final hour,しき,shiki,0
+死期,japanese,one's end,しき,shiki,0
 死人,japanese,corpse,しにん,shinin,1
 死人,japanese,dead person,しにん,shinin,1
+紙,japanese,paper,かみ,kami,1
 詩人,japanese,poet,しじん,shijin,1
+誌,japanese,magazine,し,shi,1
+誌,japanese,journal,し,shi,1
 歯学,japanese,dentistry,しがく,shigaku,0
+児,japanese,child,じ,ji,0
+児,japanese,boy,じ,ji,0
+児,japanese,I,じ,ji,0
+児,japanese,me,じ,ji,0
+字,japanese,character (esp. kanji),じ,ji,1
+字,japanese,letter,じ,ji,1
+字,japanese,written text,じ,ji,1
+字,japanese,handwriting,じ,ji,1
+字,japanese,penmanship,じ,ji,1
+字,japanese,"the ... word (e.g. ""the L word"" = ""love"")",じ,ji,1
+時,japanese,time,とき,toki,1
+時,japanese,hour,とき,toki,1
+時,japanese,moment,とき,toki,1
+時,japanese,occasion,とき,toki,1
+時,japanese,case,とき,toki,1
+時,japanese,chance,とき,toki,1
+時,japanese,opportunity,とき,toki,1
+時,japanese,season,とき,toki,1
+時,japanese,the times,とき,toki,1
+時,japanese,the age,とき,toki,1
+時,japanese,the day,とき,toki,1
+時,japanese,tense,とき,toki,1
+璽,japanese,emperor's seal,じ,ji,0
+式,japanese,way,しき,shiki,1
+式,japanese,style,しき,shiki,1
+式,japanese,fashion,しき,shiki,1
+式,japanese,method,しき,shiki,1
+式,japanese,system,しき,shiki,1
+式,japanese,form,しき,shiki,1
+式,japanese,type,しき,shiki,1
+式,japanese,ceremony,しき,shiki,1
+式,japanese,rite,しき,shiki,1
+式,japanese,ritual,しき,shiki,1
+式,japanese,celebration,しき,shiki,1
+式,japanese,wedding (ceremony),しき,shiki,1
+式,japanese,equation,しき,shiki,1
+式,japanese,formula,しき,shiki,1
+式,japanese,expression,しき,shiki,1
+式,japanese,enforcement regulations (of the ritsuryō legal codes),しき,shiki,1
 借人,japanese,borrower,かりにん,karinin,0
 若人,japanese,young person,わこうど,wakoudo,1
+主,japanese,chief,おも,omo,1
+主,japanese,main,おも,omo,1
+主,japanese,principal,おも,omo,1
+主,japanese,important,おも,omo,1
+主,japanese,main secondary or supporting role (in kyogen),おも,omo,1
+主,japanese,(one's) master,しゅ,shu,1
+主,japanese,(one's) employer,しゅ,shu,1
+主,japanese,(one's) lord,しゅ,shu,1
+主,japanese,"leader (of a country, group, etc.)",しゅ,shu,1
+主,japanese,head,しゅ,shu,1
+主,japanese,chief,しゅ,shu,1
+主,japanese,Lord,しゅ,shu,1
+主,japanese,main thing,しゅ,shu,1
+主,japanese,chief part,しゅ,shu,1
+主,japanese,first consideration,しゅ,shu,1
+主,japanese,primary object,しゅ,shu,1
+主,japanese,principal aim,しゅ,shu,1
 狩人,japanese,hunter,かりゅうど,karyuudo,1
+種,japanese,kind,しゅ,shu,0
+種,japanese,variety,しゅ,shu,0
+種,japanese,(biological) species,しゅ,shu,0
+種,japanese,(logical) species,しゅ,shu,0
+腫,japanese,tumor,しゅ,shu,0
+腫,japanese,tumour,しゅ,shu,0
+酒,japanese,alcohol,さけ,sake,1
+酒,japanese,sake,さけ,sake,1
 儒学,japanese,Confucianism,じゅがく,jugaku,1
 囚人,japanese,prisoner,しゅうじん,shuujin,1
 囚人,japanese,convict,しゅうじん,shuujin,1
@@ -1450,20 +1725,194 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 住人,japanese,user (of a website),じゅうにん,juunin,1
 粛学,japanese,school purge,しゅくがく,shukugaku,0
 女人,japanese,woman,にょにん,nyonin,0
+商,japanese,quotient,しょう,shou,1
+商,japanese,business,しょう,shou,1
+商,japanese,merchant,しょう,shou,1
+商,japanese,dealer,しょう,shou,1
+商,japanese,second degree (of the Japanese and Chinese pentatonic scale),しょう,shou,1
+商,japanese,Shang dynasty (of China; approx. 1600-1046 BCE),しょう,shou,1
+商,japanese,Yin dynasty,しょう,shou,1
 小学,japanese,elementary school,しょうがく,shougaku,1
 小学,japanese,primary school,しょうがく,shougaku,1
 小学,japanese,grade school,しょうがく,shougaku,1
 小学,japanese,school for children over eight years old in ancient China,しょうがく,shougaku,1
 小学,japanese,traditional Chinese philology,しょうがく,shougaku,1
 小人,japanese,child (esp. one of elementary school age or younger),しょうにん,shounin,1
+症,japanese,illness,しょう,shou,1
+症,japanese,condition,しょう,shou,1
+症,japanese,-pathy,しょう,shou,1
+称,japanese,name,しょう,shou,0
+称,japanese,title,しょう,shou,0
+称,japanese,designation,しょう,shou,0
+称,japanese,fame,しょう,shou,0
+称,japanese,reputation,しょう,shou,0
+章,japanese,chapter,しょう,shou,1
+章,japanese,section,しょう,shou,1
+章,japanese,medal,しょう,shou,1
+章,japanese,badge,しょう,shou,1
+章,japanese,insignia,しょう,shou,1
 証人,japanese,witness,しょうにん,shounin,1
+象,japanese,form,しょう,shou,1
+象,japanese,shape,しょう,shou,1
+象,japanese,figure,しょう,shou,1
+象,japanese,appearance,しょう,shou,1
+象,japanese,phenomenon,しょう,shou,1
+賞,japanese,prize,しょう,shou,1
+賞,japanese,award,しょう,shou,1
+上,japanese,above,うえ,ue,1
+上,japanese,over,うえ,ue,1
+上,japanese,up,うえ,ue,1
+上,japanese,top,うえ,ue,1
+上,japanese,summit,うえ,ue,1
+上,japanese,upper part,うえ,ue,1
+上,japanese,head (e.g. of a staircase),うえ,ue,1
+上,japanese,surface,うえ,ue,1
+上,japanese,on (top of),うえ,ue,1
+上,japanese,the above (in a piece of writing),うえ,ue,1
+上,japanese,earlier part,うえ,ue,1
+上,japanese,superior,うえ,ue,1
+上,japanese,better,うえ,ue,1
+上,japanese,"higher (position, rank, etc.)",うえ,ue,1
+上,japanese,upper (class),うえ,ue,1
+上,japanese,elder,うえ,ue,1
+上,japanese,older,うえ,ue,1
+上,japanese,senior,うえ,ue,1
+上,japanese,with respect to ...,うえ,ue,1
+上,japanese,in terms of,うえ,ue,1
+上,japanese,as far as ... is concerned,うえ,ue,1
+上,japanese,when (e.g. drunk),うえ,ue,1
+上,japanese,besides ...,うえ,ue,1
+上,japanese,in addition to ...,うえ,ue,1
+上,japanese,on top of ...,うえ,ue,1
+上,japanese,as well as ...,うえ,ue,1
+上,japanese,after ...,うえ,ue,1
+上,japanese,upon ...,うえ,ue,1
+上,japanese,on ...,うえ,ue,1
+上,japanese,with (e.g. full awareness),うえ,ue,1
+上,japanese,as a result of ...,うえ,ue,1
+上,japanese,since ...,うえ,ue,1
+上,japanese,now that ...,うえ,ue,1
+上,japanese,because ...,うえ,ue,1
+上,japanese,honorable,うえ,ue,1
+上,japanese,venerable,うえ,ue,1
+上,japanese,dear,うえ,ue,1
+上,japanese,emperor,うえ,ue,1
+上,japanese,sovereign,うえ,ue,1
+上,japanese,shogun,うえ,ue,1
+上,japanese,daimyo,うえ,ue,1
+上,japanese,upper,うわ,uwa,0
+上,japanese,upward,うわ,uwa,0
+上,japanese,outer,うわ,uwa,0
+上,japanese,surface,うわ,uwa,0
+上,japanese,top,うわ,uwa,0
+上,japanese,upper reaches (of a river),かみ,kami,1
+上,japanese,upper stream,かみ,kami,1
+上,japanese,top,かみ,kami,1
+上,japanese,upper part,かみ,kami,1
+上,japanese,upper half (of the body),かみ,kami,1
+上,japanese,long ago,かみ,kami,1
+上,japanese,beginning,かみ,kami,1
+上,japanese,first,かみ,kami,1
+上,japanese,person of high rank (e.g. the emperor),かみ,kami,1
+上,japanese,government,かみ,kami,1
+上,japanese,imperial court,かみ,kami,1
+上,japanese,imperial capital (i.e. Kyoto),かみ,kami,1
+上,japanese,capital region (i.e. Kansai),かみ,kami,1
+上,japanese,region (or direction of) the imperial palace,かみ,kami,1
+上,japanese,head (of a table),かみ,kami,1
+上,japanese,wife,かみ,kami,1
+上,japanese,mistress (of a restaurant),かみ,kami,1
+上,japanese,from the standpoint of,じょう,jou,1
+上,japanese,from the viewpoint of,じょう,jou,1
+上,japanese,with respect to,じょう,jou,1
+上,japanese,in terms of,じょう,jou,1
+上,japanese,as a matter of,じょう,jou,1
+上,japanese,in view of,じょう,jou,1
+上,japanese,so far as ... is concerned,じょう,jou,1
+上,japanese,on,じょう,jou,1
+上,japanese,above,じょう,jou,1
+上,japanese,on top of,じょう,jou,1
+上,japanese,aboard (a ship or vehicle),じょう,jou,1
+上,japanese,the best,じょう,jou,1
+上,japanese,top,じょう,jou,1
+上,japanese,first class,じょう,jou,1
+上,japanese,first grade,じょう,jou,1
+上,japanese,first volume (of a two or three-volume set),じょう,jou,1
+上,japanese,first book,じょう,jou,1
+上,japanese,with my compliments,じょう,jou,1
 上人,japanese,holy priest,しょうにん,shounin,0
 上人,japanese,saint,しょうにん,shounin,0
+冗,japanese,waste,じょう,jou,0
+冗,japanese,uselessness,じょう,jou,0
+冗,japanese,redundance,じょう,jou,0
+嬢,japanese,unmarried woman,じょう,jou,1
+嬢,japanese,Miss,じょう,jou,1
+嬢,japanese,-ess,じょう,jou,1
+嬢,japanese,-ette,じょう,jou,1
+情,japanese,feelings,じょう,jou,1
+情,japanese,emotion,じょう,jou,1
+情,japanese,sentiment,じょう,jou,1
+情,japanese,compassion,じょう,jou,1
+情,japanese,sympathy,じょう,jou,1
+情,japanese,passion,じょう,jou,1
+情,japanese,affection,じょう,jou,1
+情,japanese,love,じょう,jou,1
+情,japanese,the way things really are,じょう,jou,1
+情,japanese,the actual situation,じょう,jou,1
+状,japanese,form,じょう,jou,1
+状,japanese,shape,じょう,jou,1
+状,japanese,appearance,じょう,jou,1
+状,japanese,state,じょう,jou,1
+状,japanese,condition,じょう,jou,1
+状,japanese,circumstances,じょう,jou,1
+状,japanese,letter,じょう,jou,1
+状,japanese,correspondence,じょう,jou,1
+畳,japanese,"tatami mat (esp. as a measure of room size, either 1.82 sqm or 1.54 sqm)",じょう,jou,1
+職,japanese,job,しょく,shoku,1
+職,japanese,work,しょく,shoku,1
+職,japanese,employment,しょく,shoku,1
+職,japanese,occupation,しょく,shoku,1
+職,japanese,position,しょく,shoku,1
+職,japanese,duties,しょく,shoku,1
+職,japanese,trade,しょく,shoku,1
+職,japanese,skill,しょく,shoku,1
 職人,japanese,craftsman,しょくにん,shokunin,1
 職人,japanese,artisan,しょくにん,shokunin,1
 職人,japanese,tradesman,しょくにん,shokunin,1
 職人,japanese,worker,しょくにん,shokunin,1
 職人,japanese,workman,しょくにん,shokunin,1
+色,japanese,colour,いろ,iro,1
+色,japanese,color,いろ,iro,1
+色,japanese,hue,いろ,iro,1
+色,japanese,tint,いろ,iro,1
+色,japanese,tinge,いろ,iro,1
+色,japanese,shade,いろ,iro,1
+色,japanese,complexion,いろ,iro,1
+色,japanese,skin colour,いろ,iro,1
+色,japanese,skin color,いろ,iro,1
+色,japanese,look (on one's face),いろ,iro,1
+色,japanese,expression,いろ,iro,1
+色,japanese,appearance,いろ,iro,1
+色,japanese,air,いろ,iro,1
+色,japanese,feeling,いろ,iro,1
+色,japanese,personality,いろ,iro,1
+色,japanese,character,いろ,iro,1
+色,japanese,"tone (of one's voice, etc.)",いろ,iro,1
+色,japanese,tune,いろ,iro,1
+色,japanese,sound,いろ,iro,1
+色,japanese,ring,いろ,iro,1
+色,japanese,love,いろ,iro,1
+色,japanese,lust,いろ,iro,1
+色,japanese,sensuality,いろ,iro,1
+色,japanese,love affair,いろ,iro,1
+色,japanese,lover,いろ,iro,1
+色,japanese,paramour,いろ,iro,1
+色,japanese,beauty,いろ,iro,1
+色,japanese,sexiness,いろ,iro,1
+色,japanese,physical appeal,いろ,iro,1
+色,japanese,kind,いろ,iro,1
+色,japanese,type,いろ,iro,1
+色,japanese,variety,いろ,iro,1
 新人,japanese,newcomer,しんじん,shinjin,1
 新人,japanese,new figure,しんじん,shinjin,1
 新人,japanese,new member,しんじん,shinjin,1
@@ -1474,6 +1923,16 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 新人,japanese,modern humans (from Cro-Magnon man onwards),しんじん,shinjin,1
 新人,japanese,Homo sapiens,しんじん,shinjin,1
 真人,japanese,true man,しんじん,shinjin,0
+神,japanese,god,かみ,kami,1
+神,japanese,deity,かみ,kami,1
+神,japanese,divinity,かみ,kami,1
+神,japanese,spirit,かみ,kami,1
+神,japanese,kami,かみ,kami,1
+神,japanese,incredible,かみ,kami,1
+神,japanese,fantastic,かみ,kami,1
+神,japanese,amazing,かみ,kami,1
+神,japanese,Emperor (of Japan),かみ,kami,1
+神,japanese,thunder,かみ,kami,1
 神学,japanese,theology,しんがく,shingaku,1
 神学,japanese,divinity,しんがく,shingaku,1
 進学,japanese,advancing to the next stage of education,しんがく,shingaku,1
@@ -1705,6 +2164,14 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 人虱,japanese,body lice,ひとじらみ,hitojirami,0
 人虱,japanese,head louse,ひとじらみ,hitojirami,0
 人虱,japanese,head lice,ひとじらみ,hitojirami,0
+仁,japanese,benevolence (esp. as a virtue of Confucianism),じん,jin,1
+仁,japanese,consideration,じん,jin,1
+仁,japanese,compassion,じん,jin,1
+仁,japanese,humanity,じん,jin,1
+仁,japanese,charity,じん,jin,1
+仁,japanese,human,じん,jin,1
+仁,japanese,kernel,じん,jin,1
+仁,japanese,nucleolus,じん,jin,1
 仁人,japanese,man of virtue,じんじん,jinjin,0
 仁人,japanese,humanitarian,じんじん,jinjin,0
 粋人,japanese,person of refined tastes,すいじん,suijin,0
@@ -1712,6 +2179,14 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 粋人,japanese,man of the world,すいじん,suijin,0
 粋人,japanese,understanding person,すいじん,suijin,0
 粋人,japanese,man about town,すいじん,suijin,0
+酔う,japanese,to get drunk,よう,you,1
+酔う,japanese,to become intoxicated,よう,you,1
+酔う,japanese,to feel sick (e.g. in a vehicle),よう,you,1
+酔う,japanese,to become nauseated,よう,you,1
+酔う,japanese,to be elated,よう,you,1
+酔う,japanese,to be exalted,よう,you,1
+酔う,japanese,to be spellbound,よう,you,1
+酔う,japanese,to be in raptures,よう,you,1
 数学,japanese,mathematics,すうがく,suugaku,1
 数人,japanese,several people,すうにん,suunin,1
 数人,japanese,a few people,すうにん,suunin,1
@@ -1728,16 +2203,80 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 聖人,japanese,great religious teacher,せいじん,seijin,1
 聖人,japanese,sage,せいじん,seijin,1
 聖人,japanese,refined sake,せいじん,seijin,1
+声,japanese,voice,こえ,koe,1
+声,japanese,singing (of a bird),こえ,koe,1
+声,japanese,chirping (of an insect),こえ,koe,1
+声,japanese,hoot,こえ,koe,1
+声,japanese,voice,こえ,koe,1
+声,japanese,opinion (as expressed in words),こえ,koe,1
+声,japanese,view,こえ,koe,1
+声,japanese,wish,こえ,koe,1
+声,japanese,attitude,こえ,koe,1
+声,japanese,will,こえ,koe,1
+声,japanese,sound,こえ,koe,1
+声,japanese,sense (of something's arrival),こえ,koe,1
+声,japanese,feeling,こえ,koe,1
+声,japanese,voice,こえ,koe,1
+声,japanese,voiced sound,こえ,koe,1
+青,japanese,blue,あお,ao,1
+青,japanese,azure,あお,ao,1
+青,japanese,green,あお,ao,1
+青,japanese,green light (traffic),あお,ao,1
+青,japanese,black (horse coat color),あお,ao,1
+青,japanese,blue 5-point card,あお,ao,1
+青,japanese,immature,あお,ao,1
+青,japanese,unripe,あお,ao,1
+青,japanese,young,あお,ao,1
 碩学,japanese,great scholar,せきがく,sekigaku,0
 碩学,japanese,profound scholar,せきがく,sekigaku,0
+仙,japanese,hermit,せん,sen,0
+仙,japanese,wizard,せん,sen,0
+仙,japanese,wizardry,せん,sen,0
 仙人,japanese,immortal mountain wizard (in Taoism),せんにん,sennin,1
 仙人,japanese,mountain man (esp. a hermit),せんにん,sennin,1
 仙人,japanese,person not bound by earthly desires,せんにん,sennin,1
+先,japanese,former,せん,sen,0
+先,japanese,previous,せん,sen,0
+先,japanese,old,せん,sen,0
+先,japanese,"first move (in go, shogi, etc.)",せん,sen,0
+先,japanese,opening move,せん,sen,0
 先人,japanese,predecessor,せんじん,senjin,1
 先人,japanese,pioneer,せんじん,senjin,1
 先人,japanese,ancestor,せんじん,senjin,1
+千,japanese,thousand,せん,sen,1
+千,japanese,"1,000",せん,sen,1
 浅学,japanese,shallow knowledge,せんがく,sengaku,0
 浅学,japanese,superficial learning,せんがく,sengaku,0
+煎,japanese,infusing (tea),せん,sen,0
+煎,japanese,infusion,せん,sen,0
+線,japanese,line,せん,sen,1
+線,japanese,stripe,せん,sen,1
+線,japanese,stria,せん,sen,1
+線,japanese,line (e.g. telephone line),せん,sen,1
+線,japanese,wire,せん,sen,1
+線,japanese,ray (e.g. X-ray),せん,sen,1
+線,japanese,beam,せん,sen,1
+線,japanese,line (e.g. of a railroad),せん,sen,1
+線,japanese,track,せん,sen,1
+線,japanese,route,せん,sen,1
+線,japanese,lane,せん,sen,1
+線,japanese,outline,せん,sen,1
+線,japanese,contours,せん,sen,1
+線,japanese,form,せん,sen,1
+線,japanese,level,せん,sen,1
+線,japanese,division,せん,sen,1
+線,japanese,line (of action),せん,sen,1
+線,japanese,position,せん,sen,1
+線,japanese,approach,せん,sen,1
+線,japanese,policy,せん,sen,1
+線,japanese,principle,せん,sen,1
+線,japanese,impression one leaves,せん,sen,1
+線,japanese,air one gives off,せん,sen,1
+腺,japanese,gland,せん,sen,0
+銭,japanese,sen (hundredth of a yen),せん,sen,1
+銭,japanese,coin made of non-precious materials,せん,sen,1
+銭,japanese,one-thousandth of a kan (as a unit of currency),せん,sen,1
+銭,japanese,one-thousandth of a kan (as a unit of mass),せん,sen,1
 前人,japanese,predecessor,ぜんじん,zenjin,0
 前人,japanese,people of former times,ぜんじん,zenjin,0
 善人,japanese,good person,ぜんにん,zennin,0
@@ -1758,6 +2297,17 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 訴人,japanese,an informant,そにん,sonin,0
 訴人,japanese,sue,そにん,sonin,0
 訴人,japanese,accuse,そにん,sonin,0
+喪,japanese,mourning,も,mo,1
+喪,japanese,calamity,も,mo,1
+喪,japanese,misfortune,も,mo,1
+掃く,japanese,to sweep,はく,haku,1
+掃く,japanese,to brush,はく,haku,1
+掃く,japanese,to clean,はく,haku,1
+掃く,japanese,to gather silkworms,はく,haku,1
+藻,japanese,algae,も,mo,1
+藻,japanese,waterweed,も,mo,1
+藻,japanese,seaweed,も,mo,1
+藻,japanese,duckweed,も,mo,1
 俗学,japanese,popular learning,ぞくがく,zokugaku,0
 俗学,japanese,worldly study,ぞくがく,zokugaku,0
 俗人,japanese,person with low tastes,ぞくじん,zokujin,0
@@ -1767,6 +2317,13 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 俗人,japanese,layperson,ぞくじん,zokujin,0
 俗人,japanese,layman,ぞくじん,zokujin,0
 村人,japanese,villager,むらびと,murabito,1
+多,japanese,multi-,た,ta,1
+対,japanese,pair,つい,tsui,1
+対,japanese,couple,つい,tsui,1
+対,japanese,set,つい,tsui,1
+対,japanese,antithesis,つい,tsui,1
+対,japanese,counter for items that come in pairs,つい,tsui,1
+対,japanese,"counter for sets (of clothes, small furniture, utensils, etc.)",つい,tsui,1
 退学,japanese,dropping out of school,たいがく,taigaku,1
 退学,japanese,withdrawal from school,たいがく,taigaku,1
 退学,japanese,expulsion from school,たいがく,taigaku,1
@@ -1790,6 +2347,8 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 痴人,japanese,dunce,ちじん,chijin,0
 痴人,japanese,fool,ちじん,chijin,0
 痴人,japanese,idiot,ちじん,chijin,0
+茶菓,japanese,tea and cakes,さか,saka,0
+茶菓,japanese,refreshments,さか,saka,0
 中学,japanese,junior high school,ちゅうがく,chuugaku,1
 中学,japanese,middle school,ちゅうがく,chuugaku,1
 中学,japanese,lower secondary school,ちゅうがく,chuugaku,1
@@ -1814,8 +2373,22 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 哲人,japanese,wise man,てつじん,tetsujin,1
 哲人,japanese,philosopher,てつじん,tetsujin,1
 哲人,japanese,sage,てつじん,tetsujin,1
+田,japanese,rice field,た,ta,1
+徒,japanese,party,と,to,0
+徒,japanese,set,と,to,0
+徒,japanese,gang,と,to,0
+徒,japanese,company,と,to,0
+徒,japanese,person,と,to,0
+斗,japanese,to,と,to,1
+斗,japanese,"traditional unit of volume, approx. 18 litres",と,to,1
+斗,japanese,square bearing block (at the top of a pillar),と,to,1
+斗,japanese,"Chinese ""Dipper"" constellation (one of the 28 mansions)",と,to,1
+土器,japanese,earthenware,どき,doki,1
+土器,japanese,unglazed (bisque-fired) earthenware,どき,doki,1
 土人,japanese,native,どじん,dojin,1
 土人,japanese,aboriginal,どじん,dojin,1
+怒気,japanese,anger,どき,doki,1
+怒気,japanese,wrath,どき,doki,1
 島人,japanese,islander,とうじん,toujin,0
 盗人,japanese,thief,ぬすびと,nusubito,0
 盗人,japanese,robber,ぬすびと,nusubito,0
@@ -1831,12 +2404,20 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 入学,japanese,enrolment,にゅうがく,nyuugaku,1
 入学,japanese,enrollment,にゅうがく,nyuugaku,1
 入学,japanese,matriculation,にゅうがく,nyuugaku,1
+任,japanese,obligation,にん,nin,1
+任,japanese,duty,にん,nin,1
+任,japanese,charge,にん,nin,1
+任,japanese,responsibility,にん,nin,1
 農学,japanese,(science of) agriculture,のうがく,nougaku,0
 俳人,japanese,haiku poet,はいじん,haijin,1
 廃人,japanese,cripple,はいじん,haijin,0
 廃人,japanese,disabled person,はいじん,haijin,0
 廃人,japanese,invalid,はいじん,haijin,0
 廃人,japanese,"(game, internet, etc.) addict",はいじん,haijin,0
+伯,japanese,count,はく,haku,1
+伯,japanese,earl,はく,haku,1
+伯,japanese,chief official of the Department of Worship (under the ritsuryō system),はく,haku,1
+伯,japanese,Brazil,はく,haku,1
 博学,japanese,erudition,はくがく,hakugaku,1
 博学,japanese,extensive learning,はくがく,hakugaku,1
 白人,japanese,white person,はくじん,hakujin,1
@@ -1846,14 +2427,61 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 白人,japanese,unlicensed prostitute,はくじん,hakujin,1
 函人,japanese,armorer,かんじん,kanjin,0
 函人,japanese,armourer,かんじん,kanjin,0
+髪,japanese,hair (on the head),かみ,kami,1
+判,japanese,seal,はん,han,1
+判,japanese,stamp,はん,han,1
+判,japanese,monogram signature,はん,han,1
+判,japanese,judgment,はん,han,1
+判,japanese,judgement,はん,han,1
+判,japanese,size (of paper or books),はん,han,1
+半,japanese,half,はん,han,1
+半,japanese,semi-,はん,han,1
+半,japanese,partial,はん,han,1
+半,japanese,half-past,はん,han,1
+半,japanese,odd number,はん,han,1
+半,japanese,"han (unit of land area, approx. 595.8 m^2)",はん,han,1
+反,japanese,variable measure of fabric (28.8 cm in width),たん,tan,0
+反,japanese,for kimonos: at least 10 m in length,たん,tan,0
+反,japanese,for haori: at least 7.27 m in length,たん,tan,0
+反,japanese,for other clothes: at least 6.06 m in length,たん,tan,0
+反,japanese,"300 tsubo (991.74 meters square, 0.24506 acres)",たん,tan,0
+反,japanese,six ken (10.91 m),たん,tan,0
+反,japanese,anti-,はん,han,1
+反,japanese,antithesis,はん,han,1
+反,japanese,fanqie,はん,han,1
+反,japanese,"traditional Chinese spelling system in which two characters are used: the first one for the onset, the second one for rhyme and tone",はん,han,1
+版,japanese,edition,はん,han,1
+版,japanese,version,はん,han,1
+版,japanese,printing,はん,han,1
+版,japanese,impression,はん,han,1
+版,japanese,implementation (of software),はん,han,1
+版,japanese,plate,はん,han,1
+版,japanese,block,はん,han,1
+版,japanese,cast,はん,han,1
+版,japanese,counter for editions of a publication,はん,han,1
 犯人,japanese,offender,はんにん,hannin,1
 犯人,japanese,criminal,はんにん,hannin,1
 犯人,japanese,culprit,はんにん,hannin,1
+班,japanese,group,はん,han,1
+班,japanese,party,はん,han,1
+班,japanese,team,はん,han,1
+班,japanese,squad,はん,han,1
+班,japanese,section,はん,han,1
+藩,japanese,han (estate of a daimyo in the Edo and early Meiji periods),はん,han,1
+藩,japanese,feudal domain,はん,han,1
+藩,japanese,fief,はん,han,1
+藩,japanese,province,はん,han,1
 藩学,japanese,han school,はんがく,hangaku,0
 藩学,japanese,school established by a daimyo for educating the children of the domain's retainers,はんがく,hangaku,0
 晩学,japanese,late education,ばんがく,bangaku,0
 番人,japanese,guard,ばんにん,bannin,0
 番人,japanese,watchman,ばんにん,bannin,0
+匪徒,japanese,bandit,ひと,hito,0
+肥,japanese,manure,こえ,koe,1
+肥,japanese,night soil,こえ,koe,1
+肥,japanese,dung,こえ,koe,1
+肥,japanese,fertiliser,こえ,koe,1
+肥,japanese,fertilizer,こえ,koe,1
 非人,japanese,group comprising the lowest rank of Japan's Edo-period caste system (incl. ex-convicts and vagrants),ひにん,hinin,0
 非人,japanese,non-human,ひにん,hinin,0
 美学,japanese,esthetics,びがく,bigaku,1
@@ -1861,6 +2489,19 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 美人,japanese,beautiful woman,びじん,bijin,1
 美人,japanese,(a) beauty,びじん,bijin,1
 氷人,japanese,go-between (in marriage),ひょうじん,hyoujin,0
+表,japanese,surface,おもて,omote,1
+表,japanese,face (i.e. the visible side of an object),おもて,omote,1
+表,japanese,"front (of a building, etc.)",おもて,omote,1
+表,japanese,"obverse side (i.e. ""head"") of a coin",おもて,omote,1
+表,japanese,outside,おもて,omote,1
+表,japanese,exterior,おもて,omote,1
+表,japanese,appearance,おもて,omote,1
+表,japanese,public,おもて,omote,1
+表,japanese,first half (of an inning),おもて,omote,1
+表,japanese,top (of an inning),おもて,omote,1
+表,japanese,"cover (for tatami mats, etc.)",おもて,omote,1
+表,japanese,foreground,おもて,omote,1
+表,japanese,Omotesenke school of tea ceremony,おもて,omote,1
 病人,japanese,sick person,びょうにん,byounin,1
 病人,japanese,patient,びょうにん,byounin,1
 病人,japanese,invalid,びょうにん,byounin,1
@@ -1887,6 +2528,29 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 変人,japanese,oddball,へんじん,henjin,1
 勉学,japanese,study,べんがく,bengaku,1
 勉学,japanese,pursuit of knowledge,べんがく,bengaku,1
+片,japanese,one (of a pair),かた,kata,0
+片,japanese,incomplete,かた,kata,0
+片,japanese,imperfect,かた,kata,0
+片,japanese,fragmentary,かた,kata,0
+片,japanese,few,かた,kata,0
+片,japanese,little,かた,kata,0
+片,japanese,off-centre,かた,kata,0
+片,japanese,remote,かた,kata,0
+片,japanese,side,かた,kata,0
+片,japanese,problem,かた,kata,0
+片,japanese,question,かた,kata,0
+片,japanese,matters,かた,kata,0
+方,japanese,direction,かた,kata,1
+方,japanese,way,かた,kata,1
+方,japanese,person,かた,kata,1
+方,japanese,lady,かた,kata,1
+方,japanese,gentleman,かた,kata,1
+方,japanese,method of,かた,kata,1
+方,japanese,manner of,かた,kata,1
+方,japanese,way of,かた,kata,1
+方,japanese,care of ...,かた,kata,1
+方,japanese,person in charge of ...,かた,kata,1
+方,japanese,"side (e.g. ""on my mother's side"")",かた,kata,1
 法学,japanese,law,ほうがく,hougaku,1
 法学,japanese,jurisprudence,ほうがく,hougaku,1
 法人,japanese,corporation,ほうじん,houjin,1
@@ -1907,6 +2571,7 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 本人,japanese,said person,ほんにん,honnin,1
 民人,japanese,the people,みんじん,minjin,0
 民人,japanese,the public,みんじん,minjin,0
+夢,japanese,dream,ゆめ,yume,1
 無学,japanese,uneducated,むがく,mugaku,0
 無学,japanese,ignorant,むがく,mugaku,0
 無学,japanese,illiterate,むがく,mugaku,0
@@ -1922,7 +2587,15 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 名人,japanese,expert,めいじん,meijin,1
 名人,japanese,Meijin (professional title),めいじん,meijin,1
 名人,japanese,Meijin (highest title for male players in competitive karuta),めいじん,meijin,1
+免,japanese,dismissal,めん,men,0
+免,japanese,discharge,めん,men,0
+綿,japanese,cotton,めん,men,1
+麺,japanese,noodles,めん,men,1
+麺,japanese,flour,めん,men,1
 盲人,japanese,blind person,もうじん,moujin,1
+也,japanese,to be,なり,nari,0
+也,japanese,to be (at a location),なり,nari,0
+也,japanese,sum of money,なり,nari,0
 夜学,japanese,night school,やがく,yagaku,1
 夜学,japanese,evening school,やがく,yagaku,1
 夜学,japanese,evening class,やがく,yagaku,1
@@ -1947,6 +2620,17 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 傭人,japanese,employee,ようにん,younin,0
 傭人,japanese,labourer employed by the government or a local public body,ようにん,younin,0
 庸人,japanese,common man,ようじん,youjin,0
+用,japanese,business,よう,you,1
+用,japanese,task,よう,you,1
+用,japanese,errand,よう,you,1
+用,japanese,engagement,よう,you,1
+用,japanese,use,よう,you,1
+用,japanese,purpose,よう,you,1
+用,japanese,for the use of ...,よう,you,1
+用,japanese,used for ...,よう,you,1
+用,japanese,made for ...,よう,you,1
+用,japanese,call of nature,よう,you,1
+用,japanese,excretion,よう,you,1
 蘭学,japanese,rangaku,らんがく,rangaku,0
 蘭学,japanese,study of Western knowledge through the Dutch language during the Edo period,らんがく,rangaku,0
 吏人,japanese,officials,りじん,rijin,0
@@ -1995,11 +2679,17 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 佗人,japanese,lonesome person,わびびと,wabibito,0
 佗人,japanese,unwanted person,わびびと,wabibito,0
 佗人,japanese,poverty-stricken person,わびびと,wabibito,0
+冤,japanese,false charge,えん,en,0
+冤,japanese,false accusation,えん,en,0
 咎人,japanese,offender,とがにん,toganin,0
 咎人,japanese,criminal,とがにん,toganin,0
+夥多,japanese,many,かた,kata,0
+夥多,japanese,plentiful,かた,kata,0
 佞人,japanese,flatterer,ねいじん,neijin,0
 佞人,japanese,smooth talker,ねいじん,neijin,0
 佞人,japanese,crafty person,ねいじん,neijin,0
+痰,japanese,phlegm,たん,tan,0
+痰,japanese,sputum,たん,tan,0
 衒学,japanese,pedantry,げんがく,gengaku,0
 衒学,japanese,display of one's learning,げんがく,gengaku,0
 閹人,japanese,eunuch,えんじん,enjin,0
@@ -2013,6 +2703,18 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 一人,japanese,just,ひとり,hitori,1
 一人,japanese,only,ひとり,hitori,1
 一人,japanese,simply,ひとり,hitori,1
+魚,japanese,fish,さかな,sakana,1
+鮭,japanese,salmon (Salmonidae spp.),さけ,sake,1
+鮭,japanese,chum salmon (Oncorhynchus keta),さけ,sake,1
+鮭,japanese,dog salmon,さけ,sake,1
+四,japanese,four,し,shi,1
+四,japanese,4,し,shi,1
+次,japanese,next,じ,ji,0
+次,japanese,hypo- (i.e. containing an element with low valence),じ,ji,0
+次,japanese,order,じ,ji,0
+次,japanese,sequence,じ,ji,0
+次,japanese,time,じ,ji,0
+次,japanese,times,じ,ji,0
 主人,japanese,head (of a household),しゅじん,shujin,1
 主人,japanese,proprietor (of a store),しゅじん,shujin,1
 主人,japanese,proprietress,しゅじん,shujin,1
@@ -2088,6 +2790,8 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 人力,japanese,human strength,じんりき,jinriki,0
 人力,japanese,human effort,じんりき,jinriki,0
 人力,japanese,human agency,じんりき,jinriki,0
+壬,japanese,9th in rank,じん,jin,0
+壬,japanese,ninth sign of the Chinese calendar,じん,jin,0
 他人,japanese,another person,たにん,tanin,1
 他人,japanese,other people,たにん,tanin,1
 他人,japanese,others,たにん,tanin,1
@@ -2112,6 +2816,11 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 二人,japanese,two people,ふたり,futari,1
 二人,japanese,pair,ふたり,futari,1
 二人,japanese,couple,ふたり,futari,1
+博,japanese,doctor,はく,haku,1
+博,japanese,PhD,はく,haku,1
+博,japanese,exposition,はく,haku,1
+博,japanese,fair,はく,haku,1
+博,japanese,exhibition,はく,haku,1
 別人,japanese,different person,べつじん,betsujin,1
 別人,japanese,another person,べつじん,betsujin,1
 別人,japanese,someone else,べつじん,betsujin,1
@@ -2121,8 +2830,67 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 凡人,japanese,mediocre person,ぼんじん,bonjin,1
 万人,japanese,all people,ばんにん,bannin,1
 万人,japanese,everybody,ばんにん,bannin,1
+面,japanese,face,おもて,omote,1
+面,japanese,surface,おもて,omote,1
+面,japanese,mask (esp. a noh or kyogen mask),おもて,omote,1
+面,japanese,face,つら,tsura,1
+面,japanese,mug,つら,tsura,1
+面,japanese,surface,つら,tsura,1
+面,japanese,cheek meat,つら,tsura,1
+面,japanese,cheek,つら,tsura,1
+面,japanese,cheeks,つら,tsura,1
+面,japanese,surrounding area,つら,tsura,1
+面,japanese,face,めん,men,1
+面,japanese,mask,めん,men,1
+面,japanese,face guard,めん,men,1
+面,japanese,striking the head (in kendo),めん,men,1
+面,japanese,surface (esp. a geometrical surface),めん,men,1
+面,japanese,page,めん,men,1
+面,japanese,aspect,めん,men,1
+面,japanese,facet,めん,men,1
+面,japanese,side,めん,men,1
+面,japanese,chamfer,めん,men,1
+面,japanese,"counter for broad, flat objects, levels or stages, e.g. in a video game",めん,men,1
 余人,japanese,others,よじん,yojin,1
 余人,japanese,other people,よじん,yojin,1
+貪,japanese,coveting,たん,tan,0
+貪,japanese,raga (desire),たん,tan,0
+位置,japanese,place,いち,ichi,1
+位置,japanese,position,いち,ichi,1
+位置,japanese,location,いち,ichi,1
+位置,japanese,position,いち,ichi,1
+位置,japanese,standing,いち,ichi,1
+位置,japanese,status,いち,ichi,1
+位置,japanese,situation,いち,ichi,1
+終わり,japanese,end,おわり,owari,1
+終わり,japanese,ending,おわり,owari,1
+終わり,japanese,close,おわり,owari,1
+終わり,japanese,conclusion,おわり,owari,1
+終わり,japanese,end of (one's) life,おわり,owari,1
+終わり,japanese,death,おわり,owari,1
+食う,japanese,to eat,くう,kuu,1
+食う,japanese,to live,くう,kuu,1
+食う,japanese,to make a living,くう,kuu,1
+食う,japanese,to survive,くう,kuu,1
+食う,japanese,to bite,くう,kuu,1
+食う,japanese,to sting (as insects do),くう,kuu,1
+食う,japanese,to tease,くう,kuu,1
+食う,japanese,to torment,くう,kuu,1
+食う,japanese,to taunt,くう,kuu,1
+食う,japanese,to make light of,くう,kuu,1
+食う,japanese,to make fun of,くう,kuu,1
+食う,japanese,to encroach on,くう,kuu,1
+食う,japanese,to eat into,くう,kuu,1
+食う,japanese,to consume,くう,kuu,1
+食う,japanese,to defeat a superior,くう,kuu,1
+食う,japanese,to threaten a position,くう,kuu,1
+食う,japanese,to consume time,くう,kuu,1
+食う,japanese,to consume resources,くう,kuu,1
+食う,japanese,to receive something (usu. an unfavourable event),くう,kuu,1
+食う,japanese,"to have sexual relations with a woman, esp. for the first time",くう,kuu,1
+些些,japanese,trifling,ささ,sasa,0
+些些,japanese,trivial,ささ,sasa,0
+些些,japanese,slight,ささ,sasa,0
 人知,japanese,human intellect,じんち,jinchi,0
 人知,japanese,knowledge,じんち,jinchi,0
 蛮人,japanese,savage,ばんじん,banjin,0
@@ -2131,19 +2899,58 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 人肌,japanese,the skin (of a human being),ひとはだ,hitohada,0
 人肌,japanese,warmth of the skin,ひとはだ,hitohada,0
 人肌,japanese,body warmth,ひとはだ,hitohada,0
+様,japanese,appearing ...,よう,you,1
+様,japanese,looking ...,よう,you,1
+様,japanese,way to ...,よう,you,1
+様,japanese,method of ...ing,よう,you,1
+様,japanese,form,よう,you,1
+様,japanese,style,よう,you,1
+様,japanese,design,よう,you,1
+様,japanese,like,よう,you,1
+様,japanese,similar to,よう,you,1
+様,japanese,thing (thought or spoken),よう,you,1
+陽,japanese,(the) positive,よう,you,1
+陽,japanese,yang (in Chinese divination),よう,you,1
+陽,japanese,the open,よう,you,1
+陽,japanese,visible place,よう,you,1
+陽,japanese,public place,よう,you,1
 同学,japanese,studying the same subject,どうがく,dougaku,0
 同学,japanese,studying at the same school,どうがく,dougaku,0
 同学,japanese,studying under the same teacher,どうがく,dougaku,0
 同学,japanese,schoolmate,どうがく,dougaku,0
 同学,japanese,classmate,どうがく,dougaku,0
 同学,japanese,fellow student,どうがく,dougaku,0
+履く,japanese,"to put on (lower-body clothing, e.g. pants, skirt, footwear)",はく,haku,1
+履く,japanese,to wear,はく,haku,1
+履く,japanese,to affix (a sword to one's hip),はく,haku,1
+履く,japanese,to affix (a bowstring to a bow),はく,haku,1
 楽人,japanese,musician (esp. Gagaku),がくじん,gakujin,0
+づら,japanese,wig,づら,zura,0
+づら,japanese,hairpiece,づら,zura,0
 寡人,japanese,I,かじん,kajin,0
 寡人,japanese,me,かじん,kajin,0
 学際,japanese,interdisciplinary,がくさい,gakusai,1
+鈍,japanese,dull,どん,don,0
+鈍,japanese,slow,どん,don,0
+鈍,japanese,stupid,どん,don,0
+鈍,japanese,dull-brained,どん,don,0
+艶,japanese,charming,えん,en,0
+艶,japanese,fascinating,えん,en,0
+艶,japanese,voluptuous,えん,en,0
+非と,japanese,condemning,ひと,hito,0
+非と,japanese,denouncing,ひと,hito,0
+都,japanese,Metropolis (of Tokyo),と,to,0
+都,japanese,(Tokyo) Metropolitan District,と,to,0
+都,japanese,metropolitan prefecture,と,to,0
+都,japanese,counter for cities and towns,と,to,0
+都,japanese,capital,と,to,0
 義人,japanese,"selfless (pious, righteous) man",ぎじん,gijin,0
 地学,japanese,earth science,ちがく,chigaku,0
 地学,japanese,geoscience,ちがく,chigaku,0
+錠,japanese,lock,じょう,jou,1
+錠,japanese,padlock,じょう,jou,1
+錠,japanese,tablet,じょう,jou,1
+錠,japanese,pill,じょう,jou,1
 良人,japanese,husband,りょうじん,ryoujin,0
 良人,japanese,good person,りょうじん,ryoujin,0
 堅人,japanese,square,かたじん,katajin,0
@@ -2166,6 +2973,7 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 唐人,japanese,foreigner,とうじん,toujin,0
 落人,japanese,defeated soldier fleeing the enemy,おちうど,ochiudo,0
 幾人,japanese,how many people,いくにん,ikunin,0
+雨露,japanese,rain and dew,うろ,uro,0
 蔵人,japanese,keeper of imperial archives,くろうど,kuroudo,0
 蔵人,japanese,worker skilled in the brewing of sake or soy sauce,くろうど,kuroudo,0
 工人,japanese,workman,こうじん,koujin,0
@@ -2206,6 +3014,7 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 行人,japanese,passer-by,こうじん,koujin,0
 行人,japanese,traveler,こうじん,koujin,0
 行人,japanese,traveller,こうじん,koujin,0
+費途,japanese,(way of) spending,ひと,hito,0
 雅人,japanese,individual of taste,がじん,gajin,0
 竺学,japanese,Indian studies,じくがく,jikugaku,0
 竺学,japanese,Buddhist studies,じくがく,jikugaku,0
@@ -2234,6 +3043,8 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 門人,japanese,pupil,もんじん,monjin,0
 門人,japanese,student,もんじん,monjin,0
 門人,japanese,follower,もんじん,monjin,0
+始期,japanese,beginning period,しき,shiki,0
+始期,japanese,initial term,しき,shiki,0
 宮人,japanese,(noble) courtier,みやびと,miyabito,0
 星学,japanese,astronomy,せいがく,seigaku,0
 売人,japanese,trader,ばいにん,bainin,0
@@ -2270,12 +3081,15 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 教学,japanese,education and learning,きょうがく,kyougaku,0
 氏人,japanese,lineal descendant,うじびと,ujibito,0
 氏人,japanese,clan member,うじびと,ujibito,0
+紙器,japanese,paper articles,しき,shiki,0
+紙器,japanese,"containers, etc. made of paper",しき,shiki,0
 神人,japanese,gods and men,しんじん,shinjin,0
 神人,japanese,godlike person,しんじん,shinjin,0
 神人,japanese,person as powerful as a god,しんじん,shinjin,0
 神人,japanese,person as refined as a god,しんじん,shinjin,0
 神人,japanese,low-ranking Shinto priest,しんじん,shinjin,0
 私人,japanese,private individual,しじん,shijin,0
+私記,japanese,private records or documents,しき,shiki,0
 道学,japanese,ethics,どうがく,dougaku,0
 道学,japanese,moral philosophy,どうがく,dougaku,0
 道学,japanese,(study of) Confucianism (esp. neo-Confucianism),どうがく,dougaku,0
@@ -2314,6 +3128,8 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 時人,japanese,contemporaries,じじん,jijin,0
 詩学,japanese,study of poetry,しがく,shigaku,0
 詩学,japanese,poetics,しがく,shigaku,0
+志気,japanese,determination,しき,shiki,0
+志気,japanese,esprit de corps,しき,shiki,0
 全学,japanese,whole college,ぜんがく,zengaku,1
 復学,japanese,return to school,ふくがく,fukugaku,0
 経学,japanese,Confucianism,けいがく,keigaku,0
@@ -2338,10 +3154,16 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 稿人,japanese,straw figure,こうじん,koujin,0
 宿学,japanese,renowned scholar,しゅくがく,shukugaku,0
 人我,japanese,oneself and others,じんが,jinga,0
+嘆,japanese,sigh,たん,tan,0
+嘆,japanese,grief,たん,tan,0
+嘆,japanese,lamentation,たん,tan,0
+鳴り,japanese,ringing,なり,nari,1
+鳴り,japanese,sound,なり,nari,1
 巴人,japanese,resident of ancient Sichuan,はじん,hajin,0
 巴人,japanese,bumpkin,はじん,hajin,0
 巴人,japanese,uncultivated person,はじん,hajin,0
 巴人,japanese,yokel,はじん,hajin,0
+裳,japanese,traditional skirt,も,mo,0
 用人,japanese,manager,ようにん,younin,0
 用人,japanese,steward,ようにん,younin,0
 用人,japanese,factotum,ようにん,younin,0
@@ -2351,14 +3173,24 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 弋人,japanese,archer,よくじん,yokujin,0
 蘭人,japanese,Dutchman,らんじん,ranjin,0
 蘭人,japanese,Dutchwoman,らんじん,ranjin,0
+泊,japanese,counter for nights of a stay,はく,haku,0
+泊,japanese,overnight stay,はく,haku,0
+泊,japanese,lodging,はく,haku,0
+桂,japanese,knight,けい,kei,0
 不学,japanese,unlearned,ふがく,fugaku,0
 不学,japanese,uneducated,ふがく,fugaku,0
+詩,japanese,poem,し,shi,1
+詩,japanese,poetry,し,shi,1
+詩,japanese,verse,し,shi,1
+詩,japanese,Chinese poem,し,shi,1
+他,japanese,other (esp. people and abstract matters),た,ta,1
 建学,japanese,founding of a school,けんがく,kengaku,0
 人定,japanese,confirmation of someone's identity,じんてい,jintei,0
 人定,japanese,enactment,じんてい,jintei,0
 人定,japanese,establishment,じんてい,jintei,0
 人定,japanese,creation,じんてい,jintei,0
 図学,japanese,graphics,ずがく,zugaku,0
+生り,japanese,bearing (fruit),なり,nari,0
 人様,japanese,other people,ひとさま,hitosama,1
 人様,japanese,others,ひとさま,hitosama,1
 学,japanese,learning,がく,gaku,1
@@ -2370,17 +3202,126 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 学,japanese,study of ...,がく,gaku,1
 学,japanese,-ology,がく,gaku,1
 学,japanese,-ics,がく,gaku,1
+軽,japanese,"light (e.g. aircraft, truck)",けい,kei,1
+軽,japanese,light motor vehicle (up to 660cc and 64bhp),けい,kei,1
+軽,japanese,kei car,けい,kei,1
+笹,japanese,bamboo grass,ささ,sasa,1
+笹,japanese,generally smaller species of running bamboo that do not shed their sheaths (e.g. Sasa spp.),ささ,sasa,1
+師,japanese,teacher,し,shi,0
+師,japanese,master,し,shi,0
+師,japanese,mentor,し,shi,0
+師,japanese,religious leader,し,shi,0
+師,japanese,specialist,し,shi,0
+師,japanese,five-battalion brigade comprising 2500 men (Zhou dynasty Chinese army),し,shi,0
+痔,japanese,hemorrhoids,じ,ji,1
+痔,japanese,piles,じ,ji,1
+将,japanese,commander,しょう,shou,1
+将,japanese,general,しょう,shou,1
+将,japanese,leader,しょう,shou,1
+衝,japanese,important point (e.g. on a route),しょう,shou,0
+衝,japanese,"important role (responsibility, etc.)",しょう,shou,0
+衝,japanese,opposition,しょう,shou,0
+食,japanese,food,しょく,shoku,1
+食,japanese,foodstuff,しょく,shoku,1
+食,japanese,eating,しょく,shoku,1
+食,japanese,appetite,しょく,shoku,1
+食,japanese,meal,しょく,shoku,1
+食,japanese,portion,しょく,shoku,1
+陣,japanese,battle formation,じん,jin,0
+陣,japanese,camp,じん,jin,0
+陣,japanese,encampment,じん,jin,0
+陣,japanese,position,じん,jin,0
+陣,japanese,group,じん,jin,0
+陣,japanese,gang,じん,jin,0
+陣,japanese,party,じん,jin,0
+陣,japanese,corps,じん,jin,0
+陣,japanese,war,じん,jin,0
+陣,japanese,battle,じん,jin,0
+陣,japanese,campaign,じん,jin,0
+栓,japanese,stopper,せん,sen,1
+栓,japanese,cork,せん,sen,1
+栓,japanese,plug,せん,sen,1
+栓,japanese,bung,せん,sen,1
+栓,japanese,tap,せん,sen,1
+栓,japanese,faucet,せん,sen,1
+栓,japanese,stopcock,せん,sen,1
+選,japanese,selection,せん,sen,1
+選,japanese,choice,せん,sen,1
+選,japanese,choosing,せん,sen,1
+選,japanese,picking,せん,sen,1
+選,japanese,election,せん,sen,1
+途,japanese,way,と,to,1
+途,japanese,route,と,to,1
+汎,japanese,pan-,はん,han,1
+範,japanese,example,はん,han,1
+範,japanese,model,はん,han,1
+煩,japanese,trouble,はん,han,0
+そら,japanese,look!,そら,sora,0
+そら,japanese,there!,そら,sora,0
+そら,japanese,here!,そら,sora,0
+そら,japanese,that is,そら,sora,0
+獏,japanese,tapir (Tapirus spp.),ばく,baku,0
+獏,japanese,"mo (mythological Chinese chimera similar to a tapir, said to devour bad dreams)",ばく,baku,0
 岳人,japanese,alpinist,がくじん,gakujin,0
 岳人,japanese,mountaineer,がくじん,gakujin,0
 英人,japanese,Briton,えいじん,eijin,0
 英人,japanese,Englishman,えいじん,eijin,0
 米人,japanese,American person,べいじん,beijin,1
 四人,japanese,four people,よにん,yonin,1
+首,japanese,counter for songs and poems,しゅ,shu,0
+爆,japanese,burst of laughter,ばく,baku,0
+爆,japanese,roar of laughter,ばく,baku,0
+爆,japanese,in copious amounts,ばく,baku,0
 何人,japanese,anyone,なにびと,nanibito,1
 何人,japanese,any person,なにびと,nanibito,1
 何人,japanese,whoever,なにびと,nanibito,1
 学参,japanese,study reference,がくさん,gakusan,0
 学参,japanese,study-aid book,がくさん,gakusan,0
+径,japanese,diameter,けい,kei,0
+箔,japanese,foil,はく,haku,0
+箔,japanese,"(gold, etc.) leaf",はく,haku,0
+箔,japanese,prestige,はく,haku,0
+時,japanese,hour,じ,ji,1
+時,japanese,o'clock,じ,ji,1
+時,japanese,(specified) time,じ,ji,1
+時,japanese,when ...,じ,ji,1
+時,japanese,during ...,じ,ji,1
+も,japanese,too,も,mo,1
+も,japanese,also,も,mo,1
+も,japanese,in addition,も,mo,1
+も,japanese,as well,も,mo,1
+も,japanese,(not) either (in a negative sentence),も,mo,1
+も,japanese,both A and B,も,mo,1
+も,japanese,A as well as B,も,mo,1
+も,japanese,neither A nor B (in a negative sentence),も,mo,1
+も,japanese,even,も,mo,1
+も,japanese,as much as,も,mo,1
+も,japanese,as many as,も,mo,1
+も,japanese,as far as,も,mo,1
+も,japanese,as long as,も,mo,1
+も,japanese,no less than,も,mo,1
+も,japanese,no fewer than,も,mo,1
+も,japanese,even if,も,mo,1
+も,japanese,even though,も,mo,1
+も,japanese,although,も,mo,1
+も,japanese,in spite of,も,mo,1
+も,japanese,further,も,mo,1
+も,japanese,more,も,mo,1
+も,japanese,again,も,mo,1
+も,japanese,another,も,mo,1
+も,japanese,the other,も,mo,1
+なり,japanese,or something,なり,nari,1
+なり,japanese,for instance ... (though there are other suitable options),なり,nari,1
+なり,japanese,... or ...,なり,nari,1
+なり,japanese,as soon as,なり,nari,1
+なり,japanese,right after,なり,nari,1
+なり,japanese,while still,なり,nari,1
+なり,japanese,with previous state still in effect,なり,nari,1
+笙,japanese,traditional Japanese wind instrument resembling panpipes,しょう,shou,0
+笙,japanese,free-reed instrument used in Japanese court music,しょう,shou,0
+虚,japanese,hollow,うろ,uro,0
+虚,japanese,cavity,うろ,uro,0
+虚,japanese,hole,うろ,uro,0
 中人,japanese,go-between,ちゅうじん,chuujin,0
 中人,japanese,intermediary,ちゅうじん,chuujin,0
 中人,japanese,middleman,ちゅうじん,chuujin,0
@@ -2388,43 +3329,253 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 中人,japanese,"person of middling ability, talent, etc.",ちゅうじん,chuujin,0
 中人,japanese,average person,ちゅうじん,chuujin,0
 中人,japanese,middle-class person,ちゅうじん,chuujin,0
+うわ,japanese,yikes,うわ,uwa,0
+うわ,japanese,oops,うわ,uwa,0
+うわ,japanese,eep,うわ,uwa,0
+うわ,japanese,wow,うわ,uwa,0
+うわ,japanese,aargh,うわ,uwa,0
 人間,japanese,the world,じんかん,jinkan,0
+形,japanese,shape,かた,kata,0
+形,japanese,form,かた,kata,0
+形,japanese,style,かた,kata,0
+形,japanese,security,かた,kata,0
+形,japanese,collateral,かた,kata,0
+形,japanese,obverse of an old zeni coin,かた,kata,0
 虚学,japanese,"the soft sciences (social science, humanities, etc.)",きょがく,kyogaku,0
+空,japanese,empty air,くう,kuu,0
+空,japanese,sky,くう,kuu,0
+空,japanese,shunyata (the lack of an immutable intrinsic nature within any phenomenon),くう,kuu,0
+空,japanese,emptiness,くう,kuu,0
+空,japanese,air force,くう,kuu,0
+空,japanese,fruitlessness,くう,kuu,0
+空,japanese,meaninglessness,くう,kuu,0
+空,japanese,void (one of the five elements),くう,kuu,0
+空,japanese,empty (e.g. set),くう,kuu,0
+条,japanese,article (in a document),じょう,jou,0
+条,japanese,clause,じょう,jou,0
+条,japanese,section,じょう,jou,0
+条,japanese,provision,じょう,jou,0
+条,japanese,"counter for lines, stripes, streaks, rays, etc.",じょう,jou,0
+条,japanese,although,じょう,jou,0
+条,japanese,though,じょう,jou,0
+条,japanese,since,じょう,jou,0
+条,japanese,as,じょう,jou,0
+条,japanese,because,じょう,jou,0
+条,japanese,inasmuch as,じょう,jou,0
+条,japanese,jō,じょう,jou,0
+条,japanese,north-south division of an imperial city consisting of west-east streets and their corresponding wards (in the jō-bō system),じょう,jou,0
+枝,japanese,"counter for long, thin things (i.e. swords)",し,shi,0
+戦,japanese,war,せん,sen,0
+戦,japanese,battle,せん,sen,0
+戦,japanese,match,せん,sen,0
+戦,japanese,game,せん,sen,0
+戦,japanese,competition,せん,sen,0
+乗,japanese,(nth) power,じょう,jou,0
+乗,japanese,counter for vehicles,じょう,jou,0
+乗,japanese,multiplication,じょう,jou,0
+乗,japanese,Buddha's teachings,じょう,jou,0
+史,japanese,history,し,shi,1
 本学,japanese,this university,ほんがく,hongaku,0
 本学,japanese,this educational establishment,ほんがく,hongaku,0
+犯,japanese,perpetrators of (some) crime,はん,han,0
+犯,japanese,(some type of) crime,はん,han,0
+省,japanese,ministry,しょう,shou,0
+省,japanese,department,しょう,shou,0
+省,japanese,province (of China),しょう,shou,0
+省,japanese,saving,しょう,shou,0
+省,japanese,conserving,しょう,shou,0
+辞,japanese,address (e.g. opening or closing remarks),じ,ji,0
+辞,japanese,speech,じ,ji,0
+辞,japanese,words,じ,ji,0
+辞,japanese,ci (Chinese literary form),じ,ji,0
+辞,japanese,ancillary word,じ,ji,0
 獣人,japanese,(fictional) fusion of human and animal,じゅうじん,juujin,0
 獣人,japanese,therianthrope,じゅうじん,juujin,0
 獣人,japanese,furry,じゅうじん,juujin,0
 獣人,japanese,human beast,じゅうじん,juujin,0
+忍,japanese,endurance,にん,nin,0
+忍,japanese,forbearance,にん,nin,0
+忍,japanese,patience,にん,nin,0
+忍,japanese,self-restraint,にん,nin,0
+小,japanese,smallness,しょう,shou,1
+小,japanese,small item,しょう,shou,1
+小,japanese,short month (i.e. having fewer than 31 days),しょう,shou,1
+小,japanese,elementary school,しょう,shou,1
+小,japanese,"smaller (of two things, places, etc. with the same name)",しょう,shou,1
+小,japanese,inferior,しょう,shou,1
+小,japanese,younger (of two people with the same name),しょう,shou,1
+小,japanese,junior,しょう,shou,1
+小,japanese,unit of field area (approx. 400 sq m),しょう,shou,1
+床,japanese,counter for beds,しょう,shou,0
+襖,japanese,everyday garment worn by men in ancient Japan,あお,ao,0
+し,japanese,and,し,shi,1
+し,japanese,besides,し,shi,1
+し,japanese,moreover,し,shi,1
+し,japanese,what's more,し,shi,1
+し,japanese,not only ... but also,し,shi,1
+し,japanese,because,し,shi,1
+し,japanese,since,し,shi,1
+し,japanese,the thing is,し,shi,1
+し,japanese,for one thing,し,shi,1
+城,japanese,castle (in place names),じょう,jou,0
+城,japanese,castle,じょう,jou,0
+城,japanese,fortress,じょう,jou,0
 学債,japanese,school bond or debenture,がくさい,gakusai,0
 人中,japanese,in company,じんちゅう,jinchuu,0
 人中,japanese,among people,じんちゅう,jinchuu,0
 人中,japanese,philtrum,じんちゅう,jinchuu,0
 鮮人,japanese,Korean person,せんじん,senjin,0
+色,japanese,counter for colours,しょく,shoku,0
 星人,japanese,person from (the planet of),せいじん,seijin,0
+氏,japanese,Mr,し,shi,1
+氏,japanese,Mrs,し,shi,1
+氏,japanese,Ms,し,shi,1
+氏,japanese,Miss,し,shi,1
+氏,japanese,clan,し,shi,1
+氏,japanese,he,し,shi,1
+氏,japanese,him,し,shi,1
+氏,japanese,counter for people,し,shi,1
 人日,japanese,man-day,にんにち,ninnichi,0
 人日,japanese,person-day,にんにち,ninnichi,0
 人日,japanese,Jinjitsu (one of the five annual festivals; celebrated on the seventh day of the first month of the lunar calendar),じんじつ,jinjitsu,0
 菌学,japanese,mycology,きんがく,kingaku,0
 菌学,japanese,fungology,きんがく,kingaku,0
+穣,japanese,10^28,じょう,jou,0
+穣,japanese,ten octillion,じょう,jou,0
+糸,japanese,thread,し,shi,0
+糸,japanese,0.0001,し,shi,0
+糸,japanese,one ten-thousandth,し,shi,0
+はん,japanese,Mr,はん,han,0
+はん,japanese,Mrs,はん,han,0
+はん,japanese,Ms,はん,han,0
+はん,japanese,-san,はん,han,0
+努,japanese,never,ゆめ,yume,0
+努,japanese,by no means,ゆめ,yume,0
 開学,japanese,establishment of a university,かいがく,kaigaku,0
+形,japanese,style,なり,nari,0
+形,japanese,way,なり,nari,0
+形,japanese,shape,なり,nari,0
+形,japanese,form,なり,nari,0
+形,japanese,appearance,なり,nari,0
+形,japanese,state,なり,nari,0
 人鳥,japanese,penguin,じんちょう,jinchou,0
 座学,japanese,classroom learning (as contrasted to practical training),ざがく,zagaku,0
 座学,japanese,classroom lecture,ざがく,zagaku,0
 座学,japanese,desk study,ざがく,zagaku,0
+どん,japanese,bang,どん,don,0
+どん,japanese,bam,どん,don,0
+どん,japanese,boom,どん,don,0
+どん,japanese,thud,どん,don,0
+どん,japanese,thump,どん,don,0
+どん,japanese,crash,どん,don,0
+どん,japanese,noontime signal gun (carried out early Meiji to Taishō),どん,don,0
+どん,japanese,noon gun,どん,don,0
+どん,japanese,noonday gun,どん,don,0
+どん,japanese,last round in a game of 12 rounds,どん,don,0
+どん,japanese,precisely,どん,don,0
+どん,japanese,exactly,どん,don,0
+どん,japanese,plumb,どん,don,0
+どん,japanese,totally,どん,don,0
+どん,japanese,very,どん,don,0
+どん,japanese,Mr.,どん,don,0
+どん,japanese,Mrs.,どん,don,0
+どん,japanese,Miss,どん,don,0
+どん,japanese,Ms.,どん,don,0
+どん,japanese,-san,どん,don,0
+丈,japanese,3.03 meters (ten shaku),じょう,jou,0
+丈,japanese,length,じょう,jou,0
+丈,japanese,measure,じょう,jou,0
+丈,japanese,Mr.,じょう,jou,0
+丈,japanese,Mrs.,じょう,jou,0
+烏鷺,japanese,crows and herons,うろ,uro,0
+烏鷺,japanese,black and white (esp. go stones),うろ,uro,0
+烏鷺,japanese,go (game),うろ,uro,0
 人,japanese,counter for people,にん,nin,1
 人気,japanese,prevailing mood of a locality,じんき,jinki,0
 人気,japanese,emotional climate of a district,じんき,jinki,0
 学活,japanese,class activities,がっかつ,gakkatsu,0
 学活,japanese,homeroom activities,がっかつ,gakkatsu,0
+良う,japanese,well,よう,you,0
+良う,japanese,properly,よう,you,0
+良う,japanese,skillfully,よう,you,0
+良う,japanese,often,よう,you,0
+良う,japanese,how (could you),よう,you,0
+良う,japanese,why (would you),よう,you,0
+少,japanese,small,しょう,shou,1
+少,japanese,little,しょう,shou,1
+少,japanese,few,しょう,shou,1
+然然,japanese,such and such,ささ,sasa,0
+其,japanese,that,し,shi,0
+其,japanese,you,し,shi,0
+其,japanese,oneself,し,shi,0
+其,japanese,themself,し,shi,0
 人頭,japanese,skull,ひとがしら,hitogashira,0
 人頭,japanese,cranium,ひとがしら,hitogashira,0
 人頭,japanese,"kanji ""person"" radical at top",ひとがしら,hitogashira,0
+銭,japanese,round coin with a (square) hole in the center,ぜに,zeni,0
+銭,japanese,coin made of non-precious materials,ぜに,zeni,0
+銭,japanese,money,ぜに,zeni,0
 人界,japanese,spiritual realm of humanity,にんがい,ningai,0
 人界,japanese,world of man,じんかい,jinkai,0
+魄,japanese,Yin energy,はく,haku,0
+魄,japanese,spirit,はく,haku,0
+事,japanese,individual concrete phenomenon (as opposed to a general principle),じ,ji,0
+敬,japanese,reverence,けい,kei,0
+敬,japanese,respect,けい,kei,0
+要,japanese,main point,よう,you,0
+要,japanese,essential point,よう,you,0
+要,japanese,important thing,よう,you,0
+要,japanese,necessity,よう,you,0
+要,japanese,need,よう,you,0
+要,japanese,requirement,よう,you,0
+兄,japanese,you,けい,kei,0
+兄,japanese,Mr,けい,kei,0
+兄,japanese,Mister,けい,kei,0
+兄,japanese,older brother,けい,kei,0
+兄,japanese,elder brother,けい,kei,0
+たん,japanese,"diminutive used with names, etc.",たん,tan,0
+たん,japanese,diminutive adjective ending,たん,tan,0
 勤学,japanese,studying while working,きんがく,kingaku,0
 何人,japanese,what nationality,なにじん,nanijin,0
+掛絡,japanese,"Zen monk's waistcoat (short, informal kasaya)",から,kara,0
+掛絡,japanese,ring (usu. made of ivory) attached to this waistcoat,から,kara,0
+掛絡,japanese,netsuke,から,kara,0
+掛絡,japanese,item attached to a netsuke,から,kara,0
+頃,japanese,qing (Chinese unit of land area equal to 100 mu),けい,kei,0
+子,japanese,child (esp. a boy),し,shi,0
+子,japanese,viscount,し,shi,0
+子,japanese,founder of a school of thought (esp. Confucius),し,shi,0
+子,japanese,master,し,shi,0
+子,japanese,masters and philosophers (categorization of Chinese classical literature),し,shi,0
+子,japanese,you,し,shi,0
+子,japanese,-er (i.e. man who spends all his time doing ...),し,shi,0
+子,japanese,counter for played stones,し,shi,0
+路,japanese,route,じ,ji,0
+路,japanese,road,じ,ji,0
+路,japanese,distance travelled in a day,じ,ji,0
+路,japanese,"one's ... (age, e.g. 40s, 60s)",じ,ji,0
+ネ申,japanese,incredible,かみ,kami,0
+ネ申,japanese,fantastic,かみ,kami,0
+ネ申,japanese,amazing,かみ,kami,0
+頌,japanese,praise,しょう,shou,0
+頌,japanese,hymn (genre of the Shi Jing),しょう,shou,0
+識,japanese,acquaintanceship,しき,shiki,0
+識,japanese,vijnana,しき,shiki,0
+識,japanese,consciousness,しき,shiki,0
+識,japanese,written by ...,しき,shiki,0
+鋪,japanese,mine tunnel,しき,shiki,0
+鋪,japanese,mine shaft,しき,shiki,0
+鋪,japanese,mineshaft,しき,shiki,0
+簫,japanese,xiao (vertical Chinese bamboo flute),しょう,shou,0
+仞,japanese,"ren (ancient Chinese measure of height, depth, etc.; between 1-3 meters)",じん,jin,0
 旧人,japanese,paleoanthropic man (e.g. Neanderthal),きゅうじん,kyuujin,0
+拍,japanese,beat,はく,haku,0
+拍,japanese,mora,はく,haku,0
+相,japanese,minister (of a government department),しょう,shou,1
+撰,japanese,"anthology (of poetry, etc.)",せん,sen,0
+撰,japanese,compilation,せん,sen,0
+撰,japanese,collection,せん,sen,0
+撰,japanese,selection,せん,sen,0
 益人,japanese,people,ますひと,masuhito,0
 益人,japanese,subjects,ますひと,masuhito,0
 益人,japanese,populace,ますひと,masuhito,0
@@ -2433,31 +3584,181 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 宋学,japanese,Song-period neo-Confucianism (based esp. on the teachings of Zhu Xi),そうがく,sougaku,0
 舞人,japanese,dancer (esp. a bugaku dancer),まいびと,maibito,0
 人長,japanese,chief kagura dancer (of kagura performed at the imperial palace),にんじょう,ninjou,0
+觜,japanese,"Chinese ""Turtle Beak"" constellation (one of the 28 mansions)",し,shi,0
+奎,japanese,"Chinese ""Legs"" constellation (one of the 28 mansions)",けい,kei,0
+升,japanese,shō,しょう,shou,0
+升,japanese,"traditional unit of volume, approx. 1.8 litres",しょう,shou,0
+繊,japanese,daikon julienne,せん,sen,0
+繊,japanese,julienned daikon,せん,sen,0
+繊,japanese,one ten-millionth,せん,sen,0
+塵,japanese,defilement,じん,jin,0
+塵,japanese,impurity,じん,jin,0
+塵,japanese,affliction,じん,jin,0
+塵,japanese,object (perceived with the mind or the senses),じん,jin,0
+塵,japanese,one billionth,じん,jin,0
 真人,japanese,Mahito (highest of the eight hereditary titles),まひと,mahito,0
 真人,japanese,you,まひと,mahito,0
+杖,japanese,public caning (60-100 strokes; second least severe of the five ritsuryō punishments),じょう,jou,0
+荘,japanese,manor,しょう,shou,0
+荘,japanese,villa,しょう,shou,0
+抄,japanese,excerpt,しょう,shou,0
+抄,japanese,extract,しょう,shou,0
+抄,japanese,annotation,しょう,shou,0
+抄,japanese,"shō (unit of volume, approx. 1.8 ml)",しょう,shou,0
+抄,japanese,banknote,しょう,shou,0
+抄,japanese,paper money,しょう,shou,0
+長官,japanese,director (highest of the four administrative positions of the ritsuryō system),かみ,kami,0
+長官,japanese,chief,かみ,kami,0
+司,japanese,office (government department beneath a bureau under the ritsuryō system),し,shi,0
+職,japanese,agency (government department between a ministry and a bureau under the ritsuryō system),しき,shiki,0
+姉,japanese,honorific suffix used after the name of a woman of equal or higher status,し,shi,0
+方,japanese,Sirs,がた,gata,0
+方,japanese,Mesdames,がた,gata,0
+方,japanese,"around (the time that, etc.)",がた,gata,0
+方,japanese,about,がた,gata,0
+形,japanese,form,けい,kei,0
+形,japanese,adjective,けい,kei,0
+形,japanese,i-adjective (in Japanese),けい,kei,0
+葉,japanese,"counter for leaves, pieces of paper, etc.",よう,you,0
+葉,japanese,counter for boats,よう,you,0
+磬,japanese,sounding stone,けい,kei,0
+磬,japanese,qing,けい,kei,0
+磬,japanese,"ancient Chinese chime shaped like a chevron (inverted 'v'), orig. of stone, today often metal, in Japan primarily used at Buddhist temples",けい,kei,0
+巵,japanese,zhi (large bowl-shaped ancient Chinese cup with two handles),し,shi,0
+視,japanese,viewing as ...,し,shi,0
+視,japanese,seeing as ...,し,shi,0
+視,japanese,treating as ...,し,shi,0
+視,japanese,regarding as ...,し,shi,0
+帖,japanese,folding book,じょう,jou,0
+帖,japanese,counter for units of paper and nori (48 pages of Mino paper; 20 pages of hanshi; 10 sheets of nori),じょう,jou,0
+帖,japanese,"counter for folding books, folding screens, shields, etc.",じょう,jou,0
+帖,japanese,counter for pairs (of curtains),じょう,jou,0
+帖,japanese,counter for tatami mats,じょう,jou,0
+炎,japanese,-itis (indicating an inflammatory disease),えん,en,0
+自,japanese,self-,じ,ji,0
+自,japanese,from (a time or place),じ,ji,0
+至,japanese,to (a place),し,shi,0
+至,japanese,until (a time),し,shi,0
+罫,japanese,rule,けい,kei,0
+罫,japanese,(ruled) line,けい,kei,0
+罫,japanese,"line (on a go board, shogi board, etc.)",けい,kei,0
+萼,japanese,calyx,がく,gaku,0
 学食,japanese,school cafeteria,がくしょく,gakushoku,0
+面,japanese,looking like a ...,づら,zura,0
+面,japanese,acting as if a ...,づら,zura,0
+詞,japanese,words,し,shi,0
+詞,japanese,writing,し,shi,0
+詞,japanese,lyrics,し,shi,0
+詞,japanese,ci (form of Chinese poetry),し,shi,0
+詞,japanese,independent word,し,shi,0
+寺,japanese,counter for temples,じ,ji,0
+守,japanese,director (of the provincial governors under the ritsuryō system),かみ,kami,0
+細,japanese,small,ささ,sasa,0
+細,japanese,little,ささ,sasa,0
+色,japanese,rupa (form),しき,shiki,0
+色,japanese,visible objects (i.e. color and form),しき,shiki,0
+尽,japanese,last day (of the month),じん,jin,0
+朱,japanese,vermillion (colour),しゅ,shu,0
+朱,japanese,cinnabar,しゅ,shu,0
+朱,japanese,red orange,しゅ,shu,0
+朱,japanese,vermillion (pigment),しゅ,shu,0
+朱,japanese,cinnabar ink stick,しゅ,shu,0
+朱,japanese,correction written in red ink,しゅ,shu,0
+時,japanese,time for ...,どき,doki,0
+時,japanese,time to ...,どき,doki,0
+時,japanese,good time to ...,どき,doki,0
+時,japanese,opportunity to ...,どき,doki,0
+時,japanese,season,どき,doki,0
 産学,japanese,industry-academic,さんがく,sangaku,0
 産学,japanese,industry-university,さんがく,sangaku,0
+幹,japanese,trunk,から,kara,0
+幹,japanese,stem,から,kara,0
+幹,japanese,stalk,から,kara,0
+幹,japanese,shaft (of an arrow),から,kara,0
+幹,japanese,handle,から,kara,0
 士人,japanese,samurai,しじん,shijin,0
 士人,japanese,person of extensive learning,しじん,shijin,0
 士人,japanese,person of great culture,しじん,shijin,0
 士人,japanese,person of superior social standing,しじん,shijin,0
 我人,japanese,you,わひと,wahito,0
+地,japanese,ground,じ,ji,0
+地,japanese,land,じ,ji,0
+地,japanese,earth,じ,ji,0
+地,japanese,soil,じ,ji,0
+地,japanese,the region in question,じ,ji,0
+地,japanese,the local area,じ,ji,0
+地,japanese,skin,じ,ji,0
+地,japanese,texture,じ,ji,0
+地,japanese,fabric,じ,ji,0
+地,japanese,material,じ,ji,0
+地,japanese,weave,じ,ji,0
+地,japanese,base,じ,ji,0
+地,japanese,background,じ,ji,0
+地,japanese,one's true nature,じ,ji,0
+地,japanese,narrative (i.e. descriptive part of a story),じ,ji,0
+地,japanese,real life,じ,ji,0
+地,japanese,actuality,じ,ji,0
+地,japanese,captured territory,じ,ji,0
+地,japanese,noh chorus,じ,ji,0
+地,japanese,accompaniment music (in Japanese dance),じ,ji,0
+地,japanese,basic phrase (in Japanese music; usu. repetitive),じ,ji,0
+地,japanese,base part (of multiple shamisens),じ,ji,0
 貴学,japanese,your university,きがく,kigaku,0
+正,japanese,exactly,しょう,shou,0
+正,japanese,precisely,しょう,shou,0
+正,japanese,correct,しょう,shou,0
+正,japanese,right,しょう,shou,0
+正,japanese,true,しょう,shou,0
+正,japanese,greater (of equal court ranks),しょう,shou,0
+正,japanese,upper,しょう,shou,0
+正,japanese,senior,しょう,shou,0
+正,japanese,director (highest of the four administrative positions of the ritsuryō period),しょう,shou,0
+正,japanese,chief,しょう,shou,0
+史記,japanese,Shiji (first of China's 24 dynastic histories),しき,shiki,0
+史記,japanese,Records of the Grand Historian,しき,shiki,0
+性,japanese,nature,しょう,shou,0
+性,japanese,disposition,しょう,shou,0
+性,japanese,temperament,しょう,shou,0
+性,japanese,character,しょう,shou,0
+性,japanese,quality,しょう,shou,0
+性,japanese,that which does not change according to external influences,しょう,shou,0
+杳,japanese,dark,よう,you,0
+杳,japanese,not understood,よう,you,0
+杳,japanese,unknown,よう,you,0
+癰,japanese,carbuncle,よう,you,0
+箋,japanese,slip (of paper),せん,sen,0
+箋,japanese,"tag (usu. bamboo, wood, ivory, etc.)",せん,sen,0
+箋,japanese,label,せん,sen,0
 人月,japanese,man month,にんげつ,ningetsu,0
 人月,japanese,man-month,にんげつ,ningetsu,0
+承,japanese,second line of a four-line Chinese poem,しょう,shou,0
+唐,japanese,China (sometimes also used in ref. to Korea or other foreign countries),から,kara,0
 漢人,japanese,Chinese immigrant,あやひと,ayahito,0
 唐人,japanese,Chinese person,からびと,karabito,0
 唐人,japanese,Korean person,からびと,karabito,0
+敷き,japanese,spreading,しき,shiki,0
+敷き,japanese,laying out,しき,shiki,0
+敷き,japanese,covering,しき,shiki,0
+敷き,japanese,security deposit,しき,shiki,0
+敷き,japanese,Japanese mattress,しき,shiki,0
+燭,japanese,light,しょく,shoku,0
+燭,japanese,lamp,しょく,shoku,0
+燭,japanese,obsolete unit of luminous intensity (approx. 1.0067 candela),しょく,shoku,0
 食人,japanese,cannibalism,しょくじん,shokujin,0
 食人,japanese,anthropophagism,しょくじん,shokujin,0
 旅人,japanese,itinerant (esp. itinerant gambler),たびにん,tabinin,0
 旅人,japanese,drifter,たびにん,tabinin,0
 旅人,japanese,nomad,たびにん,tabinin,0
 旅人,japanese,rover,たびにん,tabinin,0
+蜀,japanese,Sichuan (province in China),しょく,shoku,0
+蜀,japanese,Shu (kingdom in China during the Three Kingdoms era; 221-263),しょく,shoku,0
+蜀,japanese,Shu Han,しょく,shoku,0
+蜀,japanese,Shu (kingdom in ancient China; ??-316 BCE),しょく,shoku,0
 婚人,japanese,suitor,よばいびと,yobaibito,0
 諸学,japanese,various studies,しょがく,shogaku,0
 石人,japanese,stone image of people,せきじん,sekijin,0
+秭,japanese,10^24,し,shi,0
+秭,japanese,septillion,し,shi,0
 兼学,japanese,concurrently studying the teachings of two or more different schools or sects,けんがく,kengaku,0
 人見,japanese,slit in the curtains that allows someone on stage to see the audience (in kabuki theatre),ひとみ,hitomi,0
 人見,japanese,public eye,ひとみ,hitomi,0
@@ -2465,6 +3766,7 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 人見,japanese,casual observers,ひとみ,hitomi,0
 厨人,japanese,chef,ちゅうじん,chuujin,0
 厨人,japanese,head cook,ちゅうじん,chuujin,0
+もて,japanese,emphatic prefix,もて,mote,0
 舎人,japanese,servant,しゃじん,shajin,0
 舎人,japanese,valet,しゃじん,shajin,0
 舎人,japanese,footman,しゃじん,shajin,0
@@ -2494,7 +3796,19 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 誰人,japanese,everyone,たれびと,tarebito,0
 誰人,japanese,every person,たれびと,tarebito,0
 誰人,japanese,all,たれびと,tarebito,0
+庸,japanese,tax paid to avoid forced labor (ritsuryō period),よう,you,0
+庸,japanese,tax in kind,よう,you,0
+庸,japanese,mediocrity,よう,you,0
+勝,japanese,win,しょう,shou,0
+勝,japanese,victory,しょう,shou,0
+勝,japanese,beautiful scenery,しょう,shou,0
+勝,japanese,scenic spot,しょう,shou,0
+勝,japanese,counter for wins,しょう,shou,0
+帛,japanese,silk,はく,haku,0
+鬨,japanese,battle cry,とき,toki,0
+鬨,japanese,war cry,とき,toki,0
 伯人,japanese,Brazilian (person),はくじん,hakujin,0
+成り,japanese,promoted (of a piece),なり,nari,0
 念人,japanese,"assistant in a competition (e.g. cockfight, archery, poetry contest)",ねんにん,nennin,0
 念人,japanese,older male in an homosexual relationship,ねんにん,nennin,0
 農人,japanese,farmer,のうじん,noujin,0
@@ -2502,9 +3816,63 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 来学,japanese,coming to school,らいがく,raigaku,0
 来学,japanese,coming to university,らいがく,raigaku,0
 骨学,japanese,osteology,こつがく,kotsugaku,0
+とん,japanese,tap,とん,ton,0
+とん,japanese,knock,とん,ton,0
+とん,japanese,bonk,とん,ton,0
+使,japanese,messenger,し,shi,0
+使,japanese,police and judicial chief (Heian and Kamakura periods),し,shi,0
+使,japanese,"klesha (polluting thoughts such as greed, hatred and delusion, which result in suffering)",し,shi,0
+株,japanese,stump,しゅ,shu,0
+株,japanese,counter for trees,しゅ,shu,0
+単,japanese,single,たん,tan,1
+単,japanese,simple,たん,tan,1
+単,japanese,"singles (tennis, badminton, etc.)",たん,tan,1
+単,japanese,win bet (bet which predicts the winner of a race),たん,tan,1
+吐く,japanese,to vomit,はく,haku,1
+吐く,japanese,to throw up,はく,haku,1
+吐く,japanese,to spit up,はく,haku,1
+吐く,japanese,to emit,はく,haku,1
+吐く,japanese,to send forth,はく,haku,1
+吐く,japanese,to breathe out,はく,haku,1
+吐く,japanese,to give (an opinion),はく,haku,1
+吐く,japanese,to make (a comment),はく,haku,1
+吐く,japanese,to express,はく,haku,1
+吐く,japanese,to tell,はく,haku,1
+吐く,japanese,to confess,はく,haku,1
+短,japanese,fault,たん,tan,0
+短,japanese,defect,たん,tan,0
+短,japanese,weak point,たん,tan,0
+短,japanese,minor,たん,tan,0
+短,japanese,5-point card,たん,tan,0
+短,japanese,short,たん,tan,0
 宗学,japanese,study of religious doctrine,しゅうがく,shuugaku,0
+場,japanese,place,じょう,jou,0
+場,japanese,spot,じょう,jou,0
+場,japanese,grounds,じょう,jou,0
+場,japanese,arena,じょう,jou,0
+場,japanese,stadium,じょう,jou,0
+場,japanese,range,じょう,jou,0
+場,japanese,course,じょう,jou,0
+た,japanese,did,た,ta,0
+た,japanese,(have) done,た,ta,0
+た,japanese,(please) do,た,ta,0
+よう,japanese,(I) will,よう,you,0
+よう,japanese,(I) shall,よう,you,0
+よう,japanese,let's,よう,you,0
+よう,japanese,(I) wonder (if),よう,you,0
+よう,japanese,might it be (that),よう,you,0
+よう,japanese,maybe,よう,you,0
+よう,japanese,perhaps,よう,you,0
+よう,japanese,perchance,よう,you,0
+四気,japanese,"weather of the four seasons (warmth of spring, heat of summer, cool of autumn, and cold of winter)",しき,shiki,0
+景,japanese,vista,けい,kei,0
+景,japanese,view,けい,kei,0
+景,japanese,scene,けい,kei,0
+景,japanese,scenic view,けい,kei,0
+景,japanese,counter for scenes (in a play),けい,kei,0
 人孔,japanese,manhole,じんこう,jinkou,0
 人穴,japanese,volcanic cave traditionally said to be inhabited,ひとあな,hitoana,0
+腎,japanese,kidney,じん,jin,0
 徒人,japanese,ordinary person,ただびと,tadabito,0
 徒人,japanese,untitled individual,ただびと,tadabito,0
 徒人,japanese,useless fellow,いたずらびと,itazurabito,0
@@ -2519,11 +3887,19 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 洛学,japanese,Luo Xue school (neo-Confucianist school),らくがく,rakugaku,0
 楽人,japanese,carefree person,らくじん,rakujin,0
 楽人,japanese,person living at his ease,らくじん,rakujin,0
+初句,japanese,first five syllables (of a tanka),しょく,shoku,0
+初句,japanese,first line (of a poem),しょく,shoku,0
 熱学,japanese,theory of heat,ねつがく,netsugaku,0
 熱学,japanese,thermal science,ねつがく,netsugaku,0
 熱学,japanese,thermology,ねつがく,netsugaku,0
 梵学,japanese,study of Sanskrit,ぼんがく,bongaku,0
 梵学,japanese,study of Buddhism,ぼんがく,bongaku,0
+終,japanese,end,つい,tsui,0
+終,japanese,final,つい,tsui,0
+終,japanese,end of life,つい,tsui,0
+終,japanese,death,つい,tsui,0
+終,japanese,never,つい,tsui,0
+終,japanese,not at all,つい,tsui,0
 害人,japanese,foreigner,がいじん,gaijin,0
 害人,japanese,gaijin,がいじん,gaijin,0
 紅学,japanese,redology,こうがく,kougaku,0
@@ -2531,6 +3907,8 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 学的,japanese,scholarly,がくてき,gakuteki,0
 学的,japanese,scholastic,がくてき,gakuteki,0
 学的,japanese,academic,がくてき,gakuteki,0
+私,japanese,private affairs,し,shi,0
+私,japanese,personal matter,し,shi,0
 神人,japanese,shrine maiden,かみんちゅ,kaminchu,0
 鄙人,japanese,countryfolk,ひなびと,hinabito,0
 鄙人,japanese,villager,ひなびと,hinabito,0
@@ -2538,8 +3916,31 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 鄙人,japanese,greedy person,ひなびと,hinabito,0
 鄙人,japanese,underclass,ひなびと,hinabito,0
 鄙人,japanese,low-standing person,ひなびと,hinabito,0
+洋,japanese,Occident and Orient (esp. the Occident),よう,you,0
+洋,japanese,ocean,よう,you,0
+洋,japanese,sea,よう,you,0
+洋,japanese,foreign,よう,you,0
+洋,japanese,Western,よう,you,0
+洋,japanese,European,よう,you,0
+専,japanese,exclusively doing ...,せん,sen,0
+専,japanese,person who exclusively does ...,せん,sen,0
+専,japanese,fetish for ...,せん,sen,0
+専,japanese,someone with a fetish for ...,せん,sen,0
+専,japanese,first,せん,sen,0
+専,japanese,most important thing,せん,sen,0
+専,japanese,number one priority,せん,sen,0
 三学,japanese,threefold training,さんがく,sangaku,0
 三学,japanese,three divisions of the noble eightfold path,さんがく,sangaku,0
+筌,japanese,cylindrical bamboo fishing basket,うえ,ue,0
+白,japanese,white,はく,haku,0
+白,japanese,striped mullet fry (Mugil cephalus),はく,haku,0
+白,japanese,"(spoken) line (in a play, film, etc.)",はく,haku,0
+白,japanese,one's lines,はく,haku,0
+白,japanese,white dragon tile,はく,haku,0
+白,japanese,winning hand with a pung (or kong) of white dragon tiles,はく,haku,0
+白,japanese,Belgium,はく,haku,0
+白,japanese,white person,はく,haku,0
+白,japanese,Caucasian,はく,haku,0
 人和,japanese,blessing of man,レンホー,renho-,0
 人和,japanese,winning with a discard in the first turn,レンホー,renho-,0
 酒人,japanese,person in charge of the brewing of sacrificial wine,さかびと,sakabito,0
@@ -2548,16 +3949,32 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 亜人,japanese,demi-human,あじん,ajin,0
 亜人,japanese,Argentinian (person),あじん,ajin,0
 亜人,japanese,American (person),あじん,ajin,0
+取,japanese,appropriation,しゅ,shu,0
+取,japanese,obtaining,しゅ,shu,0
+豚,japanese,pig,とん,ton,0
+豚,japanese,pork,とん,ton,0
+端,japanese,origin,たん,tan,0
+端,japanese,beginning,たん,tan,0
+端,japanese,variable measure of fabric (28.8 cm in width),たん,tan,0
+端,japanese,for kimonos: at least 10 m in length,たん,tan,0
+端,japanese,for haori: at least 7.27 m in length,たん,tan,0
+端,japanese,for other clothes: at least 6.06 m in length,たん,tan,0
+端,japanese,tip,たん,tan,0
+端,japanese,extremity,たん,tan,0
 人脳,japanese,human brain,じんのう,jinnou,0
 仲人,japanese,go-between,なかびと,nakabito,0
 仲人,japanese,matchmaker,なかびと,nakabito,0
 跳人,japanese,Nebuta festival dancer,はねと,haneto,0
 属人,japanese,personal,ぞくじん,zokujin,0
 属人,japanese,individual,ぞくじん,zokujin,0
+紙,japanese,newspaper,し,shi,0
+紙,japanese,paper,し,shi,0
+紙,japanese,counter for newspapers,し,shi,0
 人狼,japanese,werewolf,じんろう,jinrou,0
 人狼,japanese,Werewolf (social deduction game),じんろう,jinrou,0
 人狼,japanese,Mafia,じんろう,jinrou,0
 郷学,japanese,"village school (esp. in Edo-era Japan, and ancient Korea and China)",ごうがく,gougaku,0
+鍾,japanese,round bronze jar used for storing alcohol (Han dynasty China),しょう,shou,0
 学法,japanese,(legally) incorporated educational institution,がくほう,gakuhou,0
 凶人,japanese,scoundrel,きょうじん,kyoujin,0
 凶人,japanese,ruffian,きょうじん,kyoujin,0
@@ -2569,8 +3986,18 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 学都,japanese,college town,がくと,gakuto,0
 桜人,japanese,cherry blossom viewer,さくらびと,sakurabito,0
 桜人,japanese,cherry blossom admirer,さくらびと,sakurabito,0
+逆,japanese,inverse,さか,saka,0
+逆,japanese,reverse,さか,saka,0
+士,japanese,man (esp. one who is well-respected),し,shi,0
+士,japanese,samurai,し,shi,0
+士,japanese,"person (in a certain profession, esp. licensed)",し,shi,0
+士,japanese,member,し,shi,0
 華人,japanese,"ethnic Chinese (living abroad, esp. with non-Chinese citizenship)",かじん,kajin,0
 華人,japanese,overseas Chinese,かじん,kajin,0
+逸,japanese,very,いち,ichi,0
+逸,japanese,excellent,いち,ichi,0
+一,japanese,one,ひと,hito,1
+一,japanese,one,ひと,hito,1
 人才,japanese,capable person,じんさい,jinsai,0
 人才,japanese,talented person,じんさい,jinsai,0
 人手,japanese,someone else's hands,ひとで,hitode,0
@@ -2590,8 +4017,16 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 天人,japanese,celestial being,てんにん,tennin,0
 天人,japanese,celestial nymph,てんにん,tennin,0
 天人,japanese,celestial maiden,てんにん,tennin,0
+経,japanese,warp (weaving),けい,kei,0
+経,japanese,longitude,けい,kei,0
+経,japanese,scripture,けい,kei,0
+経,japanese,sutra,けい,kei,0
+経,japanese,trans-,けい,kei,0
 特学,japanese,special class for disabled children,とくがく,tokugaku,0
 特学,japanese,special needs class,とくがく,tokugaku,0
+支,japanese,China,し,shi,0
+倩,japanese,good-looking,せん,sen,0
+倩,japanese,attractive,せん,sen,0
 遊人,japanese,someone without a fixed occupation,ゆうじん,yuujin,0
 遊人,japanese,man of leisure,ゆうじん,yuujin,0
 遊人,japanese,playboy,ゆうじん,yuujin,0
@@ -2602,6 +4037,7 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 隼人,japanese,Hayato,はやと,hayato,0
 隼人,japanese,ethnic group which lived in Kyūshū in ancient times and opposed the state of Yamato,はやと,hayato,0
 隼人,japanese,man from Kagoshima,はやと,hayato,0
+少輔,japanese,"assistant vice-minister (ritsuryō system, early Meiji period)",しょう,shou,0
 相人,japanese,physiognomist,そうにん,sounin,0
 幻人,japanese,witchcraft user,げんじん,genjin,0
 幻人,japanese,magician,げんじん,genjin,0
@@ -2612,23 +4048,37 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 丈人,japanese,senior,じょうじん,joujin,0
 丈人,japanese,wife's father,じょうじん,joujin,0
 丈人,japanese,father-in-law,じょうじん,joujin,0
+砥,japanese,whetstone,と,to,0
+砥,japanese,grindstone,と,to,0
 人年,japanese,person-year,じんねん,jinnen,0
 人年,japanese,man-year,じんねん,jinnen,0
+刷く,japanese,to daub,はく,haku,0
+刷く,japanese,to brush,はく,haku,0
+刷く,japanese,to touch up,はく,haku,0
 別学,japanese,single-sex education,べつがく,betsugaku,0
 放学,japanese,expulsion from school,ほうがく,hougaku,0
 放学,japanese,dismissal of class (at the end of the day),ほうがく,hougaku,0
 性学,japanese,sexology,せいがく,seigaku,0
 初学,japanese,learning (a subject) for the first time,しょがく,shogaku,0
 初学,japanese,start of one's study,しょがく,shogaku,0
+くう,japanese,phew,くう,kuu,0
+くう,japanese,whew,くう,kuu,0
+食,japanese,"eclipse (solar, lunar, etc.)",しょく,shoku,0
+食,japanese,occultation,しょく,shoku,0
+洗,japanese,washing machine,せん,sen,0
+洗,japanese,(clothes) washer,せん,sen,0
 聖人,japanese,person on the path to enlightenment,しょうにん,shounin,0
 聖人,japanese,Buddha,しょうにん,shounin,0
 聖人,japanese,bodhisattva,しょうにん,shounin,0
 聖人,japanese,high priest,しょうにん,shounin,0
+昭,japanese,nth year in the Shōwa era (1926.12.25-1989.1.7),しょう,shou,0
 人用,japanese,human usage,じんよう,jinyou,0
 人用,japanese,(for) use by people,じんよう,jinyou,0
 願人,japanese,petitioner,がんにん,gannin,0
 願人,japanese,person who prays,がんにん,gannin,0
 願人,japanese,beggar-priest,がんにん,gannin,0
+譚,japanese,story,たん,tan,0
+譚,japanese,tale,たん,tan,0
 海人,japanese,seashore dweller,かいじん,kaijin,0
 海人,japanese,fisherman,かいじん,kaijin,0
 海人,japanese,sea god,かいじん,kaijin,0
@@ -2636,15 +4086,114 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 海人,japanese,Neptune,かいじん,kaijin,0
 卜人,japanese,fortune teller,ぼくじん,bokujin,0
 卜人,japanese,diviner,ぼくじん,bokujin,0
+楽,japanese,music,がく,gaku,0
+楽,japanese,gagaku,がく,gaku,0
+楽,japanese,ceremonial Japanese court music,がく,gaku,0
+試,japanese,testing,し,shi,0
+試,japanese,experiment,し,shi,0
+試,japanese,test,し,shi,0
+試,japanese,examination,し,shi,0
+試,japanese,exam,し,shi,0
+試,japanese,trial,し,shi,0
+資,japanese,funds,し,shi,0
+資,japanese,capital,し,shi,0
+資,japanese,material,し,shi,0
+資,japanese,basis,し,shi,0
+資,japanese,character,し,shi,0
+資,japanese,qualities,し,shi,0
+資,japanese,disposition,し,shi,0
+歯,japanese,tooth,し,shi,0
+歯,japanese,age,し,shi,0
+歯,japanese,years,し,shi,0
+嗣,japanese,succession,し,shi,0
+嗣,japanese,successor,し,shi,0
+駟,japanese,four-horse carriage,し,shi,0
+駟,japanese,team of four horses,し,shi,0
+持,japanese,"draw (in go, poetry contest, etc.)",じ,ji,0
+持,japanese,tie,じ,ji,0
+諡,japanese,posthumous name,し,shi,0
+諡,japanese,posthumous title,し,shi,0
+妾,japanese,mistress,しょう,shou,0
+妾,japanese,kept woman,しょう,shou,0
+妾,japanese,concubine,しょう,shou,0
+妾,japanese,I,しょう,shou,0
+妾,japanese,me,しょう,shou,0
+声,japanese,voice,しょう,shou,0
+声,japanese,sound,しょう,shou,0
+声,japanese,tone (of Chinese character),しょう,shou,0
+声,japanese,tone mark,しょう,shou,0
+声,japanese,stress (in pronunciation),しょう,shou,0
+声,japanese,intonation,しょう,shou,0
+声,japanese,accent,しょう,shou,0
+祥,japanese,omen (usu. good),しょう,shou,0
+祥,japanese,(auspicious) sign,しょう,shou,0
+祥,japanese,first two anniversaries of a person's death,しょう,shou,0
+礁,japanese,reef,しょう,shou,0
+請,japanese,request,しょう,shou,0
+請,japanese,invitation,しょう,shou,0
+請,japanese,privilege in criminal law given to nobles of the fifth rank or above (ritsuryō system),しょう,shou,0
+諚,japanese,lord's command,じょう,jou,0
+諸苦,japanese,numerous sufferings,しょく,shoku,0
+諸苦,japanese,various kinds of suffering,しょく,shoku,0
 屠人,japanese,slaughterer,とじん,tojin,0
 屠人,japanese,butcher,とじん,tojin,0
 屠人,japanese,cook,とじん,tojin,0
+銭,japanese,money,ぜぜ,zeze,0
+疝,japanese,colic,せん,sen,0
+宣,japanese,imperial order,せん,sen,0
+宣,japanese,imperial decree,せん,sen,0
+詮,japanese,way,せん,sen,0
+詮,japanese,method,せん,sen,0
+詮,japanese,means,せん,sen,0
+詮,japanese,effect,せん,sen,0
+詮,japanese,result,せん,sen,0
+詮,japanese,worth,せん,sen,0
+詮,japanese,benefit,せん,sen,0
+詮,japanese,use,せん,sen,0
+暹,japanese,Siam (former name of Thailand),せん,sen,0
+饌,japanese,food offering to the gods,せん,sen,0
+饌,japanese,prepared food,せん,sen,0
+磚,japanese,brick (used in Chinese-style buildings),せん,sen,0
 庶人,japanese,commoner,しょじん,shojin,0
 庶人,japanese,common people,しょじん,shojin,0
+堵,japanese,fence,と,to,0
+堵,japanese,wall,と,to,0
+堵,japanese,hedge,と,to,0
+し,japanese,did,し,shi,0
+し,japanese,(have) done,し,shi,0
+縛,japanese,tying up,ばく,baku,0
+縛,japanese,restraint,ばく,baku,0
+縛,japanese,restriction,ばく,baku,0
+縛,japanese,arrest,ばく,baku,0
+漠,japanese,vague,ばく,baku,0
+漠,japanese,obscure,ばく,baku,0
+漠,japanese,vast,ばく,baku,0
+漠,japanese,boundless,ばく,baku,0
 人天,japanese,earth and heaven,にんでん,ninden,0
 人天,japanese,human and heavenly beings,にんでん,ninden,0
+幼,japanese,infancy,よう,you,0
+幼,japanese,childhood,よう,you,0
+幼,japanese,infant,よう,you,0
+幼,japanese,child,よう,you,0
+俑,japanese,terra-cotta figure (in Qin dynasty tombs in China),よう,you,0
+酪,japanese,"acidic drink made from fermented milk (cow, sheep, mare; one of the five flavors in Buddhism)",らく,raku,0
+洛,japanese,the capital (esp. Kyoto),らく,raku,0
 人海,japanese,sea of people,じんかい,jinkai,0
 人海,japanese,(very large) crowd of people,じんかい,jinkai,0
+じ,japanese,"probably isn't (doesn't, won't, etc.)",じ,ji,0
+じ,japanese,will not,じ,ji,0
+じ,japanese,must not,じ,ji,0
+じ,japanese,don't intend to,じ,ji,0
+定,japanese,certainty,じょう,jou,0
+定,japanese,reality,じょう,jou,0
+定,japanese,actuality,じょう,jou,0
+定,japanese,regular,じょう,jou,0
+定,japanese,permanent,じょう,jou,0
+定,japanese,samadhi (state of intense concentration achieved through meditation),じょう,jou,0
+せん,japanese,will not do,せん,sen,0
+せん,japanese,do not,せん,sen,0
+せん,japanese,does not,せん,sen,0
+尾張,japanese,Owari (former province located in the west of present-day Aichi Prefecture),おわり,owari,0
 人々,japanese,each person,にんにん,ninnin,0
 人々,japanese,everybody,にんにん,ninnin,0
 露人,japanese,Russian person,ろじん,rojin,0
@@ -2652,6 +4201,8 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 自学,japanese,learning by oneself,じがく,jigaku,0
 自学,japanese,self-study,じがく,jigaku,0
 自学,japanese,driving school,じがく,jigaku,0
+塩,japanese,"salt (e.g. sodium chloride, calcium sulfate, etc.)",えん,en,0
+塩,japanese,chloride,えん,en,0
 現人,japanese,this present body,うつしおみ,utsushiomi,0
 現人,japanese,this present existence,うつしおみ,utsushiomi,0
 現人,japanese,this mortal frame,うつしおみ,utsushiomi,0
@@ -2660,6 +4211,15 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 和学,japanese,study of classical Japanese literature and culture,わがく,wagaku,0
 和学,japanese,Japanology,わがく,wagaku,0
 和学,japanese,Japanese studies,わがく,wagaku,0
+匠,japanese,craftsman,しょう,shou,0
+匠,japanese,artisan,しょう,shou,0
+匠,japanese,carpenter,しょう,shou,0
+匠,japanese,(skilled) workman,しょう,shou,0
+繁,japanese,complexity,はん,han,0
+繁,japanese,frequency,はん,han,0
+繁,japanese,trouble,はん,han,0
+繁,japanese,traditional Chinese character,はん,han,0
+繁,japanese,unsimplified Chinese character,はん,han,0
 人乳,japanese,human milk,じんにゅう,jinnyuu,0
 人流,japanese,population flow,じんりゅう,jinryuu,0
 人流,japanese,movement of people,じんりゅう,jinryuu,0
@@ -2682,22 +4242,56 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 人数,japanese,(being counted as an) adult,ひとかず,hitokazu,0
 毛人,japanese,Emishi,もうじん,moujin,0
 毛人,japanese,non-Yamato peoples in northern Japan,もうじん,moujin,0
+がた,japanese,decrepitude,がた,gata,0
+がた,japanese,(being) rickety,がた,gata,0
+がた,japanese,(state of) falling apart,がた,gata,0
+がた,japanese,looseness (in machinery),がた,gata,0
+がた,japanese,play,がた,gata,0
+園,japanese,garden,えん,en,1
+園,japanese,orchard,えん,en,1
+園,japanese,park,えん,en,1
+園,japanese,plantation,えん,en,1
+園,japanese,kindergarten,えん,en,1
+園,japanese,nursery school,えん,en,1
+園,japanese,preschool,えん,en,1
 召人,japanese,person specially invited to compose and recite a poem at the Imperial New Year's Poetry Reading,めしうど,meshiudo,0
 召人,japanese,person employed by the Imperial Court to compile anthologies of waka poetry,めしうど,meshiudo,0
 召人,japanese,person summoned to perform bugaku (for the nobility),めしうど,meshiudo,0
 末人,japanese,last man (Nietzsche's archetypal passive nihilist),まつじん,matsujin,0
+加羅,japanese,Karak (ancient Korean confederacy),から,kara,0
+加羅,japanese,Kaya,から,kara,0
+船,japanese,ship,せん,sen,0
+船,japanese,boat,せん,sen,0
+船,japanese,vessel,せん,sen,0
 人血,japanese,human blood,じんけつ,jinketsu,0
 人型,japanese,human figure,ひとがた,hitogata,0
 人型,japanese,human form,ひとがた,hitogata,0
+銖,japanese,shu,しゅ,shu,0
+銖,japanese,"unit of weight, 1/24th of a ryō",しゅ,shu,0
+銖,japanese,shu,しゅ,shu,0
+銖,japanese,"Edo-period unit of currency, 1/16th of a ryō",しゅ,shu,0
 人神,japanese,man-god,ひとがみ,hitogami,0
 人神,japanese,person enshrined as a god,ひとがみ,hitogami,0
 蜜人,japanese,mummy,みつじん,mitsujin,0
+辛,japanese,counter for spiciness of food (e.g. curry),から,kara,0
+卿,japanese,you,けい,kei,0
+卿,japanese,you,けい,kei,0
 人狐,japanese,fox spirit that possesses people (typical of the Chūgoku region),ひとぎつね,hitogitsune,0
 半人,japanese,useless,はんにん,hannin,0
 半人,japanese,worthless,はんにん,hannin,0
 半人,japanese,no good,はんにん,hannin,0
 半人,japanese,half-man (esp. upper body),はんにん,hannin,0
 半人,japanese,half day (e.g. when working),はんにん,hannin,0
+証,japanese,proof,しょう,shou,0
+証,japanese,evidence,しょう,shou,0
+証,japanese,certificate,しょう,shou,0
+証,japanese,license,しょう,shou,0
+証,japanese,permit,しょう,shou,0
+証,japanese,membership card,しょう,shou,0
+証,japanese,ID card,しょう,shou,0
+証,japanese,enlightenment,しょう,shou,0
+証,japanese,symptoms (in Chinese medicine),しょう,shou,0
+証,japanese,patient's condition,しょう,shou,0
 魔人,japanese,sorcerer,まじん,majin,0
 魔人,japanese,genie,まじん,majin,0
 魔人,japanese,human with supernatural powers,まじん,majin,0
@@ -2713,10 +4307,14 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 大人,japanese,adult,だいにん,dainin,0
 中人,japanese,child in elementary or middle school,ちゅうにん,chuunin,0
 車学,japanese,driving school,しゃがく,shagaku,0
+緬,japanese,Myanmar,めん,men,0
+緬,japanese,Burma,めん,men,0
 動学,japanese,dynamics,どうがく,dougaku,0
 動学,japanese,mechanics,どうがく,dougaku,0
 動学,japanese,dynamics,どうがく,dougaku,0
+子規,japanese,lesser cuckoo (Cuculus poliocephalus),しき,shiki,0
 人音,japanese,sound of someone (being near or coming),ひとおと,hitooto,0
+鮮,japanese,Korea,せん,sen,0
 九人,japanese,nine people,きゅうにん,kyuunin,0
 伊人,japanese,Italian (person),いじん,ijin,0
 五人,japanese,five people,ごにん,gonin,0
@@ -2724,6 +4322,13 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 七人,japanese,seven people,しちにん,shichinin,0
 八人,japanese,eight people,はちにん,hachinin,0
 十人,japanese,ten people,じゅうにん,juunin,0
+酒,japanese,alcohol,ささ,sasa,0
+酒,japanese,sake,ささ,sasa,0
+酒,japanese,alcohol,しゅ,shu,0
+酒,japanese,(alcoholic) drink,しゅ,shu,0
+酒,japanese,liqueur,しゅ,shu,0
+酒,japanese,alcohol,さか,saka,0
+酒,japanese,sake,さか,saka,0
 盗人,japanese,thief,ぬすっと,nusutto,0
 盗人,japanese,robber,ぬすっと,nusutto,0
 匠人,japanese,craftsman,しょうじん,shoujin,0
@@ -2740,11 +4345,15 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 至人,japanese,highly virtuous person,しじん,shijin,0
 鳥学,japanese,ornithology,ちょうがく,chougaku,0
 雲学,japanese,nephology,くもがく,kumogaku,0
+糸冬,japanese,end,おわり,owari,0
+糸冬,japanese,conclusion,おわり,owari,0
+糸冬,japanese,ending,おわり,owari,0
 弊学,japanese,my university,へいがく,heigaku,0
 大人,japanese,exalted person,うし,ushi,0
 大人,japanese,person of high education,うし,ushi,0
 大人,japanese,feudal lord,うし,ushi,0
 大人,japanese,nobleman,うし,ushi,0
+顎,japanese,jaw,がく,gaku,0
 人損,japanese,personal damage (as opposed to property damage),じんそん,jinson,0
 人損,japanese,personal injury,じんそん,jinson,0
 人台,japanese,dressmaker's dummy,じんだい,jindai,0
@@ -2764,3 +4373,4 @@ K人,chinese,to beat sb,K ​rén,k ren,0
 学研,japanese,Gakken (publisher),がっけん,gakken,0
 学芸,japanese,Tokyo Gakugei University (abbr.),がくげい,gakugei,0
 学大,japanese,Tokyo Gakugei University (abbr.),がくだい,gakudai,0
+とき,japanese,Toki (regular Jōetsu-line Shinkansen),とき,toki,0

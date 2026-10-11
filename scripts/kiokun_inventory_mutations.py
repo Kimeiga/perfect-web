@@ -124,6 +124,18 @@ MUTANTS = [
         "        if False:\n",
     ),
     (
+        "the search sample keeps no row for the word sample's homophones",
+        SEARCH_SAMPLE,
+        '        homophone = row[at["language"]] == "japanese" and row[at["pronunciation"]] in readings\n',
+        "        homophone = False\n",
+    ),
+    (
+        "the search sample keeps any language's row read as a sample reading",
+        SEARCH_SAMPLE,
+        '        homophone = row[at["language"]] == "japanese" and row[at["pronunciation"]] in readings\n',
+        '        homophone = row[at["pronunciation"]] in readings\n',
+    ),
+    (
         "the search sample keeps the Korean IPA",
         SEARCH_SAMPLE,
         '            row[at["pronunciation"]] = ""\n',

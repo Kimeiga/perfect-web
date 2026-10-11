@@ -38,6 +38,14 @@ pub(crate) struct Row {
     pub(crate) is_common: i64,
 }
 
+/// One row the reading statement returns.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ReadingRow {
+    pub(crate) word: String,
+    pub(crate) pronunciation: String,
+    pub(crate) is_common: i64,
+}
+
 /// The index, opened.
 pub(crate) struct Index {
     conn: Mutex<Connection>,
@@ -304,6 +312,39 @@ impl Index {
         binds.push(Sql::Text(as_words(query)));
         binds.push(Sql::Integer(limit));
         self.rows(sql, binds)
+    }
+
+    /// **The reading statement** (`api/lookup-reading/+server.ts`): the
+    /// Japanese words whose pronunciation is `reading`, each word,
+    /// pronunciation and common flag once; common first, then shorter, at
+    /// most `limit`. As kiokun.com writes it, the reading is an FTS5 string
+    /// of the pronunciation column and then compared whole. What it leaves
+    /// out after (the reading itself) is the program's.
+    pub(crate) fn reading(&self, reading: &str, limit: i64) -> Result<Vec<ReadingRow>, String> {
+        let sql = "SELECT DISTINCT word, pronunciation, is_common \
+             FROM dictionary_search \
+             WHERE pronunciation MATCH ('\"' || replace(?1, '\"', '\"\"') || '\"') \
+               AND language = 'japanese' \
+               AND pronunciation = ?1 \
+             ORDER BY is_common DESC, LENGTH(word) ASC \
+             LIMIT ?2";
+        let conn = self.conn.lock().expect("the index");
+        let mut statement = conn.prepare(sql).map_err(|e| e.to_string())?;
+        let rows = statement
+            .query_map(rusqlite::params![reading, limit], |r| {
+                Ok(ReadingRow {
+                    word: r.get::<_, String>(0)?,
+                    pronunciation: r.get::<_, String>(1)?,
+                    is_common: match r.get::<_, Sql>(2)? {
+                        Sql::Integer(n) => n,
+                        Sql::Text(t) => t.parse().unwrap_or(0),
+                        _ => 0,
+                    },
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
     }
 }
 

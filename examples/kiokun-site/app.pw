@@ -2435,6 +2435,7 @@ type WordShown = WordShown {
     japanese: List<ShownJapanese>,
     korean: List<ShownKorean>,
     names: List<ShownName>,
+    homophones: List<HomophoneGroup>,
     contains: ContainsList,
     appears: Appears,
     edrdg: Bool,
@@ -2454,7 +2455,7 @@ fn japanese_all(words: List<JapaneseWord>, labels: List<Label>, pitches: List<Wo
     List.fold(words, none, (out, w) => List.concat(out, [japanese_shown(w, labels, pitch_at(pitches, List.length(out)))]))
 }
 
-fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>, pitches: List<WordPitch>) -> WordShown {
+fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>, pitches: List<WordPitch>, found: List<ReadingFound>) -> WordShown {
     let none: List<ShownChinese> = []
     let e = l.data
     WordShown {
@@ -2465,6 +2466,7 @@ fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>,
         japanese: japanese_all(e.japanese, labels, pitches),
         korean: List.map(e.korean, korean_shown),
         names: List.map(e.names, name_shown),
+        homophones: homophones_of(word, e, found),
         contains: contains_of(e, word, glosses),
         appears: appears_in(e),
         edrdg: edrdg_shown(e),
@@ -2483,6 +2485,80 @@ fn edrdg_shown(e: Entry) -> Bool {
         Some(_) => true,
         None => false,
     }
+}
+
+// ---------------------------------------------------------------------------
+// Homophones (`[word]/+page.svelte`, `api/lookup-reading/+server.ts`): the
+// words read as each of the page's Japanese readings, from the search index.
+// kiokun.com fetches them in the browser, one request a reading, and shows
+// each group when its request answers; the rewrite reads them with the page
+// and shows them in the readings' order (the reading index ADR).
+
+// What the reading index answered for one of the page's readings.
+type ReadingFound = ReadingFound {
+    reading: String,
+    rows: List<ReadingHit>,
+}
+
+// One homophone: a word, linked, marked where its dictionary calls it common.
+type HomophoneWord = HomophoneWord {
+    id: String,
+    word: String,
+    chip: String,
+}
+
+// One reading's homophones; its reading is shown where there are several.
+type HomophoneGroup = HomophoneGroup {
+    id: String,
+    reading: String,
+    labelled: Bool,
+    words: List<HomophoneWord>,
+}
+
+// The readings kiokun.com's page asks for: each Japanese word's kana, each
+// once, in the words' order.
+fn readings_of(e: Entry) -> List<String> {
+    let none: List<String> = []
+    List.fold(e.japanese, none, (out, w) => List.fold(w.kana, out, (o, k) => if k.text == "" | List.any(o, r => r == k.text) { o } else { List.concat(o, [k.text]) }))
+}
+
+// The page's own forms: its word, and each Japanese word's kanji and kana.
+fn own_forms(word: String, e: Entry) -> List<String> {
+    let none: List<String> = []
+    List.concat([word], List.fold(e.japanese, none, (out, w) => List.concat(out, List.concat(List.map(w.kanji, k => k.text), List.map(w.kana, k => k.text)))))
+}
+
+// The limit the page asks the reading index for (`?limit=20`), which is the
+// endpoint's most.
+fn homophone_limit() -> Int {
+    20
+}
+
+// One reading's words: none of the page's own forms. kiokun.com also drops
+// the reading itself, twice: the endpoint the word equal to the trimmed
+// query, the page the word equal to the reading. Both are implied here: the
+// reading is one of the page's kana, so among its forms, and trimming
+// changes none of kiokun's readings (none of the committed index's 427,860
+// Japanese pronunciations; the reading index ADR).
+fn homophone_words(f: ReadingFound, forms: List<String>) -> List<HomophoneWord> {
+    let kept = List.filter(f.rows, r => !List.any(forms, x => x == r.word))
+    let none: List<HomophoneWord> = []
+    List.fold(kept, none, (out, r) => List.concat(out, [HomophoneWord {
+        id: "{f.reading}:{List.length(out)}",
+        word: r.word,
+        chip: if r.is_common != 0 { "homophone-chip common" } else { "homophone-chip" },
+    }]))
+}
+
+// Each reading with words left, as a group.
+fn homophones_of(word: String, e: Entry, found: List<ReadingFound>) -> List<HomophoneGroup> {
+    let forms = own_forms(word, e)
+    let none: List<HomophoneGroup> = []
+    let groups = List.fold(found, none, (out, f) => match List.length(homophone_words(f, forms)) {
+        0 => out,
+        _ => List.concat(out, [HomophoneGroup { id: f.reading, reading: f.reading, labelled: false, words: homophone_words(f, forms) }]),
+    })
+    List.map(groups, g => HomophoneGroup { id: g.id, reading: g.reading, labelled: List.length(groups) > 1, words: g.words })
 }
 
 // **A word's page** (`[word]/+page.ts`): kiokun's entry for `word`, its
@@ -2521,6 +2597,13 @@ public query Word(word: String) -> Result<WordShown, KiokunError>
         Some(l) => List.map(l.data.japanese, w => WordPitch { readings: read_pitch(pitch_shard(speak_of(w)), speak_of(w)) }),
         None => none,
     }
+    // Each reading's homophones, asked as the page asks (`?limit=20`); an
+    // empty reading, which the endpoint refuses, is asked nothing.
+    let unread: List<ReadingFound> = []
+    let found = match page {
+        Some(l) => List.map(List.filter(readings_of(l.data), r => String.trim(r) != ""), r => ReadingFound { reading: r, rows: search_reading(String.trim(r), homophone_limit()) }),
+        None => unread,
+    }
     // A simplified form that equals its one traditional form in meaning is
     // moved to that form's page, for good (`[word]/+page.ts:415-425`,
     // ADR-0295): the word's own file decides, before a stub is followed or
@@ -2529,7 +2612,7 @@ public query Word(word: String) -> Result<WordShown, KiokunError>
     match moved {
         Some(t) => Err(Moved(t)),
         None => match page {
-            Some(l) => Ok(shown(word, l, labels, glosses, pitches)),
+            Some(l) => Ok(shown(word, l, labels, glosses, pitches, found)),
             None => Err(NotFound),
         },
     }
@@ -2850,6 +2933,21 @@ page WordPage(word: String) {
                     {/each}
                 </section>
             {/if}
+            {#if page.homophones}
+                <section id="homophones" aria-labelledby="homophones-heading">
+                    <h2 id="homophones-heading">Homophones</h2>
+                    <div class="homophones-section">
+                        {#each page.homophones as g (g.id)}
+                            <div class="homophone-group">
+                                {#if g.labelled}<div class="homophone-reading">{g.reading}</div>{/if}
+                                <div class="homophone-list">
+                                    {#each g.words as h (h.id)}<a href="/word/{h.word}" class={h.chip}>{h.word}</a>{/each}
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                </section>
+            {/if}
             {#if page.names}
                 <section id="names" aria-labelledby="names-heading">
                     <h2 id="names-heading">Japanese Names</h2>
@@ -2902,6 +3000,14 @@ type SearchRow = SearchRow {
     is_common: Int,
 }
 
+// A word the reading statement answers (`api/lookup-reading`): a Japanese
+// row's word, its pronunciation and its common flag, each once.
+type ReadingHit = ReadingHit {
+    word: String,
+    pronunciation: String,
+    is_common: Int,
+}
+
 // One key and what kiokun.com's aliases give for it (`search-aliases.json`).
 type AliasSet = AliasSet {
     term: String,
@@ -2911,7 +3017,7 @@ type AliasSet = AliasSet {
 // kiokun.com's search index and aliases: read, never written; every read
 // sees the one index the deployment opened.
 source KiokunSearch
-    holds        SearchRow, AliasSet
+    holds        SearchRow, AliasSet, ReadingHit
     transactions none
     reads        strong
     changes      none
@@ -2924,6 +3030,11 @@ fn search_cjk(terms: List<String>, reading: String, limit: Int) -> List<SearchRo
 // The Latin statement: the query over every column.
 fn search_latin(asked: String, limit: Int) -> List<SearchRow> !{ database.read<SearchRow> }
     host "kiokun:data/search#latin"
+
+// The reading statement (`api/lookup-reading`): the Japanese words read as
+// `reading`, common first, then shorter.
+fn search_reading(reading: String, limit: Int) -> List<ReadingHit> !{ database.read<ReadingHit> }
+    host "kiokun:data/search#reading"
 
 // Each term's whole-word aliases (`aliases`).
 fn search_aliases(terms: List<String>) -> List<AliasSet> !{ database.read<AliasSet> }

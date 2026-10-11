@@ -8,7 +8,9 @@ sources only (the integrator's ruling of 2026-10-10): committed data is the
 minimum a committed test reads.
 
 The rows kept are those whose word holds one of WORDS' characters, and is
-no longer than LONGEST characters. Of them:
+no longer than LONGEST characters; and the Japanese rows read as one of the
+word sample's Japanese readings (`examples/kiokun/data/han-1char-3`), which
+the word page's Homophones asks the index for. Of them:
 - a Chinese row is kept only where its definition is an item's that Dong
   Chinese's export (`data/chinese_dictionary_word_2025-06-25.jsonl`, read at
   kiokun-data's HEAD) tags `cedict` (CC-CEDICT) or `unicode` (Unihan) for
@@ -28,6 +30,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import zlib
 
 # The characters whose words CI searches: 人, from the entries'
 # sample, and 学 and 學, for a script variant the hand-made aliases name.
@@ -59,14 +62,30 @@ def cleared_chinese(root: pathlib.Path) -> set[tuple[str, str]]:
     return out
 
 
-def kept_rows(header: list[str], rows, chinese: set[tuple[str, str]]) -> list[list[str]]:
+def sample_readings(repo: pathlib.Path) -> set[str]:
+    """Each kana reading of the word sample's Japanese words (JMdict's), which
+    the word page asks the reading index for its homophones."""
+    out = set()
+    for f in sorted((repo / "examples/kiokun/data/han-1char-3").rglob("*.json.deflate")):
+        entry = json.loads(zlib.decompress(f.read_bytes(), -15))
+        for word in entry.get("japanese_words", []):
+            for kana in word.get("kana", []):
+                if kana.get("text"):
+                    out.add(kana["text"])
+    return out
+
+
+def kept_rows(
+    header: list[str], rows, chinese: set[tuple[str, str]], readings: frozenset[str] | set[str] = frozenset()
+) -> list[list[str]]:
     """The rows the sample keeps, from cleared sources."""
     at = {name: i for i, name in enumerate(header)}
     kept = []
     for row in rows:
         row = list(row)
         word = row[at["word"]]
-        if len(word) > LONGEST or not any(c in word for c in WORDS):
+        homophone = row[at["language"]] == "japanese" and row[at["pronunciation"]] in readings
+        if not homophone and (len(word) > LONGEST or not any(c in word for c in WORDS)):
             continue
         language = row[at["language"]]
         if language == "chinese" and (word, row[at["definition"]]) not in chinese:
@@ -86,7 +105,7 @@ def main() -> int:
     reader = csv.reader(io.StringIO(committed(root, "output_search_index.csv")))
     header = next(reader)
     at = {name: i for i, name in enumerate(header)}
-    kept = kept_rows(header, reader, chinese)
+    kept = kept_rows(header, reader, chinese, sample_readings(repo))
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(header)

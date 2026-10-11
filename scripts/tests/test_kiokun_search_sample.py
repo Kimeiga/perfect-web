@@ -40,6 +40,22 @@ class Kept(unittest.TestCase):
         ]
         self.assertEqual(self.kept(rows), [])
 
+    def test_a_japanese_row_read_as_a_sample_reading_is_kept_for_homophones(self) -> None:
+        rows = [
+            ["水", "japanese", "water", "みず", "mizu", "1"],
+            ["見ず", "japanese", "without seeing", "みず", "mizu", "0"],
+            ["水", "chinese", "water", "みず", "shui", "0"],
+            ["물", "korean", "water", "みず", "mul", "0"],
+            ["火", "japanese", "fire", "ひ", "hi", "1"],
+        ]
+        self.assertEqual(sample.kept_rows(HEADER, rows, CLEARED, {"みず"}), rows[:2])
+
+    def test_the_word_samples_readings_are_its_japanese_words_kana(self) -> None:
+        readings = sample.sample_readings(SCRIPTS.parent)
+        self.assertIn("ひと", readings)
+        self.assertIn("がく", readings)
+        self.assertNotIn("rén", readings)
+
 
 if __name__ == "__main__":
     unittest.main()

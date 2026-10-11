@@ -220,7 +220,8 @@ fn kiokun_is_served_by_the_host_its_entries_read_from_kiokuns_files() {
             "database.read<CharGloss>",
             "database.read<PitchReading>",
             "database.read<SearchRow>",
-            "database.read<AliasSet>"
+            "database.read<AliasSet>",
+            "database.read<ReadingHit>"
         ]
     );
     assert!(s.data.operations().contains("kiokun:data/entries#read"));
@@ -1928,6 +1929,233 @@ fn search_reads_kana_variants_and_canonical_pages() {
     for w in &want {
         assert!(targets.contains(&w.as_str()), "{w} in {people:?}");
     }
+}
+
+/// The page's Homophones, as shown: each group's reading where it is shown,
+/// and its words, each with whether its chip is marked common.
+fn homophones_in(html: &str) -> Vec<(Option<String>, Vec<(String, bool)>)> {
+    let Some(at) = html.find("<section id=\"homophones\"") else {
+        return Vec::new();
+    };
+    let end = at + html[at..].find("</section>").expect("its end");
+    html[at..end]
+        .split("class=\"homophone-group\"")
+        .skip(1)
+        .map(|group| {
+            let reading = group
+                .split_once("class=\"homophone-reading\"")
+                .map(|(_, r)| {
+                    let r = &r[r.find('>').expect("its text") + 1..];
+                    r[..r.find('<').expect("its end")].to_string()
+                });
+            let words = group
+                .split("<a ")
+                .skip(1)
+                .map(|chip| {
+                    let class = chip
+                        .split_once("class=\"")
+                        .map(|(_, c)| &c[..c.find('"').expect("its end")])
+                        .unwrap_or_default();
+                    let text = &chip[chip.find('>').expect("its text") + 1..];
+                    (
+                        text[..text.find("</a>").expect("its end")].to_string(),
+                        class.split(' ').any(|c| c == "common"),
+                    )
+                })
+                .collect();
+            (reading, words)
+        })
+        .collect()
+}
+
+/// **Homophones** (`[word]/+page.svelte`, `api/lookup-reading/+server.ts`),
+/// over the repository's sample index, which holds the Japanese rows read as
+/// the word sample's readings; each answer is kiokun.com's own rules':
+/// - each of the page's readings is a group, in the readings' order, its
+///   reading shown where there are several;
+/// - a group's words are those read as it, common first, then shorter, each
+///   chip marked common where its dictionary says so, linked to its page;
+/// - the page's own forms are left out: 人's ひと has no 人;
+/// - a word read as a reading by two entries, one common and one not, is
+///   shown twice, as the endpoint's DISTINCT answers it: 色's 食;
+/// - one group shows no reading: 夢's ゆめ;
+/// - a reading with none left has no group, and a page with none has no
+///   section: 諺.
+#[test]
+fn homophones_are_each_readings_words_but_the_pages_own() {
+    let s = served_kiokun();
+    let page = |w: &str| {
+        let page = fetched(&s, &path_of(w));
+        assert!(page.starts_with("HTTP/1.1 200"), "{w}: {page}");
+        homophones_in(page.split("<script").next().unwrap_or_default())
+    };
+    let person = page("人");
+    let readings: Vec<Option<String>> = person.iter().map(|(r, _)| r.clone()).collect();
+    assert_eq!(
+        readings,
+        ["と", "ひと", "にん", "じん"]
+            .map(|r| Some(r.to_string()))
+            .to_vec()
+    );
+    let hito = &person[1].1;
+    assert_eq!(hito[0], ("一".to_string(), true), "{hito:?}");
+    assert!(hito.iter().all(|(w, _)| w != "人"), "{hito:?}");
+    let jin = &person[3].1;
+    assert_eq!(jin[0], ("仁".to_string(), true), "{jin:?}");
+    assert!(jin[1..].iter().all(|(_, common)| !common), "{jin:?}");
+    let colour = page("色");
+    let shoku = &colour[0].1;
+    assert!(shoku.contains(&("食".to_string(), true)), "{shoku:?}");
+    assert!(shoku.contains(&("食".to_string(), false)), "{shoku:?}");
+    assert_eq!(page("夢"), vec![(None, vec![("努".to_string(), false)])]);
+    assert_eq!(page("諺"), Vec::new());
+    let html = fetched(&s, &path_of("夢"));
+    assert!(
+        html.contains("<h2 id=\"homophones-heading\">Homophones</h2>"),
+        "{html}"
+    );
+    assert!(
+        html.contains(&format!("href=\"{}\"", path_of("努"))),
+        "{html}"
+    );
+    // A reading two of the page's words share is one group: an entry made
+    // for it, its two words read かみ.
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    write_entry(
+        dir.path(),
+        "上",
+        r#"{"key":"上","japanese_words":[
+            {"id":"1","kanji":[{"text":"上","tags":[],"common":true}],"kana":[{"text":"かみ","tags":[],"common":true}],"sense":[]},
+            {"id":"2","kanji":[{"text":"上","tags":[],"common":true}],"kana":[{"text":"かみ","tags":[],"common":false},{"text":"うえ","tags":[],"common":true}],"sense":[]}]}"#,
+    );
+    let shared = served_kiokun_on(dir.path());
+    let page = fetched(&shared, &path_of("上"));
+    let groups = homophones_in(page.split("<script").next().unwrap_or_default());
+    let readings: Vec<Option<String>> = groups.iter().map(|(r, _)| r.clone()).collect();
+    assert_eq!(
+        readings,
+        vec![Some("かみ".to_string()), Some("うえ".to_string())],
+        "{page}"
+    );
+}
+
+/// **The Homophones against kiokun.com's**: for each word the oracle
+/// answers, each reading's words, as a multiset of (word, common), beside
+/// kiokun.com's; and the rewrite's groups in the readings' order and each
+/// group's words common first, then shorter, as kiokun.com's statement
+/// orders them. kiokun.com shows each group when its request answers, so its
+/// groups' order is not compared (the reading index ADR's Difference), nor
+/// the order of words its statement does not order.
+fn homophones_held_to_oracle(s: &Server, oracle: &serde_json::Value) -> Vec<String> {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut differ = Vec::new();
+    for (word, groups) in answers {
+        let page = fetched(s, &path_of(word));
+        if !page.starts_with("HTTP/1.1 200") {
+            differ.push(format!(
+                "{word}: {}",
+                page.lines().next().unwrap_or_default()
+            ));
+            continue;
+        }
+        let got = homophones_in(page.split("<script").next().unwrap_or_default());
+        let want: Vec<(String, Vec<(String, bool)>)> = groups
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|g| {
+                let words = g["words"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|w| {
+                        (
+                            w["word"].as_str().unwrap_or_default().to_string(),
+                            w["is_common"].as_i64().unwrap_or(0) != 0
+                                || w["is_common"].as_bool() == Some(true),
+                        )
+                    })
+                    .collect();
+                (g["reading"].as_str().unwrap_or_default().to_string(), words)
+            })
+            .collect();
+        if got.len() != want.len() {
+            differ.push(format!(
+                "{word}: {} groups, kiokun.com {}",
+                got.len(),
+                want.len()
+            ));
+            continue;
+        }
+        for ((reading, words), (want_reading, want_words)) in got.iter().zip(&want) {
+            if want.len() > 1 && reading.as_deref() != Some(want_reading.as_str()) {
+                differ.push(format!(
+                    "{word}: a group read {reading:?}, kiokun.com's {want_reading}"
+                ));
+            }
+            let (mut a, mut b) = (words.clone(), want_words.clone());
+            a.sort();
+            b.sort();
+            if a != b {
+                differ.push(format!(
+                    "{word} {want_reading}:\n  kiokun.com: {want_words:?}\n  rewrite:    {words:?}"
+                ));
+            }
+            let ordered = words.windows(2).all(|p| {
+                let key = |(w, c): &(String, bool)| (!c, w.chars().count());
+                key(&p[0]) <= key(&p[1])
+            });
+            if !ordered {
+                differ.push(format!(
+                    "{word} {want_reading}: not common first, then shorter: {words:?}"
+                ));
+            }
+        }
+    }
+    differ
+}
+
+/// **Homophones against kiokun.com's answers for the repository's sample**
+/// (`kiokun-oracle/homophones-sample.json`, written by `just
+/// e14-kiokun-homophones` over the word sample and the index sample): what CI
+/// holds.
+#[test]
+fn homophones_match_kiokuns_answers_for_the_sample() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../kiokun-oracle/homophones-sample.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the fixture")).expect("JSON");
+    let oracle = &fixture["oracle"];
+    assert!(
+        oracle["answered"].as_u64().is_some_and(|n| n > 10),
+        "{fixture}"
+    );
+    let s = served_kiokun();
+    let differ = homophones_held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+}
+
+/// **Homophones against kiokun.com's own code** (local: `just
+/// e14-kiokun-homophones` runs its `api/lookup-reading` handler, copied from
+/// `KIOKUN_APP`'s HEAD, over kiokun-data's committed index and a sample of
+/// its entries, and names its answers in `KIOKUN_HOMOPHONES_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-homophones`"]
+fn homophones_match_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_HOMOPHONES_ORACLE").expect("KIOKUN_HOMOPHONES_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let differ = homophones_held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} words with Japanese words (stride {}, {} entries read, {} readings)",
+        oracle["answered"], oracle["stride"], oracle["read"], oracle["lookups"]
+    );
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(30) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
 }
 
 /// The value at fraction `q` of sorted `values` (nearest rank).

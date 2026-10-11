@@ -249,6 +249,42 @@ e14-kiokun-search:
     @grep -q "# fail 0" docs/evidence/E14/kiokun-search.txt
     @! grep -qE "panicked|FAILED" docs/evidence/E14/kiokun-search.txt
 
+# The word page's Homophones and the reading index (the track's step 2, the
+# reading index ADR), against kiokun.com's own `api/lookup-reading`, copied
+# from KIOKUN_APP's HEAD, over kiokun-data's committed index and every 256th
+# entry of each subdirectory; then the CI fixture over the repository's
+# samples. Local: it reads the owner's checkout.
+e14-kiokun-homophones:
+    @test -n "${KIOKUN_DATA:-}" || { echo "KIOKUN_DATA must name a kiokun-data checkout's output_dictionary"; exit 1; }
+    @test -n "${KIOKUN_APP:-}" || { echo "KIOKUN_APP must name a kiokun-data checkout's sveltekit-app"; exit 1; }
+    @test "$(df -g / | awk 'NR==2{print $4}')" -ge 8 || { echo "under 8 GiB free: not building the index"; exit 1; }
+    @mkdir -p docs/evidence/E14
+    @lib="$(mktemp -d)"; sample="$(mktemp -d)"; \
+     python3 scripts/kiokun_app_source.py "$KIOKUN_APP" "$lib" 'src/routes/api/lookup-reading/+server.ts=lookup.ts' \
+       migrations/0005_search_index_with_jyutping.sql=schema.sql > "$lib/source.txt" || exit 1; \
+     python3 scripts/kiokun_app_source.py "$KIOKUN_DATA/.." "$lib" output_search_index.csv=index.csv > "$lib/index.txt" || exit 1; \
+     cp "$lib/lookup.ts" "$lib/schema.sql" "$sample/"; \
+     cp examples/kiokun/data/search-sample.csv "$sample/index.csv"; \
+     { echo "The word page's Homophones, against kiokun.com's own api/lookup-reading"; echo; \
+       echo "produced by: just e14-kiokun-homophones (local: reads a kiokun-data checkout)"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       cat "$lib/source.txt" "$lib/index.txt"; \
+       echo "node: $(node --version)"; echo "host: $(uname -sm), $(sysctl -n hw.ncpu 2>/dev/null || nproc) cores, $(uptime | sed 's/.*load/load/')"; echo; \
+       echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/homophones.mjs)"; echo; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/homophones.mjs "$lib" "$KIOKUN_DATA" 256 "$lib/homophones.json"; \
+       echo; echo "== the rewrite's, compared"; echo; \
+       KIOKUN_HOMOPHONES_ORACLE="$lib/homophones.json" cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::homophones_match_kiokuns_own 2>&1 \
+         | grep -E '^(compared|unnamed|difference|  kiokun|  rewrite)|test result|panicked'; \
+       echo "after it: $(uptime | sed 's/.*load/load/')"; \
+       echo; echo "== the CI fixture: kiokun.com's answers over the repository's word sample and index sample"; echo; \
+       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/homophones.mjs "$sample" examples/kiokun/data/han-1char-3 1 "$sample/homophones.json"; \
+       python3 scripts/kiokun_oracle_fixture.py "$sample/homophones.json" spikes/own-renderer/kiokun-oracle/homophones-sample.json \
+         "just e14-kiokun-homophones" "$(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD)" "$(git rev-parse HEAD)" "$(node --version)"; \
+     } > docs/evidence/E14/kiokun-homophones.txt; rm -rf "$lib" "$sample"
+    @cat docs/evidence/E14/kiokun-homophones.txt
+    @grep -q "unnamed differences: 0" docs/evidence/E14/kiokun-homophones.txt
+    @! grep -qE "panicked|FAILED" docs/evidence/E14/kiokun-homophones.txt
+
 # The word page (the track's step 1), served by the development server as a
 # third program beside the store and the feed (docs/PARALLEL.md, "W6's
 # inventory, answered", Q2): `examples/kiokun-site`, its entries read by the

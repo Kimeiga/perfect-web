@@ -43,6 +43,11 @@ written here.
   ones, over that sample and its hand-made aliases: each hit's forms,
   readings and definitions from CC-CEDICT's and Unihan's definitions and
   JMdict's glosses, with the builder's romanizations.
+- **`homophones-sample.json`**: what kiokun.com's `api/lookup-reading`
+  answers, filtered as its word page filters it, for each Japanese reading of
+  the word sample's 21 entries with Japanese words, over the index sample:
+  each reading and each word, its pronunciation and its common flag, from
+  JMdict.
 
 ## The sources
 

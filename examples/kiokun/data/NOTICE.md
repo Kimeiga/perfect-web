@@ -26,10 +26,12 @@ fields named in the manifest, for 28 words.
 
 ## The search index's sample
 
-`search-sample.csv` holds 2,765 rows of kiokun-data's search index CSV
+`search-sample.csv` holds 4,375 rows of kiokun-data's search index CSV
 (`output_search_index.csv`, committed there at a47956fb), written by
 `scripts/kiokun_search_sample.py`: the rows whose word holds 人, 学 or 學 and
-is no longer than two characters, read with `git show HEAD:…`. A Chinese row
+is no longer than two characters, and the Japanese rows read as one of the
+word sample's Japanese readings (for the word page's Homophones), read with
+`git show HEAD:…`. A Chinese row
 is kept only where its definition is an item's that Dong Chinese's export
 tags `cedict` (CC-CEDICT) or `unicode` (Unihan) for that traditional form; a
 Japanese row is JMdict's. Its romanizations are the builder's. It is
