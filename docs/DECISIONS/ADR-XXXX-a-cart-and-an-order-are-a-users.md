@@ -182,6 +182,18 @@ A rule of the platform, built once the refusal ruling (ADR-0302) merged, a
   - Not held: forgotten while idle, or served by a host before this one.
     `"refused":"out-of-date"`, ADR-0302's words for a page out of date.
   - A command that names no document is answered as before.
+  - **A press the host already answered is answered from what it kept**
+    (the integrator's finding on the seam, 2026-10-11). The check ran before
+    `command_answer`, where an interaction's kept answer is read, so a retry
+    of a press that committed and whose answer was lost (ADR-0175) was
+    refused as stale if the page went stale between the two attempts: a
+    false "not committed", which ADR-0175's retry exists to prevent. Where
+    the host keeps the press's outcome, the retry is now answered from it,
+    and the rule governs only commands not yet run. The outcome is kept by
+    session, and a sign-in rotates the session, so it is looked for under
+    the session the page was shown to (the session's own where the host
+    no longer holds the page). Nothing runs and nothing waits:
+    `pw-resource`'s `command_outcome`, read-only, new here.
 - **The runtime tells it where the press was**, as ADR-0302 tells a
   refusal: the words beside the control and by the page's announcer, the
   speculation taken back, `data-pw-handler-error` `refused:another-reader`.
@@ -308,8 +320,11 @@ Recorded by `just e14-store-accounts` in
   another tab, the same page is refused 403 with the platform's words and
   nothing runs; a page the host does not hold is told it is out of date; a
   request that names no page, or page 0, runs; the new reader's own page
-  runs. In three engines (`e2e/store-accounts.spec.mjs`): refused at the
-  next press, told beside the button and by the announcer, the cart as it
+  runs; a retry of a press that committed, its answer lost, after a
+  sign-in in another tab or once the host forgot the page, is told it
+  committed and nothing runs twice. In three engines
+  (`e2e/store-accounts.spec.mjs`, the tab's subscription held so that its
+  own reload does not race the press): refused at the next press, told beside the button and by the announcer, the cart as it
   was; read again, the press runs; signed out in the other tab, refused
   again. The feed's stale tab (`e2e/identity.spec.mjs`) is told these
   words.
@@ -317,6 +332,13 @@ Recorded by `just e14-store-accounts` in
 
 ## Not claimed
 
+- **A retry after the host forgot the page and its session**: a page's
+  session is forgotten with its last document, after two minutes idle
+  (`IDLE`), and its interactions with it, so a retry that comes later than
+  that is refused as out of date though its press committed. The runtime
+  retries within seconds (twice, from one second), so the window is only a
+  retry held past two minutes. Logged for KNOWN_LIMITATIONS through the
+  packet.
 - **A host restarted** numbers its documents from 1 again, so a tab's page
   from before the restart may name a document now another session's: it is
   refused all the same, told the sign-in words where the out-of-date ones

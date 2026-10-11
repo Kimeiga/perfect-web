@@ -187,8 +187,15 @@ test("a tab whose reader signed in or out in another is refused at its next pres
   const [here, there] = [await context.newPage(), await context.newPage()];
   const words = "You signed in or out in another tab. Reload this page to go on.";
   const told = (name) => here.locator(`button[aria-label="Add ${name}"] + .pw-refusal`);
+  // The tab's subscription held from here: its next poll, from the new
+  // session, would be told to read the page again (a document the session
+  // does not hold), and that reload races the press. Held, the tab is one
+  // whose subscription has not asked yet, which is the case the rule is for.
+  const hold = () => here.route("**/stream?*", () => {});
+  const release = () => here.unroute("**/stream?*");
   // A guest's page, and the reader signs up in another tab.
   await ready(here, "/stores/47");
+  await hold();
   await signUp(there, handle(testInfo, "tab"));
   const refused = await add(here, "Espresso");
   expect(refused.status()).toBe(403);
@@ -202,10 +209,12 @@ test("a tab whose reader signed in or out in another is refused at its next pres
   );
   await expect(here.locator("#cart-count")).toHaveText("0");
   // Read again, the page is the new reader's, and the press runs.
+  await release();
   await ready(here, "/stores/47");
   expect((await add(here, "Espresso")).status()).toBe(202);
   await expect(here.locator("#cart-count")).toHaveText("1");
   // Signed out in the other tab: refused again, the cart as it was.
+  await hold();
   await there.evaluate(() => fetch("/sign-out", { method: "POST" }));
   const again = await add(here, "Cortado");
   expect(again.status()).toBe(403);
