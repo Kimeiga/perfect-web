@@ -62,6 +62,31 @@ fn limits() -> Limits {
     }
 }
 
+/// The item a press adds: a `MenuItem` as its record takes it, its fields
+/// in the order the type declares them. Until 2026-10-11 an id, the command's
+/// parameter before ADR-0178 made it the item the page showed.
+fn menu_item(i: usize) -> Val {
+    let text = |s: &str| Val::String(s.into());
+    Val::Record(vec![
+        ("id".into(), Val::String(format!("item-{i}"))),
+        ("store-id".into(), text("store_47")),
+        ("name".into(), text("Cortado")),
+        ("description".into(), text("")),
+        (
+            "price".into(),
+            Val::Record(vec![("minor-units".into(), Val::S64(450))]),
+        ),
+        ("available".into(), Val::Bool(true)),
+        (
+            "category".into(),
+            Val::Record(vec![
+                ("id".into(), text("coffee")),
+                ("name".into(), text("Coffee")),
+            ]),
+        ),
+    ])
+}
+
 fn node(grants: &[&str]) -> Topology {
     Topology {
         nodes: vec![Node {
@@ -89,18 +114,26 @@ fn the_compiled_command_through_the_host() {
     .find(|c| c.component_id == "store.page.add_to_cart")
     .expect("add_to_cart");
     let actual = engine::imports_of(&bytes).expect("imports");
-    let admission = admit(
-        &contract,
-        &node(&["database.write<Carts>", "session.read"]),
-        "origin-1",
-        &actual,
-    );
+    // The node grants what the command's contract requires, read from it:
+    // until 2026-10-11 the two it required when this was written, and the
+    // command, which reads the menu (ADR-0178) and hands the outbox its
+    // event (ADR-0246) since, was refused admission, unseen, the test being
+    // run only by `just e10-bench` and `just e8-host`.
+    let grants: Vec<String> = contract
+        .required_capabilities
+        .iter()
+        .map(Capability::name)
+        .collect();
+    let grants: Vec<&str> = grants.iter().map(String::as_str).collect();
+    let admission = admit(&contract, &node(&grants), "origin-1", &actual);
     let granted = Granted::from(&admission, &BTreeMap::new()).expect("admitted");
     let export = contract.exports[0].component.clone().expect("located");
     let cart = Val::Result(Ok(Some(Box::new(Val::Record(vec![(
         "lines".into(),
+        // A line as `CartLine` declares it, its name since ADR-0172.
         Val::List(vec![Val::Record(vec![
             ("item-id".into(), Val::String("cortado".into())),
+            ("name".into(), Val::String("Cortado".into())),
             ("quantity".into(), Val::S64(2)),
             (
                 "unit-price".into(),
@@ -111,10 +144,24 @@ fn the_compiled_command_through_the_host() {
     let add_result = cart.clone();
     let read: HostFn = Arc::new(|_| Ok(vec![Val::String("session-7".into())]));
     let add: HostFn = Arc::new(move |_| Ok(vec![add_result.clone()]));
+    let done: HostFn = Arc::new(|_| Ok(Vec::new()));
+    let available: HostFn = Arc::new(|_| Ok(vec![Val::Bool(true)]));
     let ops = BTreeMap::from([
         ("pw:host/session#read".to_string(), read),
         ("store:data/carts#add".to_string(), add.clone()),
+        ("store:data/menus#is-available".to_string(), available),
+        ("pw:host/outbox#cart-changed".to_string(), done.clone()),
+        ("pw:host/invalidations#store-page-cart".to_string(), done),
     ]);
+    // Each import the contract declares, answered here: one the benchmark
+    // does not answer is said by name rather than refused by the engine.
+    for import in &contract.imports {
+        assert!(
+            ops.contains_key(&import.key()),
+            "the benchmark answers no `{}`: add it here",
+            import.key()
+        );
+    }
 
     let started = Instant::now();
     let prepared = engine::Prepared::compile(&bytes).expect("compiles");
@@ -131,7 +178,7 @@ fn the_compiled_command_through_the_host() {
                 &limits(),
                 &ops,
                 &[&export.interface, &export.function],
-                &[Val::String(format!("item-{i}")), Val::S64(1)],
+                &[menu_item(i), Val::S64(1)],
                 |predicate, _arguments| match predicate {
                     "SignedIn" => Ok(true),
                     other => Err(format!("benchmark deployment does not define `{other}`")),
