@@ -1037,4 +1037,21 @@ Each a decision for a track, with its date; a track's ADR records it too.
   page-speculation test holds a page to its own entry (ADR-0191 amended),
   which your verify's survivor needs. Master's navigate.spec presses from
   the keyboard now (its Firefox failure, named known until then).
+- **2026-10-11, W6: kiokun.com's deinflection is GPL-3.0's, so it is out
+  for now.** kiokun.com's `deinflect.ts` is "Adapted from 10ten-ja-reader",
+  which is GPL-3.0: 241 rules, 38 reasons and their labels, and its
+  algorithm. kiokun.com uses it in its search box and in a 307 from an
+  inflected word to its dictionary form. Ruled **(c)**: deinflection is not
+  claimed, and the reading index and the Homophones section go first.
+  Nothing of the table is committed, whole, in part or transcribed.
+  **The owner's question**: may this public Apache-2.0 repository hold that
+  table under GPL-3.0 in a separate file, making its licensing mixed (a), or
+  should our own rules be written from a cited grammar reference, keeping
+  the repository Apache-2.0 alone (b)? The integrator recommends (b):
+  conjugation is grammar, the rules would be structured and labelled as our
+  own, and kiokun.com's behaviour would be an oracle whose disagreements are
+  named. Also ruled: the Homophones section is rendered on the server, its
+  groups in reading order, a Difference from kiokun.com's client-only
+  fetches, whose order is whichever answers first; the oracle compares each
+  reading's set.
 
