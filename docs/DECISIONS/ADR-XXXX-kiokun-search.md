@@ -107,8 +107,10 @@ kiokun.com in Pleris, step 2 (search).
    - over a deterministic query sample: every 8,000th row's word, its
      romanization, a Japanese row's kana, and its definition's first word.
 7. **CI holds a sample** (B5, A): `examples/kiokun/data/search-sample.csv`,
-   2,765 rows of the committed CSV whose word holds 人, 学 or 學 and is at
-   most two characters long, from cleared sources only:
+   4,375 rows of the committed CSV whose word holds 人, 学 or 學 and is at
+   most two characters long, and since the reading index ADR, the Japanese
+   rows read as one of the word sample's readings, from cleared sources
+   only:
    - a Chinese row only where a CC-CEDICT or Unihan item gives its
      definition, and a Japanese row as JMdict's;
    - written by `scripts/kiokun_search_sample.py`, read with `git show HEAD`;
@@ -116,7 +118,7 @@ kiokun.com in Pleris, step 2 (search).
      two canonical pages), since kiokun.com's aliases come from the
      builder's mapping and Dong Chinese's pairs, which stay local.
    - The fixture `search-sample.json` is kiokun.com's answers over that
-     sample: 97 sampled queries and six hand-made ones.
+     sample: 165 sampled queries (every 97th row's) and nine hand-made ones.
 
 ## Differences from kiokun.com
 
@@ -177,7 +179,7 @@ Numbered after the Contains and Appears in ADR's 24.
       inputs of Difference 27, `"` and `*` find nothing; `AND` finds what
       `and` finds; `renho-` finds 人和, read レンホー; `person, people` finds
       the three rows holding both words.
-  - `search_matches_kiokuns_answers_for_the_sample` (CI): the fixture's 111
+  - `search_matches_kiokuns_answers_for_the_sample` (CI): the fixture's 174
     queries. Nine of them, the hand cases above, are kiokun.com's 500s,
     each answered.
   - `search_matches_kiokuns_own_on_a_sample` (local, ignored).

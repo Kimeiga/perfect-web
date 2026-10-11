@@ -38,9 +38,9 @@ written here.
   items: Chinese words' forms from CC-CEDICT; Japanese words, readings,
   common flags and glosses from JMdict; Korean words and definitions from
   KRDICT. Chinese readings, Jyutping and definitions are held locally.
-- **`search-sample.json`**: what kiokun.com's `api/search` answers for 97
-  queries taken from the repository's search index sample and six hand-made
-  ones, over that sample and its hand-made aliases: each hit's forms,
+- **`search-sample.json`**: what kiokun.com's `api/search` answers for 165
+  queries taken from the repository's search index sample and nine
+  hand-made ones, over that sample and its hand-made aliases: each hit's forms,
   readings and definitions from CC-CEDICT's and Unihan's definitions and
   JMdict's glosses, with the builder's romanizations.
 - **`homophones-sample.json`**: what kiokun.com's `api/lookup-reading`
