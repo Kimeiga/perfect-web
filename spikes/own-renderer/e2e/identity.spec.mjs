@@ -67,6 +67,16 @@ async function sessionCookie(context) {
 /** What the page's announcer says, as a screen reader would hear it. */
 const announced = (page) => page.locator(".pw-announcer[role=status]");
 
+/**
+ * The page's stream held from now: what tells it of a sign-out in another
+ * tab is its next press. Its next stream request would carry the new
+ * session, whose document it is not, and load it again, signed out, which
+ * also tells the reader; which comes first is a race (found 2026-10-11 in
+ * Firefox), and a page told at once of a principal's change is W8's.
+ */
+const holdStream = (page) =>
+  page.route((url) => new URL(url).pathname === "/stream", () => {});
+
 test("a signed-out reader reads, and is given neither a composer nor a Like", async ({ page }) => {
   await home(page);
   await expect(post(page, "Hello, feed.")).toHaveCount(1);
@@ -89,6 +99,7 @@ test("a like pressed on a page whose reader signed out in another tab is refused
   const context = await browser.newContext();
   const [page, there] = [await context.newPage(), await context.newPage()];
   await signUp(page, handle(testInfo, "lee"), `Lee ${testInfo.project.name}`);
+  await holdStream(page);
   await home(there);
   await there.getByRole("button", { name: "Sign out" }).click();
   await expect(there.locator("#signed-out")).toBeVisible();
@@ -161,6 +172,7 @@ test("a tab whose reader signed out in another is told so at its next post", asy
   const context = await browser.newContext();
   const [here, there] = [await context.newPage(), await context.newPage()];
   await signUp(here, handle(testInfo, "eve"), `Eve ${testInfo.project.name}`);
+  await holdStream(here);
   await home(there);
   await there.getByRole("button", { name: "Sign out" }).click();
   await expect(there.locator("#signed-out")).toBeVisible();

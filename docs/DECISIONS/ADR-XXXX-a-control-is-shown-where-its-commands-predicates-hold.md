@@ -87,6 +87,15 @@ the page can already tell it would be refused.
    telling (the host's notification and message tests found it). Only the
    controls are guarded by the predicate; the blocks that show live values
    keep the query that decides them.
+4. **An answer was read again at each read of a document's values**, as
+   `requires` would answer it then, where this ADR holds it to the
+   document's life. The identity spec's two stale-tab tests failed in turn
+   in Firefox: after a sign-out in another tab, any change the page showed
+   re-rendered its regions with `SignedIn` false, so the controls of the
+   regions that changed went and the rest stayed, and a page of one reader's
+   data could be given another's answers. The host now answers a document
+   when it is first read and keeps that answer until the document is
+   forgotten (`a_documents_answers_are_its_own_for_its_life`, and a mutant).
 
 ## Alternatives
 

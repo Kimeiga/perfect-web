@@ -806,6 +806,10 @@ struct Server {
     /// Registered and forgotten with its parameters; a document not in it
     /// is the store's.
     pages: Mutex<BTreeMap<Doc, String>>,
+    /// **What each document's page asked of its reader, as answered when it
+    /// was first read** (ADR-XXXX): the document's for its life, as the data
+    /// it shows was read for its reader then. Forgotten with it.
+    answers: Mutex<BTreeMap<Doc, BTreeMap<String, bool>>>,
     /// **What commits dropped that other sessions may hold** (ADR-0219),
     /// with the session that committed: told once the request that
     /// committed is answered (`tell_waiting`).
@@ -1527,6 +1531,7 @@ impl Server {
             documents: std::sync::atomic::AtomicU64::new(1),
             params: Mutex::new(BTreeMap::new()),
             pages: Mutex::new(BTreeMap::new()),
+            answers: Mutex::new(BTreeMap::new()),
             telling: Mutex::new(Vec::new()),
             told: Mutex::new(BTreeMap::new()),
             words: BTreeMap::new(),
@@ -2478,6 +2483,12 @@ impl Server {
                 pages.remove(doc);
             }
         }
+        {
+            let mut answers = self.answers.lock().expect("answers");
+            for doc in &documents {
+                answers.remove(doc);
+            }
+        }
         for session in forgotten {
             self.materializer.evict(&self.cart_key(&session));
             // And the query values kept for it alone (ADR-0127): a private
@@ -3388,17 +3399,49 @@ impl Server {
             self.timers.hold(&(session.to_string(), document), until);
         }
         // **What the page asks of its reader** (ADR-XXXX): each predicate's
-        // answer for the document, as `requires` would answer it now, read
-        // by the name its template reads it by.
+        // answer for the document, as `requires` answered it when the
+        // document was first read, read by the name its template reads it
+        // by. The document's for its life, as the values it shows were read
+        // for its reader then: a reader who signs out in another tab is told
+        // at the next press (ADR-0302). Until 2026-10-11 each read answered
+        // again, as `requires` would now, so a page re-rendered after a
+        // sign-out elsewhere lost the controls of the regions that changed
+        // and kept the rest, and a page of one reader's data could be given
+        // another's answers.
         let mut out = out?;
-        for predicate in plan["predicates"]
+        let asked: Vec<&str> = plan["predicates"]
             .as_array()
             .into_iter()
             .flatten()
             .filter_map(|p| p.as_str())
-        {
-            let held = self.identity.answers(predicate, session)?;
-            out.insert(asked_name(predicate), Val::Bool(held));
+            .collect();
+        if !asked.is_empty() {
+            let kept = document.and_then(|n| {
+                let answers = self.answers.lock().expect("answers");
+                answers.get(&(session.to_string(), n)).cloned()
+            });
+            let held = match kept {
+                Some(held) => held,
+                None => {
+                    let mut held = BTreeMap::new();
+                    for predicate in &asked {
+                        held.insert(
+                            predicate.to_string(),
+                            self.identity.answers(predicate, session)?,
+                        );
+                    }
+                    if let Some(n) = document {
+                        self.answers
+                            .lock()
+                            .expect("answers")
+                            .insert((session.to_string(), n), held.clone());
+                    }
+                    held
+                }
+            };
+            for (predicate, holds) in held {
+                out.insert(asked_name(&predicate), Val::Bool(holds));
+            }
         }
         Ok(out)
     }

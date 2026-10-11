@@ -445,6 +445,42 @@ fn a_control_is_shown_where_its_commands_predicate_holds() {
     );
 }
 
+/// **What a page asked of its reader is the document's for its life**
+/// (ADR-XXXX): its values, read again after its reader signed out in another
+/// tab, answer as they did when it was first read, as the data it shows was
+/// read for that reader; a document served since is answered anew. Until
+/// 2026-10-11 each read answered again, as `requires` would then, and a page
+/// that changed after a sign-out elsewhere lost the controls of the regions
+/// that changed and kept the rest (the identity spec's two stale-tab tests,
+/// failing in turn in Firefox).
+#[test]
+fn a_documents_answers_are_its_own_for_its_life() {
+    let provider = Arc::new(TestProvider::default());
+    let s = feed_with(provider.clone());
+    let session = signed_in(&s, &provider, "s-a", "ada");
+    let html = get(&s, "/", &format!("pw-session={session}"));
+    assert!(html.contains(">Like</button>"), "{html}");
+    let doc = latest(&s.pending.lock().expect("pending"), &session);
+    let asked = |document: u64| {
+        s.bindings(&session, document).expect("read")[&asked_name("SignedIn")].clone()
+    };
+    assert_eq!(asked(doc.1), Val::Bool(true));
+    let answer = exchanged(
+        &s,
+        &format!(
+            "POST /sign-out HTTP/1.1\r\nHost: t\r\nCookie: pw-session={session}\r\n\
+             Sec-Fetch-Site: same-origin\r\ncontent-length: 0\r\n\r\n"
+        ),
+    );
+    assert!(answer.starts_with("HTTP/1.1 303"), "{answer}");
+    // Read again, as a change it shows reads it: as it was first answered.
+    assert_eq!(asked(doc.1), Val::Bool(true));
+    // A document served since is answered anew.
+    let (fresh, _) = set_cookie(&answer, "pw-session").expect("a new session");
+    let out = get(&s, "/", &format!("pw-session={fresh}"));
+    assert!(!out.contains(">Like</button>"), "{out}");
+}
+
 /// The host reads an answer by the name the compiler gives it (ADR-XXXX).
 #[test]
 fn an_answer_is_read_by_the_compilers_name_for_it() {

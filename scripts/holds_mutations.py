@@ -167,15 +167,22 @@ MUTANTS = [
         "the host gives no answer",
         "host",
         SERVER,
-        "            out.insert(asked_name(predicate), Val::Bool(held));\n",
-        "            let _ = held;\n",
+        "                out.insert(asked_name(&predicate), Val::Bool(holds));\n",
+        "                let _ = (predicate, holds);\n",
+    ),
+    (
+        "a document's answers are read again at each read",
+        "host",
+        SERVER,
+        "                answers.get(&(session.to_string(), n)).cloned()\n",
+        "                answers.get(&(session.to_string(), n)).cloned().filter(|_| false)\n",
     ),
     (
         "an answer is always true",
         "host",
         SERVER,
-        "            let held = self.identity.answers(predicate, session)?;\n",
-        "            let held = { let _ = self.identity.answers(predicate, session)?; true };\n",
+        "                            self.identity.answers(predicate, session)?,\n",
+        "                            { let _ = self.identity.answers(predicate, session)?; true },\n",
     ),
     (
         "the document does not carry the answer",
@@ -198,6 +205,7 @@ CARGO = {
     "host": [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
         "a_control_is_shown_where_its_commands_predicate_holds",
+        "a_documents_answers_are_its_own_for_its_life",
     ],
 }
 SPECS = [
