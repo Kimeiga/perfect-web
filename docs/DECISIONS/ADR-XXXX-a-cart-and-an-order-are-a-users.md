@@ -396,7 +396,10 @@ Recorded by `just e14-store-accounts` in
   Chromium), and milestone 2's 12 ("a delivery goes to the reader's chosen
   address"). Each mutant now runs its own suite (server, core or browser),
   as `refusal_mutations.py` does under W6's ruling. Before that, every
-  mutant ran every command, and CI took 1 h 51 min over 29 mutants. Its first run left one
+  mutant ran every command, and CI took 1 h 51 min over 29 mutants. Two
+  mutants since, for the kept answer (six and eight of the stale tab's),
+  each killed here by the retry's test; the script's 37 are recorded whole
+  by CI's verification (ADR-0281), not again here. Its first run left one
   survivor, "a signed-in session that signs in again is joined to the next
   user": on the canonical store a signed-in session's guest owner holds
   nothing once the sign-in closes it, so nothing moved. It is killed now by a
