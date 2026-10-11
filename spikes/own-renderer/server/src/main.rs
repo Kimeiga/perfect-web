@@ -2677,6 +2677,46 @@ impl Server {
         }
     }
 
+    /// **What the host kept for a press made on `document`** (track
+    /// `store-accounts`, the integrator's finding): its interaction's
+    /// outcome, kept under the session the page was shown to (the
+    /// session's own where the host no longer holds the page), with the
+    /// arguments it was first sent with. Nothing runs, and nothing waits: a
+    /// press still running, or none kept, is `None`.
+    fn kept_answer(
+        &self,
+        session: &str,
+        document: u64,
+        component_id: &str,
+        json: &[serde_json::Value],
+        interaction: Option<&str>,
+    ) -> Option<Answered> {
+        let id = interaction?;
+        let shown_to = self
+            .pages
+            .lock()
+            .expect("pages")
+            .keys()
+            .find(|(_, n)| *n == document)
+            .map(|(shown_to, _)| shown_to.clone())
+            .unwrap_or_else(|| session.to_string());
+        let key = format!("{shown_to}\u{1f}{component_id}\u{1f}{id}");
+        let sent = serde_json::Value::Array(json.to_vec()).to_string();
+        let first_sent = self
+            .interactions
+            .lock()
+            .expect("interactions")
+            .get(&shown_to)?
+            .iter()
+            .any(|(k, first)| *k == key && *first == sent);
+        if !first_sent {
+            return None;
+        }
+        self.commands
+            .command_outcome(&key)
+            .map(|kept| Answered::from_kept(&kept))
+    }
+
     /// `pw-resource`'s clock, brought to wall time (ADR-0127).
     /// **The host's wall clock** (ADR-0304), in milliseconds since the
     /// epoch: the system's at start, moved since as the query clock is, by
@@ -7211,6 +7251,11 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             // the command runs, in the platform's words, as a `requires`
             // refusal is told (ADR-0302). A command from no page names none
             // and is answered as before.
+            // **A press the host already answered is answered from what it
+            // kept** (the integrator's finding of 2026-10-11): a retry of a
+            // press whose answer was lost after it committed (ADR-0175) is
+            // told it committed, though the page went stale between the two
+            // attempts. The rule governs only commands not yet run.
             let document = headers.lines().find_map(|l| {
                 let (k, v) = l.split_once(':')?;
                 k.trim()
@@ -7218,16 +7263,22 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                     .then(|| v.trim().parse::<u64>().ok())
                     .flatten()
             });
-            if let Some((refused, words)) =
-                document.and_then(|document| server.stale_document(&session, document))
-            {
-                let refused = serde_json::json!({
-                    "committed": false,
-                    "refused": refused,
-                    "says": words,
-                });
-                respond_json(&mut stream, 403, &session, fresh, &refused.to_string());
-                return;
+            let mut kept = None;
+            if let Some((document, (refused, words))) = document.and_then(|document| {
+                server
+                    .stale_document(&session, document)
+                    .map(|why| (document, why))
+            }) {
+                kept = server.kept_answer(&session, document, id, &args, interaction.as_deref());
+                if kept.is_none() {
+                    let refused = serde_json::json!({
+                        "committed": false,
+                        "refused": refused,
+                        "says": words,
+                    });
+                    respond_json(&mut stream, 403, &session, fresh, &refused.to_string());
+                    return;
+                }
             }
             // Charter §15.5's one-shot network error (ADR-0175): the
             // connection closed with no answer, before the command runs, or
@@ -7240,7 +7291,10 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             // own case, 403 and the predicate, never shaped like a declared
             // error. Taken before the command, so none is left from another.
             let _ = identity::take_refusal();
-            let answer = server.command_answer(id, &session, &args, interaction.as_deref());
+            let answer = match kept {
+                Some(kept) => Ok(kept),
+                None => server.command_answer(id, &session, &args, interaction.as_deref()),
+            };
             if drop_at == Some(DropAt::After) {
                 return;
             }

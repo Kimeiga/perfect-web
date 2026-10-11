@@ -156,7 +156,16 @@ MUTANTS = [
             "            <p id=\"store-description\">{store.description}</p>\n", ""
         )
         .replace("            <p id=\"menu-line\">{summary}</p>\n", "")
-        .replace("                                    <p>{item.description}</p>\n", ""),
+        .replace("                                    <p>{item.description}</p>\n", "")
+        # And where deliveries go (track store-accounts), which says more of
+        # the store too: without it the store says as little as it did.
+        .replace(
+            "            <p id=\"deliver-to\">\n"
+            "                {#if reach.chosen}Delivering to {reach.to}{:else}No delivery address yet{/if}\n"
+            "                <a id=\"change-address\" href=\"/stores/{id}/address\">Change the address</a>\n"
+            "            </p>\n",
+            "",
+        ),
     ),
 ]
 

@@ -837,6 +837,19 @@ impl<V: Clone> Resources<V> {
         finished
     }
 
+    /// **A finished command's kept outcome**, read without running or
+    /// waiting for anything: `None` where the key has none, where its
+    /// command is still running, or where its outcome is unknown. A host
+    /// reads it to answer a retry it would not run again (track
+    /// `store-accounts`).
+    pub fn command_outcome(&self, idempotency_key: &str) -> Option<String> {
+        let st = self.state.lock().expect("state");
+        match st.applied.get(idempotency_key)?.get() {
+            Some(Ok(value)) => Some(value),
+            _ => None,
+        }
+    }
+
     /// How many command outcomes are held: what a host bounds.
     pub fn commands_held(&self) -> usize {
         self.state.lock().expect("state").applied.len()

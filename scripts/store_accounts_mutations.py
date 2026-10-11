@@ -33,8 +33,9 @@ Each mutant undoes one piece:
 - milestone 1's rest, the stale tab (Q3): the host reading no document a
   command names; a page shown to another session, or one the host no
   longer holds, answered; a request from no numbered page refused; the
-  predicate's words told for the platform's; and the runtime naming no
-  document.
+  predicate's words told for the platform's; a retry of a press that
+  committed refused as stale, or its kept answer looked for under the
+  retry's session; and the runtime naming no document.
 
 Each mutant names its suite, and runs that suite's tests alone (W6's ruling
 of 2026-10-09, as `refusal_mutations.py` does): `server`, the store's
@@ -362,6 +363,20 @@ MUTANTS = [
         SERVER,
         '    "You signed in or out in another tab. Reload this page to go on.",\n',
         '    "Sign in to do this.",\n',
+    ),
+    (
+        "a retry of a press that committed is refused as stale",
+        "server",
+        SERVER,
+        "                kept = server.kept_answer(&session, document, id, &args, interaction.as_deref());\n",
+        "                kept = None;\n",
+    ),
+    (
+        "a press's kept answer is looked for under the session the retry came from",
+        "server",
+        SERVER,
+        "            .map(|(shown_to, _)| shown_to.clone())\n",
+        "            .map(|_| session.to_string())\n",
     ),
     (
         "the runtime names no document",

@@ -464,3 +464,74 @@ fn a_command_is_answered_for_the_reader_its_page_was_shown_to() {
     let answer = pressed_on(&s, &ada, Some(hers), "i-6");
     assert!(answer.contains("\"committed\":true"), "{answer}");
 }
+
+/// **A press the host already answered is answered from what it kept,
+/// though its page went stale between the two attempts** (the integrator's
+/// finding of 2026-10-11): its answer lost after it committed (ADR-0175),
+/// the reader signs in in another tab, and the retry, from the new session
+/// and the same interaction, is told it committed; nothing runs twice. The
+/// same where the host has since forgotten the page. A press the host never
+/// answered is still refused.
+#[test]
+fn a_retry_of_a_press_that_committed_is_answered_from_what_was_kept() {
+    let provider = Arc::new(TestProvider::default());
+    let s = store_with(provider.clone());
+    let drop_after = |session: &str| {
+        s.connection_faults
+            .lock()
+            .expect("connection faults")
+            .entry(session.to_string())
+            .or_default()
+            .drop_command = Some(DropAt::After);
+    };
+    s.serve_document_settled(
+        "came-ada",
+        "store.page.StorePage",
+        &store_params(STORE_ID),
+        &[],
+    )
+    .expect("served");
+    let guests = latest(&s.pending.lock().expect("pending"), "came-ada").1;
+    drop_after("came-ada");
+    assert_eq!(
+        pressed_on(&s, "came-ada", Some(guests), "i-1"),
+        "",
+        "the answer is lost"
+    );
+    // Signed in in another tab before the retry: the guest's line joins.
+    let ada = signed_in(&s, &provider, "came-ada", "ada");
+    assert_eq!(s.cart_lines(&ada), [("cortado".to_string(), 1)]);
+    let retried = pressed_on(&s, &ada, Some(guests), "i-1");
+    assert!(
+        retried.starts_with("HTTP/1.1 202") && retried.contains("\"committed\":true"),
+        "the retry is told it committed: {retried}"
+    );
+    assert_eq!(
+        s.cart_lines(&ada),
+        [("cortado".to_string(), 1)],
+        "and nothing ran again"
+    );
+    // A press on that page the host never answered is refused.
+    let fresh = pressed_on(&s, &ada, Some(guests), "i-2");
+    assert!(fresh.starts_with("HTTP/1.1 403"), "{fresh}");
+
+    // Ada's own page, its answer lost, then forgotten by the host.
+    s.serve_document_settled(&ada, "store.page.StorePage", &store_params(STORE_ID), &[])
+        .expect("served");
+    let doc = latest(&s.pending.lock().expect("pending"), &ada);
+    drop_after(&ada);
+    assert_eq!(pressed_on(&s, &ada, Some(doc.1), "i-3"), "");
+    assert_eq!(s.cart_lines(&ada), [("cortado".to_string(), 2)]);
+    s.pages.lock().expect("pages").remove(&doc);
+    let retried = pressed_on(&s, &ada, Some(doc.1), "i-3");
+    assert!(
+        retried.starts_with("HTTP/1.1 202") && retried.contains("\"committed\":true"),
+        "the retry is told it committed: {retried}"
+    );
+    assert_eq!(s.cart_lines(&ada), [("cortado".to_string(), 2)], "once");
+    let fresh = pressed_on(&s, &ada, Some(doc.1), "i-4");
+    assert!(
+        fresh.contains("\"refused\":\"out-of-date\""),
+        "a press never answered is refused: {fresh}"
+    );
+}
