@@ -112,7 +112,9 @@ Numbered after the search ADR's 30.
 - **The scripts' tests**: the index sample keeps a Japanese row read as a
   sample reading, and not a Chinese or Korean one; the sample's readings are
   its Japanese words' kana.
-- **The oracle** (`just e14-kiokun-homophones`, local): RESULT.
+- **The oracle** (`just e14-kiokun-homophones`, local): every 256th entry
+  of each subdirectory, 5,938 read, 1,082 with Japanese words, 1,318
+  readings looked up: 0 unnamed differences over the whole index.
 - **Mutation controls**: seven in `scripts/kiokun_word_mutations.py`, suite
   `homophones` (the own forms kept, a shared reading asked twice, one group's
   reading shown, every chip common, an empty group, a smaller limit, the
