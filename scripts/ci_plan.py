@@ -110,6 +110,7 @@ NEEDS_DATABASE = {
     "e14-notifications",
     "e14-messages",
     "e14-store-postgres",
+    "e14-store-search",
 }
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
