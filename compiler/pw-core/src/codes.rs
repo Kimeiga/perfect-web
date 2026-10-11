@@ -109,6 +109,9 @@ pub enum Owner {
     /// ADR-0253: the kiokun track's codes, PW60xx: kiokun.com, the owner's
     /// dictionary, rewritten in Pleris (docs/PARALLEL.md, W6's plan).
     Kiokun,
+    /// ADR-0253: the store-search track's codes, PW63xx: the DoorDash
+    /// store's customer search (docs/PARALLEL.md, W9). None registered yet.
+    StoreSearch,
 }
 
 impl fmt::Display for Code {
@@ -894,6 +897,7 @@ impl Owner {
             Owner::Messages => "PW58",
             Owner::StorePg => "PW59",
             Owner::Kiokun => "PW60",
+            Owner::StoreSearch => "PW63",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -957,6 +961,7 @@ mod tests {
                 (Owner::Messages, "PW58"),
                 (Owner::StorePg, "PW59"),
                 (Owner::Kiokun, "PW60"),
+                (Owner::StoreSearch, "PW63"),
             ] {
                 assert!(
                     !c.id.starts_with(block) || c.owner == owner,

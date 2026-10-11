@@ -341,10 +341,21 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             .map(|d| d.split('`').nth(1).expect("named"))
             .collect()
     };
-    // Each query but `Recommendations`, which asks `eventual`.
+    // Each query but `Recommendations`, which asks `eventual`; the search
+    // (track `store-search`) once for each of the two it reads, the stores
+    // and their menus.
     assert_eq!(
         named("PW0344"),
-        ["Menu", "Store", "StoreList", "Cart", "Estimate", "Order"]
+        [
+            "Menu",
+            "Store",
+            "StoreList",
+            "Cart",
+            "Estimate",
+            "Order",
+            "Search",
+            "Search"
+        ]
     );
     // The commands that ask a serializable transaction.
     assert_eq!(
@@ -363,5 +374,5 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     ];
     assert_eq!(named("PW0347"), commands);
     assert_eq!(named("PW0348"), commands);
-    assert_eq!(found.len(), 21, "{found:#?}");
+    assert_eq!(found.len(), 23, "{found:#?}");
 }

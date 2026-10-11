@@ -235,3 +235,15 @@ store.page.remove_from_cart  abi e413a06821dd64ec
   exports   command remove_from_cart
   requires  SignedIn
 
+store.search.Search  abi d7e577e092fd4d47
+  runs at   origin
+  needs     database.read<Menus>
+  needs     database.read<Stores>
+  host      store:data/search#find  (database.read<Stores>)
+  exports   query Search
+
+store.search.SearchPage  abi 99aebc4fbc66d85e
+  runs at   origin
+  component pw:app/store.search.Search#Search
+  exports   page SearchPage
+

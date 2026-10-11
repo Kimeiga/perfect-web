@@ -96,6 +96,8 @@ fn the_store_builds_every_artifact_from_source() {
             // The cart, placed as an order (ADR-0193).
             "store.page.place_order",
             "store.page.remove_from_cart",
+            // The search (track `store-search`).
+            "store.search.Search",
         ],
         "every command, query and materialization the page reaches, compiled and audited"
     );
@@ -131,8 +133,9 @@ fn the_store_builds_every_artifact_from_source() {
 
     assert_eq!(
         b.templates.len(),
-        4,
-        "StorePage, CartPage (ADR-0190), HomePage (ADR-0192) and OrderPage (ADR-0193)"
+        5,
+        "StorePage, CartPage (ADR-0190), HomePage (ADR-0192), OrderPage (ADR-0193) \
+         and SearchPage (track `store-search`)"
     );
     assert_eq!(
         b.handlers.len(),

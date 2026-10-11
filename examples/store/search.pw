@@ -1,0 +1,203 @@
+// @corpus: fixture
+// @id: E14-store-search
+// @category: the store's search — the stores and their dishes, matched in
+//            the store's data layer
+// @charter: §15.1, §7.5
+// @milestone: E14
+//
+// Track `store-search` (docs/PARALLEL.md, W9). A reader searches the stores
+// and their menus by text, and the search page lists the stores that match
+// and the dishes that match, each dish under its store, linked to it.
+//
+// The match runs in the store's data layer, as its operation (as kiokun's
+// search runs in kiokun's): in memory, and on PostgreSQL, where `LIKE`
+// matches each term with its `%`, `_` and `\` escaped and every value bound.
+// Both layers hold one meaning, and the ADR states it:
+// - case is ignored, by each character's Unicode simple lowercase;
+// - a store matches where every term is part of its name, its description
+//   or its cuisine; a dish, where every term is part of its name, its
+//   description or its category;
+// - a store is listed where it matches or any of its dishes does;
+// - stores rank by where their terms were found, then by name, then id;
+//   a store's dishes likewise.
+//
+// The catalog is public, so the search is public and kept `shared`, keyed by
+// its text. The page is shown in `StoreLayout`, which shows the reader's
+// cart, so the page is the session's.
+
+module store.search
+
+import List
+// The data the search reads: the stores, and their menus.
+import Stores
+import Menus
+import domain.{ StoreId, MenuItemId, Money, USD }
+import Events.{ MenuChanged, InventoryChanged }
+import store.page.{ StoreLayout }
+
+// **A dish that matched**, as the search shows it: its store's page is
+// where it is ordered.
+type DishHit = DishHit {
+    id: MenuItemId,
+    name: String,
+    description: String,
+    category: String,
+    price: Money<USD>,
+}
+
+// **A store that matched**, or whose dishes did, and the dishes of it that
+// matched, the first five, with how many more.
+type StoreHit = StoreHit {
+    id: StoreId,
+    name: String,
+    description: String,
+    cuisine: String,
+    dishes: List<DishHit>,
+    more_dishes: Int,
+}
+
+// **What a search found**: the stores, the first twenty, with how many more.
+type SearchFound = SearchFound {
+    stores: List<StoreHit>,
+    more_stores: Int,
+}
+
+// **What the data layer refuses to search**: text with no term in it, and
+// text longer than 100 characters.
+type SearchError =
+    | Blank
+    | TooLong
+
+// **The store's search, in its data layer** (`store:data/search#find`).
+fn find(text: String) -> Result<SearchFound, SearchError> !{ database.read<Stores>, database.read<Menus> }
+    host "store:data/search#find"
+
+// **A store as the page shows it**: its dishes, and how many more there
+// are, in words.
+type ShownStore = ShownStore {
+    id: StoreId,
+    name: String,
+    description: String,
+    cuisine: String,
+    dishes: List<DishHit>,
+    more: String,
+}
+
+// **What the page says of a search**: what was asked, a sentence for what
+// was found or why nothing was, the stores, and how many more, in words.
+type SearchShown = SearchShown {
+    asked: String,
+    said: String,
+    stores: List<ShownStore>,
+    more: String,
+}
+
+fn shown(asked: String, answer: Result<SearchFound, SearchError>) -> SearchShown {
+    let none: List<ShownStore> = []
+    match answer {
+        Ok(found) => SearchShown {
+            asked: asked,
+            said: summary(asked, found),
+            stores: List.map(found.stores, s => shown_store(s)),
+            more: more(found.more_stores, "store", "stores"),
+        },
+        Err(SearchError.Blank) => SearchShown { asked: asked, said: "Type a store, a dish or a cuisine to search for.", stores: none, more: "" },
+        Err(SearchError.TooLong) => SearchShown { asked: asked, said: "That search is too long: 100 characters at most.", stores: none, more: "" },
+    }
+}
+
+fn shown_store(s: StoreHit) -> ShownStore {
+    ShownStore {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        cuisine: s.cuisine,
+        dishes: s.dishes,
+        more: more(s.more_dishes, "dish", "dishes"),
+    }
+}
+
+fn summary(asked: String, found: SearchFound) -> String {
+    let n = List.length(found.stores) + found.more_stores
+    if n == 0 {
+        "No stores or dishes match “{asked}”."
+    } else if n == 1 {
+        "1 store matches “{asked}”."
+    } else {
+        "{n} stores match “{asked}”."
+    }
+}
+
+// **A search** (track `store-search`): every reader's, so kept shared and
+// keyed by its text, and dropped when any store's menu or stock changes.
+public query Search(q: String) -> SearchShown
+    freshness      30.seconds
+    consistency    snapshot
+    cache          shared
+    key            q
+    invalidates_on MenuChanged(_), InventoryChanged(_, _)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    // The host call is in the query's own body: a call reached only
+    // through a helper is not among the component's imports.
+    let answer = find(q)
+    shown(q, answer)
+}
+
+// **"5 more dishes"**, or nothing where there are none.
+fn more(n: Int, one: String, many: String) -> String !{} {
+    if n == 0 {
+        ""
+    } else if n == 1 {
+        "1 more {one}"
+    } else {
+        "{n} more {many}"
+    }
+}
+
+// **The search page** (track `store-search`). TEMPORARY: its address is
+// `/search/{q}`, and it has no search box, until a route reads its query
+// part (docs/PARALLEL.md, 2026-10-11); then `/search{?q}` and a plain
+// `<form method="get" action="/search">`, and `q` stays its parameter.
+session page SearchPage(q: String) {
+    route     "/search/{q}"
+    layout    StoreLayout
+    placement origin
+    cache     private
+
+    let search = query Search(q)
+
+    view {
+        <title>Search: {search.asked}</title>
+        <meta name="robots" content="noindex, follow" />
+        <main>
+            <h1>Search</h1>
+            <p id="search-said" role="status">{search.said}</p>
+            <ul id="search-stores">
+                {#each search.stores as store (store.id)}
+                    <li>
+                        <h2><a href="/stores/{store.id}">{store.name}</a></h2>
+                        <p class="cuisine">{store.cuisine}</p>
+                        <p>{store.description}</p>
+                        {#if store.dishes}
+                            <ul aria-label="Dishes at {store.name}">
+                                {#each store.dishes as dish (dish.id)}
+                                    <li>
+                                        <a href="/stores/{store.id}">{dish.name}</a>
+                                        <span class="category">{dish.category}</span>
+                                        <p>{dish.description}</p>
+                                        <p>{dish.price.display}</p>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                        {#if store.more}<p>{store.more}</p>{/if}
+                    </li>
+                {/each}
+            </ul>
+            {#if search.more}<p id="search-more">{search.more}</p>{/if}
+        </main>
+    }
+}

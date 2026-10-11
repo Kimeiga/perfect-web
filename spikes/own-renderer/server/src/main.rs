@@ -679,6 +679,8 @@ mod kiokun;
 mod clock;
 // ADR-0305: a page's commands run in the order it sent them.
 mod order;
+// TRACK SEAM (store-search): the store's search, in its data layer (W9).
+mod search;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -12293,6 +12295,9 @@ public query Store(",
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
     mod kiokun;
+
+    // TRACK SEAM (store-search): the store's search page, served (W9).
+    mod store_search;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent

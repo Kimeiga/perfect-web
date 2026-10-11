@@ -2922,5 +2922,119 @@
         }
       }
     ]
+  },
+  {
+    "component_id": "store.search.Search",
+    "capability_mapping": 1,
+    "abi_schema": "d7e577e092fd4d47",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Menus"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/search",
+        "name": "find",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Menus"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "primitive": "String"
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.search.SearchFound"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "store.search.SearchError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "Search",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-search-search-api@0.1.0",
+          "function": "search"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.search.SearchPage",
+    "capability_mapping": 1,
+    "abi_schema": "99aebc4fbc66d85e",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.search.Search",
+        "name": "Search",
+        "owner": "external",
+        "kind": "component"
+      }
+    ],
+    "exports": [
+      {
+        "name": "SearchPage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-search-search-page-api@0.1.0",
+          "function": "search-page"
+        }
+      }
+    ]
   }
 ]
