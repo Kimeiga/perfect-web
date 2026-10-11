@@ -198,6 +198,14 @@ A rule of the platform, built once the refusal ruling (ADR-0302) merged, a
   refusal: the words beside the control and by the page's announcer, the
   speculation taken back, `data-pw-handler-error` `refused:another-reader`.
   The press is not replayed; read again, the page is the new reader's.
+- **After a soft navigation** (ADR-0306) the page shown is handed to a
+  runtime of its own, whose `pw-document` names that page's document, so a
+  press on it runs (the integrator's review, point 1; a browser test).
+- **At the command route, in the integrator's order** (with ADR-0305's
+  order): a held interaction's answer first, then the stale check, then
+  the order's wait, then the command. A stale press is refused at once,
+  not held for the command before it; one answered from what was kept, or
+  refused, is marked as arrived, so what follows it is not held either.
 
 The words are the platform's, not a predicate's: no program declares this
 rule, so no program can forget it. The feed's tab whose reader signed out
@@ -343,9 +351,6 @@ Recorded by `just e14-store-accounts` in
   from before the restart may name a document now another session's: it is
   refused all the same, told the sign-in words where the out-of-date ones
   are meant.
-- **Soft navigation**: a page swapped in without a document load would
-  name the document it replaced; the rule holds while every page is a
-  document, and is the soft navigation's to carry.
 - **Telling by principal for a key that is not the reader's handle**: a
   private entry keyed by a user's id the binding does not fill with
   `current_user()` reaches every reader of it, as before.
@@ -456,4 +461,11 @@ Recorded by `just e14-store-accounts` in
   `command_retry_mutations.py`'s runtime mutant, re-anchored on the headers
   now on lines of their own. The store's `StoreLayout` is a `user` layout
   that reads `Cart(current_user())`.
+- `origin/master` merged at `7b9984b4` (soft navigation ADR-0306, command
+  order ADR-0305): the command route in the integrator's order (6), the
+  runtime's `pw-after` beside `pw-document`, and `command_order`'s wait
+  mutant re-anchored. **Two identity.spec tests are told the platform's
+  words**: "a tab whose reader signed out in another is told so at its next
+  post" now, and track/holds' "a like pressed on a page whose reader signed
+  out in another tab is refused where it was pressed" once it merges.
 - **The four status documents are untouched.**

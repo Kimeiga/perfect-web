@@ -116,10 +116,11 @@ then `navigate StorePage(id)`). The label is checked by `address_label`
 before the command: a label outside 1 to 40 is told on the page and sends
 nothing.
 
-The navigation is a document load today; the store's page is served with the
-new address's estimate already in it, because `Estimate` is kept for no time
-and keyed by the reader. The header's remount assertion waits for soft
-navigation (track/layouts).
+Since soft navigation (ADR-0306) the navigation loads no document: the
+store's page is shown in the layout kept, its header not mounted again,
+and read after the commit before it, with the new address's estimate in it,
+because `Estimate` is kept for no time and keyed by the reader. Before
+soft navigation merged it was one document load, and the test said so.
 
 ## Questions to the integrator, and its answers
 
@@ -204,7 +205,8 @@ Recorded by `just e14-store-accounts` in
   WebKit, development accounts): milestone 3, an address saved goes back to
   the store, whose estimate is the new address's as served (Union Square to
   Dolores Park, 3.58 km: "Delivery in 40 to 50 min"), the URL without a
-  search, and one load of the store's document; a store out of reach says so
+  search, no load of the store's document, and the layout's header and the
+  window kept (ADR-0306); a store out of reach says so
   and refuses its Add; an address chosen goes back to the store, its
   estimate the chosen one's.
 - **`pw-conformance`'s oracle**: `add_to_cart`'s reference reads the reach
@@ -217,7 +219,6 @@ Recorded by `just e14-store-accounts` in
   coordinates, no address outside them.
 - **A courier's minutes are a stated model**, four a kilometre in a straight
   line; no road, no traffic.
-- **The header's remount assertion**: when soft navigation lands.
 - **An address's label is not checked for meaning**, only its length.
 
 ## Report
