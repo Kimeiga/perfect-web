@@ -11,6 +11,14 @@
 #      proves the harness can see a disagreement at all;
 #   C. a deliberately ill-typed term must be REJECTED by Koka, which proves the
 #      acceptance above is Koka type-checking rather than Koka shrugging.
+# And one positive control, because a run that cannot AGREE measures nothing
+# either:
+#   A. a well-typed module with a function and no `main` must be ACCEPTED.
+#      Until 2026-10-11 every module was compiled as a program (`koka -c`),
+#      whose `main` a module of the corpus never has: no module could agree,
+#      the first to reach Koka (A-032) was counted a disagreement, and every
+#      nightly verify since it landed failed this recipe. A module is now
+#      checked as a library (`koka -l`).
 #
 # ADR-0015 governs what the generated subset is. A file whose emitted module has
 # no function bodies is NOT in the common subset and is counted as skipped
@@ -32,9 +40,10 @@ disagreed=0
 declare -a DISAGREEMENTS=()
 declare -a SKIPPED=()
 
-# Compile one Koka module, discarding output. Returns 0 when Koka accepts.
+# Compile one Koka module as a library, discarding output. Returns 0 when Koka
+# accepts. A library: a program's `main` is not the module's to have.
 koka_accepts() {
-    koka -c --outputdir="$BUILD/out" "$1" >"$BUILD/koka.log" 2>&1
+    koka -l --outputdir="$BUILD/out" "$1" >"$BUILD/koka.log" 2>&1
 }
 
 for src in "$REPO_ROOT"/examples/accepted/*.pw; do
@@ -88,6 +97,15 @@ done
 
 # --- the controls ------------------------------------------------------------
 
+control_a="$BUILD/control_a.kk"
+cat > "$control_a" <<'KK'
+module control_a
+
+pub fun tone( likes : int ) : total string
+  if likes > 0 then "liked" else "quiet"
+KK
+if koka_accepts "$control_a"; then control_a_result="pass"; else control_a_result="FAIL (Koka refused it)"; fi
+
 control_b="$BUILD/control_b.kk"
 cat > "$control_b" <<'KK'
 module control_b
@@ -120,6 +138,7 @@ if koka_accepts "$control_c"; then control_c_result="FAIL (Koka accepted it)"; e
     echo "E9 gate item 2 — differential agreement with Koka"
     echo
     echo "produced by: just e9-parity"
+    echo "commit: $(git -C "$REPO_ROOT" rev-parse HEAD)$(git -C "$REPO_ROOT" diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"
     echo "koka: $(koka --version | head -1)"
     echo
     echo "Every accepted corpus file that lowers to the pure subset (ADR-0015),"
@@ -137,7 +156,8 @@ if koka_accepts "$control_c"; then control_c_result="FAIL (Koka accepted it)"; e
     echo "SKIPPED — counted as skipped, never as agreement. Silence is not parity:"
     printf '  %s\n' "${SKIPPED[@]}"
     echo
-    echo "CONTROLS — a run that cannot fail measures nothing"
+    echo "CONTROLS — a run that cannot fail, or cannot agree, measures nothing"
+    echo "  A. a well-typed module with no \`main\` is accepted by Koka:   $control_a_result"
     echo "  B. non-exhaustive match under \`total\` is rejected by Koka: $control_b_result"
     echo "  C. ill-typed term is rejected by Koka:                      $control_c_result"
     echo
@@ -156,6 +176,7 @@ cat "$EVIDENCE/koka-parity.txt"
 
 # A disagreement, or a control that did not fire, is a failure of the gate item.
 [ "$disagreed" -eq 0 ] || exit 1
+[ "$control_a_result" = "pass" ] || exit 1
 [ "$control_b_result" = "pass" ] || exit 1
 [ "$control_c_result" = "pass" ] || exit 1
 # **Not an error, and this is the finding.** The common subset is currently

@@ -10283,11 +10283,32 @@ public query Store(",
             delay_ms: 1_000,
         };
         let (_, a) = s.serve_document("a");
+        // Each read that joined another's flight, as the query runtime traces it.
+        let joined = || {
+            s.queries
+                .trace()
+                .iter()
+                .filter(|t| matches!(t, pw_resource::Trace::RequestDeduplicated { .. }))
+                .count()
+        };
+        let before = joined();
         std::thread::scope(|scope| {
             let hot = scope.spawn(|| s.read_keyed("a", "browsing", 1, a, &category("hot"), STAYED));
             std::thread::sleep(std::time::Duration::from_millis(100));
             let command = scope.spawn(|| s.command(ADD, "b", &add("espresso", 1), false));
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            // Until `b`'s read has joined `a`'s flight, whichever began it.
+            // Until 2026-10-11 the test waited 100 ms for it, and on a loaded
+            // runner `a` moved on first: the flight was stopped with nobody
+            // else holding it, which is what it should do then (the nightly
+            // of 2026-10-11, e14-last-known-good's baseline).
+            let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            while joined() == before {
+                assert!(
+                    std::time::Instant::now() < until,
+                    "`b`'s read never joined the flight"
+                );
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
             assert_eq!(
                 s.read_keyed("a", "browsing", 2, a, &category("cold"), STAYED),
                 Ok(KeyOutcome::Applied)
@@ -15110,12 +15131,20 @@ public query Store(",
                 && matches!(&p.operation, PatchOp::ReplaceText { text } if text == "2")),
             "{to_cart:?}"
         );
-        // And the speculated value to each, as each speculates (ADR-0191).
+        // And the speculated value to each, as each speculates (ADR-0191):
+        // at the cart's own entry, the one its patches are derived from.
+        // Since ADR-0303 each page speculates on its layout's binding of the
+        // cart too, sent at an entry of its own (ADR-0222), so a value at any
+        // entry did not say the page was sent its own: until 2026-10-11 a
+        // host that sent the cart's to the store's documents alone passed.
         let values = |doc: &Doc| {
+            let own = set(doc).basis.resources[0].entry.clone();
             s.pending.lock().expect("pending")[doc]
                 .frames
                 .iter()
-                .filter(|(_, f)| matches!(f, StreamFrame::EntryValue { .. }))
+                .filter(
+                    |(_, f)| matches!(f, StreamFrame::EntryValue { entry, .. } if *entry == own),
+                )
                 .count()
         };
         assert_eq!((values(&store) > 0, values(&cart) > 0), (true, true));
