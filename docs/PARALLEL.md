@@ -1027,4 +1027,14 @@ Each a decision for a track, with its date; a track's ADR records it too.
   a round trip and a write per search. Typed page query parameters are the
   integrator's next work after the soft navigation's merge; W9's search
   waits for them the same way.
+- **2026-10-11, the soft navigation and the command order merged** as
+  ADR-0306 and ADR-0305, from `5ed759d` (verify 38157805656 green): a
+  navigation between two pages of one layout keeps it, and a page's
+  commands run in the order it sent them (`pw-after`; the host waits two
+  seconds for the one before, then answers early, 409). **W8, W6 and W9
+  merge `master`.** For W8: a command now carries `pw-after` beside your
+  `pw-document`, and a press's retry carries both; and master's
+  page-speculation test holds a page to its own entry (ADR-0191 amended),
+  which your verify's survivor needs. Master's navigate.spec presses from
+  the keyboard now (its Firefox failure, named known until then).
 

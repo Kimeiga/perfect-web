@@ -2551,3 +2551,40 @@ integrator's; the first of the store hours' steps).
   `LocalDate`, `LocalTime`, `Weekday`, effect `clock.zone`. Found: the clock
   was a stub answering 0; a host function whose effect needs no authority is
   never linked.
+
+[ADR-0305](DECISIONS/ADR-0305-a-pages-commands-run-in-the-order-it-sent-them.md):
+a page's commands run in the order it sent them (the integrator's, found by
+ADR-0306's evidence run).
+- Each command names the latest its page sent and has not been answered
+  (`pw-after`). The host runs it once that one has run, waits two seconds
+  for one not yet arrived, and past that answers it early (409), running
+  nothing. What follows a command answered early is answered early too, and
+  one closed unrun is waited for again. The runtime sends an early-answered
+  command again, naming none, once each before it is answered. This is
+  Bayou's monotonic writes; Next.js orders a client's actions one at a time,
+  and Replicache by `lastMutationID`. Found: "Clear", pressed after "Place
+  order", reached the server first, and the order was refused as nothing to
+  order.
+
+[ADR-0306](DECISIONS/ADR-0306-a-navigation-keeps-the-layout.md): a navigation
+keeps the layout, and shows the next page in it (the integrator's, the third
+step to the parts two pages share kept in place).
+- This covers a link's navigation, a handler's `navigate` after its commit
+  (ADR-0280), and back and forward between the entries it made, from a page
+  that names a layout. The next page is read as a load reads it, and kept
+  only where its build (`pw-build`) and its layout's path and schema are this
+  page's; otherwise it is loaded whole.
+- The swap is one step: the slot's content, each layout region the next
+  document renders differently, the layout's elements' attributes, the
+  title, description, style and manifest, the address pushed, and scroll and
+  focus placed. The page then goes to the next document's runtime, and its
+  own life ends.
+- Found:
+  - a page from the back-forward cache listened to nothing;
+  - a soft navigation stopped the browser's own load;
+  - three of ADR-0280's tests raced the page;
+  - two presses' commands ran out of order (ADR-0305);
+  - the verify of `b6e98ef` found two navigate mutants surviving in a
+    rule that had a copy on each path out of a page; each rule is now one
+    function both paths call.
+
