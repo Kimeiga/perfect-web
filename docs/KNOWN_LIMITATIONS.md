@@ -599,17 +599,26 @@ awaited in order. What remains:
   never linked (`pw-host`'s `linkable`), so the zone reads are granted.
 - **A layout is one, unnested, and given nothing** (ADR-0303): a page names
   one layout; a layout is shown in no other, is given none of the page's
-  parameters, has no title template of its own, and holds one slot. A
-  navigation between two pages of one layout does not keep it yet (the soft
-  navigation, next).
-- **A navigation is a document load** (ADR-0280): the page a handler goes
-  to replaces this one whole, so the parts the two share are rendered
-  again, not kept in place with their focus and scroll; a soft navigation
-  is next. A navigation the user stops lets the page take presses again
-  only where the browser says it stopped (Chromium's Navigation API):
-  Firefox 146 has none, and WebKit 26.0's aborts nothing, so there the page
-  stays leaving until it is loaded again. A press that never answers holds
-  the navigation as long as the browser waits for it.
+  parameters, has no title template of its own, and holds one slot.
+- **A navigation keeps a layout, not more** (ADR-0306): between two pages
+  of one layout and one build, the layout's regions stay; a page of another
+  layout, another build, or none is loaded whole (ADR-0280), so the parts
+  two such pages share are rendered again. A loop or a view that contains
+  itself in the layout is taken whole from the next document, not merged
+  row by row. No view transition is run, and nothing is fetched before the
+  press (no prefetch on hover). The document a page left lingers on the
+  host until it is forgotten as idle (120 s). A whole load the user stops
+  lets the page take presses again only where the browser says it stopped
+  (Chromium's Navigation API): Firefox 146 has none, and WebKit 26.0's
+  aborts nothing, so there the page stays leaving until it is loaded again.
+  A press that never answers holds the navigation as long as the browser
+  waits for it.
+- **A page's commands are ordered by one host** (ADR-0305): the host that
+  answers keeps each page's order, so hosts behind a balancer would share
+  it or pin a page to one. A command lost on its way from a page that has
+  left is never sent again, so the next is answered early after two seconds
+  and is lost with it. An answer made by something between the page and the
+  host (a proxy's error) costs the next command the two seconds.
 - **A link's hole that is `.` or `..`** (found with ADR-0280): the URL
   parser resolves `/stores/..` to `/`, so such a link goes elsewhere, and
   PW5009 matched its text to the route. `navigate` refuses such a value; a

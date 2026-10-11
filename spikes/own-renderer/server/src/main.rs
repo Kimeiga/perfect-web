@@ -677,6 +677,8 @@ mod messages;
 mod kiokun;
 // ADR-0304: the platform's clock, and what a value read by it holds until.
 mod clock;
+// ADR-0305: a page's commands run in the order it sent them.
+mod order;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -890,6 +892,9 @@ struct Server {
     /// **Each live document, to read again when what it shows holds no
     /// longer** (ADR-0304).
     timers: clock::Timers,
+    /// **Each page's commands, in the order it sent them** (ADR-0305): a
+    /// command runs once the one its page sent before it has.
+    order: order::Order,
     /// **Who a request is, and what `requires` is told**: the identity
     /// track's (ADR-0253).
     identity: identity::Identity,
@@ -1556,6 +1561,7 @@ impl Server {
             zones: Arc::new(pw_time::Database::system()),
             held: Mutex::new(std::collections::HashMap::new()),
             timers: clock::Timers::default(),
+            order: order::Order::default(),
             // TRACK SEAM (identity): built above, its principals the layer's.
             identity,
             uploads: uploads::Uploads::default(),
@@ -2492,6 +2498,8 @@ impl Server {
             }
             // And what its kept values held until (ADR-0304).
             self.held.lock().expect("held").retain(|k, _| !mine(&k.key));
+            // And its commands' order (ADR-0305).
+            self.order.forget(&session);
             // And the versions its speculated values were sent at (ADR-0222).
             self.speculated_versions
                 .lock()
@@ -6966,17 +6974,41 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             };
             // The interaction this request belongs to, sent by the runtime
             // once per press and kept by a retry (ADR-0121).
-            let interaction = headers.lines().find_map(|l| {
-                let (k, v) = l.split_once(':')?;
-                k.trim()
-                    .eq_ignore_ascii_case("pw-interaction")
-                    .then(|| v.trim().to_string())
-            });
+            let header = |name: &str| {
+                headers.lines().find_map(|l| {
+                    let (k, v) = l.split_once(':')?;
+                    k.trim()
+                        .eq_ignore_ascii_case(name)
+                        .then(|| v.trim().to_string())
+                })
+            };
+            let interaction = header("pw-interaction");
+            // **After the one its page sent before it** (ADR-0305): run once
+            // that one has, whichever request the network brought first;
+            // answered early, running nothing, where it does not come.
+            let arrival = interaction
+                .as_deref()
+                .map(|i| server.order.arrive(&session, i));
+            if let Some(after) = header("pw-after")
+                && server.order.follow(&session, &after) == order::Turn::Early
+            {
+                if let Some(arrival) = arrival {
+                    arrival.early();
+                }
+                let early =
+                    serde_json::json!({ "committed": false, "early": true, "after": after });
+                respond_json(&mut stream, 409, &session, fresh, &early.to_string());
+                return;
+            }
             // Charter §15.5's one-shot network error (ADR-0175): the
             // connection closed with no answer, before the command runs, or
             // after it has committed.
             let drop_at = server.take_command_drop(&session);
             if drop_at == Some(DropAt::Before) {
+                // Never run: what follows it waits for it to be sent again.
+                if let Some(arrival) = arrival {
+                    arrival.vanish();
+                }
                 return;
             }
             // TRACK SEAM (identity): a `requires` refusal is answered as its
@@ -8666,6 +8698,9 @@ fn signal_document(
         manifest["computed"] = serde_json::Value::String(module);
     }
     with_instance_templates(&mut manifest, template, templates);
+    if let Some(layout) = plan.get("layout").filter(|l| !l.is_null()) {
+        manifest["layout"] = layout.clone();
+    }
     // No `<` in a script element's text (ADR-0097).
     let json =
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
@@ -8823,6 +8858,11 @@ fn document(
     // A private page's own session's values: this document is `cache private`.
     let mut manifest = manifest;
     with_instance_templates(&mut manifest, template, templates);
+    // **The layout it is shown in** (ADR-0303): what a
+    // navigation compares, to keep the layout in place.
+    if let Some(layout) = plan.get("layout").filter(|l| !l.is_null()) {
+        manifest["layout"] = layout.clone();
+    }
     // And its signals (ADR-0140): a page that reads queries holds UI state
     // too, and the browser renders what they decide, as on a page of
     // signals alone.
@@ -11028,6 +11068,30 @@ public query Store(",
     /// A request through [`handle`], as a page sends one: what came back,
     /// and nothing when the connection was closed with no answer.
     fn posted(s: &Server, path: &str, session: &str, interaction: &str, body: &str) -> String {
+        posted_with(
+            s,
+            path,
+            session,
+            &format!("pw-interaction: {interaction}\r\n"),
+            body,
+        )
+    }
+
+    /// [`posted`], naming the command its page sent before it (ADR-0305).
+    fn posted_after(
+        s: &Server,
+        path: &str,
+        session: &str,
+        interaction: &str,
+        after: &str,
+        body: &str,
+    ) -> String {
+        let headers = format!("pw-interaction: {interaction}\r\npw-after: {after}\r\n");
+        posted_with(s, path, session, &headers, body)
+    }
+
+    /// [`posted`], with `headers`, each line ending in CRLF.
+    fn posted_with(s: &Server, path: &str, session: &str, headers: &str, body: &str) -> String {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
         let at = listener.local_addr().expect("address");
         std::thread::scope(|scope| {
@@ -11040,7 +11104,7 @@ public query Store(",
                 .write_all(
                     format!(
                         "POST {path} HTTP/1.1\r\nHost: t\r\nCookie: pw-session={session}\r\n\
-                         pw-interaction: {interaction}\r\ncontent-type: application/json\r\n\
+                         {headers}content-type: application/json\r\n\
                          content-length: {}\r\n\r\n{body}",
                         body.len()
                     )
@@ -11228,6 +11292,118 @@ public query Store(",
         let back = posted(&s, &format!("/bench/clock?at={now}"), "clock", "c-3", "");
         assert!(back.starts_with("HTTP/1.1 400"), "never back: {back}");
         assert!(s.now() >= to, "and not moved");
+    }
+
+    /// **A page's command, here before the one it follows, runs after it**
+    /// (ADR-0305): "Clear", pressed after "Place order", names it, and the
+    /// network brings it first. It waits; the order is placed with the cart's
+    /// line, and the cart is cleared after. Until 2026-10-10 the clear ran
+    /// first, and the order was refused as nothing to order.
+    #[test]
+    fn a_pages_command_here_before_the_one_it_follows_runs_after_it() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let session = "ordered";
+        let body = serde_json::json!([shown("espresso"), 1]).to_string();
+        let added = posted(&s, &format!("/command/{ADD}"), session, "press-0", &body);
+        assert!(added.contains("\"committed\":true"), "{added}");
+        std::thread::scope(|scope| {
+            let clear = scope.spawn(|| {
+                let path = format!("/command/{CLEAR}");
+                posted_after(&s, &path, session, "press-2", "press-1", "[]")
+            });
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            assert!(!clear.is_finished(), "the clear waits for the order");
+            assert_eq!(
+                quantities(&s, session),
+                [("espresso".to_string(), 1)],
+                "and has not run"
+            );
+            let placed = posted(&s, &format!("/command/{PLACE}"), session, "press-1", "[]");
+            assert!(placed.contains("\"$case\":\"ok\""), "placed: {placed}");
+            let cleared = clear.join().expect("answered");
+            assert!(cleared.starts_with("HTTP/1.1 202"), "{cleared}");
+        });
+        assert_eq!(quantities(&s, session), [], "cleared after");
+    }
+
+    /// **One whose first never comes is answered early, and runs nothing**
+    /// (ADR-0305): sent again by its page, naming none, it runs.
+    #[test]
+    fn a_pages_command_whose_first_never_comes_is_answered_early_and_runs_nothing() {
+        let mut s = rendering_server();
+        s.order = order::Order::waiting(std::time::Duration::from_millis(200));
+        let session = "early";
+        let path = format!("/command/{ADD}");
+        let body = serde_json::json!([shown("cortado"), 1]).to_string();
+        let early = posted_after(&s, &path, session, "press-2", "press-1", &body);
+        assert!(early.starts_with("HTTP/1.1 409"), "{early}");
+        assert!(early.contains("\"early\":true"), "{early}");
+        assert_eq!(quantities(&s, session), [], "nothing ran");
+        // What follows one answered early is answered early, at once.
+        let started = std::time::Instant::now();
+        let after = posted_after(&s, &path, session, "press-3", "press-2", &body);
+        assert!(after.starts_with("HTTP/1.1 409"), "{after}");
+        assert!(started.elapsed() < std::time::Duration::from_millis(150));
+        assert_eq!(quantities(&s, session), [], "nothing ran");
+        let again = posted(&s, &path, session, "press-2", &body);
+        assert!(again.contains("\"committed\":true"), "{again}");
+        assert_eq!(quantities(&s, session), [("cortado".to_string(), 1)]);
+    }
+
+    /// **A session forgotten for idleness takes its commands' order**
+    /// (ADR-0305, ADR-0161), as it takes its interactions.
+    #[test]
+    fn a_session_forgotten_takes_its_commands_order() {
+        let mut s = rendering_server();
+        s.order = order::Order::waiting(std::time::Duration::from_millis(100));
+        let session = "idle-order";
+        let _ = s.serve_document(session);
+        let body = serde_json::json!([shown("cortado"), 1]).to_string();
+        let added = posted(&s, &format!("/command/{ADD}"), session, "press-1", &body);
+        assert!(added.contains("\"committed\":true"), "{added}");
+        assert_eq!(s.order.follow(session, "press-1"), order::Turn::Run);
+        let long_ago = std::time::Instant::now() - IDLE - std::time::Duration::from_secs(1);
+        for w in s.pending.lock().unwrap().values_mut() {
+            w.seen = long_ago;
+        }
+        s.forget_idle_subscribers();
+        assert_eq!(s.order.follow(session, "press-1"), order::Turn::Early);
+    }
+
+    /// **One that follows a command whose connection closed before it ran
+    /// waits for it to be sent again** (ADR-0305, ADR-0175): that one never
+    /// ran, so it is not yet the one before.
+    #[test]
+    fn a_pages_command_after_one_closed_unrun_waits_for_it_sent_again() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let session = "closed";
+        let body = serde_json::json!([shown("espresso"), 1]).to_string();
+        let added = posted(&s, &format!("/command/{ADD}"), session, "press-0", &body);
+        assert!(added.contains("\"committed\":true"), "{added}");
+        s.connection_faults
+            .lock()
+            .unwrap()
+            .entry(session.into())
+            .or_default()
+            .drop_command = Some(DropAt::Before);
+        let place = format!("/command/{PLACE}");
+        assert_eq!(
+            posted(&s, &place, session, "press-1", "[]"),
+            "",
+            "no answer"
+        );
+        std::thread::scope(|scope| {
+            let clear = scope.spawn(|| {
+                let path = format!("/command/{CLEAR}");
+                posted_after(&s, &path, session, "press-2", "press-1", "[]")
+            });
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            assert!(!clear.is_finished(), "the clear waits for the order");
+            let placed = posted(&s, &place, session, "press-1", "[]");
+            assert!(placed.contains("\"$case\":\"ok\""), "placed: {placed}");
+            let cleared = clear.join().expect("answered");
+            assert!(cleared.starts_with("HTTP/1.1 202"), "{cleared}");
+        });
     }
 
     /// **A forced reconnect** (charter §15.5, ADR-0175): the session's open
