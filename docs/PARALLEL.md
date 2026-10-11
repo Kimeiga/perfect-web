@@ -911,3 +911,120 @@ Each a decision for a track, with its date; a track's ADR records it too.
   take 0305 and 0306. Its host read is merged with ADR-0303's: a document's
   bindings are read once each, inside the clock's noting of what they
   compared. Store hours' step 2 waits for W8's merge.
+- **2026-10-11, W9: the DoorDash customer side, search now, store hours
+  after W8** (the owner, relayed by the coordinator 2026-10-11: more
+  parallel work on DoorDash, the third slot once the disk allows; the
+  integrator pruned its merged worktrees and `master`'s target the same
+  day, 21 to 58 GiB free). The slots: W6 (kiokun), W8 (store accounts),
+  **W9**; W7 (TodoMVC) waits for the next one. Checkout and payments, and
+  ratings and reviews (W10), wait behind W8: they touch the cart and orders.
+  - **Track `store-search`**, branch `track/store-search`, from `master`
+    now. Its ADRs are `ADR-XXXX`, numbered at the merge; its recipes live in
+    `just/store-search.just`; its code block is **PW63**
+    (`Owner::StoreSearch => "PW63"`); its Playwright runs use PORT=7941
+    (7941 to 8140, nothing listening there on 2026-10-11), its hosts at
+    PORT+170..172 (`STORE_SEARCH_PORTS`). Search needs no migration; one it
+    finds it needs is the store's from `0010`, W8 holding `0003` to `0009`,
+    and is numbered again at the merge if W8 needs more.
+  - **What**: a reader searches the stores and their menus by text, and a
+    search page lists the stores and the dishes that match, each dish under
+    its store, linking to it. Its research (DoorDash's search, cited in its
+    ADR) decides what it shows; these are the rules it holds to:
+    1. **The address.** A search's text belongs in the page's query string,
+       a typed page query parameter, which is the integrator's to build
+       next (as ruled for W6's `?q=`). The search box is then a plain
+       `<form method="get">`, which needs no script. Until it lands, the
+       page is at `route "/search/{q}"`, reached by its address. It has no
+       form, since `navigate` follows only a committed command (ADR-0280).
+       `q` stays a page parameter, so the move changes only the route clause
+       and adds the form. Both are named temporary in the ADR (corrected
+       2026-10-11, W6's finding).
+    2. **One meaning on both layers.** The search runs in the store's data
+       layer, as its operations (as W6's runs in kiokun's), in memory and on
+       PostgreSQL, and both hold one stated meaning, tested on the same
+       fixtures:
+       - case is ignored (each layer's Unicode lowercase, with non-ASCII
+         names in the fixtures);
+       - every whitespace-separated term matches, each a substring of a
+         store's name, description or cuisine, or of an item's name,
+         description or category;
+       - results are ranked by a stated rule, the same on both layers,
+         ties by name and then id.
+       Accents and stems are not folded, since the layers would differ
+       without a new crate or a PostgreSQL extension; that goes in
+       KNOWN_LIMITATIONS.
+    3. **No input fails the page.** PostgreSQL's `LIKE` escapes `%`, `_`
+       and `\` (an `ESCAPE` clause), and every value is bound, never
+       interpolated. A blank query shows no results and says so. A query
+       past a bound the ADR states is a declared error, told.
+    4. **Public data on a reader's page.** The catalog is public, so its
+       queries are public and may be shared. The page is shown in
+       `StoreLayout`, which shows the reader's cart, so it is the session's
+       now, and the user's once W8 merges (PW5046).
+    5. **Its own files.** `examples/store/search.pw` (its page, queries and
+       views), `spikes/own-renderer/server/src/search.rs` (the layer's
+       operations, both layers), `e2e/store-search.spec.mjs` and its
+       fixtures. Where the layers register operations (`store.rs`,
+       `store_pg.rs`) and the host routes, it adds one marked line each
+       (`TRACK SEAM (store-search)`). It does not touch
+       `examples/store/app.pw`, which is W8's until it merges.
+    6. **Its tests.** Both layers answer the same table of queries:
+       - blank;
+       - `%`, `_`, `\` and quotes;
+       - mixed case, non-ASCII, several terms and none matching.
+       The page is tested in three engines. Its mutation controls are
+       narrowed from the start: each mutant is given the tests that can see
+       its rule, measured with `scripts/mutant_killers.py`, so its verify
+       stays within the planner's ceiling.
+  - **Its seams with W8.** W8 owns the store program's user, cart, order
+    and address code, and `app.pw`, until it merges. Then W9 merges `master`
+    and, in its own commits:
+    - the search page becomes `user`, as `StoreLayout` will be;
+    - the home page gets its search form (one marked line);
+    - results may be filtered to the stores that reach the reader's
+      address, through W8's `Reach`.
+  - **Track `store-hours`**, branch `track/store-hours`, from `master` after
+    W8's merge, since it needs `place_order` and the user's cart. It is the
+    integrator's design of 2026-10-10 (NEXT, DoorDash item 4, step 2), ruled
+    here:
+    1. **The hours.** A store's weekly periods in its IANA zone (`closes <=
+       opens` runs past midnight), and its special dates (closed, or other
+       hours). Both layers hold them, with a PostgreSQL migration numbered
+       after W8's.
+    2. **What a page shows.** A `StoreStatus` query, `Open { until }` or
+       `Closed { opens: Option<Instant> }`, read by comparison with the
+       platform's clock. A page is told when the clock passes the instant
+       (ADR-0304). It is shown on the store page, on each store on the home
+       page, in search results ("open now"), and in the cart.
+    3. **Ordering while closed is refused.** `place_order` answers a declared
+       `Closed { opens }` from its transaction, with a last-order cut-off the
+       store sets (DoorDash's is 20 minutes before close). Adding to a cart
+       while closed is allowed, since that is browsing. The refusal is told
+       where the press was (ADR-0302).
+    4. **Its tests**, on both layers:
+       - a page told at the closing instant, by a test clock advanced as
+         ADR-0304's are;
+       - an order refused at close minus the cut-off;
+       - a DST day in the store's zone (RFC 5545's rule for a skipped or
+         repeated local time, as the clock's ADR has it);
+       - hours that run past midnight;
+       - a special date closed.
+    5. **Research to cite**: DoorDash's store hours (`open_hours`,
+       `special_hours`), schema.org's `OpeningHoursSpecification`, and RFC
+       5545 §3.3.5.
+- **2026-10-11, W6: no search form before the route reads its query
+  part.** W6 found that "the form sent by `navigate`" cannot be written.
+  `navigate` goes only at the end of a command's `Ok` arm (ADR-0280, PW5043),
+  a command a page's handler calls declares `idempotent_by` (PW0338), and
+  kiokun's sources are `transactions none`, so no command could carry it.
+  Ruled **(c)**:
+  - no search box until a route reads its query part;
+  - then a plain `<form method="get" action="/search">` with `name="q"`,
+    which needs no script and is nearer kiokun.com.
+  Not (a), a navigation from a handler that calls no command. A link and a
+  GET form already say that, without script, and ADR-0280 keeps `navigate`
+  for a commit's consequence. Not (b), a placeholder command, which would be
+  a round trip and a write per search. Typed page query parameters are the
+  integrator's next work after the soft navigation's merge; W9's search
+  waits for them the same way.
+
