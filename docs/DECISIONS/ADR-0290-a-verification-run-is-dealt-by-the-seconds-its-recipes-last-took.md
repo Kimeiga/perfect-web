@@ -156,3 +156,16 @@ recipes of 184,111 s.
 
 `scripts/tests/test_ci_scripts.py`: four tests;
 `scripts/dealt_by_time_mutations.py`: four more mutants, 17 of 17.
+
+### And again, 2026-10-11: half the limit
+
+`track/store-accounts`' verify 38046546700, dealt within 13,800 s, ran its
+shard 6's recipes 1.6 to 1.7 times their recorded seconds (`e14-availability`
+12,125 s for 7,405): its server's tests had grown, and each mutant of a
+script that runs them whole runs them all. Its shard was stopped at 345
+minutes. A branch's recipes run longer than recorded until its own run
+measures them, up to twice (command order's two recipes), so the ceiling is
+half the limit, **10,350 s**. And `e14-kiokun-word` ran past 20,500 s by
+itself on `track/kiokun`: no ceiling holds a recipe longer than the limit,
+which is the mutation narrowing's (NEXT, infrastructure), W6's for that
+script.

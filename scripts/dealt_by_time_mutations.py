@@ -130,7 +130,7 @@ MUTANTS = [
     (
         "the ceiling is a shard's limit",
         PLAN,
-        "CEILING = 13_800\n",
+        "CEILING = 10_350\n",
         "CEILING = 20_700\n",
     ),
 ]

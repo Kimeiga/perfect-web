@@ -59,14 +59,16 @@ SETUP = {(False, False): 42, (False, True): 384, (True, False): 390, (True, True
 # 2026-10-10). A shard runs at most 345 minutes (verify.yml's
 # `timeout-minutes`, 20,700 s), and one stopped there is a recipe shard that
 # failed: nothing of its run is fetched (ADR-0281), and the run is made again
-# whole. Two thirds of the limit, since measured shards ended up to half again
-# past their recorded seconds: track/command-order's verify 38015617597 dealt
-# 13,959 s into its shard 7, whose two recipes then took twice theirs, and
-# the shard was stopped at 345 minutes. A run is dealt into more shards than
-# it asks for where its number would end past this, up to `MOST`: the jobs
-# past the Free plan's 20 wait for one to end, which costs a run less than a
-# stopped shard does.
-CEILING = 13_800
+# whole. Half the limit: a branch's recipes run longer than their recorded
+# seconds until its own run measures them, up to twice: track/command-order's
+# verify 38015617597 dealt 13,959 s into its shard 7, whose two recipes then
+# took twice theirs, and track/store-accounts' 38046546700 ran its shard 6's
+# 1.6 to 1.7 times (its server's tests grew, and each mutant runs them
+# whole); each was stopped at 345 minutes. Two thirds (13,800 s, 2026-10-10)
+# was too little. A run is dealt into more shards than it asks for where its
+# number would end past this, up to `MOST`: the jobs past the Free plan's 20
+# wait for one to end, which costs a run less than a stopped shard does.
+CEILING = 10_350
 MOST = 40
 
 # Measurements of the machine they run on: a time, a load, a memory curve,
