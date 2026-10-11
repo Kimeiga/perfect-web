@@ -56,9 +56,21 @@ kiokun.com in Pleris, step 2 (search).
      logs that in NEXT.
 3. **The page now, at a temporary address** (B3): `page SearchPage(q)` at
    `route "/search/{q}"`, as `/word/{word}` was. Pleris has no form for a
-   route that answers JSON, so `/api/search` is the integrator's, later;
-   and a page reads no query string yet (ADR-0295), so kiokun.com's
-   `/search?q=` waits on the integrator (Questions).
+   route that answers JSON, so `/api/search` is the integrator's, later.
+   - **The route is temporary**: a page reads no query string yet
+     (ADR-0295), so kiokun.com's `/search?q=` waits for a route that reads
+     its query part. The integrator's next work gives one: the route's query
+     part as an RFC 6570 form-style expansion, `route "/search{?q}"`, typed
+     as a path parameter is, an `Option` where it may be absent (the
+     integrator's ruling of 2026-10-11, Questions).
+   - `q` stays a page parameter, so the move is the route clause and the
+     form alone.
+   - **There is no search box until then.** Once a route reads its query
+     part, the box is kiokun.com's own: a plain `<form method="get"
+     action="/search">` with an input named `q`, which **needs no script**.
+     Until then, a box would need script, a handler that navigates, and
+     `navigate` follows only a command's commit (ADR-0280, PW5043), which a
+     search, writing nothing, has not.
 4. **The index, cached** (B5): built once per process from the CSV into
    `target/kiokun-search/kiokun-search-<digest>.db`, the digest of the
    CSV's bytes and the schema, a stale one removed when a new one is built;
@@ -70,7 +82,17 @@ kiokun.com in Pleris, step 2 (search).
    Loaded from the CSV as text, kiokun.com's `Boolean(row.is_common)` would
    read `'0'` as true and mark every hit Common. kiokun-data's notes
    describe importing the CSV with the shell's `.import`, which stores text
-   (Found 2).
+   (Found 2). An assumption, logged in ASSUMPTIONS.md through the
+   integrator; the oracle runs both loadings once and records how much
+   they differ.
+8. **A search does not fail on what a reader types** (the integrator's
+   ruling of 2026-10-11). `search#latin` binds each whitespace-separated
+   term of the query as an FTS5 string, its inner `"` doubled, joined as
+   FTS5's implicit AND (`as_words`). So `AND`, `NEAR`, `"`, `*`, a comma or a
+   romanization's `-` is a word, not syntax. For a query of plain words this
+   is what kiokun.com's query means already, and the oracle holds every
+   other query to it. The ranks still compare the query as typed. The CJK
+   statement quoted its terms already.
 6. **Held to kiokun.com's own code** (B4): `just e14-kiokun-search` runs
    kiokun.com's `GET` handler, copied from HEAD, in Node:
    - over `node:sqlite`, with migration 0005 run as written and the CSV
@@ -104,13 +126,21 @@ Numbered after the Contains and Appears in ADR's 24.
     `jyutping_search` column, so a Jyutping query finds what the live site,
     importing a newer CSV, may find. A data difference, until the owner
     commits a current CSV.
-26. **The page's address is `/search/{q}`**, not `/search?q=`, until a page
-    can read a query string (Decision 3); the header's search box, which
-    submits `?q=`, is not built.
-27. **A failed search fails the page.** A query FTS5 cannot read (`"`,
-    `AND`) is answered with kiokun.com's error, 500, by the endpoint, and
-    its page shows "Search is unavailable"; the rewrite's query fails, and
-    its page with it. The harness counts each by name.
+26. **The page's address is `/search/{q}`**, not `/search?q=`, until a
+    route reads its query part (Decision 3). The header's search box, which
+    submits `?q=`, is not built until then, and when it is, it needs no
+    script.
+27. **What kiokun.com fails on, the rewrite answers** (Decision 8). kiokun.com
+    binds the query as FTS5's query language, so a query FTS5 reads as
+    syntax is a 500 from its endpoint, and its page shows "Search is
+    unavailable". The oracle's sample found four:
+    - `bingmaweidong, liangcaoxianxing` (a comma);
+    - `ime-ji`, `monsuta-` and `maikuroa-ruenue-`, romanizations whose
+      long-vowel `-` FTS5 reads as a column filter;
+    - and `"`, `AND` and `*` fail as well.
+    The rewrite answers each as words. The harness counts each by name ("a
+    search kiokun.com fails, answered"); a page that failed on one would be
+    a difference.
 28. **The rest of each column is a `<details>` disclosure**, where kiokun.com
     shows twelve more each time the reader presses "Show more". It needs no
     script.
@@ -122,12 +152,16 @@ Numbered after the Contains and Appears in ADR's 24.
 
 ## Found
 
-1. **The oracle found nothing to name**: 355 queries over the whole index
-   (834,036 rows), the same; 4 of them failed alike (Difference 27).
-2. **`is_common`'s type decides kiokun.com's Common badge.** If production
-   imported the CSV as kiokun-data's notes say, every hit is marked Common.
-   That cannot be checked here: robots.txt keeps the live site from this
-   track. For the owner.
+1. **The oracle found nothing else to name**: of 355 queries over the whole
+   index (834,036 rows), 351 have the same answers. kiokun.com fails the
+   other 4, and the rewrite answers them (Difference 27).
+2. **`is_common`'s type decides kiokun.com's Common badge, and its order.**
+   Over the oracle's 355 queries, loaded as text, 331 answers differ from
+   the integer loading's. Every hit is marked Common: 6,542 of 6,542, where
+   2,183 are as integers. And `ORDER BY is_common DESC` no longer orders
+   anything. If production imported the CSV as kiokun-data's notes say, its
+   search is like the text loading. That cannot be checked here: robots.txt
+   keeps the live site from this track. For the owner.
 3. **The repository's index sample has no Korean rows**: a Korean row's word
    is Hangul and holds none of the sample's characters. Korean search is
    held locally, over the whole index.
@@ -138,20 +172,28 @@ Numbered after the Contains and Appears in ADR's 24.
   - `search_reads_kana_variants_and_canonical_pages`: ヒト finds 人 by its
     reading; 学 finds 學; 学生 is one hit linking 學生, read in Japanese and
     Chinese; eight hits a column and the rest disclosed; nothing found is
-    said; `"` and `AND` fail. Each answer is kiokun.com's own.
-  - `search_matches_kiokuns_answers_for_the_sample` (CI): the fixture's 103
-    queries.
+    said. Each of these answers is kiokun.com's own.
+    - The rewrite's own answers, where kiokun.com answers 500: the four
+      inputs of Difference 27, `"` and `*` find nothing; `AND` finds what
+      `and` finds; `renho-` finds 人和, read レンホー; `person, people` finds
+      the three rows holding both words.
+  - `search_matches_kiokuns_answers_for_the_sample` (CI): the fixture's 111
+    queries. Nine of them, the hand cases above, are kiokun.com's 500s,
+    each answered.
   - `search_matches_kiokuns_own_on_a_sample` (local, ignored).
-  - The CSV reader's own test (`kiokun::search`).
+  - The layer's own tests (`kiokun::search`): the CSV reader; a query as
+    words, whatever it holds; and an index answering what FTS5 cannot read
+    raw, plain words finding what they found raw.
 - **The scripts' tests**: the D1 stand-in (`d1.test.mjs`, four), and the
   index sample's generator.
 - **The oracle** (`just e14-kiokun-search`, local): 355 queries, 0 unnamed
-  differences, 4 failed searches counted by name.
-- **Mutation controls**: ten in `scripts/kiokun_word_mutations.py`, in the
+  differences, kiokun.com's 4 failed searches answered, counted by name; and
+  `is_common` loaded both ways (Found 2).
+- **Mutation controls**: twelve in `scripts/kiokun_word_mutations.py`, in the
   program and the layer (the expansion, katakana, canonical pages, the
   display score, the pronunciation order, the definition cut, CJK detection,
-  the eight shown, the exact rank, the reading clause), each killed when
-  checked by hand; and two in `scripts/kiokun_inventory_mutations.py` for the
+  the eight shown, the exact rank, the reading clause, a Latin query bound
+  as FTS5's syntax, a term's quote not doubled), each killed; and two in `scripts/kiokun_inventory_mutations.py` for the
   index sample's generator (20 of 20 killed). The word script is run whole
   by the branch's verify (ADR-0281).
 
@@ -159,7 +201,25 @@ Numbered after the Contains and Appears in ADR's 24.
 
 - **The page's address** (W6, 2026-10-10): a page query parameter in the
   language, a development-server seam mapping `/search?q=`, or `/search/{q}`
-  with navigate. ANSWER
+  with navigate.
+  - The integrator, 2026-10-11: keep `route "/search/{q}"` with a form
+    submitted by navigate, name the temporary route and the form's need for
+    script, and keep `q` a page parameter.
+- **The form by navigate cannot be written** (W6, 2026-10-11). `navigate`
+  follows a command's commit (ADR-0280, PW5043). A command a handler calls
+  declares `idempotent_by` (PW0338), whose record commits with its writes
+  (PW0348). And kiokun's sources take no transactions. Asked: (a) navigate
+  without a command, (b) a stand-in store, or (c) no box until a route reads
+  its query part.
+  - The integrator: **(c)** (PARALLEL.md, 1e84f9a6). A link and a GET form
+    already express a navigation that commits nothing, without script, and
+    ADR-0280 keeps `navigate` for a commit's consequence. A stand-in store
+    is a fake write per search. Typed page query parameters
+    (`route "/search{?q}"`) are the integrator's next work (Decision 3).
+- **A search must not fail on what a reader types** (the integrator,
+  2026-10-11): Decision 8 and Difference 27.
+- **Both loadings of `is_common`** (the integrator, 2026-10-11): run once,
+  locally (Found 2).
 - **B1 to B5** (W6, 2026-10-10): the integrator's rulings, as Decisions 1
   to 7 record them.
 

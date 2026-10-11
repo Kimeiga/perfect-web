@@ -233,14 +233,14 @@ e14-kiokun-search:
        echo "== the D1 stand-in's own test (spikes/own-renderer/kiokun-oracle/d1.test.mjs)"; echo; \
        node --test --no-warnings spikes/own-renderer/kiokun-oracle/d1.test.mjs 2>&1 | grep -E "^# (tests|pass|fail)"; \
        echo; echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/search.mjs)"; echo; \
-       node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/search.mjs "$lib" "$lib/aliases.json" 8000 "$lib/search.json"; \
+       KIOKUN_BOTH_LOADINGS=1 node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/search.mjs "$lib" "$lib/aliases.json" 8000 "$lib/search.json" 2>&1 | grep -v '^Search error\|^    at \|^  [a-z]*: \|^}$'; \
        echo; echo "== the rewrite's, compared (the index built under target/kiokun-search)"; echo; \
        KIOKUN_SEARCH_ORACLE="$lib/search.json" cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::search_matches_kiokuns_own 2>&1 \
          | grep -E '^(compared|named|unnamed|difference|  kiokun|  rewrite)|test result|panicked'; \
        echo "after it: $(uptime | sed 's/.*load/load/')"; \
        echo; echo "== the CI fixture: kiokun.com's answers over the repository's sample and its hand-made aliases"; echo; \
        node --experimental-strip-types --no-warnings spikes/own-renderer/kiokun-oracle/search.mjs "$sample" examples/kiokun/data/search-aliases-sample.json 97 "$sample/search.json" \
-         '["ヒト","学","学生","zzzzqq","\"","AND"]'; \
+         '["ヒト","学","学生","zzzzqq","\"","AND","and","*","renho-","person, people","bingmaweidong, liangcaoxianxing","ime-ji","monsuta-","maikuroa-ruenue-"]' 2>&1 | grep -v '^Search error\|^    at \|^  [a-z]*: \|^}$'; \
        python3 scripts/kiokun_oracle_fixture.py "$sample/search.json" spikes/own-renderer/kiokun-oracle/search-sample.json \
          "just e14-kiokun-search" "$(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD)" "$(git rev-parse HEAD)" "$(node --version)"; \
      } > docs/evidence/E14/kiokun-search.txt; rm -rf "$lib" "$sample"

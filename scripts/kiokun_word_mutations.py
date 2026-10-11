@@ -651,6 +651,18 @@ MUTANTS = [
         '.map(|i| format!("WHEN word = ? THEN {}", if i == 0 { 400 } else { 900 }))',
     ),
     (
+        "a Latin query is bound as FTS5's query language",
+        SEARCH,
+        "        binds.push(Sql::Text(as_words(query)));",
+        "        binds.push(Sql::Text(query.to_string()));",
+    ),
+    (
+        "a term's inner quote is not doubled",
+        SEARCH,
+        """        .map(|t| format!("\\"{}\\"", t.replace('"', "\\"\\"")))""",
+        """        .map(|t| format!("\\"{}\\"", t))""",
+    ),
+    (
         "a kana query's reading is never searched",
         SEARCH,
         "        if !reading.is_empty() {\n            clauses.push(",

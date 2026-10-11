@@ -2,10 +2,13 @@
  "kiokun_commit": "abf71a89af1111f4039578cd1fde58e06f14c4bf",
  "node": "v22.21.1",
  "oracle": {
-  "answered": 103,
+  "answered": 111,
   "answers": {
    "\"": {
     "error": "500: Search failed: unterminated string"
+   },
+   "*": {
+    "error": "500: Search failed: unknown special query: "
    },
    "AND": {
     "error": "500: Search failed: fts5: syntax error near \"AND\""
@@ -1594,6 +1597,806 @@
      }
     ]
    },
+   "and": {
+    "results": [
+     {
+      "definitions": [
+       "arts and sciences"
+      ],
+      "forms": [
+       "学芸"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "がくげい",
+      "targetWord": "学芸",
+      "word": "学芸"
+     },
+     {
+      "definitions": [
+       "arts and sciences"
+      ],
+      "forms": [
+       "学術"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "がくじゅつ",
+      "targetWord": "学術",
+      "word": "学術"
+     },
+     {
+      "definitions": [
+       "students and pupils"
+      ],
+      "forms": [
+       "学徒"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "がくと",
+      "targetWord": "学徒",
+      "word": "学徒"
+     },
+     {
+      "definitions": [
+       "geisha and prostitutes"
+      ],
+      "forms": [
+       "玄人"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "くろうと",
+      "targetWord": "玄人",
+      "word": "玄人"
+     },
+     {
+      "definitions": [
+       "geisha and prostitutes"
+      ],
+      "forms": [
+       "黒人"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "こくじん",
+      "targetWord": "黒人",
+      "word": "黒人"
+     },
+     {
+      "definitions": [
+       "customs and manners"
+      ],
+      "forms": [
+       "人情"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "にんじょう",
+      "targetWord": "人情",
+      "word": "人情"
+     },
+     {
+      "definitions": [
+       "wise and virtuous person (esp. in Confucianism)"
+      ],
+      "forms": [
+       "聖人"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "せいじん",
+      "targetWord": "聖人",
+      "word": "聖人"
+     },
+     {
+      "definitions": [
+       "person well-balanced morally and intellectually"
+      ],
+      "forms": [
+       "全人"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "ぜんじん",
+      "targetWord": "全人",
+      "word": "全人"
+     },
+     {
+      "definitions": [
+       "men and women"
+      ],
+      "forms": [
+       "人々"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "ひとびと",
+      "targetWord": "人々",
+      "word": "人々"
+     },
+     {
+      "definitions": [
+       "study of classical Japanese literature and culture",
+       "school (of a provincial capital during the Xia, Shang and Zhou dynasties)"
+      ],
+      "forms": [
+       "国学"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "こくがく",
+      "targetWord": "国学",
+      "word": "国学"
+     },
+     {
+      "definitions": [
+       "local lords and samurai"
+      ],
+      "forms": [
+       "国人"
+      ],
+      "is_common": true,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "こくじん",
+      "targetWord": "国人",
+      "word": "国人"
+     },
+     {
+      "definitions": [
+       "men and horses",
+       "man and horse",
+       "rider and horse"
+      ],
+      "forms": [
+       "人馬"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese",
+       "japanese"
+      ],
+      "pronunciation": "じんば · rén​mǎ",
+      "targetWord": "人馬",
+      "word": "人馬"
+     },
+     {
+      "definitions": [
+       "wise and able person"
+      ],
+      "forms": [
+       "人傑"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "rén​jié",
+      "targetWord": "人傑",
+      "word": "人傑"
+     },
+     {
+      "definitions": [
+       "spirit within a person (i.e. blood and essential breath 血氣|血气 of TCM)"
+      ],
+      "forms": [
+       "人精"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "rén​jīng",
+      "targetWord": "人精",
+      "word": "人精"
+     },
+     {
+      "definitions": [
+       "Imperial College of Supreme Learning, established in 124 BC, and the highest educational institute in ancient China until the Sui Dynasty"
+      ],
+      "forms": [
+       "太學"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "Tài​xué",
+      "targetWord": "太學",
+      "word": "太學"
+     },
+     {
+      "definitions": [
+       "presumptuous and ignorant person"
+      ],
+      "forms": [
+       "妄人"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "wàng​rén",
+      "targetWord": "妄人",
+      "word": "妄人"
+     },
+     {
+      "definitions": [
+       "conduct and learning (of an individual)",
+       "moral nature and skill"
+      ],
+      "forms": [
+       "品學"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "pǐn​xué",
+      "targetWord": "品學",
+      "word": "品學"
+     },
+     {
+      "definitions": [
+       "teaching and learning"
+      ],
+      "forms": [
+       "教學"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "jiào​xué",
+      "targetWord": "教學",
+      "word": "教學"
+     },
+     {
+      "definitions": [
+       "Man and Heaven",
+       "God and man",
+       "heaven and man"
+      ],
+      "forms": [
+       "天人"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese",
+       "japanese"
+      ],
+      "pronunciation": "てんじん · tiān​rén",
+      "targetWord": "天人",
+      "word": "天人"
+     },
+     {
+      "definitions": [
+       "Wei and Jin philosophical school amalgamating Daoist and Confucian ideals"
+      ],
+      "forms": [
+       "玄學"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "xuán​xué",
+      "targetWord": "玄學",
+      "word": "玄學"
+     },
+     {
+      "definitions": [
+       "talent and learning"
+      ],
+      "forms": [
+       "才學"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "cái​xué",
+      "targetWord": "才學",
+      "word": "才學"
+     },
+     {
+      "definitions": [
+       "ethnic groups in the north and west of China in ancient times",
+       "barbarian from the north and west of China"
+      ],
+      "forms": [
+       "胡人"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese",
+       "japanese"
+      ],
+      "pronunciation": "こじん · hú​rén",
+      "targetWord": "胡人",
+      "word": "胡人"
+     },
+     {
+      "definitions": [
+       "bride and groom"
+      ],
+      "forms": [
+       "新人"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "xīn​rén",
+      "targetWord": "新人",
+      "word": "新人"
+     },
+     {
+      "definitions": [
+       "rich and important person"
+      ],
+      "forms": [
+       "舍人"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "shè​rén",
+      "targetWord": "舍人",
+      "word": "舍人"
+     },
+     {
+      "definitions": [
+       "person of wide knowledge and sound scholarship"
+      ],
+      "forms": [
+       "通人"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "tōng​rén",
+      "targetWord": "通人",
+      "word": "通人"
+     },
+     {
+      "definitions": [
+       "Neo-Confucian Rationalistic School (from Song to mid-Qing times, c. 1000-1750, typified by the teachings of Cheng Hao 程顥|程颢[Chéng​Hào], Cheng Yi 程頤|程颐[Chéng​Yí] and Zhu Xi 朱熹[Zhū​xī])"
+      ],
+      "forms": [
+       "理學"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "Lǐ​xué",
+      "targetWord": "理學",
+      "word": "理學"
+     },
+     {
+      "definitions": [
+       "the great and the good"
+      ],
+      "forms": [
+       "賢人"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "xián​rén",
+      "targetWord": "賢人",
+      "word": "賢人"
+     },
+     {
+      "definitions": [
+       "Dutch studies (study of Europe and the world in premodern Japan)"
+      ],
+      "forms": [
+       "蘭學"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "lán​xué",
+      "targetWord": "蘭學",
+      "word": "蘭學"
+     },
+     {
+      "definitions": [
+       "school for Daoism in Tang and Song times"
+      ],
+      "forms": [
+       "道學"
+      ],
+      "is_common": false,
+      "language": "chinese",
+      "languages": [
+       "chinese"
+      ],
+      "pronunciation": "dào​xué",
+      "targetWord": "道學",
+      "word": "道學"
+     },
+     {
+      "definitions": [
+       "myself and others"
+      ],
+      "forms": [
+       "我人"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "われひと",
+      "targetWord": "我人",
+      "word": "我人"
+     },
+     {
+      "definitions": [
+       "talent and education"
+      ],
+      "forms": [
+       "才学"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "さいがく",
+      "targetWord": "才学",
+      "word": "才学"
+     },
+     {
+      "definitions": [
+       "men and animals"
+      ],
+      "forms": [
+       "人畜"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "じんちく",
+      "targetWord": "人畜",
+      "word": "人畜"
+     },
+     {
+      "definitions": [
+       "group comprising the lowest rank of Japan's Edo-period caste system (incl. ex-convicts and vagrants)"
+      ],
+      "forms": [
+       "非人"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "ひにん",
+      "targetWord": "非人",
+      "word": "非人"
+     },
+     {
+      "definitions": [
+       "learning and virtue"
+      ],
+      "forms": [
+       "学徳"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "がくとく",
+      "targetWord": "学徳",
+      "word": "学徳"
+     },
+     {
+      "definitions": [
+       "education and learning"
+      ],
+      "forms": [
+       "教学"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "きょうがく",
+      "targetWord": "教学",
+      "word": "教学"
+     },
+     {
+      "definitions": [
+       "gods and men"
+      ],
+      "forms": [
+       "神人"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "しんじん",
+      "targetWord": "神人",
+      "word": "神人"
+     },
+     {
+      "definitions": [
+       "Edo-period moral philosophy that blended Buddhist, Shinto and Confucian ethical teachings"
+      ],
+      "forms": [
+       "心学"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "しんがく",
+      "targetWord": "心学",
+      "word": "心学"
+     },
+     {
+      "definitions": [
+       "Western learning (introduced to Japan in the late-Edo and early-Meiji periods)"
+      ],
+      "forms": [
+       "洋学"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "ようがく",
+      "targetWord": "洋学",
+      "word": "洋学"
+     },
+     {
+      "definitions": [
+       "oneself and others"
+      ],
+      "forms": [
+       "人我"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "じんが",
+      "targetWord": "人我",
+      "word": "人我"
+     },
+     {
+      "definitions": [
+       "person next in rank to the chief retainers and in charge of general management and accounting in a samurai family (Edo period)"
+      ],
+      "forms": [
+       "用人"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "ようにん",
+      "targetWord": "用人",
+      "word": "用人"
+     },
+     {
+      "definitions": [
+       "(fictional) fusion of human and animal"
+      ],
+      "forms": [
+       "獣人"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "じゅうじん",
+      "targetWord": "獣人",
+      "word": "獣人"
+     },
+     {
+      "definitions": [
+       "official in charge of court poetry and music (under the ritsuryō system)"
+      ],
+      "forms": [
+       "歌人"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "うたびと",
+      "targetWord": "歌人",
+      "word": "歌人"
+     },
+     {
+      "definitions": [
+       "village school (esp. in Edo-era Japan, and ancient Korea and China)"
+      ],
+      "forms": [
+       "郷学"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "ごうがく",
+      "targetWord": "郷学",
+      "word": "郷学"
+     },
+     {
+      "definitions": [
+       "humans and animals",
+       "humans and beasts"
+      ],
+      "forms": [
+       "人獣"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "じんじゅう",
+      "targetWord": "人獣",
+      "word": "人獣"
+     },
+     {
+      "definitions": [
+       "ethnic group which lived in Kyūshū in ancient times and opposed the state of Yamato"
+      ],
+      "forms": [
+       "隼人"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "はやと",
+      "targetWord": "隼人",
+      "word": "隼人"
+     },
+     {
+      "definitions": [
+       "earth and heaven",
+       "human and heavenly beings"
+      ],
+      "forms": [
+       "人天"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "にんでん",
+      "targetWord": "人天",
+      "word": "人天"
+     },
+     {
+      "definitions": [
+       "study of classical Japanese literature and culture"
+      ],
+      "forms": [
+       "和学"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "わがく",
+      "targetWord": "和学",
+      "word": "和学"
+     },
+     {
+      "definitions": [
+       "person specially invited to compose and recite a poem at the Imperial New Year's Poetry Reading"
+      ],
+      "forms": [
+       "召人"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "めしうど",
+      "targetWord": "召人",
+      "word": "召人"
+     },
+     {
+      "definitions": [
+       "down-and-out person"
+      ],
+      "forms": [
+       "徒人"
+      ],
+      "is_common": false,
+      "language": "japanese",
+      "languages": [
+       "japanese"
+      ],
+      "pronunciation": "いたずらびと",
+      "targetWord": "徒人",
+      "word": "徒人"
+     }
+    ]
+   },
    "beauty": {
     "results": [
      {
@@ -1667,6 +2470,9 @@
       "word": "玉人"
      }
     ]
+   },
+   "bingmaweidong, liangcaoxianxing": {
+    "error": "500: Search failed: fts5: syntax error near \",\""
    },
    "bunjin": {
     "results": [
@@ -3047,6 +3853,9 @@
       "word": "人虱"
      }
     ]
+   },
+   "ime-ji": {
+    "error": "500: Search failed: no such column: ji"
    },
    "interruption": {
     "results": [
@@ -4566,6 +5375,9 @@
      }
     ]
    },
+   "maikuroa-ruenue-": {
+    "error": "500: Search failed: no such column: ruenue"
+   },
    "man": {
     "results": [
      {
@@ -5558,6 +6370,9 @@
       "word": "每人"
      }
     ]
+   },
+   "monsuta-": {
+    "error": "500: Search failed: fts5: syntax error near \"\""
    },
    "nannin": {
     "results": [
@@ -6815,6 +7630,9 @@
      }
     ]
    },
+   "person, people": {
+    "error": "500: Search failed: fts5: syntax error near \",\""
+   },
    "pharmaceutics": {
     "results": [
      {
@@ -7940,6 +8758,9 @@
       "word": "人定"
      }
     ]
+   },
+   "renho-": {
+    "error": "500: Search failed: fts5: syntax error near \"\""
    },
    "renshou": {
     "results": [
@@ -14360,15 +15181,26 @@
     ]
    }
   },
+  "failed": [
+   "\"",
+   "AND",
+   "*",
+   "renho-",
+   "person, people",
+   "bingmaweidong, liangcaoxianxing",
+   "ime-ji",
+   "monsuta-",
+   "maikuroa-ruenue-"
+  ],
   "named": {},
   "provenance": {
    "results": "each a group of the search index's rows: CC-CEDICT's and Unihan's definitions (through Dong Chinese's export, kiokun-data data/chinese_dictionary_word_2025-06-25.jsonl, items tagged cedict or unicode), JMdict's glosses (jmdict-simplified 3.6.1), with the builder's romanizations",
    "the index": "kiokun-data's output_search_index.csv at a47956fb, or the repository's sample of it (examples/kiokun/data/search-sample.csv), with the hand-made aliases where the sample is read"
   },
-  "queries": 103,
+  "queries": 111,
   "rows": 2765,
   "stride": 97
  },
- "pleris_commit": "131f089b2eb19f2c56e5078780e850009253ec31",
+ "pleris_commit": "0fe81cc20af4c7063a389542d3ea44eb4fa76e5f",
  "produced_by": "just e14-kiokun-search"
 }

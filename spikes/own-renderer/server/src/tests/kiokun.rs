@@ -1729,8 +1729,10 @@ fn search_wanted(answer: &serde_json::Value, language: &str) -> Vec<String> {
 
 /// **The search page against kiokun.com's answers**: each query's hits, in
 /// each language's column, beside the oracle's. A query kiokun.com answers
-/// with an error is counted by name where the page fails too (Difference
-/// 27); any other difference is listed.
+/// with an error (FTS5 reading it as syntax) is counted by name where the
+/// page answers it, 200 (Difference 27: a search does not fail on what a
+/// reader types); any other difference is listed, a page that fails on it
+/// among them.
 fn search_held_to_oracle(
     s: &Server,
     oracle: &serde_json::Value,
@@ -1742,9 +1744,15 @@ fn search_held_to_oracle(
         let page = fetched(s, &search_path(q));
         if answer.get("error").is_some() {
             if page.starts_with("HTTP/1.1 200") {
-                differ.push(format!("{q}: kiokun.com {}, the page 200", answer["error"]));
+                *named
+                    .entry("a search kiokun.com fails, answered".to_string())
+                    .or_default() += 1;
             } else {
-                *named.entry("a failed search".to_string()).or_default() += 1;
+                differ.push(format!(
+                    "{q}: kiokun.com {}, and the page fails too: {}",
+                    answer["error"],
+                    page.lines().next().unwrap_or_default()
+                ));
             }
             continue;
         }
@@ -1825,7 +1833,11 @@ fn search_matches_kiokuns_answers_for_the_sample() {
 /// - a Japanese form groups under its canonical page: 学生 is one hit,
 ///   written 学生, linking 學生, read in Japanese and Chinese;
 /// - a query nothing matches says so;
-/// - a query FTS5 cannot read fails, as kiokun.com's does.
+/// - what kiokun.com answers 500, FTS5 reading it as syntax, is answered as
+///   words (Difference 27; the integrator's ruling of 2026-10-11): the four
+///   inputs its oracle found fail there, a romanization's `-` and a comma
+///   among them, and `"`, `*` and `AND`. Those answers are the rewrite's
+///   own, not kiokun.com's.
 #[test]
 fn search_reads_kana_variants_and_canonical_pages() {
     let s = served_kiokun();
@@ -1864,9 +1876,57 @@ fn search_reads_kana_variants_and_canonical_pages() {
     assert!(student.contains("Found 1 result<"), "{student}");
     let none = html("zzzzqq");
     assert!(none.contains("No results for “zzzzqq”"), "{none}");
-    for unreadable in ["\"", "AND"] {
-        let page = fetched(&s, &search_path(unreadable));
-        assert!(!page.starts_with("HTTP/1.1 200"), "{unreadable}: {page}");
+    // Nothing in the sample holds these words: each is answered, and found
+    // nothing.
+    for nothing in [
+        "\"",
+        "*",
+        "bingmaweidong, liangcaoxianxing",
+        "ime-ji",
+        "monsuta-",
+        "maikuroa-ruenue-",
+    ] {
+        let page = html(nothing);
+        assert!(page.contains("No results for “"), "{nothing}: {page}");
+        for language in ["chinese", "japanese", "korean"] {
+            assert_eq!(
+                search_hits_in(&page, language),
+                Vec::<String>::new(),
+                "{nothing}"
+            );
+        }
+    }
+    // A word that is FTS5's operator is the word.
+    let and = html("and");
+    for language in ["chinese", "japanese", "korean"] {
+        assert_eq!(
+            search_hits_in(&html("AND"), language),
+            search_hits_in(&and, language),
+            "AND, {language}"
+        );
+    }
+    assert!(!search_hits_in(&and, "chinese").is_empty(), "{and}");
+    // A romanization's long-vowel `-`: 人和, read レンホー, romanized renho-.
+    let renho = search_hits_in(&html("renho-"), "japanese");
+    assert!(
+        renho
+            .first()
+            .is_some_and(|h| h.starts_with("人和 | [レンホー]")),
+        "{renho:?}"
+    );
+    // A comma between words: both words, in any order.
+    let people = search_hits_in(&html("person, people"), "chinese");
+    let targets: Vec<&str> = people
+        .iter()
+        .map(|h| h.rsplit(" | ").next().unwrap_or_default())
+        .collect();
+    let want: Vec<String> = ["漢人", "華人", "港人"]
+        .iter()
+        .map(|w| path_of(w).trim_start_matches("/word/").to_string())
+        .collect();
+    assert_eq!(targets.len(), 3, "{people:?}");
+    for w in &want {
+        assert!(targets.contains(&w.as_str()), "{w} in {people:?}");
     }
 }
 

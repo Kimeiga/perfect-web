@@ -282,9 +282,11 @@ impl Index {
     }
 
     /// **The Latin statement** (`api/search/+server.ts`): the query matched
-    /// over every column as FTS5 reads it; an exact definition at 1000, an
-    /// exact reading at 900, a reading's prefix at 600, a definition's at
-    /// 500, a whole word of a definition at 100; then common, earlier.
+    /// over every column, each of its terms an FTS5 string (`as_words`); an
+    /// exact definition at 1000, an exact reading at 900, a reading's prefix
+    /// at 600, a definition's at 500, a whole word of a definition at 100;
+    /// then common, earlier. The ranks compare the query as typed, as
+    /// kiokun.com's do.
     pub(crate) fn latin(&self, query: &str, limit: i64) -> Result<Vec<Row>, String> {
         let sql = "SELECT word, language, definition, pronunciation, reading_search, is_common, \
              CASE \
@@ -298,9 +300,30 @@ impl Index {
              ELSE 0 END as custom_rank \
              FROM dictionary_search WHERE dictionary_search MATCH ? \
              ORDER BY custom_rank DESC, is_common DESC, rowid ASC LIMIT ?";
-        let mut binds: Vec<Sql> = (0..8).map(|_| Sql::Text(query.to_string())).collect();
+        let mut binds: Vec<Sql> = (0..7).map(|_| Sql::Text(query.to_string())).collect();
+        binds.push(Sql::Text(as_words(query)));
         binds.push(Sql::Integer(limit));
         self.rows(sql, binds)
+    }
+}
+
+/// **A query as FTS5 words, never its syntax** (the integrator's ruling of
+/// 2026-10-11: a search must not fail on what a reader types). kiokun.com
+/// binds the query as FTS5's query language, so `"`, `AND`, `*` or `e.g.`
+/// is a syntax error and its endpoint answers 500 (the search ADR's
+/// Difference 27). Here each whitespace-separated term is an FTS5 string,
+/// its inner `"` doubled, and the terms are joined as FTS5's implicit AND,
+/// which is what kiokun.com's query of plain words already means. A query
+/// of no terms is the empty string, which matches nothing.
+pub(crate) fn as_words(query: &str) -> String {
+    let terms: Vec<String> = query
+        .split_whitespace()
+        .map(|t| format!("\"{}\"", t.replace('"', "\"\"")))
+        .collect();
+    if terms.is_empty() {
+        "\"\"".to_string()
+    } else {
+        terms.join(" ")
     }
 }
 
@@ -328,6 +351,48 @@ impl Aliases {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_query_is_words_whatever_it_holds() {
+        assert_eq!(as_words("to eat"), r#""to" "eat""#);
+        assert_eq!(as_words("\""), r#""""""#);
+        assert_eq!(as_words(r#"say "hi""#), r#""say" """hi""""#);
+        assert_eq!(as_words("AND"), r#""AND""#);
+        assert_eq!(as_words("eat*"), r#""eat*""#);
+        assert_eq!(as_words(" \t "), r#""""#);
+    }
+
+    /// Every input FTS5 cannot read as its query language is answered, and
+    /// plain words find what they found raw.
+    #[test]
+    fn a_query_fts5_cannot_read_raw_is_answered() {
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        let csv = dir.path().join("index.csv");
+        std::fs::write(
+            &csv,
+            "word,language,definition,pronunciation,reading_search,is_common\n\
+             a,chinese,and then,ā,a,1\n\
+             b,chinese,\"say \"\"hi\"\"\",bǐ,bi,0\n\
+             c,chinese,e.g. example,cī,ci,0\n",
+        )
+        .expect("the CSV");
+        let index = Index::open(&csv, &dir.path().join("cache")).expect("the index");
+        let words = |q: &str| -> Vec<String> {
+            index
+                .latin(q, 10)
+                .unwrap_or_else(|e| panic!("{q:?} failed: {e}"))
+                .into_iter()
+                .map(|r| r.word)
+                .collect()
+        };
+        for q in ["\"", "NEAR", "*", "(of", "don't", " "] {
+            assert_eq!(words(q), Vec::<String>::new(), "{q:?}");
+        }
+        assert_eq!(words("and then"), vec!["a"]);
+        assert_eq!(words("AND"), vec!["a"]);
+        assert_eq!(words("\"hi\""), vec!["b"]);
+        assert_eq!(words("e.g."), vec!["c"]);
+    }
 
     #[test]
     fn a_csv_record_holds_quotes_commas_and_line_breaks() {
