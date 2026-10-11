@@ -138,6 +138,7 @@ if koka_accepts "$control_c"; then control_c_result="FAIL (Koka accepted it)"; e
     echo "E9 gate item 2 — differential agreement with Koka"
     echo
     echo "produced by: just e9-parity"
+    echo "commit: $(git -C "$REPO_ROOT" rev-parse HEAD)$(git -C "$REPO_ROOT" diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"
     echo "koka: $(koka --version | head -1)"
     echo
     echo "Every accepted corpus file that lowers to the pure subset (ADR-0015),"

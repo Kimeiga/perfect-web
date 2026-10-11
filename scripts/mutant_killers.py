@@ -18,7 +18,9 @@ run whole again before its evidence is recorded.
 `--suite` keeps the mutants whose suite (the element before the file) is
 that name; without it, every mutant. The command is run as given, with
 `--no-fail-fast` added after `test`. Prints, for each mutant, the targets
-that fail under it, then the union as `--test` arguments. A mutant no
+that fail under it, and where one target alone fails, its failing tests by
+name (a suite of one target, the development server's, is narrowed by
+test name), then the union as `--test` arguments. A mutant no
 target fails is a survivor of the whole suite, and is said so: narrowing
 cannot help it, and the script's own run reports it.
 
@@ -48,6 +50,20 @@ TIMEOUT = 3600
 # `Running unittests src/lib.rs (..)`: the target whose results follow.
 RUNNING = re.compile(r"^\s*Running (\S+)(?: \(([^)]*)\))?")
 RESULT = re.compile(r"test result: (ok|FAILED)\. (\d+) passed; (\d+) failed")
+# `test tests::a_change_reaches_each_page ... FAILED`: a failing test, by the
+# name a filter matches (`-- --exact <name>`), for a suite of one target
+# such as the development server's.
+FAILING = re.compile(r"^test (\S+) \.\.\. FAILED")
+
+
+def tests_failed(output):
+    """Each failing test's name, in the order the run reported them."""
+    names = []
+    for line in output.splitlines():
+        m = FAILING.match(line.strip())
+        if m and m.group(1) not in names:
+            names.append(m.group(1))
+    return names
 
 
 # Cargo's own account at the end of a `--no-fail-fast` run: `error: 2
@@ -178,6 +194,7 @@ def main():
         finally:
             restore()
         failed, ran = targets_failed(out)
+        tests = tests_failed(out)
         if hung:
             verdict = "a hang (every target is a killer: narrow none)"
             failed = ["*"]
@@ -185,10 +202,13 @@ def main():
             verdict = "does not build (no target needed)"
         elif failed:
             verdict = "killed by " + ", ".join(failed)
+            if len(failed) == 1:
+                shown = " ".join(tests[:8]) + (" .." if len(tests) > 8 else "")
+                verdict += f" ({len(tests)} tests: {shown})"
         else:
             verdict = "SURVIVED the whole suite"
         print(f"{what}: {verdict}", flush=True)
-        report[what] = failed
+        report[what] = {"targets": failed, "tests": tests}
         for t in failed:
             if t not in killers:
                 killers.append(t)

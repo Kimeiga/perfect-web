@@ -48,6 +48,9 @@ class Killers(unittest.TestCase):
         green = RUN.replace("test result: FAILED. 1 passed; 1 failed", "test result: ok. 2 passed; 0 failed")
         self.assertEqual(killers.targets_failed(green), ([], True))
 
+    def test_a_failing_test_is_named(self):
+        self.assertEqual(killers.tests_failed(RUN), ["a_label_names_the_first_element_with_its_id"])
+
     def test_a_run_that_built_nothing_ran_nothing(self):
         # A mutant that does not build: no result, and so no killer named.
         self.assertEqual(killers.targets_failed("error[E0308]: mismatched types\n"), ([], False))

@@ -43,6 +43,7 @@ echo "$out"
   echo "E8 — the artifact audit"
   echo
   echo "produced by: just e8-host"
+  echo "commit: $(git -C "$REPO_ROOT" rev-parse HEAD)$(git -C "$REPO_ROOT" diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"
   echo
   echo "Three checks on data (no engine), fifteen more in tests/admission.rs:"
   echo "  placement and capability are separate and can disagree either way"

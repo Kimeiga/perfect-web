@@ -171,3 +171,12 @@ The audit now builds each guest itself
 (`cargo build --locked --release --target wasm32-wasip2`, each into its own
 `target/`, where the tests read it). `rust-toolchain.toml` already installs
 the target.
+
+Its first run since then failed, and so did the recipe: a test the rule of
+2026-10-01 (`e20caefc`, a call reaches only an export whose place in the
+component the contract names) had made a refusal. `tests/artifact.rs`'s
+contract declared `lookup` with no place, so its granted guest's call was
+refused as "not an export declared by component contract `spike.Store`".
+Every test that reads a guest is ignored where the guests are not built, and
+none was run for ten days. The test's contract now names the export's place.
+The evidence names its commit, and so does `e9-parity`'s, which named none.
