@@ -189,16 +189,17 @@ session page SearchPage(q: Option<String>) {
         <meta name="robots" content="noindex, follow" />
         <main>
             <h1>{search.title}</h1>
-            <!-- With no `q`, what can be searched for. -->
-            {#match q}
-            {:Some(_)}
-            {:None}<p id="search-intro">Search the stores by name or cuisine, and their dishes by name or what they are.</p>
-            {/match}
             <form id="search-form" method="get" action="/search" role="search">
                 <label>Stores and dishes <input id="search-q" type="search" name="q" value={search.asked} /></label>
                 <button>Search</button>
             </form>
-            <p id="search-said" role="status">{search.said}</p>
+            <!-- What was found, or with no `q`, what can be searched for.
+                 The sentence is told where it is when the search's result
+                 changes, its arm being the document's (ADR-XXXX). -->
+            {#match q}
+            {:Some(_)}<p id="search-said" role="status">{search.said}</p>
+            {:None}<p id="search-intro">Search the stores by name or cuisine, and their dishes by name or what they are.</p>
+            {/match}
             <ul id="search-stores">
                 {#each search.stores as store (store.id)}
                     <li>

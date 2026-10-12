@@ -878,20 +878,86 @@ pub fn settled_patch(
 }
 
 fn find_part(chunks: &[Chunk], want: PartId) -> Option<&Part> {
+    match chunk_of(chunks, want)? {
+        Chunk::Dynamic(p) => Some(p),
+        Chunk::Static(_) => None,
+    }
+}
+
+/// The chunk that is the part numbered `want`, wherever it is in `chunks`.
+fn chunk_of(chunks: &[Chunk], want: PartId) -> Option<&Chunk> {
     for c in chunks {
         let Chunk::Dynamic(p) = c else { continue };
         if p.id() == Some(want) {
-            return Some(p);
+            return Some(c);
         }
         if let Some(found) = p
             .nested()
             .into_iter()
-            .find_map(|inner| find_part(inner, want))
+            .find_map(|inner| chunk_of(inner, want))
         {
             return Some(found);
         }
     }
     None
+}
+
+/// **The arm a `{#match}` on `value` shows at `env`, and the env its body is
+/// rendered in** (ADR-0042): the arm whose case the value is, the case's
+/// payload bound to its name, or each field of a case of several to each of
+/// its names (ADR-0061). One reading for a render and for what changed
+/// inside it.
+fn arm_shown<'a>(arms: &'a [Arm], value: &str, env: &Env) -> Result<(&'a Arm, Env), Blocked> {
+    let v = env.get(value).ok_or(Blocked::MissingValue {
+        path: value.to_string(),
+    })?;
+    let Value::Variant { case, payload } = v else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: "a `{#match}` takes an Option or a Result apart".to_string(),
+            at: value.to_string(),
+        });
+    };
+    let arm =
+        arms.iter()
+            .find(|a| a.case == *case)
+            .ok_or_else(|| Blocked::UnrepresentedConstruct {
+                reason: format!("no arm renders `{case}`"),
+                at: value.to_string(),
+            })?;
+    let mut scoped = match (&arm.binding, payload) {
+        (Some(name), Some(p)) => env.with(name, (**p).clone()),
+        (Some(_), None) => {
+            return Err(Blocked::UnrepresentedConstruct {
+                reason: format!("`{case}` has no payload to bind"),
+                at: value.to_string(),
+            });
+        }
+        (None, _) => env.clone(),
+    };
+    // A case of several fields: its payload is a list of them, one per name
+    // (ADR-0061).
+    if !arm.fields.is_empty() {
+        let Some(Value::List(parts)) = payload.as_deref() else {
+            return Err(Blocked::UnrepresentedConstruct {
+                reason: format!("`{case}` has no fields to bind"),
+                at: value.to_string(),
+            });
+        };
+        if parts.len() != arm.fields.len() {
+            return Err(Blocked::UnrepresentedConstruct {
+                reason: format!(
+                    "`{case}` has {} field(s), and the arm binds {}",
+                    parts.len(),
+                    arm.fields.len()
+                ),
+                at: value.to_string(),
+            });
+        }
+        for (name, part) in arm.fields.iter().zip(parts) {
+            scoped = scoped.with(name, part.clone());
+        }
+    }
+    Ok((arm, scoped))
 }
 
 /// Render ONE instance of a keyed loop, anchors included.
@@ -1153,10 +1219,12 @@ pub fn instance_env(t: &Template, each: PartId, item: &Value, env: &Env) -> Resu
 }
 
 /// **What changed in one instance of the keyed loop `each`, from `was` to
-/// `now`, part by part** (ADR-0168): each text part's new text, and each
-/// attribute's new value, in the order the template writes them. `None` when
-/// anything else changed (a block, a component, a raw value, what a handler
-/// captures): the instance is rendered again.
+/// `now`, part by part** (ADR-0168): each text part's new text, each
+/// attribute's new value, what each element's handlers capture, and each
+/// keyed list's changes, in the order the template writes them, inside a
+/// block that shows the branch it showed too. `None` when anything changed
+/// that is not set in place (a block that shows another branch, a view's
+/// instance, a raw value, an unkeyed list): the instance is rendered again.
 ///
 /// Until 2026-10-03 a host patched an instance's text parts and nothing
 /// else, so an attribute that read a changed field kept its old value: an
@@ -1218,6 +1286,37 @@ fn row_changes(
     Ok(Some(out))
 }
 
+/// **What changed in the block `block`, from `before` to `after`, part by
+/// part** (ADR-XXXX): while it shows the arm it showed, each part inside it
+/// set where it is, as a row's are (ADR-0168, ADR-0178). `None` where it
+/// shows another arm, or where anything changed inside it that is not set in
+/// place (a view's instance, a raw value, an unkeyed list): the block is
+/// rendered again, whole.
+pub fn block_changes(
+    t: &Template,
+    block: PartId,
+    before: &Env,
+    after: &Env,
+    others: &[Template],
+) -> Result<Option<Vec<(PartId, InstanceChange)>>, Blocked> {
+    let Some(chunk) = chunk_of(&t.chunks, block) else {
+        return Err(Blocked::UnrepresentedConstruct {
+            reason: format!("no part {block} in `{}`", t.path),
+            at: t.path.clone(),
+        });
+    };
+    let chunk = std::slice::from_ref(chunk);
+    // Each element's handlers in the block, whose captures are one
+    // attribute of it (ADR-0172).
+    let mut handlers: BTreeMap<ElementId, Vec<&Part>> = BTreeMap::new();
+    handlers_within(chunk, &mut handlers);
+    let mut out = Vec::new();
+    if !changes_within(chunk, before, after, &handlers, others, &t.path, &mut out)? {
+        return Ok(None);
+    }
+    Ok(Some(out))
+}
+
 /// Every event part in `chunks`, and in the blocks inside them, by its
 /// element.
 fn handlers_within<'t>(chunks: &'t [Chunk], out: &mut BTreeMap<ElementId, Vec<&'t Part>>) {
@@ -1237,7 +1336,8 @@ fn handlers_within<'t>(chunks: &'t [Chunk], out: &mut BTreeMap<ElementId, Vec<&'
 /// that decides as it did is looked into, and its branch's parts are set
 /// where they are (ADR-0178): until 2026-10-04 any change inside a block
 /// rendered the row again, and a renamed item whose Add sat in one lost its
-/// button's node.
+/// button's node. A `{#match}` that shows the arm it showed is too
+/// (ADR-XXXX).
 #[allow(clippy::too_many_arguments)]
 fn changes_within(
     chunks: &[Chunk],
@@ -1325,6 +1425,20 @@ fn changes_within(
                 }
                 let branch = if x { then } else { otherwise };
                 if !changes_within(branch, before, after, handlers, others, at, out)? {
+                    return Ok(false);
+                }
+            }
+            // **A `{#match}` that shows the arm it showed is looked into**, as
+            // a conditional is, its names bound to what each side gives them
+            // (ADR-XXXX). Until 2026-10-12 one rendered its region again for
+            // any change inside it.
+            Part::Match { value, arms, .. } => {
+                let (x, was) = arm_shown(arms, value, before)?;
+                let (y, now) = arm_shown(arms, value, after)?;
+                if x.case != y.case {
+                    return Ok(false);
+                }
+                if !changes_within(&y.body, &was, &now, handlers, others, at, out)? {
                     return Ok(false);
                 }
             }
@@ -2043,54 +2157,7 @@ fn emit_part<'o>(
         // The arm whose case the value is, its payload bound (ADR-0042). A
         // range, as a conditional is: the runtime replaces it whole.
         Part::Match { id, value, arms } => {
-            let v = env.get(value).ok_or(Blocked::MissingValue {
-                path: value.clone(),
-            })?;
-            let Value::Variant { case, payload } = v else {
-                return Err(Blocked::UnrepresentedConstruct {
-                    reason: "a `{#match}` takes an Option or a Result apart".to_string(),
-                    at: value.clone(),
-                });
-            };
-            let arm = arms.iter().find(|a| a.case == *case).ok_or_else(|| {
-                Blocked::UnrepresentedConstruct {
-                    reason: format!("no arm renders `{case}`"),
-                    at: value.clone(),
-                }
-            })?;
-            let mut scoped = match (&arm.binding, payload) {
-                (Some(name), Some(p)) => env.with(name, (**p).clone()),
-                (Some(_), None) => {
-                    return Err(Blocked::UnrepresentedConstruct {
-                        reason: format!("`{case}` has no payload to bind"),
-                        at: value.clone(),
-                    });
-                }
-                (None, _) => env.clone(),
-            };
-            // A case of several fields: its payload is a list of them, one
-            // per name (ADR-0061).
-            if !arm.fields.is_empty() {
-                let Some(Value::List(parts)) = payload.as_deref() else {
-                    return Err(Blocked::UnrepresentedConstruct {
-                        reason: format!("`{case}` has no fields to bind"),
-                        at: value.clone(),
-                    });
-                };
-                if parts.len() != arm.fields.len() {
-                    return Err(Blocked::UnrepresentedConstruct {
-                        reason: format!(
-                            "`{case}` has {} field(s), and the arm binds {}",
-                            parts.len(),
-                            arm.fields.len()
-                        ),
-                        at: value.clone(),
-                    });
-                }
-                for (name, part) in arm.fields.iter().zip(parts) {
-                    scoped = scoped.with(name, part.clone());
-                }
-            }
+            let (arm, scoped) = arm_shown(arms, value, env)?;
             out.push_str(&format!("<!--pw:s{id}-->"));
             emit(&arm.body, &scoped, others, out)?;
             out.push_str(&format!("<!--pw:e{id}-->"));

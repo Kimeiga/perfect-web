@@ -73,8 +73,8 @@ MUTANTS = [
         "a block a host's subject decides is not rendered again",
         "cargo",
         VALUES,
-        "                || derived_values.iter().any(|d| d.path == entry.value))\n",
-        "                || false)\n",
+        "                || derived_values.iter().any(|d| d.path == entry.value)\n                || part.nested()",
+        "                || false\n                || part.nested()",
     ),
     (
         "a value the host computes in a block is a text part of its own",

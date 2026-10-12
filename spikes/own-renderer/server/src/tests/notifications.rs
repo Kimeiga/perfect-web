@@ -163,13 +163,14 @@ fn reaches_each_session(s: &Server) {
     };
     run(s, "like", "s-bob", &[&post], "i-2");
     s.tell_waiting();
+    // The count, set where it is in the block that shows it (ADR-XXXX).
     for doc in &docs[..2] {
-        let sets = told(s, doc);
-        assert!(sets.contains("Notifications: 1 unread"), "{doc:?}: {sets}");
+        let counts = texts_told(s, doc, HOME, "waiting");
+        assert_eq!(counts, ["1"], "{doc:?}: {}", told(s, doc));
     }
     // The control: bob's own page is told nothing of alice's.
-    let bobs = told(s, &docs[2]);
-    assert!(!bobs.contains("Notifications: 1 unread"), "{bobs}");
+    let bobs = texts_told(s, &docs[2], HOME, "waiting");
+    assert!(bobs.is_empty(), "{bobs:?}: {}", told(s, &docs[2]));
 }
 
 /// **An entry at a user, as the host keys it** (`entry_key`): a private
@@ -280,8 +281,8 @@ fn read_everywhere(s: &Server) {
     };
     run(s, "mark_read", "s-alice-1", &[], "i-5");
     s.tell_waiting();
-    let other = told(s, &docs[0]);
-    assert!(other.contains("Notifications: 0 unread"), "{other}");
+    let other = texts_told(s, &docs[0], HOME, "waiting");
+    assert_eq!(other, ["0"], "{}", told(s, &docs[0]));
     assert_eq!(count_on_home(s, "s-alice-2"), "0");
     let page = shown(s, "s-alice-2", PAGE);
     assert!(
@@ -289,8 +290,12 @@ fn read_everywhere(s: &Server) {
         "{page}"
     );
     // The control: bob's are his, unread.
-    let bobs = told(s, &docs[1]);
-    assert!(!bobs.contains("Notifications: 0 unread"), "{bobs}");
+    let bobs = texts_told(s, &docs[1], HOME, "waiting");
+    assert!(
+        !bobs.contains(&"0".to_string()),
+        "{bobs:?}: {}",
+        told(s, &docs[1])
+    );
     assert_eq!(count_on_home(s, "s-bob"), "1");
 }
 

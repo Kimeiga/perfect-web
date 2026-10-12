@@ -515,6 +515,21 @@ fn own_reads(p: &crate::template_ir::Part) -> Vec<String> {
     }
 }
 
+/// **Does anything `chunks` renders read a query's value**, as `queried`
+/// tells it, at any depth: a block inside it, a loop's list, a view's
+/// instance given one (ADR-XXXX).
+fn renders(
+    chunks: &[crate::template_ir::Chunk],
+    queried: &dyn Fn(&crate::template_ir::Part) -> bool,
+) -> bool {
+    chunks.iter().any(|c| match c {
+        crate::template_ir::Chunk::Dynamic(p) => {
+            queried(p) || p.nested().into_iter().any(|r| renders(r, queried))
+        }
+        crate::template_ir::Chunk::Static(_) => false,
+    })
+}
+
 /// **What a page's canonical address reads** (ADR-0311): each value among
 /// its route's arguments.
 fn canonical_reads(args: &[(String, crate::template_ir::TitlePiece)]) -> Vec<String> {
@@ -689,9 +704,12 @@ pub struct PageValues {
     /// The parts its signals decide.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub live: Vec<Live>,
-    /// **The blocks a query's value decides, at the top of the page**
-    /// (ADR-0146): a host renders each from the bindings' values, and again
-    /// when what it renders changed. A block inside one is rendered with it.
+    /// **Each block at the top of the page that renders a query's value**
+    /// (ADR-0146): one a query's value decides, and one whatever decides it
+    /// that renders one inside it (ADR-XXXX). A host renders each from the
+    /// bindings' values, and again when what it renders changed: part by
+    /// part while it shows the arm it showed. A block inside one is rendered
+    /// with it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocks: Vec<u32>,
     /// **Each region that shows a query's state** (ADR-0148): a host runs
@@ -1810,6 +1828,25 @@ fn plan(
     // rendered again when that query changes: the row is rendered again for
     // its item (ADR-0145). Refused, until rows are (ADR-0146).
     in_rows(&template.chunks, &found_names(&found), false)?;
+    // **What reads a query's value**, by its part: a path whose root is a
+    // query's binding, a value a host computes from one (ADR-0226,
+    // ADR-0229), or what a handler captures of one (ADR-0217).
+    let queried = |p: &crate::template_ir::Part| -> bool {
+        let found_root = |path: &str| {
+            let root = path.split('.').next().unwrap_or_default();
+            found.iter().any(|(n, ..)| n == root)
+        };
+        own_reads(p)
+            .iter()
+            .any(|v| found_root(v) || derived_values.iter().any(|d| d.path == *v))
+            || p.id().is_some_and(|id| {
+                others.iter().any(|r| {
+                    r.part == id
+                        && r.kind == crate::template_ir::ReadKind::Captures
+                        && found_root(&r.path)
+                })
+            })
+    };
     for entry in template.manifest() {
         if entry.kind == "each"
             && let Some(root) = entry.value.split('.').next()
@@ -1822,13 +1859,20 @@ fn plan(
         // and renders it again when what it renders changed. At the top of
         // the page, or inside such a block, which renders it again with it.
         // Its subject a host computes from a query's value too (ADR-0229).
+        // **And one that renders a query's value, whatever decides it**
+        // (ADR-XXXX): a page's parameter, or what the page asks of its
+        // reader, decides its arm for the document's life, and what the arm
+        // renders changes with the query. Until 2026-10-12 none was planned,
+        // and the search's sentence inside `{#match q}` was never told (W9).
         if matches!(entry.kind, "conditional" | "match")
             && let Some(root) = entry.value.split('.').next()
+            && let Some(part) = template.chunks.iter().find_map(|c| match c {
+                crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id) => Some(p),
+                _ => None,
+            })
             && (found.iter().any(|(n, ..)| n == root)
-                || derived_values.iter().any(|d| d.path == entry.value))
-            && template.chunks.iter().any(
-                |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),
-            )
+                || derived_values.iter().any(|d| d.path == entry.value)
+                || part.nested().into_iter().any(|r| renders(r, &queried)))
         {
             blocks.push(entry.id.0);
         }

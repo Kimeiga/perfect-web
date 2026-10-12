@@ -295,13 +295,18 @@ fn read_everywhere(s: &Server) {
     };
     run(s, "read_conversation", "s-alice-1", &["bob"], "i-9");
     s.tell_waiting();
-    let other = told(s, &docs[0]);
-    assert!(other.contains("Messages: 0 unread"), "{other}");
+    // The count, set where it is in the block that shows it (ADR-XXXX).
+    let other = texts_told(s, &docs[0], HOME, "unread_dms");
+    assert_eq!(other, ["0"], "{}", told(s, &docs[0]));
     let talk = shown(s, "s-alice-2", TALK, &with("bob"));
     assert!(talk.contains("Four") && !talk.contains("New"), "{talk}");
     // The control: Carol's are hers, unread.
-    let carols = told(s, &docs[1]);
-    assert!(!carols.contains("Messages: 0 unread"), "{carols}");
+    let carols = texts_told(s, &docs[1], HOME, "unread_dms");
+    assert!(
+        !carols.contains(&"0".to_string()),
+        "{carols:?}: {}",
+        told(s, &docs[1])
+    );
     assert_eq!(count_on_home(s, "s-carol"), "1");
 }
 

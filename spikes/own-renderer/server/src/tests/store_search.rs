@@ -191,6 +191,47 @@ fn an_open_search_page_is_told_of_a_menu_change() {
     assert!(told.contains("1 store matches"), "{told}");
 }
 
+/// **The sentence is told where it is** (ADR-XXXX): inside the `Some` arm of
+/// `{#match q}`, which the page's parameter decides for the document's life,
+/// it is set as text, and the arm is not rendered again, so the status
+/// region is the region it was. Until 2026-10-12 a block a query did not
+/// decide was not planned, and the sentence was never told (W9's finding).
+#[test]
+fn the_sentence_inside_its_arm_is_told_where_it_is() {
+    let s = served();
+    let params = Params::from([("q".to_string(), "flat white".to_string())]);
+    s.serve_document_settled("a", "store.search.SearchPage", &params, &[])
+        .expect("served");
+    let doc = latest(&s.pending.lock().expect("pending"), "a");
+    let before = sets_of(&s, &doc).len();
+    let answer = posted(
+        &s,
+        "/command/menu?op=insert_after&id=flat-white&name=Flat%20White",
+        "b",
+        "menu-1",
+        "",
+    );
+    assert!(answer.starts_with("HTTP/1.1 202"), "{answer}");
+    let sets = sets_of(&s, &doc);
+    let operations: Vec<&PatchOp> = sets[before..]
+        .iter()
+        .flat_map(|set| set.patches.iter().map(|p| &p.operation))
+        .collect();
+    assert!(
+        operations.iter().any(|op| matches!(
+            op,
+            PatchOp::ReplaceText { text } if text == "1 store matches “flat white”."
+        )),
+        "the sentence, as text: {operations:#?}"
+    );
+    assert!(
+        !operations
+            .iter()
+            .any(|op| matches!(op, PatchOp::ReplaceRange { .. })),
+        "no block rendered again: {operations:#?}"
+    );
+}
+
 /// **The store's own page is told of a menu change once**: by the menu's
 /// patches, which insert the dish. The search's telling leaves it out, as
 /// a second reading would insert the dish a second time.
