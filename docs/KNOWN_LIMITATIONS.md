@@ -311,6 +311,11 @@ refused by name:
   renders and is not patched, and neither is a shared list other than the
   menu. A query's error is the server's failure, not a value a page shows.
   kiokun's pages are static.
+  A part inside a block whose subject the page's parameters give, not a
+  query, is not told when a query it reads changes (ADR-0308's Found, W9's
+  `{#match q}`): the plan names a block only when a query's value decides
+  it. The integrator's to fix next; the search's sentence stands outside
+  its match until then.
 - **A clause's words are the clause's** (ADR-0047). Every name resolves in
   lexical scope, but `scope application`'s `application`, or `load`'s
   `on_first_interaction`, is a word of its clause and not a name. A word

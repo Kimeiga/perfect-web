@@ -907,7 +907,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
             W9's, after W8's merge: the home page's form, the cuisine as the
             store's own field (ruled 2026-10-12), `user`, and results
             filtered to the stores that reach the reader's address, through
-            W8's `Reach`;
+            W8's `Reach`. The integrator's, first: a part inside an arm whose
+            subject did not change is told when the query it reads changes
+            (ADR-0308's Found), and the sentence goes back inside the arm;
           - **W9, ratings and reviews** of orders and stores, after
             accounts.
 

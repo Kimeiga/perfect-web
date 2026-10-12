@@ -1191,3 +1191,6 @@ Each a decision for a track, with its date; a track's ADR records it too.
   amended): `route "/search{?q}"`, a plain GET form, 33 of 33 mutants. W9's
   finding, a part inside a `{#match q}` arm not told when what it reads
   changes, is the host's to fix (the integrator's, next).
+  Correction (the integrator's): the merge's message (a391e95a) says the
+  finding stays open in KNOWN_LIMITATIONS and NEXT. Neither recorded it
+  until the commit after it; only the ADR's amendment did.
