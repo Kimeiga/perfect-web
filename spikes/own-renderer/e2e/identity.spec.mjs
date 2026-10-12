@@ -4,12 +4,14 @@
 // (`PW_IDENTITY=dev-accounts`), which this server serves at /dev-idp as a
 // deployment's provider would be served at its own origin.
 //   - a signed-out reader reads the timeline and is shown how to sign in,
-//     where the post form's guard is, and is given no composer (ADR-0302);
-//     a like pressed anyway is refused by the server (`requires SignedIn`,
-//     403), taken back, and told beside the button, in the feed's words for
-//     the predicate, and said by the page's announcer; a tab whose reader
-//     signed out in another is told so at its next post; a press no answer
-//     comes for is told so;
+//     where the post form's guard is, and is given neither a composer nor a
+//     Like (ADR-0302, and the ADR of a control shown where its command's
+//     predicates hold); a like pressed on a page whose reader signed out in
+//     another tab is refused by the server (`requires SignedIn`, 403), taken
+//     back, and told beside the button, in the feed's words for the
+//     predicate, and said by the page's announcer; a tab whose reader signed
+//     out in another is told so at its next post; a press no answer comes for
+//     is told so;
 //   - sign-up at the provider, back signed in, the session cookie HttpOnly
 //     and SameSite=Lax and a new one;
 //   - a post is its author's: named for them to every reader, and a Delete
@@ -65,19 +67,45 @@ async function sessionCookie(context) {
 /** What the page's announcer says, as a screen reader would hear it. */
 const announced = (page) => page.locator(".pw-announcer[role=status]");
 
-test("a signed-out reader reads, is given no composer, and a like is refused where it was pressed", async ({
-  page,
-}) => {
+/**
+ * The page's stream held from now: what tells it of a sign-out in another
+ * tab is its next press. Its next stream request would carry the new
+ * session, whose document it is not, and load it again, signed out, which
+ * also tells the reader; which comes first is a race (found 2026-10-11 in
+ * Firefox), and a page told at once of a principal's change is W8's.
+ */
+const holdStream = (page) =>
+  page.route((url) => new URL(url).pathname === "/stream", () => {});
+
+test("a signed-out reader reads, and is given neither a composer nor a Like", async ({ page }) => {
   await home(page);
   await expect(post(page, "Hello, feed.")).toHaveCount(1);
   await expect(page.locator("#signed-out")).toHaveText("Sign in to post, reply or like.");
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
-  // No composer to be refused at (ADR-0302).
+  // No composer to be refused at (ADR-0302), and no Like: the page asks
+  // `SignedIn` of its reader, and shows a control where it holds.
   await expect(page.getByLabel("What's happening?")).toBeHidden();
   await expect(page.getByRole("button", { name: "Post" })).toBeHidden();
-  // A like pressed anyway: refused before the command runs, and told where
-  // it was pressed, in the feed's words for `SignedIn`.
+  await expect(post(page, "Hello, feed.").getByRole("button", { name: "Like" })).toHaveCount(0);
+});
+
+test("a like pressed on a page whose reader signed out in another tab is refused where it was pressed", async ({
+  browser,
+}, testInfo) => {
+  // Signed in when the page was shown, so its Like is there; signed out in
+  // another tab since: the press is refused before the command runs, and
+  // told where it was pressed. The sign-out gave the browser a new session,
+  // and the page was shown to the old one, so the host refuses it as a page
+  // another reader's, before `requires` is read (track `store-accounts`,
+  // Q3), in the platform's words.
+  const context = await browser.newContext();
+  const [page, there] = [await context.newPage(), await context.newPage()];
+  await signUp(page, handle(testInfo, "lee"), `Lee ${testInfo.project.name}`);
+  await holdStream(page);
+  await home(there);
+  await there.getByRole("button", { name: "Sign out" }).click();
+  await expect(there.locator("#signed-out")).toBeVisible();
   const like = post(page, "Hello, feed.").getByRole("button", { name: "Like" });
   const likes = await post(page, "Hello, feed.").locator(".likes").innerText();
   const refused = page.waitForResponse((r) => r.url().includes("/command/feed.app.like"));
@@ -85,13 +113,13 @@ test("a signed-out reader reads, is given no composer, and a like is refused whe
   await like.focus();
   await like.press("Enter");
   expect((await refused).status()).toBe(403);
-  const words = "Sign in to post, reply, like or follow.";
+  const words = "You signed in or out in another tab. Reload this page to go on.";
   const message = post(page, "Hello, feed.").locator(".pw-refusal");
   await expect(message).toHaveText(words);
   // Named by the button, and said without the focus moving.
   const id = await message.getAttribute("id");
   await expect(like).toHaveAttribute("aria-describedby", new RegExp(`\\b${id}\\b`));
-  await expect(like).toHaveAttribute("data-pw-handler-error", "refused:SignedIn");
+  await expect(like).toHaveAttribute("data-pw-handler-error", "refused:another-reader");
   await expect(announced(page)).toHaveText(words);
   // The focus stays where the press was.
   await expect(like).toBeFocused();
@@ -121,13 +149,19 @@ test("a signed-out reader reads, is given no composer, and a like is refused whe
   await expect
     .poll(() => page.evaluate(() => window.__heard))
     .toEqual({ message: ["", words], said: ["", words] });
-  // What the server answered: the predicate and its words, nothing else.
+  // What the server answers a press from no page, signed out: the predicate
+  // and the feed's words for it, nothing else.
   const answer = await page.request.post("/command/feed.app.like", {
     data: ["p1"],
     headers: { "pw-interaction": `refused-${Date.now()}` },
   });
   expect(answer.status()).toBe(403);
-  expect(await answer.json()).toEqual({ committed: false, refused: "SignedIn", says: words });
+  expect(await answer.json()).toEqual({
+    committed: false,
+    refused: "SignedIn",
+    says: "Sign in to post, reply, like or follow.",
+  });
+  await context.close();
 });
 
 test("the page's announcer is in it from the first byte, empty", async ({ request }) => {
@@ -146,6 +180,7 @@ test("a tab whose reader signed out in another is told so at its next post", asy
   const context = await browser.newContext();
   const [here, there] = [await context.newPage(), await context.newPage()];
   await signUp(here, handle(testInfo, "eve"), `Eve ${testInfo.project.name}`);
+  await holdStream(here);
   await home(there);
   await there.getByRole("button", { name: "Sign out" }).click();
   await expect(there.locator("#signed-out")).toBeVisible();
@@ -167,8 +202,9 @@ test("a tab whose reader signed out in another is told so at its next post", asy
   await context.close();
 });
 
-test("a press no answer comes for is told so", async ({ page }) => {
-  await home(page);
+test("a press no answer comes for is told so", async ({ page }, testInfo) => {
+  // A signed-in reader's Like, which the page shows them.
+  await signUp(page, handle(testInfo, "ned"), `Ned ${testInfo.project.name}`);
   await page.route("**/command/feed.app.like", (route) => route.abort("failed"));
   const like = post(page, "Hello, feed.").getByRole("button", { name: "Like" });
   await like.click();

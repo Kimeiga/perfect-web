@@ -334,7 +334,7 @@
     "path": "store.page.CartPage",
     "name": "CartPage",
     "params": [],
-    "schema": "0653b48a6aee2b1e",
+    "schema": "f3ac052ff4885f65",
     "chunks": [
       {
         "chunk": "static",
@@ -611,28 +611,47 @@
       },
       {
         "chunk": "static",
-        "value": ">\n                Clear\n            </button>\n            \n            <button data-pw=\"5\" id=\"place-order\" type=\"button\""
+        "value": ">\n                Clear\n            </button>\n            \n            "
       },
       {
         "chunk": "dynamic",
         "value": {
-          "part": "event",
+          "part": "conditional",
           "id": 17,
-          "owner": 5,
-          "event": "press",
-          "handler": "1fcfca1cde1b9a61",
-          "name": "place_order"
+          "value": "SignedIn~holds",
+          "then": [
+            {
+              "chunk": "static",
+              "value": "<button data-pw=\"5\" id=\"place-order\" type=\"button\""
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "event",
+                "id": 18,
+                "owner": 5,
+                "event": "press",
+                "handler": "1fcfca1cde1b9a61",
+                "name": "place_order"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">\n                Place order\n            </button>"
+            }
+          ],
+          "otherwise": []
         }
       },
       {
         "chunk": "static",
-        "value": ">\n                Place order\n            </button>\n            "
+        "value": "\n            "
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "match",
-          "id": 18,
+          "id": 19,
           "value": "order",
           "arms": [
             {
@@ -665,7 +684,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 19,
+          "id": 20,
           "pieces": [
             {
               "piece": "text",
@@ -939,7 +958,7 @@
     "params": [
       "id"
     ],
-    "schema": "58e4188af13fff33",
+    "schema": "c7c04600eb2314da",
     "chunks": [
       {
         "chunk": "static",
@@ -1256,7 +1275,7 @@
                       "then": [
                         {
                           "chunk": "static",
-                          "value": "\n                                        <button data-pw=\"1\" type=\"button\" "
+                          "value": "\n                                        \n                                        <button data-pw=\"1\" type=\"button\" "
                         },
                         {
                           "chunk": "dynamic",
@@ -1289,6 +1308,9 @@
                             "name": "add_to_cart",
                             "captures": [
                               "item"
+                            ],
+                            "modifiers": [
+                              "refusable"
                             ]
                           }
                         },

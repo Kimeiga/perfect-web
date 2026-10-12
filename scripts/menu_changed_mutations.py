@@ -89,7 +89,10 @@ CARGO = ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]
 
 # How long one run may take. Past the bound it is killed with everything it
 # started, and the run counts as failing.
-BOUND = 900
+# 1800 since 2026-10-12 (track store-accounts): the server's whole suite,
+# which these mutants run, took 941 to 961 s on CI's runner at 420 tests
+# (verify 38187098071), and its baseline ran past 900 and was stopped.
+BOUND = 1800
 
 
 def run():

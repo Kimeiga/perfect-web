@@ -69,6 +69,8 @@ test.describe("the document the server produced", () => {
     // the menu grouped by category (ADR-0181): the coffee category's
     // instance 2, its heading 2, and its items' own loop 2 = 6. And the menu
     // counted, which the host keeps (ADR-0277): its line 2. And the count of
+    // (ADR-0307's Clear block is not this store's: a cart is anyone's to
+    // change, so its controls ask nothing; track `store-accounts`.)
     // the cart in the layout the page is shown in (ADR-0303): 2. And where
     // deliveries go (track `store-accounts`): whether an address is chosen,
     // its block 2, and whether the store reaches it, its block 2 = 4. 78 in

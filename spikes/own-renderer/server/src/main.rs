@@ -842,6 +842,10 @@ struct Server {
     /// Registered and forgotten with its parameters; a document not in it
     /// is the store's.
     pages: Mutex<BTreeMap<Doc, String>>,
+    /// **What each document's page asked of its reader, as answered when it
+    /// was first read** (ADR-0307): the document's for its life, as the data
+    /// it shows was read for its reader then. Forgotten with it.
+    answers: Mutex<BTreeMap<Doc, BTreeMap<String, bool>>>,
     /// **What commits dropped that other sessions may hold** (ADR-0219),
     /// with the session that committed: told once the request that
     /// committed is answered (`tell_waiting`).
@@ -1583,6 +1587,7 @@ impl Server {
             documents: std::sync::atomic::AtomicU64::new(1),
             params: Mutex::new(BTreeMap::new()),
             pages: Mutex::new(BTreeMap::new()),
+            answers: Mutex::new(BTreeMap::new()),
             telling: Mutex::new(Vec::new()),
             told: Mutex::new(BTreeMap::new()),
             words: BTreeMap::new(),
@@ -2635,6 +2640,12 @@ impl Server {
                 pages.remove(doc);
             }
         }
+        {
+            let mut answers = self.answers.lock().expect("answers");
+            for doc in &documents {
+                answers.remove(doc);
+            }
+        }
         for session in forgotten {
             self.materializer.evict(&self.cart_key(&session));
             // And the query values kept for it alone (ADR-0127): a private
@@ -3644,7 +3655,52 @@ impl Server {
         if let (Some(document), Some(until)) = (document, until) {
             self.timers.hold(&(session.to_string(), document), until);
         }
-        out
+        // **What the page asks of its reader** (ADR-0307): each predicate's
+        // answer for the document, as `requires` answered it when the
+        // document was first read, read by the name its template reads it
+        // by. The document's for its life, as the values it shows were read
+        // for its reader then: a reader who signs out in another tab is told
+        // at the next press (ADR-0302). Until 2026-10-11 each read answered
+        // again, as `requires` would now, so a page re-rendered after a
+        // sign-out elsewhere lost the controls of the regions that changed
+        // and kept the rest, and a page of one reader's data could be given
+        // another's answers.
+        let mut out = out?;
+        let asked: Vec<&str> = plan["predicates"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|p| p.as_str())
+            .collect();
+        if !asked.is_empty() {
+            let kept = document.and_then(|n| {
+                let answers = self.answers.lock().expect("answers");
+                answers.get(&(session.to_string(), n)).cloned()
+            });
+            let held = match kept {
+                Some(held) => held,
+                None => {
+                    let mut held = BTreeMap::new();
+                    for predicate in &asked {
+                        held.insert(
+                            predicate.to_string(),
+                            self.identity.answers(predicate, session)?,
+                        );
+                    }
+                    if let Some(n) = document {
+                        self.answers
+                            .lock()
+                            .expect("answers")
+                            .insert((session.to_string(), n), held.clone());
+                    }
+                    held
+                }
+            };
+            for (predicate, holds) in held {
+                out.insert(asked_name(&predicate), Val::Bool(holds));
+            }
+        }
+        Ok(out)
     }
 
     /// **A binding's arguments**, as a host computes them: a page parameter
@@ -6525,6 +6581,14 @@ fn category_of(item: &str) -> &'static str {
 const STORE_ID: &str = "47";
 const STORE_NAME: &str = "Blue Bottle";
 
+/// **The name a template reads a predicate's answer by** (ADR-0307):
+/// `SignedIn~holds`, which no source writes. The compiler's convention
+/// (`pw_core::template_ir::asked_name`), which the plan's `predicates` and
+/// the template's paths follow; a test holds the two the same.
+fn asked_name(predicate: &str) -> String {
+    format!("{predicate}~holds")
+}
+
 /// **Why a page's values could not be read** (ADR-0163): its address names
 /// nothing, as the page declares, or it cannot be shown now. Told apart by
 /// type, so no failure's text can make it the other.
@@ -8668,6 +8732,20 @@ fn serve_bound(
                 return unavailable(stream, Unread::Failed(format!("its metadata: {why:?}")));
             }
         };
+        // What it asked of its reader, as the host answered for it (ADR-0307).
+        let holds: BTreeMap<String, bool> = server.plan_of(page)["predicates"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|p| p.as_str())
+            .filter_map(|p| {
+                let name = asked_name(p);
+                match env.value(&name) {
+                    Some(Value::Bool(b)) => Some((name, *b)),
+                    _ => None,
+                }
+            })
+            .collect();
         let html = document(
             &rendered,
             &title,
@@ -8678,6 +8756,7 @@ fn serve_bound(
             server.plan_of(page),
             cursor,
             speculation,
+            &holds,
             &server.build_id,
         );
         server.respond_streaming(stream, session, fresh, &html, template, &env, &mut settling);
@@ -9159,6 +9238,7 @@ fn document(
     plan: &serde_json::Value,
     cursor: u64,
     speculation: Option<(String, serde_json::Value, Vec<u32>, Params)>,
+    holds: &BTreeMap<String, bool>,
     build: &str,
 ) -> String {
     let manifest = serde_json::json!({
@@ -9225,6 +9305,11 @@ fn document(
         // And the page's parameters (ADR-0236), as its address gives them:
         // a region a speculation renders again reads them, as the host does.
         manifest["params"] = serde_json::json!(params);
+        // And what the page asked of its reader (ADR-0307), as the host
+        // answered it for the document: a region rendered again reads it.
+        if !holds.is_empty() {
+            manifest["holds"] = serde_json::json!(holds);
+        }
         // Each part a speculation renders again, as its template writes it
         // (ADR-0172): the browser's copy of the renderer renders it from the
         // speculated value.
@@ -16430,6 +16515,8 @@ public query Store(",
         // Each arm with the comment after it (ADR-0223).
         assert!(
             // ADR-0277: the menu counted is a part of the page's, before
+            // (ADR-0307's four cart blocks are not this store's: its cart
+            // controls ask nothing, track `store-accounts`.)
             // them; and ADR-0303: the layout's count is part 0, before all.
             // Track `store-accounts`: and where deliveries go, before them.
             whole.ends_with("</template><!--/pw-38--></body>\n</html>\n"),
@@ -16658,6 +16745,7 @@ public query Store(",
             &plan,
             3,
             None,
+            &BTreeMap::new(),
             COMMITTED_ARTIFACTS,
         ));
         assert_eq!(manifest["signals"], serde_json::json!({ "open": true }));
@@ -16674,6 +16762,7 @@ public query Store(",
             &serde_json::json!({}),
             3,
             None,
+            &BTreeMap::new(),
             COMMITTED_ARTIFACTS,
         ));
         assert!(manifest.get("signals").is_none(), "{manifest}");

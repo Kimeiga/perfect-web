@@ -1,19 +1,22 @@
 ADR-0113 - a resumable handler runs in the browser
 
 produced by: just e10-handlers-in-the-browser
-commit: 7273939ff189b463b358703626562796a731eec4
+commit: a1a232f5c9e804c5eba9e2123d57fe8637666993
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38186484587 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == handlers in the browser (compiler/pw-core/tests/handlers_in_the_browser.rs)
 
 test a_handler_performs_only_what_the_browser_may ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+test a_function_named_as_a_handler_performs_only_what_the_browser_may ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.13s
 
 == mutation controls (scripts/handler_placement_mutations.py)
 
-baseline: 1 passed, 0 failed
-the rule does not run: KILLED (1 of 1 tests fail)
-a command call is performed here: KILLED (1 of 1 tests fail)
-any call is a request: KILLED (1 of 1 tests fail)
-the browser grants everything: KILLED (1 of 1 tests fail)
+baseline: 2 passed, 0 failed
+the rule does not run: KILLED (2 of 2 tests fail)
+a command call is performed here: KILLED (1 of 2 tests fail)
+any call is a request: KILLED (2 of 2 tests fail)
+the browser grants everything: KILLED (2 of 2 tests fail)
 4 of 4 mutants killed
+memory bound: no process was stopped

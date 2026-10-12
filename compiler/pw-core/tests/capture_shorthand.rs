@@ -71,7 +71,7 @@ fn page_with(extra: &str, handler: &str) -> String {
          page ShopPage(id: StoreId) {{\n    placement origin\n    cache private\n\n    \
          let menu = query Menu(id)\n\n    view {{\n        <ul>\n            \
          {{#each menu as item (item.id)}}\n                <li>\n                    \
-         <button type=\"button\" on:press={{{handler}}}>Add</button>\n                \
+         <button type=\"button\" on:press|refusable={{{handler}}}>Add</button>\n                \
          </li>\n            {{/each}}\n        </ul>\n    }}\n}}\n"
     )
 }

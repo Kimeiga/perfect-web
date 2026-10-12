@@ -1063,4 +1063,62 @@ Each a decision for a track, with its date; a track's ADR records it too.
   production loaded the index is not known to the owner; W6 keeps its plan
   (integers, as the `.sql` writes them), and its oracle runs both loadings
   once and records any difference, which the coordinator tells the owner.
+- **2026-10-12, W6: an inflected word's page.** kiokun.com answers
+  /食べた, which has no entry, with a 307 to
+  `/食べる?from=食べた&conj=past&alt=<JSON>`, and the target shows the note
+  and the other candidates. A page declares one `redirect_on` case, which
+  carries one value. Ruled **(b), as the answer and not a stopgap**:
+  - /word/食べた answers 200 with the entry of the first candidate whose
+    parts of speech fit, the note "食べた → 食べる (past)", the other
+    candidates as links, and a canonical link to /word/食べる. It is
+    named a Difference from kiokun.com's 307.
+  - **Corrected the same day (W6 found it): a page cannot state a
+    canonical link yet.** The ruling as first sent said the link is
+    "checked as a link (ADR-0189)". It is not: ADR-0189 refuses one in a
+    page's body (PW5035), and its Not claimed says a page cannot state one.
+    W6 builds (b) without it and names the link as waiting. Its
+    Alternatives call hoisting a page's canonical and alternate links into
+    its head "the next step if a page needs one". kiokun's word page now
+    does, so the integrator takes it, on a track after the query-params
+    fix.
+  - **Corrected again**: its form is the one ruled on 2026-10-09 (Q2,
+    "1e's questions answered"), which the second message first missed. It
+    is `<link rel="canonical" href={WordPage(page.word)} />` at the top of
+    the view: a page address checked as `navigate`'s is, written absolute
+    with the configured public origin. The word page states it
+    unconditionally (W6 confirmed), and it names /word/食べる on both
+    addresses.
+  - Why: a deinflection is a guess among candidates, not a move. A 307
+    says the resource "resides temporarily under a different URI" (RFC
+    9110 §15.4.8), and a 308 says so permanently and is cached.
+  - Why: a redirect costs the reader a round trip before the page's
+    first byte.
+  - Why: the reader keeps the address they typed, and a shared link
+    carries the question.
+  - Why: it is MediaWiki's answer. en.wikipedia.org/wiki/UK, read
+    2026-10-12, answers 200 with the article, "(Redirected from UK)", and
+    a canonical link to /wiki/United_Kingdom.
+  - RFC 6596 §3: the canonical holds the referring page's content. The
+    entry is the same; the note and the alternatives are that address's
+    own navigation, as on Wikipedia's page. W6's ADR states this reading.
+  - The address is not replaced by script (MediaWiki's
+    `wgInternalRedirectTargetUrl`), so a reload keeps the note, with
+    script on or off.
+  Also ruled:
+  - Several `redirect_on` cases per page, and a case carrying a query, are
+    not scheduled; no page needs them.
+  - Wiktionary's Appendix:Japanese verbs (oldid 92311215) and
+    Appendix:Japanese adjectives (oldid 91406689), beside Wikipedia's
+    "Japanese conjugation" (oldid 1379736007), need no separate yes. They
+    are CC BY-SA 4.0, a cleared licence, and Wiktionary is already a
+    source of kiokun's data.
+  - Their use: facts only, stated in our own structure and words, with no
+    prose or table transcribed, and each rule cited by page and oldid in
+    W6's ADR.
 
+- **2026-10-12, holds merged as ADR-0307** (a control is shown where its
+  command's predicates hold). To W8, at its next merge of `master`: its
+  stale-tab rule (`pw-document` on each press) sits beside holds' answers,
+  and both are the document's for its life. W8's change to the sign-out
+  test's expected text in `identity.spec.mjs` meets holds' second stale-tab
+  test there: keep both, with W8's text in each.
