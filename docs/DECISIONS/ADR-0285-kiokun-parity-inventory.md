@@ -34,7 +34,9 @@ it. Date: 2026-10-08. Milestone: E14, the owner's production target.
 
 1. **The routes are SvelteKit's own.** A route is a directory under
    `src/routes` holding a `+page` or a `+server.ts`: 101 of them at
-   `abf71a89`, 49 pages and 52 endpoints. `scripts/kiokun_inventory.py`
+   `abf71a89`, 49 pages and 52 endpoints; 102 at `2391117c` (50 pages and
+   52 endpoints: `/credits` and two character endpoints added, `/api/notes`
+   and `/api/uploads` removed). `scripts/kiokun_inventory.py`
    reads them from the checkout's commit at HEAD and holds this ADR to them: every route is a row below, and
    every row is a route (`just e14-kiokun-inventory`).
 2. **The source was read whole.** Four readers covered the word page and
@@ -138,7 +140,7 @@ signed-in user's data.
 | route | kind | status | what it is | Pleris today, or what it needs |
 |---|---|---|---|---|
 | `/[word]` | page | partial | The entry: forms, readings, meanings, characters, words, names, examples, mnemonics, components, history, related words; loader redirects and fallbacks. | Pleris today: `Lookup` (one redirect) and `WordPage` over all 1.49 million entries, 404 for none, no script (ADR-0037, ADR-0041). 17 of the 50 features below are built, 9 partial. |
-| `/search` | page | partial | 60 hits in Chinese, Japanese and Korean columns, a reading, up to three definitions, a Common badge; community words. | Pleris today (the search ADR): `SearchPage` over the whole index, Korean rows, the variant expansion, three columns, 60 hits, held to kiokun.com's handler. Needs its address, `/search?q=` (a route reading its query part, the integrator's next), the header's search box, and the custom words (accounts). |
+| `/search` | page | partial | 60 hits in Chinese, Japanese and Korean columns, a reading, up to three definitions, a Common badge; community words. | Pleris today (the search ADR): `SearchPage` over the whole index, Korean rows, the variant expansion, three columns, 60 hits, held to kiokun.com's handler, at kiokun.com's `/search?q=` (ADR-0309), the empty state, and a lead to the word a CJK query is. Needs the custom words (accounts). |
 | `/api/search` | endpoint | partial | JSON search over the FTS5 index, used by the dropdown (8) and the search page (60). | Pleris today (the search ADR): its two statements as written, in the kiokun layer, over the whole index; what it does around them, in the program. Needs a form for a route that answers JSON. |
 | `/api/lookup-reading` | endpoint | partial | Kana to written forms: Japanese rows whose reading is the query. Feeds the word page's homophones and the deinflection fallback. | Pleris today (the reading index ADR): its statement as written, in the kiokun layer, which the word page's Homophones read. Needs a form for a route that answers JSON. |
 | `/api/dictionary` | endpoint | missing | Proxies one entry file from raw GitHub, then jsDelivr, cached at the edge; `optional=1` turns a miss into 204. The client app's only path to an entry. | Not needed while pages render on the server: the host reads entries itself. Needed for a client that reads entries (an offline app). |
@@ -147,6 +149,8 @@ signed-in user's data.
 | `/api/stroke-data` | endpoint | missing | Proxies hanzi-writer stroke JSON from jsDelivr. | An outbound fetch, or the data served locally; the animation is client. |
 | `/api/handwriting` | endpoint | missing | Sends drawn strokes to Google Input Tools' unofficial endpoint (always Japanese: the client never sends a language). | An outbound fetch to a third party; a drawing canvas (client). |
 | `/api/character-support` | endpoint | missing | Glosses, a taxonomy and component uses for the asked characters, from three static JSON files. | Static data read by the host; a query over it. |
+| `/api/character-lesson/[character]` | endpoint | missing | A reviewed lesson for a character, read from R2; read-only (a POST is 405). | Blob reads; its content is AI-authored and stays local (the owner's ruling of 2026-10-10). |
+| `/api/character-narrative/[character]` | endpoint | missing | A reviewed narrative for a character and its provenance, read from R2. | Blob reads; its content is AI-authored and stays local (the owner's ruling of 2026-10-10). |
 | `/api/og` | endpoint | missing | A 1200×630 PNG link-preview card, drawn with resvg and CJK fonts. | Image rendering (a crate, the owner's to approve) or cards made at build. |
 | `/api/frequency` | endpoint | missing | Redirects to `/frequency_list.json`. | A redirect and a static file. |
 | `/api/cors-port` | endpoint | missing | Development only: the local CORS server's port. | Proposed not to port: the host reads the data directly. |
@@ -157,6 +161,7 @@ signed-in user's data.
 | `/homophones/japanese` | page | missing | Groups by reading, romaji converted to kana, pitch badges, filters in the URL; notes per group. | Static data (2.3 MB), romaji-to-kana in Pleris; notes need accounts. |
 | `/homophones/korean` | page | missing | Hanja words sharing a hangul reading; notes per group. | Static data; notes need accounts. |
 | `/japanese-emoji` | page | missing | A written reference of 59 emoji with readings and use. | A static page. |
+| `/credits` | page | missing | Sources and credits: each data source, its licence, and how the data is shared. | A static page; the rewrite's data NOTICE names the same sources. |
 | `/sitemap.xml` | endpoint | missing | 19 paths and every course and lesson. | A generated list. |
 | `/favicon.ico` | endpoint | missing | Redirects to the PNG icon. | A redirect; the slice answers 404. |
 
@@ -192,13 +197,11 @@ signed-in user's data.
 | `/users/[userId]` | page | missing | One user's notes: search, sort, paging, Markdown. | Accounts; sanitized Markdown (a library). |
 | `/api/users` | endpoint | missing | The users and their counts. | A query. |
 | `/api/users/[userId]/notes` | endpoint | missing | One user's notes; their private ones to them alone. | A private query. |
-| `/api/notes` | endpoint | missing | Legacy notes, with no session on any method, over columns the current table lacks. | Proposed not to port (Found 6). |
 | `/api/notes/[character]` | endpoint | missing | One note per user and entry: read, create, edit, delete; an administrator's notes shown to all. | Accounts; commands; an administrator's role. |
 | `/api/user/notes` | endpoint | missing | The signed-in user's notes. | A private query. |
 | `/api/internal/notes` | endpoint | missing | A machine writes a note, signed with Ed25519; its sender does not exist in the checkout. | A signed request, or a script against the database. |
 | `/api/images/[...path]` | endpoint | missing | Serves an uploaded image from R2; its owner may delete it. | The uploads track's blob storage (ADR-0260). |
 | `/api/images/upload` | endpoint | missing | Uploads an image (5 MB, four types) for a note or an artifact. | A typed upload (ADR-0260). |
-| `/api/uploads` | endpoint | missing | Signs an R2 upload URL for anyone. | Proposed not to port (Found 6). |
 | `/custom-words` | page | missing | The latest 100 words users added; filters; delete one's own. | Accounts; a query. |
 | `/custom-words/new` | page | missing | Add a word: language, forms, definitions, parts of speech, notes. | A form and a command; the clash with the dictionary checked on the server, which kiokun.com does not do. |
 | `/api/custom-words` | endpoint | missing | List and add custom words. | A query and a command. |
@@ -270,7 +273,7 @@ signed-in user's data.
 | deinflection | `+page.ts:353-379`, `deinflect.ts`, `korean-deinflect.ts` | partial | A conjugated Japanese or Korean word redirects to its dictionary form, with how it was conjugated. | Built: Japanese, by rules of our own from cited grammar, kiokun.com's resolution, the form shown at the address asked (the deinflection ADR). Missing: Korean. |
 | custom-word fallback | `+page.ts:381-405` | missing | A word users added, when the dictionary has none. | Accounts' data. |
 | conjugation note | `+page.svelte:429-461` | built | "from → word (how)", and other candidates. | Built: on the inflected address itself, the reasons in the rewrite's words (the deinflection ADR). |
-| search box | `Header.svelte:84-127` | partial | A combobox with suggestions as one types, and handwriting. | Built: a plain search form. Missing: suggestions and handwriting (client). |
+| search box | `Header.svelte:84-127` | partial | A combobox with suggestions as one types, and handwriting. | Built: kiokun.com's field as a plain GET form to `/search?q=`, needing no script (the search ADR). Missing: suggestions and handwriting (client). |
 | word hero | `+page.svelte:550-559` | partial | The headword large, with save, practice and share. | Built: the headword. The actions are client and accounts. |
 | built-from strip | `WordCharacterStrip.svelte` | missing | Each character of a word, glossed and linked. | The entry's `contains`; server-renderable. |
 | false friends | `false-friends.ts:43-63` | missing | A warning when Chinese and Japanese meanings diverge. | Pleris computation over the entry. |
@@ -331,19 +334,19 @@ signed-in user's data.
 `scripts/kiokun_inventory.py` counts the rows above
 (`docs/evidence/E14/kiokun-inventory.txt`):
 
-- **Routes: 101** (49 pages, 52 endpoints). **0 built, 5 partial, 96
+- **Routes: 102** (50 pages, 52 endpoints, at kiokun.com's 2391117c). **0 built, 5 partial, 97
   missing.** The partial five: `/`, `/[word]`, `/search`, and
   `/api/search`'s and `/api/lookup-reading`'s statements, which the pages
   read but no JSON route answers.
 - **Features: 62** (49 of the word page, 13 of the site). **17 built, 10
   partial, 35 missing** (2026-10-11, after the word page's steps,
   search and deinflection). All seventeen built, and nine of the partial, are the word page's.
-- **Proposed not to port: 9 routes**, dead or developer pages: `/demo`,
-  `/test`, `/api/cors-port`, `/api/notes`, `/api/uploads`,
-  `/api/tutor/chat`, `/api/tutor/exercise`, `/api/learning-resources/words`,
-  `/api/study/searches`. And 3 more unless the iPhone app stays:
-  `/api/sync/pull`, `/api/sync/push`, `/api/mobile-auth/complete`. The 96
-  missing count them.
+- **Proposed not to port: 7 routes**, dead or developer pages: `/demo`,
+  `/test`, `/api/cors-port`, `/api/tutor/chat`, `/api/tutor/exercise`,
+  `/api/learning-resources/words`, `/api/study/searches`. And 3 more unless
+  the iPhone app stays: `/api/sync/pull`, `/api/sync/push`,
+  `/api/mobile-auth/complete`. The 97 missing count them. (kiokun.com
+  removed `/api/notes` and `/api/uploads`, two proposed here, by 2391117c.)
 
 ## What the gaps need, by kind
 

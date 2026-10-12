@@ -1616,7 +1616,95 @@ fn a_page_with_edrdg_data_acknowledges_the_group() {
 
 /// The search page's path for `q`, its one segment percent-encoded.
 fn search_path(q: &str) -> String {
-    path_of(q).replacen("/word/", "/search/", 1)
+    // The query percent-encoded as a word's path segment is, every byte but
+    // RFC 3986's unreserved characters: a form's encoding as the host reads
+    // it (ADR-0309).
+    path_of(q).replacen("/word/", "/search?q=", 1)
+}
+
+/// **The search box and the search page's address** (ADR-0309, the search
+/// ADR's amendment): kiokun.com's field on every page, a plain GET form to
+/// `/search` naming `q`, which needs no script; the search page at
+/// `/search?q=`, `+` read as a space; an address with no query, or a blank
+/// one, shows kiokun.com's empty state and searches nothing; a CJK query
+/// that is a word leads to its page, with how it was inflected where it was
+/// (deinflection behind the box, as kiokun.com's header goes to the word).
+#[test]
+fn the_search_box_sends_its_query_to_the_search_page() {
+    let s = served_kiokun();
+    let word = fetched(&s, &path_of("人"));
+    for part in [
+        "<form class=\"header-search\" role=\"search\" method=\"get\" action=\"/search\">",
+        " name=\"q\" type=\"search\" aria-label=\"Search the dictionary\"",
+        "placeholder=\"人\"",
+    ] {
+        assert!(word.contains(part), "{part}: {word}");
+    }
+    for blank in ["/search", "/search?q=", "/search?q=%20", "/search?q=+"] {
+        let page = fetched(&s, blank);
+        assert!(page.starts_with("HTTP/1.1 200"), "{blank}: {page}");
+        assert!(
+            page.contains(
+                "Use the search field above to find a character, word, pronunciation, or meaning."
+            ),
+            "{blank}: {page}"
+        );
+        assert!(!page.contains("class=\"result-card"), "{blank}: {page}");
+        assert!(
+            page.contains("placeholder=\"Search the dictionary\""),
+            "{blank}"
+        );
+    }
+    // `+` is a space: "person people" is "person, people"'s two words.
+    let plus = fetched(&s, "/search?q=person+people");
+    let spaced = fetched(&s, &search_path("person people"));
+    assert_eq!(
+        search_hits_in(plus.split("<script").next().unwrap_or_default(), "chinese"),
+        search_hits_in(
+            spaced.split("<script").next().unwrap_or_default(),
+            "chinese"
+        ),
+    );
+    assert!(
+        plus.contains("for <strong>person people</strong>"),
+        "{plus}"
+    );
+    // A word with its own entry leads to its page.
+    let person = fetched(&s, &search_path("人"));
+    assert!(
+        person.contains(&format!(
+            "href=\"{}\" class=\"word-lead-link\">人</a>",
+            path_of("人")
+        )),
+        "{person}"
+    );
+    // A Latin query leads nowhere, an entry of its own or not: kiokun.com's
+    // header searches a non-CJK query (`navigateOrSearch`).
+    assert!(!fetched(&s, &search_path("person")).contains("word-lead"));
+    let latin = tempfile::tempdir().expect("a temporary directory");
+    write_entry(
+        latin.path(),
+        "OK",
+        &japanese_entry("OK", "オーケー", &["exp"]),
+    );
+    let l = served_kiokun_on(latin.path());
+    assert!(fetched(&l, &path_of("OK")).starts_with("HTTP/1.1 200"));
+    assert!(!fetched(&l, &search_path("OK")).contains("word-lead"));
+    // An inflected word leads to its address, which shows its dictionary form.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let d = served_kiokun_on(&root.join("examples/kiokun/data/deinflection"));
+    let ate = fetched(&d, &search_path("食べた"));
+    assert!(
+        ate.contains(&format!(
+            "href=\"{}\" class=\"word-lead-link\">食べる</a>",
+            path_of("食べた")
+        )),
+        "{ate}"
+    );
+    assert!(
+        ate.contains("<span class=\"conjugation-detail\">(past)</span>"),
+        "{ate}"
+    );
 }
 
 /// **One language's column of the search page** (`search/+page.svelte`):

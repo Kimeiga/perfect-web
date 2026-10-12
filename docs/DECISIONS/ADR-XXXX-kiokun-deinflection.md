@@ -254,8 +254,10 @@ Numbered after the reading index ADR's 33.
   first commit ba343f46, 2026-02-16, names no outside source; checked from
   its header and history by the integrator). It may be reimplemented on
   the same terms as the resolution; it is not claimed yet.
-- **The search box's deinflection** (`navigateOrSearch`): there is no search
-  box until a route reads its query part (the search ADR).
+- **The search box's navigation** (`navigateOrSearch`): the box sends a
+  query to the search page, which leads to the word a CJK query resolves
+  to, by this resolution; kiokun.com goes to it in the browser (the search
+  ADR's Difference 26).
 - **The conjugation table** (`ConjugationTable.svelte`): the inventory's.
 - **Forms kiokun.com reads that the oracle's inputs do not ask**: the
   inputs are the rewrite's own conjugator's forms. A form kiokun.com knows

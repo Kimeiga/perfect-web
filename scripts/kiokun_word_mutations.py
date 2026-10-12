@@ -783,6 +783,34 @@ MUTANTS = [
         "        if false {\n            clauses.push(",
     ),
     (
+        "a blank query is a search like any other",
+        "search",
+        APP,
+        '        blank: String.trim(asked) == "",',
+        "        blank: false,",
+    ),
+    (
+        "a word with its own entry leads nowhere",
+        "search",
+        APP,
+        '        Some(_) => [WordLead { id: asked, asked: asked, shown: asked, how: "" }],',
+        "        Some(_) => none,",
+    ),
+    (
+        "an inflected query leads nowhere",
+        "search",
+        APP,
+        "            Some(r) => [WordLead { id: asked, asked: asked, shown: r.word, how: r.how }],",
+        "            Some(_) => none,",
+    ),
+    (
+        "a Latin query with an entry leads to it",
+        "search",
+        APP,
+        "    let own_files = read_entries(if cjk { [place_of(trimmed)] } else { no_places })",
+        "    let own_files = read_entries(if String.trim(q) != \"\" { [place_of(trimmed)] } else { no_places })",
+    ),
+    (
         "a godan く verb's te form is って",
         "deinflection",
         APP,
@@ -1051,6 +1079,7 @@ GROUPS = {
         "kiokun::search::tests::a_query_is_words_whatever_it_holds",
         "kiokun::search::tests::a_query_fts5_cannot_read_raw_is_answered",
         "kiokun::search::tests::a_csv_record_holds_quotes_commas_and_line_breaks",
+        K + "the_search_box_sends_its_query_to_the_search_page",
     ],
     "homophones": [
         K + "homophones_are_each_readings_words_but_the_pages_own",
@@ -1129,6 +1158,7 @@ SEEN_BY = {
     "search": [
         K + "search_matches_kiokuns_answers_for_the_sample",
         K + "search_reads_kana_variants_and_canonical_pages",
+        K + "the_search_box_sends_its_query_to_the_search_page",
     ],
     "homophones": [
         K + "homophones_are_each_readings_words_but_the_pages_own",

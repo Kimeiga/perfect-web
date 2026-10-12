@@ -54,23 +54,32 @@ kiokun.com in Pleris, step 2 (search).
      ranking. A generic platform full-text source waits for a second real
      use (DoorDash's store search is the likely one), and the integrator
      logs that in NEXT.
-3. **The page now, at a temporary address** (B3): `page SearchPage(q)` at
-   `route "/search/{q}"`, as `/word/{word}` was. Pleris has no form for a
-   route that answers JSON, so `/api/search` is the integrator's, later.
-   - **The route is temporary**: a page reads no query string yet
-     (ADR-0295), so kiokun.com's `/search?q=` waits for a route that reads
-     its query part. The integrator's next work gives one: the route's query
-     part as an RFC 6570 form-style expansion, `route "/search{?q}"`, typed
-     as a path parameter is, an `Option` where it may be absent (the
+3. **The page, at kiokun.com's address** (B3; amended 2026-10-12, when
+   ADR-0309 landed): `page SearchPage(q: Option<String>)` at `route
+   "/search{?q}"`. Pleris has no form for a route that answers JSON, so
+   `/api/search` is the integrator's, later.
+   - Until ADR-0309, the page was at the temporary `route "/search/{q}"`,
+     and there was no search box. A box would have needed script and a
+     handler that navigates, and `navigate` follows only a command's commit
+     (ADR-0280, PW5043), which a search, writing nothing, has not (the
      integrator's ruling of 2026-10-11, Questions).
-   - `q` stays a page parameter, so the move is the route clause and the
-     form alone.
-   - **There is no search box until then.** Once a route reads its query
-     part, the box is kiokun.com's own: a plain `<form method="get"
-     action="/search">` with an input named `q`, which **needs no script**.
-     Until then, a box would need script, a handler that navigates, and
-     `navigate` follows only a command's commit (ADR-0280, PW5043), which a
-     search, writing nothing, has not.
+   - **The search box** (`SiteSearch`, at the top of the word page and the
+     search page) is kiokun.com's header field, `Header.svelte:84-127`: a
+     plain `<form method="get" action="/search" role="search">` with an
+     input named `q`, which **needs no script**. PW5050 holds its fields to
+     the route's names. The host reads `+` and `%20` as a space and takes
+     the first `q`. The word page's placeholder is its word, as kiokun.com's
+     is; the search page's is "Search the dictionary".
+   - **No query, or a blank one**, is kiokun.com's empty state ("Use the
+     search field above …"), with nothing searched (`performSearch`
+     returns on a blank query).
+   - **Deinflection behind the box**: a CJK query that is a word leads the
+     page with a link to it. That is the query itself where it has its own
+     entry, else the first form the deinflection ADR's resolution finds, the
+     link going to the query's own address, which shows that form with its
+     note. kiokun.com's header does this in the browser (`navigateOrSearch`,
+     `resolveWordNavigationUrl`): it goes to the word's page instead of
+     searching (Difference 26).
 4. **The index, cached** (B5): built once per process from the CSV into
    `target/kiokun-search/kiokun-search-<digest>.db`, the digest of the
    CSV's bytes and the schema, a stale one removed when a new one is built;
@@ -128,10 +137,15 @@ Numbered after the Contains and Appears in ADR's 24.
     `jyutping_search` column, so a Jyutping query finds what the live site,
     importing a newer CSV, may find. A data difference, until the owner
     commits a current CSV.
-26. **The page's address is `/search/{q}`**, not `/search?q=`, until a
-    route reads its query part (Decision 3). The header's search box, which
-    submits `?q=`, is not built until then, and when it is, it needs no
-    script.
+26. **The search box searches, and leads to the word** (Decision 3).
+    - kiokun.com's header, with script, sends a CJK query that is a word
+      straight to the word's page, and a single CJK character always.
+    - Here the box sends every query to the search page, which needs no
+      script, and leads with the word's link above the results.
+    - kiokun.com's suggestions as one types, its handwriting, its simplified
+      to traditional lookup and its sentence reader are not built.
+    - (Until ADR-0309 this Difference was the page's temporary address,
+      `/search/{q}`; that is closed.)
 27. **What kiokun.com fails on, the rewrite answers** (Decision 8). kiokun.com
     binds the query as FTS5's query language, so a query FTS5 reads as
     syntax is a 500 from its endpoint, and its page shows "Search is
@@ -183,6 +197,15 @@ Numbered after the Contains and Appears in ADR's 24.
     queries. Nine of them, the hand cases above, are kiokun.com's 500s,
     each answered.
   - `search_matches_kiokuns_own_on_a_sample` (local, ignored).
+  - `the_search_box_sends_its_query_to_the_search_page`:
+    - the word page's form, a GET to `/search` naming `q`, its placeholder
+      the word;
+    - `/search`, `?q=`, `?q=%20` and `?q=+` show the empty state and no
+      hits;
+    - `+` is a space;
+    - 人 leads to its page, and a Latin query leads nowhere, even one with
+      its own entry (OK);
+    - 食べた leads to its address, shown as 食べる (past).
   - The layer's own tests (`kiokun::search`): the CSV reader; a query as
     words, whatever it holds; and an index answering what FTS5 cannot read
     raw, plain words finding what they found raw.
@@ -195,7 +218,12 @@ Numbered after the Contains and Appears in ADR's 24.
   program and the layer (the expansion, katakana, canonical pages, the
   display score, the pronunciation order, the definition cut, CJK detection,
   the eight shown, the exact rank, the reading clause, a Latin query bound
-  as FTS5's syntax, a term's quote not doubled), each killed; and two in `scripts/kiokun_inventory_mutations.py` for the
+  as FTS5's syntax, a term's quote not doubled), each killed; four for the
+  box (a blank query searched, a word's own entry or an inflected query
+  leading nowhere, a Latin query with an entry leading to it), measured
+  with `mutant_killers.py` and confirmed through the suite's cover. Reading
+  a Latin query back as a word is equivalent, since it has no kana ending
+  and its one reading, a bare stem and る, names no entry; and two in `scripts/kiokun_inventory_mutations.py` for the
   index sample's generator (20 of 20 killed). The word script is run whole
   by the branch's verify (ADR-0281).
 
