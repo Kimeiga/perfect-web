@@ -1036,6 +1036,9 @@ impl<'a> P<'a> {
         }
         let cp = self.b.checkpoint();
         self.expr_lhs(cp);
+        // The operator a chain's `|` or `&` is, the first one written, and
+        // whether its mixing is already refused: see below.
+        let mut logical: Option<(Kind, bool)> = None;
         loop {
             if self.at_eof() {
                 break;
@@ -1082,6 +1085,26 @@ impl<'a> P<'a> {
             };
             if lbp < min_bp {
                 break;
+            }
+            // **`|` and `&` have no precedence between them** (ADR-XXXX): a
+            // chain that mixes them is refused, once, where the mix begins,
+            // as Carbon refuses `and` beside `or`. Parsed left to right, as
+            // one power, `a | b & c` was `(a | b) & c`, where most languages
+            // read `a | (b & c)`: W9's "open until" read one way and ran the
+            // other (track store-hours, 2026-10-12).
+            if matches!(k, Kind::Amp | Kind::Pipe) {
+                match logical {
+                    Some((first, false)) if first != k => {
+                        self.error_help(
+                            "PW0031",
+                            "`|` and `&` are mixed without parentheses, and neither binds tighter",
+                            "write `(a | b) & c` or `a | (b & c)`, whichever is meant",
+                        );
+                        logical = Some((first, true));
+                    }
+                    Some(_) => {}
+                    None => logical = Some((k, false)),
+                }
             }
             self.b.start_at(cp, K::BinaryExpr);
             self.bump(); // operator
@@ -4045,6 +4068,49 @@ mod tests {
         parse_ok(
             "fn f(b: Bool) -> Int {\n    match b {\n        true => 1,\n        false => 0,\n    }\n}\n",
         );
+    }
+
+    #[test]
+    fn or_and_and_mixed_without_parentheses_is_refused() {
+        // ADR-XXXX: `|` and `&` have no precedence between them. Until
+        // 2026-10-12 they were one power, left to right, and `a | b & c` was
+        // `(a | b) & c` (W9's finding). Refused once a chain, where the mix
+        // begins.
+        let query = |body: &str| {
+            format!(
+                "public query Q(a: Bool, b: Bool, c: Bool, d: Bool, e: Bool) -> Bool {{ {body} }}\n"
+            )
+        };
+        for (body, mix) in [
+            ("a | b & c", " & "),
+            ("a & b | c", " | "),
+            ("a == b | c > d & e", " & "),
+            ("a | b | c & d", " & "),
+            ("a | b & c | d", " & "),
+            ("a | b & c & d", " & "),
+        ] {
+            let src = query(body);
+            let p = parse_tree(&src);
+            assert_lossless(&src, &p);
+            let found: Vec<_> = p.errors.iter().map(|e| (e.code, e.span.start)).collect();
+            let at = src.find(mix).expect("the mix") + 1;
+            assert_eq!(found, vec![("PW0031", at)], "{body}");
+        }
+        // Each grouping written out, a chain of one, a comparison inside one,
+        // and a lambda's body of its own.
+        for body in [
+            "(a | b) & c",
+            "a | (b & c)",
+            "a | b | c",
+            "a & b & c",
+            "!(a & b) | c",
+            "a == b | c",
+            "List.any([a], x => x & b) | c",
+        ] {
+            let src = query(body);
+            let p = parse_ok(&src);
+            assert_lossless(&src, &p);
+        }
     }
 
     #[test]
