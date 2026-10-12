@@ -526,6 +526,17 @@ class Fetch(unittest.TestCase):
         self.assertIsNone(fetch.refusal({"status": "completed", "conclusion": "success"}, jobs, []))
         self.assertIn("no job", fetch.refusal(run, [{"name": "recipes 0", "conclusion": "success"}], ["x"]))
 
+    def test_what_a_failed_recipe_wrote_is_not_copied(self) -> None:
+        # 2026-10-12: W8's merge, its run's failure known, took e14-diffs'
+        # output with its evidence, stopped at a patch that did not apply.
+        results = [
+            {"recipe": "e14-diffs", "status": 1, "seconds": 9, "wrote": ["docs/evidence/E14/semantic-diffs.txt"]},
+            {"recipe": "e14-feed", "status": 0, "seconds": 9, "wrote": ["docs/evidence/E14/feed.txt"]},
+            {"recipe": "e14-old", "status": 0, "seconds": 9},
+        ]
+        self.assertEqual(fetch.failed_files(results), {"docs/evidence/E14/semantic-diffs.txt"})
+        self.assertEqual(fetch.failed_files(results[1:]), set())
+
     def test_a_recipe_that_ran_to_its_end_has_its_seconds_kept(self) -> None:
         # ADR-0290: the plan deals the next runs by them.
         with tempfile.TemporaryDirectory() as tmp:
