@@ -14,8 +14,9 @@ Each mutant undoes one piece:
 - in the browser runtime: the handler given the whole answer.
 
 A compiler, server or store mutant must fail `handlers.rs`, `answers.rs`,
-the oracle or the server's tests, all of them run. The runtime's must fail
-the availability and resource-path browser tests, in Chromium.
+the oracle or the server's tests that see its rule (measured, below). The
+runtime's must fail the availability and resource-path browser tests, in
+Chromium.
 
 Run from the repository root; `just e14-command-answers` records the output.
 The source is restored after every mutant, whatever happens.
@@ -179,7 +180,19 @@ CARGO = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "handlers",
      "--test", "answers"],
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-conformance", "--test", "oracle"],
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The development server's tests that see the cargo mutants' rules (W6's
+    # ruling of 2026-10-09: a mutant that takes long is given the tests that
+    # can see its rule), measured by `scripts/mutant_killers.py` on
+    # 2026-10-12 against its whole suite. Each of the seven it sees is failed
+    # by two of these where two fail at all; the other eight, the compiler's,
+    # it does not see, and `handlers`, `answers` and the oracle do. Its whole
+    # suite ran for every mutant, and the recipe took 13,000 s of a verify.
+    ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+     "tests::a_build_that_names_no_build_is_not_served",
+     "tests::a_kept_answer_is_the_answer_it_kept",
+     "tests::a_line_records_the_stores_name_and_price_not_the_requests",
+     "tests::a_page_carries_its_data_layers_style_and_no_other",
+     "tests::an_item_sold_out_since_the_page_is_refused_by_name"],
 ]
 
 BROWSER = ["e2e/availability.spec.mjs", "e2e/resource-path.spec.mjs"]

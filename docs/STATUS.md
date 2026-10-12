@@ -23,6 +23,15 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-12: three mutation scripts' server mutants run the server tests
+that see them** (W6's ruling of 2026-10-09; track `narrowing`, merged from
+`973df1a`). Each ran the development server's whole suite for every
+mutant. They now run the tests measured to fail under its mutants, two per
+mutant where two do. `e14-command-answers` went from 10,599 to 2,105 s,
+`e14-availability` from 8,012 to 3,206 s and `e14-connection-faults` from
+9,614 to 1,498 s, about 21,400 s of a full verify. Every mutant is still
+killed (verify 38206663536).
+
 **ADR-0311, 2026-10-12: a page states its canonical address** (the
 integrator's; track `canonical`, merged from `d65f278`). kiokun's word page
 answers an inflected word with its dictionary form's entry, so it names

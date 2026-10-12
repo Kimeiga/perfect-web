@@ -820,6 +820,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
             A target renamed later matches nothing, and a run of no tests is
             a failure, not a survival. A task for a worker with a target of
             its own.
+            Progress, 2026-10-12:
+            - `pw-core`'s whole suite: seven scripts narrowed (`aa174750`
+              and before); `availability`'s core suite and `command_retry`
+              remain, measured next;
+            - the development server's whole suite, by test name
+              (`--exact`), each mutant failed by two of the named tests
+              where two fail: `command_answers` 10,599 → 2,105 s,
+              `availability` 8,012 → 3,206 s and `connection_faults` 9,614
+              → 1,498 s (verify 38206663536, every mutant still killed),
+              about 21,400 s a full verify; `test_controls` measured, and
+              14 more scripts in the queue (`scripts/mutant_killers.py`,
+              in a worktree with a target of its own);
 
           The worker tracks, one at a time beside the integrator (the
           owner's budget rule), each launched under docs/PARALLEL.md when
