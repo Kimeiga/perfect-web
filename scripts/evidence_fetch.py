@@ -17,7 +17,13 @@ Refused, before anything is copied:
   (ADR-0281). A recipe shard is never known: its evidence is the record;
 - a file whose `commit:` line names another commit than the run's: it would
   be evidence of something else;
-- a run of another commit than `HEAD`, unless `--any-commit` says so.
+- a run of another commit than `HEAD`, unless `--any-commit` says so;
+- a file whose recipe reads what changed between the run's commit and the
+  tree here, staged or not, as `ci_plan.py --changed` would plan that
+  range (ADR-0281, amended 2026-10-12): it is evidence of code this tree
+  does not hold. Its track merges master and is verified again; or, where
+  another run records that recipe, `--skip RECIPE` copies none of its
+  files.
 
 Each recipe that ran to its end (exit 0) has its seconds kept in
 `scripts/ci_seconds.json`, which `ci_plan.py` deals the next runs by
@@ -25,7 +31,7 @@ Each recipe that ran to its end (exit 0) has its seconds kept in
 failed or was cancelled among them, and copies no evidence: a recipe's time
 is what it took, whatever its shard's others did.
 
-    python3 scripts/evidence_fetch.py <run-id> [--any-commit] [--known JOB]...
+    python3 scripts/evidence_fetch.py <run-id> [--any-commit] [--known JOB]... [--skip RECIPE]...
     python3 scripts/evidence_fetch.py <run-id> --times-only
 """
 
@@ -117,6 +123,39 @@ def failed_files(results: list[dict]) -> set[str]:
     return {w for r in results if r.get("status") != 0 for w in r.get("wrote", [])}
 
 
+def recorded(results: list[dict]) -> dict[str, str]:
+    """Each file a recipe wrote, and that recipe (`ci_recipes.py` lists every
+    file a shard's artifact holds)."""
+    return {w: r["recipe"] for r in results for w in r.get("wrote", [])}
+
+
+def moved_on(sha: str, recipes: list[str]) -> set[str]:
+    """**The recipes of `recipes` that read what changed between the commit
+    `sha` and the tree here**, staged or not, by the planner's own rule
+    (ADR-0281, amended 2026-10-12). A run's file of one is evidence of code
+    this tree does not hold. Until then a merge could take one: narrowing-2's
+    run at `853674f` recorded scripts that run the server's tests by name,
+    and W8, fixed-arms and W6's packet had changed that server on master
+    since."""
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import ci_plan  # what a push plans, so a fetch and a push agree
+
+    return set(ci_plan.recipes_for(ci_plan.hunks(sha, None), ci_plan.NEAR, recipes))
+
+
+def verdict(recipe: str | None, moved: set[str], skip: list[str]) -> str | None:
+    """Why a run's file written by `recipe` is not copied, or `None`: its
+    recipe skipped, read what changed since the run (`moved_on`), or none
+    of the run's recipes wrote it."""
+    if recipe in skip:
+        return "skipped"
+    if recipe is None:
+        return "no recipe of the run wrote it"
+    if recipe in moved:
+        return f"{recipe} reads what changed since the run: merge master into its branch, and verify it again"
+    return None
+
+
 def results_of(shards: list[pathlib.Path]) -> list[dict]:
     out = []
     for shard in shards:
@@ -131,6 +170,7 @@ def main() -> int:
     parser.add_argument("--any-commit", action="store_true")
     parser.add_argument("--known", action="append", default=[], metavar="JOB")
     parser.add_argument("--times-only", action="store_true")
+    parser.add_argument("--skip", action="append", default=[], metavar="RECIPE")
     args = parser.parse_args()
     run = json.loads(gh("run", "view", args.run, "--json", "headSha,url,status,conclusion,workflowName,jobs"))
     if args.times_only:
@@ -157,7 +197,14 @@ def main() -> int:
         staged: dict[pathlib.Path, bytes] = {}
         refused = []
         shards = shard_dirs(pathlib.Path(tmp))
-        failed = failed_files(results_of(shards))
+        results = results_of(shards)
+        failed = failed_files(results)
+        by = recorded(results)
+        here = subprocess.run(["git", "cat-file", "-e", f"{run['headSha']}^{{commit}}"], cwd=ROOT, capture_output=True)
+        if here.returncode != 0:
+            print(f"evidence-fetch: run {args.run} is of {run['headSha']}, which is not here: git fetch it", file=sys.stderr)
+            return 1
+        moved = moved_on(run["headSha"], sorted(set(by.values()) - set(args.skip)))
         for shard in shards:
             runner = (shard / "runner.txt").read_text().strip() if (shard / "runner.txt").exists() else "a GitHub-hosted runner"
             for f in sorted((shard / "evidence").rglob("*")):
@@ -166,6 +213,13 @@ def main() -> int:
                 rel = f.relative_to(shard / "evidence")
                 if str(rel) in failed:
                     print(f"  not copied, its recipe failed: {rel}")
+                    continue
+                why = verdict(by.get(str(rel)), moved, args.skip)
+                if why == "skipped":
+                    print(f"  not copied, {by[str(rel)]} skipped: {rel}")
+                    continue
+                if why is not None:
+                    refused.append(f"{rel}: {why}")
                     continue
                 if rel.suffix != ".txt":
                     staged[ROOT / rel] = f.read_bytes()

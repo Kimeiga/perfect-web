@@ -8,7 +8,8 @@ Each mutant puts back one piece of the session-wide subscriber:
 - in the browser runtime: the page's long poll, or its stream, names no
   document.
 
-A server mutant must fail the server's tests, all of them run. The
+A server mutant must fail the server's tests that see its rule (measured,
+below). The
 runtime's must fail the two-tab browser test, in Chromium.
 
 Run from the repository root; `just e14-documents` records the output. The
@@ -90,7 +91,16 @@ MUTANTS = [
     ),
 ]
 
-CARGO = [["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]]
+# The server tests that fail under its mutants, measured against the whole
+# suite by `scripts/mutant_killers.py` on 2026-10-12 (W6's ruling of
+# 2026-10-09), two per mutant where two fail.
+CARGO = [[
+    "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+    "tests::a_change_reaches_each_page_that_reads_it_by_its_own_plan",
+    "tests::a_change_reaches_every_document_of_its_session",
+    "tests::a_read_older_than_the_latest_is_not_applied",
+    "tests::a_session_is_forgotten_with_its_last_document",
+]]
 BROWSER = ["e2e/tabs.spec.mjs"]
 
 # How long one command may run. A mutant can make a test wait for ever (a
