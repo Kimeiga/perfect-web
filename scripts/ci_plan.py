@@ -9,8 +9,9 @@ The recipes are `just`'s own list, kept where they record evidence
   the chain's choice: each recipe running a mutation script that the range
   changed, whose mutant sits within `--near` lines of a changed line, or
   whose tests the range changed, a Rust test or a browser spec (ADR-0281);
-  each recipe that runs a browser spec the range changed; and each recipe
-  whose own lines changed;
+  each recipe that runs a browser spec the range changed; each recipe whose
+  own script changed or reads a program or a benchmark the range changed
+  (`data_inputs`); and each recipe whose own lines changed;
 - or those named.
 
 Each is dealt, the longest first, to the shard where it ends soonest
@@ -292,6 +293,41 @@ def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set
     return out
 
 
+# **Where a recipe's own script reads a program or a benchmark from**: the
+# paths it names from the repository's root under these. A mutation script's
+# are its mutants' targets, which `touched_scripts` reads by line instead.
+DATA_ROOTS = ("benchmarks/", "examples/")
+
+
+def data_inputs(script: pathlib.Path) -> list[str]:
+    """The paths `script` names as `ROOT / "..."` under `DATA_ROOTS`:
+    `semantic_diffs.py`'s `benchmarks/tasks` and `benchmarks/baselines/
+    pleris`."""
+    named = re.findall(r'ROOT\s*/\s*"([^"]+)"', script.read_text())
+    return [p.rstrip("/") for p in named if p.startswith(DATA_ROOTS)]
+
+
+def reads_what_changed(body: str, changed: dict[str, list[tuple[int, int]]]) -> bool:
+    """Whether a recipe's own script, one that plants no mutant, changed or
+    reads what changed. Until 2026-10-12 neither planned it: holds' merge
+    changed the benchmark's baseline store, T11's patches stopped applying
+    to it, and no verify planned `e14-diffs`, which applies them (W8's
+    finding)."""
+    for name in re.findall(r"scripts/(\w+\.py)", body):
+        if name.endswith("_mutations.py"):
+            continue
+        rel = f"scripts/{name}"
+        if rel in changed:
+            return True
+        path = ROOT / rel
+        if not path.exists():
+            continue
+        inputs = data_inputs(path)
+        if any(c == i or c.startswith(i + "/") for i in inputs for c in changed):
+            return True
+    return False
+
+
 def changed_recipes(base: str, head: str, near: int, names: list[str]) -> list[str]:
     """The recipes of `names` a range of commits touches (see the module)."""
     return recipes_for(hunks(base, head), near, names)
@@ -309,6 +345,8 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
         if any(f"scripts/{s}" in body.get(name, "") for s in scripts)
         # A recipe that runs a browser spec the range changed (ADR-0281).
         or any(s in body.get(name, "") for s in specs)
+        # A recipe whose own script changed, or reads what changed.
+        or reads_what_changed(body.get(name, ""), changed)
     }
     # A recipe whose own lines changed: written or changed in the range, in
     # any part of the justfile.

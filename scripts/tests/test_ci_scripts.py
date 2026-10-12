@@ -145,6 +145,28 @@ class Plan(unittest.TestCase):
             plan.touched_scripts({"spikes/own-renderer/e2e/nothing.spec.mjs": [(1, 1)]}, 30),
         )
 
+    def test_a_recipe_is_planned_where_its_script_reads_what_changed(self) -> None:
+        # W8's finding, 2026-10-12: holds' merge changed the benchmark's
+        # baseline store, and no verify planned `e14-diffs`, whose script
+        # applies each task's patches to it. A change to the baseline, to a
+        # task's patch, or to the script itself plans it now.
+        names = plan.recipes()
+        for changed in [
+            "benchmarks/baselines/pleris/store/app.pw",
+            "benchmarks/tasks/T11-confirm-clear/reference/pleris.patch",
+            "scripts/semantic_diffs.py",
+        ]:
+            self.assertIn("e14-diffs", plan.recipes_for({changed: [(1, 1)]}, 30, names), changed)
+        self.assertIn(
+            "benchmarks/baselines/pleris",
+            plan.data_inputs(plan.ROOT / "scripts/semantic_diffs.py"),
+        )
+        # The control: what it does not read plans nothing of it.
+        self.assertNotIn(
+            "e14-diffs",
+            plan.recipes_for({"benchmarks/baselines/sveltekit/README.md": [(1, 1)]}, 30, names),
+        )
+
     def test_a_recipe_in_an_imported_file_is_read_and_planned(self) -> None:
         # ADR-0253: a track's recipes live in a file the justfile imports.
         with tempfile.TemporaryDirectory() as d:
