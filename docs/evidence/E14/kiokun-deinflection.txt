@@ -1,0 +1,25 @@
+The word page's deinflection, against kiokun.com's own resolution
+
+produced by: just e14-kiokun-deinflection (local: reads a kiokun-data checkout)
+commit: a8d42e8ca9a80d32faf421ed1681e08d4362bf5c
+kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree (src/lib/utils/search-navigation.ts ef7a407c22fe; src/lib/utils/deinflect.ts 6ee6f75ea555; src/lib/utils/korean-deinflect.ts 341ff8581997; src/routes/api/lookup-reading/+server.ts 75a934056574; migrations/0005_search_index_with_jyutping.sql 004a33675a53)
+kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree (output_search_index.csv 0d5523b5cc3a)
+node: v22.21.1
+host: Darwin arm64, 12 cores, load averages: 26.53 30.05 31.63
+
+== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/deinflect.mjs)
+
+stride 128: read 11732 entries; 189 words; 3873 forms asked; 0 found nothing
+
+== the rewrite's, compared
+
+compared: 3873 forms of 189 words (stride 128, 11732 entries read)
+named differences: {"a vs-s verb read as a する verb": 22, "いい beside よい": 12}
+unnamed differences: 0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 411 filtered out; finished in 31.59s
+after it: load averages: 21.30 27.98 30.28
+
+== the CI fixture: kiokun.com's answers over the repository's deinflection and index samples
+
+stride 1: read 27 entries; 25 words; 501 forms asked; 6 found nothing
+fixture: spikes/own-renderer/kiokun-oracle/deinflection-sample.json: 501 answers, named {}
