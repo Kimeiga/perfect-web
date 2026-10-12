@@ -56,7 +56,10 @@ integrator's). Date: 2026-10-12. Milestone: E14 (the language). Found by W9
   written out, chains of one, a comparison inside one, and a lambda's body of
   its own parse.
 - Every shipped program and the corpus parse as before (`just ci`'s
-  `test-compile`, `corpus`).
+  `test-compile`, `corpus`). One test's program mixed them: the JavaScript
+  conformance program's `Inside`, `a & b | c`, now `(a & b) | c`, the
+  reading it had (`pw-conformance`'s `javascript.rs`; found by the track's
+  `ci` run 38298832576, since its local run had not run that crate).
 - `scripts/logical_mixed_mutations.py`, each mutant killed.
 
 ## Not claimed
