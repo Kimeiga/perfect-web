@@ -255,6 +255,10 @@ pub(crate) trait Rows {
     fn search(&mut self, terms: &[String]) -> Result<Vec<crate::search::Matched>, String> {
         crate::search::scan(self, terms)
     }
+    // TRACK SEAM (store-hours): a store's opening hours (`hours.rs`), none
+    // where the layer holds no such store.
+    fn hours(&mut self, store: &str) -> Result<Option<crate::hours::Hours>, String>;
+    fn set_hours(&mut self, store: &str, hours: &crate::hours::Hours) -> Result<(), String>;
 }
 
 /// **Where an operation's rows are**, each layer's: it runs `f` on them, in
@@ -804,6 +808,7 @@ pub(crate) const DEFAULT_ESTIMATE: Estimate = (25, None);
 fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
     let mut ops: Ops = BTreeMap::new();
     ops.extend(crate::search::ops(with.clone())); // TRACK SEAM (store-search)
+    ops.extend(crate::hours::ops(with.clone())); // TRACK SEAM (store-hours)
     // Charter §15.5's store delay (ADR-0174), and its origin failing once
     // (ADR-0177), as a test set them.
     let store_delay = faults.store_delay_ms.clone();
@@ -1261,6 +1266,8 @@ pub(crate) fn writes(
         }),
     );
     ops = faulted(&faults.cart_faults, session, ops);
+    // TRACK SEAM (store-hours): a store's hours, the host's own write.
+    ops.extend(crate::hours::host_writes(with.clone(), written.clone()));
     ops.extend(host_writes(with, session, written));
     ops
 }
@@ -1583,6 +1590,8 @@ pub(crate) struct State {
     estimates: BTreeMap<String, Estimate>,
     /// Each owner's saved addresses (track `store-accounts`).
     addresses: BTreeMap<String, Vec<AddressRow>>,
+    /// TRACK SEAM (store-hours): each store's opening hours (`hours.rs`).
+    hours: BTreeMap<String, crate::hours::Hours>,
 }
 
 impl State {
@@ -1617,6 +1626,10 @@ impl State {
             curated: None,
             estimates: BTreeMap::new(),
             addresses: BTreeMap::new(),
+            // TRACK SEAM (store-hours): each store's, as it is first.
+            hours: [STORE_ID, SECOND_STORE.0]
+                .map(|id| (id.to_string(), crate::hours::seed()))
+                .into(),
         }
     }
 }
@@ -1749,6 +1762,14 @@ impl Rows for MemRows {
     }
     fn set_estimate(&mut self, session: &str, estimate: Estimate) -> Result<(), String> {
         self.state().estimates.insert(session.to_string(), estimate);
+        Ok(())
+    }
+    // TRACK SEAM (store-hours): a store's hours, in memory.
+    fn hours(&mut self, store: &str) -> Result<Option<crate::hours::Hours>, String> {
+        Ok(self.state.hours.get(store).cloned())
+    }
+    fn set_hours(&mut self, store: &str, hours: &crate::hours::Hours) -> Result<(), String> {
+        self.state().hours.insert(store.to_string(), hours.clone());
         Ok(())
     }
 }

@@ -178,3 +178,30 @@ test("a reader's search lists the stores that reach their chosen address", async
     "Showing the stores that deliver to Home; 1 more matches but doesn't.",
   );
 });
+
+// Track `store-hours`: a store's hours, told when the clock passes its
+// closing (ADR-0304). Store 48 open 07:00 to 19:00 in San Francisco, the
+// host's clock at 18:59:30 PST on 2027-03-01; then the clock moved past 19:00
+// while the page is open. Its hours are put back, open the day round, after.
+test("a store's page is told when the store closes", async ({ page, request }) => {
+  const set = await request.post("/bench/hours?store=48&opens=420&closes=1140");
+  expect(set.status()).toBe(200);
+  try {
+    const at = Date.parse("2027-03-02T02:59:30Z");
+    const moved = await request.post(`/bench/clock?at=${at}`);
+    expect(moved.status()).toBe(200);
+    await ready(page, "/stores/48");
+    await expect(page.locator("#store-open")).toHaveText("Open until 7:00 pm");
+    expect((await request.post("/bench/clock?advance=31000")).status()).toBe(200);
+    await expect(page.locator("#store-open")).toHaveText("Closed · opens tomorrow at 7:00 am");
+    await ready(page, "/");
+    await expect(page.locator("#stores .open")).toHaveText([
+      "Open 24 hours",
+      "Closed · opens tomorrow at 7:00 am",
+    ]);
+  } finally {
+    expect((await request.post("/bench/hours?store=48&opens=0&closes=0")).status()).toBe(200);
+  }
+  await ready(page, "/");
+  await expect(page.locator("#stores .open")).toHaveText(["Open 24 hours", "Open 24 hours"]);
+});

@@ -453,7 +453,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // `store-accounts`, milestone 2).
     // 2026-10-12: `examples/domain.pw`'s `Store` gains `cuisine`, what the
     // store serves in its own words (ADR-0308, amended).
-    const EXPECTED: u64 = 0x60cee521efeee55a;
+    // 2026-10-12: `clock` gains `day_number`, `numbered_day` and `midnight`,
+    // a date as its number and back and a day's first minute; `domain.pw`
+    // gains `same_store` and `OrderError.Closed` (track `store-hours`).
+    const EXPECTED: u64 = 0xc0f2c82a1659a247;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

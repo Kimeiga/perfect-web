@@ -58,6 +58,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0011_store_cuisine",
         include_str!("../migrations/store/0011_store_cuisine.sql"),
     ),
+    // TRACK SEAM (store-hours): each store's zone, cut-off and hours.
+    (
+        "0012_store_hours",
+        include_str!("../migrations/store/0012_store_hours.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -216,6 +221,14 @@ impl Rows for PgRows<'_> {
     // TRACK SEAM (store-search): a search, matched by the database (`search.rs`).
     fn search(&mut self, terms: &[String]) -> Result<Vec<crate::search::Matched>, String> {
         crate::search::on_postgres(self.0, terms)
+    }
+
+    // TRACK SEAM (store-hours): a store's hours, read and replaced (`hours.rs`).
+    fn hours(&mut self, store: &str) -> Result<Option<crate::hours::Hours>, String> {
+        crate::hours::pg_hours(self.0, store)
+    }
+    fn set_hours(&mut self, store: &str, hours: &crate::hours::Hours) -> Result<(), String> {
+        crate::hours::pg_set_hours(self.0, store, hours)
     }
 
     fn stores(&mut self) -> Result<Vec<StoreRow>, String> {

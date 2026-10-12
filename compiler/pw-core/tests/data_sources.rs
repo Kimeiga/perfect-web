@@ -359,6 +359,12 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "Places",
             "Reach",
             "Order",
+            // A store's hours (track `store-hours`): the stores' rows, and
+            // for the cart's, the cart's too.
+            "StoreStatus",
+            "StoresOpen",
+            "CartHours",
+            "CartHours",
             "Search",
             "Search",
             "Search"
@@ -391,5 +397,5 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     ];
     assert_eq!(named("PW0347"), commands);
     assert_eq!(named("PW0348"), commands);
-    assert_eq!(found.len(), 37, "{found:#?}");
+    assert_eq!(found.len(), 41, "{found:#?}");
 }

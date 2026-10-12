@@ -221,6 +221,9 @@ type OrderError =
     // A store an item is from does not deliver to the reader's chosen address
     // (track `store-accounts`, ADR-0319).
     | NoCoverage
+    // A store an item is from is closed, or past its last order (track
+    // `store-hours`): why, in words, with when it opens.
+    | Closed(String)
 
 type OrderDraft = OrderDraft {
     id: OrderId,
@@ -324,3 +327,6 @@ type SyncError =
 // Whether two ids name one item. The representation is readable only here
 // (ADR-0048), so the comparison is written here (ADR-0122).
 fn same_item(a: MenuItemId, b: MenuItemId) -> Bool !{} { a.value == b.value }
+
+// Whether two ids name one store (track `store-hours`).
+fn same_store(a: StoreId, b: StoreId) -> Bool !{} { a.value == b.value }

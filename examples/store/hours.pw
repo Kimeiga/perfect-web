@@ -1,0 +1,348 @@
+// @corpus: fixture
+// @id: E14-store-hours
+// @category: a store's opening hours, and whether it is open, read by
+//            comparison with the platform's clock
+// @charter: §15.1, §7.5
+// @milestone: E14
+//
+// Track `store-hours` (docs/PARALLEL.md, W9). A store keeps weekly periods in
+// its IANA time zone, a period whose closing is not after its opening running
+// past midnight; special dates, closed or open other hours; and a cut-off
+// before a closing past which it takes no order. Whether it is open is
+// computed here, by comparing the clock with each opening and closing
+// (ADR-0304): a value holds until the earliest instant it compared, and a page
+// showing it is told then. A time a period names that a zone's transition
+// skips or repeats is its instant as RFC 5545 §3.3.5 has it (`clock.at`).
+
+module store.hours
+
+import List
+import clock
+import Stores
+import Carts
+import domain.{ StoreId, StoreError, Store, same_store }
+import Events.{ UserCartChanged, StoreChanged }
+import capability.{ User, UserId }
+import clock.{ Instant, LocalDate }
+
+// **One weekly period**: its ISO weekday (1, Monday, to 7, Sunday), its
+// opening and closing minutes from midnight. A closing not after the opening
+// is the next day's; the same minute, the whole day round.
+type WeeklyPeriod = WeeklyPeriod { weekday: Int, opens: Int, closes: Int }
+
+// **A special date** (days since 1970-01-01 in the store's zone): closed, or
+// open from `opens` to `closes` in place of its weekday's periods.
+type SpecialDate = SpecialDate { date: Int, closed: Bool, opens: Int, closes: Int }
+
+// **A store's hours**: its zone, its cut-off in minutes before a closing,
+// its weekly periods and its special dates.
+type OpeningHours = OpeningHours {
+    zone: String,
+    last_order_minutes: Int,
+    weekly: List<WeeklyPeriod>,
+    special: List<SpecialDate>,
+}
+
+// **A store's hours, with the store** (and its name, where the cart's).
+type OpeningHoursOf = OpeningHoursOf { store: StoreId, name: String, hours: OpeningHours }
+
+fn hours_of(store: StoreId) -> Result<OpeningHours, StoreError> !{ database.read<Stores> }
+    host "store:data/hours#for-store"
+
+fn hours_of_stores(stores: List<StoreId>) -> List<OpeningHoursOf> !{ database.read<Stores> }
+    host "store:data/hours#for-stores"
+
+// The hours of each store whose item is in the reader's cart, in the order
+// the cart first lists one.
+fn hours_of_cart(reader: User<UserId>) -> List<OpeningHoursOf> !{ database.read<Stores>, database.read<Carts> }
+    host "store:data/hours#for-cart"
+
+// **When a store is open, or next opens** (track `store-hours`).
+type Opening = Opening { until: Instant, last_order: Instant }
+
+type OpenState =
+    | Open(Opening)
+    | Closed(Option<Instant>)
+
+// **A span of opening on the calendar**: its first and last day, by number,
+// and its minutes, an end at 1440 written as the next day's 0. Spans that
+// meet are one: a store open every day round is one span.
+type DaySpan = DaySpan { from_day: Int, from: Int, to_day: Int, to: Int }
+
+// **A span as instants**, and as the calendar says it, for the page.
+type Span = Span { opens: Instant, closes: Instant, last_order: Instant, days: DaySpan }
+
+// What a weekday is, ISO's number.
+fn weekday_number(day: LocalDate) -> Int !{} {
+    match clock.weekday(day) {
+        Monday => 1,
+        Tuesday => 2,
+        Wednesday => 3,
+        Thursday => 4,
+        Friday => 5,
+        Saturday => 6,
+        Sunday => 7,
+    }
+}
+
+// A minute of a day written as its day and a minute under 1440.
+fn normal(day: Int, minute: Int) -> DaySpan !{} {
+    if minute >= 1440 {
+        DaySpan { from_day: day + 1, from: minute - 1440, to_day: 0, to: 0 }
+    } else {
+        DaySpan { from_day: day, from: minute, to_day: 0, to: 0 }
+    }
+}
+
+// **The periods of day `n`**: its special date's, or its weekday's.
+fn spans_on(h: OpeningHours, n: Int) -> List<DaySpan> !{} {
+    let none: List<DaySpan> = []
+    let no_periods: List<WeeklyPeriod> = []
+    let day = clock.numbered_day(n)
+    let periods = match List.find(h.special, s => s.date == n) {
+        Some(s) => if s.closed { no_periods } else { [WeeklyPeriod { weekday: 0, opens: s.opens, closes: s.closes }] },
+        None => List.filter(h.weekly, p => p.weekday == weekday_number(day)),
+    }
+    List.fold(periods, none, (out, p) => List.concat(out, [span_of(n, p)]))
+}
+
+fn span_of(n: Int, p: WeeklyPeriod) -> DaySpan !{} {
+    let from = normal(n, p.opens)
+    let to = if p.closes <= p.opens { normal(n + 1, p.closes) } else { normal(n, p.closes) }
+    DaySpan { from_day: from.from_day, from: from.from, to_day: to.from_day, to: to.from }
+}
+
+// One span after another, a span that starts where the last ends joined to
+// it.
+fn joined(spans: List<DaySpan>, next: DaySpan) -> List<DaySpan> !{} {
+    match List.get(spans, List.length(spans) - 1) {
+        Some(last) => if last.to_day == next.from_day & last.to == next.from {
+            List.concat(List.take(spans, List.length(spans) - 1), [DaySpan { from_day: last.from_day, from: last.from, to_day: next.to_day, to: next.to }])
+        } else {
+            List.concat(spans, [next])
+        },
+        None => [next],
+    }
+}
+
+// **The store's spans from yesterday to a week ahead**, joined, by number.
+fn day_spans(h: OpeningHours, today: Int) -> List<DaySpan> !{} {
+    let none: List<DaySpan> = []
+    let days = List.map([0, 1, 2, 3, 4, 5, 6, 7, 8], d => today - 1 + d)
+    let each = List.fold(days, none, (out, n) => List.concat(out, spans_on(h, n)))
+    List.fold(each, none, (out, s) => joined(out, s))
+}
+
+// A minute of a numbered day as an instant in `zone`.
+fn instant(day: Int, minute: Int, zone: clock.TimeZone) -> Instant !{ clock.zone } {
+    match clock.time(minute / 60, minute % 60) {
+        Some(t) => clock.at(clock.numbered_day(day), t, zone),
+        None => clock.at(clock.numbered_day(day), clock.midnight(), zone),
+    }
+}
+
+// **The last order**: `cutoff` minutes before the span's end, a day back
+// where that is before its midnight.
+fn last_order(s: DaySpan, cutoff: Int, zone: clock.TimeZone) -> Instant !{ clock.zone } {
+    if s.to >= cutoff {
+        instant(s.to_day, s.to - cutoff, zone)
+    } else {
+        instant(s.to_day - 1, s.to - cutoff + 1440, zone)
+    }
+}
+
+fn spans(h: OpeningHours, zone: clock.TimeZone, today: Int) -> List<Span> !{ clock.zone } {
+    List.map(day_spans(h, today), s => Span {
+        opens: instant(s.from_day, s.from, zone),
+        closes: instant(s.to_day, s.to, zone),
+        last_order: last_order(s, h.last_order_minutes, zone),
+        days: s,
+    })
+}
+
+// **Whether the store is open now, and until when; or when it next opens**,
+// by comparing the clock with each span's opening and closing.
+fn status_of(h: OpeningHours) -> OpenState !{ clock.compare, clock.zone } {
+    let zone = clock.zone(h.zone)
+    let today = clock.day_number(clock.today_in(zone))
+    let all = spans(h, zone, today)
+    match List.find(all, s => clock.passed(s.opens) & !clock.passed(s.closes)) {
+        Some(s) => OpenState.Open(Opening { until: s.closes, last_order: s.last_order }),
+        None => match List.find(all, s => !clock.passed(s.opens)) {
+            Some(s) => OpenState.Closed(Some(s.opens)),
+            None => OpenState.Closed(None),
+        },
+    }
+}
+
+// The span the status names, for what the page says of it.
+fn named_span(h: OpeningHours) -> Option<Span> !{ clock.compare, clock.zone } {
+    let zone = clock.zone(h.zone)
+    let today = clock.day_number(clock.today_in(zone))
+    let all = spans(h, zone, today)
+    match List.find(all, s => clock.passed(s.opens) & !clock.passed(s.closes)) {
+        Some(s) => Some(s),
+        None => List.find(all, s => !clock.passed(s.opens)),
+    }
+}
+
+// **"7:00 am"**, a minute of a day as en-US writes it.
+fn time_said(minute: Int) -> String !{} {
+    let h = minute / 60
+    let m = minute % 60
+    let hour = if h == 0 { 12 } else if h > 12 { h - 12 } else { h }
+    let half = if h < 12 { "am" } else { "pm" }
+    let pad = if m < 10 { "0" } else { "" }
+    "{hour}:{pad}{m} {half}"
+}
+
+// **"today", "tomorrow" or a weekday**, of day `n` seen from `today`.
+fn day_said(n: Int, today: Int) -> String !{} {
+    if n == today {
+        "today"
+    } else if n == today + 1 {
+        "tomorrow"
+    } else {
+        match clock.weekday(clock.numbered_day(n)) {
+            Monday => "Monday",
+            Tuesday => "Tuesday",
+            Wednesday => "Wednesday",
+            Thursday => "Thursday",
+            Friday => "Friday",
+            Saturday => "Saturday",
+            Sunday => "Sunday",
+        }
+    }
+}
+
+// Whether a store is open every day, the whole day round, with no special
+// date.
+fn always_open(h: OpeningHours) -> Bool !{} {
+    List.length(h.special) == 0 & List.all([1, 2, 3, 4, 5, 6, 7], d => List.any(h.weekly, p => p.weekday == d & p.opens == p.closes))
+}
+
+// **What a page says of a store's hours**: "Open 24 hours", "Open until
+// 7:00 pm", "Opens tomorrow at 7:00 am", or "Closed".
+type StatusShown = StatusShown { status: OpenState, open: Bool, said: String }
+
+fn shown(h: OpeningHours) -> StatusShown !{ clock.compare, clock.zone } {
+    let status = status_of(h)
+    let today = clock.day_number(clock.today_in(clock.zone(h.zone)))
+    let said = match named_span(h) {
+        Some(s) => match status {
+            Open(_) => if always_open(h) { "Open 24 hours" } else if (s.days.to_day == today) | ((s.days.to_day == today + 1) & (s.days.to == 0)) { "Open until {time_said(s.days.to)}" } else { "Open until {day_said(s.days.to_day, today)} at {time_said(s.days.to)}" },
+            Closed(_) => "Closed · opens {day_said(s.days.from_day, today)} at {time_said(s.days.from)}",
+        },
+        None => "Closed",
+    }
+    let open = match status {
+        Open(_) => true,
+        Closed(_) => false,
+    }
+    StatusShown { status: status, open: open, said: said }
+}
+
+fn closed_shown() -> StatusShown !{} {
+    StatusShown { status: OpenState.Closed(None), open: false, said: "Closed" }
+}
+
+// **Whether a store is open, and what its page says of it** (track
+// `store-hours`): every reader's, kept shared until the next instant it
+// compared, its opening or its closing, and read again then.
+public query StoreStatus(id: StoreId) -> StatusShown
+    freshness      1.hours
+    consistency    snapshot
+    cache          shared
+    key            id
+    invalidates_on StoreChanged(id)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    match hours_of(id) {
+        Ok(h) => shown(h),
+        Err(_) => closed_shown(),
+    }
+}
+
+// **Why a cart's order is refused by the hours, or nothing**: the first of
+// its stores that is closed, or past its last order.
+fn closed_in(stores: List<OpeningHoursOf>) -> String !{ clock.compare, clock.zone } {
+    List.fold(stores, "", (why, s) => if why != "" { why } else { refusal(s) })
+}
+
+fn refusal(s: OpeningHoursOf) -> String !{ clock.compare, clock.zone } {
+    let today = clock.day_number(clock.today_in(clock.zone(s.hours.zone)))
+    match status_of(s.hours) {
+        Open(o) => if clock.passed(o.last_order) {
+            match named_span(s.hours) {
+                Some(span) => "{s.name} takes its last orders {s.hours.last_order_minutes} minutes before it closes at {time_said(span.days.to)}.",
+                None => "{s.name} is about to close.",
+            }
+        } else {
+            ""
+        },
+        Closed(_) => match named_span(s.hours) {
+            Some(span) => "{s.name} is closed: it opens {day_said(span.days.from_day, today)} at {time_said(span.days.from)}.",
+            None => "{s.name} is closed.",
+        },
+    }
+}
+
+// **A store as a list shows it**: what it says of itself, and of its hours.
+type ListedStore = ListedStore {
+    id: StoreId,
+    name: String,
+    description: String,
+    cuisine: String,
+    open: Bool,
+    said: String,
+}
+
+fn listed(s: Store, hours: List<OpeningHoursOf>) -> ListedStore !{ clock.compare, clock.zone } {
+    let status = match List.find(hours, h => same_store(h.store, s.id)) {
+        Some(h) => shown(h.hours),
+        None => closed_shown(),
+    }
+    ListedStore { id: s.id, name: s.name, description: s.description, cuisine: s.cuisine, open: status.open, said: status.said }
+}
+
+// **Every store, with whether it is open** (track `store-hours`): what the
+// home page lists, every reader's, kept until the next instant compared.
+public query StoresOpen() -> List<ListedStore>
+    freshness      30.seconds
+    consistency    snapshot
+    cache          shared
+    invalidates_on StoreChanged(_)
+    concurrency    one_per_key
+    timeout        2.seconds
+{
+    let stores = Stores.list()
+    let hours = hours_of_stores(List.map(stores, s => s.id))
+    List.map(stores, s => listed(s, hours))
+}
+
+// **What the reader's cart says of its stores' hours** (track
+// `store-hours`): why an order would be refused now, or nothing; the
+// reader's, read again when the cart changes or an instant compared passes.
+user query CartHours(reader: User<UserId>) -> String
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader
+    invalidates_on UserCartChanged(reader), StoreChanged(_)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    closed_in(hours_of_cart(reader))
+}
+
+// **What a list's store says of its hours**: its own among `hours`, or
+// closed where it has none.
+fn shown_of(store: StoreId, hours: List<OpeningHoursOf>) -> StatusShown !{ clock.compare, clock.zone } {
+    match List.find(hours, h => same_store(h.store, store)) {
+        Some(h) => shown(h.hours),
+        None => closed_shown(),
+    }
+}

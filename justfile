@@ -21,6 +21,7 @@ import 'just/messages.just'
 import 'just/kiokun.just'
 import 'just/store-accounts.just'
 import 'just/store-search.just'
+import 'just/store-hours.just'
 
 default:
     @just --list

@@ -90,6 +90,25 @@
       }
     },
     {
+      "binding": "open",
+      "resource": "store.hours.StoreStatus",
+      "args": [
+        "id"
+      ],
+      "policy": {
+        "cache": "shared",
+        "privacy": "public",
+        "freshness_ms": 3600000,
+        "timeout_ms": 2000,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0
+        ],
+        "on_key_change": "cancel"
+      }
+    },
+    {
       "binding": "cart",
       "resource": "store.page.Cart",
       "args": [
@@ -163,6 +182,16 @@
     },
     {
       "part": 3,
+      "path": "open.said",
+      "binding": "open",
+      "steps": [
+        {
+          "field": "said"
+        }
+      ]
+    },
+    {
+      "part": 4,
       "path": "store.description",
       "binding": "store",
       "steps": [
@@ -172,13 +201,13 @@
       ]
     },
     {
-      "part": 4,
+      "part": 5,
       "path": "line",
       "binding": "line",
       "steps": []
     },
     {
-      "part": 23,
+      "part": 24,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -188,7 +217,7 @@
       ]
     },
     {
-      "part": 35,
+      "part": 36,
       "path": "cart.subtotal.display",
       "binding": "cart",
       "steps": [
@@ -213,20 +242,20 @@
   ],
   "live": [
     {
-      "part": 37,
+      "part": 38,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
     }
   ],
   "blocks": [
-    5,
-    8,
-    36
+    6,
+    9,
+    37
   ],
   "streams": [
     {
-      "part": 11,
+      "part": 12,
       "resource": "store.page.Estimate",
       "args": [
         "id",
@@ -248,7 +277,7 @@
       "streamed": true
     },
     {
-      "part": 39,
+      "part": 40,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -310,9 +339,9 @@
     }
   ],
   "attributes": [
-    24
+    25
   ],
-  "title": 42,
+  "title": 43,
   "scope": "user:",
   "layout": {
     "path": "store.page.StoreLayout",

@@ -54,6 +54,41 @@ domain.total  abi 646f52dd5992d40d
   runs at   build, browser, edge, origin
   exports   function total
 
+store.hours.CartHours  abi ad95ef681a4ee1cc
+  runs at   origin
+  needs     clock.compare
+  needs     clock.zone
+  needs     database.read<Carts>
+  needs     database.read<Stores>
+  host      pw:host/clock#at  (clock.zone)
+  host      pw:host/clock#passed  (clock.compare)
+  host      pw:host/clock#today  (clock.compare)
+  host      store:data/hours#for-cart  (database.read<Stores>)
+  exports   query CartHours
+
+store.hours.StoreStatus  abi 8745b39c6f40cb6a
+  runs at   origin
+  needs     clock.compare
+  needs     clock.zone
+  needs     database.read<Stores>
+  host      pw:host/clock#at  (clock.zone)
+  host      pw:host/clock#passed  (clock.compare)
+  host      pw:host/clock#today  (clock.compare)
+  host      store:data/hours#for-store  (database.read<Stores>)
+  exports   query StoreStatus
+
+store.hours.StoresOpen  abi 83705ac29176622a
+  runs at   origin
+  needs     clock.compare
+  needs     clock.zone
+  needs     database.read<Stores>
+  host      pw:host/clock#at  (clock.zone)
+  host      pw:host/clock#passed  (clock.compare)
+  host      pw:host/clock#today  (clock.compare)
+  host      store:data/hours#for-stores  (database.read<Stores>)
+  host      store:data/stores#list  (database.read<Stores>)
+  exports   query StoresOpen
+
 store.page.AddressPage  abi 770e51c96051ba77
   runs at   origin
   needs     session.read
@@ -75,6 +110,7 @@ store.page.Cart  abi 37cb9e8b9dc1738c
 store.page.CartPage  abi f00a4fe14eeded6f
   runs at   origin
   needs     session.read
+  component pw:app/store.hours.CartHours#CartHours
   component pw:app/store.page.Cart#Cart
   component pw:app/store.page.Order#Order
   component pw:app/store.page.clear_cart#clear_cart
@@ -95,8 +131,8 @@ store.page.Estimate  abi 94da90c7ccd7e563
 store.page.HomePage  abi 2c950586f6696763
   runs at   origin
   needs     session.read
+  component pw:app/store.hours.StoresOpen#StoresOpen
   component pw:app/store.page.Cart#Cart
-  component pw:app/store.page.StoreList#StoreList
   host      pw:host/principal#read  (session.read)
   exports   page HomePage
 
@@ -177,6 +213,7 @@ store.page.StoreList  abi 7fad5df1af8cdb8f
 store.page.StorePage  abi d803b26130c7cf49
   runs at   origin
   needs     session.read
+  component pw:app/store.hours.StoreStatus#StoreStatus
   component pw:app/store.page.Cart#Cart
   component pw:app/store.page.Estimate#Estimate
   component pw:app/store.page.Menu#Menu
@@ -264,17 +301,25 @@ store.page.increase_in_cart  abi ea834328e33999c3
   host      store:data/user-carts#add  (database.write<Carts>)
   exports   command increase_in_cart
 
-store.page.place_order  abi fb6bec6c5ebf1383
+store.page.place_order  abi b0018e0965e11e9b
   runs at   origin
+  needs     clock.compare
+  needs     clock.zone
+  needs     database.read<Carts>
+  needs     database.read<Stores>
   needs     database.write<Carts>
   needs     database.write<Orders>
   needs     outbox.write
   needs     session.read
+  host      pw:host/clock#at  (clock.zone)
+  host      pw:host/clock#passed  (clock.compare)
+  host      pw:host/clock#today  (clock.compare)
   host      pw:host/invalidations#store-page-cart  (outbox.write)
   host      pw:host/invalidations#store-page-order  (outbox.write)
   host      pw:host/outbox#user-cart-changed  (outbox.write)
   host      pw:host/outbox#user-order-changed  (outbox.write)
   host      pw:host/principal#read  (session.read)
+  host      store:data/hours#for-cart  (database.read<Stores>)
   host      store:data/user-orders#place  (database.write<Orders>)
   exports   command place_order
   requires  SignedIn
@@ -312,11 +357,17 @@ store.page.rename_address  abi 7e1a5f55cd7ee9c6
   host      store:data/addresses#rename  (database.write<Addresses>)
   exports   command rename_address
 
-store.search.Search  abi d26c16946c40ccae
+store.search.Search  abi 9c8a7f1e53e7f531
   runs at   origin
+  needs     clock.compare
+  needs     clock.zone
   needs     database.read<Addresses>
   needs     database.read<Menus>
   needs     database.read<Stores>
+  host      pw:host/clock#at  (clock.zone)
+  host      pw:host/clock#passed  (clock.compare)
+  host      pw:host/clock#today  (clock.compare)
+  host      store:data/hours#for-stores  (database.read<Stores>)
   host      store:data/search#find-for  (database.read<Stores>)
   exports   query Search
 

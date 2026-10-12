@@ -116,3 +116,20 @@ fn time(hour: Int, minute: Int) -> Option<LocalTime> !{} {
 fn next_day(date: LocalDate) -> LocalDate !{} {
     LocalDate(date.value + 1)
 }
+
+// **A date's number**, days since 1970-01-01 (track `store-hours`): what a
+// store's special dates are stored by, and how two dates are compared and
+// counted apart.
+fn day_number(date: LocalDate) -> Int !{} {
+    date.value
+}
+
+// **The date numbered `days`** since 1970-01-01 (track `store-hours`).
+fn numbered_day(days: Int) -> LocalDate !{} {
+    LocalDate(days)
+}
+
+// **Midnight**, a day's first minute (track `store-hours`).
+fn midnight() -> LocalTime !{} {
+    LocalTime(0)
+}
