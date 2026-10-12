@@ -783,6 +783,48 @@ MUTANTS = [
         "        if false {\n            clauses.push(",
     ),
     (
+        "the word page states no canonical address",
+        "head",
+        APP,
+        "        <link rel=\"canonical\" href={WordPage(page.word)} />\n",
+        "",
+    ),
+    (
+        "the canonical address is the one asked",
+        "head",
+        APP,
+        "        <link rel=\"canonical\" href={WordPage(page.word)} />\n",
+        "        <link rel=\"canonical\" href={WordPage(word)} />\n",
+    ),
+    (
+        "a blank query is a search like any other",
+        "search",
+        APP,
+        '        blank: String.trim(asked) == "",',
+        "        blank: false,",
+    ),
+    (
+        "a word with its own entry leads nowhere",
+        "search",
+        APP,
+        '        Some(_) => [WordLead { id: asked, asked: asked, shown: asked, how: "" }],',
+        "        Some(_) => none,",
+    ),
+    (
+        "an inflected query leads nowhere",
+        "search",
+        APP,
+        "            Some(r) => [WordLead { id: asked, asked: asked, shown: r.word, how: r.how }],",
+        "            Some(_) => none,",
+    ),
+    (
+        "a Latin query with an entry leads to it",
+        "search",
+        APP,
+        "    let own_files = read_entries(if cjk { [place_of(trimmed)] } else { no_places })",
+        "    let own_files = read_entries(if String.trim(q) != \"\" { [place_of(trimmed)] } else { no_places })",
+    ),
+    (
         "a godan く verb's te form is って",
         "deinflection",
         APP,
@@ -959,15 +1001,20 @@ MUTANTS = [
     ),
 ]
 
-# Four test threads, not one per core. Each distinct program is compiled
-# once per test process and its files written into each test's own TempDir
-# (the integrator's ruling of 2026-10-09; ADR-0158 holds). Measured back to
-# back with /usr/bin/time -l on 12 cores at a load near 16, the tests alone
-# take 76.0 s and 2.71 GB at one thread per core, or 99.0 s and 2.39 GB on
-# four (before the cache: 92.8 s and 3.61 GB, or 138.7 s and 2.09 GB). In
-# a whole run at one thread per core, ADR-0292's 4 GiB bound still stopped
-# the test process in 19 of 69 mutants' runs; on four threads, a whole run
-# before the cache stopped none.
+# Four test threads, CI's runner's cores, for the baseline and for each
+# mutant's cover. Each distinct program is compiled once per test process
+# and its files written into each test's own TempDir (the integrator's
+# ruling of 2026-10-09; ADR-0158 holds), and each component once a process
+# (ADR-0317).
+#
+# The test binary's peak footprint as ADR-0292's bound reads it (macOS
+# phys_footprint, measured 2026-10-12; the bound 3.9 GiB on CI):
+# - before ADR-0317, when every test's server compiled the program's
+#   components again: every kiokun test 5.21 GiB on four threads (verify
+#   38235212974 stopped that baseline), 4.19 on three, 3.47 on two, 2.11 on
+#   one; the largest cover, files' eight tests, 2.98 GiB on two threads;
+# - after it: every kiokun test 1.28 GiB on four threads, in 46 s; files'
+#   cover 1.10 GiB on four, in 55 s.
 CARGO = ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]
 TESTS = [CARGO + ["--", "kiokun", "--test-threads=4"]]
 
@@ -1021,6 +1068,7 @@ GROUPS = {
         K + "the_description_takes_kiokuns_fragments_and_length",
         K + "the_page_head_matches_kiokuns_answers_for_the_sample",
         K + "the_page_describes_itself_as_kiokun_com_does",
+        K + "the_word_page_names_its_entrys_page_canonical",
     ],
     "pitch": [
         K + "a_japanese_word_shows_its_pitch_accent",
@@ -1051,6 +1099,7 @@ GROUPS = {
         "kiokun::search::tests::a_query_is_words_whatever_it_holds",
         "kiokun::search::tests::a_query_fts5_cannot_read_raw_is_answered",
         "kiokun::search::tests::a_csv_record_holds_quotes_commas_and_line_breaks",
+        K + "the_search_box_sends_its_query_to_the_search_page",
     ],
     "homophones": [
         K + "homophones_are_each_readings_words_but_the_pages_own",
@@ -1104,6 +1153,7 @@ SEEN_BY = {
         K + "the_description_takes_kiokuns_fragments_and_length",
         K + "the_page_describes_itself_as_kiokun_com_does",
         K + "the_page_head_matches_kiokuns_answers_for_the_sample",
+        K + "the_word_page_names_its_entrys_page_canonical",
     ],
     "pitch": [
         K + "a_japanese_word_shows_its_pitch_accent",
@@ -1129,6 +1179,7 @@ SEEN_BY = {
     "search": [
         K + "search_matches_kiokuns_answers_for_the_sample",
         K + "search_reads_kana_variants_and_canonical_pages",
+        K + "the_search_box_sends_its_query_to_the_search_page",
     ],
     "homophones": [
         K + "homophones_are_each_readings_words_but_the_pages_own",

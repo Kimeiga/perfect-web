@@ -1,11 +1,11 @@
 The search page, against kiokun.com's own api/search
 
 produced by: just e14-kiokun-search (local: reads a kiokun-data checkout)
-commit: 2cd2e8006f42bdce8ab008566e9e021173517c27
-kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree (src/routes/api/search/+server.ts 9f42e0748d7e; src/lib/search-aliases.ts edaf48e4fc5d; src/lib/search-aliases-core.ts a706514b31d6; migrations/0005_search_index_with_jyutping.sql 004a33675a53; src/lib/generated/search-aliases.json e0e33a86ef77)
-kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree (output_search_index.csv 0d5523b5cc3a)
+commit: 98a1f1e1b59ad378cdd5b1c70eda7d277108b959
+kiokun.com's source: 2391117c3f9e888aadc9a161b7c42e414cd8ffec, its committed tree (src/routes/api/search/+server.ts 9f42e0748d7e; src/lib/search-aliases.ts edaf48e4fc5d; src/lib/search-aliases-core.ts a706514b31d6; migrations/0005_search_index_with_jyutping.sql 004a33675a53; src/lib/generated/search-aliases.json e0e33a86ef77)
+kiokun.com's source: 2391117c3f9e888aadc9a161b7c42e414cd8ffec, its committed tree (output_search_index.csv 0d5523b5cc3a)
 node: v22.21.1
-host: Darwin arm64, 12 cores, load averages: 14.79 20.71 27.17
+host: Darwin arm64, 12 cores, load averages: 44.26 47.77 48.04
 
 == the D1 stand-in's own test (spikes/own-renderer/kiokun-oracle/d1.test.mjs)
 
@@ -24,8 +24,8 @@ stride 8000: 834036 rows; 355 queries
 compared: 355 queries (stride 8000, 834036 rows)
 named differences: {"a search kiokun.com fails, answered": 4}
 unnamed differences: 0
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 408 filtered out; finished in 16.11s
-after it: load averages: 52.03 38.23 32.86
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 441 filtered out; finished in 12.35s
+after it: load averages: 64.93 63.38 54.19
 
 == the CI fixture: kiokun.com's answers over the repository's sample and its hand-made aliases
 

@@ -23,6 +23,17 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-12: kiokun's search box and canonical link** (W6's second packet,
+merged from `5b7dc1e`; ADR-0314, ADR-0316 and ADR-0293 amended).
+- The search is at `/search{?q}`, with kiokun.com's header field as a plain
+  GET form on the word and search pages.
+- The word page names its dictionary form's address as its canonical link,
+  with `og:url` from it.
+- The inventory is at kiokun.com's `2391117c`: 102 routes.
+- After ADR-0317 every kiokun test runs at a 1.28 GiB peak in 46 s, from
+  5.21 GiB and 839 s, and W6's thread limits are relaxed again.
+Verify 38264024746 green: kiokun-word 138 of 138 and redirects 15 of 15.
+
 **ADR-0320, 2026-10-12: a block is told part by part while its arm stays**
 (the integrator's; W9's finding; track `fixed-arms`, merged from `124b62b`).
 W9's search sentence, inside the `Some` arm of `{#match q}`, was never told

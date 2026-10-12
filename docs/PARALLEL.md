@@ -1250,4 +1250,8 @@ Each a decision for a track, with its date; a track's ADR records it too.
     resolves `shown` against this;
   - a test that matched a block's whole HTML in what a change sent reads
     the part's text now (`texts_told`), as the feed's count tests do.
+- **2026-10-12, W6's second packet merged** (`5b7dc1e`, verify 38264024746):
+  the search box at `/search{?q}`, the canonical link, the inventory at
+  kiokun.com's `2391117c`, and the search's evidence recorded again at its
+  route. No new ADR: ADR-0314, ADR-0316 and ADR-0293 are amended.
 
