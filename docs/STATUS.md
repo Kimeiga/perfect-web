@@ -23,6 +23,21 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0325, 2026-10-12: an interaction's answer commits with its writes**
+(the integrator's; NEXT 5; track `interactions-committed`, merged from
+`51998bc`).
+- PW0348 promised a record of the interaction committed with its writes, and
+  the host kept it in memory: on PostgreSQL, a host started after another,
+  or a second host, ran a retried interaction again (two cart lines, two
+  posts).
+- The record (the key, the arguments first sent, the answer) commits in the
+  command's transaction: `interactions` in each PostgreSQL schema (store
+  0005, feed 0008), the materializer's table in memory. A command recalls
+  it before running; a second host's commit that meets it rolls back and
+  answers what the first recorded; a record answers a day, as Stripe's
+  keys do.
+Verify TRAIN_RUN green, with the train.
+
 **ADR-0324, 2026-10-12: `private` says a declaration is not importable,
 and nothing more** (the integrator's; NEXT 3a, W8's finding; track
 `private-module`, merged from `d933b21`).

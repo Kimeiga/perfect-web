@@ -745,10 +745,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              stores more, pinned and equal at both; rows read by set
              (`= ANY($1)`), a scan in memory; mutants restore each loop.
              W9's, after store-hours, on the counter W9's search brings;
-          5. **idempotency committed with the writes** (PW0348, ADR-0246's
-             Not claimed), before a payment depends on it: an interaction's
-             answer kept in the transaction that commits its command, in
-             both layers;
+          5. ~~**idempotency committed with the writes**~~ (ADR-0325,
+             merged 2026-10-12): an interaction's answer commits in its
+             command's transaction, on both layers, and answers a day;
           6. **checkout**: fees, taxes, a tip and promo codes, in money that
              cannot round silently (`Money` is USD's alone, so no other
              currency, conversion or locale's format, said where it

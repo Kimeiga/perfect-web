@@ -2858,3 +2858,9 @@ integrator's; W8's finding, NEXT 3a).
 - The user's scope is `user`'s alone; `private` on a declaration that holds
   data is refused by name (PW0029); PW0023's repair drops `private`; a
   `user` opening a declaration ends the clause before it.
+[ADR-0325](DECISIONS/ADR-0325-an-interactions-answer-commits-with-its-writes.md):
+an interaction's answer commits with its writes (the integrator's; NEXT 5).
+- The record of an idempotent command's interaction (its key, the arguments
+  first sent, its answer) commits in the command's transaction, on both
+  layers; a command recalls it before running, a second host's commit that
+  meets it answers what the first recorded, and a record answers a day.

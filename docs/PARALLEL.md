@@ -1378,3 +1378,16 @@ Each a decision for a track, with its date; a track's ADR records it too.
     before navigating, so the old document's next poll was told to read the
     page again and that reload raced the test's own navigation. It navigates
     first now, then continues the held polls (`d933b21`).
+- **2026-10-12, an interaction's answer commits with its writes, merged as
+  ADR-0325** (the integrator's, NEXT 5; track `interactions-committed`, from
+  `51998bc`; Verify TRAIN_RUN green, with the train.). Item 6 (checkout) may depend on it: a charge is
+  idempotent by the order's interaction.
+  - **Found by its verify (38301897351)**: "an interaction reused with
+    other arguments shares the first outcome" survived. A committed record
+    now refuses a reused interaction before the session's memory is asked,
+    so no test reached the memory's refusal. It alone holds an interaction
+    that committed nothing, a declared error's: the test sends a sold-out
+    add, then the same interaction with other arguments (`51998bc`).
+  - The store's migration is `0005_interactions`, in the numbers left free
+    below `0010_search`; a database that ran 0010 first runs it after, as
+    the runner applies each migration it has not recorded.

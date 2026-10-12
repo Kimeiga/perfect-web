@@ -48,6 +48,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0004_addresses",
         include_str!("../migrations/store/0004_addresses.sql"),
     ),
+    // ADR-0325: an interaction's answer, committed with its writes.
+    (
+        "0005_interactions",
+        include_str!("../migrations/store/0005_interactions.sql"),
+    ),
     // TRACK SEAM (store-search): each store's cuisine, which a search reads.
     (
         "0010_search",
@@ -705,6 +710,7 @@ impl crate::data::Staged for Staging<'_> {
         &mut self,
         events: &[Handed],
         invalidated: &[Dropped],
+        interaction: Option<&crate::data::Recorded<'_>>,
     ) -> Result<Option<Outboxed>, String> {
         let mut conn = self.conn.lock().expect("the command's connection");
         let c = conn
@@ -739,6 +745,10 @@ impl crate::data::Staged for Staging<'_> {
                 .map_err(pg)?;
             ids.push(row.get(0));
         }
+        // **The interaction's answer, with the writes** (ADR-0325).
+        if let Some(r) = interaction {
+            crate::feed_pg::record(c, r)?;
+        }
         // The writes and the outbox's rows, at once or not at all. A commit
         // the database refuses (a serialization failure, a deferred
         // constraint) has rolled back, and nothing is delivered.
@@ -770,6 +780,15 @@ impl Drop for Staging<'_> {
 }
 
 impl crate::data::DataLayer for StorePg {
+    fn keeps_interactions(&self) -> bool {
+        true
+    }
+
+    fn recalled(&self, key: &str, since_ms: u64) -> Result<Option<(String, String)>, String> {
+        let mut conn = self.pool.take()?;
+        crate::feed_pg::recalled(conn.client(), key, since_ms).map_err(pg)
+    }
+
     fn reads(&self, session: &str, stopped: Option<Stopped>) -> Ops {
         let pool = self.pool.clone();
         let with: With = Arc::new(move |f| {
