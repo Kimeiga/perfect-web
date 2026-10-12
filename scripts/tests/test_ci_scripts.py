@@ -355,6 +355,29 @@ class Plan(unittest.TestCase):
         limits = [int(m) for m in __import__("re").findall(r"timeout-minutes: (\d+)", workflow)]
         self.assertLess(plan.CEILING, max(limits) * 60)
 
+    def test_a_diff_that_is_no_utf8_is_still_read(self) -> None:
+        # A raw DEFLATE file git diffs as text, its bytes no UTF-8, and a
+        # path in kana as `core.quotePath=false` writes it.
+        diff = (
+            "diff --git a/examples/kiokun/data/02/\u5410\u304f.json.deflate "
+            "b/examples/kiokun/data/02/\u5410\u304f.json.deflate\n"
+            "--- /dev/null\n"
+            "+++ b/examples/kiokun/data/02/\u5410\u304f.json.deflate\n"
+            "@@ -0,0 +1,2 @@\n"
+        ).encode("utf-8") + b"+\xcd\xff\x80 raw\n+\xfe\n" + (
+            "diff --git a/compiler/pw-core/src/check.rs b/compiler/pw-core/src/check.rs\n"
+            "--- a/compiler/pw-core/src/check.rs\n"
+            "+++ b/compiler/pw-core/src/check.rs\n"
+            "@@ -10,0 +11,3 @@\n"
+        ).encode("utf-8")
+        self.assertEqual(
+            plan.parsed(diff),
+            {
+                "examples/kiokun/data/02/\u5410\u304f.json.deflate": [(1, 2)],
+                "compiler/pw-core/src/check.rs": [(11, 13)],
+            },
+        )
+
     def test_the_seconds_are_read_where_the_fetch_keeps_them(self) -> None:
         self.assertEqual(plan.SECONDS, fetch.SECONDS)
         with tempfile.TemporaryDirectory() as d:

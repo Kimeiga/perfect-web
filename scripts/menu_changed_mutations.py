@@ -29,10 +29,11 @@ STORE = ROOT / "examples/store/app.pw"
 # Re-anchored by ADR-0178, whose stock change is an event of its own.
 # Re-anchored by track store-pg: the change is written through the layer
 # with its event, and what committed is delivered.
+# Re-anchored by track store-search: what the change dropped is told to
+# each session reading it, so the drop is the closure's first line.
 EVENT = (
     "            |delivered| {\n"
-    "                self.invalidate_queries(\"\", &[], delivered);\n"
-    "            },\n"
+    "                let reached = self.invalidate_queries(\"\", &[], delivered);\n"
 )
 
 # (what, file, anchor, replacement)
@@ -43,13 +44,14 @@ MUTANTS = [
         EVENT,
         "            |_| {\n"
         "                self.queries.invalidate(\"store.page.Menu\");\n"
-        "            },\n",
+        "                let reached: Vec<String> = Vec::new();\n",
     ),
     (
         "a menu change drops nothing",
         SERVER,
         EVENT,
-        "            |_| {},\n",
+        "            |_| {\n"
+        "                let reached: Vec<String> = Vec::new();\n",
     ),
     (
         "the event names no store",

@@ -131,6 +131,10 @@ export const KIOKUN_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 
 export const STORE_ACCOUNTS_PORTS = Object.fromEntries(
   ENGINES.map((e, i) => [e, PORT + 160 + i]),
 );
+// TRACK SEAM (store-search): the store's search hosts (docs/PARALLEL.md,
+// W9), the store's build, one per engine, because a test adds a dish to
+// store 47's menu, which is one per server.
+export const STORE_SEARCH_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 170 + i]));
 // A build serves the runtime it was built with. One built before the runtime
 // changed runs the old runtime against the new server, and fails for a reason
 // that is no test's: `dist-keyed` did, once each page's subscription named
@@ -314,6 +318,16 @@ export default defineConfig({
           timeout: 60_000,
         }))
       : []),
+    // TRACK SEAM (store-search): the store's search hosts.
+    ...(process.env.PW_PERFORMANCE
+      ? []
+      : Object.values(STORE_SEARCH_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist`,
+          env: { PORT: String(port), ...IN_MEMORY },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))),
     // The kiokun track's hosts: kiokun's build, its entries read from
     // KIOKUN_DATA where the caller names it, the repository's sample
     // otherwise.

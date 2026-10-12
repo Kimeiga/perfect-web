@@ -23,6 +23,50 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0309, 2026-10-12: a page's query parameters are typed, and a GET form
+makes them** (the integrator's; track `query-params`, merged from `718bbfd`).
+A search's text belongs in the address's query, where a browser's GET form
+puts it and a reader can share it.
+- A route's query part is RFC 6570's form-style expansion,
+  `route "/search{?q}"`, each name an `Option` of text.
+- The host reads it as the URL Standard reads a form, and refuses bytes that
+  are no UTF-8.
+- A link's query and a GET form's fields name only what the route gives
+  (PW5050).
+- Found: a move and the upload check read a route's query part as part of
+  its path, so a move to itself was a 308 loop, and PW5602 missed a page.
+  Each now reads the path.
+Verify 38196213688 green: the routes' and uploads' tests, the host's, the
+demo's search in three engines with scripts on and off, and 12 of 12
+mutants. Its first two pushes' runs are covered by it (ADR-0253, amended).
+
+**ADR-0308, 2026-10-12: the store's stores and dishes, searched in its data
+layer to one meaning** (W9's, track `store-search`, merged from `00ecfc6`).
+- A delivery app starts from a search. The store's is now one meaning, in
+  memory and on PostgreSQL alike: Unicode 16.0's lowering, every term part
+  of one of a record's fields, tiers by where the terms were found, and one
+  order, cut and bound, which `search.rs` alone applies to what either
+  layer matched.
+- The page is at `route "/search/{q}"` until a route reads its query part.
+- Found:
+  - the menu route's drop told only the store's own pages, and now tells
+    each open page that reads what it dropped;
+  - the first verify's survivor moved a dish's tier on PostgreSQL alone,
+    which the test's table did not show. The test now compares every
+    record whole.
+- Evidence: verify 38188240871 at `b32f7dc` for every recipe but the
+  search's (12 green); `e14-store-search` from dispatch 38208290480 at
+  `6a69b62`, by the ruling that a head changing only tests merges on its
+  verified commit's evidence. Its tests in memory and on PostgreSQL, 15 of
+  15 browser tests in three engines, and 30 of 30 mutants.
+
+**Correction, 2026-10-12: a track's later verify covered its earlier ones,
+and both ran** (ADR-0253, amended). A track's push plans everything since it
+left `master`. The workflow still said a later run covers nothing earlier,
+which holds only for `master`'s pushes. query-params' three pushes ran three
+plans of nearly every recipe. A track's pushes now share a concurrency group,
+and the earlier run is cancelled.
+
 **ADR-0307, 2026-10-12: a control is shown where its command's predicates
 hold** (the integrator's; track `holds`, merged from `a1a232f`). This is the
 third step of "a refusal is never silent". A page asks a predicate of its

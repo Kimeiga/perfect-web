@@ -428,6 +428,27 @@
         "id",
         "label"
       ]
+    },
+    {
+      "path": "store.search.Search",
+      "name": "Search",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "key": [
+        "q"
+      ],
+      "params": [
+        "q"
+      ]
+    },
+    {
+      "path": "store.search.SearchPage",
+      "name": "SearchPage",
+      "node": "page",
+      "params": [
+        "q"
+      ]
     }
   ],
   "edges": [
@@ -869,6 +890,39 @@
       "kind": "invalidates",
       "key": [
         "current_user()"
+      ]
+    },
+    {
+      "from": "store.search.Search",
+      "to": "Events.InventoryChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "_",
+        "_"
+      ]
+    },
+    {
+      "from": "store.search.Search",
+      "to": "Events.MenuChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "_"
+      ]
+    },
+    {
+      "from": "store.search.SearchPage",
+      "to": "store.page.Cart",
+      "kind": "reads",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.search.SearchPage",
+      "to": "store.search.Search",
+      "kind": "reads",
+      "key": [
+        "q"
       ]
     }
   ],

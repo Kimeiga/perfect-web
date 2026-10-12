@@ -68,6 +68,11 @@ fn build(change: impl Fn(&str) -> String) -> Result<pw_core::build::Build, Strin
         for p in paths {
             if p.ends_with("store/app.pw") {
                 add(p, &change);
+            } else if p.ends_with("store/search.pw") {
+                // The search page (track `store-search`) links to a store's
+                // route, which the control below takes away, and its title
+                // is its own: left out of both builds.
+                continue;
             } else {
                 add(p, &same);
             }

@@ -343,7 +343,9 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     };
     // Each query but `Recommendations`, which asks `eventual`; `Estimate`
     // once for each resource it reads, the estimates and the reader's
-    // addresses (track `store-accounts`).
+    // addresses (track `store-accounts`); and the search (track
+    // `store-search`) once for each of the two it reads, the stores and
+    // their menus.
     assert_eq!(
         named("PW0344"),
         [
@@ -356,7 +358,9 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "SavedAddresses",
             "Places",
             "Reach",
-            "Order"
+            "Order",
+            "Search",
+            "Search"
         ]
     );
     // The commands that ask a serializable transaction.
@@ -386,5 +390,5 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     ];
     assert_eq!(named("PW0347"), commands);
     assert_eq!(named("PW0348"), commands);
-    assert_eq!(found.len(), 34, "{found:#?}");
+    assert_eq!(found.len(), 36, "{found:#?}");
 }

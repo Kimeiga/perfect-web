@@ -111,6 +111,7 @@ NEEDS_DATABASE = {
     "e14-messages",
     "e14-store-postgres",
     "e14-store-accounts",
+    "e14-store-search",
 }
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
@@ -198,9 +199,25 @@ def cost(body: str) -> int:
 def hunks(base: str, head: str) -> dict[str, list[tuple[int, int]]]:
     """Each file the range changed, with its changed lines' ranges in `head`
     (a deletion is the line it stood before)."""
+    # Bytes, and paths as written: a file git diffs as text need not be
+    # UTF-8, and a path outside ASCII is quoted unless told not to be.
     diff = subprocess.run(
-        ["git", "diff", "-U0", base, head], cwd=ROOT, capture_output=True, text=True, check=True
+        ["git", "-c", "core.quotePath=false", "diff", "-U0", base, head],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
     ).stdout
+    return parsed(diff)
+
+
+def parsed(diff: bytes) -> dict[str, list[tuple[int, int]]]:
+    """**A diff's files and their changed lines** (`hunks`). Read as UTF-8
+    with each byte that is not one replaced: until 2026-10-12 it was decoded
+    strictly, and a raw DEFLATE file that held no NUL byte, which git diffs
+    as text, stopped a track's plan (W6's `吐く.json.deflate`), so its verify
+    ran no recipe. Only its paths and its hunks' line numbers are read, and
+    those are ASCII where a file's own bytes are not."""
+    diff = diff.decode("utf-8", errors="replace")
     out: dict[str, list[tuple[int, int]]] = {}
     current = None
     for line in diff.splitlines():

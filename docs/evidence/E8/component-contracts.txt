@@ -312,3 +312,15 @@ store.page.rename_address  abi 7e1a5f55cd7ee9c6
   host      store:data/addresses#rename  (database.write<Addresses>)
   exports   command rename_address
 
+store.search.Search  abi d7e577e092fd4d47
+  runs at   origin
+  needs     database.read<Menus>
+  needs     database.read<Stores>
+  host      store:data/search#find  (database.read<Stores>)
+  exports   query Search
+
+store.search.SearchPage  abi 99aebc4fbc66d85e
+  runs at   origin
+  component pw:app/store.search.Search#Search
+  exports   page SearchPage
+

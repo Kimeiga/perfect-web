@@ -1,8 +1,8 @@
 ADR-0164 - a menu change drops what declares it, for its store
 
 produced by: just e14-menu-changed
-commit: d043fa6ff49de0ce18e5046773c3fc49f7d0560b
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37932273524 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: b32f7dc1cd3be745fd77d38f97cda063889dbf64
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38188240871 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the store's graph: what MenuChanged(id) invalidates
@@ -13,22 +13,23 @@ store.menu_fragment.MenuFragment  --invalidated-by-->  Events.MenuChanged(id)
 store.page.Menu  --invalidated-by-->  Events.MenuChanged(id)
 store.page.MenuSize  --invalidated-by-->  Events.MenuChanged(id)
 store.page.Recommendations  --invalidated-by-->  Events.MenuChanged(id)
+store.search.Search  --invalidated-by-->  Events.MenuChanged(_)
 
 == the development server (pw-dev-server)
 
 test tests::a_change_to_one_stores_menu_reaches_that_stores_pages_only ... ok
-test tests::a_menu_change_drops_the_menus_kept_values ... ok
 test tests::a_menu_change_drops_that_stores_kept_menu_only ... ok
 test tests::a_menu_change_drops_that_stores_recommendations_only ... ok
-test result: ok. 344 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 512.32s
+test tests::a_menu_change_drops_the_menus_kept_values ... ok
+test result: ok. 410 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 463.28s
 
 == mutation controls (scripts/menu_changed_mutations.py)
 
-baseline: 344 passed, 0 failed
-a menu change drops every store's menu, by the query's name: KILLED (7 of 344 tests fail)
-a menu change drops nothing: KILLED (16 of 344 tests fail)
-the event names no store: KILLED (3 of 344 tests fail)
-the event is another store's: KILLED (14 of 344 tests fail)
-the store's menu declares no invalidation: KILLED (11 of 344 tests fail)
+baseline: 410 passed, 0 failed
+a menu change drops every store's menu, by the query's name: KILLED (9 of 410 tests fail)
+a menu change drops nothing: KILLED (19 of 410 tests fail)
+the event names no store: KILLED (3 of 410 tests fail)
+the event is another store's: KILLED (15 of 410 tests fail)
+the store's menu declares no invalidation: KILLED (12 of 410 tests fail)
 5 of 5 mutants killed
 memory bound: no process was stopped

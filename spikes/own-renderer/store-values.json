@@ -22,5 +22,9 @@
   "said": "",
   "saved": [],
   "places": [],
-  "SignedIn~holds": false
+  "SignedIn~holds": false,
+  "search.asked": "coffee",
+  "search.said": "2 stores match “coffee”.",
+  "search.stores": [],
+  "search.more": ""
 }

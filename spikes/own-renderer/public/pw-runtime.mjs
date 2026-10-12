@@ -1981,6 +1981,32 @@ function leaveFor(url, reload = false) {
  * fails visibly.
  */
 function pageAddress(route, args) {
+  // The route's query part, RFC 6570's form-style expansion (ADR-0309):
+  // `?name=value` for each name given as text, `&` between, nothing for one
+  // not given; its values encoded as a segment's are.
+  const at = route.indexOf("{?");
+  const path = at < 0 ? route : route.slice(0, at);
+  const names = at < 0 ? [] : route.slice(at + 2, -1).split(",").map((n) => n.trim());
+  const query = names
+    .filter((n) => typeof args[n] === "string")
+    .map((n) => `${n}=${encodeUnreserved(args[n])}`);
+  return query.length ? `${pathAddress(path, args)}?${query.join("&")}` : pathAddress(path, args);
+}
+
+/** Each byte of `value` outside RFC 3986's unreserved set, as `%XX`. */
+function encodeUnreserved(value) {
+  let out = "";
+  for (const b of new TextEncoder().encode(value)) {
+    const unreserved =
+      (b >= 0x41 && b <= 0x5a) || (b >= 0x61 && b <= 0x7a) || (b >= 0x30 && b <= 0x39) ||
+      b === 0x2d || b === 0x2e || b === 0x5f || b === 0x7e;
+    out += unreserved ? String.fromCharCode(b) : "%" + b.toString(16).toUpperCase().padStart(2, "0");
+  }
+  return out;
+}
+
+/** A route's path, each `{name}` segment given its value (ADR-0280). */
+function pathAddress(route, args) {
   return route.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, name) => {
     const value = args[name];
     if (typeof value !== "string") {
@@ -1989,14 +2015,7 @@ function pageAddress(route, args) {
     if (value === "" || value === "." || value === "..") {
       throw new Error(`{${name}} in ${route} cannot be ${JSON.stringify(value)}: no segment carries it`);
     }
-    let out = "";
-    for (const b of new TextEncoder().encode(value)) {
-      const unreserved =
-        (b >= 0x41 && b <= 0x5a) || (b >= 0x61 && b <= 0x7a) || (b >= 0x30 && b <= 0x39) ||
-        b === 0x2d || b === 0x2e || b === 0x5f || b === 0x7e;
-      out += unreserved ? String.fromCharCode(b) : "%" + b.toString(16).toUpperCase().padStart(2, "0");
-    }
-    return out;
+    return encodeUnreserved(value);
   });
 }
 /** Each element's parts a listener is bound for: an element may handle two

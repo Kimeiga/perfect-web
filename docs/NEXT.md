@@ -724,14 +724,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
              the store's hours (**W9's** `track/store-hours`, after W8's
              merge, on the integrator's design: PARALLEL.md, 2026-10-11);
              orders scheduled;
-          4a. **typed page query parameters, the integrator's next**
-             (2026-10-11): a route's query part, `route "/search{?q}"` as
-             RFC 6570's form-style expansion (to check at the RFC), each a
-             page parameter typed like a path's, an absent one an `Option`.
-             A plain `<form method="get">` and a link make the address. It
-             blocks W6's kiokun search box and W9's store search, which have
-             no form until it lands (PARALLEL.md, the ruling of 2026-10-11:
-             `navigate` follows only a commit);
+          4a. ~~**typed page query parameters**~~ (ADR-0309, merged
+             2026-10-12): a route's query part, `route "/search{?q}"`,
+             RFC 6570's form-style expansion; each name an `Option` of
+             text; a plain `<form method="get">` and a link make the
+             address. W6's kiokun search box and W9's store search move to
+             it;
           5. **idempotency committed with the writes** (PW0348, ADR-0246's
              Not claimed), before a payment depends on it: an interaction's
              answer kept in the transaction that commits its command, in
@@ -884,10 +882,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
               reproducible, a loss shown as plainly as a win, and no
               placeholder shipped as a number; served here first, any
               public deploy on the owner's explicit go;
-          - **W8, search and filters**: stores and dishes, by name and
-            cuisine, run in the database or a declared search source, its
-            guarantees stated as ADR-0207 states a source's; no search engine
-            is built here;
+          - ~~**search and filters**~~: stores and dishes, by name and
+            cuisine, searched in the store's data layer to one meaning
+            (ADR-0308, W9's, merged 2026-10-12). Its next steps, W9's: the
+            search's route and form once a route reads its query part
+            (`route "/search{?q}"`, the integrator's next merge); the cuisine
+            as the store's own field after W8's merge (ruled 2026-10-12);
+            results filtered to the stores that reach the reader's address,
+            through W8's `Reach`;
           - **W9, ratings and reviews** of orders and stores, after
             accounts.
 

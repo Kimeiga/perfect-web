@@ -29,8 +29,17 @@ on:
         required: false
         default: "17"
 
-# No concurrency group: a run's plan is its own push's commits, so a later
-# run does not cover an earlier one, and none is cancelled for it.
+# **A track's later push covers its earlier ones** (ADR-0253, amended
+# 2026-10-12). A track's push plans everything the track changed since it
+# left `master` (its merge base, below), so its latest run covers every
+# earlier one, and an earlier run still queued or running is cancelled for
+# it. Until then none was, and query-params' three pushes ran three plans
+# of nearly every recipe. A push to `master` plans its own commits, so no
+# run of it covers another; it, the nightly and a dispatch, which plans the
+# recipes it names, each have a group of their own and are never cancelled.
+concurrency:
+  group: verify-${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/track/')) && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/track/') }}
 
 env:
   CARGO_TERM_COLOR: never

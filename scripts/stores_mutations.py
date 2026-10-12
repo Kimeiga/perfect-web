@@ -48,17 +48,16 @@ MUTANTS = [
         "no page is named by its route",
         "browser",
         SERVER,
-        "            route_params(route, path).map(|params| (page.clone(), params))\n",
-        "            route_params(route, path).map(|params| (page.clone(), params)).filter(|_| false)\n",
+        "            let mut params = route_params(route_path(route), path)?;\n",
+        "            let mut params = route_params(route_path(route), path).filter(|_| false)?;\n",
     ),
     (
         "a page's parameter is the default store's",
         "cargo",
         SERVER,
-        "                        .map(Val::String)\n"
-        "                        .ok_or_else(|| format!(\"the page's `{name}` is given no value here\"))\n",
-        "                        .map(|_| Val::String(STORE_ID.into()))\n"
-        "                        .ok_or_else(|| format!(\"the page's `{name}` is given no value here\"))\n",
+        "                                .and_then(|p| param_val(plan, name, p))\n",
+        "                                .and_then(|p| param_val(plan, name, p))\n"
+        "                                .map(|_| Val::String(STORE_ID.into()))\n",
     ),
     (
         "the second store is not held",

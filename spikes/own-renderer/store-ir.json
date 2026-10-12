@@ -1706,5 +1706,367 @@
         }
       }
     ]
+  },
+  {
+    "path": "store.search.SearchPage",
+    "name": "SearchPage",
+    "params": [
+      "q"
+    ],
+    "schema": "b016449c784c99cc",
+    "chunks": [
+      {
+        "chunk": "static",
+        "value": "<header>\n            <nav aria-label=\"Store\">\n                <a href=\"/\">Stores</a>\n                <a id=\"header-cart\" href=\"/cart\">Cart <span id=\"header-cart-count\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 0,
+          "value": "cart~StoreLayout.line_count",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</span></a>\n            </nav>\n        </header><!--pw-slot--><main>\n            <h1>Search</h1>\n            <p id=\"search-said\" role=\"status\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 1,
+          "value": "search.said",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</p>\n            <ul id=\"search-stores\">\n                "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "each",
+          "id": 2,
+          "collection": "search.stores",
+          "binding": "store",
+          "key": "id",
+          "body": [
+            {
+              "chunk": "static",
+              "value": "\n                    <li>\n                        <h2><a data-pw=\"0\" "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "interpolated_attribute",
+                "id": 3,
+                "owner": 0,
+                "name": "href",
+                "segments": [
+                  {
+                    "segment": "static",
+                    "value": "/stores/"
+                  },
+                  {
+                    "segment": "value",
+                    "value": "store.id"
+                  }
+                ],
+                "context": "url"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": ">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 4,
+                "value": "store.name",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</a></h2>\n                        <p class=\"cuisine\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 5,
+                "value": "store.cuisine",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</p>\n                        <p>"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 6,
+                "value": "store.description",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</p>\n                        "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "conditional",
+                "id": 7,
+                "value": "store.dishes",
+                "then": [
+                  {
+                    "chunk": "static",
+                    "value": "\n                            <ul data-pw=\"1\" "
+                  },
+                  {
+                    "chunk": "dynamic",
+                    "value": {
+                      "part": "interpolated_attribute",
+                      "id": 8,
+                      "owner": 1,
+                      "name": "aria-label",
+                      "segments": [
+                        {
+                          "segment": "static",
+                          "value": "Dishes at "
+                        },
+                        {
+                          "segment": "value",
+                          "value": "store.name"
+                        }
+                      ],
+                      "context": "attribute"
+                    }
+                  },
+                  {
+                    "chunk": "static",
+                    "value": ">\n                                "
+                  },
+                  {
+                    "chunk": "dynamic",
+                    "value": {
+                      "part": "each",
+                      "id": 9,
+                      "collection": "store.dishes",
+                      "binding": "dish",
+                      "key": "id",
+                      "body": [
+                        {
+                          "chunk": "static",
+                          "value": "\n                                    <li>\n                                        <a data-pw=\"2\" "
+                        },
+                        {
+                          "chunk": "dynamic",
+                          "value": {
+                            "part": "interpolated_attribute",
+                            "id": 10,
+                            "owner": 2,
+                            "name": "href",
+                            "segments": [
+                              {
+                                "segment": "static",
+                                "value": "/stores/"
+                              },
+                              {
+                                "segment": "value",
+                                "value": "store.id"
+                              }
+                            ],
+                            "context": "url"
+                          }
+                        },
+                        {
+                          "chunk": "static",
+                          "value": ">"
+                        },
+                        {
+                          "chunk": "dynamic",
+                          "value": {
+                            "part": "text",
+                            "id": 11,
+                            "value": "dish.name",
+                            "context": "text"
+                          }
+                        },
+                        {
+                          "chunk": "static",
+                          "value": "</a>\n                                        <span class=\"category\">"
+                        },
+                        {
+                          "chunk": "dynamic",
+                          "value": {
+                            "part": "text",
+                            "id": 12,
+                            "value": "dish.category",
+                            "context": "text"
+                          }
+                        },
+                        {
+                          "chunk": "static",
+                          "value": "</span>\n                                        <p>"
+                        },
+                        {
+                          "chunk": "dynamic",
+                          "value": {
+                            "part": "text",
+                            "id": 13,
+                            "value": "dish.description",
+                            "context": "text"
+                          }
+                        },
+                        {
+                          "chunk": "static",
+                          "value": "</p>\n                                        <p>"
+                        },
+                        {
+                          "chunk": "dynamic",
+                          "value": {
+                            "part": "text",
+                            "id": 14,
+                            "value": "dish.price.display",
+                            "context": "text"
+                          }
+                        },
+                        {
+                          "chunk": "static",
+                          "value": "</p>\n                                    </li>\n                                "
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "chunk": "static",
+                    "value": "\n                            </ul>\n                        "
+                  }
+                ],
+                "otherwise": []
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "\n                        "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "conditional",
+                "id": 15,
+                "value": "store.more",
+                "then": [
+                  {
+                    "chunk": "static",
+                    "value": "<p>"
+                  },
+                  {
+                    "chunk": "dynamic",
+                    "value": {
+                      "part": "text",
+                      "id": 16,
+                      "value": "store.more",
+                      "context": "text"
+                    }
+                  },
+                  {
+                    "chunk": "static",
+                    "value": "</p>"
+                  }
+                ],
+                "otherwise": []
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "\n                    </li>\n                "
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n            </ul>\n            "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "conditional",
+          "id": 17,
+          "value": "search.more",
+          "then": [
+            {
+              "chunk": "static",
+              "value": "<p id=\"search-more\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 18,
+                "value": "search.more",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</p>"
+            }
+          ],
+          "otherwise": []
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n        </main><!--/pw-slot-->"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "title",
+          "id": 19,
+          "pieces": [
+            {
+              "piece": "text",
+              "value": "Search:"
+            },
+            {
+              "piece": "text",
+              "value": " "
+            },
+            {
+              "piece": "value",
+              "value": "search.asked"
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "meta",
+          "id": 20,
+          "attribute": "name",
+          "key": "robots",
+          "content": [
+            {
+              "piece": "text",
+              "value": "noindex, follow"
+            }
+          ]
+        }
+      }
+    ]
   }
 ]
