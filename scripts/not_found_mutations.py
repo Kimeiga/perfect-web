@@ -14,8 +14,8 @@ Each mutant undoes one piece:
 
 A checker, plan or parser mutant must fail `compiler/pw-core/tests/
 not_found.rs`; a server mutant, and the plan's written field, the server's
-tests, all of them run; the not-found page's, `e2e/stores.spec.mjs` in
-Chromium.
+tests that see them (measured, below); the not-found page's,
+`e2e/stores.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-not-found` records the output. The
 source is restored after every mutant, whatever happens.
@@ -175,16 +175,26 @@ MUTANTS = [
 
 SUITES_RUN = {
     "compiler": [["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "not_found"]],
-    "server": [["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]],
+    # The development server's tests that see its mutants' rules (W6's ruling
+    # of 2026-10-09: a mutant that takes long is given the tests that can see
+    # its rule), measured by `scripts/mutant_killers.py` on 2026-10-12 against
+    # its whole suite: each of the six is failed by two of these, of the 5 to
+    # 11 that fail under it. The whole suite ran for every server mutant, and
+    # the recipe took 8,422 s of a verify.
+    "server": [[
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_store_that_is_not_there_is_not_found",
+        "tests::redirects::a_page_at_another_address_of_the_page_is_moved_there_for_good",
+    ]],
 }
 BROWSER = ["e2e/stores.spec.mjs"]
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
-# 1800 since 2026-10-12 (track store-accounts): the server's whole suite,
-# which these mutants run, took 941 to 961 s on CI's runner at 420 tests
-# (verify 38187098071), and its baseline ran past 900 and was stopped.
-BOUND = 1800
+# 1800 from 2026-10-12 (track store-accounts) while these mutants ran the
+# server's whole suite, 941 to 961 s on CI's runner at 420 tests; they run
+# the tests that see them since (above).
+BOUND = 900
 
 
 def bounded(cmd, **kw):

@@ -1337,3 +1337,6 @@ Each a decision for a track, with its date; a track's ADR records it too.
     verified commit to the merged head: `evidence_fetch.py`'s check is the
     rule, file by file, so a head that changes tests or scripts needs no
     rule of its own.
+- **2026-10-12, narrowing batch 3 merged on the train** (track
+  `narrowing-3`, from `25bfad5`, verify 38315832945): nine scripts, 39,463 s
+  to 13,041 s. Batch 4 (13 scripts) is being measured.

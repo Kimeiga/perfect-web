@@ -23,6 +23,17 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-12: nine more scripts' mutants run the tests that see them**
+(W6's ruling of 2026-10-09; track `narrowing-3`, merged from `25bfad5`).
+- Measured by `scripts/mutant_killers.py`, two killers kept per mutant where
+  two fail: the server's suite for slots, menu_changed, stores, cart_lines,
+  invariants, last_known_good and not_found; pw-core's for command_retry and
+  availability.
+- The nine recipes: 39,463 s of master's latest runs to 13,041 s (verify
+  38315832945, 14 of 14 green, at `25bfad5`), every mutant still killed. A
+  bound raised to 1800 while the whole suite ran goes back to 900 or 1200.
+Verified again with the train (TRAIN_RUN).
+
 **ADR-0321, 2026-10-12: a related note is shown in its own file** (the
 integrator's; W8's finding; track `related-files`, merged from `87010c1`).
 - W8's PW5046 stopped `pw check` with an internal error: its note's span,

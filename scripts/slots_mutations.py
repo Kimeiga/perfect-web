@@ -9,10 +9,10 @@ Each mutant undoes one piece:
   store's recommendations drawn from its own menu as it is now;
 - the page: the estimate said to a screen reader when it comes.
 
-A declaration or server mutant must fail the development server's tests, all
-of them run: they build the store from `examples`, so a mutant of its source
-is read when they run. The page's must fail `e2e/slots.spec.mjs` in
-Chromium.
+A declaration or server mutant must fail the development server's tests that
+see it (measured, below): they build the store from `examples`, so a mutant
+of its source is read when they run. The page's must fail
+`e2e/slots.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-slots` records the output. The
 source is restored after every mutant, whatever happens.
@@ -101,15 +101,25 @@ MUTANTS = [
     ),
 ]
 
-CARGO = ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]
+# The development server's tests that see its mutants' rules (W6's ruling of
+# 2026-10-09: a mutant that takes long is given the tests that can see its
+# rule), measured by `scripts/mutant_killers.py` on 2026-10-12 against its
+# whole suite: four of the six are failed by one test alone, and these two see
+# all six. The whole suite ran for every mutant, and the recipe took 6,237 s
+# of a verify.
+CARGO = [
+    "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+    "tests::a_menu_change_drops_that_stores_recommendations_only",
+    "tests::a_stock_change_drops_the_menu_and_not_the_recommendations",
+]
 BROWSER = ["e2e/slots.spec.mjs"]
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
-# 1800 since 2026-10-12 (track store-accounts): the server's whole suite,
-# which these mutants run, took 941 to 961 s on CI's runner at 420 tests
-# (verify 38187098071), and its baseline ran past 900 and was stopped.
-BOUND = 1800
+# 1800 from 2026-10-12 (track store-accounts) while these mutants ran the
+# server's whole suite, 941 to 961 s on CI's runner at 420 tests; they run
+# the tests that see them since (above).
+BOUND = 900
 
 
 def bounded(cmd, **kw):

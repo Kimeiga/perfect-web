@@ -20,8 +20,9 @@ Each mutant undoes one piece:
 - the store: `PositiveInt` stating nothing.
 
 A lowering, rule, value-analysis or contract mutant must fail `pw-core`'s
-tests, all of them run; a host mutant, `pw-host`'s with its engine; a server
-or store mutant, the development server's.
+`invariants` target; a host mutant, `pw-host`'s tests with its engine; a
+server or store mutant, the development server's that see it (each measured,
+below).
 
 Run from the repository root; `just e14-invariants` records the output. The
 source is restored after every mutant, whatever happens.
@@ -260,16 +261,26 @@ CARGO = {
     # 211 targets, relinked, and the recipe took 5,183 s of a verify.
     "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "invariants"],
     "host": ["cargo", "test", "--quiet", "--locked", "-p", "pw-host", "--features", "engine"],
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The development server's tests that see its mutants' rules (W6's ruling
+    # of 2026-10-09: a mutant that takes long is given the tests that can see
+    # its rule), measured by `scripts/mutant_killers.py` on 2026-10-12 against
+    # its whole suite: each of the two is failed by three, two of them among
+    # these. The whole suite ran for both, and the recipe took 9,647 s of a
+    # verify.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_delivery_estimate_is_a_range",
+        "tests::a_posts_text_is_held_to_its_length_where_it_arrives",
+        "tests::a_quantity_that_is_no_positive_int_is_refused_at_the_boundary",
+    ],
 }
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
-# 1800 s while its server command runs the development server's whole
-# suite, about 950 s on CI at 420 tests (the integrator's ruling of
-# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
-# see its mutants, it needs far less (W6's ruling of 2026-10-09).
-BOUND = 1800
+# 1800 from 2026-10-12 while its server command ran the development
+# server's whole suite, about 950 s on CI at 420 tests (the integrator's
+# ruling, PARALLEL.md); it runs the tests that see its mutants since.
+BOUND = 1200
 
 
 def bounded(cmd, **kw):

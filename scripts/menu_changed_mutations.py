@@ -7,9 +7,9 @@ Each mutant puts back one piece of the drop by name:
 - the event names no store, or another store;
 - the store's `Menu` declares no `invalidates_on MenuChanged(id)`.
 
-Each must fail the development server's tests, all of them run. The tests
-build the store from `examples`, so a mutant of the store's source is read
-when they run.
+Each must fail the development server's tests that see it (measured,
+below). The tests build the store from `examples`, so a mutant of the
+store's source is read when they run.
 
 Run from the repository root; `just e14-menu-changed` records the output.
 The source is restored after every mutant, whatever happens.
@@ -87,14 +87,24 @@ MUTANTS = [
     ),
 ]
 
-CARGO = ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]
+# The development server's tests that see its mutants' rules (W6's ruling of
+# 2026-10-09: a mutant that takes long is given the tests that can see its
+# rule), measured by `scripts/mutant_killers.py` on 2026-10-12 against its
+# whole suite: each of the five is failed by two of these, of the 3 to 16 that
+# fail under it. The whole suite ran for every mutant, and the recipe took
+# 3,671 s of a verify.
+CARGO = [
+    "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+    "tests::a_menu_change_drops_that_stores_kept_menu_only",
+    "tests::materializations::a_document_that_reads_another_key_is_told_nothing",
+]
 
 # How long one run may take. Past the bound it is killed with everything it
 # started, and the run counts as failing.
-# 1800 since 2026-10-12 (track store-accounts): the server's whole suite,
-# which these mutants run, took 941 to 961 s on CI's runner at 420 tests
-# (verify 38187098071), and its baseline ran past 900 and was stopped.
-BOUND = 1800
+# 1800 from 2026-10-12 (track store-accounts) while these mutants ran the
+# server's whole suite, 941 to 961 s on CI's runner at 420 tests; they run
+# the tests that see them since (above).
+BOUND = 900
 
 
 def run():
