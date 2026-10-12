@@ -125,6 +125,11 @@ NEEDS_DATABASE = {
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
 
+# How near a changed line a mutant's anchor plans its script (`--near`):
+# a push's plan and a fetch's check of what changed since its run read the
+# same.
+NEAR = 30
+
 
 def recipes() -> list[str]:
     """Every recipe `just` knows, by name."""
@@ -205,13 +210,15 @@ def cost(body: str) -> int:
     return 1 + sum(mutants(s) for s in scripts)
 
 
-def hunks(base: str, head: str) -> dict[str, list[tuple[int, int]]]:
+def hunks(base: str, head: str | None) -> dict[str, list[tuple[int, int]]]:
     """Each file the range changed, with its changed lines' ranges in `head`
-    (a deletion is the line it stood before)."""
+    (a deletion is the line it stood before). `head` None is the tree here,
+    what is staged and what is not: a merge not yet committed
+    (`evidence_fetch.moved_on`)."""
     # Bytes, and paths as written: a file git diffs as text need not be
     # UTF-8, and a path outside ASCII is quoted unless told not to be.
     diff = subprocess.run(
-        ["git", "-c", "core.quotePath=false", "diff", "-U0", base, head],
+        ["git", "-c", "core.quotePath=false", "diff", "-U0", base, *([head] if head else [])],
         cwd=ROOT,
         capture_output=True,
         check=True,
@@ -537,7 +544,7 @@ def main() -> int:
     parser.add_argument("--shards", type=int, default=16)
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--changed", nargs=2, metavar=("BASE", "HEAD"))
-    parser.add_argument("--near", type=int, default=30)
+    parser.add_argument("--near", type=int, default=NEAR)
     parser.add_argument("recipes", nargs="*")
     args = parser.parse_args()
     known = recipes()
