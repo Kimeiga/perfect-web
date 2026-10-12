@@ -608,7 +608,7 @@
     "params": [
       "id"
     ],
-    "schema": "96a364577a26a978",
+    "schema": "96aa9dbfdf65bdd0",
     "chunks": [
       {
         "chunk": "static",
@@ -658,7 +658,7 @@
         "value": {
           "part": "text",
           "id": 3,
-          "value": "summary",
+          "value": "line",
           "context": "text"
         }
       },
@@ -918,7 +918,7 @@
           "part": "each",
           "id": 18,
           "collection": "cart.lines",
-          "binding": "line",
+          "binding": "line~1",
           "key": "item_id",
           "body": [
             {
@@ -930,7 +930,7 @@
               "value": {
                 "part": "text",
                 "id": 19,
-                "value": "line.name",
+                "value": "line~1.name",
                 "context": "text"
               }
             },
@@ -952,7 +952,7 @@
                   },
                   {
                     "segment": "value",
-                    "value": "line.name"
+                    "value": "line~1.name"
                   }
                 ],
                 "context": "attribute"
@@ -969,7 +969,10 @@
                 "name": "decrease_in_cart",
                 "captures": [
                   "line.item_id"
-                ]
+                ],
+                "renames": {
+                  "line": "line~1"
+                }
               }
             },
             {
@@ -981,7 +984,7 @@
               "value": {
                 "part": "text",
                 "id": 22,
-                "value": "line.quantity.count",
+                "value": "line~1.quantity.count",
                 "context": "text"
               }
             },
@@ -1003,7 +1006,7 @@
                   },
                   {
                     "segment": "value",
-                    "value": "line.name"
+                    "value": "line~1.name"
                   }
                 ],
                 "context": "attribute"
@@ -1020,7 +1023,10 @@
                 "name": "increase_in_cart",
                 "captures": [
                   "line.item_id"
-                ]
+                ],
+                "renames": {
+                  "line": "line~1"
+                }
               }
             },
             {
@@ -1032,7 +1038,7 @@
               "value": {
                 "part": "text",
                 "id": 25,
-                "value": "line.total.display",
+                "value": "line~1.total.display",
                 "context": "text"
               }
             },
@@ -1054,7 +1060,7 @@
                   },
                   {
                     "segment": "value",
-                    "value": "line.name"
+                    "value": "line~1.name"
                   }
                 ],
                 "context": "attribute"
@@ -1071,7 +1077,10 @@
                 "name": "remove_from_cart",
                 "captures": [
                   "line.item_id"
-                ]
+                ],
+                "renames": {
+                  "line": "line~1"
+                }
               }
             },
             {
