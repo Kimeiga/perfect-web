@@ -84,3 +84,25 @@ Date: 2026-10-07. Milestone: E14, the owner's Twitter list, items 4 and 7.
   they exist; none does yet.
 - **The root justfile split by area.** One session edits it; split when a
   third worker needs part of it.
+
+## Amended, 2026-10-12: a track's later push covers its earlier ones
+
+A track's push plans what the track changed since it left `master`: the
+merge base of `origin/master` and the push. So its latest run covers every
+recipe an earlier one planned. The verify workflow still said it had no
+concurrency group because "a later run does not cover an earlier one". That
+was written for `master`'s pushes, which plan their own commits, before
+tracks existed (ADR-0245).
+
+So every push of a track ran its plan whole, beside the plans before it:
+- query-params' three pushes ran three plans of nearly every recipe, each a
+  run of the whole pool;
+- the merge evidence was gathered from all three, where the last was
+  enough.
+
+Now a track's pushes share a concurrency group, and an earlier run still
+queued or running is cancelled for the later one. A push to `master`, the
+nightly and a dispatch, which plans the recipes it names, each have a group
+of their own, and none is cancelled. A track merges on the evidence of its
+latest run, with ADR-0281's other conditions. A head that differs from its
+verified commit only in tests merges by PARALLEL.md's ruling of 2026-10-12.

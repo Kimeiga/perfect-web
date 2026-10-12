@@ -23,6 +23,13 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**Correction, 2026-10-12: a track's later verify covered its earlier ones,
+and both ran** (ADR-0253, amended). A track's push plans everything since it
+left `master`. The workflow still said a later run covers nothing earlier,
+which holds only for `master`'s pushes. query-params' three pushes ran three
+plans of nearly every recipe. A track's pushes now share a concurrency group,
+and the earlier run is cancelled.
+
 **ADR-0307, 2026-10-12: a control is shown where its command's predicates
 hold** (the integrator's; track `holds`, merged from `a1a232f`). This is the
 third step of "a refusal is never silent". A page asks a predicate of its

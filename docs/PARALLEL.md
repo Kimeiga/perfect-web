@@ -1138,3 +1138,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - The merge's own master verify replans what the merge changes, as
     always.
   - A change to code that ships needs a verify at the head.
+- **2026-10-12, a track's later push cancels its earlier verify** (ADR-0253,
+  amended). A track's push plans from where the track left `master`, so its
+  latest verify covers the earlier ones. Those are now cancelled. A
+  workflow dispatch is never cancelled and never cancels: dispatch only
+  what a ruling allows, such as W9's test-only head. At a merge, the
+  evidence is the latest run's.
