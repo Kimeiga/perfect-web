@@ -137,7 +137,7 @@ signed-in user's data.
 
 | route | kind | status | what it is | Pleris today, or what it needs |
 |---|---|---|---|---|
-| `/[word]` | page | partial | The entry: forms, readings, meanings, characters, words, names, examples, mnemonics, components, history, related words; loader redirects and fallbacks. | Pleris today: `Lookup` (one redirect) and `WordPage` over all 1.49 million entries, 404 for none, no script (ADR-0037, ADR-0041). 16 of the 50 features below are built, 8 partial. |
+| `/[word]` | page | partial | The entry: forms, readings, meanings, characters, words, names, examples, mnemonics, components, history, related words; loader redirects and fallbacks. | Pleris today: `Lookup` (one redirect) and `WordPage` over all 1.49 million entries, 404 for none, no script (ADR-0037, ADR-0041). 17 of the 50 features below are built, 9 partial. |
 | `/search` | page | partial | 60 hits in Chinese, Japanese and Korean columns, a reading, up to three definitions, a Common badge; community words. | Pleris today (the search ADR): `SearchPage` over the whole index, Korean rows, the variant expansion, three columns, 60 hits, held to kiokun.com's handler. Needs its address, `/search?q=` (a route reading its query part, the integrator's next), the header's search box, and the custom words (accounts). |
 | `/api/search` | endpoint | partial | JSON search over the FTS5 index, used by the dropdown (8) and the search page (60). | Pleris today (the search ADR): its two statements as written, in the kiokun layer, over the whole index; what it does around them, in the program. Needs a form for a route that answers JSON. |
 | `/api/lookup-reading` | endpoint | partial | Kana to written forms: Japanese rows whose reading is the query. Feeds the word page's homophones and the deinflection fallback. | Pleris today (the reading index ADR): its statement as written, in the kiokun layer, which the word page's Homophones read. Needs a form for a route that answers JSON. |
@@ -267,9 +267,9 @@ signed-in user's data.
 | canonical redirect | `+page.ts:419-425` | built | 308 to the one traditional form a simplified character equals in meaning. | Built: `redirect_on KiokunError.Moved permanent` (ADR-0295, ADR-0301), held to kiokun.com's code. |
 | variants merged | `+page.ts:464-492` | built | A stub with several traditional forms shows every form's Chinese words. | Built: each form read and its words merged, deduped by id (ADR-0289). |
 | related forms | `+page.ts:153-280` | partial | Up to twelve related forms read and, where equivalent, merged. | Built: an equivalent form's words, Contains and Appears in merged on the canonical page (ADR-0289, the Contains ADR). Missing: the related forms' list itself. |
-| deinflection | `+page.ts:353-379`, `deinflect.ts`, `korean-deinflect.ts` | missing | A conjugated Japanese or Korean word redirects to its dictionary form, with how it was conjugated. | Japanese and Korean deinflection in Pleris (about 1,470 lines of rules); `/api/lookup-reading`. |
+| deinflection | `+page.ts:353-379`, `deinflect.ts`, `korean-deinflect.ts` | partial | A conjugated Japanese or Korean word redirects to its dictionary form, with how it was conjugated. | Built: Japanese, by rules of our own from cited grammar, kiokun.com's resolution, the form shown at the address asked (the deinflection ADR). Missing: Korean. |
 | custom-word fallback | `+page.ts:381-405` | missing | A word users added, when the dictionary has none. | Accounts' data. |
-| conjugation note | `+page.svelte:429-461` | missing | "from → word (how)", and other candidates. | The deinflection; URL parameters. |
+| conjugation note | `+page.svelte:429-461` | built | "from → word (how)", and other candidates. | Built: on the inflected address itself, the reasons in the rewrite's words (the deinflection ADR). |
 | search box | `Header.svelte:84-127` | partial | A combobox with suggestions as one types, and handwriting. | Built: a plain search form. Missing: suggestions and handwriting (client). |
 | word hero | `+page.svelte:550-559` | partial | The headword large, with save, practice and share. | Built: the headword. The actions are client and accounts. |
 | built-from strip | `WordCharacterStrip.svelte` | missing | Each character of a word, glossed and linked. | The entry's `contains`; server-renderable. |
@@ -335,9 +335,9 @@ signed-in user's data.
   missing.** The partial five: `/`, `/[word]`, `/search`, and
   `/api/search`'s and `/api/lookup-reading`'s statements, which the pages
   read but no JSON route answers.
-- **Features: 62** (49 of the word page, 13 of the site). **16 built, 9
-  partial, 37 missing** (2026-10-11, after the word page's steps and
-  search). All sixteen built, and eight of the partial, are the word page's.
+- **Features: 62** (49 of the word page, 13 of the site). **17 built, 10
+  partial, 35 missing** (2026-10-11, after the word page's steps,
+  search and deinflection). All seventeen built, and nine of the partial, are the word page's.
 - **Proposed not to port: 9 routes**, dead or developer pages: `/demo`,
   `/test`, `/api/cors-port`, `/api/notes`, `/api/uploads`,
   `/api/tutor/chat`, `/api/tutor/exercise`, `/api/learning-resources/words`,

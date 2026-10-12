@@ -41,6 +41,18 @@ distributed under CC BY-SA 4.0, as the entries are.
 for the tests (学 and 學, and two Japanese forms' canonical pages), in the
 shape of kiokun.com's `search-aliases.json`, which stays local.
 
+## The deinflection sample
+
+`deinflection/` holds 27 entries that the word page's deinflection tests
+read: a verb of each class the rules read back, いい and 良い, 履く, 吐く and
+掃く (which the index sample reads as はく), ケチ臭い and けち臭い, and 口を滑らす
+and 口を滑らせる. They are read from kiokun-data's build output and written
+by `scripts/kiokun_sample.py`, in kiokun's layout, with their `key` and
+their Japanese words alone: JMdict's (with Tatoeba's examples, each with its
+id), the fields `han-1char-3/MANIFEST.txt` names under `japanese_words`.
+`deinflection/MANIFEST.txt` lists each file with its SHA-256. They are
+distributed under CC BY-SA 4.0, as the entries above are.
+
 ## The sources
 
 Each was read at its primary source on **2026-10-10**.

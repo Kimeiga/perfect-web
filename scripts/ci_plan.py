@@ -103,6 +103,8 @@ LOCAL_ONLY = {
     "e14-kiokun-search",
     # And its Homophones against kiokun.com's own reading index.
     "e14-kiokun-homophones",
+    # And its deinflection against kiokun.com's own resolution.
+    "e14-kiokun-deinflection",
 }
 
 # Recipes run against a database (ADR-0246). Each is a shard of its own,

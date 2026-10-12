@@ -285,6 +285,46 @@ e14-kiokun-homophones:
     @grep -q "unnamed differences: 0" docs/evidence/E14/kiokun-homophones.txt
     @! grep -qE "panicked|FAILED" docs/evidence/E14/kiokun-homophones.txt
 
+# The word page's deinflection (the track's step 2, the deinflection ADR),
+# against kiokun.com's own resolution run as a black box: its
+# `findWordsWithDeinflection`, with `deinflect.ts` (GPL-3.0's, run, never
+# read, never committed), copied from KIOKUN_APP's HEAD, over kiokun-data's
+# entries and committed index; the inputs, the rewrite's own conjugator's
+# forms of every 128th entry's words. Then the CI fixture over the
+# repository's deinflection and index samples. Local: it reads the owner's
+# checkout.
+e14-kiokun-deinflection:
+    @test -n "${KIOKUN_DATA:-}" || { echo "KIOKUN_DATA must name a kiokun-data checkout's output_dictionary"; exit 1; }
+    @test -n "${KIOKUN_APP:-}" || { echo "KIOKUN_APP must name a kiokun-data checkout's sveltekit-app"; exit 1; }
+    @test "$(df -g / | awk 'NR==2{print $4}')" -ge 8 || { echo "under 8 GiB free: not building the index"; exit 1; }
+    @mkdir -p docs/evidence/E14
+    @lib="$(mktemp -d)"; sample="$(mktemp -d)"; \
+     python3 scripts/kiokun_app_source.py "$KIOKUN_APP" "$lib" src/lib/utils/search-navigation.ts \
+       src/lib/utils/deinflect.ts src/lib/utils/korean-deinflect.ts 'src/routes/api/lookup-reading/+server.ts=lookup.ts' \
+       migrations/0005_search_index_with_jyutping.sql=schema.sql > "$lib/source.txt" || exit 1; \
+     python3 scripts/kiokun_app_source.py "$KIOKUN_DATA/.." "$lib" output_search_index.csv=index.csv > "$lib/index.txt" || exit 1; \
+     cp "$lib/search-navigation.ts" "$lib/deinflect.ts" "$lib/korean-deinflect.ts" "$lib/lookup.ts" "$lib/schema.sql" "$sample/"; \
+     cp examples/kiokun/data/search-sample.csv "$sample/index.csv"; \
+     { echo "The word page's deinflection, against kiokun.com's own resolution"; echo; \
+       echo "produced by: just e14-kiokun-deinflection (local: reads a kiokun-data checkout)"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       cat "$lib/source.txt" "$lib/index.txt"; \
+       echo "node: $(node --version)"; echo "host: $(uname -sm), $(sysctl -n hw.ncpu 2>/dev/null || nproc) cores, $(uptime | sed 's/.*load/load/')"; echo; \
+       echo "== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/deinflect.mjs)"; echo; \
+       node --experimental-transform-types --no-warnings spikes/own-renderer/kiokun-oracle/deinflect.mjs "$lib" "$KIOKUN_DATA" 128 "$lib/deinflect.json"; \
+       echo; echo "== the rewrite's, compared"; echo; \
+       KIOKUN_DEINFLECTION_ORACLE="$lib/deinflect.json" cargo test --release --locked -p pw-dev-server -- --ignored --nocapture kiokun::deinflection_matches_kiokuns_own 2>&1 \
+         | grep -E '^(compared|named|unnamed|difference)|test result|panicked'; \
+       echo "after it: $(uptime | sed 's/.*load/load/')"; \
+       echo; echo "== the CI fixture: kiokun.com's answers over the repository's deinflection and index samples"; echo; \
+       node --experimental-transform-types --no-warnings spikes/own-renderer/kiokun-oracle/deinflect.mjs "$sample" examples/kiokun/data/deinflection 1 "$sample/deinflect.json"; \
+       python3 scripts/kiokun_oracle_fixture.py "$sample/deinflect.json" spikes/own-renderer/kiokun-oracle/deinflection-sample.json \
+         "just e14-kiokun-deinflection" "$(GIT_OPTIONAL_LOCKS=0 git -C "$KIOKUN_APP" rev-parse HEAD)" "$(git rev-parse HEAD)" "$(node --version)"; \
+     } > docs/evidence/E14/kiokun-deinflection.txt; rm -rf "$lib" "$sample"
+    @cat docs/evidence/E14/kiokun-deinflection.txt
+    @grep -q "unnamed differences: 0" docs/evidence/E14/kiokun-deinflection.txt
+    @! grep -qE "panicked|FAILED" docs/evidence/E14/kiokun-deinflection.txt
+
 # The word page (the track's step 1), served by the development server as a
 # third program beside the store and the feed (docs/PARALLEL.md, "W6's
 # inventory, answered", Q2): `examples/kiokun-site`, its entries read by the

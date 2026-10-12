@@ -2045,6 +2045,281 @@ fn homophones_are_each_readings_words_but_the_pages_own() {
     );
 }
 
+/// A Japanese word's entry as kiokun's build writes one, with one sense of
+/// parts of speech `pos`.
+fn japanese_entry(word: &str, kana: &str, pos: &[&str]) -> String {
+    let pos: Vec<String> = pos.iter().map(|p| format!("\"{p}\"")).collect();
+    format!(
+        r#"{{"key":"{word}","japanese_words":[{{"id":"{word}","kanji":[{{"text":"{word}","tags":[],"common":true}}],
+            "kana":[{{"text":"{kana}","tags":[],"common":true}}],
+            "sense":[{{"gloss":[{{"text":"a gloss"}}],"info":[],"partOfSpeech":[{}],"field":[],"misc":[],"dialect":[]}}]}}]}}"#,
+        pos.join(",")
+    )
+}
+
+/// The page's note on an inflected address: the word asked, the form shown,
+/// how, and the other forms linked.
+fn inflection_in(html: &str) -> Option<(String, String, String, Vec<String>)> {
+    let at = html.find("class=\"conjugation-info\"")?;
+    let note = &html[at..at + html[at..].find("</aside>")?];
+    let text = |class: &str| {
+        let from = note.find(&format!("class=\"{class}\""))?;
+        let rest = &note[from..];
+        let rest = &rest[rest.find('>')? + 1..];
+        Some(rest[..rest.find('<')?].to_string())
+    };
+    let others = note
+        .split("class=\"alternative-chip\"")
+        .skip(1)
+        .filter_map(|chip| {
+            let rest = &chip[chip.find('>')? + 1..];
+            Some(rest[..rest.find('<')?].to_string())
+        })
+        .collect();
+    Some((
+        text("conjugated-from")?,
+        text("dictionary-form")?,
+        text("conjugation-detail")?,
+        others,
+    ))
+}
+
+/// **An inflected word shows the dictionary form it is** (the deinflection
+/// ADR, the integrator's ruling of 2026-10-11): a word with no file of its own
+/// is read back, by the rules of the grammar the ADR cites, to the forms it
+/// can be; the first whose entry's part of speech fits is shown, 200, at the
+/// address asked, with the note "asked → form (how)" and the others linked.
+/// Over entries made for it:
+/// - endings and auxiliaries read back in turn: 食べなかった, 食べさせられた;
+/// - each verb class's own forms: a godan's euphony (書いて), 行く's (行った), the
+///   godan potential (書ける), する after a noun (勉強しました), 来る;
+/// - an adjective's (高くなかった), and いい's on よ (よかった);
+/// - a hiragana form whose own word has no entry is looked up by reading, as
+///   kiokun.com does: はいた is はく, which the index sample reads as 掃く, 履く
+///   and 吐く, of which 履く and 吐く have entries here;
+/// - a form nothing reads back is not found.
+#[test]
+fn an_inflected_word_shows_the_dictionary_form_it_is() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    for (word, kana, pos) in [
+        ("食べる", "たべる", &["v1", "vt"][..]),
+        ("書く", "かく", &["v5k", "vt"][..]),
+        ("行く", "いく", &["v5k-s", "vi"][..]),
+        ("勉強", "べんきょう", &["n", "vs"][..]),
+        ("来る", "くる", &["vk", "vi"][..]),
+        ("高い", "たかい", &["adj-i"][..]),
+        ("いい", "いい", &["adj-ix"][..]),
+        ("履く", "はく", &["v5k", "vt"][..]),
+        ("吐く", "はく", &["v5k", "vt"][..]),
+        // はいた is also はいる's past, but this はいる is a noun: its entry
+        // does not fit the verb.
+        ("はいる", "はいる", &["n"][..]),
+    ] {
+        write_entry(dir.path(), word, &japanese_entry(word, kana, pos));
+    }
+    // A candidate's file that is a stub is followed to the entry it names:
+    // たべた is たべる's past, and たべる's file names 食べる.
+    write_entry(
+        dir.path(),
+        "たべる",
+        r#"{"key":"たべる","redirect":"食べる"}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    let note = |asked: &str| {
+        let page = fetched(&s, &path_of(asked));
+        assert!(page.starts_with("HTTP/1.1 200"), "{asked}: {page}");
+        let html = page.split("<script").next().unwrap_or_default().to_string();
+        let (from, shown, how, others) =
+            inflection_in(&html).unwrap_or_else(|| panic!("{asked}: no note: {html}"));
+        assert_eq!(from, asked);
+        assert!(
+            html.contains(&format!("<h1 id=\"headword\">{shown}</h1>")),
+            "{asked}: {html}"
+        );
+        (shown, how, others)
+    };
+    let shown = |asked: &str, form: &str, how: &str| {
+        let (s, h, _) = note(asked);
+        assert_eq!((s.as_str(), h.as_str()), (form, how), "{asked}");
+    };
+    shown("食べた", "食べる", "(past)");
+    shown("食べなかった", "食べる", "(negative, past)");
+    shown(
+        "食べさせられた",
+        "食べる",
+        "(causative, passive or potential, past)",
+    );
+    shown("書いて", "書く", "(te form)");
+    shown("書ける", "書く", "(potential)");
+    shown("書かれる", "書く", "(passive)");
+    shown("行った", "行く", "(past)");
+    shown("勉強しました", "勉強", "(polite, past)");
+    shown("来なかった", "来る", "(negative, past)");
+    shown("高くなかった", "高い", "(negative, past)");
+    shown("よかった", "いい", "(past)");
+    let (form, how, others) = note("はいた");
+    assert_eq!(how, "(past)");
+    let mut all = vec![form];
+    all.extend(others);
+    all.sort();
+    assert_eq!(all, vec!["吐く".to_string(), "履く".to_string()]);
+    // The stub's word is the form shown, as kiokun.com adds the candidate.
+    shown("たべた", "たべる", "(past)");
+    let none = fetched(&s, &path_of("ほげほげ"));
+    assert!(none.starts_with("HTTP/1.1 404"), "{none}");
+    // A word with its own file is its own page, with no note.
+    let own = fetched(&s, &path_of("書く"));
+    assert!(!own.contains("conjugation-info"), "{own}");
+}
+
+/// **Deinflection against kiokun.com's answers**: for each inflected form the
+/// oracle asked, the page's answer beside kiokun.com's resolution. Where
+/// kiokun.com finds a form, the page shows it, 200, with the same first form
+/// and the same forms in all (in any order: each side orders the others by its
+/// own candidates); where kiokun.com finds none, the page is not found. Each
+/// difference is listed, by kind.
+fn deinflection_held_to_oracle(
+    s: &Server,
+    oracle: &serde_json::Value,
+) -> (BTreeMap<String, usize>, Vec<String>) {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut named: BTreeMap<String, usize> = BTreeMap::new();
+    let mut differ = Vec::new();
+    for (form, answer) in answers {
+        let page = fetched(s, &path_of(form));
+        let html = page.split("<script").next().unwrap_or_default();
+        let at = format!(
+            "{form} ({} {}, {})",
+            answer["from"], answer["pos"], answer["how"]
+        );
+        let Some(primary) = answer["primary"].as_str() else {
+            if !page.starts_with("HTTP/1.1 404") {
+                match inflection_in(html) {
+                    // いい's forms on よ, which kiokun.com reads as よい's alone.
+                    Some((_, s, _, others))
+                        if s.ends_with("いい") && others.iter().all(|o| o.ends_with("いい")) =>
+                    {
+                        *named.entry("いい beside よい".to_string()).or_default() += 1;
+                    }
+                    shown => {
+                        let shown = shown.map(|(_, s, h, _)| format!("{s} {h}"));
+                        differ.push(format!(
+                            "{at}: kiokun.com finds none; the rewrite {shown:?}"
+                        ));
+                    }
+                }
+            }
+            continue;
+        };
+        let Some((_, shown, how, others)) = inflection_in(html) else {
+            differ.push(format!(
+                "{at}: kiokun.com {primary}; the rewrite {}",
+                page.lines().next().unwrap_or_default()
+            ));
+            continue;
+        };
+        let mut want: Vec<String> = answer["alternatives"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|a| a.as_str().map(str::to_string))
+            .collect();
+        want.push(primary.to_string());
+        want.sort();
+        let mut in_order = vec![shown.clone()];
+        in_order.extend(others.iter().cloned());
+        let mut got = in_order.clone();
+        got.sort();
+        if shown == primary && got == want {
+            continue;
+        }
+        // The rewrite's own answers (the deinflection ADR's Differences): a
+        // 〜する verb JMdict marks vs-s, read as a する verb; and いい beside
+        // よい. With those forms taken out, the rest is kiokun.com's.
+        let extra = |w: &str| {
+            !want.iter().any(|k| k == w)
+                && (w.ends_with("する")
+                    || (w.ends_with("いい")
+                        && want.contains(&format!("{}よい", &w[..w.len() - "いい".len()]))))
+        };
+        let kept: Vec<&String> = in_order.iter().filter(|w| !extra(w)).collect();
+        let mut kept_sorted: Vec<String> = kept.iter().map(|w| w.to_string()).collect();
+        kept_sorted.sort();
+        if kept.first().map(|w| w.as_str()) == Some(primary) && kept_sorted == want {
+            let kind = if in_order.iter().any(|w| extra(w) && w.ends_with("する")) {
+                "a vs-s verb read as a する verb"
+            } else {
+                "いい beside よい"
+            };
+            *named.entry(kind.to_string()).or_default() += 1;
+            continue;
+        }
+        differ.push(format!(
+            "{at}: kiokun.com {primary} of {want:?}; the rewrite {shown} {how} of {got:?}"
+        ));
+    }
+    (named, differ)
+}
+
+/// **Deinflection against kiokun.com's answers for the repository's sample**
+/// (`kiokun-oracle/deinflection-sample.json`, written by `just
+/// e14-kiokun-deinflection` over the deinflection sample and the index
+/// sample): what CI holds.
+#[test]
+fn deinflection_matches_kiokuns_answers_for_the_sample() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let fixture: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(
+            root.join("spikes/own-renderer/kiokun-oracle/deinflection-sample.json"),
+        )
+        .expect("the fixture"),
+    )
+    .expect("JSON");
+    let oracle = &fixture["oracle"];
+    assert!(
+        oracle["asked"].as_u64().is_some_and(|n| n > 100),
+        "{fixture}"
+    );
+    let s = served_kiokun_on(&root.join("examples/kiokun/data/deinflection"));
+    let (named, differ) = deinflection_held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+    // The sample holds each of the rewrite's own answers.
+    assert!(
+        named
+            .get("a vs-s verb read as a する verb")
+            .is_some_and(|n| *n > 0),
+        "{named:?}"
+    );
+    assert!(
+        named.get("いい beside よい").is_some_and(|n| *n > 0),
+        "{named:?}"
+    );
+}
+
+/// **Deinflection against kiokun.com's own code** (local: `just
+/// e14-kiokun-deinflection` runs its `findWordsWithDeinflection`, copied from
+/// `KIOKUN_APP`'s HEAD, over kiokun-data's entries and committed index, and
+/// names its answers in `KIOKUN_DEINFLECTION_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-deinflection`"]
+fn deinflection_matches_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_DEINFLECTION_ORACLE").expect("KIOKUN_DEINFLECTION_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let (named, differ) = deinflection_held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} forms of {} words (stride {}, {} entries read)",
+        oracle["asked"], oracle["words"], oracle["stride"], oracle["read"]
+    );
+    println!("named differences: {named:?}");
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(400) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
+}
+
 /// **The Homophones against kiokun.com's**: for each word the oracle
 /// answers, each reading's words, as a multiset of (word, common), beside
 /// kiokun.com's; and the rewrite's groups in the readings' order and each

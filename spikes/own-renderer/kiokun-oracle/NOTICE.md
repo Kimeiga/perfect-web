@@ -49,6 +49,13 @@ written here.
   each reading and each word, its pronunciation and its common flag, from
   JMdict.
 
+- **`deinflection-sample.json`**: what kiokun.com's resolution of an
+  inflected word answers for each form the rewrite's own conjugator makes of
+  the deinflection sample's words, over that sample and the index sample:
+  each dictionary form, JMdict's. The inflected forms and what was done to
+  them are the rewrite's own. Nothing of kiokun.com's deinflection rules is
+  here: they are adapted from GPL-3.0 code and run locally only.
+
 ## The sources
 
 The same as the sample's, each read at its primary source on 2026-10-10; see

@@ -112,6 +112,12 @@ MUTANTS = [
         "        pass\n",
     ),
     (
+        "the deinflection sample keeps every cleared field",
+        SAMPLE,
+        '    return {k: out[k] for k in ("key", "japanese_words") if k in out}\n',
+        "    return out\n",
+    ),
+    (
         "the NOTICE links Unicode's licence and reproduces none",
         ROOT / "examples/kiokun/data/NOTICE.md",
         "`LICENSE-UNICODE.txt`, beside this file",

@@ -303,6 +303,52 @@ def main():
         + "\n"
     )
     print(f"{len(lines)} files -> {out}")
+    write_deinflection_sample(source, root / "examples/kiokun/data/deinflection", pairs)
+
+
+# The deinflection sample's words (the deinflection ADR): a verb of each
+# class the rules read back, いい and 良い, the three verbs the index sample
+# reads as はく (the hiragana fallback), a katakana adjective with its
+# hiragana spelling, and a one-row verb whose stem is another verb's
+# imperative.
+DEINFLECTION_WORDS = [
+    "食べる", "見る", "書く", "行く", "泳ぐ", "話す", "待つ", "死ぬ", "遊ぶ", "読む", "帰る", "買う", "問う",
+    "来る", "勉強", "愛する", "愛す", "高い", "いい", "良い", "履く", "吐く", "掃く", "ケチ臭い", "けち臭い",
+    "口を滑らす", "口を滑らせる",
+]
+
+
+def deinflection_kept(entry, pairs):
+    """An entry as the deinflection sample keeps it: its key and its Japanese
+    words alone, JMdict's, the only fields its tests read."""
+    out = cleared(entry, pairs)
+    return {k: out[k] for k in ("key", "japanese_words") if k in out}
+
+
+def write_deinflection_sample(source, out, pairs):
+    """The deinflection sample, in kiokun's layout, with its MANIFEST."""
+    if out.exists():
+        shutil.rmtree(out)
+    lines = []
+    for word in DEINFLECTION_WORDS:
+        sub = format(kiokun_hash(word) & 0xFF, "02x")
+        src = source / sub / f"{word}.json.deflate"
+        entry = json.loads(zlib.decompress(src.read_bytes(), -15))
+        assert entry["key"] == word, src
+        text = json.dumps(deinflection_kept(entry, pairs), ensure_ascii=False, separators=(",", ":"))
+        c = zlib.compressobj(9, zlib.DEFLATED, -15)
+        data = c.compress(text.encode()) + c.flush()
+        (out / sub).mkdir(parents=True, exist_ok=True)
+        (out / sub / src.name).write_bytes(data)
+        lines.append(f"{sub}/{src.name}  {len(data):6d}  {hashlib.sha256(data).hexdigest()}")
+    (out / "MANIFEST.txt").write_text(
+        f"The deinflection sample: {len(lines)} entries read from kiokun-data's output and written\n"
+        "by scripts/kiokun_sample.py with their key and their Japanese words alone (JMdict's,\n"
+        "the fields the han-1char-3 MANIFEST names under japanese_words); see ../NOTICE.md.\n\n"
+        + "\n".join(lines)
+        + "\n"
+    )
+    print(f"{len(lines)} files -> {out}")
 
 
 if __name__ == "__main__":

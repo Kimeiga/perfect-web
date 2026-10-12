@@ -2436,6 +2436,7 @@ type WordShown = WordShown {
     korean: List<ShownKorean>,
     names: List<ShownName>,
     homophones: List<HomophoneGroup>,
+    inflection: List<Inflection>,
     contains: ContainsList,
     appears: Appears,
     edrdg: Bool,
@@ -2455,7 +2456,7 @@ fn japanese_all(words: List<JapaneseWord>, labels: List<Label>, pitches: List<Wo
     List.fold(words, none, (out, w) => List.concat(out, [japanese_shown(w, labels, pitch_at(pitches, List.length(out)))]))
 }
 
-fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>, pitches: List<WordPitch>, found: List<ReadingFound>) -> WordShown {
+fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>, pitches: List<WordPitch>, found: List<ReadingFound>, inflection: List<Inflection>) -> WordShown {
     let none: List<ShownChinese> = []
     let e = l.data
     WordShown {
@@ -2467,6 +2468,7 @@ fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>,
         korean: List.map(e.korean, korean_shown),
         names: List.map(e.names, name_shown),
         homophones: homophones_of(word, e, found),
+        inflection: inflection,
         contains: contains_of(e, word, glosses),
         appears: appears_in(e),
         edrdg: edrdg_shown(e),
@@ -2484,6 +2486,542 @@ fn edrdg_shown(e: Entry) -> Bool {
     List.length(e.japanese) > 0 | List.length(e.names) > 0 | previewed | match e.japanese_char {
         Some(_) => true,
         None => false,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Deinflection (the deinflection ADR): an inflected Japanese word read back to
+// the dictionary forms it can be. The facts are Japanese grammar's, as
+// English Wikipedia's "Japanese conjugation" (revision 1379736007) and
+// Wiktionary's appendices on Japanese verbs (revision 92311215) and
+// adjectives (revision 91406689) state them. The structure is the rewrite's
+// own:
+// - a word class has bases, each a text that takes the place of the
+//   dictionary form's ending;
+// - an ending closes a word on one of its bases (書い + た);
+// - an auxiliary follows a base and makes a word of its own class (書か +
+//   ない, an adjective), which is read back in turn.
+// So 書かなかった is read back as 書かない, an adjective, past; then as 書く,
+// negative, past.
+
+// One base of a word class: its name, and the text that takes the place of
+// the dictionary form's ending.
+type Base = Base {
+    name: String,
+    text: String,
+}
+
+// A word class: its code (JMdict's part of speech), the group an entry's
+// part of speech is checked against, the dictionary form's ending, and its
+// bases.
+type WordClass = WordClass {
+    code: String,
+    group: String,
+    ending: String,
+    bases: List<Base>,
+}
+
+// A form that closes a word: the groups whose words it closes, the base it
+// follows, its text, and what it says.
+type Closing = Closing {
+    groups: List<String>,
+    base: String,
+    text: String,
+    reasons: List<String>,
+}
+
+// An auxiliary: the groups it follows, the base it follows, its dictionary
+// form, the class of the word it makes, and what it says.
+type Auxiliary = Auxiliary {
+    groups: List<String>,
+    base: String,
+    text: String,
+    makes: String,
+    reason: String,
+}
+
+// A word read back: a dictionary form, its class, and what was done to it,
+// innermost first.
+type Deinflected = Deinflected {
+    word: String,
+    class: String,
+    reasons: List<String>,
+}
+
+// A five-row (godan) verb's class, by its ending's row: the a-row for the
+// irrealis base and the voices, the i-row for the continuative, the e-row
+// for the hypothetical, the imperative and the potential, the o-row and う
+// for the volitional, and its euphonic te and ta forms.
+fn godan(code: String, ending: String, a: String, i: String, e: String, o: String, te: String, ta: String) -> WordClass {
+    WordClass {
+        code: code,
+        group: "godan",
+        ending: ending,
+        bases: [
+            Base { name: "irrealis", text: a },
+            Base { name: "voice", text: a },
+            Base { name: "continuative", text: i },
+            Base { name: "hypothetical", text: e },
+            Base { name: "imperative", text: e },
+            Base { name: "volitional", text: "{o}う" },
+            Base { name: "te", text: te },
+            Base { name: "ta", text: ta },
+            Base { name: "cha", text: cha_of(te) },
+        ],
+    }
+}
+
+// The te form's contraction before しまう: て as ちゃ, で as じゃ.
+fn cha_of(te: String) -> String {
+    let n = String.length(te)
+    let last = String.slice(te, n - 1, n)
+    if last == "て" { "{String.slice(te, 0, n - 1)}ちゃ" } else if last == "で" { "{String.slice(te, 0, n - 1)}じゃ" } else { te }
+}
+
+// A one-row verb's bases, after a stem `stem` that takes the place of
+// `ending`: for 食べる, `ending` る and `stem` empty; for 来る, `ending` 来る
+// and `stem` 来.
+fn ichidan_bases(stem: String) -> List<Base> {
+    [
+        Base { name: "irrealis", text: stem },
+        Base { name: "voice", text: stem },
+        Base { name: "continuative", text: stem },
+        Base { name: "hypothetical", text: "{stem}れ" },
+        Base { name: "imperative", text: "{stem}ろ" },
+        Base { name: "imperative", text: "{stem}よ" },
+        Base { name: "volitional", text: "{stem}よう" },
+        Base { name: "te", text: "{stem}て" },
+        Base { name: "ta", text: "{stem}た" },
+        Base { name: "cha", text: "{stem}ちゃ" },
+    ]
+}
+
+// する's bases, after `stem`.
+fn suru_bases() -> List<Base> {
+    [
+        Base { name: "irrealis", text: "し" },
+        Base { name: "irrealis", text: "せ" },
+        Base { name: "voice", text: "さ" },
+        Base { name: "continuative", text: "し" },
+        Base { name: "hypothetical", text: "すれ" },
+        Base { name: "imperative", text: "しろ" },
+        Base { name: "imperative", text: "せよ" },
+        Base { name: "volitional", text: "しよう" },
+        Base { name: "te", text: "して" },
+        Base { name: "ta", text: "した" },
+        Base { name: "cha", text: "しちゃ" },
+    ]
+}
+
+// An i-adjective's bases, after `stem`, which takes the place of い (よ for
+// いい).
+fn adjective_bases(stem: String) -> List<Base> {
+    [
+        Base { name: "stem", text: stem },
+        Base { name: "continuative", text: "{stem}く" },
+        Base { name: "hypothetical", text: "{stem}けれ" },
+        Base { name: "te", text: "{stem}くて" },
+        Base { name: "ta", text: "{stem}かった" },
+    ]
+}
+
+// Every class the rules read back to, and the classes auxiliaries make.
+fn word_classes() -> List<WordClass> {
+    [
+        WordClass { code: "v1", group: "ichidan", ending: "る", bases: ichidan_bases("") },
+        godan("v5u", "う", "わ", "い", "え", "お", "って", "った"),
+        godan("v5u-s", "う", "わ", "い", "え", "お", "うて", "うた"),
+        godan("v5k", "く", "か", "き", "け", "こ", "いて", "いた"),
+        godan("v5k-s", "く", "か", "き", "け", "こ", "って", "った"),
+        godan("v5g", "ぐ", "が", "ぎ", "げ", "ご", "いで", "いだ"),
+        godan("v5s", "す", "さ", "し", "せ", "そ", "して", "した"),
+        godan("v5t", "つ", "た", "ち", "て", "と", "って", "った"),
+        godan("v5n", "ぬ", "な", "に", "ね", "の", "んで", "んだ"),
+        godan("v5b", "ぶ", "ば", "び", "べ", "ぼ", "んで", "んだ"),
+        godan("v5m", "む", "ま", "み", "め", "も", "んで", "んだ"),
+        godan("v5r", "る", "ら", "り", "れ", "ろ", "って", "った"),
+        WordClass { code: "vs-i", group: "suru", ending: "する", bases: suru_bases() },
+        // する after one kanji (愛する): する's bases and the godan-like
+        // sa-row ones beside them (愛さない, 愛そう, 愛せ, 愛せば).
+        WordClass {
+            code: "vs-s",
+            group: "suru",
+            ending: "する",
+            bases: List.concat(suru_bases(), [
+                Base { name: "irrealis", text: "さ" },
+                Base { name: "volitional", text: "そう" },
+                Base { name: "imperative", text: "せ" },
+                Base { name: "hypothetical", text: "せ" },
+            ]),
+        },
+        WordClass { code: "vs", group: "noun-vs", ending: "", bases: suru_bases() },
+        WordClass {
+            code: "vk",
+            group: "kuru",
+            ending: "くる",
+            bases: [
+                Base { name: "irrealis", text: "こ" },
+                Base { name: "voice", text: "こ" },
+                Base { name: "continuative", text: "き" },
+                Base { name: "hypothetical", text: "くれ" },
+                Base { name: "imperative", text: "こい" },
+                Base { name: "volitional", text: "こよう" },
+                Base { name: "te", text: "きて" },
+                Base { name: "ta", text: "きた" },
+                Base { name: "cha", text: "きちゃ" },
+            ],
+        },
+        WordClass {
+            code: "vk",
+            group: "kuru",
+            ending: "来る",
+            bases: [
+                Base { name: "irrealis", text: "来" },
+                Base { name: "voice", text: "来" },
+                Base { name: "continuative", text: "来" },
+                Base { name: "hypothetical", text: "来れ" },
+                Base { name: "imperative", text: "来い" },
+                Base { name: "volitional", text: "来よう" },
+                Base { name: "te", text: "来て" },
+                Base { name: "ta", text: "来た" },
+                Base { name: "cha", text: "来ちゃ" },
+            ],
+        },
+        WordClass { code: "adj-i", group: "adj-i", ending: "い", bases: adjective_bases("") },
+        WordClass { code: "adj-ix", group: "adj-i", ending: "いい", bases: adjective_bases("よ") },
+        WordClass { code: "masu", group: "masu", ending: "ます", bases: [Base { name: "stem", text: "" }] },
+    ]
+}
+
+// The groups whose words are verbs.
+fn verbs() -> List<String> {
+    ["ichidan", "godan", "suru", "noun-vs", "kuru"]
+}
+
+// The forms that close a word.
+fn closings() -> List<Closing> {
+    [
+        // A one-row verb's bare stem first, before the forms it can also be
+        // (口を滑らせ is 口を滑らせる's stem before it is 口を滑らす's imperative).
+        Closing { groups: ["ichidan"], base: "continuative", text: "", reasons: ["continuative stem"] },
+        Closing { groups: verbs(), base: "ta", text: "", reasons: ["past"] },
+        Closing { groups: verbs(), base: "te", text: "", reasons: ["te form"] },
+        Closing { groups: verbs(), base: "ta", text: "ら", reasons: ["conditional (たら)"] },
+        Closing { groups: verbs(), base: "ta", text: "り", reasons: ["listing (たり)"] },
+        Closing { groups: verbs(), base: "hypothetical", text: "ば", reasons: ["conditional (ば)"] },
+        Closing { groups: verbs(), base: "volitional", text: "", reasons: ["volitional"] },
+        Closing { groups: verbs(), base: "imperative", text: "", reasons: ["imperative"] },
+        Closing { groups: verbs(), base: "irrealis", text: "ず", reasons: ["negative (ず)"] },
+        Closing { groups: verbs(), base: "continuative", text: "そう", reasons: ["appearance (そう)"] },
+        Closing { groups: ["adj-i"], base: "stem", text: "そう", reasons: ["appearance (そう)"] },
+        Closing { groups: ["adj-i"], base: "ta", text: "", reasons: ["past"] },
+        Closing { groups: ["adj-i"], base: "te", text: "", reasons: ["te form"] },
+        Closing { groups: ["adj-i"], base: "ta", text: "ら", reasons: ["conditional (たら)"] },
+        Closing { groups: ["adj-i"], base: "hypothetical", text: "ば", reasons: ["conditional (ば)"] },
+        Closing { groups: ["adj-i"], base: "continuative", text: "", reasons: ["adverb"] },
+        Closing { groups: ["adj-i"], base: "stem", text: "さ", reasons: ["noun (さ)"] },
+        Closing { groups: ["masu"], base: "stem", text: "ました", reasons: ["past"] },
+        Closing { groups: ["masu"], base: "stem", text: "ません", reasons: ["negative"] },
+        Closing { groups: ["masu"], base: "stem", text: "ませんでした", reasons: ["negative", "past"] },
+        Closing { groups: ["masu"], base: "stem", text: "ましょう", reasons: ["volitional"] },
+        Closing { groups: ["masu"], base: "stem", text: "まして", reasons: ["te form"] },
+        Closing { groups: ["masu"], base: "stem", text: "ましたら", reasons: ["conditional (たら)"] },
+    ]
+}
+
+// The auxiliaries, each a word of its own class once attached.
+fn auxiliaries() -> List<Auxiliary> {
+    [
+        Auxiliary { groups: verbs(), base: "irrealis", text: "ない", makes: "adj-i", reason: "negative" },
+        Auxiliary { groups: ["adj-i"], base: "continuative", text: "ない", makes: "adj-i", reason: "negative" },
+        Auxiliary { groups: verbs(), base: "continuative", text: "ます", makes: "masu", reason: "polite" },
+        Auxiliary { groups: verbs(), base: "continuative", text: "たい", makes: "adj-i", reason: "desire (たい)" },
+        // Where two readings take as many steps, the potential is tried
+        // first, then the one-row and 来る voices, then the godan and する
+        // voices.
+        Auxiliary { groups: ["godan"], base: "hypothetical", text: "る", makes: "v1", reason: "potential" },
+        Auxiliary { groups: ["ichidan", "kuru"], base: "voice", text: "られる", makes: "v1", reason: "passive or potential" },
+        Auxiliary { groups: ["ichidan", "kuru"], base: "voice", text: "させる", makes: "v1", reason: "causative" },
+        Auxiliary { groups: ["godan"], base: "voice", text: "される", makes: "v1", reason: "causative-passive (される)" },
+        Auxiliary { groups: ["godan", "suru", "noun-vs"], base: "voice", text: "れる", makes: "v1", reason: "passive" },
+        Auxiliary { groups: ["godan", "suru", "noun-vs"], base: "voice", text: "せる", makes: "v1", reason: "causative" },
+        Auxiliary { groups: verbs(), base: "te", text: "いる", makes: "v1", reason: "progressive (ている)" },
+        Auxiliary { groups: verbs(), base: "te", text: "る", makes: "v1", reason: "progressive (てる)" },
+        Auxiliary { groups: verbs(), base: "te", text: "しまう", makes: "v5u", reason: "completion (てしまう)" },
+        Auxiliary { groups: verbs(), base: "cha", text: "う", makes: "v5u", reason: "completion (ちゃう)" },
+        Auxiliary { groups: verbs(), base: "continuative", text: "すぎる", makes: "v1", reason: "excess (すぎる)" },
+        Auxiliary { groups: ["adj-i"], base: "stem", text: "すぎる", makes: "v1", reason: "excess (すぎる)" },
+    ]
+}
+
+fn none_auxiliaries() -> List<Auxiliary> {
+    let none: List<Auxiliary> = []
+    none
+}
+
+// The classes an auxiliary makes, whose dictionary forms are read back in
+// turn.
+fn made_classes() -> List<String> {
+    ["adj-i", "v1", "v5u", "masu"]
+}
+
+// What precedes `tail` in `word`, where `word` ends with it.
+fn stem_before(word: String, tail: String) -> Option<String> {
+    if String.ends_with(word, tail) {
+        Some(String.slice(word, 0, String.length(word) - String.length(tail)))
+    } else {
+        None
+    }
+}
+
+// The texts of a class's bases named `name`.
+fn bases_named(c: WordClass, name: String) -> List<String> {
+    List.map(List.filter(c.bases, b => b.name == name), b => b.text)
+}
+
+// `out` with `d` added, where its word is not empty and it is not there yet
+// by word and class.
+fn add_read_back(out: List<Deinflected>, d: Deinflected) -> List<Deinflected> {
+    if d.word == "" | List.any(out, o => o.word == d.word & o.class == d.class) { out } else { List.concat(out, [d]) }
+}
+
+// Each way `word` is a dictionary form, of a class an auxiliary makes, or a
+// closed form of a class's word.
+fn closed_forms(word: String) -> List<Deinflected> {
+    let none: List<Deinflected> = []
+    let as_is = List.fold(List.filter(word_classes(), c => List.any(made_classes(), m => m == c.code)), none, (out, c) => match stem_before(word, c.ending) {
+        Some(_) => add_read_back(out, Deinflected { word: word, class: c.code, reasons: [] }),
+        None => out,
+    })
+    List.fold(closings(), as_is, (out, k) => List.fold(List.filter(word_classes(), c => List.any(k.groups, g => g == c.group)), out, (o, c) => List.fold(bases_named(c, k.base), o, (o2, b) => match stem_before(word, "{b}{k.text}") {
+        Some(stem) => add_read_back(o2, Deinflected { word: "{stem}{c.ending}", class: c.code, reasons: k.reasons }),
+        None => o2,
+    })))
+}
+
+// Each word `d` is with an auxiliary taken off: `d` is the dictionary form of
+// the word an auxiliary made. A bare stem's word is read back no further.
+fn unattached(d: Deinflected) -> List<Deinflected> {
+    let none: List<Deinflected> = []
+    let auxiliaries_off = if List.any(d.reasons, r => r == "continuative stem") { none_auxiliaries() } else { List.filter(auxiliaries(), a => a.makes == d.class) }
+    List.fold(auxiliaries_off, none, (out, a) => List.fold(List.filter(word_classes(), c => List.any(a.groups, g => g == c.group)), out, (o, c) => List.fold(bases_named(c, a.base), o, (o2, b) => match stem_before(d.word, "{b}{a.text}") {
+        Some(stem) => add_read_back(o2, Deinflected { word: "{stem}{c.ending}", class: c.code, reasons: List.concat([a.reason], d.reasons) }),
+        None => o2,
+    })))
+}
+
+// The words read back so far, and those found in the last round, read back
+// further for `rounds` more rounds; a word already found is not found again.
+fn read_back(found: List<Deinflected>, last: List<Deinflected>, rounds: Int) -> List<Deinflected> {
+    let none: List<Deinflected> = []
+    let next = List.fold(last, none, (out, d) => List.fold(unattached(d), out, (o, u) => if List.any(found, f => f.word == u.word & f.class == u.class) { o } else { add_read_back(o, u) }))
+    if rounds == 0 | List.length(next) == 0 { found } else { read_back(List.concat(found, next), next, rounds - 1) }
+}
+
+// How many auxiliaries the rules read back through, at most.
+fn deinflect_rounds() -> Int {
+    6
+}
+
+// **The dictionary forms an inflected word can be**: each a word of a
+// dictionary class, something done to it, fewest reasons first.
+fn deinflected(word: String) -> List<Deinflected> {
+    let asked = String.trim(word)
+    // A word written in katakana is read in hiragana too, first, as
+    // kiokun.com does (ガサ入れした is がさ入れ's as well as ガサ入れ's).
+    let spellings = each_once([hiragana(asked), asked])
+    let none: List<Deinflected> = []
+    let first = List.fold(spellings, none, (out, w) => List.fold(closed_forms(w), out, (o, d) => add_read_back(o, d)))
+    let all = read_back(first, first, deinflect_rounds())
+    let kept = List.filter(all, d => d.class != "masu" & List.length(d.reasons) > 0)
+    List.sort_by(kept, (a, b) => List.length(a.reasons) - List.length(b.reasons))
+}
+
+// A word's entry, as kiokun.com's resolution reads it: the word's file, its
+// redirect followed one hop (`fetchDictionaryEntry`).
+type Filed = Filed {
+    word: String,
+    entry: Option<Entry>,
+}
+
+// A dictionary form an inflected word resolves to, and how it was inflected.
+type Resolved = Resolved {
+    word: String,
+    how: String,
+}
+
+// One other form an inflected word can be, as the page links it.
+type OtherForm = OtherForm {
+    id: String,
+    word: String,
+    how: String,
+}
+
+// What the page says of an inflected address (`+page.svelte:427-460`): the
+// word asked, the dictionary form shown, how it was inflected, and the other
+// forms it can be.
+type Inflection = Inflection {
+    asked: String,
+    shown: String,
+    how: String,
+    others: List<OtherForm>,
+}
+
+// The group a JMdict part of speech is checked as, or none (`posToWordType`'s
+// groups: verbs by kind, the する verbs, nouns taking する, i-adjectives).
+fn pos_group(pos: String) -> String {
+    if String.starts_with(pos, "v1") {
+        "ichidan"
+    } else if String.starts_with(pos, "v5") {
+        "godan"
+    } else if pos == "vk" {
+        "kuru"
+    } else if pos == "vs-i" | pos == "vs-s" | pos == "vs-c" {
+        "suru"
+    } else if pos == "vs" {
+        "noun-vs"
+    } else if pos == "adj-i" | pos == "adj-ix" {
+        "adj-i"
+    } else {
+        ""
+    }
+}
+
+// The group of a class's words.
+fn group_of(class: String) -> String {
+    match List.find(word_classes(), c => c.code == class) {
+        Some(c) => c.group,
+        None => "",
+    }
+}
+
+// Does `e`'s Japanese words' parts of speech include `d`'s group
+// (`validatePosMatch`)? An entry with none of the groups fits nothing.
+fn fits(d: Deinflected, e: Option<Entry>) -> Bool {
+    let group = group_of(d.class)
+    match e {
+        Some(x) => List.any(x.japanese, w => List.any(w.senses, s => List.any(s.pos, p => pos_group(p) == group))),
+        None => false,
+    }
+}
+
+// Only hiragana (U+3040 to U+309F), and not empty (`isHiraganaOnly`).
+fn hiragana_only(word: String) -> Bool {
+    let points = String.codepoints(word)
+    List.length(points) > 0 & List.all(points, c => c >= 12352 & c <= 12447)
+}
+
+// The words `items` names, each once, in order.
+fn each_once(items: List<String>) -> List<String> {
+    let none: List<String> = []
+    List.fold(items, none, (out, w) => if List.any(out, o => o == w) { out } else { List.concat(out, [w]) })
+}
+
+// The targets of the files' redirects.
+fn redirects_of(files: List<Option<Entry>>) -> List<String> {
+    let none: List<String> = []
+    List.fold(files, none, (out, f) => match f {
+        Some(e) => match e.redirect {
+            Some(t) => List.concat(out, [t]),
+            None => out,
+        },
+        None => out,
+    })
+}
+
+// The entry `entries` holds for `word`.
+fn entry_of(entries: List<Filed>, word: String) -> Option<Entry> {
+    match List.find(entries, f => f.word == word) {
+        Some(f) => f.entry,
+        None => None,
+    }
+}
+
+// Each word with its file, a redirect followed to the file read for its
+// target among `hops`.
+fn filed(words: List<String>, files: List<Option<Entry>>, targets: List<String>, hops: List<Option<Entry>>) -> List<Filed> {
+    let none: List<Filed> = []
+    let hopped = List.fold(targets, none, (out, t) => List.concat(out, [Filed { word: t, entry: file_at(hops, List.length(out)) }]))
+    List.fold(words, none, (out, w) => List.concat(out, [Filed { word: w, entry: followed_file(file_at(files, List.length(out)), hopped) }]))
+}
+
+// The file at place `i` of `files`, or none.
+fn file_at(files: List<Option<Entry>>, i: Int) -> Option<Entry> {
+    match List.get(files, i) {
+        Some(f) => f,
+        None => None,
+    }
+}
+
+// A file, its redirect followed to the entry `hopped` holds for its target.
+fn followed_file(file: Option<Entry>, hopped: List<Filed>) -> Option<Entry> {
+    match file {
+        Some(e) => match e.redirect {
+            Some(t) => entry_of(hopped, t),
+            None => Some(e),
+        },
+        None => None,
+    }
+}
+
+// What a reading lookup found as a reading's written forms
+// (`findKanjiFormsFromReading`): each word but the reading itself, as the
+// endpoint answers.
+fn written_forms(readings: List<ReadingFound>, reading: String) -> List<String> {
+    let none: List<String> = []
+    match List.find(readings, f => f.reading == reading) {
+        Some(f) => List.map(List.filter(f.rows, r => r.word != reading), r => r.word),
+        None => none,
+    }
+}
+
+// The hiragana words read back whose own entries do not fit, which the
+// resolution looks up by reading.
+fn unfit_kana(candidates: List<Deinflected>, entries: List<Filed>) -> List<String> {
+    each_once(List.map(List.filter(candidates, d => hiragana_only(d.word) & !fits(d, entry_of(entries, d.word))), d => d.word))
+}
+
+// How a word was inflected, as the page says it.
+fn how_of(reasons: List<String>) -> String {
+    String.join(reasons, ", ")
+}
+
+// The most forms an inflected word resolves to (`maxResults`).
+fn resolved_limit() -> Int {
+    5
+}
+
+fn add_resolved(out: List<Resolved>, word: String, how: String) -> List<Resolved> {
+    if List.length(out) >= resolved_limit() | List.any(out, r => r.word == word) { out } else { List.concat(out, [Resolved { word: word, how: how }]) }
+}
+
+// **The forms an inflected word resolves to** (`findWordsWithDeinflection`):
+// each candidate, fewest reasons first, whose entry fits it; else, for a
+// hiragana candidate, each written form its reading finds whose entry fits
+// it.
+fn resolved(candidates: List<Deinflected>, entries: List<Filed>, readings: List<ReadingFound>) -> List<Resolved> {
+    let none: List<Resolved> = []
+    List.fold(candidates, none, (out, d) => if fits(d, entry_of(entries, d.word)) {
+        add_resolved(out, d.word, how_of(d.reasons))
+    } else if hiragana_only(d.word) {
+        List.fold(written_forms(readings, d.word), out, (o, k) => if fits(d, entry_of(entries, k)) { add_resolved(o, k, how_of(d.reasons)) } else { o })
+    } else {
+        out
+    })
+}
+
+// The page's note, where its address was an inflected word.
+fn inflection_of(asked: String, found: List<Resolved>) -> List<Inflection> {
+    let none: List<Inflection> = []
+    let others: List<OtherForm> = []
+    match List.get(found, 0) {
+        Some(first) => [Inflection {
+            asked: asked,
+            shown: first.word,
+            how: first.how,
+            others: List.fold(List.drop(found, 1), others, (out, r) => List.concat(out, [OtherForm { id: r.word, word: r.word, how: r.how }])),
+        }],
+        None => none,
     }
 }
 
@@ -2577,7 +3115,40 @@ public query Word(word: String) -> Result<WordShown, KiokunError>
     // among the component's imports (the compiler's `host_calls` reads the
     // declaration's body alone).
     let labels = read_labels()
-    let first = recorded(read_entry(shards.subdirectory(word), file_name(word)), word)
+    let own = recorded(read_entry(shards.subdirectory(word), file_name(word)), word)
+    // A word with no file of its own is read back to the dictionary forms
+    // it can be (`+page.ts:350-379`, `findWordsWithDeinflection`): each
+    // candidate's file, its redirect followed one hop; for a hiragana
+    // candidate whose own entry does not fit, the written forms its reading
+    // finds (`?limit=10`), and theirs.
+    let unread: List<Deinflected> = []
+    let candidates = match own {
+        Some(_) => unread,
+        None => deinflected(word),
+    }
+    let asked_words = each_once(List.map(candidates, d => d.word))
+    let asked_files = read_entries(List.map(asked_words, place_of))
+    let asked_hops = read_entries(List.map(redirects_of(asked_files), place_of))
+    let asked_entries = filed(asked_words, asked_files, redirects_of(asked_files), asked_hops)
+    let lookups = List.map(unfit_kana(candidates, asked_entries), r => ReadingFound { reading: r, rows: search_reading(r, 10) })
+    let no_words: List<String> = []
+    let written = each_once(List.fold(lookups, no_words, (out, f) => List.concat(out, written_forms(lookups, f.reading))))
+    let written_files = read_entries(List.map(written, place_of))
+    let written_hops = read_entries(List.map(redirects_of(written_files), place_of))
+    let entries = List.concat(asked_entries, filed(written, written_files, redirects_of(written_files), written_hops))
+    let resolutions = resolved(candidates, entries, lookups)
+    let inflection = inflection_of(word, resolutions)
+    // The page shown: the word's own, else the first dictionary form it
+    // resolves to, at the word's address (the deinflection ADR: kiokun.com
+    // answers 307 to it).
+    let shown_word = match List.get(resolutions, 0) {
+        Some(r) => r.word,
+        None => word,
+    }
+    let first = match List.get(resolutions, 0) {
+        Some(r) => recorded(read_entry(shards.subdirectory(r.word), file_name(r.word)), r.word),
+        None => own,
+    }
     let target = target_of(first)
     let followed = match target {
         Some(t) => recorded(read_entry(shards.subdirectory(t), file_name(t)), t),
@@ -2591,7 +3162,7 @@ public query Word(word: String) -> Result<WordShown, KiokunError>
         Some(d) => Some(loaded(d, stub, words, read)),
         None => None,
     }
-    let glosses = read_glosses(characters_for(word, page))
+    let glosses = read_glosses(characters_for(shown_word, page))
     let none: List<WordPitch> = []
     let pitches = match page {
         Some(l) => List.map(l.data.japanese, w => WordPitch { readings: read_pitch(pitch_shard(speak_of(w)), speak_of(w)) }),
@@ -2608,11 +3179,11 @@ public query Word(word: String) -> Result<WordShown, KiokunError>
     // moved to that form's page, for good (`[word]/+page.ts:415-425`,
     // ADR-0295): the word's own file decides, before a stub is followed or
     // forms merged.
-    let moved = moved_from(first, word)
+    let moved = moved_from(first, shown_word)
     match moved {
         Some(t) => Err(Moved(t)),
         None => match page {
-            Some(l) => Ok(shown(word, l, labels, glosses, pitches, found)),
+            Some(l) => Ok(shown(shown_word, l, labels, glosses, pitches, found, inflection)),
             None => Err(NotFound),
         },
     }
@@ -2765,6 +3336,14 @@ page WordPage(word: String) {
         <meta name="twitter:title" content="{page.seo.title}" />
         <meta name="twitter:description" content="{page.seo.description}" />
         <main>
+            {#each page.inflection as i (i.asked)}
+                <aside class="conjugation-info">
+                    <p><span class="conjugated-from">{i.asked}</span> → <span class="dictionary-form">{i.shown}</span> <span class="conjugation-detail">({i.how})</span></p>
+                    {#if i.others}
+                        <p class="conjugation-alternatives">Could also be: {#each i.others as o (o.id)}<a href="/word/{o.word}" class="alternative-chip">{o.word}</a> {/each}</p>
+                    {/if}
+                </aside>
+            {/each}
             <h1 id="headword">{page.word}</h1>
             {#if page.header.shown}
                 <div id="character-header" class="character-identity-grid">

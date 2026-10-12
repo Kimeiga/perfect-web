@@ -1,0 +1,3599 @@
+{
+ "kiokun_commit": "abf71a89af1111f4039578cd1fde58e06f14c4bf",
+ "node": "v22.21.1",
+ "oracle": {
+  "answered": 501,
+  "answers": {
+   "よかった": {
+    "alternatives": [],
+    "from": "いい",
+    "how": "past",
+    "pos": "adj-ix",
+    "primary": null
+   },
+   "よく": {
+    "alternatives": [],
+    "from": "いい",
+    "how": "adverb",
+    "pos": "adj-ix",
+    "primary": null
+   },
+   "よくて": {
+    "alternatives": [],
+    "from": "いい",
+    "how": "te form",
+    "pos": "adj-ix",
+    "primary": null
+   },
+   "よくない": {
+    "alternatives": [],
+    "from": "いい",
+    "how": "negative",
+    "pos": "adj-ix",
+    "primary": null
+   },
+   "よくなかった": {
+    "alternatives": [],
+    "from": "いい",
+    "how": "negative, past",
+    "pos": "adj-ix",
+    "primary": null
+   },
+   "よければ": {
+    "alternatives": [],
+    "from": "いい",
+    "how": "conditional (ば)",
+    "pos": "adj-ix",
+    "primary": null
+   },
+   "ケチ臭かった": {
+    "alternatives": [
+     "ケチ臭い"
+    ],
+    "from": "ケチ臭い",
+    "how": "past",
+    "pos": "adj-i",
+    "primary": "けち臭い"
+   },
+   "ケチ臭く": {
+    "alternatives": [
+     "ケチ臭い"
+    ],
+    "from": "ケチ臭い",
+    "how": "adverb",
+    "pos": "adj-i",
+    "primary": "けち臭い"
+   },
+   "ケチ臭くて": {
+    "alternatives": [
+     "ケチ臭い"
+    ],
+    "from": "ケチ臭い",
+    "how": "te form",
+    "pos": "adj-i",
+    "primary": "けち臭い"
+   },
+   "ケチ臭くない": {
+    "alternatives": [
+     "ケチ臭い"
+    ],
+    "from": "ケチ臭い",
+    "how": "negative",
+    "pos": "adj-i",
+    "primary": "けち臭い"
+   },
+   "ケチ臭くなかった": {
+    "alternatives": [
+     "ケチ臭い"
+    ],
+    "from": "ケチ臭い",
+    "how": "negative, past",
+    "pos": "adj-i",
+    "primary": "けち臭い"
+   },
+   "ケチ臭ければ": {
+    "alternatives": [
+     "ケチ臭い"
+    ],
+    "from": "ケチ臭い",
+    "how": "conditional (ば)",
+    "pos": "adj-i",
+    "primary": "けち臭い"
+   },
+   "勉強させられた": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "causative, passive, past",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強させる": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "causative",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強された": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "passive, past",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強される": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "passive",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強した": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "past",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強したい": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "desire",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強したくない": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "desire, negative",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強したら": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "conditional (たら)",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強して": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "te form",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強していた": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "progressive, past",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強している": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "progressive",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強しない": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "negative",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強しなかった": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "negative, past",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強しなくて": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "negative, te form",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強しなければ": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "negative, conditional (ば)",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強しました": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "polite, past",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強します": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "polite",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強しません": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "polite, negative",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強しませんでした": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "polite, negative, past",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強しよう": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "volitional",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強しろ": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "imperative",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "勉強すれば": {
+    "alternatives": [],
+    "from": "勉強",
+    "how": "conditional (ば)",
+    "pos": "vs",
+    "primary": "勉強"
+   },
+   "口を滑らさせられた": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "causative, passive, past",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らさせる": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "causative",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らさない": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "negative",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らさなかった": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "negative, past",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らさなくて": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "negative, te form",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らさなければ": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "negative, conditional (ば)",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らされた": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "passive, past",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らされる": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "passive",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らした": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "past",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らしたい": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "desire",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らしたくない": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "desire, negative",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らしたら": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "conditional (たら)",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らして": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "te form",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らしていた": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "progressive, past",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らしている": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "progressive",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らしました": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "polite, past",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らします": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "polite",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らしません": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "polite, negative",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らしませんでした": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "polite, negative, past",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らせ": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らす",
+    "how": "imperative",
+    "pos": "v5s",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせさせられた": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "causative, passive, past",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせさせる": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "causative",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせた": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "past",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせたい": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "desire",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせたくない": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "desire, negative",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせたら": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "conditional (たら)",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせて": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "te form",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせていた": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "progressive, past",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせている": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "progressive",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせない": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "negative",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせなかった": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "negative, past",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせなくて": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "negative, te form",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせなければ": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "negative, conditional (ば)",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせば": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "conditional (ば)",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "口を滑らせました": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "polite, past",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせます": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "polite",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせません": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "polite, negative",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせませんでした": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "polite, negative, past",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせよう": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "volitional",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせられた": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "passive, past",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせられる": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "passive",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせれば": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "conditional (ば)",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らせろ": {
+    "alternatives": [
+     "口を滑らす"
+    ],
+    "from": "口を滑らせる",
+    "how": "imperative",
+    "pos": "v1",
+    "primary": "口を滑らせる"
+   },
+   "口を滑らそう": {
+    "alternatives": [],
+    "from": "口を滑らす",
+    "how": "volitional",
+    "pos": "v5s",
+    "primary": "口を滑らす"
+   },
+   "吐いた": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "past",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐いたら": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "conditional (たら)",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐いて": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "te form",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐いていた": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "progressive, past",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐いている": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "progressive",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐かせられた": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "causative, passive, past",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐かせる": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "causative",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐かない": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "negative",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐かなかった": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "negative, past",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐かなくて": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "negative, te form",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐かなければ": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "negative, conditional (ば)",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐かれた": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "passive, past",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐かれる": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "passive",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐きたい": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "desire",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐きたくない": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "desire, negative",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐きました": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "polite, past",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐きます": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "polite",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐きません": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "polite, negative",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐きませんでした": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "polite, negative, past",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐け": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "imperative",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐けば": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "conditional (ば)",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐ける": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "potential",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "吐こう": {
+    "alternatives": [],
+    "from": "吐く",
+    "how": "volitional",
+    "pos": "v5k",
+    "primary": "吐く"
+   },
+   "問いたい": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "desire",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問いたくない": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "desire, negative",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問いました": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "polite, past",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問います": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "polite",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問いません": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "polite, negative",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問いませんでした": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "polite, negative, past",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問うた": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "past",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問うたら": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "conditional (たら)",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問うて": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "te form",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問うていた": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "progressive, past",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問うている": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "progressive",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問え": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "imperative",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問えば": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "conditional (ば)",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問える": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "potential",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問おう": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "volitional",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問わせられた": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "causative, passive, past",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問わせる": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "causative",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問わない": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "negative",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問わなかった": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "negative, past",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問わなくて": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "negative, te form",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問わなければ": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "negative, conditional (ば)",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問われた": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "passive, past",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "問われる": {
+    "alternatives": [],
+    "from": "問う",
+    "how": "passive",
+    "pos": "v5u-s",
+    "primary": "問う"
+   },
+   "履いた": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "past",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履いたら": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "conditional (たら)",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履いて": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "te form",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履いていた": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "progressive, past",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履いている": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "progressive",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履かせられた": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "causative, passive, past",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履かせる": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "causative",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履かない": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "negative",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履かなかった": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "negative, past",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履かなくて": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "negative, te form",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履かなければ": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "negative, conditional (ば)",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履かれた": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "passive, past",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履かれる": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "passive",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履きたい": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "desire",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履きたくない": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "desire, negative",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履きました": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "polite, past",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履きます": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "polite",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履きません": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "polite, negative",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履きませんでした": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "polite, negative, past",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履け": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "imperative",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履けば": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "conditional (ば)",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履ける": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "potential",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "履こう": {
+    "alternatives": [],
+    "from": "履く",
+    "how": "volitional",
+    "pos": "v5k",
+    "primary": "履く"
+   },
+   "帰った": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "past",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰ったら": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "conditional (たら)",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰って": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "te form",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰っていた": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "progressive, past",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰っている": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "progressive",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰らせられた": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "causative, passive, past",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰らせる": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "causative",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰らない": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "negative",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰らなかった": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "negative, past",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰らなくて": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "negative, te form",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰らなければ": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "negative, conditional (ば)",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰られた": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "passive, past",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰られる": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "passive",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰りたい": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "desire",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰りたくない": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "desire, negative",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰りました": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "polite, past",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰ります": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "polite",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰りません": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "polite, negative",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰りませんでした": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "polite, negative, past",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰れ": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "imperative",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰れば": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "conditional (ば)",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰れる": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "potential",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "帰ろう": {
+    "alternatives": [],
+    "from": "帰る",
+    "how": "volitional",
+    "pos": "v5r",
+    "primary": "帰る"
+   },
+   "待たせられた": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "causative, passive, past",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待たせる": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "causative",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待たない": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "negative",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待たなかった": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "negative, past",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待たなくて": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "negative, te form",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待たなければ": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "negative, conditional (ば)",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待たれた": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "passive, past",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待たれる": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "passive",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待ちたい": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "desire",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待ちたくない": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "desire, negative",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待ちました": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "polite, past",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待ちます": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "polite",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待ちません": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "polite, negative",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待ちませんでした": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "polite, negative, past",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待った": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "past",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待ったら": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "conditional (たら)",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待って": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "te form",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待っていた": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "progressive, past",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待っている": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "progressive",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待て": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "imperative",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待てば": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "conditional (ば)",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待てる": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "potential",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "待とう": {
+    "alternatives": [],
+    "from": "待つ",
+    "how": "volitional",
+    "pos": "v5t",
+    "primary": "待つ"
+   },
+   "愛させられた": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "causative, passive, past",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛させる": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "causative",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛さない": {
+    "alternatives": [
+     "愛する"
+    ],
+    "from": "愛す",
+    "how": "negative",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛さなかった": {
+    "alternatives": [
+     "愛する"
+    ],
+    "from": "愛す",
+    "how": "negative, past",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛さなくて": {
+    "alternatives": [
+     "愛する"
+    ],
+    "from": "愛す",
+    "how": "negative, te form",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛さなければ": {
+    "alternatives": [
+     "愛する"
+    ],
+    "from": "愛す",
+    "how": "negative, conditional (ば)",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛された": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "passive, past",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛される": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "passive",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛した": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "past",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛したい": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "desire",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛したくない": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "desire, negative",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛したら": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "conditional (たら)",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛して": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "te form",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛していた": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "progressive, past",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛している": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "progressive",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛しました": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "polite, past",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛します": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "polite",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛しません": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "polite, negative",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛しませんでした": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "polite, negative, past",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛せ": {
+    "alternatives": [
+     "愛する"
+    ],
+    "from": "愛す",
+    "how": "imperative",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛せば": {
+    "alternatives": [
+     "愛する"
+    ],
+    "from": "愛す",
+    "how": "conditional (ば)",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛せる": {
+    "alternatives": [],
+    "from": "愛す",
+    "how": "potential",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "愛そう": {
+    "alternatives": [
+     "愛する"
+    ],
+    "from": "愛す",
+    "how": "volitional",
+    "pos": "v5s",
+    "primary": "愛す"
+   },
+   "掃いた": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "past",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃いたら": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "conditional (たら)",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃いて": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "te form",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃いていた": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "progressive, past",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃いている": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "progressive",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃かせられた": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "causative, passive, past",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃かせる": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "causative",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃かない": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "negative",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃かなかった": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "negative, past",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃かなくて": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "negative, te form",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃かなければ": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "negative, conditional (ば)",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃かれた": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "passive, past",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃かれる": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "passive",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃きたい": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "desire",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃きたくない": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "desire, negative",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃きました": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "polite, past",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃きます": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "polite",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃きません": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "polite, negative",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃きませんでした": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "polite, negative, past",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃け": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "imperative",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃けば": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "conditional (ば)",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃ける": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "potential",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "掃こう": {
+    "alternatives": [],
+    "from": "掃く",
+    "how": "volitional",
+    "pos": "v5k",
+    "primary": "掃く"
+   },
+   "書いた": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "past",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書いたら": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "conditional (たら)",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書いて": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "te form",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書いていた": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "progressive, past",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書いている": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "progressive",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書かせられた": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "causative, passive, past",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書かせる": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "causative",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書かない": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "negative",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書かなかった": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "negative, past",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書かなくて": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "negative, te form",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書かなければ": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "negative, conditional (ば)",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書かれた": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "passive, past",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書かれる": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "passive",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書きたい": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "desire",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書きたくない": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "desire, negative",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書きました": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "polite, past",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書きます": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "polite",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書きません": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "polite, negative",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書きませんでした": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "polite, negative, past",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書け": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "imperative",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書けば": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "conditional (ば)",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書ける": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "potential",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "書こう": {
+    "alternatives": [],
+    "from": "書く",
+    "how": "volitional",
+    "pos": "v5k",
+    "primary": "書く"
+   },
+   "来い": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "imperative",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来させられた": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "causative, passive, past",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来させる": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "causative",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来た": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "past",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来たい": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "desire",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来たくない": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "desire, negative",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来たら": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "conditional (たら)",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来て": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "te form",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来ていた": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "progressive, past",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来ている": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "progressive",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来ない": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "negative",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来なかった": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "negative, past",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来なくて": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "negative, te form",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来なければ": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "negative, conditional (ば)",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来ました": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "polite, past",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来ます": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "polite",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来ません": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "polite, negative",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来ませんでした": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "polite, negative, past",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来よう": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "volitional",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来られた": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "passive, past",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来られる": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "passive",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "来れば": {
+    "alternatives": [],
+    "from": "来る",
+    "how": "conditional (ば)",
+    "pos": "vk",
+    "primary": "来る"
+   },
+   "死なせられた": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "causative, passive, past",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死なせる": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "causative",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死なない": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "negative",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死ななかった": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "negative, past",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死ななくて": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "negative, te form",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死ななければ": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "negative, conditional (ば)",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死なれた": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "passive, past",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死なれる": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "passive",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死にたい": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "desire",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死にたくない": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "desire, negative",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死にました": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "polite, past",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死にます": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "polite",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死にません": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "polite, negative",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死にませんでした": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "polite, negative, past",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死ね": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "imperative",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死ねば": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "conditional (ば)",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死ねる": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "potential",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死のう": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "volitional",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死んだ": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "past",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死んだら": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "conditional (たら)",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死んで": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "te form",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死んでいた": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "progressive, past",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "死んでいる": {
+    "alternatives": [],
+    "from": "死ぬ",
+    "how": "progressive",
+    "pos": "v5n",
+    "primary": "死ぬ"
+   },
+   "泳いだ": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "past",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳いだら": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "conditional (たら)",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳いで": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "te form",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳いでいた": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "progressive, past",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳いでいる": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "progressive",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳がせられた": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "causative, passive, past",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳がせる": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "causative",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳がない": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "negative",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳がなかった": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "negative, past",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳がなくて": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "negative, te form",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳がなければ": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "negative, conditional (ば)",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳がれた": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "passive, past",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳がれる": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "passive",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳ぎたい": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "desire",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳ぎたくない": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "desire, negative",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳ぎました": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "polite, past",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳ぎます": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "polite",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳ぎません": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "polite, negative",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳ぎませんでした": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "polite, negative, past",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳げ": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "imperative",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳げば": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "conditional (ば)",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳げる": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "potential",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "泳ごう": {
+    "alternatives": [],
+    "from": "泳ぐ",
+    "how": "volitional",
+    "pos": "v5g",
+    "primary": "泳ぐ"
+   },
+   "良かった": {
+    "alternatives": [],
+    "from": "良い",
+    "how": "past",
+    "pos": "adj-i",
+    "primary": "良い"
+   },
+   "良く": {
+    "alternatives": [],
+    "from": "良い",
+    "how": "adverb",
+    "pos": "adj-i",
+    "primary": "良い"
+   },
+   "良くて": {
+    "alternatives": [],
+    "from": "良い",
+    "how": "te form",
+    "pos": "adj-i",
+    "primary": "良い"
+   },
+   "良くない": {
+    "alternatives": [],
+    "from": "良い",
+    "how": "negative",
+    "pos": "adj-i",
+    "primary": "良い"
+   },
+   "良くなかった": {
+    "alternatives": [],
+    "from": "良い",
+    "how": "negative, past",
+    "pos": "adj-i",
+    "primary": "良い"
+   },
+   "良ければ": {
+    "alternatives": [],
+    "from": "良い",
+    "how": "conditional (ば)",
+    "pos": "adj-i",
+    "primary": "良い"
+   },
+   "行かせられた": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "causative, passive, past",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行かせる": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "causative",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行かない": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "negative",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行かなかった": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "negative, past",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行かなくて": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "negative, te form",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行かなければ": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "negative, conditional (ば)",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行かれた": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "passive, past",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行かれる": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "passive",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行きたい": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "desire",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行きたくない": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "desire, negative",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行きました": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "polite, past",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行きます": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "polite",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行きません": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "polite, negative",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行きませんでした": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "polite, negative, past",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行け": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "imperative",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行けば": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "conditional (ば)",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行ける": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "potential",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行こう": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "volitional",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行った": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "past",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行ったら": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "conditional (たら)",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行って": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "te form",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行っていた": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "progressive, past",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "行っている": {
+    "alternatives": [],
+    "from": "行く",
+    "how": "progressive",
+    "pos": "v5k-s",
+    "primary": "行く"
+   },
+   "見させられた": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "causative, passive, past",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見させる": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "causative",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見た": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "past",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見たい": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "desire",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見たくない": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "desire, negative",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見たら": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "conditional (たら)",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見て": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "te form",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見ていた": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "progressive, past",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見ている": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "progressive",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見ない": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "negative",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見なかった": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "negative, past",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見なくて": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "negative, te form",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見なければ": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "negative, conditional (ば)",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見ました": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "polite, past",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見ます": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "polite",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見ません": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "polite, negative",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見ませんでした": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "polite, negative, past",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見よう": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "volitional",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見られた": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "passive, past",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見られる": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "passive",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見れば": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "conditional (ば)",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "見ろ": {
+    "alternatives": [],
+    "from": "見る",
+    "how": "imperative",
+    "pos": "v1",
+    "primary": "見る"
+   },
+   "話させられた": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "causative, passive, past",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話させる": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "causative",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話さない": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "negative",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話さなかった": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "negative, past",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話さなくて": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "negative, te form",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話さなければ": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "negative, conditional (ば)",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話された": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "passive, past",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話される": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "passive",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話した": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "past",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話したい": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "desire",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話したくない": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "desire, negative",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話したら": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "conditional (たら)",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話して": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "te form",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話していた": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "progressive, past",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話している": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "progressive",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話しました": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "polite, past",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話します": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "polite",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話しません": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "polite, negative",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話しませんでした": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "polite, negative, past",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話せ": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "imperative",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話せば": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "conditional (ば)",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話せる": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "potential",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "話そう": {
+    "alternatives": [],
+    "from": "話す",
+    "how": "volitional",
+    "pos": "v5s",
+    "primary": "話す"
+   },
+   "読ませられた": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "causative, passive, past",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読ませる": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "causative",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読まない": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "negative",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読まなかった": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "negative, past",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読まなくて": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "negative, te form",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読まなければ": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "negative, conditional (ば)",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読まれた": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "passive, past",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読まれる": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "passive",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読みたい": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "desire",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読みたくない": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "desire, negative",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読みました": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "polite, past",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読みます": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "polite",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読みません": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "polite, negative",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読みませんでした": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "polite, negative, past",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読め": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "imperative",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読めば": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "conditional (ば)",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読める": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "potential",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読もう": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "volitional",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読んだ": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "past",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読んだら": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "conditional (たら)",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読んで": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "te form",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読んでいた": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "progressive, past",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "読んでいる": {
+    "alternatives": [],
+    "from": "読む",
+    "how": "progressive",
+    "pos": "v5m",
+    "primary": "読む"
+   },
+   "買いたい": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "desire",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買いたくない": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "desire, negative",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買いました": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "polite, past",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買います": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "polite",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買いません": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "polite, negative",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買いませんでした": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "polite, negative, past",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買え": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "imperative",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買えば": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "conditional (ば)",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買える": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "potential",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買おう": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "volitional",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買った": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "past",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買ったら": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "conditional (たら)",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買って": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "te form",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買っていた": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "progressive, past",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買っている": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "progressive",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買わせられた": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "causative, passive, past",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買わせる": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "causative",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買わない": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "negative",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買わなかった": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "negative, past",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買わなくて": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "negative, te form",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買わなければ": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "negative, conditional (ば)",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買われた": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "passive, past",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "買われる": {
+    "alternatives": [],
+    "from": "買う",
+    "how": "passive",
+    "pos": "v5u",
+    "primary": "買う"
+   },
+   "遊ばせられた": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "causative, passive, past",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊ばせる": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "causative",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊ばない": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "negative",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊ばなかった": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "negative, past",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊ばなくて": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "negative, te form",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊ばなければ": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "negative, conditional (ば)",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊ばれた": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "passive, past",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊ばれる": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "passive",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊びたい": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "desire",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊びたくない": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "desire, negative",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊びました": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "polite, past",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊びます": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "polite",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊びません": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "polite, negative",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊びませんでした": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "polite, negative, past",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊べ": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "imperative",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊べば": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "conditional (ば)",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊べる": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "potential",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊ぼう": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "volitional",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊んだ": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "past",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊んだら": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "conditional (たら)",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊んで": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "te form",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊んでいた": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "progressive, past",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "遊んでいる": {
+    "alternatives": [],
+    "from": "遊ぶ",
+    "how": "progressive",
+    "pos": "v5b",
+    "primary": "遊ぶ"
+   },
+   "食べさせられた": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "causative, passive, past",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べさせる": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "causative",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べた": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "past",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べたい": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "desire",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べたくない": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "desire, negative",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べたら": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "conditional (たら)",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べて": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "te form",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べていた": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "progressive, past",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べている": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "progressive",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べない": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "negative",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べなかった": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "negative, past",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べなくて": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "negative, te form",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べなければ": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "negative, conditional (ば)",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べました": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "polite, past",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べます": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "polite",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べません": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "polite, negative",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べませんでした": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "polite, negative, past",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べよう": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "volitional",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べられた": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "passive, past",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べられる": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "passive",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べれば": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "conditional (ば)",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "食べろ": {
+    "alternatives": [],
+    "from": "食べる",
+    "how": "imperative",
+    "pos": "v1",
+    "primary": "食べる"
+   },
+   "高かった": {
+    "alternatives": [],
+    "from": "高い",
+    "how": "past",
+    "pos": "adj-i",
+    "primary": "高い"
+   },
+   "高く": {
+    "alternatives": [],
+    "from": "高い",
+    "how": "adverb",
+    "pos": "adj-i",
+    "primary": "高い"
+   },
+   "高くて": {
+    "alternatives": [],
+    "from": "高い",
+    "how": "te form",
+    "pos": "adj-i",
+    "primary": "高い"
+   },
+   "高くない": {
+    "alternatives": [],
+    "from": "高い",
+    "how": "negative",
+    "pos": "adj-i",
+    "primary": "高い"
+   },
+   "高くなかった": {
+    "alternatives": [],
+    "from": "高い",
+    "how": "negative, past",
+    "pos": "adj-i",
+    "primary": "高い"
+   },
+   "高ければ": {
+    "alternatives": [],
+    "from": "高い",
+    "how": "conditional (ば)",
+    "pos": "adj-i",
+    "primary": "高い"
+   }
+  },
+  "asked": 501,
+  "named": {},
+  "provenance": {
+   "from, primary, alternatives": "JMdict's written forms (EDRDG, CC BY-SA 4.0, through jmdict-simplified 3.6.1), as kiokun-data's builder files them",
+   "the inflected forms, how": "the rewrite's own conjugator (inflect.mjs), from the grammar the deinflection ADR cites"
+  },
+  "read": 27,
+  "stride": 1,
+  "words": 25
+ },
+ "pleris_commit": "provisional",
+ "produced_by": "just e14-kiokun-deinflection"
+}

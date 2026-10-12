@@ -161,6 +161,21 @@ class Notice(unittest.TestCase):
         self.assertIn("`LICENSE-UNICODE.txt`, beside this file", (data / "NOTICE.md").read_text())
 
 
+class Deinflection(unittest.TestCase):
+    def test_the_deinflection_sample_keeps_the_key_and_jmdicts_words_alone(self) -> None:
+        out = sample.deinflection_kept(ENTRY, PAIRS)
+        self.assertEqual(set(out), {"key", "japanese_words"})
+        self.assertEqual(out["japanese_words"], sample.cleared(ENTRY, PAIRS)["japanese_words"])
+
+    def test_the_committed_deinflection_sample_holds_nothing_else(self) -> None:
+        data = ROOT / "examples/kiokun/data/deinflection"
+        files = sorted(data.rglob("*.json.deflate"))
+        self.assertEqual(len(files), len(sample.DEINFLECTION_WORDS))
+        for f in files:
+            entry = json.loads(zlib.decompress(f.read_bytes(), -15))
+            self.assertLessEqual(set(entry), {"key", "japanese_words"}, f.name)
+
+
 class Cleared(unittest.TestCase):
     def setUp(self) -> None:
         self.out = sample.cleared(ENTRY, PAIRS)
