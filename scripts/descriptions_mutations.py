@@ -38,8 +38,18 @@ BOTH_DESCRIPTIONS = (
     "            <p id=\"store-description\">{store.description}</p>\n"
     "            <p id=\"menu-line\">{line}</p>\n"
     "\n"
+    # Re-anchored by track store-accounts (milestone 2): where deliveries go,
+    # and the estimate to the reader's chosen address.
+    "            <!-- Where deliveries go, and whether this store reaches it (track\n"
+    "                 `store-accounts`), said where the menu is. -->\n"
+    "            <p id=\"deliver-to\">\n"
+    "                {#if reach.chosen}Delivering to {reach.to}{:else}No delivery address yet{/if}\n"
+    "                <a id=\"change-address\" href=\"/stores/{id}/address\">Change the address</a>\n"
+    "            </p>\n"
+    "            {#if reach.delivers}{:else}<p id=\"out-of-range\">{store.name} doesn't deliver to {reach.to}.</p>{/if}\n"
+    "\n"
     "            <section aria-label=\"Delivery\" aria-live=\"polite\">\n"
-    "                <stream query={Estimate(current_session())}>\n"
+    "                <stream query={Estimate(id, current_user())}>\n"
     "                    <placeholder><p>Estimating delivery</p></placeholder>\n"
     "                    <ready as={estimate}><p>Delivery in {estimate.min_minutes} to {estimate.max_minutes} min</p></ready>\n"
     "                    <failed><p>Delivery estimate unavailable</p></failed>\n"
@@ -146,7 +156,16 @@ MUTANTS = [
             "            <p id=\"store-description\">{store.description}</p>\n", ""
         )
         .replace("            <p id=\"menu-line\">{line}</p>\n", "")
-        .replace("                                    <p>{item.description}</p>\n", ""),
+        .replace("                                    <p>{item.description}</p>\n", "")
+        # And where deliveries go (track store-accounts), which says more of
+        # the store too: without it the store says as little as it did.
+        .replace(
+            "            <p id=\"deliver-to\">\n"
+            "                {#if reach.chosen}Delivering to {reach.to}{:else}No delivery address yet{/if}\n"
+            "                <a id=\"change-address\" href=\"/stores/{id}/address\">Change the address</a>\n"
+            "            </p>\n",
+            "",
+        ),
     ),
 ]
 

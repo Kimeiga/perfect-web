@@ -372,6 +372,23 @@ const DOCUMENT_ATTEMPTS: u32 = 3;
 /// far more often than this.
 const IDLE: std::time::Duration = std::time::Duration::from_secs(120);
 
+/// **A command whose page was shown to another reader** (track
+/// `store-accounts`, Q3): the reader signed in or out in another tab, so the
+/// session the browser now sends is not the one the page was served to.
+/// What the 403 names, and what the reader is told.
+const ANOTHER_READER: (&str, &str) = (
+    "another-reader",
+    "You signed in or out in another tab. Reload this page to go on.",
+);
+
+/// **A command whose page this host no longer holds** (track
+/// `store-accounts`, Q3): forgotten while idle (`IDLE`), or served by a host
+/// before this one. ADR-0302's words for a page out of date.
+const PAGE_NOT_HELD: (&str, &str) = (
+    "out-of-date",
+    "This page is out of date. Reload it to go on.",
+);
+
 /// `{"cursor":..,"frames":[reload]}`: the batch a forgotten subscriber gets.
 fn reload_batch(cursor: u64) -> String {
     let frame = StreamFrame::Recovery {
@@ -390,6 +407,17 @@ fn reload_batch(cursor: u64) -> String {
 /// second tab leaves what its first was waiting for. Until 2026-10-03 a
 /// session had one subscriber, and serving a document cleared it.
 type Doc = (String, u64);
+
+/// **What a commit's drops reached that another session may hold**
+/// (ADR-0219): a query, by its path, and, where the entries dropped were a
+/// user's, whose (track `store-accounts`, telling by principal, ADR-0318).
+/// A private entry keyed by the reader's handle is that user's sessions'
+/// alone to be told of; any other a commit reaches is every reader's.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct Reached {
+    resource: String,
+    user: Option<String>,
+}
 
 /// What a test does between a keyed read and its apply (ADR-0224).
 #[cfg(test)]
@@ -523,6 +551,11 @@ struct Shown {
     captures: BTreeMap<u32, Option<String>>,
     /// The page's title, by its part, as its text (ADR-0183).
     title: Option<(u32, String)>,
+    /// **The values its blocks were rendered from** (ADR-0320), on a page
+    /// with a block it tells part by part: what a block showed is read from
+    /// them where the block changed, beside what it shows now. Only there:
+    /// none else is read again.
+    bindings: Option<Arc<BTreeMap<String, Val>>>,
     /// **Each value the page speculates on, but the store's cart**
     /// (ADR-0222), by its binding, as the page's module decodes it: what the
     /// browser holds, sent when it changes, from the read the page's patches
@@ -664,6 +697,9 @@ mod identity;
 // TRACK SEAM (identity): the development identity provider.
 mod accounts;
 mod store;
+// TRACK SEAM (store-accounts): where a delivery goes, and whether a store
+// reaches it.
+mod places;
 // Track `store-pg`: the store's data in PostgreSQL.
 mod store_pg;
 mod uploads;
@@ -698,6 +734,11 @@ struct Server {
     /// its data is staged through `data`, as a command is; what reaches it
     /// directly is its test controls, its [`store::Faults`].
     store: Arc<dyn store::StoreLayer>,
+    /// **Whom the program's cart and order are** (track `store-accounts`):
+    /// `Some(true)` where it reads them by the reader's handle
+    /// (`Cart(current_user())`), `Some(false)` by the session (the benchmark's
+    /// copy of the store), and `None` where it reads no cart.
+    cart_by_reader: Option<bool>,
     /// The materializer's clock, advanced once per regeneration.
     ///
     /// A version is `Entry.generated_at`, which is a clock reading — so a clock
@@ -815,7 +856,7 @@ struct Server {
     /// **What commits dropped that other sessions may hold** (ADR-0219),
     /// with the session that committed: told once the request that
     /// committed is answered (`tell_waiting`).
-    telling: Mutex<Vec<(String, Vec<String>)>>,
+    telling: Mutex<Vec<(String, Vec<Reached>)>>,
     /// **The sessions being told, and whether a commit reached one again
     /// meanwhile** (ADR-0271): one telling of a session at a time, and one
     /// more after it for every commit that came while it ran.
@@ -924,10 +965,14 @@ const INTERACTIONS_PER_SESSION: usize = 64;
 /// Built from the shape the compiler's bridge produces. The server does not
 /// invent it: `EntryIdentity` is the one answer to "which entry", and a second
 /// construction here would be the divergence the split exists to prevent.
-fn cart_identity(session: &str) -> EntryIdentity {
+/// **A session's cart's entry** (ADR-0172): in the session's partition, and
+/// keyed by the cart's owner as the program keys it (track `store-accounts`):
+/// the reader's user where it reads a cart by the reader's handle, so that
+/// the program's event naming the user reaches it, or the session.
+fn cart_identity(owner: &str, session: &str) -> EntryIdentity {
     EntryIdentity::new(
         "store.page.Cart",
-        &[session],
+        &[owner],
         Partition::Session {
             id: session.to_string(),
         },
@@ -949,8 +994,8 @@ fn store_params(id: &str) -> Params {
     BTreeMap::from([("id".to_string(), id.to_string())])
 }
 
-fn cart_entry(session: &str) -> ResourceEntryId {
-    ResourceEntryId::derive(&cart_identity(session), &IDENTITY)
+fn cart_entry(owner: &str, session: &str) -> ResourceEntryId {
+    ResourceEntryId::derive(&cart_identity(owner, session), &IDENTITY)
 }
 
 /// **A value a session's page speculates on, as the browser holds it**
@@ -1029,11 +1074,11 @@ fn session_documents(session: &str) -> ResourceEntryId {
 
 /// **A session's order's entry** (ADR-0193): what a change the store makes
 /// to it is sent against, as the cart's is.
-fn order_entry(session: &str) -> ResourceEntryId {
+fn order_entry(owner: &str, session: &str) -> ResourceEntryId {
     ResourceEntryId::derive(
         &EntryIdentity::new(
             "store.page.Order",
-            &[session],
+            &[owner],
             Partition::Session {
                 id: session.to_string(),
             },
@@ -1088,7 +1133,11 @@ fn components() -> BTreeMap<String, Loaded> {
         "store.page.Store",
         "store.page.Menu",
         "store.page.Cart",
-        "domain.line_count",
+        // Whether the store reaches the reader's address (track
+        // `store-accounts`).
+        "store.page.Reach",
+        // A user's cart's count (track `store-accounts`).
+        "UserCarts.line_count",
         // What a menu's row reads its price through (ADR-0169).
         "domain.display",
         // A line's controls, and what the cart's lines read through
@@ -1098,7 +1147,7 @@ fn components() -> BTreeMap<String, Loaded> {
         "store.page.remove_from_cart",
         "domain.count",
         "domain.total",
-        "domain.subtotal",
+        "UserCarts.subtotal",
         // The menu counted, and the line the store's page shows from it
         // (ADR-0277).
         "store.page.MenuSize",
@@ -1517,7 +1566,19 @@ impl Server {
         // user through the identity's principals.
         let identity = identity::Identity::default();
         data.identified_by(identity.principals());
+        // TRACK SEAM (store-accounts): whom the program's cart is, by the
+        // key its pages read it with.
+        let cart_by_reader = std::iter::once(&plan)
+            .chain(plans.values())
+            .flat_map(|plan| plan["bindings"].as_array().into_iter().flatten())
+            .find(|b| b["resource"] == "store.page.Cart")
+            .map(|b| {
+                b["args"][0]
+                    .as_str()
+                    .is_some_and(notifications::is_current_user)
+            });
         Server {
+            cart_by_reader,
             build_id,
             templates,
             data,
@@ -1621,7 +1682,88 @@ impl Server {
 
     /// The storage key, derived from the same identity the wire id is.
     fn cart_key(&self, session: &str) -> EntryKey {
-        EntryKey::from_identity(&cart_identity(session))
+        EntryKey::from_identity(&cart_identity(&self.owner(session), session))
+    }
+
+    /// **Whom `session`'s cart and order are** (track `store-accounts`): its
+    /// reader's user, a signed-in principal's or the session's own guest
+    /// (ADR-0270), where the program reads them by the reader's handle; the
+    /// session itself where it reads them by the session.
+    fn owner(&self, session: &str) -> String {
+        match self.cart_by_reader {
+            Some(true) => notifications::user_of(&self.identity.principals(), session),
+            _ => session.to_string(),
+        }
+    }
+
+    /// The session's cart's entry, as its pages are sent it.
+    fn cart_entry(&self, session: &str) -> ResourceEntryId {
+        cart_entry(&self.owner(session), session)
+    }
+
+    /// The session's order's entry.
+    fn order_entry(&self, session: &str) -> ResourceEntryId {
+        order_entry(&self.owner(session), session)
+    }
+
+    /// **The event the program declares for its cart, and for its order**
+    /// (track `store-accounts`): a user's (`UserCartChanged`) where it reads
+    /// them by the reader's handle, else a session's.
+    fn cart_event(&self) -> &'static str {
+        match self.cart_by_reader {
+            Some(true) => "Events.UserCartChanged",
+            _ => "Events.CartChanged",
+        }
+    }
+
+    fn order_event(&self) -> &'static str {
+        match self.cart_by_reader {
+            Some(true) => "Events.UserOrderChanged",
+            _ => "Events.OrderChanged",
+        }
+    }
+
+    /// **A guest's cart joins its user's, at sign-in** (track
+    /// `store-accounts`, ADR-0318; docs/PARALLEL.md, Q2): one transaction of
+    /// the store's, the user's cart's event committed with it, and the user's
+    /// open pages told. A join that fails leaves the sign-in done and the
+    /// guest's lines where they were, and says so. A program that reads no
+    /// cart has none to join.
+    fn joined(&self, signed: &identity::SignedIn) {
+        let Some(by_reader) = self.cart_by_reader else {
+            return;
+        };
+        let guest = self.owner(signed.guest);
+        let user = if by_reader {
+            signed.principal.user.clone()
+        } else {
+            signed.session.to_string()
+        };
+        let event = (
+            self.cart_event().to_string(),
+            vec![Val::String(user.clone())],
+        );
+        let joined = self.store_write(
+            signed.session,
+            "store:host/carts#join",
+            &[Val::String(guest), Val::String(user)],
+            std::slice::from_ref(&event),
+            |delivered| {
+                let reached = self.invalidate_queries(signed.session, &[], delivered);
+                if reached.is_empty() {
+                    return;
+                }
+                self.telling
+                    .lock()
+                    .expect("telling")
+                    .push((signed.session.to_string(), reached));
+            },
+        );
+        if let Err(why) = joined {
+            eprintln!(
+                "pw dev server: a guest's cart did not join its user's at sign-in, and stays the guest's: {why}"
+            );
+        }
     }
 
     /// How many items the data layer holds for the session: the tests' view
@@ -1637,7 +1779,7 @@ impl Server {
     /// each line's item and quantity, in order.
     #[cfg(test)]
     fn cart_lines(&self, session: &str) -> Vec<(String, i64)> {
-        let read = self.layer_read(session, "store:data/carts#current", session);
+        let read = self.cart_read(session);
         match read {
             Val::Result(Ok(Some(cart))) => lines_of(&cart),
             other => panic!("carts#current answered {other:?}"),
@@ -1648,9 +1790,7 @@ impl Server {
     /// track `store-pg`).
     #[cfg(test)]
     fn cart_priced(&self, session: &str) -> Vec<(String, i64)> {
-        let Val::Result(Ok(Some(cart))) =
-            self.layer_read(session, "store:data/carts#current", session)
-        else {
+        let Val::Result(Ok(Some(cart))) = self.cart_read(session) else {
             panic!("no cart");
         };
         let Some(Val::List(lines)) = val_at(&cart, &["lines"]) else {
@@ -1675,7 +1815,15 @@ impl Server {
     /// none before one is placed.
     #[cfg(test)]
     fn order_of(&self, session: &str) -> Option<(String, Vec<(String, i64)>)> {
-        let status = match self.layer_read(session, "store:data/orders#current", session) {
+        let (current, placed) = match self.cart_by_reader {
+            Some(true) => (
+                "store:data/user-orders#current",
+                "store:data/user-orders#placed",
+            ),
+            _ => ("store:data/orders#current", "store:data/orders#placed"),
+        };
+        let owner = self.owner(session);
+        let status = match self.layer_read(session, current, &owner) {
             Val::Result(Ok(Some(v))) => match *v {
                 Val::Option(None) => return None,
                 Val::Option(Some(case)) => match *case {
@@ -1686,7 +1834,7 @@ impl Server {
             },
             other => panic!("orders#current answered {other:?}"),
         };
-        let lines = match self.layer_read(session, "store:data/orders#placed", session) {
+        let lines = match self.layer_read(session, placed, &owner) {
             Val::Option(Some(cart)) => lines_of(&cart),
             Val::Option(None) => Vec::new(),
             other => panic!("orders#placed answered {other:?}"),
@@ -1712,7 +1860,7 @@ impl Server {
             session,
             "store:host/orders#set-status",
             &[
-                Val::String(session.into()),
+                Val::String(self.owner(session)),
                 Val::Option(Some(Box::new(Val::String(status.into())))),
             ],
         );
@@ -1734,6 +1882,18 @@ impl Server {
         let mut args = vec![Val::String(STORE_ID.into())];
         args.extend(op.to_vals());
         self.untold("", "store:host/menus#change", &args);
+    }
+
+    /// **The session's cart, read through the layer as its pages read it**
+    /// (track `store-accounts`): its reader's, by the reader's handle, or the
+    /// session's.
+    #[cfg(test)]
+    fn cart_read(&self, session: &str) -> Val {
+        let op = match self.cart_by_reader {
+            Some(true) => "store:data/user-carts#current",
+            _ => "store:data/carts#current",
+        };
+        self.layer_read(session, op, &self.owner(session))
     }
 
     /// One read of the data layer's, by its key, for `session`, passed
@@ -1992,7 +2152,7 @@ impl Server {
         session: &str,
         args: &[Val],
         interaction: Option<&str>,
-    ) -> Result<(Answered, Vec<String>), String> {
+    ) -> Result<(Answered, Vec<Reached>), String> {
         // The session's one change at a time, through its frames (ADR-0172).
         let session_lock = self.one_at_a_time(session);
         let _one = session_lock
@@ -2442,10 +2602,12 @@ impl Server {
         let _one = session_lock
             .lock()
             .expect("one change of a session at a time");
+        // The event names whom the change is (track `store-accounts`): the
+        // session's owner, its user where the program reads by the reader.
         self.invalidate_queries(
             session,
             &[],
-            &[(event.to_string(), vec![Val::String(session.into())])],
+            &[(event.to_string(), vec![Val::String(self.owner(session))])],
         );
         self.clock.advance(1);
         let version = Version(self.clock.now());
@@ -2526,6 +2688,66 @@ impl Server {
                 .expect("speculated versions")
                 .retain(|(s, ..), _| *s != session);
         }
+    }
+
+    /// **Why a command from `document` is not `session`'s to send** (track
+    /// `store-accounts`, Q3), or nothing where it is: a document this host
+    /// served to another session, whose reader signed in or out in another
+    /// tab since, or one it no longer holds, forgotten while idle or served
+    /// by a host before this one. Document numbers are the host's own, one
+    /// per document served, so one names one session's document. The words
+    /// are the platform's, as ADR-0302's for a page out of date.
+    fn stale_document(&self, session: &str, document: u64) -> Option<(&'static str, &'static str)> {
+        // No document: a page the host did not serve, or no page.
+        if document == 0 {
+            return None;
+        }
+        let pages = self.pages.lock().expect("pages");
+        match pages.keys().find(|(_, n)| *n == document) {
+            Some((shown_to, _)) if shown_to == session => None,
+            Some(_) => Some(ANOTHER_READER),
+            None => Some(PAGE_NOT_HELD),
+        }
+    }
+
+    /// **What the host kept for a press made on `document`** (track
+    /// `store-accounts`, the integrator's finding): its interaction's
+    /// outcome, kept under the session the page was shown to (the
+    /// session's own where the host no longer holds the page), with the
+    /// arguments it was first sent with. Nothing runs, and nothing waits: a
+    /// press still running, or none kept, is `None`.
+    fn kept_answer(
+        &self,
+        session: &str,
+        document: u64,
+        component_id: &str,
+        json: &[serde_json::Value],
+        interaction: Option<&str>,
+    ) -> Option<Answered> {
+        let id = interaction?;
+        let shown_to = self
+            .pages
+            .lock()
+            .expect("pages")
+            .keys()
+            .find(|(_, n)| *n == document)
+            .map(|(shown_to, _)| shown_to.clone())
+            .unwrap_or_else(|| session.to_string());
+        let key = format!("{shown_to}\u{1f}{component_id}\u{1f}{id}");
+        let sent = serde_json::Value::Array(json.to_vec()).to_string();
+        let first_sent = self
+            .interactions
+            .lock()
+            .expect("interactions")
+            .get(&shown_to)?
+            .iter()
+            .any(|(k, first)| *k == key && *first == sent);
+        if !first_sent {
+            return None;
+        }
+        self.commands
+            .command_outcome(&key)
+            .map(|kept| Answered::from_kept(&kept))
     }
 
     /// `pw-resource`'s clock, brought to wall time (ADR-0127).
@@ -2799,15 +3021,16 @@ impl Server {
         session: &str,
         invalidated: &[crate::data::Dropped],
         events: &[(String, Vec<Val>)],
-    ) -> Vec<String> {
+    ) -> Vec<Reached> {
         // A query's policy, which keys its entries: read by a `let`, or by a
         // stream, whose answer is kept too (ADR-0148). Until 2026-10-03 only
         // a `let`'s was found, so an event never reached a stream's kept
         // answer (ADR-0165).
         // On any page: until 2026-10-04 only the store's was read, and a
         // query another page binds kept its stale answer (ADR-0190). A
-        // query's policy is its own, wherever it is read.
-        let policy_of = |resource: &str| {
+        // query's policy is its own, wherever it is read. And the binding's
+        // arguments, as its plan writes them (track `store-accounts`).
+        let binding_of = |resource: &str| {
             std::iter::once(&self.plan)
                 .chain(self.plans.values())
                 .flat_map(|plan| {
@@ -2816,20 +3039,44 @@ impl Server {
                         .flat_map(move |k| plan[k].as_array().into_iter().flatten())
                 })
                 .find(|b| b["resource"] == resource)
-                .map(|b| b["policy"].clone())
+                .cloned()
         };
         // Each drop says whether another session may hold what it dropped:
         // a shared entry, or a private one no key position pins to this
         // session, by its id. An entry keyed by the session is its alone.
-        let drop_entries = |resource: &str, args: &[Option<Val>]| -> Option<String> {
+        // **And one keyed by a reader's handle is that user's** (track
+        // `store-accounts`, telling by principal): the user at the key
+        // position a binding fills with `current_user()`, where the drop
+        // names one. ADR-0270's superset told every reader of the query.
+        let drop_entries = |resource: &str, args: &[Option<Val>]| -> Option<Reached> {
             // No binding reads it, so nothing of it is kept.
-            let policy = policy_of(resource)?;
+            let binding = binding_of(resource)?;
+            let policy = binding["policy"].clone();
             self.queries
                 .invalidate_where(resource, |key| names_entry(&policy, args, key));
-            let pinned = key_positions(&policy)
+            let positions = key_positions(&policy);
+            let pinned = positions
                 .iter()
                 .any(|i| matches!(args.get(*i), Some(Some(Val::String(s))) if s == session));
-            (!entry_is_private(&policy) || !pinned).then(|| resource.to_string())
+            if entry_is_private(&policy) && pinned {
+                return None;
+            }
+            let user = positions
+                .iter()
+                .filter(|i| {
+                    binding["args"][**i]
+                        .as_str()
+                        .is_some_and(notifications::is_current_user)
+                })
+                .find_map(|i| match args.get(*i) {
+                    Some(Some(Val::String(user))) => Some(user.clone()),
+                    _ => None,
+                })
+                .filter(|_| entry_is_private(&policy));
+            Some(Reached {
+                resource: resource.to_string(),
+                user,
+            })
         };
         let mut reached = Vec::new();
         // Until ADR-0209 the server read each key's text, `current_session()`
@@ -3257,10 +3504,25 @@ impl Server {
     /// dropped** (ADR-0219): a post reaches every open timeline, not only
     /// its author's. Until ADR-0219 another reader saw a change when it
     /// next loaded the page.
-    fn others_reading(&self, session: &str, reached: &[String]) -> Vec<String> {
+    fn others_reading(&self, session: &str, reached: &[Reached]) -> Vec<String> {
         if reached.is_empty() {
             return Vec::new();
         }
+        // **Telling by principal** (track `store-accounts`): what a private
+        // entry keyed by a user reached is told to that user's sessions
+        // alone; what any other reached, to every reader of it.
+        let principals = self.identity.principals();
+        let reaches = |other: &str| -> Vec<String> {
+            reached
+                .iter()
+                .filter(|r| {
+                    r.user
+                        .as_deref()
+                        .is_none_or(|user| notifications::user_of(&principals, other) == user)
+                })
+                .map(|r| r.resource.clone())
+                .collect()
+        };
         // The open documents, read before their pages: no two of these
         // tables are held at once.
         let open: Vec<Doc> = self
@@ -3272,7 +3534,7 @@ impl Server {
             .collect();
         open.into_iter()
             .filter(|(s, _)| s != session)
-            .filter(|doc| self.reads_any(&self.page_of(doc), reached))
+            .filter(|doc| self.reads_any(&self.page_of(doc), &reaches(&doc.0)))
             .map(|(s, _)| s)
             .collect()
     }
@@ -3779,7 +4041,12 @@ impl Server {
             return;
         }
 
-        self.send_documents(session, &cart_entry(session), self.version(session), true);
+        self.send_documents(
+            session,
+            &self.cart_entry(session),
+            self.version(session),
+            true,
+        );
     }
 
     /// **Each of a session's documents, read again and sent what changed**
@@ -4237,7 +4504,9 @@ impl Server {
                     String::new(),
                     reached
                         .into_iter()
-                        .filter(|r| !self.reads_any(self.store_page(), std::slice::from_ref(r)))
+                        .filter(|r| {
+                            !self.reads_any(self.store_page(), std::slice::from_ref(&r.resource))
+                        })
                         .collect(),
                 ));
             },
@@ -4642,7 +4911,7 @@ impl Server {
             .query(
                 "store.page.Cart",
                 session,
-                &[Val::String(session.to_string())],
+                &[Val::String(self.owner(session))],
             )
             .unwrap_or_else(|e| panic!("the cart query failed: {e}"));
         val_to_json(&cart)
@@ -4657,7 +4926,9 @@ impl Server {
             .iter()
             .find(|b| {
                 b["resource"] == "store.page.Cart"
-                    && b["key"] == serde_json::json!(["current_session()"])
+                    && (b["key"] == serde_json::json!(["current_session()"])
+                        // Track `store-accounts`: or by its reader's handle.
+                        || b["key"] == serde_json::json!(["current_user()"]))
             })
             .and_then(|b| b["binding"].as_str().map(str::to_string))
     }
@@ -4763,7 +5034,7 @@ impl Server {
             out.insert(
                 binding,
                 serde_json::json!({
-                    "entry": cart_entry(session),
+                    "entry": self.cart_entry(session),
                     "version": self.version(session),
                     "value": self.cart_json(session),
                 }),
@@ -4809,7 +5080,7 @@ impl Server {
         } else {
             self.version(session)
         };
-        serde_json::json!([{ "entry": cart_entry(session), "version": version }])
+        serde_json::json!([{ "entry": self.cart_entry(session), "version": version }])
     }
 
     /// Every handler identity this build's templates name.
@@ -5752,7 +6023,9 @@ impl Server {
             };
             shown.lists.insert(list.clone(), std::mem::take(items));
         }
-        // Each block a query decides, as it renders now (ADR-0146).
+        // Each block that renders a query's value, as it renders now
+        // (ADR-0146), and what it was rendered from, where one is told part
+        // by part (ADR-0320).
         let env = self.document_env(page, session, params, bindings);
         let template = self.template_of(page);
         for block in plan["blocks"].as_array().into_iter().flatten() {
@@ -5760,6 +6033,13 @@ impl Server {
             let html = pw_render::render_part(template, PartId(id), &env, &self.templates)
                 .map_err(|b| format!("block {id}: {b:?}"))?;
             shown.blocks.insert(id, html);
+        }
+        if shown
+            .blocks
+            .keys()
+            .any(|id| !self.speculation_renders(page, *id))
+        {
+            shown.bindings = Some(Arc::new(bindings.clone()));
         }
         // Each attribute at the top of the page that reads a query's value,
         // written by the function the page's render writes it with
@@ -5893,17 +6173,52 @@ impl Server {
                 operation,
             });
         }
-        // Each block a query decides whose rendering changed, rendered again
-        // where it is (ADR-0146).
+        // Each block whose rendering changed (ADR-0146): told part by part
+        // where it shows the arm it showed, as a row is (ADR-0320), so a
+        // field in it keeps its focus and a live region in it is told its
+        // new text; rendered again where it is otherwise. Until 2026-10-12
+        // every one was rendered again, whole.
+        let before = was
+            .bindings
+            .as_ref()
+            .map(|b| self.document_env(page, session, params, b));
         for (id, html) in &now.blocks {
-            if was.blocks.get(id) != Some(html) {
-                out.push(Targeted {
+            if was.blocks.get(id) == Some(html) {
+                continue;
+            }
+            let in_place = match &before {
+                // **Not one a speculation renders** (ADR-0172): the browser
+                // may show it as it speculated, and only the whole block finds
+                // it as it was derived.
+                Some(before)
+                    if was.blocks.contains_key(id) && !self.speculation_renders(page, *id) =>
+                {
+                    pw_render::block_changes(template, PartId(*id), before, &env, &self.templates)
+                        .map_err(|b| format!("block {id}: {b:?}"))?
+                }
+                _ => None,
+            };
+            match in_place {
+                Some(changes) => out.extend(instance_patches(&schema, &[], changes)),
+                None => out.push(Targeted {
                     target: PartAddress::new(&schema, LocalPartId(*id)),
                     operation: PatchOp::ReplaceRange { html: html.clone() },
-                });
+                }),
             }
         }
         Ok(out)
+    }
+
+    /// **Does a speculation on `page` render the part `id` again?**
+    /// (ADR-0172): the browser renders it from the value it speculates on,
+    /// whole, so a host tells it whole too.
+    fn speculation_renders(&self, page: &str, id: u32) -> bool {
+        self.speculations
+            .get(page)
+            .and_then(|m| m["regions"].as_array())
+            .into_iter()
+            .flatten()
+            .any(|r| r.as_u64() == Some(u64::from(id)))
     }
 }
 
@@ -5929,11 +6244,14 @@ struct StreamRun {
 }
 
 /// **Each stream a plan names, with what this request gives its query**
-/// (ADR-0148): a page parameter as `params` holds it, and
-/// `current_session()` as the request's session.
+/// (ADR-0148): a page parameter as `params` holds it, `current_session()`
+/// as the request's session, and `current_user()` as its reader's user
+/// (track `store-accounts`: a store's estimate to the reader's address;
+/// ADR-0270 left a stream's `current_user()` unclaimed).
 fn stream_runs(
     plan: &serde_json::Value,
     session: &str,
+    user: &str,
     params: &BTreeMap<String, String>,
 ) -> Result<Vec<StreamRun>, String> {
     let mut out = Vec::new();
@@ -5944,6 +6262,7 @@ fn stream_runs(
             .flatten()
             .map(|a| match a.as_str() {
                 Some("current_session()") => Ok(Val::String(session.into())),
+                Some(arg) if notifications::is_current_user(arg) => Ok(Val::String(user.into())),
                 Some(name) => param_val(plan, name, params).ok_or_else(|| {
                     format!("a stream's query is given `{name}`, which is not given")
                 }),
@@ -7072,6 +7391,9 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         &body,
         &mut stream,
         asked,
+        // TRACK SEAM (store-accounts): a guest signed in, its cart joining
+        // its user's before the sign-in is answered.
+        &|signed| server.joined(signed),
     ) {
         return;
     }
@@ -7139,13 +7461,51 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 })
             };
             let interaction = header("pw-interaction");
-            // **After the one its page sent before it** (ADR-0305): run once
-            // that one has, whichever request the network brought first;
-            // answered early, running nothing, where it does not come.
+            // Here for the order (ADR-0305), whatever its answer: a command
+            // refused below is answered, and what follows it may run.
             let arrival = interaction
                 .as_deref()
                 .map(|i| server.order.arrive(&session, i));
-            if let Some(after) = header("pw-after")
+            // TRACK SEAM (store-accounts): **a command is answered for the
+            // reader its page was shown to** (Q3, a rule of the platform).
+            // The runtime names its document (`pw-document`); one this host
+            // served to another session, the reader having signed in or out
+            // in another tab, or one it no longer holds, is refused before
+            // the command runs, in the platform's words, as a `requires`
+            // refusal is told (ADR-0302). A command from no page names none
+            // and is answered as before.
+            // **A press the host already answered is answered from what it
+            // kept, first** (the integrator's finding of 2026-10-11): a retry
+            // of a press whose answer was lost after it committed (ADR-0175)
+            // is told it committed, though the page went stale between the
+            // two attempts. The rule governs only commands not yet run, and
+            // the order's wait (ADR-0305) only those that pass it.
+            let stale = header("pw-document")
+                .and_then(|v| v.parse::<u64>().ok())
+                .and_then(|document| {
+                    server
+                        .stale_document(&session, document)
+                        .map(|why| (document, why))
+                });
+            let kept = stale.as_ref().and_then(|(document, _)| {
+                server.kept_answer(&session, *document, id, &args, interaction.as_deref())
+            });
+            if kept.is_none()
+                && let Some((_, (refused, words))) = stale
+            {
+                let refused = serde_json::json!({
+                    "committed": false,
+                    "refused": refused,
+                    "says": words,
+                });
+                respond_json(&mut stream, 403, &session, fresh, &refused.to_string());
+                return;
+            }
+            // **After the one its page sent before it** (ADR-0305): run once
+            // that one has, whichever request the network brought first;
+            // answered early, running nothing, where it does not come.
+            if kept.is_none()
+                && let Some(after) = header("pw-after")
                 && server.order.follow(&session, &after) == order::Turn::Early
             {
                 if let Some(arrival) = arrival {
@@ -7171,7 +7531,10 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             // own case, 403 and the predicate, never shaped like a declared
             // error. Taken before the command, so none is left from another.
             let _ = identity::take_refusal();
-            let answer = server.command_answer(id, &session, &args, interaction.as_deref());
+            let answer = match kept {
+                Some(kept) => Ok(kept),
+                None => server.command_answer(id, &session, &args, interaction.as_deref()),
+            };
             if drop_at == Some(DropAt::After) {
                 return;
             }
@@ -7297,18 +7660,27 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             // transaction (track `store-pg`). The order moved along keeps
             // its lines (ADR-0193); one the kitchen sets with none placed
             // has none.
+            // The order the session's reader reads (track `store-accounts`):
+            // its user's, where the program reads it by the reader's handle.
+            let owner = server.owner(&session);
             let event = (
-                "Events.OrderChanged".to_string(),
-                vec![Val::String(session.clone())],
+                server.order_event().to_string(),
+                vec![Val::String(owner.clone())],
             );
             let status = Val::Option(status.map(|s| Box::new(Val::String(s))));
             let written = server.store_write(
                 &session,
                 "store:host/orders#set-status",
-                &[Val::String(session.clone()), status],
+                &[Val::String(owner), status],
                 std::slice::from_ref(&event),
                 // And the session's open pages told (ADR-0193).
-                |_| server.session_changed(&session, "Events.OrderChanged", &order_entry(&session)),
+                |_| {
+                    server.session_changed(
+                        &session,
+                        server.order_event(),
+                        &server.order_entry(&session),
+                    )
+                },
             );
             match written {
                 Ok(_) => respond_json(&mut stream, 200, &session, fresh, "{}"),
@@ -8445,7 +8817,8 @@ fn serve_bound(
     // Each stream's query, started before the document is rendered
     // (ADR-0148): the page waits for the ones it is declared to wait
     // for, and the rest fill their regions in the same response.
-    let runs = match stream_runs(server.plan_of(page), session, &params) {
+    let reader = notifications::user_of(&server.identity.principals(), session);
+    let runs = match stream_runs(server.plan_of(page), session, &reader, &params) {
         Ok(runs) => runs,
         Err(why) => return unavailable(stream, Unread::Failed(why)),
     };
@@ -8666,8 +9039,10 @@ fn serve_page(
         .plans
         .get(path)
         .ok_or_else(|| format!("no page `{path}` in this build"))
-        .and_then(|plan| stream_runs(plan, session, &params))
-    {
+        .and_then(|plan| {
+            let reader = notifications::user_of(&server.identity.principals(), session);
+            stream_runs(plan, session, &reader, &params)
+        }) {
         Ok(runs) => runs,
         Err(why) => return not_found(stream, why),
     };
@@ -10062,7 +10437,7 @@ public query Store(",
         // Around the program, as a row can be. A database that holds the
         // invariant itself refuses the row (PostgreSQL's
         // `cart_lines_quantity_check`), and there is nothing to read.
-        if let Err(refused) = s.store.line_around("a", 0, 0) {
+        if let Err(refused) = s.store.line_around(&s.owner("a"), 0, 0) {
             assert!(refused.contains("cart_lines_quantity_check"), "{refused}");
             return;
         }
@@ -10796,6 +11171,106 @@ public query Store(",
         assert!(sets[2][1].starts_with("range \"\""), "{sets:?}");
     }
 
+    /// The store, with two blocks its cart decides, one that lists the
+    /// cart's lines and one that shows text, and one its menu decides. With
+    /// `add_to_cart`'s speculation, which renders the cart's again in the
+    /// browser (ADR-0172), or without it. The menu's no speculation renders,
+    /// so the host keeps what the page's blocks were rendered from either
+    /// way.
+    fn with_listed_blocks(app: &str, speculated: bool) -> String {
+        let speculation = "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n";
+        assert_eq!(
+            app.matches(speculation).count(),
+            1,
+            "the speculation's anchor"
+        );
+        let app = if speculated {
+            app.to_string()
+        } else {
+            app.replace(speculation, "")
+        };
+        let out = app.replacen(
+            "                <p id=\"cart-count\">{cart.line_count}</p>",
+            "                <p id=\"cart-count\">{cart.line_count}</p>\n                \
+             {#if cart.lines}<ul id=\"ready\">{#each cart.lines as l (l.item_id)}<li>{l.item_id}</li>{/each}</ul>{/if}\n                \
+             {#if cart.lines}<p id=\"fees\">Fees at checkout.</p>{/if}\n                \
+             {#if menu}<p id=\"menu-shown\">The menu.</p>{/if}",
+            1,
+        );
+        assert!(out.contains("{#if cart.lines}"));
+        out
+    }
+
+    /// The patches each change sent document `doc`, as `said` writes them.
+    fn told(s: &Server, doc: &str) -> Vec<Vec<String>> {
+        patch_sets(s, doc)
+            .iter()
+            .map(|p| p.patches.iter().map(said).collect())
+            .collect()
+    }
+
+    /// **A block that shows the arm it showed is told part by part**
+    /// (ADR-0320): the line a change adds is inserted into its list where it
+    /// is, and the block is not rendered again. Until 2026-10-12 it was,
+    /// whole, at every change inside it (ADR-0146).
+    #[test]
+    fn a_block_that_shows_the_arm_it_showed_is_told_part_by_part() {
+        let s = lines_server_with(|app| with_listed_blocks(app, false));
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("cortado", 1), false)
+            .expect("runs");
+        let sets = told(&s, "a");
+        assert_eq!(sets.len(), 2, "{sets:?}");
+        // Shown, with the first line: each block, whole.
+        assert!(
+            sets[0].iter().any(|p| p.starts_with("range \"espresso\"")),
+            "{sets:?}"
+        );
+        assert!(
+            sets[0]
+                .iter()
+                .any(|p| p.starts_with("range \"Fees at checkout.\"")),
+            "{sets:?}"
+        );
+        // Still shown: the line inserted where it is. The other block renders
+        // as it did, and is not sent.
+        assert!(
+            sets[1]
+                .iter()
+                .any(|p| p.starts_with("insert after true cortado")),
+            "{sets:?}"
+        );
+        assert!(!sets[1].iter().any(|p| p.starts_with("range")), "{sets:?}");
+    }
+
+    /// **A block a speculation renders is rendered again whole** (ADR-0320,
+    /// ADR-0172): the browser may show it as it speculated, and only the
+    /// whole block finds it as it was derived.
+    #[test]
+    fn a_block_a_speculation_renders_is_rendered_again_whole() {
+        let s = lines_server_with(|app| with_listed_blocks(app, true));
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("cortado", 1), false)
+            .expect("runs");
+        let sets = told(&s, "a");
+        assert_eq!(sets.len(), 2, "{sets:?}");
+        assert!(
+            sets[1]
+                .iter()
+                .any(|p| p.starts_with("range \"espressocortado\"")),
+            "{sets:?}"
+        );
+        // One that renders as it did is not sent (ADR-0146).
+        assert!(
+            !sets[1].iter().any(|p| p.contains("Fees at checkout.")),
+            "{sets:?}"
+        );
+    }
+
     /// The store, with a message its cart's lines decide by an attribute:
     /// `hidden` while the cart holds a line (ADR-0171). Without
     /// `add_to_cart`'s speculation, which would not reach it (ADR-0170).
@@ -11482,7 +11957,8 @@ public query Store(",
         served_from_patches_in(
             "examples",
             |app| {
-                let page = "    let stores = query StoreList()\n    let cart = query Cart(current_session())\n";
+                // The reader's cart is the user's since track `store-accounts`.
+                let page = "    let stores = query StoreList()\n    let cart = query Cart(current_user())\n";
                 let shown = "            <h1>Stores</h1>\n";
                 assert!(app.contains(page) && app.contains(shown), "the home page");
                 app.replacen("import List\n", "import List\nimport clock\n", 1)
@@ -12259,7 +12735,7 @@ public query Store(",
             "one Menu for both"
         );
         assert_eq!(
-            calls(&s, "store:data/carts#current"),
+            calls(&s, "store:data/user-carts#current"),
             2,
             "a Cart for each reader"
         );
@@ -12286,9 +12762,9 @@ public query Store(",
         }
         s.render_store("one");
         s.render_store("two");
-        assert_eq!(calls(&s, "store:data/carts#current"), 2);
+        assert_eq!(calls(&s, "store:data/user-carts#current"), 2);
         s.render_store("one");
-        assert_eq!(calls(&s, "store:data/carts#current"), 2, "kept");
+        assert_eq!(calls(&s, "store:data/user-carts#current"), 2, "kept");
 
         s.command(ADD, "one", &add_shown("espresso", 1), false)
             .expect("runs");
@@ -12297,12 +12773,16 @@ public query Store(",
             "one's own add is shown"
         );
         assert_eq!(
-            calls(&s, "store:data/carts#current"),
+            calls(&s, "store:data/user-carts#current"),
             3,
             "one's entry was dropped"
         );
         s.render_store("two");
-        assert_eq!(calls(&s, "store:data/carts#current"), 3, "two's was not");
+        assert_eq!(
+            calls(&s, "store:data/user-carts#current"),
+            3,
+            "two's was not"
+        );
     }
 
     /// **Commands that invalidate each other's reads all commit** (ADR-0127).
@@ -12556,6 +13036,13 @@ public query Store(",
     /// Track `store-pg`: the store on PostgreSQL, the tests that look at the
     /// database itself, which skip without one.
     mod store_pg;
+
+    // TRACK SEAM (store-accounts): a cart and an order a user's, on the
+    // layer the server's tests serve the store on.
+    mod store_accounts;
+
+    // TRACK SEAM (store-accounts): delivery addresses, and a store's reach.
+    mod addresses;
 
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
@@ -14265,7 +14752,7 @@ public query Store(",
 
     /// **A command commits the events it computes, and no others**
     /// (ADR-0104, ADR-0208). `add_to_cart` declares `emits
-    /// CartChanged(current_session())`: its component evaluates the key and
+    /// UserCartChanged(current_user())`: its component evaluates the key and
     /// hands the event to the platform's outbox, the one function of it its
     /// contract imports, and its cart's entry moves. The server reads no key.
     #[test]
@@ -14282,7 +14769,7 @@ public query Store(",
             .collect();
         assert_eq!(
             imported,
-            ["Events.CartChanged"],
+            ["Events.UserCartChanged"],
             "exactly the one it declares"
         );
         s.drain("session-7");
@@ -14308,7 +14795,7 @@ public query Store(",
             "examples",
             |app| {
                 // `add_to_cart`'s, the first command's.
-                let emits = "    emits         CartChanged(current_session())\n";
+                let emits = "    emits         UserCartChanged(current_user())\n";
                 assert!(app.contains(emits), "the store's add_to_cart emits");
                 app.replacen(emits, "", 1)
             },
@@ -14349,11 +14836,13 @@ public query Store(",
         let s = rendering_server();
         let named = s.handler_identities();
         // The cart's own page's handlers are the store's, as their code is
-        // (ADR-0190); placing an order is one more (ADR-0193).
+        // (ADR-0190); placing an order is one more (ADR-0193); and the
+        // address page's five, an address chosen, renamed, removed and saved
+        // (track `store-accounts`).
         assert_eq!(
             named.len(),
-            6,
-            "add_to_cart, clear_cart, a line's three (ADR-0172) and place_order: {named:?}"
+            11,
+            "add_to_cart, clear_cart, a line's three (ADR-0172), place_order and an address's five: {named:?}"
         );
         assert_eq!(
             s.uncompiled_handlers(),
@@ -14504,7 +14993,7 @@ public query Store(",
         let mut w = Subscriber::default();
         let notice = |n: u64| StreamFrame::ResourceChanged {
             protocol: CURRENT,
-            entry: cart_entry(&format!("session-{n}")),
+            entry: cart_entry(&format!("session-{n}"), &format!("session-{n}")),
             version: Version(n),
         };
         for n in 0..MAX_WAITING as u64 {
@@ -14574,6 +15063,10 @@ public query Store(",
     #[test]
     fn store_commands_carry_and_enforce_their_signed_in_precondition() {
         let mut s = server(dev_topology());
+        // Track `store-accounts` (ADR-0318): anyone fills a cart, a guest its
+        // session's guest's, so the cart's commands require no one; placing
+        // an order requires a reader signed in (`place_order`, whose
+        // component the committed evidence does not hold).
         for id in [ADD, CLEAR] {
             let contract = s
                 .contracts
@@ -14585,20 +15078,30 @@ public query Store(",
                 .as_ref()
                 .expect("compiled export")
                 .authorization;
-            assert_eq!(requirements.len(), 1, "{id}: {requirements:?}");
-            assert_eq!(requirements[0].predicate, "SignedIn");
-            assert!(requirements[0].arguments.is_empty());
+            assert!(requirements.is_empty(), "{id}: {requirements:?}");
         }
+        let place = s
+            .contracts
+            .iter()
+            .find(|c| c.component_id == "store.page.place_order")
+            .expect("place_order's contract");
+        let requirements = &place.exports[0]
+            .component
+            .as_ref()
+            .expect("compiled export")
+            .authorization;
+        assert_eq!(requirements.len(), 1, "{requirements:?}");
+        assert_eq!(requirements[0].predicate, "SignedIn");
+        assert!(requirements[0].arguments.is_empty());
 
-        // The development deployment knows SignedIn, so the ordinary demo
-        // principal may execute it.
         s.command(ADD, "signed-in-demo", &add_shown("espresso", 1), false)
-            .expect("SignedIn is explicitly approved");
+            .expect("anyone fills a cart");
 
         // A predicate the deployment does not know is denied before the
         // component or staged data layer can change state.
-        let requirement = &mut s
-            .contracts
+        let mut requirement = requirements[0].clone();
+        requirement.predicate = "OwnsOrder".to_string();
+        s.contracts
             .iter_mut()
             .find(|c| c.component_id == ADD)
             .expect("command contract")
@@ -14606,8 +15109,8 @@ public query Store(",
             .component
             .as_mut()
             .expect("compiled export")
-            .authorization[0];
-        requirement.predicate = "OwnsOrder".to_string();
+            .authorization
+            .push(requirement);
         let before = s.cart_value("signed-in-demo");
         let err = s
             .command(ADD, "signed-in-demo", &add_shown("cortado", 1), false)
@@ -14953,6 +15456,32 @@ public query Store(",
             .collect()
     }
 
+    /// **What each change set the text part of `page` that reads `value`
+    /// to**, where it is (ADR-0320): a block told part by part sets its
+    /// parts as text, and does not write the block again.
+    fn texts_told(s: &Server, doc: &Doc, page: &str, value: &str) -> Vec<String> {
+        let parts: Vec<u32> = s
+            .template_of(page)
+            .manifest()
+            .into_iter()
+            .filter(|p| p.kind == "text" && p.value == value)
+            .map(|p| p.id.0)
+            .collect();
+        assert!(
+            !parts.is_empty(),
+            "`{page}` has no text part that reads `{value}`"
+        );
+        sets_of(s, doc)
+            .iter()
+            .flat_map(|set| set.patches.iter())
+            .filter(|p| p.target.instances.is_empty() && parts.contains(&p.target.part.0))
+            .filter_map(|p| match &p.operation {
+                PatchOp::ReplaceText { text } => Some(text.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// The HTML a patch set writes, its blocks rendered again.
     fn written(set: &PatchSet) -> String {
         set.patches
@@ -15168,7 +15697,7 @@ public query Store(",
             assert!(written(&last).contains(said), "{status}: {last:?}");
             let basis = &last.basis.resources;
             assert_eq!(basis.len(), 1);
-            assert_eq!(basis[0].entry, order_entry("a"));
+            assert_eq!(basis[0].entry, s.order_entry("a"));
             versions.push(basis[0].version);
         }
         assert!(versions.windows(2).all(|w| w[0] < w[1]), "{versions:?}");
@@ -16498,10 +17027,11 @@ public query Store(",
         // Each arm with the comment after it (ADR-0223).
         assert!(
             // ADR-0277: the menu counted is a part of the page's, before
-            // them; and ADR-0303: the layout's count is part 0, before all;
-            // and ADR-0307: the cart's four controls are each shown where
-            // `SignedIn` holds, a block each.
-            whole.ends_with("</template><!--/pw-36--></body>\n</html>\n"),
+            // (ADR-0307's four cart blocks are not this store's: its cart
+            // controls ask nothing, track `store-accounts`.)
+            // them; and ADR-0303: the layout's count is part 0, before all.
+            // Track `store-accounts`: and where deliveries go, before them.
+            whole.ends_with("</template><!--/pw-38--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the

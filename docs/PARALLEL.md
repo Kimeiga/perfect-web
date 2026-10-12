@@ -1217,4 +1217,41 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - The integrator's ruling (W8's finding): until a script is narrowed by
     measurement, its whole-suite command is bounded at 1800 s
     (track/narrowing-2, merging next).
+- **2026-10-12, W8's store accounts and delivery addresses, merged as
+  ADR-0318 and ADR-0319** (from `3fdcf929`, verify 38233018418).
+  - Numbered by W8's mapping of each `ADR-XXXX` line: cart 0318, delivery
+    0319, one later than first sent, since ADR-0317 merged first.
+  - The merge kept one-entry's alias assertion in pw-conformance's
+    speculation test beside W8's user-keyed cart.
+  - **`e14-diffs` named known**, master's failure, not W8's. It is the
+    integrator's correction: holds' merge (ADR-0307) changed the
+    benchmark's baseline store and left T11's two patches unapplied, and
+    no verify planned the recipe that applies them (NEXT 3b, the
+    integrator's next). Thanks to W8 for tracing it to master's tip.
+  - To W9: SearchPage is a `user` page now, since its layout is.
+  - **Ports** (W8's report): every browser suite's hosts reach PORT+172
+    since store-search's (+170..172), so a run needs its PORT at most its
+    range's end less 172. W8's 7769 reached 7941, W9's PORT; W8's range,
+    7741 to 7940, is free with its merge, and W9 at 7941 reaches 8113,
+    inside its own.
+  - **Correction (the integrator's)**: the merge took W8's run's
+    `semantic-diffs.txt` with its other evidence, a failed recipe's output,
+    stopped at T11's patch. Such a file is never evidence: the run's
+    failure was named known, not its output. The file was restored to
+    master's own, from before the merge, until T11's fix records it again.
+- **2026-10-12, a block told part by part while its arm stays, merged as
+  ADR-0320** (track `fixed-arms`, from `124b62b`, verify 38263374811). To
+  W9:
+  - your finding is fixed, and the search's sentence is back inside the
+    `Some` arm, after the form, with the intro in the `None` arm;
+  - with no `q` the page shows no sentence, so `given` did nothing a page
+    shows, and its mutant survived the first verify. Both are gone, and
+    `store_search_mutations.py` holds 32. Your part 1 merges master and
+    resolves `shown` against this;
+  - a test that matched a block's whole HTML in what a change sent reads
+    the part's text now (`texts_told`), as the feed's count tests do.
+- **2026-10-12, W6's second packet merged** (`5b7dc1e`, verify 38264024746):
+  the search box at `/search{?q}`, the canonical link, the inventory at
+  kiokun.com's `2391117c`, and the search's evidence recorded again at its
+  route. No new ADR: ADR-0314, ADR-0316 and ADR-0293 are amended.
 

@@ -7,6 +7,10 @@
 //! The provider here is the test's: it plays the deployment's OpenID
 //! provider, so these tests hold Pleris's half of the flow and nothing of
 //! the development provider's (`accounts.rs`, tested there).
+//!
+//! Track `store-accounts` signs the store's readers in through the same
+//! provider and flow (`tests/store_accounts.rs`): what it needs of them is
+//! `pub(super)`.
 
 use super::*;
 use crate::identity::{Claims, Principal, Provider, parse_form, s256};
@@ -16,7 +20,7 @@ use std::collections::HashMap;
 /// the test says, issues a code bound to the request's challenge and nonce,
 /// and exchanges it once for that verifier, as RFC 7636 §4.6 asks.
 #[derive(Default)]
-struct TestProvider {
+pub(super) struct TestProvider {
     /// By code: the subject, their name, the challenge and the nonce.
     codes: Mutex<HashMap<String, Issued>>,
     /// What the next token says, where a test makes it wrong.
@@ -31,14 +35,14 @@ type Forgery = (fn(&mut Claims), &'static str);
 
 const ISSUER: &str = "https://id.example.test";
 const CLIENT: &str = "feed-client";
-const REDIRECT: &str = "http://127.0.0.1/sign-in/callback";
+pub(super) const REDIRECT: &str = "http://127.0.0.1/sign-in/callback";
 
 impl TestProvider {
     /// **The browser at the provider, signed in as `sub`**: the
     /// authentication request in `location` checked as a provider checks
     /// it, and the redirect back's query, with a code and the request's
     /// state.
-    fn authenticate(&self, location: &str, sub: &str, name: &str) -> String {
+    pub(super) fn authenticate(&self, location: &str, sub: &str, name: &str) -> String {
         let (endpoint, query) = location.split_once('?').expect("a query");
         assert_eq!(endpoint, "https://id.example.test/authorize");
         let q = parse_form(query);
@@ -105,7 +109,7 @@ impl Provider for TestProvider {
 }
 
 /// One HTTP request to `s`, written as given, and the whole answer.
-fn exchanged(s: &Server, request: &str) -> String {
+pub(super) fn exchanged(s: &Server, request: &str) -> String {
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
     let at = listener.local_addr().expect("address");
     std::thread::scope(|scope| {
@@ -122,7 +126,7 @@ fn exchanged(s: &Server, request: &str) -> String {
 }
 
 /// A page's text, its parts' markers taken out.
-fn text(html: &str) -> String {
+pub(super) fn text(html: &str) -> String {
     let mut out = String::new();
     let mut rest = html;
     while let Some(at) = rest.find("<!--pw:") {
@@ -152,7 +156,7 @@ fn thread_of(id: &str) -> Params {
 }
 
 /// A GET with these cookies.
-fn get(s: &Server, path: &str, cookies: &str) -> String {
+pub(super) fn get(s: &Server, path: &str, cookies: &str) -> String {
     exchanged(
         s,
         &format!("GET {path} HTTP/1.1\r\nHost: t\r\nCookie: {cookies}\r\n\r\n"),
@@ -160,7 +164,13 @@ fn get(s: &Server, path: &str, cookies: &str) -> String {
 }
 
 /// A POST of a command, from the page's own origin as a browser says it.
-fn command(s: &Server, id: &str, session: &str, interaction: &str, body: &str) -> String {
+pub(super) fn command(
+    s: &Server,
+    id: &str,
+    session: &str,
+    interaction: &str,
+    body: &str,
+) -> String {
     exchanged(
         s,
         &format!(
@@ -173,7 +183,7 @@ fn command(s: &Server, id: &str, session: &str, interaction: &str, body: &str) -
 }
 
 /// The value of the cookie `name` an answer sets, and the whole line.
-fn set_cookie(answer: &str, name: &str) -> Option<(String, String)> {
+pub(super) fn set_cookie(answer: &str, name: &str) -> Option<(String, String)> {
     answer.lines().find_map(|l| {
         let rest = l.strip_prefix("set-cookie: ")?;
         let value = rest.strip_prefix(&format!("{name}="))?;
@@ -181,7 +191,7 @@ fn set_cookie(answer: &str, name: &str) -> Option<(String, String)> {
     })
 }
 
-fn location(answer: &str) -> String {
+pub(super) fn location(answer: &str) -> String {
     answer
         .lines()
         .find_map(|l| l.strip_prefix("location: "))
@@ -198,7 +208,7 @@ fn feed_with(provider: Arc<TestProvider>) -> Served {
 
 /// **A browser signed in as `sub` through the flow**, from the session it
 /// came with: the session it is given.
-fn signed_in(s: &Server, provider: &TestProvider, came_with: &str, sub: &str) -> String {
+pub(super) fn signed_in(s: &Server, provider: &TestProvider, came_with: &str, sub: &str) -> String {
     let started = get(s, "/sign-in", &format!("pw-session={came_with}"));
     let (state, _) = set_cookie(&started, "pw-sign-in").expect("the sign-in's cookie");
     let back = provider.authenticate(&location(&started), sub, &format!("Name of {sub}"));

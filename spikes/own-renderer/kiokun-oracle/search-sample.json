@@ -1,5 +1,5 @@
 {
- "kiokun_commit": "abf71a89af1111f4039578cd1fde58e06f14c4bf",
+ "kiokun_commit": "2391117c3f9e888aadc9a161b7c42e414cd8ffec",
  "node": "v22.21.1",
  "oracle": {
   "answered": 174,
@@ -29165,6 +29165,6 @@
   "rows": 4375,
   "stride": 97
  },
- "pleris_commit": "2cd2e8006f42bdce8ab008566e9e021173517c27",
+ "pleris_commit": "98a1f1e1b59ad378cdd5b1c70eda7d277108b959",
  "produced_by": "just e14-kiokun-search"
 }

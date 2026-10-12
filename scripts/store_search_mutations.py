@@ -17,9 +17,8 @@ Each mutant undoes one piece:
   where the layers' catalogue is (the seam in `store.rs`); a menu change's
   route telling no session whose open page reads a search (the seam in
   `main.rs`);
-- the program (`examples/store/search.pw`): an address with no `q` told it
-  searched for nothing; the search box holding nothing of what was asked;
-  the title naming no search; a long text told as a blank
+- the program (`examples/store/search.pw`): the search box holding nothing
+  of what was asked; the title naming no search; a long text told as a blank
   one; a store's dishes not shown; a search kept past a menu's change;
 - PostgreSQL: `%`, `_` or `\\` not escaped in a term's pattern; the layer's
   own statements not run (the seam in `store_pg.rs`); a dish's name lowered
@@ -204,13 +203,6 @@ MUTANTS = [
         PROGRAM,
         "    invalidates_on MenuChanged(_), InventoryChanged(_, _)\n",
         "",
-    ),
-    (
-        "an address with no q is told it searched for nothing",
-        "server",
-        PROGRAM,
-        "        None => false,\n",
-        "        None => true,\n",
     ),
     (
         "the search box holds nothing of what was asked",

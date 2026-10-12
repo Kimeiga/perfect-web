@@ -77,15 +77,24 @@ test("no text fails the page, and each is told", async ({ page }) => {
 test("a dish added while the page is open reaches it", async ({ page, request }) => {
   await ready(page, "/search?q=flat%20white");
   await expect(said(page)).toHaveText("No stores or dishes match “flat white”.");
+  // The sentence is inside the `Some` arm of `{#match q}`, and is told
+  // where it is (ADR-0320): the status region is the element it was, so a
+  // screen reader hears its new text. Marked BEFORE the change.
+  await page.evaluate(() => {
+    document.querySelector("#search-said").__pwIdentity = "said";
+  });
+  const kept = () => page.evaluate(() => document.querySelector("#search-said")?.__pwIdentity);
   const added = await request.post("/command/menu?op=insert_after&id=flat-white&name=Flat%20White");
   expect(added.status()).toBe(202);
   try {
     await expect(said(page)).toHaveText("1 store matches “flat white”.");
     await expect(dishes(page, "Blue Bottle")).toHaveText(["Flat White"]);
+    expect(await kept(), "the status region is the one it was").toBe("said");
   } finally {
     expect((await request.post("/command/menu?op=remove&id=flat-white")).status()).toBe(202);
   }
   await expect(said(page)).toHaveText("No stores or dishes match “flat white”.");
+  expect(await kept(), "and again").toBe("said");
 });
 
 test("the search page keeps every rule, found, empty and blank", async ({ page }) => {
@@ -101,7 +110,8 @@ test("the search box is a GET form that makes the address", async ({ page }) => 
   await expect(page.locator("#search-intro")).toHaveText(
     "Search the stores by name or cuisine, and their dishes by name or what they are.",
   );
-  await expect(said(page)).toHaveText("");
+  // No search asked: no status; the intro, in the match's other arm.
+  await expect(said(page)).toHaveCount(0);
   await expect(stores(page)).toHaveCount(0);
   await page.getByLabel("Stores and dishes").fill("blueberry scone");
   await page.getByRole("button", { name: "Search" }).click();

@@ -136,9 +136,21 @@ fn served_kiokun() -> Served {
 fn served_kiokun_with(change: fn(&str) -> String) -> Served {
     let (dir, out) = built_kiokun_with(change);
     Served {
-        server: Server::from_build(out.clone(), out).expect("served"),
+        server: kiokun_server(&out),
         _dir: dir,
     }
+}
+
+/// The development origin kiokun's tests serve at (ADR-0311): the word page
+/// states its canonical address, which the host writes absolute with the
+/// deployment's origin, as `PW_ORIGIN` gives it to a running server.
+const ORIGIN: &str = "http://127.0.0.1:7341";
+
+/// kiokun's built program served, at `ORIGIN`.
+fn kiokun_server(out: &std::path::Path) -> Server {
+    let server = Server::from_build(out.to_path_buf(), out.to_path_buf()).expect("served");
+    let _ = server.origin.set(ORIGIN.to_string());
+    server
 }
 
 /// The word page's path for `word`, its one segment percent-encoded.
@@ -1552,7 +1564,7 @@ fn word_pages_with_long_lists_are_timed() {
         let mut times: Vec<f64> = Vec::new();
         let mut page = String::new();
         for _ in 0..repeat {
-            let s = Server::from_build(out.clone(), out.clone()).expect("served");
+            let s = kiokun_server(&out);
             let at = std::time::Instant::now();
             page = fetched_as(&s, &path_of(word), Some("timed"))
                 .into_iter()
@@ -1616,7 +1628,95 @@ fn a_page_with_edrdg_data_acknowledges_the_group() {
 
 /// The search page's path for `q`, its one segment percent-encoded.
 fn search_path(q: &str) -> String {
-    path_of(q).replacen("/word/", "/search/", 1)
+    // The query percent-encoded as a word's path segment is, every byte but
+    // RFC 3986's unreserved characters: a form's encoding as the host reads
+    // it (ADR-0309).
+    path_of(q).replacen("/word/", "/search?q=", 1)
+}
+
+/// **The search box and the search page's address** (ADR-0309, the search
+/// ADR's amendment): kiokun.com's field on every page, a plain GET form to
+/// `/search` naming `q`, which needs no script; the search page at
+/// `/search?q=`, `+` read as a space; an address with no query, or a blank
+/// one, shows kiokun.com's empty state and searches nothing; a CJK query
+/// that is a word leads to its page, with how it was inflected where it was
+/// (deinflection behind the box, as kiokun.com's header goes to the word).
+#[test]
+fn the_search_box_sends_its_query_to_the_search_page() {
+    let s = served_kiokun();
+    let word = fetched(&s, &path_of("人"));
+    for part in [
+        "<form class=\"header-search\" role=\"search\" method=\"get\" action=\"/search\">",
+        " name=\"q\" type=\"search\" aria-label=\"Search the dictionary\"",
+        "placeholder=\"人\"",
+    ] {
+        assert!(word.contains(part), "{part}: {word}");
+    }
+    for blank in ["/search", "/search?q=", "/search?q=%20", "/search?q=+"] {
+        let page = fetched(&s, blank);
+        assert!(page.starts_with("HTTP/1.1 200"), "{blank}: {page}");
+        assert!(
+            page.contains(
+                "Use the search field above to find a character, word, pronunciation, or meaning."
+            ),
+            "{blank}: {page}"
+        );
+        assert!(!page.contains("class=\"result-card"), "{blank}: {page}");
+        assert!(
+            page.contains("placeholder=\"Search the dictionary\""),
+            "{blank}"
+        );
+    }
+    // `+` is a space: "person people" is "person, people"'s two words.
+    let plus = fetched(&s, "/search?q=person+people");
+    let spaced = fetched(&s, &search_path("person people"));
+    assert_eq!(
+        search_hits_in(plus.split("<script").next().unwrap_or_default(), "chinese"),
+        search_hits_in(
+            spaced.split("<script").next().unwrap_or_default(),
+            "chinese"
+        ),
+    );
+    assert!(
+        plus.contains("for <strong>person people</strong>"),
+        "{plus}"
+    );
+    // A word with its own entry leads to its page.
+    let person = fetched(&s, &search_path("人"));
+    assert!(
+        person.contains(&format!(
+            "href=\"{}\" class=\"word-lead-link\">人</a>",
+            path_of("人")
+        )),
+        "{person}"
+    );
+    // A Latin query leads nowhere, an entry of its own or not: kiokun.com's
+    // header searches a non-CJK query (`navigateOrSearch`).
+    assert!(!fetched(&s, &search_path("person")).contains("word-lead"));
+    let latin = tempfile::tempdir().expect("a temporary directory");
+    write_entry(
+        latin.path(),
+        "OK",
+        &japanese_entry("OK", "オーケー", &["exp"]),
+    );
+    let l = served_kiokun_on(latin.path());
+    assert!(fetched(&l, &path_of("OK")).starts_with("HTTP/1.1 200"));
+    assert!(!fetched(&l, &search_path("OK")).contains("word-lead"));
+    // An inflected word leads to its address, which shows its dictionary form.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let d = served_kiokun_on(&root.join("examples/kiokun/data/deinflection"));
+    let ate = fetched(&d, &search_path("食べた"));
+    assert!(
+        ate.contains(&format!(
+            "href=\"{}\" class=\"word-lead-link\">食べる</a>",
+            path_of("食べた")
+        )),
+        "{ate}"
+    );
+    assert!(
+        ate.contains("<span class=\"conjugation-detail\">(past)</span>"),
+        "{ate}"
+    );
 }
 
 /// **One language's column of the search page** (`search/+page.svelte`):
@@ -2172,6 +2272,42 @@ fn an_inflected_word_shows_the_dictionary_form_it_is() {
     assert!(!own.contains("conjugation-info"), "{own}");
 }
 
+/// **The word page's canonical address** (ADR-0311; the deinflection ADR's
+/// Difference 35, ADR-0293's Differences 10 and 12, closed): the entry's own
+/// page, written absolute with the deployment's origin (`PW_ORIGIN`, here a
+/// development machine's), never the request's `Host`. Self-referencing on
+/// `/word/食べる`, and naming `/word/食べる` on `/word/食べた`, whose address
+/// shows 食べる's entry.
+#[test]
+fn the_word_page_names_its_entrys_page_canonical() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let s = served_kiokun_on(&root.join("examples/kiokun/data/deinflection"));
+    let origin = ORIGIN;
+    let canonical = format!(
+        "<link rel=\"canonical\" href=\"{origin}{}\">",
+        path_of("食べる")
+    );
+    for asked in ["食べる", "食べた"] {
+        let page = fetched(&s, &path_of(asked));
+        assert!(page.starts_with("HTTP/1.1 200"), "{asked}: {page}");
+        let head = &page[..page.find("</head>").expect("a head")];
+        assert_eq!(
+            head.matches("rel=\"canonical\"").count(),
+            1,
+            "{asked}: {head}"
+        );
+        assert!(head.contains(&canonical), "{asked}: {head}");
+        // Open Graph's og:url is the host's, from the canonical address.
+        assert!(
+            head.contains(&format!(
+                "<meta property=\"og:url\" content=\"{origin}{}\">",
+                path_of("食べる")
+            )),
+            "{asked}: {head}"
+        );
+    }
+}
+
 /// **Deinflection against kiokun.com's answers**: for each inflected form the
 /// oracle asked, the page's answer beside kiokun.com's resolution. Where
 /// kiokun.com finds a form, the page shows it, 200, with the same first form
@@ -2475,7 +2611,7 @@ fn a_sample_of_the_whole_dictionary_is_served_and_timed() {
         Some(other) => std::fs::read_to_string(other).expect("KIOKUN_SAMPLE_APP"),
         None => app.to_string(),
     });
-    let s = Server::from_build(out.clone(), out.clone()).expect("served");
+    let s = kiokun_server(&out);
     let word_component = std::fs::metadata(out.join("components/kiokun.site.Word.wasm"))
         .expect("the Word component")
         .len();

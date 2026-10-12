@@ -95,7 +95,10 @@ test("a like pressed on a page whose reader signed out in another tab is refused
 }, testInfo) => {
   // Signed in when the page was shown, so its Like is there; signed out in
   // another tab since: the press is refused before the command runs, and
-  // told where it was pressed, in the feed's words for `SignedIn`.
+  // told where it was pressed. The sign-out gave the browser a new session,
+  // and the page was shown to the old one, so the host refuses it as a page
+  // another reader's, before `requires` is read (track `store-accounts`,
+  // Q3), in the platform's words.
   const context = await browser.newContext();
   const [page, there] = [await context.newPage(), await context.newPage()];
   await signUp(page, handle(testInfo, "lee"), `Lee ${testInfo.project.name}`);
@@ -110,13 +113,13 @@ test("a like pressed on a page whose reader signed out in another tab is refused
   await like.focus();
   await like.press("Enter");
   expect((await refused).status()).toBe(403);
-  const words = "Sign in to post, reply, like or follow.";
+  const words = "You signed in or out in another tab. Reload this page to go on.";
   const message = post(page, "Hello, feed.").locator(".pw-refusal");
   await expect(message).toHaveText(words);
   // Named by the button, and said without the focus moving.
   const id = await message.getAttribute("id");
   await expect(like).toHaveAttribute("aria-describedby", new RegExp(`\\b${id}\\b`));
-  await expect(like).toHaveAttribute("data-pw-handler-error", "refused:SignedIn");
+  await expect(like).toHaveAttribute("data-pw-handler-error", "refused:another-reader");
   await expect(announced(page)).toHaveText(words);
   // The focus stays where the press was.
   await expect(like).toBeFocused();
@@ -146,13 +149,18 @@ test("a like pressed on a page whose reader signed out in another tab is refused
   await expect
     .poll(() => page.evaluate(() => window.__heard))
     .toEqual({ message: ["", words], said: ["", words] });
-  // What the server answered: the predicate and its words, nothing else.
+  // What the server answers a press from no page, signed out: the predicate
+  // and the feed's words for it, nothing else.
   const answer = await page.request.post("/command/feed.app.like", {
     data: ["p1"],
     headers: { "pw-interaction": `refused-${Date.now()}` },
   });
   expect(answer.status()).toBe(403);
-  expect(await answer.json()).toEqual({ committed: false, refused: "SignedIn", says: words });
+  expect(await answer.json()).toEqual({
+    committed: false,
+    refused: "SignedIn",
+    says: "Sign in to post, reply, like or follow.",
+  });
   await context.close();
 });
 
@@ -182,9 +190,12 @@ test("a tab whose reader signed out in another is told so at its next post", asy
   const refused = here.waitForResponse((r) => r.url().includes("/command/feed.app.post"));
   await here.getByRole("button", { name: "Post" }).click();
   expect((await refused).status()).toBe(403);
-  // Told beside the form, the post taken back, what was typed kept.
+  // Told beside the form, the post taken back, what was typed kept. The
+  // sign-out gave the browser a new session, and the page was shown to the
+  // old one: the host refuses the press as a page another reader's, before
+  // `requires` is read (track `store-accounts`, Q3).
   await expect(here.locator("form + .pw-refusal").first()).toHaveText(
-    "Sign in to post, reply, like or follow.",
+    "You signed in or out in another tab. Reload this page to go on.",
   );
   await expect(post(here, text)).toHaveCount(0);
   await expect(here.getByLabel("What's happening?")).toHaveValue(text);

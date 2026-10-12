@@ -447,7 +447,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // `Weekday`, the host's `passed`, `today_in`, `at`, `date_of` and
     // `time_of`, and `clock.compare` and `clock.zone`, the wall clock read by
     // comparing it and the host's tz database.
-    const EXPECTED: u64 = 0xfcb54248ad64350b;
+    // 2026-10-09: `examples/domain.pw`'s `CartError` gains `OutOfRange`, an
+    // item's store that does not reach the reader's chosen address, and
+    // `OrderError` `NoCoverage`, an order such a store's item is in (track
+    // `store-accounts`, milestone 2).
+    const EXPECTED: u64 = 0x57dbcf4ff8602699;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

@@ -19,6 +19,7 @@ import 'just/uploads.just'
 import 'just/notifications.just'
 import 'just/messages.just'
 import 'just/kiokun.just'
+import 'just/store-accounts.just'
 import 'just/store-search.just'
 
 default:
@@ -382,7 +383,7 @@ e9-values:
 # `evidence_is_current`.
 e10-component:
     @mkdir -p docs/evidence/E10
-    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart domain.line_count domain.display domain.count domain.total domain.subtotal store.page.MenuSize store.page.MenuLine; do \
+    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart store.page.Reach UserCarts.line_count domain.display domain.count domain.total UserCarts.subtotal store.page.MenuSize store.page.MenuLine; do \
       cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
         --out "docs/evidence/E10/$id.wasm" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
@@ -463,7 +464,7 @@ e10-build:
        cargo test --locked -p pw-core --test build 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; \
        echo "Since ADR-0125 the development server runs the store's queries and"; \
-       echo "domain.line_count by pages/store.page.StorePage.json. NOT CLAIMED: their"; \
+       echo "the cart's count (UserCarts.line_count since track store-accounts) by"; echo "pages/store.page.StorePage.json. NOT CLAIMED: their"; \
        echo "policies (freshness, cache, key, concurrency); E14-Q's second slice. The"; \
        echo "four Resources.* queries are 'todo' in the library, and nothing the store"; \
        echo "builds depends on them."; \
@@ -5812,3 +5813,35 @@ e14-compiled-once:
        python3 scripts/compiled_once_mutations.py; \
      } > docs/evidence/E14/compiled-once.txt
     @grep -E "^test result|mutants killed|panicked at|peak resident|within the bound|OVER THE BOUND|^wall" docs/evidence/E14/compiled-once.txt
+
+# ADR-0320: a block is told part by part while its arm stays. The plan names
+# each block at the top of a page that renders a query's value, whatever
+# decides it (compiler/pw-core/tests/blocks_that_render_a_query.rs); a host
+# tells one part by part while it shows the arm it showed, as a row is
+# (runtime/pw-render/tests/block_changes.rs, the host's tests); W9's search
+# sentence, inside its `{#match q}` arm, is told where it is, its status
+# region kept, in three engines (e2e/store-search.spec.mjs); and the mutation
+# controls (scripts/block_parts_mutations.py).
+e14-block-parts:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0320 - a block is told part by part while its arm stays"; echo; \
+       echo "produced by: just e14-block-parts"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the blocks a page's plan names (compiler/pw-core/tests/blocks_that_render_a_query.rs, page_blocks.rs)"; echo; \
+       cargo test --locked -p pw-core --test blocks_that_render_a_query --test page_blocks 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== what changed in a block, and in a row, part by part (runtime/pw-render/tests/block_changes.rs, instance_changes.rs)"; echo; \
+       cargo test --locked -p pw-render --test block_changes --test instance_changes 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host: a block told part by part, one a speculation renders, and the search's sentence"; echo; \
+       cargo test --locked -p pw-dev-server -- a_block_that_shows_the_arm_it_showed_is_told_part_by_part a_block_a_speculation_renders_is_rendered_again_whole a_block_whose_rendering_changed_is_rendered_again the_sentence_inside_its_arm_is_told_where_it_is an_open_search_page_is_told_of_a_menu_change 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the search's sentence told where it is, in three engines (e2e/store-search.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/store-search.spec.mjs -g "a dish added while the page is open reaches it" --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/block_parts_mutations.py)"; echo; \
+       python3 scripts/block_parts_mutations.py; \
+     } > docs/evidence/E14/block-parts.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/block-parts.txt

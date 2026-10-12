@@ -80,7 +80,7 @@ test("a press on a handler from another build reads the page again, once (charte
     if (stale) {
       stale = false;
       const manifest = JSON.parse(body.match(/id="pw-parts">(.*?)<\/script>/s)[1]);
-      const add = manifest.parts.find((p) => p.kind === "event" && p.owner === 0).value;
+      const add = manifest.parts.find((p) => p.kind === "event" && p.name === "add_to_cart").value;
       body = body.replaceAll(add, "ffffffffffffffff");
     }
     await route.fulfill({ response, body });
@@ -128,7 +128,8 @@ test("a document of another schema reads the page again, once (ADR-0300)", async
   // Told by the table, never by the document; and its recovery named in
   // `pw-resume`'s order, a session's region rendered again (ADR-0155).
   const told = await page.evaluate(() => window.__pw.log.join("\n"));
-  expect(told).toMatch(/knows store\.page\.StorePage's documents: \S+ session:/);
+  // A user's page since track `store-accounts`: its documents are its user's.
+  expect(told).toMatch(/knows store\.page\.StorePage's documents: \S+ user:/);
   expect(told).toMatch(/refused \S+: code \d+ recovery rerender-private-slot/);
   await expect(page.locator("#cart-count")).toHaveText("0");
   const reloaded = page.waitForEvent("load");
@@ -149,7 +150,7 @@ test("a page still stale after being read again is not read again", async ({ pag
     const response = await route.fetch();
     const body = await response.text();
     const manifest = JSON.parse(body.match(/id="pw-parts">(.*?)<\/script>/s)[1]);
-    const add = manifest.parts.find((p) => p.kind === "event" && p.owner === 0).value;
+    const add = manifest.parts.find((p) => p.kind === "event" && p.name === "add_to_cart").value;
     await route.fulfill({ response, body: body.replaceAll(add, "ffffffffffffffff") });
   });
   await ready(page);

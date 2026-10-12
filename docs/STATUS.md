@@ -23,6 +23,53 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-12: kiokun's search box and canonical link** (W6's second packet,
+merged from `5b7dc1e`; ADR-0314, ADR-0316 and ADR-0293 amended).
+- The search is at `/search{?q}`, with kiokun.com's header field as a plain
+  GET form on the word and search pages.
+- The word page names its dictionary form's address as its canonical link,
+  with `og:url` from it.
+- The inventory is at kiokun.com's `2391117c`: 102 routes.
+- After ADR-0317 every kiokun test runs at a 1.28 GiB peak in 46 s, from
+  5.21 GiB and 839 s, and W6's thread limits are relaxed again.
+Verify 38264024746 green: kiokun-word 138 of 138 and redirects 15 of 15.
+
+**ADR-0320, 2026-10-12: a block is told part by part while its arm stays**
+(the integrator's; W9's finding; track `fixed-arms`, merged from `124b62b`).
+W9's search sentence, inside the `Some` arm of `{#match q}`, was never told
+when the search's result changed.
+- The plan now names every block at the top of a page that renders a
+  query's value, whatever decides it.
+- A host tells a block whose rendering changed part by part while it shows
+  the arm it showed, as a row is (`pw_render::block_changes`, a `{#match}`
+  looked into too). A status region or a field inside it is kept, which
+  ADR-0146 had deferred.
+- A block a speculation renders is rendered again whole.
+- The sentence is back inside the arm. W9's `given` and its mutant, which
+  then tested nothing a page shows, are gone.
+- The feed's unread counts are now set as text where they are.
+Verify 38263374811 green: 14 of 14 mutants, store-search 32 of 32, five
+re-anchored scripts run whole.
+
+**ADR-0318 and ADR-0319, 2026-10-12: a cart and an order are a user's, and a
+delivery goes to the reader's chosen address** (W8's, track `store-accounts`,
+merged from `3fdcf929`). The store's customer side:
+- Carts and orders are a user's (`user query Cart(reader)`). A guest's cart
+  joins its user's at sign-in, and a user's changes are told to that user's
+  sessions alone.
+- A command is answered for the reader its page was shown to. A tab whose
+  reader signed in or out elsewhere is refused before it runs.
+- Addresses and coverage follow one rule, read by the estimate, the page and
+  the commands. Choosing an address shows its estimate with no reload: the
+  owner's own Next.js bug.
+- Found: a correction to the integrator's Q1 ruling, since another user's
+  activity reached every reader as a timing channel. Also, a record's scope
+  depended on the order of the files.
+
+Verify 38233018418: 76 of 77 recipes green. `e14-diffs` failed on master's
+own defect, named known: benchmark task T11's patches no longer apply after
+holds' merge (NEXT 3b).
+
 **ADR-0317, 2026-10-12: a component is compiled once a process** (the
 integrator's; track `compile-once`, merged from `05a67ae`).
 - Found: after kiokun's merge, the development server's suite, run whole

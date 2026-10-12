@@ -82,8 +82,8 @@ MUTANTS = [
     (
         "the renderer binds no field",
         RENDER,
-        "                    scoped = scoped.with(name, part.clone());",
-        "                    let _ = (name, part);",
+        "            scoped = scoped.with(name, part.clone());",
+        "            let _ = (name, part);",
     ),
     (
         "a server drops a declared case",

@@ -163,13 +163,14 @@ fn reaches_each_session(s: &Server) {
     };
     run(s, "like", "s-bob", &[&post], "i-2");
     s.tell_waiting();
+    // The count, set where it is in the block that shows it (ADR-0320).
     for doc in &docs[..2] {
-        let sets = told(s, doc);
-        assert!(sets.contains("Notifications: 1 unread"), "{doc:?}: {sets}");
+        let counts = texts_told(s, doc, HOME, "waiting");
+        assert_eq!(counts, ["1"], "{doc:?}: {}", told(s, doc));
     }
     // The control: bob's own page is told nothing of alice's.
-    let bobs = told(s, &docs[2]);
-    assert!(!bobs.contains("Notifications: 1 unread"), "{bobs}");
+    let bobs = texts_told(s, &docs[2], HOME, "waiting");
+    assert!(bobs.is_empty(), "{bobs:?}: {}", told(s, &docs[2]));
 }
 
 /// **An entry at a user, as the host keys it** (`entry_key`): a private
@@ -280,8 +281,8 @@ fn read_everywhere(s: &Server) {
     };
     run(s, "mark_read", "s-alice-1", &[], "i-5");
     s.tell_waiting();
-    let other = told(s, &docs[0]);
-    assert!(other.contains("Notifications: 0 unread"), "{other}");
+    let other = texts_told(s, &docs[0], HOME, "waiting");
+    assert_eq!(other, ["0"], "{}", told(s, &docs[0]));
     assert_eq!(count_on_home(s, "s-alice-2"), "0");
     let page = shown(s, "s-alice-2", PAGE);
     assert!(
@@ -289,14 +290,63 @@ fn read_everywhere(s: &Server) {
         "{page}"
     );
     // The control: bob's are his, unread.
-    let bobs = told(s, &docs[1]);
-    assert!(!bobs.contains("Notifications: 0 unread"), "{bobs}");
+    let bobs = texts_told(s, &docs[1], HOME, "waiting");
+    assert!(
+        !bobs.contains(&"0".to_string()),
+        "{bobs:?}: {}",
+        told(s, &docs[1])
+    );
     assert_eq!(count_on_home(s, "s-bob"), "1");
 }
 
 #[test]
 fn reading_them_reaches_each_of_the_readers_sessions() {
     read_everywhere(&served_feed());
+}
+
+/// **Telling by principal** (track `store-accounts`, ADR-0318): reading
+/// one's notifications drops the reader's entries alone, which are keyed by
+/// the reader's handle, so another user's open page is sent no frame at all,
+/// where ADR-0270's superset sent it a version with nothing in it: another
+/// user's activity, to every reader. The reader's other session is told.
+fn read_tells_no_one_else(s: &Server) {
+    people(s);
+    let post = posted(s, "s-alice-1", "Alice writes", "i-1");
+    run(s, "like", "s-bob", &[&post], "i-2");
+    for session in ["s-alice-2", "s-bob"] {
+        shown(s, session, HOME);
+    }
+    // What the post and the like reached, told first.
+    s.tell_waiting();
+    let docs: Vec<Doc> = {
+        let pending = s.pending.lock().expect("pending");
+        ["s-alice-2", "s-bob"]
+            .iter()
+            .map(|session| latest(&pending, session))
+            .collect()
+    };
+    let frames = |doc: &Doc| s.pending.lock().expect("pending")[doc].frames.len();
+    let before: Vec<usize> = docs.iter().map(frames).collect();
+    run(s, "mark_read", "s-alice-1", &[], "i-3");
+    s.tell_waiting();
+    assert!(
+        frames(&docs[0]) > before[0],
+        "alice's other session is told"
+    );
+    assert_eq!(frames(&docs[1]), before[1], "bob's page is sent no frame");
+}
+
+#[test]
+fn reading_them_tells_no_other_users_page() {
+    read_tells_no_one_else(&served_feed());
+}
+
+#[test]
+fn on_postgres_reading_them_tells_no_other_users_page() {
+    let Some(s) = on_postgres("notify_principal") else {
+        return;
+    };
+    read_tells_no_one_else(&s);
 }
 
 /// **Another user's session sees none of it, signed in and not**: by page,

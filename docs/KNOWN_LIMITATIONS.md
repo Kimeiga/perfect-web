@@ -314,11 +314,14 @@ refused by name:
   renders and is not patched, and neither is a shared list other than the
   menu. A query's error is the server's failure, not a value a page shows.
   kiokun's pages are static.
-  A part inside a block whose subject the page's parameters give, not a
-  query, is not told when a query it reads changes (ADR-0308's Found, W9's
-  `{#match q}`): the plan names a block only when a query's value decides
-  it. The integrator's to fix next; the search's sentence stands outside
-  its match until then.
+  A block that renders a query's value is told part by part while it shows
+  the arm it showed (ADR-0320), and rendered again whole where it shows
+  another, where something inside it that is not set in place changed (a
+  view's instance, a raw value, an unkeyed list), or where a speculation
+  renders it. A host keeps a copy of a document's values where it has such
+  a block. A member of a query read inside any block is refused at build
+  (`{cart.line_count}` in `{#if cart.lines}`), though a host renders a block
+  at the top of the page once: found on the way (NEXT).
 - **A clause's words are the clause's** (ADR-0047). Every name resolves in
   lexical scope, but `scope application`'s `application`, or `load`'s
   `on_first_interaction`, is a word of its clause and not a name. A word
@@ -396,9 +399,9 @@ refused by name:
 
 **kiokun's search** (ADR-0314) runs kiokun.com's two FTS5 statements in its
 data layer, over the whole dictionary's index:
-- **Its page is at `/search/{q}`, with no search box**, until W6's next
-  packet moves it to `/search{?q}` with a plain GET form (ADR-0309). There
-  is no `/api/search`: a route that answers JSON has no form yet, and the
+- **Its page is at `/search{?q}`, with kiokun.com's header field as a plain
+  GET form** (ADR-0314, amended 2026-10-12), and needs no script. There is
+  no `/api/search`: a route that answers JSON has no form yet, and the
   header's suggestions and handwriting input are the client's.
 - **Its ranking is FTS5's**, not Pleris's: a program cannot declare a
   full-text index or its ranking, and a platform full-text source waits for
@@ -631,6 +634,27 @@ awaited in order. What remains:
   U+A7D4, U+16EA0 to U+16EB8) are matched as written on both layers, never
   lowered, and `on_postgres_every_character_is_lowered_alike` fails when
   either version moves.
+- **A command answered for the reader its page was shown to has two
+  windows** (ADR-0318, the integrator's review of 2026-10-12):
+  - a retry of a press that committed, arriving while its first attempt
+    still runs on a page gone stale, is refused, where waiting would have
+    answered it with the outcome;
+  - a retry later than two minutes after the host forgot the page's
+    session is refused as out of date, though its press committed. The
+    runtime retries within seconds.
+  - A host restarted numbers its documents from 1 again: a page from
+    before is refused, told the sign-in words.
+- **The store's accounts** (ADR-0318):
+  - a private entry keyed by a user's id that no binding fills with
+    `current_user()` reaches every reader of it;
+  - a guest's lines whose join failed are reachable by no one;
+  - a user's order is their latest;
+  - `private` still means the user's and not importable (the integrator's
+    ruling, queued).
+- **The store's places are a fixture, not a geocoder** (ADR-0319): eleven
+  places with approximate coordinates; a courier's minutes are four a
+  kilometre in a straight line; an address's label is checked for its
+  length alone.
 - **A page asks only a predicate with no parameters of its reader**
   (ADR-0307): a control whose command requires one with parameters
   (`OwnsPost(post)`, `MayMessage(to)`) is not held to where it stands, and
@@ -703,9 +727,10 @@ awaited in order. What remains:
   the rest behind a disclosure, not read on demand (ADR-0313); Korean is not
   deinflected (`korean-deinflect.ts`, the owner's own, not yet
   reimplemented), and a form kiokun.com knows that the rewrite's own
-  conjugator does not ask is not compared (ADR-0316); the head has no
-  canonical link or `og:url` until W6's next packet states one (ADR-0311),
-  no JSON-LD until std `Json` lands, and no preview image (`og:image`,
+  conjugator does not ask is not compared (ADR-0316); its canonical link
+  and `og:url` are written with the deployment's `PW_ORIGIN`, where
+  kiokun.com uses the request's origin (ADR-0316, amended); no JSON-LD until
+  std `Json` lands, and no preview image (`og:image`,
   `twitter:card`) until the owner approves an image renderer; its title and description match kiokun.com's own code on
   5,513 sampled words, read raw, where a stub's or a merged form's page is
   held by the server's tests alone; the route is `/word/{word}` until `/_pw/` lands; the tests

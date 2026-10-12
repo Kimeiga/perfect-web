@@ -1,8 +1,8 @@
 ADR-0300 - a build is named by what it built
 
 produced by: just e14-build-id
-commit: e44173313ff4e815b5097c5c50f7af9c8cdfd9a7
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37998533705 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 3fdcf929ad57be351ef24cb1ac59a7cbe9a981ab
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38233018418 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -11,13 +11,13 @@ playwright: Version 1.58.0
 
 test the_same_sources_build_the_same_name ... ok
 test a_change_to_what_the_build_writes_changes_its_name ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.84s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.78s
 
 == the host serves it, and each page's document
 
 test tests::a_build_that_names_no_build_is_not_served ... ok
 test tests::a_host_serves_its_build_by_its_name ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 360 filtered out; finished in 4.54s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 446 filtered out; finished in 6.20s
 
 == the decision holds a document to its page (runtime/pw-resume-wasm)
 
@@ -26,7 +26,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 == a document of another schema, in three engines (e2e/recovery.spec.mjs)
 
-  18 passed (1.3m)
+  18 passed (2.1m)
 
 == mutation controls (scripts/build_id_mutations.py)
 
@@ -36,7 +36,7 @@ baseline (wasm): 1 passed, 0 failed
 baseline (browser): 1 passed, 0 failed
 the build writes no name [host]: KILLED (2 of 2 tests fail)
 the name is not of what was built [core]: KILLED (1 of 2 tests fail)
-every page's scope is public [host]: KILLED (1 of 2 tests fail)
+every page's scope is public [host]: KILLED (2 of 2 tests fail)
 a build that names no build is served [host]: KILLED (1 of 2 tests fail)
 the manifest names a constant build [host]: KILLED (1 of 2 tests fail)
 the manifest names a constant document [host]: KILLED (1 of 2 tests fail)

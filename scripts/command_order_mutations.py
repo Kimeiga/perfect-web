@@ -38,8 +38,10 @@ MUTANTS = [
         "a command is run without waiting for the one it names",
         "server",
         SERVER,
-        '            if let Some(after) = header("pw-after")\n',
-        '            if let Some(after) = header("pw-after").filter(|_| false)\n',
+        # Re-anchored by track store-accounts: the wait follows the stale
+        # check, for a command no kept answer answered (Q3).
+        '                && let Some(after) = header("pw-after")\n',
+        '                && let Some(after) = header("pw-after").filter(|_| false)\n',
     ),
     (
         "one whose named one never came runs, past the wait",
