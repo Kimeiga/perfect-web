@@ -1122,3 +1122,19 @@ Each a decision for a track, with its date; a track's ADR records it too.
   and both are the document's for its life. W8's change to the sign-out
   test's expected text in `identity.spec.mjs` meets holds' second stale-tab
   test there: keep both, with W8's text in each.
+- **2026-10-12, a head that changes only tests merges on its verified
+  commit's evidence** (W9's question). store-search's verify 38188240871 at
+  `b32f7dc1` passed every recipe but `e14-store-search`, 29 of 30 mutants.
+  The survivor, "a dish's name is lowered under the C collation", moved
+  İskender from tier 0 to tier 1 on PostgreSQL, which the test's table did
+  not show. `6a69b62c` makes the test compare every record whole: the ADR's
+  text, and a hunk inside `#[cfg(test)] mod tests` alone (checked).
+  Ruled:
+  - A head that differs from a verified commit only in `#[cfg(test)]` code
+    and docs may merge on that verify's evidence.
+  - It adds, at the head, a dispatch of each recipe that runs the changed
+    tests (here `e14-store-search`, on the PostgreSQL runner, 30 of 30),
+    and the head's ci green.
+  - The merge's own master verify replans what the merge changes, as
+    always.
+  - A change to code that ships needs a verify at the head.
