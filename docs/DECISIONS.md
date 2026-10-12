@@ -2834,4 +2834,10 @@ finding, ADR-0308's amendment; ADR-0146 amended).
     and fields with it;
   - the feed's unread counts were sent as their whole block;
   - a member read inside any block is refused (NEXT 3c).
-
+[ADR-0321](DECISIONS/ADR-0321-a-related-note-is-shown-in-its-own-file.md):
+a related note is shown in its own file (the integrator's; W8's finding).
+- A note names its file where it is not the diagnostic's own (`Related::
+  in_unit`, resolved to its path by the checker), and `pw check` shows it by
+  that file's lines. A span outside its file is told as a note, never an
+  internal error. PW5046, PW0338, PW5106, PW0351 and PW0341 note what they
+  found in another file; five explanations read as written.

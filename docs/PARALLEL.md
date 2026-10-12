@@ -1291,3 +1291,49 @@ Each a decision for a track, with its date; a track's ADR records it too.
     scripts", and it narrows eight.
   - Batch 3, nine more (track `narrowing-3`), is verified next, from this
     merge.
+- **2026-10-12, a related note shown in its own file, merged as ADR-0321**
+  (track `related-files`, from `87010c1`, verifies 38277655867, 38301508268 and 38313524593). To W8: your
+  PW5046 finding is fixed; `pw check shell.pw page.pw` names the layout's
+  file and line.
+  - **Correction (the integrator's)**: `c914849` was pushed with `just ci`
+    red, a lint (`clippy::useless_format`) in its tests, because the push
+    was chained after the chain with `;`. Fixed in the next commit, and the
+    chain run whole before the second push. The integrator's pushes are
+    chained with `&&` since.
+- **2026-10-12, the evidence check's first stale track** (related-files'
+  merge, ADR-0281 amended). Its verify 38277655867 at `5d14728` was refused
+  e14-redirects, e14-compiled-once and e14-related-files (master's
+  fixed-arms, W6's packet, T11 and the evidence check had changed what they
+  read), and, after narrowing-2, e14-titles. The track merged master twice;
+  dispatches 38301508268 and 38313524593 recorded those four; the merge
+  took the other 57 files from 38277655867 with `--skip` for them.
+  - **Correction (the integrator's, procedure)**: numbering `ADR-XXXX`
+    before the fetch made the check refuse eight more files, since the
+    numbering rewrites lines those recipes read. A merge is merged,
+    resolved, fetched, then numbered (ADR-0281's amendment says so).
+- **2026-10-12, the nightly at `a083520` (38271162931)**: 263 recipes, 3
+  failed. e14-diffs and e14-unsafe-table: T11's patches, fixed by
+  t11-patches' merge (`05f8cb5`). e8-host: the ignored benchmark still
+  answered `add_to_cart`'s imports from before store accounts; fixed
+  `4813aea` (the principal's read, the user's cart, the reach, the user's
+  cart changed). **Correction (the integrator's)**: W8's merge changed the
+  command's imports, and no per-push plan runs an ignored test; the nightly
+  is where they run, and it is read each day.
+- **2026-10-12, W9's part 1, the integrator's rulings before its merge**:
+  - "PostgreSQL's layer searches as memory does" is **not** an equivalent
+    mutant: it is the regression ADR-0308's title rules out (a search of S
+    stores run as 1 + S statements, every dish brought to the host). The
+    SQL mutants were killed by tests that call the SQL directly, so they
+    showed the statements right, not that the layer ran them. Killed by
+    counting the layer's statements, as Django's `assertNumQueries` and
+    Rails' `assert_queries_count` do: a search is two.
+  - **Finding (the integrator's): the store's PostgreSQL reads grow with
+    the data.** Its logic is written once over the layer's rows, a store's
+    or a menu's at a time, and on PostgreSQL each is a statement:
+    `place_order`'s reach one per line and store, a reader's search one per
+    store it found (each reading every store), the hours one per store.
+    NEXT 4b, W9's after store-hours.
+  - The verify's dispatch is what `ci_plan.py --changed` plans from the
+    verified commit to the merged head: `evidence_fetch.py`'s check is the
+    rule, file by file, so a head that changes tests or scripts needs no
+    rule of its own.

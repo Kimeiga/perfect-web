@@ -347,10 +347,10 @@ pub fn check(hir: &Hir, sigs: &Signatures, at: usize, out: &mut Vec<Diagnostic>)
                 .and_then(|fs| fs.iter().find(|(n, _)| n == &f.name))
                 .is_some_and(|(_, r)| !inhabited.part(r, def, &all));
             if empty {
-                related.push(Related {
-                    span: f.span.clone(),
-                    label: format!("`{}` has no finite value", f.name),
-                });
+                related.push(Related::new(
+                    f.span.clone(),
+                    format!("`{}` has no finite value", f.name),
+                ));
             }
         }
         out.push(Diagnostic {

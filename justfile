@@ -5814,6 +5814,25 @@ e14-compiled-once:
      } > docs/evidence/E14/compiled-once.txt
     @grep -E "^test result|mutants killed|panicked at|peak resident|within the bound|OVER THE BOUND|^wall" docs/evidence/E14/compiled-once.txt
 
+# ADR-0321: a related note is shown in its own file. The checker's notes in
+# another file name it (compiler/pw-core/tests/related_files.rs); `pw check`
+# shows each in its own file, and never stops on a span (pw-cli's tests and
+# tests/related_files.rs, W8's program); and the mutation controls.
+e14-related-files:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0321 - a related note is shown in its own file"; echo; \
+       echo "produced by: just e14-related-files"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== each note in its own file (compiler/pw-core/tests/related_files.rs)"; echo; \
+       cargo test --locked -p pw-core --test related_files 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== pw check: a note shown in its own file, and no stop on a span (compiler/pw-cli)"; echo; \
+       cargo test --locked -p pw-cli 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/related_files_mutations.py)"; echo; \
+       python3 scripts/related_files_mutations.py; \
+     } > docs/evidence/E14/related-files.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/related-files.txt
+
 # ADR-0320: a block is told part by part while its arm stays. The plan names
 # each block at the top of a page that renders a query's value, whatever
 # decides it (compiler/pw-core/tests/blocks_that_render_a_query.rs); a host

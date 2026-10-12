@@ -1301,14 +1301,8 @@ fn report_escape(
         ),
         primary_span: escape,
         related: vec![
-            Related {
-                span: a.span.clone(),
-                label: format!("`{}` is acquired here", a.name),
-            },
-            Related {
-                span: at.clone(),
-                label: format!("`{}` owns it", decl.name),
-            },
+            Related::new(a.span.clone(), format!("`{}` is acquired here", a.name)),
+            Related::new(at.clone(), format!("`{}` owns it", decl.name)),
         ],
         explanation: Some(format!(
             "An affine value may not outlive its acquiring scope. Storing `{}` \
@@ -1438,14 +1432,11 @@ fn report_unconsumed(
         message,
         primary_span: primary,
         related: vec![
-            Related {
-                span: a.span.clone(),
-                label: acquired,
-            },
-            Related {
-                span: at.clone(),
-                label: format!("`{}` must end it exactly once on every path", decl.name),
-            },
+            Related::new(a.span.clone(), acquired),
+            Related::new(
+                at.clone(),
+                format!("`{}` must end it exactly once on every path", decl.name),
+            ),
         ],
         explanation: Some(format!(
             "A {} must end exactly once, with {ways}. Not ending it holds whatever \
@@ -1545,11 +1536,11 @@ fn report_unheld(sigs: &Signatures, decl: &Decl, u: Unheld, at: &Span, out: &mut
         message,
         primary_span: u.span,
         related: vec![
-            Related { span: site, label },
-            Related {
-                span: at.clone(),
-                label: format!("`{}` must end it exactly once on every path", decl.name),
-            },
+            Related::new(site, label),
+            Related::new(
+                at.clone(),
+                format!("`{}` must end it exactly once on every path", decl.name),
+            ),
         ],
         explanation: Some(format!(
             "A {ty} must end exactly once, with {ways}. What ends it is followed from \

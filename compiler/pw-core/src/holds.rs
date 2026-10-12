@@ -233,10 +233,7 @@ pub fn check(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures, unit: usize) -> V
                 _ => None,
             })
             .collect();
-        let related = vec![Related {
-            span: hir.decl_span(id),
-            label: format!("`{}`", decl.name),
-        }];
+        let related = vec![Related::new(hir.decl_span(id), format!("`{}`", decl.name))];
         // PW0629: what each name the markup and its values read names.
         for e in body.walk() {
             let Expr::Name(n) = body.expr(e) else {

@@ -1,31 +1,31 @@
 ADR-0200 - () is the unit value, and no expression the compiler cannot read checks
 
 produced by: just e14-unit-value
-commit: d65f2785ad21bf9bd599e639aec2c156d25c0a51
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38203954490 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the rule (compiler/pw-core/tests/unit_value.rs)
 
 test a_file_that_does_not_parse_reports_its_syntax_errors ... ok
 test a_pattern_the_compiler_cannot_read_is_refused ... ok
-test an_expression_the_compiler_cannot_read_is_refused ... ok
 test a_file_that_does_not_parse_is_kept_out_of_the_program ... ok
+test an_expression_the_compiler_cannot_read_is_refused ... ok
 test unit_is_the_one_value_of_its_type ... ok
 test unit_is_built ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
 
 == every .pw file in the repository (compiler/pw-core/tests/every_expression_is_read.rs)
 
 test no_file_that_parses_holds_an_expression_the_compiler_cannot_read ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
 
 == a block left open (pw-syntax's grammar, compiler/pw-core/tests/template_blocks.rs)
 
 test grammar::tests::a_block_left_open_ends_with_its_element ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 92 filtered out; finished in 0.00s
 test an_unclosed_block_is_refused ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.08s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.05s
 
 == mutation controls (scripts/unit_value_mutations.py)
 

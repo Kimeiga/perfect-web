@@ -262,15 +262,15 @@ pub fn capability_arguments(
             severity: Severity::Error,
             message,
             primary_span: effect.span.clone(),
-            related: vec![Related {
-                span: effect.span.clone(),
-                label: match &suggestion {
+            related: vec![Related::new(
+                effect.span.clone(),
+                match &suggestion {
                     Some(near) => {
                         format!("`{argument}` names nothing this program declares; `{near}` does")
                     }
                     None => format!("`{argument}` names nothing this program declares"),
                 },
-            }],
+            )],
             explanation: Some(
                 "A capability's type argument is part of its IDENTITY: \
                  `database.read<Stores>` and `database.read<Payments>` are different \

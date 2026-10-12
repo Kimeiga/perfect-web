@@ -67,8 +67,9 @@ MUTANTS = [
     (
         "two pages at one route pass",
         ROUTES,
-        "                Some((_, other, theirs)) if u == unit => {\n",
-        "                Some((_, other, theirs)) if u == unit && false => {\n",
+        # Re-anchored by ADR-0321, whose note names the first page.
+        "                Some((at, other, theirs, span)) if u == unit => {\n",
+        "                Some((at, other, theirs, span)) if u == unit && false => {\n",
     ),
     (
         "two pages of one name are named alike",

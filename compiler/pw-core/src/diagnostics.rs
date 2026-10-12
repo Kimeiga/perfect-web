@@ -68,10 +68,56 @@ impl Detector {
 
 /// A span other than the primary one that the reader needs in order to
 /// understand the defect — charter §16.3's "where the value originated".
+///
+/// **In the diagnostic's own file, or in another's** (ADR-0321): a layout
+/// another module declares, a page in another file that calls a command.
+/// Until 2026-10-12 every span was read as the diagnostic's own file's: a
+/// note on a layout in another file labelled the page's own text, and past
+/// the page's end stopped `pw check` (W8's finding, PW5046).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Related {
     pub span: Span,
     pub label: String,
+    /// **The file the span is in**, as it was given to the checker, where
+    /// it is not the diagnostic's own; `None` where it is.
+    pub file: Option<String>,
+    /// The unit a detector found the span in, where it may be another than
+    /// the diagnostic's own: the checker reads it as `file`.
+    pub(crate) unit: Option<usize>,
+}
+
+impl Related {
+    /// A note in the diagnostic's own file.
+    pub fn new(span: Span, label: impl Into<String>) -> Related {
+        Related {
+            span,
+            label: label.into(),
+            file: None,
+            unit: None,
+        }
+    }
+
+    /// A note in the file of unit `unit`, which may be the diagnostic's own
+    /// or another's: the checker says which (`resolve_files`).
+    pub(crate) fn in_unit(unit: usize, span: Span, label: impl Into<String>) -> Related {
+        Related {
+            unit: Some(unit),
+            ..Related::new(span, label)
+        }
+    }
+}
+
+/// **Each related note's file, by the units a program was checked as**
+/// (ADR-0321): a note found in another unit than `own` names that unit's
+/// path; one in `own` names none.
+pub(crate) fn resolve_files(found: &mut [Diagnostic], own: usize, paths: &[&str]) {
+    for d in found {
+        for r in &mut d.related {
+            if let Some(unit) = r.unit {
+                r.file = (unit != own).then(|| paths[unit].to_string());
+            }
+        }
+    }
 }
 
 /// A concrete legal alternative. Charter §16.3 requires at least one.
@@ -160,10 +206,7 @@ impl Diagnostic {
     }
 
     pub fn related(mut self, span: Span, label: impl Into<String>) -> Self {
-        self.related.push(Related {
-            span,
-            label: label.into(),
-        });
+        self.related.push(Related::new(span, label.into()));
         self
     }
 

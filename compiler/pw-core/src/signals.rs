@@ -589,17 +589,11 @@ fn form_controls(
         let (primary, related) = match value {
             Some(a) if control == "textarea" && !children.is_empty() => (
                 a.span.clone(),
-                Related {
-                    span: body.node_span(children[0]),
-                    label: "its text".to_string(),
-                },
+                Related::new(body.node_span(children[0]), "its text".to_string()),
             ),
             Some(a) => (
                 a.span.clone(),
-                Related {
-                    span: element,
-                    label: format!("the `<{control}>` it is written on"),
-                },
+                Related::new(element, format!("the `<{control}>` it is written on")),
             ),
             None => (
                 children
@@ -607,10 +601,7 @@ fn form_controls(
                     .find(|c| !matches!(body.node(**c), Node::Text(_)))
                     .map(|c| body.node_span(*c))
                     .unwrap_or_else(|| element.clone()),
-                Related {
-                    span: element,
-                    label: "the `<textarea>` whose text it is in".to_string(),
-                },
+                Related::new(element, "the `<textarea>` whose text it is in".to_string()),
             ),
         };
         let code = crate::codes::FORM_CONTROL_VALUE;
@@ -709,9 +700,11 @@ fn is_assigned(body: &Body, name: ExprId) -> bool {
 /// declared in its module (ADR-0144).
 fn declared_here(body: &Body, name: &str, declared: Option<ExprId>) -> Vec<Related> {
     declared
-        .map(|d| Related {
-            span: body.expr_span(d),
-            label: format!("`{name}` is declared a signal here"),
+        .map(|d| {
+            Related::new(
+                body.expr_span(d),
+                format!("`{name}` is declared a signal here"),
+            )
         })
         .into_iter()
         .collect()
@@ -923,10 +916,10 @@ fn not_a_signal(body: &Body, at: ExprId, name: &str, declared: ExprId) -> Diagno
         severity: Severity::Error,
         message: format!("this handler changes `{name}`, a binding of the body it is written in"),
         primary_span: body.expr_span(at),
-        related: vec![Related {
-            span: body.expr_span(declared),
-            label: format!("`{name}` is declared here, outside the handler"),
-        }],
+        related: vec![Related::new(
+            body.expr_span(declared),
+            format!("`{name}` is declared here, outside the handler"),
+        )],
         explanation: Some(
             "A value a handler changes is UI state, and UI state is a signal: \
              declared with its type, read where the browser reads it again, and \
@@ -1199,10 +1192,10 @@ fn provided(
                 *id,
                 format!("`{name}` is provided twice in `{}`", decl.name),
             );
-            d.related.push(Related {
-                span: body.expr_span(*first),
-                label: "it is provided here first".to_string(),
-            });
+            d.related.push(Related::new(
+                body.expr_span(*first),
+                "it is provided here first".to_string(),
+            ));
             out.push(d);
             continue;
         }

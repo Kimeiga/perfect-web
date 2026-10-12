@@ -23,17 +23,17 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
-**ADR-0281 amended, 2026-10-12: a fetch takes no file of code the tree it
-joins does not hold** (the integrator's; track `evidence-current`, merged
-from `668e369`).
-- The day's ruling, made mechanical. `just evidence-fetch` refuses a run's
-  file whose recipe reads what changed between the run's commit and the tree
-  it writes into, by the planner's own rule, and copies nothing. The branch
-  merges master and is verified again. `--skip RECIPE` copies none of a
-  recipe's files, where another run records it.
-- Its first use refused all 19 files of narrowing-2's first run (at
-  `853674f`) on master's tree: the case found by hand that morning.
-Verify 38287219825 green: 22 of 22 mutants.
+**ADR-0321, 2026-10-12: a related note is shown in its own file** (the
+integrator's; W8's finding; track `related-files`, merged from `87010c1`).
+- W8's PW5046 stopped `pw check` with an internal error: its note's span,
+  the layout's name in the layout's file, was read in the page's file.
+- A note now names its file where it is not the diagnostic's own, and `pw
+  check` shows it there. A span outside its file is told as a note naming
+  the file and its bytes, never as an internal error.
+- Found by reading every place a note is made: PW0338 read a press's span
+  in the command's file; PW5106 left out a reader in another file; PW0351
+  and PW0341 named the first declaration only in their message.
+Verify verifies 38277655867, 38301508268 and 38313524593 green: 18 tests and 10 of 10 mutants.
 
 **2026-10-12: eight more mutation scripts' server mutants run the server
 tests that see them** (W6's ruling of 2026-10-09; track `narrowing-2`, merged
@@ -55,6 +55,18 @@ from `bd5c642`).
   2026-10-12).
 Verify 38283022346 green, over master's code: the branch merged master and was
 verified again (PARALLEL.md, 2026-10-12).
+
+**ADR-0281 amended, 2026-10-12: a fetch takes no file of code the tree it
+joins does not hold** (the integrator's; track `evidence-current`, merged
+from `668e369`).
+- The day's ruling, made mechanical. `just evidence-fetch` refuses a run's
+  file whose recipe reads what changed between the run's commit and the tree
+  it writes into, by the planner's own rule, and copies nothing. The branch
+  merges master and is verified again. `--skip RECIPE` copies none of a
+  recipe's files, where another run records it.
+- Its first use refused all 19 files of narrowing-2's first run (at
+  `853674f`) on master's tree: the case found by hand that morning.
+Verify 38287219825 green: 22 of 22 mutants.
 
 **2026-10-12: benchmark task T11's patches apply again, and a verify plans
 the recipe that applies them** (the integrator's; NEXT 3b; track

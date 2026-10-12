@@ -1,23 +1,24 @@
 ADR-0089 - a policy's value is one its domain has
 
 produced by: just e10-policy-values
-commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
+commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == policy values (compiler/pw-core/tests/policy_values.rs)
 
-test a_session_read_is_never_stale_however_it_is_written ... ok
-test only_transport_only_is_transport_only ... ok
-test a_session_query_in_a_shared_cache_is_refused_however_it_is_spelled ... ok
 test a_key_separates_a_partition_by_naming_it ... ok
-test a_type_a_policy_names_is_visible ... ok
-test a_word_is_one_its_domain_lists ... ok
 test a_key_names_a_parameter_or_a_partition ... ok
-test a_world_is_one_a_platform_has ... ok
+test a_session_query_in_a_shared_cache_is_refused_however_it_is_spelled ... ok
+test a_session_read_is_never_stale_however_it_is_written ... ok
 test a_retried_command_is_idempotent_whatever_it_retries_on ... ok
 test a_duration_is_a_count_and_a_unit ... ok
+test a_type_a_policy_names_is_visible ... ok
+test a_word_is_one_its_domain_lists ... ok
+test only_transport_only_is_transport_only ... ok
+test a_world_is_one_a_platform_has ... ok
 test an_operator_is_given_its_arguments ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.76s
 
 == mutation controls (scripts/policy_value_mutations.py)
 
@@ -37,3 +38,4 @@ a policy's type must be a declaration's: KILLED (1 of 11 tests fail)
 a session read's staleness is read by its first character: KILLED (1 of 11 tests fail)
 a key's partition is found in its text: KILLED (1 of 11 tests fail)
 14 of 14 mutants killed
+memory bound: no process was stopped

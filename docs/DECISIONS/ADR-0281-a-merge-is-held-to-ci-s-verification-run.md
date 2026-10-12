@@ -70,6 +70,11 @@ hold.
      its run at `853674f` recorded scripts that run the server's tests by
      name, and W8, fixed-arms and W6's packet had changed that server on
      master since. A file no recipe of the run wrote is refused too.
+   - **The fetch comes before an ADR is numbered** (the integrator's
+     correction, 2026-10-12). Numbering `ADR-XXXX` rewrites lines of the
+     branch's tests, scripts and recipes, which those recipes read, so a
+     fetch after it refused eight more files at related-files' merge. A
+     merge is merged, resolved, fetched, then numbered.
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does

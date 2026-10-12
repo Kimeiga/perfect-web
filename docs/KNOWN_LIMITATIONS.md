@@ -651,6 +651,11 @@ awaited in order. What remains:
   - a user's order is their latest;
   - `private` still means the user's and not importable (the integrator's
     ruling, queued).
+- **The store's PostgreSQL reads grow with the data** (the integrator's
+  finding, 2026-10-12; NEXT 4b): the store's logic reads the layer's rows a
+  store's or a menu's at a time, and on PostgreSQL each is a statement.
+  `place_order`'s reach runs one per cart line and store, a reader's search
+  one per store it found, each reading every store.
 - **The store's places are a fixture, not a geocoder** (ADR-0319): eleven
   places with approximate coordinates; a courier's minutes are four a
   kilometre in a straight line; an address's label is checked for its

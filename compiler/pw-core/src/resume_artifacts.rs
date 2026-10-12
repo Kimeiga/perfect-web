@@ -449,10 +449,10 @@ fn diagnostic(decl: &Decl, m: &ResumeManifest, field: &'static str, at: &Span) -
         severity: Severity::Error,
         message: format!("the resume manifest and the handler artifact disagree about {field}"),
         primary_span: m.span.clone(),
-        related: vec![Related {
-            span: at.clone(),
-            label: format!("`{}` generates both", decl.name),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            format!("`{}` generates both", decl.name),
+        )],
         explanation: Some(format!(
             "Within one build these are derived from the same source by two \
              different walks — the manifest from the `captures` list as written, \

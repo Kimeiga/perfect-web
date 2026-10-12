@@ -1070,18 +1070,21 @@ pub fn forbidden_in_phase(phase: &str, facets: &BTreeSet<Facet>) -> Option<&'sta
         // The measure phase reads. A write inside it invalidates the very
         // geometry the phase exists to read consistently.
         "measure" if has(Facet::LayoutWrite) || has(Facet::DomWrite) => Some(
-            "the measure phase reads geometry; writing inside it invalidates what              the rest of the phase is about to read",
+            "the measure phase reads geometry; writing inside it invalidates what the rest of \
+             the phase is about to read",
         ),
         // After paint, the frame is already on screen. Measuring forces the
         // browser to lay out again for a frame nobody will see.
         "post_paint" if has(Facet::LayoutRead) => Some(
-            "the frame is already presented; measuring now forces a second layout              for a frame nobody will see",
+            "the frame is already presented; measuring now forces a second layout for a frame \
+             nobody will see",
         ),
         // A painter draws. Touching the document from inside one re-enters
         // layout from a phase that runs after it.
         "draw" if has(Facet::DomWrite) || has(Facet::LayoutWrite) || has(Facet::LayoutRead) => {
             Some(
-                "a painter draws; reaching the document from inside one re-enters                  layout from a phase that runs after it",
+                "a painter draws; reaching the document from inside one re-enters layout from a \
+                 phase that runs after it",
             )
         }
         // A compositor animation runs off the main thread. An animated property
@@ -1089,7 +1092,8 @@ pub fn forbidden_in_phase(phase: &str, facets: &BTreeSet<Facet>) -> Option<&'sta
         // family-keyed version could not see, because a layout-affecting style
         // write is in the `style` family.
         "animate" if has(Facet::LayoutWrite) || has(Facet::LayoutRead) => Some(
-            "a compositor animation runs without layout; animating a property that              invalidates it forces a layout every frame",
+            "a compositor animation runs without layout; animating a property that invalidates \
+             it forces a layout every frame",
         ),
         _ => None,
     }

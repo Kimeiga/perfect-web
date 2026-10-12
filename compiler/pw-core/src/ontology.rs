@@ -923,15 +923,21 @@ pub fn check_effect_declarations(
                     marker.written
                 ),
                 primary_span: marker.span.clone(),
-                related: vec![Related {
-                    span: marker.span.clone(),
-                    label: format!(
+                related: vec![Related::new(
+                    marker.span.clone(),
+                    format!(
                         "`{}` names no type here, so the impact would never apply",
                         marker.written
                     ),
-                }],
+                )],
                 explanation: Some(
-                    "An impact condition is matched by resolved identity, never by                      spelling — which is what stops a marker from meaning whatever a                      reader assumes. A marker that resolves to nothing therefore                      matches nothing, and the facet silently stops applying: the                      program still checks clean and a phase rule quietly sees an                      effect with no consequences. That is exactly what                      `style.mutate<LayoutAffect>` did for three milestones while                      `LayoutAffect` was declared nowhere."
+                    "An impact condition is matched by resolved identity, never by spelling — \
+                     which is what stops a marker from meaning whatever a reader assumes. A \
+                     marker that resolves to nothing therefore matches nothing, and the facet \
+                     silently stops applying: the program still checks clean and a phase rule \
+                     quietly sees an effect with no consequences. That is exactly what \
+                     `style.mutate<LayoutAffect>` did for three milestones while `LayoutAffect` \
+                     was declared nowhere."
                         .to_string(),
                 ),
                 repairs: vec![Repair {
@@ -1077,10 +1083,7 @@ pub fn check_effect_rows(
                 severity: Severity::Error,
                 message,
                 primary_span: e.span().clone(),
-                related: vec![Related {
-                    span: e.span().clone(),
-                    label,
-                }],
+                related: vec![Related::new(e.span().clone(), label)],
                 explanation: Some(
                     "An effect is a DECLARATION, not a spelling. Before the ontology, \
                      `log` and a misspelled `databse` were indistinguishable to every \

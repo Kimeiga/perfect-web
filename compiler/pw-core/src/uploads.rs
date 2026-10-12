@@ -206,10 +206,10 @@ fn malformed(hir: &Hir, out: &mut Vec<Diagnostic>) {
                     "upload_path_not_literal",
                     format!("`{head} {}` is not a literal path", p.value.trim()),
                     p.span.clone(),
-                    vec![Related {
-                        span: at.clone(),
-                        label: format!("the upload `{}`", decl.name),
-                    }],
+                    vec![Related::new(
+                        at.clone(),
+                        format!("the upload `{}`", decl.name),
+                    )],
                     "An upload's paths are where a host answers it: `/` and segments of \
                      lowercase letters, digits, `-` and `_`, with no parameter, since nothing \
                      gives one.",
@@ -399,10 +399,10 @@ fn forms(hir: &Hir, uploads: &[String], out: &mut Vec<Diagnostic>) {
                     faults.join(", ")
                 ),
                 span,
-                vec![Related {
-                    span: hir.decl_span(id),
-                    label: format!("`{}` renders the form", decl.name),
-                }],
+                vec![Related::new(
+                    hir.decl_span(id),
+                    format!("`{}` renders the form", decl.name),
+                )],
                 "A file reaches a host as a form's part, posted as multipart/form-data to \
                  the route an upload declares, which reads it within that upload's limits. A \
                  form posted anywhere else sends its file to what never reads it, and a form \

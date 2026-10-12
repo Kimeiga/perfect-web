@@ -1,8 +1,8 @@
 ADR-0242 - an each head is read once, by the grammar
 
 produced by: just e14-each-heads
-commit: 3fdcf929ad57be351ef24cb1ac59a7cbe9a981ab
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38233018418 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the checker (compiler/pw-core/tests/each_heads.rs)
@@ -11,7 +11,7 @@ test a_loops_key_is_refused_at_the_key ... ok
 test a_head_with_no_name_says_so ... ok
 test a_computed_list_needs_its_key_too ... ok
 test a_head_is_its_list_as_its_name_and_its_key ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
 
 == the parser (compiler/pw-syntax/src/grammar.rs)
 
@@ -20,13 +20,13 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 92 filtered out; fin
 
 == the readers (every_name_resolves, lexical_scope, each_typing, marko_adapter, template_blocks, keyed, nested_lists)
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.04s
-test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.86s
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.50s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
 
 == mutation controls (scripts/each_heads_mutations.py)
 

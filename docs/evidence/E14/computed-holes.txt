@@ -1,8 +1,8 @@
 ADR-0226 - a value the template computes compiles
 
 produced by: just e14-computed-holes
-commit: 3fdcf929ad57be351ef24cb1ac59a7cbe9a981ab
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38233018418 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -14,23 +14,23 @@ test a_value_the_template_computes_performs_nothing ... ok
 test a_member_an_imported_module_lacks_does_not_resolve ... ok
 test a_computed_attribute_is_a_value_the_host_sets ... ok
 test a_view_composed_in_the_page_computes_from_the_pages_value ... ok
-test a_value_the_template_computes_is_lifted_and_planned ... ok
 test what_a_host_does_not_compute_is_refused_by_name ... ok
+test a_value_the_template_computes_is_lifted_and_planned ... ok
 test a_view_that_contains_itself_computes_nothing_yet_and_a_speculated_value_is_computed ... ok
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.34s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.27s
 test a_binding_named_like_a_function_is_its_value ... ok
 test a_function_named_in_a_handler_is_the_handlers ... ok
 test the_diagnostic_says_it_was_named_as_a_value ... ok
-test a_helper_without_a_row_carries_what_it_performs ... ok
 test a_field_of_a_value_is_no_function_of_the_same_name ... ok
+test a_helper_without_a_row_carries_what_it_performs ... ok
 test a_function_named_as_a_value_performs_its_effects_where_it_is_named ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
 test a_key_is_the_path_from_the_element ... ok
 test the_ir_blocks_a_computed_list_and_a_foreign_key ... ok
 test a_loops_key_is_read_from_its_element ... ok
 test a_directive_other_than_on_does_not_build ... ok
 test a_computed_hole_checks_and_does_not_build ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.40s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.54s
 
 == the corpus at C16 (corpus-check, checking_source.rs, generality.rs, corpus_history.rs, rule_fixtures.rs)
 
@@ -39,21 +39,21 @@ accepted: 34/34 charter §16 categories covered
 rejected: 65 files
 rejected: 65/65 charter §16 categories covered
 corpus-check: OK
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 90.60s
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.04s
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 88.91s
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 54.67s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.46s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 59.38s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
 test tests::an_attributes_computed_value_is_the_hosts_and_set_again ... ok
-test tests::an_invalidated_entry_is_dropped_by_the_key_the_command_computed ... ok
 test tests::a_value_computed_in_a_row_is_each_rows_and_sent_with_it ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 445 filtered out; finished in 14.68s
+test tests::an_invalidated_entry_is_dropped_by_the_key_the_command_computed ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 464 filtered out; finished in 6.97s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  66 passed (3.2m)
+  66 passed (1.7m)
 
 == mutation controls (scripts/computed_holes_mutations.py)
 
