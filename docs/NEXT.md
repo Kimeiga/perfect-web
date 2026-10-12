@@ -761,6 +761,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
             inventory names; Pleris has pages and uploads, and no form for
             a route whose answer is JSON.
 
+          - **one telling path for every page a change reaches** (W9's
+            finding, 2026-10-11): a menu change tells the store's pages by
+            `broadcast_menu`'s own patches, and every other page by what
+            the change dropped (ADR-0219, the path W9 gave it), with the
+            store's pages excluded from the second only to save a reading.
+            One path for every page, `broadcast_menu`'s folded into it;
+            after W9's merge.
           - **one entry for a query a page and its layout both bind**
             (found 2026-10-11, ADR-0191's amendment): read once for the
             document (ADR-0303), but speculated as two bindings, `cart` and
