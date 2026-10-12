@@ -184,3 +184,29 @@ fn an_open_search_page_is_told_of_a_menu_change() {
     assert!(told.contains("Flat White"), "{told}");
     assert!(told.contains("1 store matches"), "{told}");
 }
+
+/// **The store's own page is told of a menu change once**: by the menu's
+/// patches, which insert the dish. The search's telling leaves it out, as
+/// a second reading would insert the dish a second time.
+#[test]
+fn a_menu_change_tells_the_stores_page_once() {
+    let s = served();
+    s.serve_document_settled("c", "store.page.StorePage", &store_params("47"), &[])
+        .expect("served");
+    let doc = latest(&s.pending.lock().expect("pending"), "c");
+    let before = s.pending.lock().expect("pending")[&doc].frames.len();
+    let answer = posted(
+        &s,
+        "/command/menu?op=insert_after&id=flat-white&name=Flat%20White",
+        "b",
+        "menu-1",
+        "",
+    );
+    assert!(answer.starts_with("HTTP/1.1 202"), "{answer}");
+    let told: Vec<String> = s.pending.lock().expect("pending")[&doc].frames[before..]
+        .iter()
+        .map(|(_, f)| format!("{f:?}"))
+        .collect();
+    let inserting = told.iter().filter(|f| f.contains("Add Flat White")).count();
+    assert_eq!(inserting, 1, "the dish's row, once: {told:#?}");
+}

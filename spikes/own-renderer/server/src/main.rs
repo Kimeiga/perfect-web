@@ -4164,9 +4164,10 @@ impl Server {
             std::slice::from_ref(&event),
             |delivered| {
                 let reached = self.invalidate_queries("", &[], delivered);
-                // TRACK SEAM (store-search): what the change dropped that the
-                // store's page does not read (a search), told to each session
-                // reading it (ADR-0219); the store's pages get the patches below.
+                // TRACK SEAM (store-search), found by W9, a host fix: what the
+                // change dropped that the store's page does not read (a search)
+                // is told to each session reading it (ADR-0219). The store's
+                // pages are sent the menu's patches below, and are told once.
                 self.telling.lock().expect("telling").push((
                     String::new(),
                     reached

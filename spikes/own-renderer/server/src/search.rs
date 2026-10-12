@@ -1020,7 +1020,10 @@ mod tests {
     /// value but NUL, which `text` cannot hold, lowered by `lower(..
     /// COLLATE pg_c_utf8)` and by [`lower`], and compared. Without
     /// [`NEWER_THAN_POSTGRES`] 28 differ, PostgreSQL 18.6's Unicode 16.0
-    /// against Rust 1.97's 17.0.
+    /// against Rust 1.97's 17.0. It fails when either side's Unicode version
+    /// moves, a character then lowered by one and not the other: that is how
+    /// the limitation (KNOWN_LIMITATIONS) is looked at again, and the hold
+    /// changed or dropped.
     #[test]
     fn on_postgres_every_character_is_lowered_alike() {
         let Some(url) = database() else { return };

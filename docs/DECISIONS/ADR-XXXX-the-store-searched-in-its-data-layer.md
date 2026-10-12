@@ -154,18 +154,44 @@ ADR-0207 (a source states what it guarantees).
 
 ## Found
 
-- **A menu change told no page but the store's.** The menu's route
-  (`broadcast_menu`, E7-P's `/command/menu`) dropped what `MenuChanged`
-  reaches, the kept search among it, and discarded the list: an open
-  search page never saw a dish added (the spec's first run, three
+- **A menu change told no page but the store's** (a host fix, found by W9,
+  its own commit, `125f9c43`, for the integrator's review at the merge).
+  The menu's route (`broadcast_menu`, E7-P's `/command/menu`) dropped what
+  `MenuChanged` reaches, the kept search among it, and discarded the list:
+  an open search page never saw a dish added (the spec's first run, three
   engines). A command's drops are queued for telling (ADR-0219); the
   route's were not. Now what it drops that the store's page does not read
-  is queued too, at a line marked `TRACK SEAM (store-search)`. The store's
-  pages are left to the menu's patches, as before: a run of the server's
-  suite without that exclusion passed as well, so it keeps a cost, not a
-  behaviour a test sees, and no mutant is planted on it.
-- **Rust's Unicode is newer than PostgreSQL's**: 17.0 against 16.0, 28
-  capitals apart, measured over every scalar value (decision 1).
+  is queued too, at a line marked `TRACK SEAM (store-search), found by W9,
+  a host fix`.
+  - **Shown by** `tests/store_search.rs`'s
+    `an_open_search_page_is_told_of_a_menu_change` (a search page of
+    session `a` sent the dish found when session `b` adds it), the spec's
+    "a dish added while the page is open reaches it" in three engines, and
+    the script's mutant "a menu change's route tells no page reading a
+    search".
+  - **Two mutants re-anchored**: `menu_changed_mutations.py`'s "a menu
+    change drops every store's menu, by the query's name" and "a menu
+    change drops nothing", on the closure's first line, which now keeps
+    what it dropped for telling.
+  - **Why the store's own page is left out.** It is sent the menu's
+    patches by `broadcast_menu` itself, the dish inserted in its category's
+    list, so a telling would read it a second time for nothing.
+    `a_menu_change_tells_the_stores_page_once` shows the dish's row reaches
+    an open store page exactly once. Measured here, though: with the
+    exclusion taken away the row still arrives once (the telling found
+    nothing left to send), so the exclusion saves a second reading of
+    every open store page per change; it does not prevent a double
+    insertion, and no mutant is planted on it.
+- **Rust's Unicode is newer than PostgreSQL's**: Rust 1.97.1's tables are
+  Unicode 17.0 (`char::UNICODE_VERSION`), PostgreSQL 18.6's 16.0
+  (`unicode_version()`). Of every scalar value but NUL, 28 lower in Rust
+  and not in PostgreSQL: U+A7CE, U+A7D2 and U+A7D4 (Latin capitals added in
+  17.0) and U+16EA0 to U+16EB8 (Beria Erfe's capitals), each listed by
+  `on_postgres_every_character_is_lowered_alike` when the hold is taken
+  away. **Held back** means neither layer lowers them: in a query or in a
+  name, each is matched as written, on both layers alike, so its capital
+  finds only its capital. Nothing is refused. The test fails when either
+  side's Unicode version moves, which is when the hold is looked at again.
 
 ## Alternatives
 
@@ -215,7 +241,8 @@ ADR-0207 (a source states what it guarantees).
   PostgreSQL: the stores and dishes in their order, linked, in the layout;
   case and accents; no text failing the page (blank, white space, `%`, `_`,
   `\`, quotes, markup, past the bound and at it); a menu's change reaching
-  a search kept since, and an open search page told of it.
+  a search kept since; an open search page told of it, and an open
+  store page told of it once.
 - **The page in three engines** (`e2e/store-search.spec.mjs`, on its own
   hosts, `STORE_SEARCH_PORTS`): the list and a dish's link to its store;
   case, accents and several terms; no text failing the page; a dish added
@@ -256,8 +283,8 @@ ADR-0207 (a source states what it guarantees).
    four lines under one marker, and the registration), `store_pg.rs` two
    (`PgRows`' override and the migration's entry), `main.rs` three (`mod
    search`, the test module `tests::store_search`, and the menu route's
-   telling, Found above), each marked `TRACK SEAM (store-search)`. Also changed, each as small: the PW63 block in
-   `codes.rs` (no code registered), `just/store-search.just`'s import in
+   telling, Found above), each marked `TRACK SEAM (store-search)`. Also
+   changed, each as small: the PW63 block in `codes.rs` (no code registered), `just/store-search.just`'s import in
    the justfile, `e14-store-search` in `ci_plan.py`'s `NEEDS_DATABASE`,
    `STORE_SEARCH_PORTS` and their hosts in `playwright.config.mjs`, and four
    values in `store-values.json` (the static render reads every page's).
@@ -267,9 +294,14 @@ ADR-0207 (a source states what it guarantees).
 
 ## Merge notes
 
-- **KNOWN_LIMITATIONS**: the store's search folds no accent and no stem,
-  and matches each record by its own fields; its meaning is Unicode 16.0's
-  simple lowercase mapping, held to PostgreSQL 18's tables.
+- **KNOWN_LIMITATIONS** (the integrator's ruling of 2026-10-11): the
+  store's search folds no accent and no stem, and matches each record by
+  its own fields. Its meaning is Unicode 16.0's simple lowercase mapping
+  (PostgreSQL 18.6's tables) where Rust 1.97's are 17.0's: the 28 capitals
+  17.0 added (U+A7CE, U+A7D2, U+A7D4, U+16EA0 to U+16EB8) are matched as
+  written on both layers, never lowered;
+  `on_postgres_every_character_is_lowered_alike` fails when either
+  version moves.
 - **`menu_changed_mutations.py`**: its two mutants of the menu route's
   drop are re-anchored on the closure's first line, which now keeps what
   it dropped for telling.
@@ -299,7 +331,7 @@ ADR-0207 (a source states what it guarantees).
   `e2e/store-search.spec.mjs`; `just/store-search.just`
   (`e14-store-search`); `scripts/store_search_mutations.py`.
 - **Tests, local** (this Mac, PostgreSQL 18.6, rebased on `839a289b`):
-  `search.rs`'s 13 tests and `tests/store_search.rs`'s 5, green in memory
+  `search.rs`'s 13 tests and `tests/store_search.rs`'s 6, green in memory
   and on PostgreSQL; the server's whole suite in memory, 409 passed; the
   spec in three engines, 15 of 15; `pw-core`'s build, data-source, title
   and evidence tests after the counts moved.
