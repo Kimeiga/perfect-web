@@ -23,7 +23,7 @@ module domain
 // `line_count` sums a cart's quantities (ADR-0048).
 import List
 // When a delivery estimate was made (ADR-0180).
-import clock.{ Instant }
+import clock.{ Instant, LocalTime, Weekday }
 
 // --- identities -----------------------------------------------------------
 //
@@ -222,8 +222,24 @@ type OrderError =
     // (track `store-accounts`, ADR-0319).
     | NoCoverage
     // A store an item is from is closed, or past its last order (track
-    // `store-hours`): why, in words, with when it opens.
-    | Closed(String)
+    // `store-hours`): which, as data the page words (the integrator's
+    // ruling of 2026-10-12).
+    | Closed(Closing)
+
+// **Why a store takes no order now** (track `store-hours`): closed, and when
+// it opens where it does within a week; or past its last order, which was at
+// the time it carries, in the store's zone.
+type Closing =
+    | ClosedNow(Option<Opening>)
+    | PastLastOrder(LocalTime)
+
+// **When a store opens**: its day, seen from the store's today, and its time.
+type Opening = Opening { day: OpeningDay, at: LocalTime }
+
+type OpeningDay =
+    | Today
+    | Tomorrow
+    | On(Weekday)
 
 type OrderDraft = OrderDraft {
     id: OrderId,

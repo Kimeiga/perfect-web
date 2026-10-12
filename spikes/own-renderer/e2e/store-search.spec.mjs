@@ -199,6 +199,19 @@ test("a store's page is told when the store closes", async ({ page, request }) =
       "Open 24 hours",
       "Closed · opens tomorrow at 7:00 am",
     ]);
+    // Adding while closed is browsing; ordering is refused, told where the
+    // press was, in the page's wording of the command's answer.
+    await ready(page, "/stores/48");
+    await page.getByRole("button", { name: "Add Drip Coffee" }).click();
+    await expect(page.locator("#header-cart-count")).toHaveText("1");
+    await ready(page, "/cart");
+    await expect(page.locator("#cart-hours")).toHaveText(
+      "Harbor Coffee is closed: it opens tomorrow at 7:00 am.",
+    );
+    await page.getByRole("button", { name: "Place order" }).click();
+    await expect(page.locator("#cart-notice")).toHaveText(
+      "A store in your cart is closed: it opens tomorrow at 7:00 am.",
+    );
   } finally {
     expect((await request.post("/bench/hours?store=48&opens=0&closes=0")).status()).toBe(200);
   }

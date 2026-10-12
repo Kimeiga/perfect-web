@@ -334,7 +334,7 @@
     "path": "store.page.CartPage",
     "name": "CartPage",
     "params": [],
-    "schema": "44872a535d551a36",
+    "schema": "a5a7ff2e72271b3c",
     "chunks": [
       {
         "chunk": "static",
@@ -644,7 +644,7 @@
                 "id": 19,
                 "owner": 5,
                 "event": "press",
-                "handler": "47f9e9f136a524d9",
+                "handler": "c51c59a7bf923bd1",
                 "name": "place_order"
               }
             },

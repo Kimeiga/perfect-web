@@ -90,29 +90,45 @@ search).
    - the cart (`user query CartHours(reader)`, the sentence of a cart's
      store that is closed or past its last order, dropped by
      `UserCartChanged` and `StoreChanged`).
-4. **An order is refused while closed, and past the last order.**
+4. **An order is refused while closed, and past the last order** (its form
+   the integrator's, 2026-10-12).
    - `place_order` reads the hours of its cart's stores in its own
      transaction (`hours#for-cart`). Before `UserOrders.place` it answers
-     the declared `OrderError.Closed(why)`: "Blue Bottle is closed: it
-     opens tomorrow at 7:00 am.", or "... takes its last orders 20 minutes
-     before it closes at 7:00 pm.".
-   - The cart page's handler tells it where the press was (ADR-0302).
+     the declared `OrderError.Closed(Closing)`:
+     - `type Closing = | ClosedNow(Option<Opening>) | PastLastOrder(LocalTime)`;
+     - `type Opening = Opening { day: OpeningDay, at: LocalTime }`;
+     - `type OpeningDay = | Today | Tomorrow | On(Weekday)`.
+
+     The command fills them from the store's hours, in its zone, with its
+     clock. The last order is the time it was, in the store's zone.
+   - **Errors stay data; the view says them.** The browser has no zone
+     database, so it cannot word an instant. It can word these.
+     `closing_said` and `opening_said` (`hours.pw`), pure, are the ONE
+     wording, shared by:
+     - the page's "Closed · opens tomorrow at 7:00 am";
+     - the cart's "Harbor Coffee is closed: it opens tomorrow at 7:00 am.";
+     - the cart handler's "A store in your cart is closed: it opens
+       tomorrow at 7:00 am.", told where the press was (ADR-0302).
    - Adding to a cart while closed is allowed: that is browsing.
-   - The ruling's `Closed { opens }` is carried as its sentence, not as an
-     instant. A handler runs in the browser, which has no zone database to
-     say an instant in words.
-5. **The clock module gains three pure functions**: `day_number`,
-   `numbered_day` and `midnight`. A date's number is how a special date is
-   matched and how "tomorrow" is said. The integrator's file, and a change
-   to the trusted platform contract (its hash), named here.
+5. **The clock module gains four pure functions**: `day_number` and
+   `numbered_day` (days since 1970-01-01, ISO 8601's proleptic Gregorian
+   calendar), `midnight` and `minute_of_day`.
+   - A date's number is how a special date is matched and how "tomorrow"
+     is said.
+   - `minute_of_day` is how a page words a `LocalTime` a command answered.
+   - The integrator accepted the first three, 2026-10-12, as Java's
+     `LocalDate.toEpochDay` and `ofEpochDay` are. The fourth came with
+     ruling (3).
+   - The integrator's file, and a change to the trusted platform
+     contract's hash.
 
 ## Found
 
 - **`a | b & c` is `(a | b) & c`.** The language's `|` and `&` share one
   precedence, left to right. "Open until" first compared `to_day == today |
   to_day == today + 1 & to == 0`, and said "until today at 7:00 pm". The
-  test caught it, and the condition is parenthesized now. A question for
-  the integrator (below).
+  test caught it, and the condition is parenthesized now. The integrator
+  rules it refused (its answers, below).
 
 ## Alternatives
 
@@ -156,15 +172,22 @@ search).
   page says "2:30 am".
 - Store 47's notice still says "Open until 7 pm"; it is the store's text.
 
-## Questions for the integrator
+## The integrator's answers, 2026-10-12
 
-1. **`|` and `&` at one precedence** (Found). Is that the language's rule,
-   or should `&` bind tighter, as in most languages? A program that mixes
-   them reads one way and runs the other.
-2. **The clock's three functions**: are they acceptable in
-   `pw-platform-web/clock.pw`, or should a date's number stay hidden?
-3. **`OrderError.Closed(String)`** in place of `Closed { opens }`
-   (decision 4).
+1. **`|` and `&`**: neither binds tighter. A chain mixing them without
+   parentheses will be refused at parse, naming both readings ("write
+   `(a | b) & c` or `a | (b & c)`"). A chain of one operator stays
+   left-associative, and comparisons still bind tighter. The sources are
+   Carbon's logical-operators design and GCC's `-Wparentheses`.
+   - Not "& binds tighter": that would silently change any program written
+     for the old parse, where a refusal changes nothing and names the fix.
+   - The integrator's parser track does this. Store-hours writes every such
+     predicate with explicit parentheses, so it reads the same either way.
+2. **The clock's functions**: `day_number`, `numbered_day` and `midnight`
+   are accepted, their comments saying "days since 1970-01-01, ISO 8601's
+   proleptic Gregorian calendar" (decision 5).
+3. **The order's refusal is structured, not a sentence**: `Closing`,
+   `Opening` and `OpeningDay` (decision 4), worded by the view.
 
 ## Merge notes
 

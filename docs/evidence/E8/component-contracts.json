@@ -4272,7 +4272,35 @@
           }
         },
         "owner": "external",
-        "kind": "host_capability"
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "err",
+              "closed",
+              "closed-now",
+              "some",
+              "at"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          },
+          {
+            "argument": 0,
+            "path": [
+              "err",
+              "closed",
+              "past-last-order"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          }
+        ]
       }
     ],
     "exports": [

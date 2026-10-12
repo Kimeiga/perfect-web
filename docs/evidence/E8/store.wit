@@ -510,6 +510,15 @@ package pw:types {
         type clock-time-zone = string;
         type clock-local-date = s64;
         type clock-local-time = s64;
+        variant clock-weekday {
+            monday,
+            tuesday,
+            wednesday,
+            thursday,
+            friday,
+            saturday,
+            sunday,
+        }
         type domain-store-id = string;
         type domain-menu-item-id = string;
         type domain-order-id = string;
@@ -575,7 +584,20 @@ package pw:types {
         variant domain-order-error {
             nothing-to-order,
             no-coverage,
-            closed(string),
+            closed(domain-closing),
+        }
+        variant domain-closing {
+            closed-now(option<domain-opening>),
+            past-last-order(clock-local-time),
+        }
+        record domain-opening {
+            day: domain-opening-day,
+            at: clock-local-time,
+        }
+        variant domain-opening-day {
+            today,
+            tomorrow,
+            on(clock-weekday),
         }
         record domain-order-progress {
             stage-label: string,
@@ -661,12 +683,12 @@ package pw:types {
             name: string,
             hours: store-hours-opening-hours,
         }
-        record store-hours-opening {
+        record store-hours-open-until {
             until: clock-instant,
             last-order: clock-instant,
         }
         variant store-hours-open-state {
-            open(store-hours-opening),
+            open(store-hours-open-until),
             closed(option<clock-instant>),
         }
         record store-hours-status-shown {

@@ -130,20 +130,28 @@ fn an_order_is_refused_past_the_last_order_and_while_closed() {
     clock_to(&s, at(2027, 3, 1, 18, 41));
     let refused = s.command_answered(PLACE, "a", &[], None).expect("answered");
     assert!(!refused.committed, "18:41: past the last order");
-    let why = format!("{:?}", refused.result);
-    assert!(
-        why.contains("Blue Bottle takes its last orders 20 minutes before it closes at 7:00 pm."),
-        "{why}"
+    // Data the page words (the integrator's ruling of 2026-10-12): past
+    // the last order, which was at 18:40, minute 1120.
+    assert_eq!(
+        refused.result,
+        Some(
+            serde_json::json!({ "$case": "err", "value": { "$case": "closed",
+            "value": { "$case": "past-last-order", "value": 1120 } } })
+        ),
     );
     clock_to(&s, at(2027, 3, 1, 20, 0));
     s.command(ADD, "a", &add_shown("cortado", 1), false)
         .expect("added while closed: browsing");
     let refused = s.command_answered(PLACE, "a", &[], None).expect("answered");
     assert!(!refused.committed);
-    let why = format!("{:?}", refused.result);
-    assert!(
-        why.contains("Blue Bottle is closed: it opens tomorrow at 7:00 am."),
-        "{why}"
+    // Closed, and it opens tomorrow at 07:00, minute 420.
+    assert_eq!(
+        refused.result,
+        Some(
+            serde_json::json!({ "$case": "err", "value": { "$case": "closed",
+            "value": { "$case": "closed-now", "value": { "$case": "some",
+                "value": { "day": { "$case": "tomorrow" }, "at": 420 } } } } })
+        ),
     );
     // And the cart says so before the press.
     assert!(

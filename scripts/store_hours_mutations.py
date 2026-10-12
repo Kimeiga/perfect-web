@@ -117,8 +117,8 @@ MUTANTS = [
         "an order is placed whatever the hours",
         "server",
         APP,
-        '    if closed != "" {\n',
-        "    if false {\n",
+        "        Some(closing) => Err(OrderError.Closed(closing)),\n",
+        "        Some(closing) => UserOrders.place(current_user()),\n",
     ),
     (
         "memory's hours are not written",

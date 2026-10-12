@@ -20,10 +20,10 @@ import List
 import clock
 import Stores
 import Carts
-import domain.{ StoreId, StoreError, Store, same_store }
+import domain.{ StoreId, StoreError, Store, same_store, Closing, Opening, OpeningDay }
 import Events.{ UserCartChanged, StoreChanged }
 import capability.{ User, UserId }
-import clock.{ Instant, LocalDate }
+import clock.{ Instant, LocalDate, LocalTime, Weekday }
 
 // **One weekly period**: its ISO weekday (1, Monday, to 7, Sunday), its
 // opening and closing minutes from midnight. A closing not after the opening
@@ -58,10 +58,10 @@ fn hours_of_cart(reader: User<UserId>) -> List<OpeningHoursOf> !{ database.read<
     host "store:data/hours#for-cart"
 
 // **When a store is open, or next opens** (track `store-hours`).
-type Opening = Opening { until: Instant, last_order: Instant }
+type OpenUntil = OpenUntil { until: Instant, last_order: Instant }
 
 type OpenState =
-    | Open(Opening)
+    | Open(OpenUntil)
     | Closed(Option<Instant>)
 
 // **A span of opening on the calendar**: its first and last day, by number,
@@ -167,7 +167,7 @@ fn status_of(h: OpeningHours) -> OpenState !{ clock.compare, clock.zone } {
     let today = clock.day_number(clock.today_in(zone))
     let all = spans(h, zone, today)
     match List.find(all, s => clock.passed(s.opens) & !clock.passed(s.closes)) {
-        Some(s) => OpenState.Open(Opening { until: s.closes, last_order: s.last_order }),
+        Some(s) => OpenState.Open(OpenUntil { until: s.closes, last_order: s.last_order }),
         None => match List.find(all, s => !clock.passed(s.opens)) {
             Some(s) => OpenState.Closed(Some(s.opens)),
             None => OpenState.Closed(None),
@@ -196,22 +196,63 @@ fn time_said(minute: Int) -> String !{} {
     "{hour}:{pad}{m} {half}"
 }
 
-// **"today", "tomorrow" or a weekday**, of day `n` seen from `today`.
-fn day_said(n: Int, today: Int) -> String !{} {
-    if n == today {
-        "today"
+// **A minute of a day as a time.**
+fn local_time(minute: Int) -> LocalTime !{} {
+    match clock.time(minute / 60, minute % 60) {
+        Some(t) => t,
+        None => clock.midnight(),
+    }
+}
+
+// **When a store opens**, day `n` at `minute`, seen from `today`.
+fn opening_of(n: Int, minute: Int, today: Int) -> Opening !{} {
+    let day = if n == today {
+        OpeningDay.Today
     } else if n == today + 1 {
-        "tomorrow"
+        OpeningDay.Tomorrow
     } else {
-        match clock.weekday(clock.numbered_day(n)) {
-            Monday => "Monday",
-            Tuesday => "Tuesday",
-            Wednesday => "Wednesday",
-            Thursday => "Thursday",
-            Friday => "Friday",
-            Saturday => "Saturday",
-            Sunday => "Sunday",
-        }
+        OpeningDay.On(clock.weekday(clock.numbered_day(n)))
+    }
+    Opening { day: day, at: local_time(minute) }
+}
+
+// **"Monday"**.
+fn weekday_said(w: Weekday) -> String !{} {
+    match w {
+        Monday => "Monday",
+        Tuesday => "Tuesday",
+        Wednesday => "Wednesday",
+        Thursday => "Thursday",
+        Friday => "Friday",
+        Saturday => "Saturday",
+        Sunday => "Sunday",
+    }
+}
+
+// **"today", "tomorrow" or a weekday.**
+fn day_said(d: OpeningDay) -> String !{} {
+    match d {
+        Today => "today",
+        Tomorrow => "tomorrow",
+        On(w) => weekday_said(w),
+    }
+}
+
+// **"tomorrow at 7:00 am"**: the one wording of when a store opens, the
+// page's and an order's refusal's.
+fn opening_said(o: Opening) -> String !{} {
+    "{day_said(o.day)} at {time_said(clock.minute_of_day(o.at))}"
+}
+
+// **Why a store takes no order, in words**: "is closed: it opens tomorrow at
+// 7:00 am", "is closed", or "took its last orders at 6:40 pm".
+fn closing_said(c: Closing) -> String !{} {
+    match c {
+        ClosedNow(next) => match next {
+            Some(o) => "is closed: it opens {opening_said(o)}",
+            None => "is closed",
+        },
+        PastLastOrder(t) => "took its last orders at {time_said(clock.minute_of_day(t))}",
     }
 }
 
@@ -230,8 +271,8 @@ fn shown(h: OpeningHours) -> StatusShown !{ clock.compare, clock.zone } {
     let today = clock.day_number(clock.today_in(clock.zone(h.zone)))
     let said = match named_span(h) {
         Some(s) => match status {
-            Open(_) => if always_open(h) { "Open 24 hours" } else if (s.days.to_day == today) | ((s.days.to_day == today + 1) & (s.days.to == 0)) { "Open until {time_said(s.days.to)}" } else { "Open until {day_said(s.days.to_day, today)} at {time_said(s.days.to)}" },
-            Closed(_) => "Closed · opens {day_said(s.days.from_day, today)} at {time_said(s.days.from)}",
+            Open(_) => if always_open(h) { "Open 24 hours" } else if (s.days.to_day == today) | ((s.days.to_day == today + 1) & (s.days.to == 0)) { "Open until {time_said(s.days.to)}" } else { "Open until {opening_said(opening_of(s.days.to_day, s.days.to, today))}" },
+            Closed(_) => "Closed · opens {opening_said(opening_of(s.days.from_day, s.days.from, today))}",
         },
         None => "Closed",
     }
@@ -267,26 +308,44 @@ public query StoreStatus(id: StoreId) -> StatusShown
 
 // **Why a cart's order is refused by the hours, or nothing**: the first of
 // its stores that is closed, or past its last order.
-fn closed_in(stores: List<OpeningHoursOf>) -> String !{ clock.compare, clock.zone } {
-    List.fold(stores, "", (why, s) => if why != "" { why } else { refusal(s) })
+fn closed_in(stores: List<OpeningHoursOf>) -> Option<Closing> !{ clock.compare, clock.zone } {
+    let none: Option<Closing> = None
+    List.fold(stores, none, (found, s) => match found {
+        Some(_) => found,
+        None => closing_now(s.hours),
+    })
 }
 
-fn refusal(s: OpeningHoursOf) -> String !{ clock.compare, clock.zone } {
-    let today = clock.day_number(clock.today_in(clock.zone(s.hours.zone)))
-    match status_of(s.hours) {
+// **Why a store takes no order now, or nothing.**
+fn closing_now(h: OpeningHours) -> Option<Closing> !{ clock.compare, clock.zone } {
+    let today = clock.day_number(clock.today_in(clock.zone(h.zone)))
+    match status_of(h) {
         Open(o) => if clock.passed(o.last_order) {
-            match named_span(s.hours) {
-                Some(span) => "{s.name} takes its last orders {s.hours.last_order_minutes} minutes before it closes at {time_said(span.days.to)}.",
-                None => "{s.name} is about to close.",
+            match named_span(h) {
+                Some(span) => Some(Closing.PastLastOrder(local_time((span.days.to - h.last_order_minutes + 1440) % 1440))),
+                None => None,
             }
         } else {
-            ""
+            None
         },
-        Closed(_) => match named_span(s.hours) {
-            Some(span) => "{s.name} is closed: it opens {day_said(span.days.from_day, today)} at {time_said(span.days.from)}.",
-            None => "{s.name} is closed.",
-        },
+        Closed(_) => Some(Closing.ClosedNow(match named_span(h) {
+            Some(span) => Some(opening_of(span.days.from_day, span.days.from, today)),
+            None => None,
+        })),
     }
+}
+
+// **What the cart says of its stores' hours**: the first store that takes
+// no order now, by name, in the one wording; or nothing.
+fn cart_said(stores: List<OpeningHoursOf>) -> String !{ clock.compare, clock.zone } {
+    List.fold(stores, "", (said, s) => if said != "" {
+        said
+    } else {
+        match closing_now(s.hours) {
+            Some(c) => "{s.name} {closing_said(c)}.",
+            None => "",
+        }
+    })
 }
 
 // **A store as a list shows it**: what it says of itself, and of its hours.
@@ -335,7 +394,7 @@ user query CartHours(reader: User<UserId>) -> String
     on_key_change  cancel
     timeout        2.seconds
 {
-    closed_in(hours_of_cart(reader))
+    cart_said(hours_of_cart(reader))
 }
 
 // **What a list's store says of its hours**: its own among `hours`, or

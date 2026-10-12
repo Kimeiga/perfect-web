@@ -50,7 +50,7 @@ import domain.{ StoreId, Store, StoreError, CartError, MenuItem, MenuSection, In
 import capability.{ Session, SessionId, User, UserId }
 import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged, AddressesChanged }
 // TRACK SEAM (store-hours): each store's hours, and whether it is open.
-import store.hours.{ StoreStatus, StoresOpen, CartHours, hours_of_cart, closed_in }
+import store.hours.{ StoreStatus, StoresOpen, CartHours, hours_of_cart, closed_in, closing_said }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -393,11 +393,10 @@ command place_order()
 {
     // TRACK SEAM (store-hours): refused while a store of the cart is closed
     // or past its last order, read in this transaction.
-    let closed = closed_in(hours_of_cart(current_user()))
-    if closed != "" {
-        return Err(OrderError.Closed(closed))
+    match closed_in(hours_of_cart(current_user())) {
+        Some(closing) => Err(OrderError.Closed(closing)),
+        None => UserOrders.place(current_user()),
     }
-    UserOrders.place(current_user())
 }
 
 // **An address saved, and chosen as it is saved** (track `store-accounts`,
@@ -735,7 +734,7 @@ user page CartPage() {
                     Ok(_) => navigate OrderPage(),
                     Err(OrderError.NothingToOrder) => notice = "Your cart is empty: there is nothing to order.",
                     Err(OrderError.NoCoverage) => notice = "A store in your cart doesn't deliver to your address.",
-                    Err(OrderError.Closed(why)) => notice = why,
+                    Err(OrderError.Closed(closing)) => notice = "A store in your cart {closing_said(closing)}.",
                 }}
             >
                 Place order
