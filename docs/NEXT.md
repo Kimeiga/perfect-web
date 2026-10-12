@@ -937,9 +937,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
           ADR-0286, ADR-0288, ADR-0289, ADR-0293, ADR-0299, and the page's
           moves, ADR-0301, 2026-10-10), and so are Contains and Appears in,
           search, the reading index with Homophones, and deinflection
-          (ADR-0313 to ADR-0316, 2026-10-12); next (W6), the search box at
-          `/search{?q}` and the word page's canonical link (W6's next
-          packet), then `/{word}` once `/_pw/` lands. Real
+          (ADR-0313 to ADR-0316, 2026-10-12); and so are the search box at
+          `/search{?q}` and the word page's canonical link (merged
+          2026-10-12); next (W6), `/{word}` once `/_pw/` lands, and the
+          inventory's next routes (102 at kiokun.com's `2391117c`: 0 built, 5
+          partial, 97 missing). Real
           users, data, devices and deploys are the strongest
           evidence there is. Its conditions: parity with the live site,
           measured; served first on a preview origin beside the live site;

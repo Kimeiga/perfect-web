@@ -2731,6 +2731,9 @@ whole dictionary (W6's; the integrator's rulings B1 to B5 of 2026-10-10).
   by the CSV's digest. `is_common` is read as an integer.
 - Held to kiokun.com's `GET` handler in Node over `node:sqlite`. CI holds a
   4,375-row sample from cleared sources.
+- Amended 2026-10-12 (W6's second packet): the page at `/search{?q}`, with
+  kiokun.com's header field as a plain GET form, its empty state, and a CJK
+  query that is a word leading with a link to it.
 
 [ADR-0315](DECISIONS/ADR-0315-kiokun-reading-index-and-homophones.md):
 kiokun's reading index and the word page's Homophones (W6's).
@@ -2756,6 +2759,9 @@ of our own).
   MediaWiki's redirect note does), not kiokun.com's 307.
 - Held to kiokun.com as a black box in Node, never read and never
   committed: 3,873 forms, 0 unnamed differences.
+- Amended 2026-10-12: the word page states its canonical link (ADR-0311),
+  self-referencing on a dictionary form and naming it on an inflected one,
+  with `og:url` from it (ADR-0293's Differences 10 and 12 closed).
 
 [ADR-0317](DECISIONS/ADR-0317-a-component-is-compiled-once-a-process.md): a
 component is compiled once a process (the integrator's; W6's finding of
