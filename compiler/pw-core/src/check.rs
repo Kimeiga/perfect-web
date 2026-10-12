@@ -6455,7 +6455,16 @@ fn resolve_diagnostic(e: &crate::resolve::ResolveError) -> Diagnostic {
         ),
         K::PrivateAccess { module, name } => (
             codes::PRIVATE_ACCESS,
-            format!("make `{name}` public in `{module}`, or stop importing it"),
+            // Not "make it public": `public` says whose data a declaration
+            // holds, and a user's query made public would be everyone's
+            // (ADR-XXXX).
+            format!("drop `private` from `{name}` in `{module}`, or stop importing it"),
+        ),
+        K::PrivateData { .. } => (
+            codes::PRIVATE_DATA,
+            "write `user` for the user's, `session` for the session's, or `public` for \
+             everyone's; each is importable"
+                .to_string(),
         ),
         K::ImportCycle { .. } => (
             codes::IMPORT_CYCLE,
@@ -7949,8 +7958,9 @@ pub(crate) fn label_of(decl: &Decl) -> Label {
     // the developer must be shown.
     match decl.visibility.as_deref() {
         Some("session") => Label::session("SessionId"),
-        // `user`, importable, and `private`, not: each the user's.
-        Some("private") | Some("user") => Label::user("UserId"),
+        // `user`, the user's (track `store-accounts`). `private` says only
+        // that a declaration is not importable (ADR-XXXX).
+        Some("user") => Label::user("UserId"),
         _ => Label::public(),
     }
 }

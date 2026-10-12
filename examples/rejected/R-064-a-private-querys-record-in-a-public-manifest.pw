@@ -1,6 +1,6 @@
 // @corpus: rejected
 // @id: R-064
-// @category: a private query's record captured into a public manifest from a view's parameter
+// @category: a user query's record captured into a public manifest from a view's parameter
 // @rule: PW5007
 // @invariant: private_in_resume_manifest
 // @charter: §8.5, §7.8
@@ -8,11 +8,13 @@
 // @expect-error: resume manifest for `SavedSummary` would contain a `User<UserId>` value
 //
 // Found on 2026-10-09 (track `store-accounts`, ADR-0318), R-030 at the
-// user's level. A `private` query is its user's (ADR-0270), so a record only
-// it produces is the user's, as a record only a `session query` produces is
-// the session's. The view's parameter names no producer: the type is all that
-// says the value is private. Until 2026-10-09 `private` gave the type no
-// scope, and the capture crossed into the public shell unrefused.
+// user's level. A `user` query is its user's (ADR-0318), so a record only it
+// produces is the user's, as a record only a `session query` produces is the
+// session's. The view's parameter names no producer: the type is all that
+// says the value is private. Until 2026-10-09 the user's scope gave the type
+// none, and the capture crossed into the public shell unrefused. Written
+// `private query` until ADR-XXXX, which made `private` mean only "not
+// importable"; its case is a view's parameter, where R-065's is a page's.
 
 module saved.summary_view
 
@@ -25,7 +27,7 @@ type Saved = Saved {
     items: List<MenuItemId>,
 }
 
-private query SavedItems(reader: User<UserId>) -> Saved
+user query SavedItems(reader: User<UserId>) -> Saved
     freshness 0.seconds
     cache     private
     key       reader

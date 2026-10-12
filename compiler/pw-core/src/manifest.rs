@@ -236,8 +236,9 @@ fn manifest_of(decl: &Decl) -> (Manifest, Vec<Unparsed>) {
 
     let privacy = match decl.visibility.as_deref() {
         Some("session") => Privacy::Session,
-        // `user` is the user's as `private` is (track `store-accounts`).
-        Some("private") | Some("user") => Privacy::Private,
+        // `user`, the user's (track `store-accounts`; `private` says only
+        // that a declaration is not importable, ADR-XXXX).
+        Some("user") => Privacy::Private,
         _ => Privacy::Public,
     };
 

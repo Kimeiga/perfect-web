@@ -11,7 +11,7 @@ import domain.{ ConsumerId, OrderId, OrderProgress, OrderFailure }
 // event it names (ADR-0091).
 event OrdersChanged(consumer: ConsumerId)
 
-private query Orders(consumer: ConsumerId) -> Result<OrderProgress, OrderFailure>
+user query Orders(consumer: ConsumerId) -> Result<OrderProgress, OrderFailure>
     freshness     0.seconds
     consistency   read_your_writes
     cache         private

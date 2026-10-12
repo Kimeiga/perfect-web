@@ -116,7 +116,7 @@ impl TypeFacts {
                 // into a public manifest unrefused (R-064).
                 let restriction = match d.visibility.as_deref() {
                     Some("session") => Restriction::Session("SessionId".into()),
-                    Some("user") | Some("private") => Restriction::User("UserId".into()),
+                    Some("user") => Restriction::User("UserId".into()),
                     Some("organization") => Restriction::Organization("OrganizationId".into()),
                     _ => continue,
                 };

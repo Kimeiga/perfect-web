@@ -1,13 +1,14 @@
 //! **`user`, the user's visibility, importable as `session` is** (track
 //! `store-accounts`, ADR-0318; the integrator's ruling of 2026-10-09).
 //!
-//! `private` is two things: the user's scope, and not importable (PW0023).
+//! `private` was two things: the user's scope, and not importable (PW0023).
 //! A user's cart read on another module's page needs the first without the
 //! second. `user` is `session`'s peer: a declaration it opens is the user's
-//! in every rule that reads `private` as the user's, and is imported as a
-//! `session` one is. It is a visibility only at a declaration's start,
-//! before the declaration's keyword, so a field, a parameter or a binding
-//! named `user` is still a name. `private` is unchanged.
+//! in every rule, and is imported as a `session` one is. It is a visibility
+//! only at a declaration's start, before the declaration's keyword, so a
+//! field, a parameter or a binding named `user` is still a name. Since
+//! ADR-XXXX `private` says only that a declaration is not importable, and a
+//! declaration that holds data and says `private` is refused (PW0029).
 
 use pw_core::check::check_sources;
 
@@ -80,8 +81,9 @@ fn codes(files: &[(&str, String)]) -> Vec<String> {
 fn a_user_query_is_imported_and_read_on_a_user_page() {
     let found = reported(&[("saved.pw", saved("user")), ("shop.pw", page("user"))]);
     assert!(found.is_empty(), "{found:?}");
-    // The control: `private` is the user's and is not imported.
+    // The control: a `private` query is refused, and is not imported.
     let found = codes(&[("saved.pw", saved("private")), ("shop.pw", page("user"))]);
+    assert!(found.contains(&"PW0029".to_string()), "{found:?}");
     assert!(found.contains(&"PW0023".to_string()), "{found:?}");
 }
 
@@ -99,8 +101,8 @@ fn a_user_querys_record_is_the_users_and_no_other_manifest_holds_it() {
         found.contains(&"PW5007".to_string()),
         "a session page: {found:?}"
     );
-    // And a `user` query's record is the user's in a shared cache too, as a
-    // `private` one's is (PW5001's rule, read through the same label).
+    // And a `user` query's record is the user's in a shared cache too
+    // (PW5001's rule, read through the same label).
     let shared = "module saved\n\nimport capability.{ User, UserId }\n\n\
          type Saved = Saved { count: Int }\n\n\
          user query SavedItems(reader: User<UserId>) -> Saved\n    \
@@ -110,8 +112,13 @@ fn a_user_querys_record_is_the_users_and_no_other_manifest_holds_it() {
         !found.is_empty(),
         "a user's record in a shared cache: {found:?}"
     );
+    // A `private` one is refused by name (ADR-XXXX), and not read as
+    // everyone's, which would let the shared cache hold it.
     let private = shared.replace("user query", "private query");
-    assert_eq!(codes(&[("saved.pw", private)]), found, "as `private` is");
+    assert!(
+        codes(&[("saved.pw", private)]).contains(&"PW0029".to_string()),
+        "`private` on a query"
+    );
 }
 
 #[test]

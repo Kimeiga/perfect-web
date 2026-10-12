@@ -64,12 +64,12 @@ MUTANTS = [
         "the conversation is cached shared, every reader's",
         SERVER,
         APP,
-        "private query Conversation(reader: capability.User<UserId>, with: UserId, limit: Int) -> "
+        "user query Conversation(reader: capability.User<UserId>, with: UserId, limit: Int) -> "
         "Result<Conversation, FeedError>\n"
         "    freshness      0.seconds\n"
         "    consistency    read_your_writes\n"
         "    cache          private\n",
-        "private query Conversation(reader: capability.User<UserId>, with: UserId, limit: Int) -> "
+        "user query Conversation(reader: capability.User<UserId>, with: UserId, limit: Int) -> "
         "Result<Conversation, FeedError>\n"
         "    freshness      0.seconds\n"
         "    consistency    read_your_writes\n"
@@ -109,13 +109,13 @@ MUTANTS = [
         "the recipient's sessions are not told: the count listens for what the reader sends alone",
         SERVER,
         APP,
-        "private query UnreadMessages(reader: capability.User<UserId>) -> Int\n"
+        "user query UnreadMessages(reader: capability.User<UserId>) -> Int\n"
         "    freshness      0.seconds\n"
         "    consistency    read_your_writes\n"
         "    cache          private\n"
         "    key            reader\n"
         "    invalidates_on Messaged(reader, _), Messaged(_, reader)\n",
-        "private query UnreadMessages(reader: capability.User<UserId>) -> Int\n"
+        "user query UnreadMessages(reader: capability.User<UserId>) -> Int\n"
         "    freshness      0.seconds\n"
         "    consistency    read_your_writes\n"
         "    cache          private\n"

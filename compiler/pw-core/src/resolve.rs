@@ -193,6 +193,10 @@ pub enum ResolveErrorKind {
     DuplicateDeclaration { name: String },
     /// Reaching a declaration the other module does not make public.
     PrivateAccess { module: String, name: String },
+    /// **`private` on a declaration that holds data** (ADR-XXXX): it says
+    /// the declaration is not importable, and nothing of whose data it holds,
+    /// which `user`, `session` or `public` says.
+    PrivateData { name: String, kind: &'static str },
     /// `a` imports `b` imports `a`.
     ImportCycle { modules: Vec<String> },
 }
@@ -215,11 +219,34 @@ impl ResolveErrorKind {
             ResolveErrorKind::PrivateAccess { module, name } => {
                 format!("`{module}.{name}` is not public")
             }
+            ResolveErrorKind::PrivateData { name, kind } => {
+                format!(
+                    "the {kind} `{name}` is `private`, which says it is not importable, and \
+                     nothing of whose data it holds"
+                )
+            }
             ResolveErrorKind::ImportCycle { modules } => {
                 format!("import cycle: {}", modules.join(" -> "))
             }
         }
     }
+}
+
+/// **What a declaration that holds data is called** (ADR-XXXX): one whose
+/// visibility says whose data it is, `user`, `session` or `public`. `None`
+/// for one that holds none of its own, a function, a type or a view, which
+/// `private` keeps from other modules alone.
+fn holds_data(kind: DeclKind) -> Option<&'static str> {
+    Some(match kind {
+        DeclKind::Query => "query",
+        DeclKind::Page => "page",
+        DeclKind::Layout => "layout",
+        DeclKind::Command => "command",
+        DeclKind::Subscription => "subscription",
+        DeclKind::Resource => "resource",
+        DeclKind::Materialize => "materialization",
+        _ => return None,
+    })
 }
 
 /// The whole checked set, as one module graph.
@@ -299,6 +326,23 @@ impl Workspace {
                     continue;
                 }
                 let def = DefId { unit, decl: id.0 };
+                // **`private` is not importable, and says nothing more**
+                // (ADR-XXXX). A declaration that holds data says whose with
+                // `user`, `session` or `public`. Until 2026-10-12 `private`
+                // meant the user's too, so a module's own helper was the
+                // user's data wherever it was read.
+                if decl.visibility.as_deref() == Some("private")
+                    && let Some(kind) = holds_data(decl.kind)
+                {
+                    ws.errors.push(ResolveError {
+                        kind: ResolveErrorKind::PrivateData {
+                            name: decl.name.clone(),
+                            kind,
+                        },
+                        span: hir.decl_span(id),
+                        unit,
+                    });
+                }
                 if ns == Namespace::Type {
                     ws.type_arity.insert(def, decl.type_params.len());
                 }

@@ -59,7 +59,9 @@ fn a_readers_value_in_a_shared_cache_is_one_error() {
     };
     // The control: a public value is shareable.
     assert_eq!(reported(&src("public", "30.seconds")), vec![]);
-    for visibility in ["session", "private"] {
+    // `user` the user's (ADR-0318); `private` says only "not importable"
+    // since ADR-XXXX, and is refused on a query (PW0029).
+    for visibility in ["session", "user"] {
         let found = reported(&src(visibility, "0.seconds"));
         assert_eq!(found.len(), 1, "{visibility}: {found:#?}");
         assert_eq!(found[0].0, "PW5001", "{visibility}: {found:#?}");

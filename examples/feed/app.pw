@@ -831,7 +831,7 @@ fn owner(post: PostId) -> UserId !{ database.read<Post> }
 // and a follow of them, drops the entries at that user in each of their
 // sessions, and their open pages are told; a deleted post takes its
 // notifications with it, whoever's they were.
-private query Notifications(reader: capability.User<UserId>, limit: Int) -> List<Notification>
+user query Notifications(reader: capability.User<UserId>, limit: Int) -> List<Notification>
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
@@ -846,7 +846,7 @@ private query Notifications(reader: capability.User<UserId>, limit: Int) -> List
 
 // **How many of the reader's notifications are unread**, on each page that
 // shows its reader, live.
-private query Unread(reader: capability.User<UserId>) -> Int
+user query Unread(reader: capability.User<UserId>) -> Int
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
@@ -996,7 +996,7 @@ fn read_messages(reader: capability.User<UserId>, with: UserId) -> Result<Int, F
 // other's id. A message either sends the other drops it in each of the
 // reader's sessions; and whether the reader may send is read again when the
 // other follows or unfollows them, or messages them.
-private query Conversation(reader: capability.User<UserId>, with: UserId, limit: Int) -> Result<Conversation, FeedError>
+user query Conversation(reader: capability.User<UserId>, with: UserId, limit: Int) -> Result<Conversation, FeedError>
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
@@ -1012,7 +1012,7 @@ private query Conversation(reader: capability.User<UserId>, with: UserId, limit:
 
 // **The reader's conversations**, newest first: a message the reader sends
 // or is sent drops it in each of their sessions.
-private query Conversations(reader: capability.User<UserId>) -> List<ConversationItem>
+user query Conversations(reader: capability.User<UserId>) -> List<ConversationItem>
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
@@ -1027,7 +1027,7 @@ private query Conversations(reader: capability.User<UserId>) -> List<Conversatio
 
 // **How many messages the reader has yet to read**, on each page that shows
 // its reader, live.
-private query UnreadMessages(reader: capability.User<UserId>) -> Int
+user query UnreadMessages(reader: capability.User<UserId>) -> Int
     freshness      0.seconds
     consistency    read_your_writes
     cache          private

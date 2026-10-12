@@ -493,7 +493,7 @@ pub(crate) fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::L
     // the scope belongs to, which is what a flow relation needs.
     let by_visibility = match decl.visibility.as_deref() {
         Some("session") => Some(Restriction::Session("SessionId".into())),
-        Some("user") | Some("private") => Some(Restriction::User("UserId".into())),
+        Some("user") => Some(Restriction::User("UserId".into())),
         Some("organization") => Some(Restriction::Organization("OrganizationId".into())),
         _ => None,
     };

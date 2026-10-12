@@ -2415,6 +2415,15 @@ impl<'a> P<'a> {
         {
             return false;
         }
+        // **`user` before a declaration's keyword begins the declaration**
+        // (ADR-0318's contextual visibility; ADR-XXXX): until 2026-10-12, after
+        // a declaration with no body, `fn owner(..) host ".."`, it was read as
+        // that declaration's unknown policy `user`, and the query it opened
+        // as the function's clauses. No program had written one there: the
+        // feed's queries said `private`, which is reserved.
+        if self.at_visibility() {
+            return false;
+        }
         // A value must follow, on this line. An operator is not one: `a + b`
         // in a query's body is an expression. Until 2026-09-25 only `<` was
         // excluded, so `{ a + b }` was an unknown policy `a` with the value
@@ -2610,7 +2619,10 @@ impl<'a> P<'a> {
                         // whose value was `none impakt layout_write`, so the
                         // clause the parser was supposed to reject disappeared
                         // into the one it accepted.
-                        || self.at_unknown_policy())
+                        || self.at_unknown_policy()
+                        // And a declaration a contextual `user` opens
+                        // (ADR-XXXX): `user query` after `host ".."`.
+                        || self.at_visibility())
                 {
                     break;
                 }
@@ -4045,6 +4057,24 @@ mod tests {
         parse_ok(
             "fn f(b: Bool) -> Int {\n    match b {\n        true => 1,\n        false => 0,\n    }\n}\n",
         );
+    }
+
+    #[test]
+    fn a_user_declaration_after_one_with_no_body_is_its_own() {
+        // ADR-XXXX: `user` before a declaration's keyword begins the
+        // declaration, after a function with no body too. Until 2026-10-12 it
+        // was that function's unknown policy `user`, and the query it opened
+        // the `host` clause's value (the feed, once its queries said `user`).
+        let src = "fn owner(post: Int) -> Int !{}\n    host \"feed:data/posts#author\"\n\n\
+                   // the reader's\nuser query Mine(reader: Int) -> Int\n    freshness 0.seconds\n\
+                   {\n    reader\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let decls: Vec<_> = p.green.children().map(|n| n.kind()).collect();
+        assert_eq!(decls.len(), 2, "two declarations: {decls:?}");
+        // Control: the same after `private`, which is reserved.
+        let src = src.replace("user query", "private query");
+        parse_ok(&src);
     }
 
     #[test]
