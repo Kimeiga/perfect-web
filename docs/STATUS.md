@@ -23,6 +23,18 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0281 amended, 2026-10-12: a fetch takes no file of code the tree it
+joins does not hold** (the integrator's; track `evidence-current`, merged
+from `668e369`).
+- The day's ruling, made mechanical. `just evidence-fetch` refuses a run's
+  file whose recipe reads what changed between the run's commit and the tree
+  it writes into, by the planner's own rule, and copies nothing. The branch
+  merges master and is verified again. `--skip RECIPE` copies none of a
+  recipe's files, where another run records it.
+- Its first use refused all 19 files of narrowing-2's first run (at
+  `853674f`) on master's tree: the case found by hand that morning.
+Verify 38287219825 green: 22 of 22 mutants.
+
 **2026-10-12: benchmark task T11's patches apply again, and a verify plans
 the recipe that applies them** (the integrator's; NEXT 3b; track
 `t11-patches`, merged from `f14a107`).

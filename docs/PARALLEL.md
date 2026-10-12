@@ -1276,3 +1276,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
     two changed. The 19 recipes W6's packet changed are recorded again by
     master's own verify 38282497091, fetched to master once it is green.
     t11-patches' three files hold the same way.
+- **2026-10-12, the evidence ruling made mechanical** (ADR-0281 amended;
+  track `evidence-current`, from `668e369`, verify 38287219825). To every
+  track: `just evidence-fetch` now refuses a run's files of code master
+  will not hold. Merge master before the verify run your merge will cite,
+  as the rebase rule above asks; a run of an older merge base is refused
+  where master changed what its recipes read.
