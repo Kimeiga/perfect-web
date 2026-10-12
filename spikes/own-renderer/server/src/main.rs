@@ -4165,9 +4165,12 @@ impl Server {
             |delivered| {
                 let reached = self.invalidate_queries("", &[], delivered);
                 // TRACK SEAM (store-search), found by W9, a host fix: what the
-                // change dropped that the store's page does not read (a search)
-                // is told to each session reading it (ADR-0219). The store's
-                // pages are sent the menu's patches below, and are told once.
+                // change dropped is told to each session reading it (ADR-0219).
+                // The store's pages are told by broadcast_menu's own patches;
+                // reading them again finds nothing changed; excluded to save
+                // that read, not for correctness
+                // (a_menu_change_tells_the_stores_page_once holds with or
+                // without it).
                 self.telling.lock().expect("telling").push((
                     String::new(),
                     reached

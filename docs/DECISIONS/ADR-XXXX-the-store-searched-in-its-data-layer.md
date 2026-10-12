@@ -181,7 +181,15 @@ ADR-0207 (a source states what it guarantees).
     exclusion taken away the row still arrives once (the telling found
     nothing left to send), so the exclusion saves a second reading of
     every open store page per change; it does not prevent a double
-    insertion, and no mutant is planted on it.
+    insertion. **It is an optimization, named as one** (the integrator's
+    ruling of 2026-10-11): a telling costs 50 to 200 ms under parallel load
+    (ADR-0296), on the most-read page.
+  - **No mutant for the exclusion, on purpose.** Removing it is an
+    equivalent mutant: it would survive, and rightly, since nothing a page
+    shows changes. A later reviewer should not add one.
+  - **One telling path for every page** (the drop-based one, ADR-0219,
+    with `broadcast_menu`'s store-page path folded into it) is the
+    integrator's, for later (NEXT); not this track's.
 - **Rust's Unicode is newer than PostgreSQL's**: Rust 1.97.1's tables are
   Unicode 17.0 (`char::UNICODE_VERSION`), PostgreSQL 18.6's 16.0
   (`unicode_version()`). Of every scalar value but NUL, 28 lower in Rust
