@@ -339,10 +339,17 @@ ADR-0207 (a source states what it guarantees).
   `e2e/store-search.spec.mjs`; `just/store-search.just`
   (`e14-store-search`); `scripts/store_search_mutations.py`.
 - **Tests, local** (this Mac, PostgreSQL 18.6, rebased on `839a289b`):
-  `search.rs`'s 13 tests and `tests/store_search.rs`'s 6, green in memory
+  `search.rs`'s 14 tests and `tests/store_search.rs`'s 6, green in memory
   and on PostgreSQL; the server's whole suite in memory, 409 passed; the
   spec in three engines, 15 of 15; `pw-core`'s build, data-source, title
   and evidence tests after the counts moved.
 - **Mutants**: 30 planted; the record is CI's verify (below).
+- **Verify 38188240871** (at `b32f7dc1`): every recipe green but
+  `e14-store-search`, whose tests and spec passed (15 of 15 in three
+  engines) and whose mutants were 29 of 30. The survivor, "a dish's name is
+  lowered under the C collation", moved the dish İskender from tier 0 to
+  tier 1 on PostgreSQL, which the table's order did not show: the PostgreSQL
+  test now compares every search's records, tiers and all, with memory's,
+  and kills it (checked here). The next verify is the record.
 - **Verify**: VERIFY-PLACEHOLDER.
 - **Not claimed**: as above.

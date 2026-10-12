@@ -945,9 +945,12 @@ mod tests {
             let got = shown(on_postgres(&mut c, &terms_of(text)).expect("searched"));
             assert_eq!(got, want, "{text:?}");
         }
-        // And each record found is the fixture's own text, as memory's is.
-        let tiered = DISH_TIERS.iter().map(|(text, ..)| *text);
-        for text in ["juice", "z", "%", "ette"].into_iter().chain(tiered) {
+        // And each record found, its text and every tier, its dishes' too,
+        // is memory's, for every search of the table and each of
+        // `DISH_TIERS`: a dish's name lowered otherwise than memory lowers
+        // it moves it to another tier, whose order the table may not show.
+        let texts = table().into_iter().map(|(text, _)| text);
+        for text in texts.chain(DISH_TIERS.iter().map(|(text, ..)| *text)) {
             let terms = terms_of(text);
             let pg = ordered(on_postgres(&mut c, &terms).expect("searched"));
             let mem = ordered(matched(&terms, fixture()));
