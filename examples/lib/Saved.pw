@@ -7,8 +7,8 @@
 // **A `user` query, imported** (track `store-accounts`, ADR-XXXX): a reader's
 // saved items are their user's, keyed by the reader's handle, and declared
 // `user`, which is `session`'s peer: the user's, and importable, where
-// `private` is the user's and is not. A-033 reads it on a `user page` of its
-// own module; R-064 captures it into the public shell, and is refused.
+// `private` is the user's and is not. A-034 reads it on a `user page` of its
+// own module; R-065 captures it into the public shell, and is refused.
 
 module Saved
 

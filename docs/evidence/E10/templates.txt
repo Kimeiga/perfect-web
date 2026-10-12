@@ -1,7 +1,8 @@
 ADR-0042 - template branches and interpolated attributes
 
 produced by: just e10-templates
-commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
+commit: d65f2785ad21bf9bd599e639aec2c156d25c0a51
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38203954490 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the checker and the IR (compiler/pw-core/tests/template_blocks.rs)
@@ -18,7 +19,7 @@ test an_unclosed_block_is_refused ... ok
 test else_if_nests_a_conditional_in_the_otherwise_branch ... ok
 test else_is_the_other_branch_not_more_of_the_first ... ok
 test match_takes_an_option_apart_with_its_payload_bound ... ok
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.43s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
 
 == the renderer (runtime/pw-render/tests/branches.rs)
 
@@ -53,6 +54,7 @@ an arm's payload is not bound: KILLED (4 of 31 tests fail)
 a value in a URL is attribute-escaped, not one component: KILLED (3 of 31 tests fail)
 an Option reads as a condition: KILLED (1 of 31 tests fail)
 16 of 16 mutants killed
+memory bound: no process was stopped
 
 NOT CLAIMED: patches for a match region or an interpolated attribute.
 They render on the server; no patch generator emits them yet.

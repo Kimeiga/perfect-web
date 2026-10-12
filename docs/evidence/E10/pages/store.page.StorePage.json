@@ -71,7 +71,7 @@
       ]
     },
     {
-      "binding": "summary",
+      "binding": "line",
       "resource": "store.page.MenuLine",
       "args": [
         "id"
@@ -163,8 +163,8 @@
     },
     {
       "part": 3,
-      "path": "summary",
-      "binding": "summary",
+      "path": "line",
+      "binding": "line",
       "steps": []
     },
     {
@@ -274,8 +274,8 @@
     },
     {
       "collection": "cart.lines",
-      "binding": "line",
-      "path": "line.quantity.count",
+      "binding": "line~1",
+      "path": "line~1.quantity.count",
       "steps": [
         {
           "field": "quantity"
@@ -287,8 +287,8 @@
     },
     {
       "collection": "cart.lines",
-      "binding": "line",
-      "path": "line.total.display",
+      "binding": "line~1",
+      "path": "line~1.total.display",
       "steps": [
         {
           "member": "domain.total"

@@ -1,5 +1,5 @@
 // @corpus: rejected
-// @id: R-063
+// @id: R-064
 // @category: a private query's record captured into a public manifest from a view's parameter
 // @rule: PW5007
 // @invariant: private_in_resume_manifest

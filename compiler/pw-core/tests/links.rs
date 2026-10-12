@@ -36,9 +36,11 @@ fn page(markup: &str) -> String {
 #[test]
 fn a_link_the_head_holds_is_refused_in_markup() {
     for (markup, said) in [
+        // A page's own canonical link is its head's (ADR-0311): one inside
+        // an element is not.
         (
-            "<link rel=\"canonical\" href=\"/stores/{id}\" />",
-            "PW5035 `<link rel=\"canonical\">` in `P` is written into the body, where HTML does not allow `canonical` and nothing reads it: the document's head holds the page's title and metadata, and the host's links",
+            "<p><link rel=\"canonical\" href={P(id)} /></p>",
+            "PW5035 `<link rel=\"canonical\">` in `P` is inside an element or a block, not at the top of its view, where HTML does not allow it and nothing reads it",
         ),
         (
             "<link rel=\"icon\" href=\"/favicon.ico\" />",

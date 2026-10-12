@@ -2369,6 +2369,23 @@ e14-invariants:
      } > docs/evidence/E14/invariants.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/invariants.txt
 
+# ADR-0310: a name means its binding, in every analysis. The checker's cases,
+# pw-core's tests, and the mutation controls.
+e14-name-bindings:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0310 - a name means its binding, in every analysis"; echo; \
+       echo "produced by: just e14-name-bindings"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the checker's cases (compiler/pw-core/tests/names_mean_their_binding.rs)"; echo; \
+       cargo test --locked -p pw-core --test names_mean_their_binding 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== pw-core's library and the corpus (checking_source, every_name_resolves)"; echo; \
+       cargo test --locked -p pw-core --lib --test checking_source --test every_name_resolves 2>&1 | grep -E '^test result|panicked at'; \
+       echo; echo "== mutation controls (scripts/name_binding_mutations.py)"; echo; \
+       python3 scripts/name_binding_mutations.py; \
+     } > docs/evidence/E14/name-bindings.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/name-bindings.txt
+
 # ADR-0304: what a page shows by the clock is told when the clock passes it.
 # The zones, the checker's cases, the host's clock and timers, and the
 # mutation controls.
@@ -5716,3 +5733,34 @@ e14-soft-navigation:
        python3 scripts/soft_navigation_mutations.py; \
      } > docs/evidence/E14/soft-navigation.txt
     @grep -E "passed|failed|mutants killed|Error:" docs/evidence/E14/soft-navigation.txt
+
+# ADR-0311: a page states its canonical address, and a navigation takes the
+# next page's head whole. Where a canonical link is and what it addresses,
+# the head it is written into, the host's origin, the corpus at C19, the
+# browser in three engines, and the mutation controls.
+e14-canonical:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0311 - a page states its canonical address"; echo; \
+       echo "produced by: just e14-canonical"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== where a canonical link is, and what it addresses (compiler/pw-core/tests/canonical.rs, links.rs)"; echo; \
+       cargo test --locked -p pw-core --test canonical --test links 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the head it is written into (runtime/pw-render/tests/canonical.rs)"; echo; \
+       cargo test --locked -p pw-render --test canonical 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host: the deployment's origin, and an origin read as one"; echo; \
+       cargo test --locked -p pw-dev-server -- a_page_s_canonical_address_is_written_with_the_deployment_s_origin an_origin_is_a_scheme_a_host_and_a_port 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the corpus at C19 (corpus-check, generality.rs, checking_source.rs)"; echo; \
+       cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
+       cargo test --locked -p pw-core --test generality --test checking_source 2>&1 | grep -E '^test result|panicked at'; \
+       echo; echo "== a canonical address, and a navigation's head, in three engines (e2e/canonical.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/canonical.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/canonical_mutations.py)"; echo; \
+       python3 scripts/canonical_mutations.py; \
+     } > docs/evidence/E14/canonical.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at|corpus-check" docs/evidence/E14/canonical.txt

@@ -103,7 +103,7 @@ Milestone: E14, the DoorDash store's customer side, milestone 1.
   `manifest_scope`, `check.rs` and `rules.rs` read it. Until 2026-10-09 a
   record only `private` queries produced carried no scope in
   `boundary.rs`'s `TypeFacts`, so a view's parameter of it crossed into the
-  public shell unrefused (R-063, R-030 at the user's level): a soundness
+  public shell unrefused (R-064, R-030 at the user's level): a soundness
   fix.
 - **Disagreeing scoped producers are joined.** `TypeFacts` kept the last
   producer's scope alone, by the order of the units and the declarations
@@ -237,12 +237,12 @@ All 2026-10-09, relayed through the coordinating session.
 4. *`boundary.rs`'s scope, last writer wins, `private` unmapped?* **Map
    `private` to the user's; join disagreeing producers** (not drop the scope,
    which is R-030's whole check); a rejected fixture for the user's level
-   (R-063); the precision is the store's to resolve, by a record of its own
+   (R-064); the precision is the store's to resolve, by a record of its own
    or by moving the library's session `Cart` (4).
 5. *`private` means the user's and not importable: a `user` visibility?*
-   **Yes** (4), with an accepted and a rejected fixture (A-033, R-064) and
-   mutation controls for the parse and the import. R-063 is `private`'s
-   case, and R-064 `user`'s: no duplicate.
+   **Yes** (4), with an accepted and a rejected fixture (A-034, R-065) and
+   mutation controls for the parse and the import. R-064 is `private`'s
+   case, and R-065 `user`'s: no duplicate.
 6. *The superset telling breaks two browser tests (store.spec's part ids,
    transport's frame order): telling by principal, a narrower change to
    ADR-0219's empty sets, or the tests made to ignore other sessions'
@@ -302,7 +302,7 @@ Recorded by `just e14-store-accounts` in
   query both make held by neither's page, in either order of the units, and
   each held by its own scope's page alone); `boundary.rs`'s own (the join
   refuses what either scope alone would).
-- **The corpus**: corpus-check, R-063, A-033 and R-064 (C19).
+- **The corpus**: corpus-check, R-064, A-034 and R-065 (C20).
 - **The server**, in memory and with the store on PostgreSQL
   (`tests/store_accounts.rs`, `store.rs`'s joins):
   - two users' carts never share a line: each adds to their own, reads their
@@ -373,8 +373,8 @@ Recorded by `just e14-store-accounts` in
 
 - **The compiler**: `user`, a contextual visibility (`grammar.rs`,
   `lower.rs`, `check.rs`, `rules.rs`, `manifest.rs`, `pw explain`);
-  `boundary.rs`'s scope joined and `private`'s the user's. Corpus C19:
-  R-063, A-033, R-064, and the library's `Saved`.
+  `boundary.rs`'s scope joined and `private`'s the user's. Corpus C20:
+  R-064, A-034, R-065, and the library's `Saved`.
 - **The program**: `examples/lib/UserCarts.pw` (`UserCart`, its members and
   transitions, `store:data/user-carts`), `UserOrders.pw`,
   `UserCartChanged` and `UserOrderChanged`; the store's `user query Cart`,
@@ -474,6 +474,28 @@ Recorded by `just e14-store-accounts` in
   runtime's `pw-after` beside `pw-document`, and `command_order`'s wait
   mutant re-anchored. **Two identity.spec tests are told the platform's
   words**: "a tab whose reader signed out in another is told so at its next
-  post" now, and track/holds' "a like pressed on a page whose reader signed
-  out in another tab is refused where it was pressed" once it merges.
+  post", and holds' "a like pressed on a page whose reader signed out in
+  another tab is refused where it was pressed" (its last check, a press
+  from no page, still the feed's words for `SignedIn`).
+- `origin/master` merged at `8dc4b1f0` (holds, ADR-0307): the store's cart
+  controls ask nothing, a cart being anyone's to change, and only Place
+  order stands under `{#if SignedIn}` (PW5048), in the store's words "Sign
+  in to place an order."; the static render answers `SignedIn` false
+  (`store-values.json`). Holds keeps a document's predicate answers by the
+  document, `(session, number)`, as the stale tab's rule keeps its page:
+  both say a page is the reader's it was shown to, and neither reads the
+  other (holds at the document's read, the rule at the command route).
+  `slots`, `menu_changed` and `not_found`'s bound raised to 1800 s: the
+  server's whole suite, which they run per mutant, took 941 to 961 s on
+  CI at 420 tests, past their 900.
+- `origin/master` merged at store-search (ADR-0308) and query params
+  (ADR-0309): both sides kept at each seam; `SearchPage` a `user` page, its
+  layout being one. **Found**: PW5046 on a `session` page in a `user`
+  layout of another file made `pw check` panic, its annotation's span the
+  layout's rendered against the page's file (reported).
+- `origin/master` merged at `4d6374bd` (ADR-0310, ADR-0311, the narrowing):
+  **corpus renumbered** at ADR-0311's taking C19, A-033 and R-063: this
+  track's are C20, A-034, R-064 (was R-063) and R-065 (was R-064); 34
+  accepted, 65 rejected, generality 45/45. The library's `estimate_to`
+  stays (ADR-0310 binds `<ready as>` where written; either name works).
 - **The four status documents are untouched.**

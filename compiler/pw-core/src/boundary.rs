@@ -113,7 +113,7 @@ impl TypeFacts {
                 // declaration gives and resume.rs's `manifest_scope` read it.
                 // Until 2026-10-09 a type only `private` queries produce
                 // carried no scope here, so a view's parameter of it crossed
-                // into a public manifest unrefused (R-063).
+                // into a public manifest unrefused (R-064).
                 let restriction = match d.visibility.as_deref() {
                     Some("session") => Restriction::Session("SessionId".into()),
                     Some("user") | Some("private") => Restriction::User("UserId".into()),

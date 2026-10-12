@@ -862,7 +862,37 @@ Generality at open:        44/44 invariants generality-tested
 | R-061 | added: a fragment of the session's cart placed at build (`PW5002`) | new category |
 | R-062 | added: a page placed at build reading the session through a query of its own (`PW5002`) | new category |
 
-## C19: a private query's record the user's, and `user`, 2026-10-09
+## C19: a page states its canonical address, 2026-10-12
+
+Opened because the specification changed. A page states its canonical
+address with `<link rel="canonical" href={Page(args)} />` once, at the top of
+its view: a page's address, checked as a navigation's is (`PW5051`). Anywhere
+else a canonical link is still refused (`PW5035`).
+[ADR-0311](DECISIONS/ADR-0311-a-page-states-its-canonical-address.md) is the
+decision. No invariant is retired. One fixture changed:
+
+- **R-053**: its canonical link, which was at the top of the page's view, is
+  now inside `<main>`. At the top it would be the page's own address,
+  refused only for its text (R-063's defect).
+- **R-053's `@expect-error` lines**: they now say where the link is, and
+  quote PW5035's invariant as it names the exception.
+
+```text
+Corpus version:            C19
+Accepted programs:         33
+Rejected programs:         63
+Charter categories:        33/33 accepted, 63/63 rejected
+Generality at open:        45/45 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-033 | added: a page's own canonical address, beside its title and its description | new category, `page states its canonical address` |
+| R-053 | changed: its canonical link inside `<main>` (`PW5035`) | its category kept |
+| R-063 | added: a canonical address written as text (`PW5051`) | new category |
+| `canonical_address` | a GENERAL witness, an address that calls a view, and a NEIGHBOUR one, another page's address given by name in another order | new invariant |
+
+## C20: a private query's record the user's, and `user`, 2026-10-09
 
 Opened because the specification changed, twice, by the integrator's
 rulings of 2026-10-09 (track `store-accounts`, ADR-XXXX):
@@ -879,18 +909,18 @@ rulings of 2026-10-09 (track `store-accounts`, ADR-XXXX):
 
 No invariant is retired, no `@expect-error` line of an earlier fixture
 changed, and no fixture moved. The library gains `Saved`, a `user` query
-and the record only it produces, which A-033 and R-064 import.
+and the record only it produces, which A-034 and R-065 import.
 
 ```text
-Corpus version:            C19
-Accepted programs:         33
-Rejected programs:         64
-Charter categories:        33/33 accepted, 64/64 rejected
-Generality at open:        44/44 invariants generality-tested
+Corpus version:            C20
+Accepted programs:         34
+Rejected programs:         65
+Charter categories:        34/34 accepted, 65/65 rejected
+Generality at open:        45/45 invariants generality-tested
 ```
 
 | Fixture | Change | Kind |
 |---|---|---|
-| R-063 | added: a `private` query's record captured into the public shell from a view's parameter (`PW5007`) | new category |
-| A-033 | added: a `user` query imported from the library and read, and captured, on a `user page` | new category |
-| R-064 | added: the same `user` query's record captured into a public page's manifest (`PW5007`) | new category |
+| R-064 | added: a `private` query's record captured into the public shell from a view's parameter (`PW5007`) | new category |
+| A-034 | added: a `user` query imported from the library and read, and captured, on a `user page` | new category |
+| R-065 | added: the same `user` query's record captured into a public page's manifest (`PW5007`) | new category |

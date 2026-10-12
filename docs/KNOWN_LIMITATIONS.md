@@ -583,12 +583,6 @@ awaited in order. What remains:
   making recomputes its body whole, asking it again for each read it
   lacks; `regenerate on_read` is not run. One that declares no type is a
   fragment the host renders, the store's still wired by hand.
-- **A loop's name that shadows a page's binding is read as the binding**
-  (found 2026-10-08, ADR-0277). The page plan types a read by its root's
-  name among the page's bindings before its loops: on the store's page, a
-  binding named `line` beside the cart's `{#each cart.lines as line}` was
-  read for `line.name` inside the loop, and the build refused. The checker
-  accepts the shadowing; the binding is named `summary`.
 - **The clock is read by comparison alone** (ADR-0304): no value of "now"
   is kept or shown, so a countdown ("closes in 12 minutes") is not
   written; a handler reads no clock; a page built once and a public
@@ -600,6 +594,11 @@ awaited in order. What remains:
 - **A layout is one, unnested, and given nothing** (ADR-0303): a page names
   one layout; a layout is shown in no other, is given none of the page's
   parameters, has no title template of its own, and holds one slot.
+- **A page's canonical address names a page without a query part, and only
+  `canonical` is hoisted** (ADR-0311): `alternate`, `icon` and `manifest`
+  links stay refused, as does a canonical address with a query. Whether
+  the named page's content duplicates this one's, as RFC 6596 asks, is the
+  program's to decide.
 - **A page's query parameters are text, and given by a link or a form**
   (ADR-0309): a list (`{?tag*}`) or a typed number is not read, `{&name}`
   continuation and a literal query part are refused, and `navigate` gives

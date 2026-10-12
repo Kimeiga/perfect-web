@@ -195,8 +195,8 @@ MUTANTS = [
         "metadata is lowered with the rest of the view",
         "core",
         TEMPLATE,
-        "        .partition(|r| page && (is_title(body, *r) || is_meta(body, *r)));\n",
-        "        .partition(|r| page && is_title(body, *r));\n",
+        "        .partition(|r| page && (is_title(body, *r) || is_meta(body, *r) || canonical == Some(*r)));\n",
+        "        .partition(|r| page && (is_title(body, *r) || canonical == Some(*r)));\n",
     ),
     (
         "metadata is numbered before the title",
@@ -243,8 +243,10 @@ MUTANTS = [
         "core",
         PLAN,
         "            Part::Meta { content, .. } => title_reads(content),\n"
+        "            Part::Canonical { args, .. } => canonical_reads(args),\n"
         "            // A stream's query's arguments",
         "            Part::Meta { .. } => Vec::new(),\n"
+        "            Part::Canonical { args, .. } => canonical_reads(args),\n"
         "            // A stream's query's arguments",
     ),
     (

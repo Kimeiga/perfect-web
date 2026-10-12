@@ -23,6 +23,45 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-12: three mutation scripts' server mutants run the server tests
+that see them** (W6's ruling of 2026-10-09; track `narrowing`, merged from
+`973df1a`). Each ran the development server's whole suite for every
+mutant. They now run the tests measured to fail under its mutants, two per
+mutant where two do. `e14-command-answers` went from 10,599 to 2,105 s,
+`e14-availability` from 8,012 to 3,206 s and `e14-connection-faults` from
+9,614 to 1,498 s, about 21,400 s of a full verify. Every mutant is still
+killed (verify 38206663536).
+
+**ADR-0311, 2026-10-12: a page states its canonical address** (the
+integrator's; track `canonical`, merged from `d65f278`). kiokun's word page
+answers an inflected word with its dictionary form's entry, so it names
+that entry's address its own. `<link rel="canonical" href={Page(args)} />`
+at the top of a page's view is a page's address, checked as a navigation's
+is. The host writes it absolute with `PW_ORIGIN`, never the request's
+`Host`, and writes `og:url` from it.
+- Found: lowered as a call, an address took on the effects and the privacy
+  label of the page it names. Exempting the analyses one at a time missed
+  the label, and the mutation controls found it. An address is now its own
+  node in the HIR, which no analysis reads as a call.
+- Found: a soft navigation kept the last page's Open Graph properties and
+  `theme-color` (ADR-0306, amended): the next page's head is taken whole.
+Verify 38203954490 green: 21 of 21 mutants, the corpus (C19 at the merge,
+written C20 on the track), and the canonical spec in three engines.
+
+**ADR-0310, 2026-10-12: a name means its binding, in every analysis** (the
+integrator's; track `shadowing`, merged from `02a6319`). ADR-0063 ruled that
+every name means one binding, and three analyses still read names by their
+spelling:
+- `<ready as>` bound nowhere, so W8's page was charged a module function's
+  effects;
+- a call through a `let` was charged its namesake's row;
+- the page plan read a loop's `line` as the page's binding `line`.
+Each now asks `Lexical`, and a template's block that binds a name the page
+could read gets a name no source writes. The store's binding is `line` again.
+Verify 38190590057 green: 14 of 14 mutants. The merge kept holds' predicate
+names beside the template's renamed bindings, and made the store's IR and
+plan again.
+
 **ADR-0309, 2026-10-12: a page's query parameters are typed, and a GET form
 makes them** (the integrator's; track `query-params`, merged from `718bbfd`).
 A search's text belongs in the address's query, where a browser's GET form

@@ -1,13 +1,13 @@
 ADR-0048 - a read names a member its value's type has
 
 produced by: just e10-members
-commit: 661c8a0b2294e82f23e01740a66e760d88114966
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37911914095 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: d65f2785ad21bf9bd599e639aec2c156d25c0a51
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38203954490 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the member tests (compiler/pw-core/tests/members.rs)
 
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
 
 == what must stay clean: errors reported
 
@@ -17,7 +17,7 @@ kiokun: 0
 
 == what the audit decided (member relations, the accepted corpus)
 
-  Member      agree                            106
+  Member      agree                            108
   Member      undecided: Unknown               2
 
 == mutation controls (scripts/member_mutations.py)

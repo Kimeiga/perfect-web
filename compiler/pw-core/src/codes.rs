@@ -650,7 +650,12 @@ codes! {
     // and built, and was written into the body, where HTML does not allow
     // it and nothing reads it.
     LINK_NOT_IN_BODY = "PW5035" / link_not_in_body / 1, Markup,
-        "a `<link>` in markup is one HTML allows in the body: each relation body-ok, or an item's property";
+        "a `<link>` in markup is one HTML allows in the body, each relation body-ok or an item's property, or a page's canonical address, once at the top of its view";
+    // ADR-0311: a page could not say which address is its own. Its
+    // canonical link names a page, as `navigate` does (ADR-0280): an
+    // address written as text could name no page, or one served elsewhere.
+    CANONICAL_ADDRESS = "PW5051" / canonical_address / 1, Markup,
+        "a page's canonical address is a page's, `href={Page(args)}`, served at a route without a query part, each argument a value the page reads or text";
     // ADR-0221: `<textarea bind:value={draft}>` was written as an attribute
     // a textarea does not have, and a first value showed nothing until the
     // runtime set it; a `<select>`'s likewise. Found by the feed (ADR-0220).

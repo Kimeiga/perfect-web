@@ -2791,8 +2791,8 @@ function markupBetween(start, end) {
 /** Show `next`, a fetched document of the same layout, in this one: its
  * slot's markup in place of this one's, each of the layout's regions it
  * renders differently taken from it, and each of the layout's elements'
- * attributes, its head's title, description and style, its parts manifest,
- * and the regions its response filled after its body. */
+ * attributes, its head's title, what it states of itself and its style, its
+ * parts manifest, and the regions its response filled after its body. */
 function showNext(next, nextParts, here, there) {
   const layout = parts.layout;
   // The page: this one's markup out, the next one's in.
@@ -2838,12 +2838,14 @@ function showNext(next, nextParts, here, there) {
       if (own.getAttribute(a.name) !== a.value) own.setAttribute(a.name, a.value);
     }
   }
-  // Its head.
+  // Its head: what the page states of itself, every `<meta>` but the host's
+  // charset and viewport (ADR-0186), its canonical address and Open Graph's
+  // from it (ADR-0311), and its style. Until ADR-0311 only a description
+  // was taken, and the last page's other metadata stayed.
   document.title = next.title;
-  for (const sel of ['meta[name="description"]', "style"]) {
-    for (const el of document.head.querySelectorAll(sel)) el.remove();
-    for (const el of next.head.querySelectorAll(sel)) document.head.append(document.importNode(el, true));
-  }
+  const stated = 'meta[name]:not([name="viewport" i]), meta[property], link[rel="canonical"], style';
+  for (const el of document.head.querySelectorAll(stated)) el.remove();
+  for (const el of next.head.querySelectorAll(stated)) document.head.append(document.importNode(el, true));
   // Its manifest, which the next runtime reads.
   document.getElementById("pw-parts").textContent = JSON.stringify(nextParts);
   // What its response filled after its body (ADR-0148), for the next

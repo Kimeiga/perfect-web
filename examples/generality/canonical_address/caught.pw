@@ -1,0 +1,20 @@
+// @status: GENERAL
+// @invariant: canonical_address
+//
+// Structurally different from R-063: the address is a call, not text, and
+// what it calls is a view, which is rendered and served at no address.
+
+module generality.canonical_view
+
+view StoreCard(name: String) !{} {
+    <p>{name}</p>
+}
+
+page StoreMenu(name: String) !{} {
+    route "/menus/{name}"
+    view {
+        <title>Menu</title>
+        <link rel="canonical" href={StoreCard(name)} />
+        <main><h1>{name}</h1></main>
+    }
+}

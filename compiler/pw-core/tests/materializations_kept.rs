@@ -161,13 +161,13 @@ fn a_page_that_reads_one_depends_on_it_and_binds_it() {
         .find(|p| p.page == "store.page.StorePage")
         .and_then(|p| p.plan.as_ref().ok())
         .expect("the store's page is planned");
-    let summary = serde_json::to_value(plan).expect("a plan is JSON");
-    let bound = summary["bindings"]
+    let plan = serde_json::to_value(plan).expect("a plan is JSON");
+    let bound = plan["bindings"]
         .as_array()
         .into_iter()
         .flatten()
-        .find(|b| b["binding"] == "summary")
-        .expect("the page binds its summary");
+        .find(|b| b["binding"] == "line")
+        .expect("the page binds its menu's line");
     assert_eq!(bound["resource"], "store.page.MenuLine");
     assert_eq!(bound["args"], serde_json::json!(["id"]));
     // The control: the page depends on no fragment it does not read.

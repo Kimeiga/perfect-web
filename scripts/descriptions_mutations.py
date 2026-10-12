@@ -36,7 +36,7 @@ STORE = ROOT / "examples/store/app.pw"
 # Re-anchored by ADR-0277: the menu counted, a line after the store's own.
 BOTH_DESCRIPTIONS = (
     "            <p id=\"store-description\">{store.description}</p>\n"
-    "            <p id=\"menu-line\">{summary}</p>\n"
+    "            <p id=\"menu-line\">{line}</p>\n"
     "\n"
     # Re-anchored by track store-accounts (milestone 2): where deliveries go,
     # and the estimate to the reader's chosen address.
@@ -155,7 +155,7 @@ MUTANTS = [
         BOTH_DESCRIPTIONS.replace(
             "            <p id=\"store-description\">{store.description}</p>\n", ""
         )
-        .replace("            <p id=\"menu-line\">{summary}</p>\n", "")
+        .replace("            <p id=\"menu-line\">{line}</p>\n", "")
         .replace("                                    <p>{item.description}</p>\n", "")
         # And where deliveries go (track store-accounts), which says more of
         # the store too: without it the store says as little as it did.

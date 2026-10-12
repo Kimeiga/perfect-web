@@ -87,7 +87,7 @@ fn a_user_query_is_imported_and_read_on_a_user_page() {
 
 #[test]
 fn a_user_querys_record_is_the_users_and_no_other_manifest_holds_it() {
-    // Into the public shell: refused, as R-063's `private` one is.
+    // Into the public shell: refused, as R-064's `private` one is.
     let found = codes(&[("saved.pw", saved("user")), ("shop.pw", page(""))]);
     assert!(
         found.contains(&"PW5007".to_string()),

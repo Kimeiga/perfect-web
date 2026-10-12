@@ -63,7 +63,7 @@ pub enum Binder {
 }
 
 /// **The binding each use of a local name means, in one body.**
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Lexical {
     /// Each `Expr::Name` that names a local, and the binding it names.
     uses: BTreeMap<ExprId, Binder>,
@@ -482,6 +482,7 @@ impl Walk<'_> {
                     // `<ready as={items}>` and `<failed as={e}>`, a stream's
                     // parts, bind the name for their children.
                     let part = matches!(tag.as_str(), "ready" | "failed");
+                    let element = *n;
                     let mut bound = None;
                     for a in attrs {
                         let AttrValue::Expr(e) = a.value else {
@@ -492,6 +493,11 @@ impl Walk<'_> {
                             && let Expr::Name(n) = self.body.expr(e)
                         {
                             bound = Some(n.clone());
+                            // The name where it is bound means the binding
+                            // too (W8's finding, 2026-10-09): until then it
+                            // meant nothing here, and an analysis that asked
+                            // took it for a module's member of that name.
+                            self.out.uses.insert(e, Binder::Stream(element));
                             continue;
                         }
                         self.expr(e, scope);

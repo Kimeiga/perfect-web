@@ -1,7 +1,8 @@
 ADR-0189 - a <link> is written where HTML allows it
 
 produced by: just e14-links
-commit: 699900d6b3d8258029c94d7556abb7873c073cd3
+commit: d65f2785ad21bf9bd599e639aec2c156d25c0a51
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38203954490 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the rule (compiler/pw-core/tests/links.rs)
@@ -12,22 +13,22 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 == the corpus at C12 (corpus-check, generality.rs, checking_source.rs)
 
-accepted: 28 files
-accepted: 28/28 charter §16 categories covered
-rejected: 53 files
-rejected: 53/53 charter §16 categories covered
+accepted: 33 files
+accepted: 33/33 charter §16 categories covered
+rejected: 63 files
+rejected: 63/63 charter §16 categories covered
 corpus-check: OK
-test every_rejected_fixture_emits_only_its_own_defect ... ok
 test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
+test every_rejected_fixture_emits_only_its_own_defect ... ok
 test every_diagnostic_carries_what_charter_16_3_requires ... ok
-test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.16s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 49.31s
 test generality_is_reported_separately_from_conformance ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.64s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.95s
 
 == every program the repository checks
 
-pw check: 68 file(s), no diagnostics
-pw check: 50 file(s), no diagnostics
+pw check: 75 file(s), no diagnostics
+pw check: 54 file(s), no diagnostics
 pw check: 26 file(s), no diagnostics
 pw check: 42 file(s), no diagnostics
 
@@ -44,3 +45,4 @@ a relation computed in place is let through: KILLED (1 of 2 tests fail)
 a stylesheet is refused: KILLED (1 of 2 tests fail)
 an item's property is refused: KILLED (1 of 2 tests fail)
 9 of 9 mutants killed
+memory bound: no process was stopped

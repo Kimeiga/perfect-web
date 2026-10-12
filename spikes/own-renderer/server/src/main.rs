@@ -942,6 +942,12 @@ struct Server {
     identity: identity::Identity,
     /// **A request whose body is a file**: the uploads track's (ADR-0253).
     uploads: uploads::Uploads,
+    /// **The deployment's public origin** (ADR-0311), `PW_ORIGIN`, as the
+    /// identity reads it: what a page's canonical address is written
+    /// absolute with, never a request's `Host`, which its client chooses.
+    /// Set once, as the server starts; a page that states its canonical
+    /// address cannot be served without it.
+    origin: std::sync::OnceLock<String>,
 }
 
 /// How many interactions' outcomes one session keeps (ADR-0121). A retry of
@@ -1585,6 +1591,7 @@ impl Server {
             pending: Mutex::new(BTreeMap::new()),
             slow: Mutex::new(std::collections::VecDeque::new()),
             tellings: Mutex::new(std::collections::VecDeque::new()),
+            origin: std::sync::OnceLock::new(),
             shown: Mutex::new(BTreeMap::new()),
             documents: std::sync::atomic::AtomicU64::new(1),
             params: Mutex::new(BTreeMap::new()),
@@ -5178,6 +5185,10 @@ impl Server {
             .unwrap_or_else(|| template.name.clone());
         let metadata = pw_render::head_metadata(template, &env)
             .map_err(|e| format!("`{path}`'s metadata does not render: {e:?}"))?;
+        // And the address it names its own (ADR-0311).
+        let metadata = metadata
+            + &pw_render::head_canonical(template, &env, self.origin.get().map(String::as_str))
+                .map_err(|e| format!("`{path}`'s canonical address does not render: {e:?}"))?;
         Ok((
             signal_document(
                 &body,
@@ -5253,6 +5264,19 @@ impl Server {
                     Ok((page.clone(), params))
                 }
                 None => Err(format!("`{path}`'s query is no text its route can read")),
+            })
+        })
+    }
+
+    /// **Whether a page this build serves states its canonical address**
+    /// (ADR-0311): such a host is not started without a public origin.
+    fn states_canonical(&self) -> bool {
+        self.templates.iter().any(|t| {
+            t.chunks.iter().any(|c| {
+                matches!(
+                    c,
+                    pw_render::Chunk::Dynamic(pw_render::Part::Canonical { .. })
+                )
             })
         })
     }
@@ -7191,6 +7215,18 @@ fn main() {
             eprintln!("pw dev server: {e}");
             std::process::exit(1);
         });
+    // A page's canonical address is written with the public origin
+    // (ADR-0311), or the server does not start.
+    let stated = std::env::var("PW_ORIGIN").is_ok_and(|o| !o.is_empty());
+    match canonical_origin(&server, &deployment, stated) {
+        Ok(origin) => {
+            let _ = server.origin.set(origin);
+        }
+        Err(e) => {
+            eprintln!("pw dev server: {e}");
+            std::process::exit(1);
+        }
+    }
     let listener = TcpListener::bind(("127.0.0.1", port)).expect("bind");
     println!("pw dev server on {port}");
     // TRACK SEAM (identity): which identity model runs.
@@ -8790,6 +8826,17 @@ fn serve_bound(
                 return unavailable(stream, Unread::Failed(format!("its metadata: {why:?}")));
             }
         };
+        // And the address it names its own (ADR-0311).
+        let origin = server.origin.get().map(String::as_str);
+        let metadata = match pw_render::head_canonical(template, &env, origin) {
+            Ok(canonical) => metadata + &canonical,
+            Err(why) => {
+                return unavailable(
+                    stream,
+                    Unread::Failed(format!("its canonical address: {why:?}")),
+                );
+            }
+        };
         // What it asked of its reader, as the host answered for it (ADR-0307).
         let holds: BTreeMap<String, bool> = server.plan_of(page)["predicates"]
             .as_array()
@@ -8897,6 +8944,26 @@ fn moved(
         &format!("{PRIVATE}{cookie}location: {location}\r\n"),
         body.as_bytes(),
     );
+}
+
+/// **The origin a page's canonical address is written with** (ADR-0311):
+/// the deployment's public origin, `stated` where `PW_ORIGIN` names it. A
+/// production deployment whose pages state one, and that states no origin,
+/// is refused at start, rather than given this machine's: every canonical
+/// address it wrote would name a loopback address.
+fn canonical_origin(
+    server: &Server,
+    deployment: &identity::Deployment,
+    stated: bool,
+) -> Result<String, String> {
+    if server.states_canonical() && !deployment.development && !stated {
+        return Err(
+            "its pages state their canonical address, and PW_ORIGIN states no \
+                    public origin to write it with"
+                .to_string(),
+        );
+    }
+    Ok(deployment.origin.clone())
 }
 
 /// **A page that binds no query, at the parameters `params` give it**
@@ -16509,6 +16576,82 @@ public query Store(",
             assert!(head.contains(&meta), "{store}: {head}");
             assert!(!body.contains("<meta"), "{store}: {body}");
         }
+    }
+
+    /// **A page states its canonical address** (ADR-0311): the store's
+    /// page, given `<link rel="canonical" href={StorePage(id)} />`, is served
+    /// with it in its head, absolute with the deployment's origin and never
+    /// the request's `Host`, Open Graph's `og:url` from it, and nothing of
+    /// either in its body. A host with no origin cannot write it, and does
+    /// not serve the page.
+    #[test]
+    fn a_page_s_canonical_address_is_written_with_the_deployment_s_origin() {
+        fn stated(app: &str) -> String {
+            const DESCRIBED: &str =
+                "        <meta name=\"description\" content={store.description} />\n";
+            assert_eq!(app.matches(DESCRIBED).count(), 1, "the page's description");
+            app.replace(
+                DESCRIBED,
+                &format!("{DESCRIBED}        <link rel=\"canonical\" href={{StorePage(id)}} />\n"),
+            )
+        }
+        let page = |s: &Server| -> String {
+            fetched_as(s, &format!("/stores/{STORE_ID}"), Some("a"))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect()
+        };
+        let s = served_from_patches_in("examples", stated, &[]);
+        assert!(s.states_canonical());
+        recommend(&s, 0, None);
+        s.origin
+            .set("https://store.example".to_string())
+            .expect("set once");
+        let whole = page(&s);
+        let (head, body) = whole.split_once("</head>").expect("a head");
+        let address = format!("https://store.example/stores/{STORE_ID}");
+        assert!(
+            head.contains(&format!(
+                "<link rel=\"canonical\" href=\"{address}\">\n\
+                 <meta property=\"og:url\" content=\"{address}\">\n"
+            )),
+            "{head}"
+        );
+        // The request said `Host: t`, which its client chose.
+        assert!(!whole.contains("//t/"), "{head}");
+        // Neither element in the body, where only the parts manifest names
+        // the part.
+        assert!(
+            !body.contains("<link rel=\"canonical\"") && !body.contains("property=\"og:url\""),
+            "{body}"
+        );
+        // With no origin, the page is not shown rather than shown with an
+        // address made up.
+        let without = served_from_patches_in("examples", stated, &[]);
+        recommend(&without, 0, None);
+        let refused = page(&without);
+        assert!(refused.starts_with("HTTP/1.1 503"), "{refused}");
+        assert!(refused.contains("its canonical address"), "{refused}");
+        // The control: the store as it is states none.
+        let plain = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        assert!(!plain.states_canonical());
+        // At start: a production deployment whose pages state one is given
+        // its stated origin, and refused without one; a development one has
+        // this machine's; and one whose pages state none needs none.
+        let at = |development: bool| identity::Deployment {
+            development,
+            origin: "https://store.example".to_string(),
+        };
+        assert_eq!(
+            canonical_origin(&s, &at(false), true).as_deref(),
+            Ok("https://store.example")
+        );
+        assert!(
+            canonical_origin(&s, &at(false), false)
+                .is_err_and(|e| e.contains("PW_ORIGIN states no public origin"))
+        );
+        assert!(canonical_origin(&s, &at(true), false).is_ok());
+        assert!(canonical_origin(&plain, &at(false), false).is_ok());
     }
 
     /// **A page that binds no query describes itself in its head too**

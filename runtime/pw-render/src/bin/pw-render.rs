@@ -28,7 +28,7 @@ fn main() -> std::process::ExitCode {
         eprintln!(
             "usage: pw-render --out DIR [--values FILE] [--plan FILE] [--resume FILE] \
              [--runtime SRC] [--document KEY] [--partition P] \
-             [--compatibility GEN] [--identity-key K] [--wrap TITLE] \
+             [--compatibility GEN] [--identity-key K] [--wrap TITLE] [--origin ORIGIN] \
              < template-ir.json"
         );
         return std::process::ExitCode::from(2);
@@ -262,6 +262,15 @@ fn main() -> std::process::ExitCode {
             Ok(metadata) => metadata,
             Err(e) => {
                 eprintln!("pw-render: {}: its metadata: {e}", t.path);
+                return std::process::ExitCode::FAILURE;
+            }
+        };
+        // And the address it names its own, with the deployment's public
+        // origin, `--origin` (ADR-0311).
+        let metadata = match pw_render::head_canonical(t, &env, flag("--origin").as_deref()) {
+            Ok(canonical) => metadata + &canonical,
+            Err(e) => {
+                eprintln!("pw-render: {}: its canonical address: {e}", t.path);
                 return std::process::ExitCode::FAILURE;
             }
         };

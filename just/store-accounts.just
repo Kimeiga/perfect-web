@@ -8,7 +8,7 @@
 # Track `store-accounts` (ADR-XXXX), milestone 1: a cart and an order a
 # user's. The compiler's `user` visibility and a record's scope its producers'
 # joined (tests/user_visibility.rs, tests/boundary_matrix.rs, boundary.rs's
-# own); the corpus (R-063, A-033, R-064); the server's (tests/store_accounts.rs
+# own); the corpus (R-064, A-034, R-065); the server's (tests/store_accounts.rs
 # and store.rs's joins), in memory and with the store on PostgreSQL; identity's
 # sign-in, which tells the store of a guest signed in; telling by principal,
 # which the feed's notifications share; milestone 2's delivery addresses
@@ -35,7 +35,7 @@ e14-store-accounts:
        cargo test --locked -p pw-core --test user_visibility 2>&1 | grep -E '^(test |test result)|panicked at'; \
        cargo test --locked -p pw-core --test boundary_matrix 2>&1 | grep -E '^(test |test result)|panicked at'; \
        cargo test --locked -p pw-core --lib boundary 2>&1 | grep -E '^(test |test result)|panicked at'; \
-       echo; echo "== the corpus (corpus-check; R-063, A-033, R-064)"; echo; \
+       echo; echo "== the corpus (corpus-check; R-064, A-034, R-065)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        echo; echo "== the server, the store in memory (tests/store_accounts.rs, store.rs's joins, tests/sign_in.rs, tests/addresses.rs, places.rs)"; echo; \
        PW_STORE_TEST_LAYER=memory cargo test --locked -p pw-dev-server -- tests::store_accounts:: store::joins:: tests::sign_in:: tests::notifications:: a_sessions_own_change_reaches_no_other_session tests::addresses:: places:: 2>&1 | grep -E '^(test |test result)|panicked at'; \

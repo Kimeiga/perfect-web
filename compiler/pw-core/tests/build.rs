@@ -141,7 +141,7 @@ fn the_store_builds_every_artifact_from_source() {
             "Resources.Order",
             "Resources.Store",
             // The library's `user` query the corpus imports (track
-            // `store-accounts`, A-033 and R-064).
+            // `store-accounts`, A-034 and R-065).
             "Saved.SavedFor"
         ]
     );

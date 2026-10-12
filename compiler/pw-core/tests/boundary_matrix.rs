@@ -408,7 +408,7 @@ page Checkout(id: StoreId) {
 
 #[test]
 fn a_private_querys_record_is_its_users_and_no_public_manifest_holds_it() {
-    // R-063's fact (track `store-accounts`): a `private` query is a user's
+    // R-064's fact (track `store-accounts`): a `private` query is a user's
     // (ADR-0270), so a record only it produces is the user's, as a record
     // only a `session query` produces is the session's (R-030). Until
     // 2026-10-09 `private` gave the type no scope, and a view's parameter of
