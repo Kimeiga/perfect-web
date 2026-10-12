@@ -884,10 +884,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
               reproducible, a loss shown as plainly as a win, and no
               placeholder shipped as a number; served here first, any
               public deploy on the owner's explicit go;
-          - **W8, search and filters**: stores and dishes, by name and
-            cuisine, run in the database or a declared search source, its
-            guarantees stated as ADR-0207 states a source's; no search engine
-            is built here;
+          - ~~**search and filters**~~: stores and dishes, by name and
+            cuisine, searched in the store's data layer to one meaning
+            (ADR-0308, W9's, merged 2026-10-12). Its next steps, W9's: the
+            search's route and form once a route reads its query part
+            (`route "/search{?q}"`, the integrator's next merge); the cuisine
+            as the store's own field after W8's merge (ruled 2026-10-12);
+            results filtered to the stores that reach the reader's address,
+            through W8's `Reach`;
           - **W9, ratings and reviews** of orders and stores, after
             accounts.
 

@@ -1,8 +1,8 @@
 ADR-0207 - a data source states what it guarantees, and nothing asks it for more
 
 produced by: just e14-data-sources
-commit: 6964ee77b89b8ab24ab7fac6e5b651efa878aeb2
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37993980886 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: b32f7dc1cd3be745fd77d38f97cda063889dbf64
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38188240871 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the rules, and the store's source (compiler/pw-core/tests/data_sources.rs)
@@ -16,11 +16,11 @@ test a_commands_writes_are_in_one_source ... ok
 test a_source_holds_what_the_programs_effects_name_once ... ok
 test a_query_asks_no_more_consistency_than_its_source_reads ... ok
 test the_store_states_its_source_and_asks_only_what_it_gives ... ok
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
 
 == the store, checked with examples/lib/StoreData.pw
 
-pw check: 44 file(s), no diagnostics
+pw check: 45 file(s), no diagnostics
 
 == mutation controls (scripts/data_sources_mutations.py)
 

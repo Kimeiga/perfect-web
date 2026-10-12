@@ -679,6 +679,8 @@ mod kiokun;
 mod clock;
 // ADR-0305: a page's commands run in the order it sent them.
 mod order;
+// TRACK SEAM (store-search): the store's search, in its data layer (W9).
+mod search;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -4217,7 +4219,21 @@ impl Server {
             &args,
             std::slice::from_ref(&event),
             |delivered| {
-                self.invalidate_queries("", &[], delivered);
+                let reached = self.invalidate_queries("", &[], delivered);
+                // TRACK SEAM (store-search), found by W9, a host fix: what the
+                // change dropped is told to each session reading it (ADR-0219).
+                // The store's pages are told by broadcast_menu's own patches;
+                // reading them again finds nothing changed; excluded to save
+                // that read, not for correctness
+                // (a_menu_change_tells_the_stores_page_once holds with or
+                // without it).
+                self.telling.lock().expect("telling").push((
+                    String::new(),
+                    reached
+                        .into_iter()
+                        .filter(|r| !self.reads_any(self.store_page(), std::slice::from_ref(r)))
+                        .collect(),
+                ));
             },
         )?;
 
@@ -12378,6 +12394,9 @@ public query Store(",
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
     mod kiokun;
+
+    // TRACK SEAM (store-search): the store's search page, served (W9).
+    mod store_search;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent

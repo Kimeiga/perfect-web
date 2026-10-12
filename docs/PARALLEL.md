@@ -1144,3 +1144,21 @@ Each a decision for a track, with its date; a track's ADR records it too.
   workflow dispatch is never cancelled and never cancels: dispatch only
   what a ruling allows, such as W9's test-only head. At a merge, the
   evidence is the latest run's.
+- **2026-10-12, W9's store search merged as ADR-0308; its questions
+  answered.**
+  - (1) **A store's cuisine is the store's own field after W8 merges**:
+    `stores.cuisine`, `StoreRow`'s and `domain.pw`'s `Store`'s. It is shown
+    on the home page and the store's page. `store_cuisines` is dropped by a
+    later migration that copies its rows. It stays text as written ("Café,
+    Bakery"); a list of tags is not claimed until a filter needs one. W9's,
+    in its next commits after W8's merge.
+  - (2) The seams as listed are accepted, each marked `TRACK SEAM
+    (store-search)`.
+  - (3) `ESCAPE '\'` is PostgreSQL's default, so a mutant dropping it is
+    equivalent and is not planted, as the ADR says.
+  - The merge: master merged on the integrator's side, so W9 pushes no
+    master merge. The evidence is the full verify's and the test-only head's
+    dispatch, by the ruling above. W9 regenerates the store's IR, graph, WIT
+    and contracts after W8's merge, as its merge notes say. The search's
+    route and GET form follow the query part's merge (ADR-0309 at its merge,
+    the integrator's).

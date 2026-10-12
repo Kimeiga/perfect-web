@@ -16,5 +16,9 @@
   "summary": "3 items in 1 section",
   "cart.line_count": 0,
   "cart.lines": [],
-  "cart.subtotal.display": "$0.00"
+  "cart.subtotal.display": "$0.00",
+  "search.asked": "coffee",
+  "search.said": "2 stores match “coffee”.",
+  "search.stores": [],
+  "search.more": ""
 }

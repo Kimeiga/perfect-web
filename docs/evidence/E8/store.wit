@@ -153,6 +153,15 @@ interface store-page-remove-from-cart-api {
     remove-from-cart: func(arg0: domain-menu-item-id) -> result<domain-cart, domain-cart-error>;
 }
 
+interface store-search-search-api {
+    use pw:types/types.{store-search-search-shown};
+    search: func(arg0: string) -> store-search-search-shown;
+}
+
+interface store-search-search-page-api {
+    search-page: func(arg0: string);
+}
+
 world resources-cart {
     export resources-cart-api;
 }
@@ -333,6 +342,16 @@ world store-page-remove-from-cart {
     export store-page-remove-from-cart-api;
 }
 
+world store-search-search {
+    import store:data/search;
+    export store-search-search-api;
+}
+
+world store-search-search-page {
+    import store-search-search-api;
+    export store-search-search-page-api;
+}
+
 package pw:types {
     interface types {
         type capability-session-id = string;
@@ -431,6 +450,43 @@ package pw:types {
             sections: s64,
             items: s64,
         }
+        record store-search-dish-hit {
+            id: domain-menu-item-id,
+            name: string,
+            description: string,
+            category: string,
+            price: domain-money,
+        }
+        record store-search-store-hit {
+            id: domain-store-id,
+            name: string,
+            description: string,
+            cuisine: string,
+            dishes: list<store-search-dish-hit>,
+            more-dishes: s64,
+        }
+        record store-search-search-found {
+            stores: list<store-search-store-hit>,
+            more-stores: s64,
+        }
+        variant store-search-search-error {
+            blank,
+            too-long,
+        }
+        record store-search-shown-store {
+            id: domain-store-id,
+            name: string,
+            description: string,
+            cuisine: string,
+            dishes: list<store-search-dish-hit>,
+            more: string,
+        }
+        record store-search-search-shown {
+            asked: string,
+            said: string,
+            stores: list<store-search-shown-store>,
+            more: string,
+        }
     }
 }
 
@@ -482,6 +538,10 @@ package store:data {
     interface recommendations {
         use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};
         for-store: func(arg0: domain-store-id) -> result<list<domain-recommendation>, domain-recommendation-error>;
+    }
+    interface search {
+        use pw:types/types.{store-search-search-error, store-search-search-found};
+        find: func(arg0: string) -> result<store-search-search-found, store-search-search-error>;
     }
     interface stores {
         use pw:types/types.{domain-store, domain-store-error, domain-store-id};
