@@ -119,6 +119,7 @@ NEEDS_DATABASE = {
     "e14-notifications",
     "e14-messages",
     "e14-store-postgres",
+    "e14-store-accounts",
     "e14-store-search",
 }
 

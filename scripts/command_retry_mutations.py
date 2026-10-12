@@ -74,10 +74,10 @@ MUTANTS = [
         "    idempotent_by InteractionId\n"
         "    retry         transport_only(max = 2, jitter = true)\n"
         "    transaction   serializable\n"
-        "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n",
+        "    optimistic    Cart(current_user()) as cart => UserCarts.with_line(cart, item, quantity)\n",
         "    idempotent_by InteractionId\n"
         "    transaction   serializable\n"
-        "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n",
+        "    optimistic    Cart(current_user()) as cart => UserCarts.with_line(cart, item, quantity)\n",
     ),
     (
         # Re-anchored by ADR-0302: a request with no answer is thrown as
@@ -110,6 +110,7 @@ MUTANTS = [
         "a request is sent again under another interaction",
         "browser",
         RUNTIME,
+        # And by track store-accounts: the page's document beside it (Q3).
         '          "pw-interaction": interaction,\n',
         '          "pw-interaction": attempt === 0 ? interaction : `${interaction}-${attempt}`,\n',
     ),

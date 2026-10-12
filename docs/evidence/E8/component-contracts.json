@@ -129,6 +129,148 @@
     ]
   },
   {
+    "component_id": "Saved.SavedFor",
+    "capability_mapping": 1,
+    "abi_schema": "f2ec3ce3b2bd899c",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "SavedFor",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "SavedItems"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/saved-saved-for-api@0.1.0",
+          "function": "saved-for"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "UserCarts.line_count",
+    "capability_mapping": 1,
+    "abi_schema": "698ccb41e1a0a3d6",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "line_count",
+        "kind": "function",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "UserCart"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/user-carts-line-count-api@0.1.0",
+          "function": "line-count",
+          "bounded": [
+            {
+              "argument": 0,
+              "path": [
+                "lines",
+                "*",
+                "quantity"
+              ],
+              "type": "domain.PositiveInt",
+              "holds": "value >= 1",
+              "at_least": 1
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "UserCarts.subtotal",
+    "capability_mapping": 1,
+    "abi_schema": "b0e9e0e55d1dae6e",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "build",
+      "browser",
+      "edge",
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "subtotal",
+        "kind": "function",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "UserCart"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/user-carts-subtotal-api@0.1.0",
+          "function": "subtotal",
+          "bounded": [
+            {
+              "argument": 0,
+              "path": [
+                "lines",
+                "*",
+                "quantity"
+              ],
+              "type": "domain.PositiveInt",
+              "holds": "value >= 1",
+              "at_least": 1
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
     "component_id": "domain.count",
     "capability_mapping": 1,
     "abi_schema": "19d276ac5a377d7a",
@@ -195,106 +337,6 @@
     ]
   },
   {
-    "component_id": "domain.line_count",
-    "capability_mapping": 1,
-    "abi_schema": "71f80d3135f3ec16",
-    "required_capabilities": [],
-    "allowed_placements": [
-      "build",
-      "browser",
-      "edge",
-      "origin"
-    ],
-    "imports": [],
-    "exports": [
-      {
-        "name": "line_count",
-        "kind": "function",
-        "binding": {
-          "local": "direct",
-          "remote": {
-            "kind": "conditional",
-            "obligations": [
-              {
-                "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
-                "position": "argument 0",
-                "ty": "Cart"
-              }
-            ]
-          }
-        },
-        "component": {
-          "interface": "pw:app/domain-line-count-api@0.1.0",
-          "function": "line-count",
-          "bounded": [
-            {
-              "argument": 0,
-              "path": [
-                "lines",
-                "*",
-                "quantity"
-              ],
-              "type": "domain.PositiveInt",
-              "holds": "value >= 1",
-              "at_least": 1
-            }
-          ]
-        }
-      }
-    ]
-  },
-  {
-    "component_id": "domain.subtotal",
-    "capability_mapping": 1,
-    "abi_schema": "efd6a5f943acadae",
-    "required_capabilities": [],
-    "allowed_placements": [
-      "build",
-      "browser",
-      "edge",
-      "origin"
-    ],
-    "imports": [],
-    "exports": [
-      {
-        "name": "subtotal",
-        "kind": "function",
-        "binding": {
-          "local": "direct",
-          "remote": {
-            "kind": "conditional",
-            "obligations": [
-              {
-                "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
-                "position": "argument 0",
-                "ty": "Cart"
-              }
-            ]
-          }
-        },
-        "component": {
-          "interface": "pw:app/domain-subtotal-api@0.1.0",
-          "function": "subtotal",
-          "bounded": [
-            {
-              "argument": 0,
-              "path": [
-                "lines",
-                "*",
-                "quantity"
-              ],
-              "type": "domain.PositiveInt",
-              "holds": "value >= 1",
-              "at_least": 1
-            }
-          ]
-        }
-      }
-    ]
-  },
-  {
     "component_id": "domain.total",
     "capability_mapping": 1,
     "abi_schema": "646f52dd5992d40d",
@@ -335,6 +377,102 @@
     ]
   },
   {
+    "component_id": "store.page.AddressPage",
+    "capability_mapping": 1,
+    "abi_schema": "770e51c96051ba77",
+    "required_capabilities": [
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.page.Places",
+        "name": "Places",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.SavedAddresses",
+        "name": "SavedAddresses",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.add_address",
+        "name": "add_address",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.choose_address",
+        "name": "choose_address",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.remove_address",
+        "name": "remove_address",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.rename_address",
+        "name": "rename_address",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "AddressPage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-address-page-api@0.1.0",
+          "function": "address-page"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.Cart",
     "capability_mapping": 1,
     "abi_schema": "37cb9e8b9dc1738c",
@@ -350,7 +488,7 @@
     ],
     "imports": [
       {
-        "interface": "store:data/carts",
+        "interface": "store:data/user-carts",
         "name": "current",
         "capability": "database.read<Carts>",
         "capabilities": [
@@ -364,11 +502,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -381,7 +519,7 @@
               "args": [
                 {
                   "declared": {
-                    "path": "domain.Cart"
+                    "path": "UserCarts.UserCart"
                   }
                 },
                 {
@@ -422,15 +560,15 @@
             "obligations": [
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "argument 0",
-                "ty": "Session<SessionId>"
+                "ty": "User<UserId>"
               },
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "result",
-                "ty": "Cart"
+                "ty": "UserCart"
               }
             ]
           }
@@ -499,7 +637,7 @@
         "kind": "component"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -512,11 +650,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -547,8 +685,13 @@
   {
     "component_id": "store.page.Estimate",
     "capability_mapping": 1,
-    "abi_schema": "415fdfe738cf5f70",
+    "abi_schema": "94da90c7ccd7e563",
     "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      },
       {
         "family": "database",
         "operation": "read",
@@ -560,25 +703,35 @@
     ],
     "imports": [
       {
-        "interface": "store:data/estimates",
-        "name": "current",
+        "interface": "store:data/user-estimates",
+        "name": "for-store",
         "capability": "database.read<Estimates>",
         "capabilities": [
           {
             "family": "database",
             "operation": "read",
             "argument": "Estimates"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
           }
         ],
         "signature": {
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "domain.StoreId"
+              }
+            },
+            {
+              "declared": {
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -640,13 +793,13 @@
             "obligations": [
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
-                "position": "argument 0",
-                "ty": "Session<SessionId>"
+                "principal": "User<UserId>",
+                "position": "argument 1",
+                "ty": "User<UserId>"
               },
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "result",
                 "ty": "DeliveryEstimate"
               }
@@ -687,7 +840,7 @@
         "kind": "component"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -700,11 +853,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -949,7 +1102,7 @@
     ],
     "imports": [
       {
-        "interface": "store:data/orders",
+        "interface": "store:data/user-orders",
         "name": "current",
         "capability": "database.read<Orders>",
         "capabilities": [
@@ -963,11 +1116,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -1014,13 +1167,13 @@
             "obligations": [
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "argument 0",
-                "ty": "Session<SessionId>"
+                "ty": "User<UserId>"
               },
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "result",
                 "ty": "Option<OrderStatus>"
               }
@@ -1055,7 +1208,7 @@
         "kind": "component"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -1068,11 +1221,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -1096,6 +1249,155 @@
         "component": {
           "interface": "pw:app/store-page-order-page-api@0.1.0",
           "function": "order-page"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.Places",
+    "capability_mapping": 1,
+    "abi_schema": "ba2d7c89e5f43181",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/places",
+        "name": "list",
+        "capability": "database.read<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "Addresses.Place"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "Places",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-places-api@0.1.0",
+          "function": "places"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.Reach",
+    "capability_mapping": 1,
+    "abi_schema": "587ae3fe18bd6205",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/coverage",
+        "name": "for-store",
+        "capability": "database.read<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            },
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "Addresses.Coverage"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "Reach",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 1",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "Coverage"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-reach-api@0.1.0",
+          "function": "reach"
         }
       }
     ]
@@ -1176,6 +1478,95 @@
         "component": {
           "interface": "pw:app/store-page-recommendations-api@0.1.0",
           "function": "recommendations"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.SavedAddresses",
+    "capability_mapping": 1,
+    "abi_schema": "3c0d9f17c9097f9f",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/addresses",
+        "name": "list",
+        "capability": "database.read<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "Addresses.Address"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "SavedAddresses",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<Address>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-saved-addresses-api@0.1.0",
+          "function": "saved-addresses"
         }
       }
     ]
@@ -1276,7 +1667,7 @@
         "kind": "component"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -1289,11 +1680,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -1422,6 +1813,12 @@
         "kind": "component"
       },
       {
+        "interface": "pw:app/store.page.Reach",
+        "name": "Reach",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
         "interface": "pw:app/store.page.Recommendations",
         "name": "Recommendations",
         "owner": "external",
@@ -1464,7 +1861,7 @@
         "kind": "component"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -1477,11 +1874,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -1510,10 +1907,233 @@
     ]
   },
   {
+    "component_id": "store.page.add_address",
+    "capability_mapping": 1,
+    "abi_schema": "083883ce01812277",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Addresses"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-saved-addresses",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.SavedAddresses"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "addresses-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.AddressesChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/addresses",
+        "name": "add",
+        "capability": "database.write<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.AddressLabel"
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.PlaceId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "List",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "Addresses.Address"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "Addresses.AddressError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "add_address",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<Address>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-add-address-api@0.1.0",
+          "function": "add-address",
+          "idempotent_by": "InteractionId",
+          "bounded": [
+            {
+              "argument": 0,
+              "type": "Addresses.AddressLabel",
+              "holds": "String.length(value) >= 1 & String.length(value) <= 40",
+              "measure": "length",
+              "at_least": 1,
+              "at_most": 40
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.add_to_cart",
     "capability_mapping": 1,
-    "abi_schema": "e39ed9ad14de8346",
+    "abi_schema": "092247a3cf92e683",
     "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      },
       {
         "family": "database",
         "operation": "read",
@@ -1551,11 +2171,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -1572,7 +2192,7 @@
       },
       {
         "interface": "pw:host/outbox",
-        "name": "cart-changed",
+        "name": "user-cart-changed",
         "capability": "outbox.write",
         "capabilities": [
           {
@@ -1584,11 +2204,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -1601,10 +2221,10 @@
         },
         "owner": "platform",
         "kind": "host_capability",
-        "event": "Events.CartChanged"
+        "event": "Events.UserCartChanged"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -1617,11 +2237,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -1632,7 +2252,71 @@
         "kind": "host_capability"
       },
       {
-        "interface": "store:data/carts",
+        "interface": "store:data/coverage",
+        "name": "reaches",
+        "capability": "database.read<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            },
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/menus",
+        "name": "is-available",
+        "capability": "database.read<Menus>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Menus"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.MenuItemId"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/user-carts",
         "name": "add",
         "capability": "database.write<Carts>",
         "capabilities": [
@@ -1646,11 +2330,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -1673,7 +2357,7 @@
               "args": [
                 {
                   "declared": {
-                    "path": "domain.Cart"
+                    "path": "UserCarts.UserCart"
                   }
                 },
                 {
@@ -1701,32 +2385,6 @@
             "at_least": 1
           }
         ]
-      },
-      {
-        "interface": "store:data/menus",
-        "name": "is-available",
-        "capability": "database.read<Menus>",
-        "capabilities": [
-          {
-            "family": "database",
-            "operation": "read",
-            "argument": "Menus"
-          }
-        ],
-        "signature": {
-          "params": [
-            {
-              "declared": {
-                "path": "domain.MenuItemId"
-              }
-            }
-          ],
-          "result": {
-            "primitive": "Bool"
-          }
-        },
-        "owner": "external",
-        "kind": "host_capability"
       }
     ],
     "exports": [
@@ -1740,9 +2398,9 @@
             "obligations": [
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "result",
-                "ty": "Cart"
+                "ty": "UserCart"
               }
             ]
           }
@@ -1750,11 +2408,6 @@
         "component": {
           "interface": "pw:app/store-page-add-to-cart-api@0.1.0",
           "function": "add-to-cart",
-          "authorization": [
-            {
-              "predicate": "SignedIn"
-            }
-          ],
           "idempotent_by": "InteractionId",
           "bounded": [
             {
@@ -1769,9 +2422,212 @@
     ]
   },
   {
+    "component_id": "store.page.choose_address",
+    "capability_mapping": 1,
+    "abi_schema": "336d5d3e75e83603",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Addresses"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-saved-addresses",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.SavedAddresses"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "addresses-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.AddressesChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/addresses",
+        "name": "choose",
+        "capability": "database.write<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.AddressId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "List",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "Addresses.Address"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "Addresses.AddressError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "choose_address",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<Address>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-choose-address-api@0.1.0",
+          "function": "choose-address",
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.clear_cart",
     "capability_mapping": 1,
-    "abi_schema": "01a95bd54db3e938",
+    "abi_schema": "e46a1824e8426ac2",
     "required_capabilities": [
       {
         "family": "database",
@@ -1805,11 +2661,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -1826,7 +2682,7 @@
       },
       {
         "interface": "pw:host/outbox",
-        "name": "cart-changed",
+        "name": "user-cart-changed",
         "capability": "outbox.write",
         "capabilities": [
           {
@@ -1838,11 +2694,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -1855,10 +2711,10 @@
         },
         "owner": "platform",
         "kind": "host_capability",
-        "event": "Events.CartChanged"
+        "event": "Events.UserCartChanged"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -1871,11 +2727,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -1886,7 +2742,7 @@
         "kind": "host_capability"
       },
       {
-        "interface": "store:data/carts",
+        "interface": "store:data/user-carts",
         "name": "clear",
         "capability": "database.write<Carts>",
         "capabilities": [
@@ -1900,11 +2756,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -1917,7 +2773,7 @@
               "args": [
                 {
                   "declared": {
-                    "path": "domain.Cart"
+                    "path": "UserCarts.UserCart"
                   }
                 },
                 {
@@ -1958,9 +2814,9 @@
             "obligations": [
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "result",
-                "ty": "Cart"
+                "ty": "UserCart"
               }
             ]
           }
@@ -1968,11 +2824,6 @@
         "component": {
           "interface": "pw:app/store-page-clear-cart-api@0.1.0",
           "function": "clear-cart",
-          "authorization": [
-            {
-              "predicate": "SignedIn"
-            }
-          ],
           "idempotent_by": "InteractionId"
         }
       }
@@ -1981,7 +2832,7 @@
   {
     "component_id": "store.page.decrease_in_cart",
     "capability_mapping": 1,
-    "abi_schema": "a36b2242c3929e82",
+    "abi_schema": "610e5e7433cc7a04",
     "required_capabilities": [
       {
         "family": "database",
@@ -2015,11 +2866,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2036,7 +2887,7 @@
       },
       {
         "interface": "pw:host/outbox",
-        "name": "cart-changed",
+        "name": "user-cart-changed",
         "capability": "outbox.write",
         "capabilities": [
           {
@@ -2048,11 +2899,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2065,10 +2916,10 @@
         },
         "owner": "platform",
         "kind": "host_capability",
-        "event": "Events.CartChanged"
+        "event": "Events.UserCartChanged"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -2081,11 +2932,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -2096,7 +2947,7 @@
         "kind": "host_capability"
       },
       {
-        "interface": "store:data/carts",
+        "interface": "store:data/user-carts",
         "name": "decrease",
         "capability": "database.write<Carts>",
         "capabilities": [
@@ -2110,11 +2961,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2132,7 +2983,7 @@
               "args": [
                 {
                   "declared": {
-                    "path": "domain.Cart"
+                    "path": "UserCarts.UserCart"
                   }
                 },
                 {
@@ -2173,9 +3024,9 @@
             "obligations": [
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "result",
-                "ty": "Cart"
+                "ty": "UserCart"
               }
             ]
           }
@@ -2183,11 +3034,6 @@
         "component": {
           "interface": "pw:app/store-page-decrease-in-cart-api@0.1.0",
           "function": "decrease-in-cart",
-          "authorization": [
-            {
-              "predicate": "SignedIn"
-            }
-          ],
           "idempotent_by": "InteractionId"
         }
       }
@@ -2196,7 +3042,7 @@
   {
     "component_id": "store.page.increase_in_cart",
     "capability_mapping": 1,
-    "abi_schema": "0408ccf9c5cd1849",
+    "abi_schema": "ea834328e33999c3",
     "required_capabilities": [
       {
         "family": "database",
@@ -2235,11 +3081,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2256,7 +3102,7 @@
       },
       {
         "interface": "pw:host/outbox",
-        "name": "cart-changed",
+        "name": "user-cart-changed",
         "capability": "outbox.write",
         "capabilities": [
           {
@@ -2268,11 +3114,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2285,10 +3131,10 @@
         },
         "owner": "platform",
         "kind": "host_capability",
-        "event": "Events.CartChanged"
+        "event": "Events.UserCartChanged"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -2301,11 +3147,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -2316,7 +3162,33 @@
         "kind": "host_capability"
       },
       {
-        "interface": "store:data/carts",
+        "interface": "store:data/menus",
+        "name": "is-available",
+        "capability": "database.read<Menus>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Menus"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.MenuItemId"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/user-carts",
         "name": "add",
         "capability": "database.write<Carts>",
         "capabilities": [
@@ -2330,11 +3202,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2357,7 +3229,7 @@
               "args": [
                 {
                   "declared": {
-                    "path": "domain.Cart"
+                    "path": "UserCarts.UserCart"
                   }
                 },
                 {
@@ -2385,32 +3257,6 @@
             "at_least": 1
           }
         ]
-      },
-      {
-        "interface": "store:data/menus",
-        "name": "is-available",
-        "capability": "database.read<Menus>",
-        "capabilities": [
-          {
-            "family": "database",
-            "operation": "read",
-            "argument": "Menus"
-          }
-        ],
-        "signature": {
-          "params": [
-            {
-              "declared": {
-                "path": "domain.MenuItemId"
-              }
-            }
-          ],
-          "result": {
-            "primitive": "Bool"
-          }
-        },
-        "owner": "external",
-        "kind": "host_capability"
       }
     ],
     "exports": [
@@ -2424,9 +3270,9 @@
             "obligations": [
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "result",
-                "ty": "Cart"
+                "ty": "UserCart"
               }
             ]
           }
@@ -2434,11 +3280,6 @@
         "component": {
           "interface": "pw:app/store-page-increase-in-cart-api@0.1.0",
           "function": "increase-in-cart",
-          "authorization": [
-            {
-              "predicate": "SignedIn"
-            }
-          ],
           "idempotent_by": "InteractionId"
         }
       }
@@ -2486,11 +3327,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2519,11 +3360,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2540,7 +3381,7 @@
       },
       {
         "interface": "pw:host/outbox",
-        "name": "cart-changed",
+        "name": "user-cart-changed",
         "capability": "outbox.write",
         "capabilities": [
           {
@@ -2552,11 +3393,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2569,11 +3410,11 @@
         },
         "owner": "platform",
         "kind": "host_capability",
-        "event": "Events.CartChanged"
+        "event": "Events.UserCartChanged"
       },
       {
         "interface": "pw:host/outbox",
-        "name": "order-changed",
+        "name": "user-order-changed",
         "capability": "outbox.write",
         "capabilities": [
           {
@@ -2585,11 +3426,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2602,10 +3443,10 @@
         },
         "owner": "platform",
         "kind": "host_capability",
-        "event": "Events.OrderChanged"
+        "event": "Events.UserOrderChanged"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -2618,11 +3459,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -2633,7 +3474,7 @@
         "kind": "host_capability"
       },
       {
-        "interface": "store:data/orders",
+        "interface": "store:data/user-orders",
         "name": "place",
         "capability": "database.write<Orders>",
         "capabilities": [
@@ -2652,11 +3493,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2709,9 +3550,212 @@
     ]
   },
   {
+    "component_id": "store.page.remove_address",
+    "capability_mapping": 1,
+    "abi_schema": "b915ad172ccb24ed",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Addresses"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-saved-addresses",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.SavedAddresses"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "addresses-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.AddressesChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/addresses",
+        "name": "remove",
+        "capability": "database.write<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.AddressId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "List",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "Addresses.Address"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "Addresses.AddressError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "remove_address",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<Address>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-remove-address-api@0.1.0",
+          "function": "remove-address",
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.remove_from_cart",
     "capability_mapping": 1,
-    "abi_schema": "e413a06821dd64ec",
+    "abi_schema": "d68c7826ead9ab7e",
     "required_capabilities": [
       {
         "family": "database",
@@ -2745,11 +3789,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2766,7 +3810,7 @@
       },
       {
         "interface": "pw:host/outbox",
-        "name": "cart-changed",
+        "name": "user-cart-changed",
         "capability": "outbox.write",
         "capabilities": [
           {
@@ -2778,11 +3822,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2795,10 +3839,10 @@
         },
         "owner": "platform",
         "kind": "host_capability",
-        "event": "Events.CartChanged"
+        "event": "Events.UserCartChanged"
       },
       {
-        "interface": "pw:host/session",
+        "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
         "capabilities": [
@@ -2811,11 +3855,11 @@
           "params": [],
           "result": {
             "declared": {
-              "path": "capability.Session",
+              "path": "capability.User",
               "args": [
                 {
                   "declared": {
-                    "path": "capability.SessionId"
+                    "path": "capability.UserId"
                   }
                 }
               ]
@@ -2826,7 +3870,7 @@
         "kind": "host_capability"
       },
       {
-        "interface": "store:data/carts",
+        "interface": "store:data/user-carts",
         "name": "remove",
         "capability": "database.write<Carts>",
         "capabilities": [
@@ -2840,11 +3884,11 @@
           "params": [
             {
               "declared": {
-                "path": "capability.Session",
+                "path": "capability.User",
                 "args": [
                   {
                     "declared": {
-                      "path": "capability.SessionId"
+                      "path": "capability.UserId"
                     }
                   }
                 ]
@@ -2862,7 +3906,7 @@
               "args": [
                 {
                   "declared": {
-                    "path": "domain.Cart"
+                    "path": "UserCarts.UserCart"
                   }
                 },
                 {
@@ -2903,9 +3947,9 @@
             "obligations": [
               {
                 "kind": "preserve_principal",
-                "principal": "Session<SessionId>",
+                "principal": "User<UserId>",
                 "position": "result",
-                "ty": "Cart"
+                "ty": "UserCart"
               }
             ]
           }
@@ -2913,12 +3957,225 @@
         "component": {
           "interface": "pw:app/store-page-remove-from-cart-api@0.1.0",
           "function": "remove-from-cart",
-          "authorization": [
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.rename_address",
+    "capability_mapping": 1,
+    "abi_schema": "7e1a5f55cd7ee9c6",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Addresses"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-saved-addresses",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
             {
-              "predicate": "SignedIn"
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
             }
           ],
-          "idempotent_by": "InteractionId"
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.SavedAddresses"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "addresses-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.AddressesChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/addresses",
+        "name": "rename",
+        "capability": "database.write<Addresses>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.AddressId"
+              }
+            },
+            {
+              "declared": {
+                "path": "Addresses.AddressLabel"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "builtin": {
+                    "ctor": "List",
+                    "args": [
+                      {
+                        "declared": {
+                          "path": "Addresses.Address"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "Addresses.AddressError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "rename_address",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<Address>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-rename-address-api@0.1.0",
+          "function": "rename-address",
+          "idempotent_by": "InteractionId",
+          "bounded": [
+            {
+              "argument": 1,
+              "type": "Addresses.AddressLabel",
+              "holds": "String.length(value) >= 1 & String.length(value) <= 40",
+              "measure": "length",
+              "at_least": 1,
+              "at_most": 40
+            }
+          ]
         }
       }
     ]

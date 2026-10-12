@@ -374,15 +374,23 @@ fn kiokun() -> Vec<pw_core::check::Unit> {
     units(&borrowed)
 }
 
-/// [`fixed`], with whether an item can be ordered answered `available`.
-fn stocked(available: bool) -> impl FnMut(&mut Rng, &Types) -> Box<Answer> {
+/// [`fixed`], with whether an item can be ordered answered `available`, and
+/// whether its store reaches the reader's chosen address `reaches` (track
+/// `store-accounts`).
+fn stocked_within(available: bool, reaches: bool) -> impl FnMut(&mut Rng, &Types) -> Box<Answer> {
     move |rng, t| {
         let rest = fixed(rng, t);
         Box::new(move |op, args| match op {
             "store:data/menus#is-available" => Val::Bool(available),
+            "store:data/coverage#reaches" => Val::Bool(reaches),
             _ => rest(op, args),
         })
     }
+}
+
+/// [`stocked_within`], every store reaching the reader's address.
+fn stocked(available: bool) -> impl FnMut(&mut Rng, &Types) -> Box<Answer> {
+    stocked_within(available, true)
 }
 
 #[test]
@@ -395,10 +403,10 @@ fn the_stores_commands_agree_with_their_reference() {
     let add: Reference = |args, host| {
         // Its entry and its event first, their keys computed before its
         // body, in the order they are written (ADR-0208, ADR-0209).
-        let key = host("pw:host/session#read", vec![]);
+        let key = host("pw:host/principal#read", vec![]);
         host("pw:host/invalidations#store-page-cart", vec![key]);
-        let key = host("pw:host/session#read", vec![]);
-        host("pw:host/outbox#cart-changed", vec![key]);
+        let key = host("pw:host/principal#read", vec![]);
+        host("pw:host/outbox#user-cart-changed", vec![key]);
         let id = field(&args[0], "id");
         if host("store:data/menus#is-available", vec![id.clone()]) != Val::Bool(true) {
             return Val::Result(Err(Some(Box::new(Val::Variant(
@@ -406,8 +414,21 @@ fn the_stores_commands_agree_with_their_reference() {
                 Some(Box::new(id)),
             )))));
         }
-        let session = host("pw:host/session#read", vec![]);
-        host("store:data/carts#add", vec![session, id, args[1].clone()])
+        // Whether the item's store reaches the reader's chosen address
+        // (track `store-accounts`), refused by name where it does not.
+        let store = field(&args[0], "store-id");
+        let reader = host("pw:host/principal#read", vec![]);
+        if host("store:data/coverage#reaches", vec![store.clone(), reader]) != Val::Bool(true) {
+            return Val::Result(Err(Some(Box::new(Val::Variant(
+                "out-of-range".to_string(),
+                Some(Box::new(store)),
+            )))));
+        }
+        let reader = host("pw:host/principal#read", vec![]);
+        host(
+            "store:data/user-carts#add",
+            vec![reader, id, args[1].clone()],
+        )
     };
     let runnable = Runnable::new(compile(&u, "store.page.add_to_cart"));
     differential("store.page.add_to_cart", &runnable, add, stocked(true));
@@ -417,25 +438,31 @@ fn the_stores_commands_agree_with_their_reference() {
         add,
         stocked(false),
     );
+    differential(
+        "store.page.add_to_cart, out of reach",
+        &runnable,
+        add,
+        stocked_within(true, false),
+    );
     // One more of a line's item (ADR-0172): its availability read again, as
     // `add_to_cart`'s is, and one added.
     let increase: Reference = |args, host| {
         // Its entry and its event first, their keys computed before its
         // body, in the order they are written (ADR-0208, ADR-0209).
-        let key = host("pw:host/session#read", vec![]);
+        let key = host("pw:host/principal#read", vec![]);
         host("pw:host/invalidations#store-page-cart", vec![key]);
-        let key = host("pw:host/session#read", vec![]);
-        host("pw:host/outbox#cart-changed", vec![key]);
+        let key = host("pw:host/principal#read", vec![]);
+        host("pw:host/outbox#user-cart-changed", vec![key]);
         if host("store:data/menus#is-available", vec![args[0].clone()]) != Val::Bool(true) {
             return Val::Result(Err(Some(Box::new(Val::Variant(
                 "item-unavailable".to_string(),
                 Some(Box::new(args[0].clone())),
             )))));
         }
-        let session = host("pw:host/session#read", vec![]);
+        let reader = host("pw:host/principal#read", vec![]);
         host(
-            "store:data/carts#add",
-            vec![session, args[0].clone(), Val::S64(1)],
+            "store:data/user-carts#add",
+            vec![reader, args[0].clone(), Val::S64(1)],
         )
     };
     let runnable = Runnable::new(compile(&u, "store.page.increase_in_cart"));
@@ -451,19 +478,22 @@ fn the_stores_commands_agree_with_their_reference() {
         increase,
         stocked(false),
     );
-    // One fewer, and a line gone: the data layer's, by the session's cart.
+    // One fewer, and a line gone: the data layer's, by the reader's cart (track `store-accounts`).
     differential(
         "store.page.decrease_in_cart",
         &Runnable::new(compile(&u, "store.page.decrease_in_cart")),
         |args, host| {
             // Its entry and its event first, their keys computed before its
             // body, in the order they are written (ADR-0208, ADR-0209).
-            let key = host("pw:host/session#read", vec![]);
+            let key = host("pw:host/principal#read", vec![]);
             host("pw:host/invalidations#store-page-cart", vec![key]);
-            let key = host("pw:host/session#read", vec![]);
-            host("pw:host/outbox#cart-changed", vec![key]);
-            let session = host("pw:host/session#read", vec![]);
-            host("store:data/carts#decrease", vec![session, args[0].clone()])
+            let key = host("pw:host/principal#read", vec![]);
+            host("pw:host/outbox#user-cart-changed", vec![key]);
+            let reader = host("pw:host/principal#read", vec![]);
+            host(
+                "store:data/user-carts#decrease",
+                vec![reader, args[0].clone()],
+            )
         },
         fixed,
     );
@@ -473,12 +503,15 @@ fn the_stores_commands_agree_with_their_reference() {
         |args, host| {
             // Its entry and its event first, their keys computed before its
             // body, in the order they are written (ADR-0208, ADR-0209).
-            let key = host("pw:host/session#read", vec![]);
+            let key = host("pw:host/principal#read", vec![]);
             host("pw:host/invalidations#store-page-cart", vec![key]);
-            let key = host("pw:host/session#read", vec![]);
-            host("pw:host/outbox#cart-changed", vec![key]);
-            let session = host("pw:host/session#read", vec![]);
-            host("store:data/carts#remove", vec![session, args[0].clone()])
+            let key = host("pw:host/principal#read", vec![]);
+            host("pw:host/outbox#user-cart-changed", vec![key]);
+            let reader = host("pw:host/principal#read", vec![]);
+            host(
+                "store:data/user-carts#remove",
+                vec![reader, args[0].clone()],
+            )
         },
         fixed,
     );
@@ -488,12 +521,12 @@ fn the_stores_commands_agree_with_their_reference() {
         |_, host| {
             // Its entry and its event first, their keys computed before its
             // body, in the order they are written (ADR-0208, ADR-0209).
-            let key = host("pw:host/session#read", vec![]);
+            let key = host("pw:host/principal#read", vec![]);
             host("pw:host/invalidations#store-page-cart", vec![key]);
-            let key = host("pw:host/session#read", vec![]);
-            host("pw:host/outbox#cart-changed", vec![key]);
-            let session = host("pw:host/session#read", vec![]);
-            host("store:data/carts#clear", vec![session])
+            let key = host("pw:host/principal#read", vec![]);
+            host("pw:host/outbox#user-cart-changed", vec![key]);
+            let reader = host("pw:host/principal#read", vec![]);
+            host("store:data/user-carts#clear", vec![reader])
         },
         fixed,
     );
@@ -503,7 +536,7 @@ fn the_stores_commands_agree_with_their_reference() {
 fn the_stores_queries_agree_with_their_reference() {
     let u = store();
     for (id, op) in [
-        ("store.page.Cart", "store:data/carts#current"),
+        ("store.page.Cart", "store:data/user-carts#current"),
         // The menu, grouped by category, as the data layer answers it
         // (ADR-0181).
         ("store.page.Menu", "store:data/menus#sections"),
@@ -514,8 +547,8 @@ fn the_stores_queries_agree_with_their_reference() {
             id,
             &Runnable::new(compile(&u, id)),
             match op {
-                "store:data/carts#current" => {
-                    |args, host| host("store:data/carts#current", vec![args[0].clone()])
+                "store:data/user-carts#current" => {
+                    |args, host| host("store:data/user-carts#current", vec![args[0].clone()])
                 }
                 "store:data/menus#sections" => {
                     |args, host| host("store:data/menus#sections", vec![args[0].clone()])
@@ -891,18 +924,18 @@ fn the_oracle_notices_a_reference_that_is_wrong() {
         caught("Lookup, no redirect", &lookup, |args, host| {
             host("kiokun:data/entries#get", vec![args[0].clone()])
         }),
-        caught("add_to_cart, no session", &add, |args, host| {
+        caught("add_to_cart, no reader", &add, |args, host| {
             host(
-                "store:data/carts#add",
+                "store:data/user-carts#add",
                 vec![Val::String(String::new()), args[0].clone(), args[1].clone()],
             )
         }),
         // The command as it was before ADR-0157: whatever the item, added.
         caught("add_to_cart, availability not read", &add, |args, host| {
-            let session = host("pw:host/session#read", vec![]);
+            let reader = host("pw:host/principal#read", vec![]);
             host(
-                "store:data/carts#add",
-                vec![session, args[0].clone(), args[1].clone()],
+                "store:data/user-carts#add",
+                vec![reader, args[0].clone(), args[1].clone()],
             )
         }),
     ];

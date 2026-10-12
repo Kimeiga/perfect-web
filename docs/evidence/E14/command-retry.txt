@@ -1,8 +1,8 @@
 ADR-0173 - a command is sent again where no answer came
 
 produced by: just e14-command-retry
-commit: a1a232f5c9e804c5eba9e2123d57fe8637666993
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38186484587 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 3fdcf929ad57be351ef24cb1ac59a7cbe9a981ab
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38233018418 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -13,8 +13,8 @@ test a_command_inside_a_function_is_refused ... ok
 test a_command_parameter_a_browser_cannot_send_is_refused ... ok
 test a_command_is_sent_again_as_its_retry_clause_says ... ok
 test a_handler_calls_several_commands_in_order ... ok
-test a_handler_branches_between_commands ... ok
 test a_handler_that_calls_no_command_is_refused ... ok
+test a_handler_branches_between_commands ... ok
 test a_handler_that_discards_its_answer_by_name_sends_it ... ok
 test a_handler_that_discards_its_answer_with_underscore_sends_it ... ok
 test a_handler_computes_what_it_sends ... ok
@@ -24,12 +24,12 @@ test a_string_with_escapes_sends_its_value ... ok
 test a_value_the_handler_did_not_capture_is_not_read ... ok
 test an_int_a_javascript_number_cannot_carry_stops_the_handler_before_it_sends ... ok
 test an_opaque_constructor_sends_its_representation ... ok
-test a_program_that_does_not_check_compiles_no_handlers ... ok
 test each_path_read_is_read_where_the_document_carries_it ... ok
+test a_program_that_does_not_check_compiles_no_handlers ... ok
 test a_handler_calls_its_commands_by_the_contracts_own_ids ... ok
 test a_module_and_its_event_part_name_one_handler ... ok
 test the_stores_handlers_compile_to_the_calls_their_bodies_make ... ok
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.85s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.24s
 test a_key_separates_a_partition_by_naming_it ... ok
 test a_key_names_a_parameter_or_a_partition ... ok
 test a_session_query_in_a_shared_cache_is_refused_however_it_is_spelled ... ok
@@ -41,21 +41,21 @@ test a_word_is_one_its_domain_lists ... ok
 test only_transport_only_is_transport_only ... ok
 test a_world_is_one_a_platform_has ... ok
 test an_operator_is_given_its_arguments ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.83s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.58s
 
 == sent again where no answer came, in three engines (e2e/retry.spec.mjs)
 
-  15 passed (2.3m)
+  15 passed (2.5m)
 
 == mutation controls (scripts/command_retry_mutations.py)
 
-baseline (core): 1507 passed, 0 failed
+baseline (core): 1538 passed, 0 failed
 baseline (browser): 5 passed, 0 failed
-`transport_only` retries a command that is not idempotent [core]: KILLED (1 of 1051 tests fail)
-`retry none` is refused as a retry [core]: KILLED (1 of 1051 tests fail)
-the clause is not read [core]: KILLED (1 of 607 tests fail)
-the policy is not passed where the command is sent [core]: KILLED (1 of 607 tests fail)
-the store's `add_to_cart` declares no retry [core]: KILLED (1 of 607 tests fail)
+`transport_only` retries a command that is not idempotent [core]: KILLED (1 of 1074 tests fail)
+`retry none` is refused as a retry [core]: KILLED (1 of 1074 tests fail)
+the clause is not read [core]: KILLED (1 of 618 tests fail)
+the policy is not passed where the command is sent [core]: KILLED (1 of 618 tests fail)
+the store's `add_to_cart` declares no retry [core]: KILLED (1 of 618 tests fail)
 nothing is sent again [browser]: KILLED (3 of 5 tests fail)
 an answer is sent again [browser]: KILLED (1 of 5 tests fail)
 there is no bound [browser]: KILLED (1 of 5 tests fail)

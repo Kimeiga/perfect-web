@@ -1,7 +1,7 @@
 //! **Optimistic transitions, compiled and run** (ADR-0122).
 //!
-//! The store's `add_to_cart` declares `optimistic Cart(current_session()) as
-//! cart => Carts.with_line(cart, item, quantity)`, checked since ADR-0025 and
+//! The store's `add_to_cart` declares `optimistic Cart(current_user()) as
+//! cart => UserCarts.with_line(cart, item, quantity)`, checked since ADR-0025 and
 //! executed by nothing until 2026-10-02; a line's −, + and Remove declare
 //! theirs (ADR-0172). These compile the store page's speculation module and
 //! run it under Node: each transition the source states, over the value the
@@ -103,7 +103,8 @@ fn the_stores_transitions_run_and_its_parts_read_the_result() {
         "clear_cart declares no optimistic clause, so it has no speculation"
     );
     // The page's cart, and its layout's (ADR-0303, the layouts'): one entry
-    // by one key, one binding, the layout's name its alias (ADR-0312).
+    // by one key, one binding, the layout's name its alias (ADR-0312). The
+    // reader's user's cart since track `store-accounts`.
     let names: Vec<(&str, &[String])> = m
         .bindings
         .iter()
@@ -112,7 +113,7 @@ fn the_stores_transitions_run_and_its_parts_read_the_result() {
     assert_eq!(names, [("cart", &["cart~StoreLayout".to_string()][..])]);
     for b in &m.bindings {
         assert_eq!(b.resource, "store.page.Cart");
-        assert_eq!(b.key, ["current_session()"]);
+        assert_eq!(b.key, ["current_user()"]);
     }
 
     let temp = tempfile::TempDir::with_prefix("pw-speculation-").expect("a temporary directory");

@@ -631,6 +631,27 @@ awaited in order. What remains:
   U+A7D4, U+16EA0 to U+16EB8) are matched as written on both layers, never
   lowered, and `on_postgres_every_character_is_lowered_alike` fails when
   either version moves.
+- **A command answered for the reader its page was shown to has two
+  windows** (ADR-0318, the integrator's review of 2026-10-12):
+  - a retry of a press that committed, arriving while its first attempt
+    still runs on a page gone stale, is refused, where waiting would have
+    answered it with the outcome;
+  - a retry later than two minutes after the host forgot the page's
+    session is refused as out of date, though its press committed. The
+    runtime retries within seconds.
+  - A host restarted numbers its documents from 1 again: a page from
+    before is refused, told the sign-in words.
+- **The store's accounts** (ADR-0318):
+  - a private entry keyed by a user's id that no binding fills with
+    `current_user()` reaches every reader of it;
+  - a guest's lines whose join failed are reachable by no one;
+  - a user's order is their latest;
+  - `private` still means the user's and not importable (the integrator's
+    ruling, queued).
+- **The store's places are a fixture, not a geocoder** (ADR-0319): eleven
+  places with approximate coordinates; a courier's minutes are four a
+  kilometre in a straight line; an address's label is checked for its
+  length alone.
 - **A page asks only a predicate with no parameters of its reader**
   (ADR-0307): a control whose command requires one with parameters
   (`OwnsPost(post)`, `MayMessage(to)`) is not held to where it stands, and

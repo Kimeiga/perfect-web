@@ -67,11 +67,13 @@ fn the_store_builds_every_artifact_from_source() {
             // of its own since ADR-0125: a line's count, a price as text
             // (ADR-0169), the cart's count, and a line's and the cart's
             // totals (ADR-0172).
+            // Track `store-accounts` (ADR-0318): a user's cart's count
+            // and its subtotal, its record's own.
+            "UserCarts.line_count",
+            "UserCarts.subtotal",
             "domain.count",
             "domain.display",
-            "domain.line_count",
-            // A cart's line and its cart, priced (ADR-0172).
-            "domain.subtotal",
+            // A cart's line, priced (ADR-0172).
             "domain.total",
             "store.page.Cart",
             // The store's slots, since ADR-0165: each stream's query.
@@ -84,18 +86,28 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.MenuSize",
             // A session's order (ADR-0193).
             "store.page.Order",
+            // The places an address may name, and whether the store reaches
+            // the reader's (track `store-accounts`).
+            "store.page.Places",
+            "store.page.Reach",
             "store.page.Recommendations",
+            // The reader's addresses (track `store-accounts`).
+            "store.page.SavedAddresses",
             "store.page.Store",
             // The stores the home page lists (ADR-0192).
             "store.page.StoreList",
+            "store.page.add_address",
             "store.page.add_to_cart",
+            "store.page.choose_address",
             "store.page.clear_cart",
             // A line's controls (ADR-0172).
             "store.page.decrease_in_cart",
             "store.page.increase_in_cart",
             // The cart, placed as an order (ADR-0193).
             "store.page.place_order",
+            "store.page.remove_address",
             "store.page.remove_from_cart",
+            "store.page.rename_address",
             // The search (track `store-search`).
             "store.search.Search",
         ],
@@ -127,22 +139,26 @@ fn the_store_builds_every_artifact_from_source() {
             "Resources.Cart",
             "Resources.Menu",
             "Resources.Order",
-            "Resources.Store"
+            "Resources.Store",
+            // The library's `user` query the corpus imports (track
+            // `store-accounts`, A-034 and R-065).
+            "Saved.SavedFor"
         ]
     );
 
     assert_eq!(
         b.templates.len(),
-        5,
-        "StorePage, CartPage (ADR-0190), HomePage (ADR-0192), OrderPage (ADR-0193) \
-         and SearchPage (track `store-search`)"
+        6,
+        "StorePage, CartPage (ADR-0190), HomePage (ADR-0192), OrderPage (ADR-0193), \
+         AddressPage (track `store-accounts`) and SearchPage (track `store-search`)"
     );
     assert_eq!(
         b.handlers.len(),
-        10,
+        15,
         "add_to_cart, clear_cart, and a line's three (ADR-0172); the cart \
          page's clear and a line's three (ADR-0190), and its place_order \
-         (ADR-0193)"
+         (ADR-0193); the address page's label and its four (track \
+         `store-accounts`)"
     );
     assert_eq!(
         b.contracts.len(),

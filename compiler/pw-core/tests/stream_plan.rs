@@ -157,9 +157,11 @@ fn the_store_streams_its_estimate_and_its_recommendations() {
     assert_eq!(
         streams,
         [
+            // The store's estimate to the reader's chosen address (track
+            // `store-accounts`): by the store and the reader's user.
             (
                 "store.page.Estimate",
-                ["current_session()".to_string()].as_slice(),
+                ["id".to_string(), "current_user()".to_string()].as_slice(),
                 "private",
                 0,
                 true

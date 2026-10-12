@@ -132,7 +132,10 @@ fn a_capability_survives_the_crossing_with_its_argument() {
 
 #[test]
 fn command_authorization_survives_the_compiler_host_boundary() {
-    let command = find("store.page.add_to_cart");
+    // Track `store-accounts` (ADR-0318): anyone fills a cart, a guest its
+    // session's guest's, and placing an order requires a reader signed in.
+    // What a command requires, and what it does not, both survive.
+    let command = find("store.page.place_order");
     let component = command.exports[0]
         .component
         .as_ref()
@@ -141,13 +144,13 @@ fn command_authorization_survives_the_compiler_host_boundary() {
     assert_eq!(component.authorization[0].predicate, "SignedIn");
     assert!(component.authorization[0].arguments.is_empty());
 
-    let clear = find("store.page.clear_cart");
-    let component = clear.exports[0]
-        .component
-        .as_ref()
-        .expect("compiled command export");
-    assert_eq!(component.authorization.len(), 1);
-    assert_eq!(component.authorization[0].predicate, "SignedIn");
+    for id in ["store.page.add_to_cart", "store.page.clear_cart"] {
+        let component = find(id).exports[0]
+            .component
+            .clone()
+            .expect("compiled command export");
+        assert!(component.authorization.is_empty(), "{id} requires nothing");
+    }
 }
 
 #[test]
@@ -228,7 +231,12 @@ fn the_real_contracts_drive_a_real_admission() {
                 // `outbox.write` joined it on 2026-10-05 (ADR-0208): a
                 // command's events are committed with its writes, so a node
                 // runs it only where it keeps an outbox.
+                //
+                // `database.read<Addresses>` joined it with track
+                // `store-accounts`: `add_to_cart` reads whether the item's
+                // store reaches the reader's chosen address.
                 grants: BTreeSet::from([
+                    "database.read<Addresses>".to_string(),
                     "database.read<Carts>".to_string(),
                     "database.read<Menus>".to_string(),
                     "database.read<Stores>".to_string(),

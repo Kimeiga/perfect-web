@@ -2771,3 +2771,39 @@ component is compiled once a process (the integrator's; W6's finding of
   held more than ADR-0292's bound after kiokun's merge. It now runs in
   302 s at a 1.56 GiB peak on CI, from about 950 s and over the bound.
 
+[ADR-0318](DECISIONS/ADR-0318-a-cart-and-an-order-are-a-users.md): a cart and
+an order are a user's (W8's, track `store-accounts`, milestone 1).
+- `user query Cart(reader)` and `user query Order(reader)`, read by
+  `current_user()`. Their commands emit `UserCartChanged` and
+  `UserOrderChanged`, carrying the reader's handle.
+- Anyone fills a cart; a reader signed in places an order. A guest's cart
+  joins its user's at sign-in, in one store transaction.
+- `user`, a visibility: the user's, and importable, as `session` is the
+  session's. `private` is unchanged (the integrator's ruling, queued).
+- A record's scope is its scoped producers', joined.
+- A user's entry is told to that user's sessions alone (telling by
+  principal).
+- A command is answered for the reader its page was shown to: a document
+  served to another session, or not held, is refused before it runs; a
+  press already answered is answered from what was kept.
+- Found:
+  - a correction to the integrator's ruling of Q1: the superset it accepted
+    sent another user's activity to every reader, a timing channel;
+  - a record's scope depended on the order of the files;
+  - `private` was two things.
+
+[ADR-0319](DECISIONS/ADR-0319-a-delivery-goes-to-the-readers-chosen-address.md):
+a delivery goes to the reader's chosen address (W8's, milestones 2 and 3).
+- Eleven fixed places, and each store's zone a radius. One rule
+  (`places::delivers_to`, haversine) read by the estimate, the page,
+  `add_to_cart` and `place_order`, on both layers.
+- Out of reach is the program's declared error (`CartError.OutOfRange`,
+  `OrderError.NoCoverage`), told in the page's words.
+- Addresses are the reader's, at most ten. The estimate is the reader's,
+  kept for no time.
+- The address page: choosing an address and returning to the store shows its
+  estimate with no reload (the owner's Next.js bug).
+- Found:
+  - a `<ready as>` name resolved as a module function (fixed by ADR-0310);
+  - the place table first told the two stores' radii apart nowhere.
+

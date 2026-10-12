@@ -122,6 +122,15 @@ export const MESSAGES_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT 
 // Pleris, one per engine, beside the slice's single host at KIOKUN_PORT.
 // Registered before any suite serves on them, so no other track takes them.
 export const KIOKUN_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 120 + i]));
+// The store-accounts track's hosts (docs/PARALLEL.md, W8's plan): the store's
+// build, its sessions signed in through the development identity provider
+// (`PW_IDENTITY=dev-accounts`), so a guest's cart follows them in, a user's
+// cart and addresses are theirs in each of their sessions, and a saved
+// address's estimate is the store page's. One per engine, because an account
+// and its cart are every reader's on a host.
+export const STORE_ACCOUNTS_PORTS = Object.fromEntries(
+  ENGINES.map((e, i) => [e, PORT + 160 + i]),
+);
 // TRACK SEAM (store-search): the store's search hosts (docs/PARALLEL.md,
 // W9), the store's build, one per engine, because a test adds a dish to
 // store 47's menu, which is one per server.
@@ -331,6 +340,15 @@ export default defineConfig({
           timeout: 60_000,
         }))
       : []),
+    ...(process.env.PW_PERFORMANCE
+      ? []
+      : Object.values(STORE_ACCOUNTS_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist`,
+          env: { PORT: String(port), PW_IDENTITY: "dev-accounts", ...IN_MEMORY },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))),
     ...(process.env.PW_PERFORMANCE
       ? []
       : [

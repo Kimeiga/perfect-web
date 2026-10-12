@@ -23,7 +23,9 @@
 //
 // The catalog is public, so the search is public and kept `shared`, keyed by
 // its text. The page is shown in `StoreLayout`, which shows the reader's
-// cart, so the page is the session's.
+// cart, so the page is the reader's: a `user` page, as the layout is since
+// track `store-accounts` (a page declares at least its layout's audience,
+// PW5046).
 
 module store.search
 
@@ -171,12 +173,13 @@ fn more(n: Int, one: String, many: String) -> String !{} {
         "{n} more {many}"
     }
 }
+
 // **The search page** (track `store-search`, ADR-0308; its address
 // ADR-0309's): at `/search{?q}`, its search box a plain GET form that makes
 // the address, with scripts on or off. With no `q` it asks what to search
 // for; with one, it says what was found. A navigation gives no query, so a
 // link or the form reaches it.
-session page SearchPage(q: Option<String>) {
+user page SearchPage(q: Option<String>) {
     route     "/search{?q}"
     layout    StoreLayout
     placement origin
