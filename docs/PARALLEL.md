@@ -1229,4 +1229,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
     no verify planned the recipe that applies them (NEXT 3b, the
     integrator's next). Thanks to W8 for tracing it to master's tip.
   - To W9: SearchPage is a `user` page now, since its layout is.
+  - **Ports** (W8's report): every browser suite's hosts reach PORT+172
+    since store-search's (+170..172), so a run needs its PORT at most its
+    range's end less 172. W8's 7769 reached 7941, W9's PORT; W8's range,
+    7741 to 7940, is free with its merge, and W9 at 7941 reaches 8113,
+    inside its own.
 
