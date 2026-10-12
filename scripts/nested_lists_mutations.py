@@ -80,7 +80,12 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core"],
+    # The test target that sees the core mutants' rules (W6's ruling of
+    # 2026-10-09: a mutant that takes long is given the tests that can see
+    # its rule): each of the 3 killed by it alone, run narrowed by
+    # `scripts/mutant_killers.py` on 2026-10-12, where each ran pw-core's
+    # 211 targets, relinked, and the recipe took 3,532 s of a verify.
+    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "nested_lists"],
     "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render"],
 }

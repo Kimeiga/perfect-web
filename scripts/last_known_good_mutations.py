@@ -122,7 +122,16 @@ MUTANTS = [
 
 CARGO = {
     "resource": ["cargo", "test", "--quiet", "--locked", "-p", "pw-resource"],
-    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core"],
+    # The tests that see the core mutants' rules (W6's ruling of 2026-10-09:
+    # a mutant that takes long is given the tests that can see its rule),
+    # measured by `scripts/mutant_killers.py` on 2026-10-12 against pw-core's
+    # 211 targets: PW0343's two by the library's own test, and the plan's
+    # `fallback` by `evidence_is_current` alone, which holds the committed
+    # store page's plan to the compiler's.
+    "core": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
+        "--lib", "--test", "evidence_is_current",
+    ],
     "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
 }
 
