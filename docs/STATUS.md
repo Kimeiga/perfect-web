@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0317, 2026-10-12: a component is compiled once a process** (the
+integrator's; track `compile-once`, merged from `05a67ae`).
+- Found: after kiokun's merge, the development server's suite, run whole
+  four tests at once, held more than ADR-0292's memory bound. Ten
+  whole-suite mutation baselines were stopped in a verify, and
+  `e14-kiokun-word` on master.
+- The cause: a server compiled each component twice, once to read its
+  imports and once to run it, and every test's server did so again.
+- Now a component's bytes are compiled once a process, and its imports are
+  read from that compile.
+- On CI the suite runs in 302 s at a 1.56 GiB peak (3.9 GiB bound), from
+  about 950 s and over it. Here it went from 1,034 s at 4.47 GiB to 618 s
+  at 1.40 GiB.
+
+Verify 38256961376 green: 2 of 2 mutants, and the suite's own measure.
+
 **ADR-0313 to ADR-0316, 2026-10-12: kiokun's Contains and Appears in, its
 search, its reading index and Homophones, and its deinflection** (W6's,
 track `kiokun`, merged from `fc77a5a2`). Each is held to kiokun.com's own
