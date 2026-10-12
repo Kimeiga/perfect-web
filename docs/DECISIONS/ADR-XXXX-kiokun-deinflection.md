@@ -166,15 +166,17 @@ Numbered after the reading index ADR's 33.
     `/食べる?from=…&conj=…&alt=…` addresses, copied from its address bar, show
     the entry without the note here: a route ignores names it does not
     declare (ADR-0308).
-35. **No canonical link yet.** kiokun.com states one on every page. Here a
-    page cannot state one until the integrator builds it:
-    - `<link rel="canonical" href={WordPage(page.word)} />` at the view's
-      top, written absolute from the deployment's configured origin (the
-      ruling of 2026-10-09, PARALLEL's "1e's questions answered", Q2);
-    - ADR-0293's Differences 10 and 12;
-    - ADR-0189, which refuses one in the body (PW5035).
-    When it lands, the word page states it always: self-referencing on
-    `/word/食べる`, and naming `/word/食べる` on `/word/食べた`.
+35. **The canonical link is written with the configured origin.**
+    - Closed as a gap on 2026-10-12, when ADR-0311 landed (the ruling of
+      2026-10-09, PARALLEL's "1e's questions answered", Q2). The word page
+      states `<link rel="canonical" href={WordPage(page.word)} />` at its
+      view's top: self-referencing on `/word/食べる`, and naming
+      `/word/食べる` on `/word/食べた`. The host writes it absolute, with
+      `og:url` from it.
+    - kiokun.com writes its canonical with the request's origin; here it is
+      the deployment's (`PW_ORIGIN`).
+    - Tested by `the_word_page_names_its_entrys_page_canonical`. ADR-0293's
+      Differences 10 and 12 are closed with it.
 36. **A する verb JMdict marks vs-s is read as a する verb for する's own
     forms** (供した, 供しない, 愛した → 供する, 愛する). kiokun.com finds those
     only through the godan 供す and the noun 供. The oracle counts each by

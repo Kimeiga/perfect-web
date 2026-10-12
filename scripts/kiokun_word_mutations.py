@@ -783,6 +783,20 @@ MUTANTS = [
         "        if false {\n            clauses.push(",
     ),
     (
+        "the word page states no canonical address",
+        "head",
+        APP,
+        "        <link rel=\"canonical\" href={WordPage(page.word)} />\n",
+        "",
+    ),
+    (
+        "the canonical address is the one asked",
+        "head",
+        APP,
+        "        <link rel=\"canonical\" href={WordPage(page.word)} />\n",
+        "        <link rel=\"canonical\" href={WordPage(word)} />\n",
+    ),
+    (
         "a blank query is a search like any other",
         "search",
         APP,
@@ -1049,6 +1063,7 @@ GROUPS = {
         K + "the_description_takes_kiokuns_fragments_and_length",
         K + "the_page_head_matches_kiokuns_answers_for_the_sample",
         K + "the_page_describes_itself_as_kiokun_com_does",
+        K + "the_word_page_names_its_entrys_page_canonical",
     ],
     "pitch": [
         K + "a_japanese_word_shows_its_pitch_accent",
@@ -1133,6 +1148,7 @@ SEEN_BY = {
         K + "the_description_takes_kiokuns_fragments_and_length",
         K + "the_page_describes_itself_as_kiokun_com_does",
         K + "the_page_head_matches_kiokuns_answers_for_the_sample",
+        K + "the_word_page_names_its_entrys_page_canonical",
     ],
     "pitch": [
         K + "a_japanese_word_shows_its_pitch_accent",

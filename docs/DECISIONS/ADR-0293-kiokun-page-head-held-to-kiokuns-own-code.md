@@ -108,11 +108,23 @@ Added to ADR-0286's list:
 10. **No canonical link.** A `<link rel="canonical">` in a page's markup is
     refused (PW5035); kiokun.com's is the requested slug, absolute, on the
     page's origin. A question for the integrator (below).
+    - **Closed, amended 2026-10-12** (ADR-0311): the word page states
+      `<link rel="canonical" href={WordPage(page.word)} />` at its view's
+      top, and the host writes it absolute. The address is the entry's
+      page: itself on `/word/食べる`, and `/word/食べる` on `/word/食べた`
+      (the deinflection ADR). It is written with the deployment's configured
+      origin (`PW_ORIGIN`), never the request's: kiokun.com uses the
+      request's origin, which is the difference left.
+    - Held by `the_word_page_names_its_entrys_page_canonical`, with two
+      mutants in `kiokun_word_mutations.py` (no canonical link, and the
+      address asked named instead).
 11. **No link preview image, so no `og:image` and no `twitter:card`.**
     kiokun.com's is drawn by `/api/og` (resvg and CJK fonts), which needs an
     image renderer the owner approves. Pointing at an image that is not
     served would be worse than naming none.
-12. **No `og:url`**, which is the canonical address (10).
+12. **No `og:url`**, which is the canonical address (10). **Closed, amended
+    2026-10-12** (ADR-0311): the host writes `og:url` from the canonical
+    address. A page's own is refused (PW5034); the word page writes none.
 13. **No JSON-LD.** kiokun.com writes a `WebPage` whose `mainEntity` is a
     `DefinedTerm`; a Pleris page writes no script (ADR-0094). A question for
     the integrator.

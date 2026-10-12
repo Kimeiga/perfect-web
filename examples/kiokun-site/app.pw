@@ -3326,6 +3326,7 @@ page WordPage(word: String) {
 
     view {
         <title>{page.seo.title}</title>
+        <link rel="canonical" href={WordPage(page.word)} />
         <meta name="description" content="{page.seo.description}" />
         <meta name="robots" content="index, follow" />
         <meta property="og:type" content="website" />

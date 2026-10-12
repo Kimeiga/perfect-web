@@ -136,9 +136,21 @@ fn served_kiokun() -> Served {
 fn served_kiokun_with(change: fn(&str) -> String) -> Served {
     let (dir, out) = built_kiokun_with(change);
     Served {
-        server: Server::from_build(out.clone(), out).expect("served"),
+        server: kiokun_server(&out),
         _dir: dir,
     }
+}
+
+/// The development origin kiokun's tests serve at (ADR-0311): the word page
+/// states its canonical address, which the host writes absolute with the
+/// deployment's origin, as `PW_ORIGIN` gives it to a running server.
+const ORIGIN: &str = "http://127.0.0.1:7341";
+
+/// kiokun's built program served, at `ORIGIN`.
+fn kiokun_server(out: &std::path::Path) -> Server {
+    let server = Server::from_build(out.to_path_buf(), out.to_path_buf()).expect("served");
+    let _ = server.origin.set(ORIGIN.to_string());
+    server
 }
 
 /// The word page's path for `word`, its one segment percent-encoded.
@@ -1552,7 +1564,7 @@ fn word_pages_with_long_lists_are_timed() {
         let mut times: Vec<f64> = Vec::new();
         let mut page = String::new();
         for _ in 0..repeat {
-            let s = Server::from_build(out.clone(), out.clone()).expect("served");
+            let s = kiokun_server(&out);
             let at = std::time::Instant::now();
             page = fetched_as(&s, &path_of(word), Some("timed"))
                 .into_iter()
@@ -2260,6 +2272,42 @@ fn an_inflected_word_shows_the_dictionary_form_it_is() {
     assert!(!own.contains("conjugation-info"), "{own}");
 }
 
+/// **The word page's canonical address** (ADR-0311; the deinflection ADR's
+/// Difference 35, ADR-0293's Differences 10 and 12, closed): the entry's own
+/// page, written absolute with the deployment's origin (`PW_ORIGIN`, here a
+/// development machine's), never the request's `Host`. Self-referencing on
+/// `/word/食べる`, and naming `/word/食べる` on `/word/食べた`, whose address
+/// shows 食べる's entry.
+#[test]
+fn the_word_page_names_its_entrys_page_canonical() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let s = served_kiokun_on(&root.join("examples/kiokun/data/deinflection"));
+    let origin = ORIGIN;
+    let canonical = format!(
+        "<link rel=\"canonical\" href=\"{origin}{}\">",
+        path_of("食べる")
+    );
+    for asked in ["食べる", "食べた"] {
+        let page = fetched(&s, &path_of(asked));
+        assert!(page.starts_with("HTTP/1.1 200"), "{asked}: {page}");
+        let head = &page[..page.find("</head>").expect("a head")];
+        assert_eq!(
+            head.matches("rel=\"canonical\"").count(),
+            1,
+            "{asked}: {head}"
+        );
+        assert!(head.contains(&canonical), "{asked}: {head}");
+        // Open Graph's og:url is the host's, from the canonical address.
+        assert!(
+            head.contains(&format!(
+                "<meta property=\"og:url\" content=\"{origin}{}\">",
+                path_of("食べる")
+            )),
+            "{asked}: {head}"
+        );
+    }
+}
+
 /// **Deinflection against kiokun.com's answers**: for each inflected form the
 /// oracle asked, the page's answer beside kiokun.com's resolution. Where
 /// kiokun.com finds a form, the page shows it, 200, with the same first form
@@ -2563,7 +2611,7 @@ fn a_sample_of_the_whole_dictionary_is_served_and_timed() {
         Some(other) => std::fs::read_to_string(other).expect("KIOKUN_SAMPLE_APP"),
         None => app.to_string(),
     });
-    let s = Server::from_build(out.clone(), out.clone()).expect("served");
+    let s = kiokun_server(&out);
     let word_component = std::fs::metadata(out.join("components/kiokun.site.Word.wasm"))
         .expect("the Word component")
         .len();
