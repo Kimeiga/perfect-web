@@ -1,8 +1,8 @@
 ADR-0203 - a view that contains itself is an instance of its own template, made at run time
 
 produced by: just e14-view-instances
-commit: a1a232f5c9e804c5eba9e2123d57fe8637666993
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38186484587 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 124b62ba4deb1d849dfaa957762ec47c6c5e72f3
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38263374811 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
@@ -36,7 +36,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 == the thread page (spikes/own-renderer/e2e/thread.spec.mjs), three engines
 
-  18 passed (1.2m)
+  18 passed (1.0m)
 
 == mutation controls (scripts/view_instances_mutations.py)
 

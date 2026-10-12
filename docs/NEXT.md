@@ -717,13 +717,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
              the user's scope or becomes "not importable" alone is the
              integrator's ruling, a change to every program that says it
              (the feed's notifications and messages);
-          3b. **benchmark task T11's patches apply again** (open, the
-             integrator's; named known by W8's merge, 2026-10-12): holds'
-             merge (ADR-0307) changed `benchmarks/baselines/pleris/store/
-             app.pw` and left T11's reference and unsafe patches unapplied,
-             so `e14-diffs` fails at `git apply`. With it, the planner gap
-             that let it through: a change to a benchmark's baseline planned
-             no recipe that applies patches to it;
+          3c. **a member read inside a block at the top of the page**
+             (found on the way to ADR-0320, 2026-10-12): `{cart.line_count}`
+             in `{#if cart.lines}` is refused at build ("which a host would
+             call per instance"), though a host renders a block at the top
+             once. A host computes such a member once per change, into what
+             the block is rendered with, as a top-level part's; one in a
+             loop's row stays a row read;
+          3b. ~~**benchmark task T11's patches apply again**~~ (merged
+             2026-10-12, track `t11-patches`): each patch made again against
+             the store holds' merge changed, and a script that names a
+             program or benchmark that changed plans its recipe;
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled.
              In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
@@ -910,9 +914,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
             W9's, after W8's merge: the home page's form, the cuisine as the
             store's own field (ruled 2026-10-12), `user`, and results
             filtered to the stores that reach the reader's address, through
-            W8's `Reach`. The integrator's, first: a part inside an arm whose
-            subject did not change is told when the query it reads changes
-            (ADR-0308's Found), and the sentence goes back inside the arm;
+            W8's `Reach`. ~~A part inside an arm whose subject did not change
+            told when the query it reads changes~~ (ADR-0320, merged
+            2026-10-12; the sentence is back inside the arm);
           - **W9, ratings and reviews** of orders and stores, after
             accounts.
 
@@ -930,9 +934,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
           ADR-0286, ADR-0288, ADR-0289, ADR-0293, ADR-0299, and the page's
           moves, ADR-0301, 2026-10-10), and so are Contains and Appears in,
           search, the reading index with Homophones, and deinflection
-          (ADR-0313 to ADR-0316, 2026-10-12); next (W6), the search box at
-          `/search{?q}` and the word page's canonical link (W6's next
-          packet), then `/{word}` once `/_pw/` lands. Real
+          (ADR-0313 to ADR-0316, 2026-10-12); and so are the search box at
+          `/search{?q}` and the word page's canonical link (merged
+          2026-10-12); next (W6), `/{word}` once `/_pw/` lands, and the
+          inventory's next routes (102 at kiokun.com's `2391117c`: 0 built, 5
+          partial, 97 missing). Real
           users, data, devices and deploys are the strongest
           evidence there is. Its conditions: parity with the live site,
           measured; served first on a preview origin beside the live site;

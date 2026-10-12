@@ -11,7 +11,10 @@ the run ends (and the fewest of those that end it as soon), and the fetch
 keeping only a recipe that ran to its end, over the others kept; and (the
 amendment of 2026-10-10) a run dealt into more shards than it asks for where
 its own would end a shard past the ceiling, a recipe longer than it alone
-let be, and the ceiling under a shard's limit. At least one test of
+let be, and the ceiling under a shard's limit; and (ADR-0281's amendment
+of 2026-10-12) the fetch refusing a file whose recipe reads what changed
+since its run, against the tree here, staged or not, and one no recipe
+wrote, and copying none of a recipe it skips. At least one test of
 `scripts/tests/test_ci_scripts.py` must then fail.
 
 Run from the repository root; `just e14-dealt-by-time` records the output.
@@ -30,6 +33,36 @@ FETCH = ROOT / "scripts/evidence_fetch.py"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
+    (
+        "a file whose recipe reads what changed since its run is copied",
+        FETCH,
+        "    if recipe in moved:\n",
+        "    if False:\n",
+    ),
+    (
+        "what changed since a run is read between commits, not against the tree here",
+        FETCH,
+        "ci_plan.hunks(sha, None)",
+        "ci_plan.hunks(sha, \"HEAD\")",
+    ),
+    (
+        "the tree here is read as its last commit",
+        PLAN,
+        "*([head] if head else [])",
+        "*([head] if head else [\"HEAD\"])",
+    ),
+    (
+        "a recipe the fetch skips has its files judged",
+        FETCH,
+        "    if recipe in skip:\n        return \"skipped\"\n",
+        "",
+    ),
+    (
+        "a file no recipe wrote is copied",
+        FETCH,
+        "    if recipe is None:\n        return \"no recipe of the run wrote it\"\n",
+        "",
+    ),
     (
         "a recipe costs its mutants again",
         PLAN,

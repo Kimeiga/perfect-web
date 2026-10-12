@@ -3326,6 +3326,7 @@ page WordPage(word: String) {
 
     view {
         <title>{page.seo.title}</title>
+        <link rel="canonical" href={WordPage(page.word)} />
         <meta name="description" content="{page.seo.description}" />
         <meta name="robots" content="index, follow" />
         <meta property="og:type" content="website" />
@@ -3335,6 +3336,7 @@ page WordPage(word: String) {
         <meta property="og:description" content="{page.seo.description}" />
         <meta name="twitter:title" content="{page.seo.title}" />
         <meta name="twitter:description" content="{page.seo.description}" />
+        <SiteSearch placeholder={page.word} />
         <main>
             {#each page.inflection as i (i.asked)}
                 <aside class="conjugation-info">
@@ -3829,27 +3831,63 @@ fn column_of(hits: List<ShownHit>, groups: List<Group>, language: String, headin
     }
 }
 
+// The word a search leads to, where the query is one (kiokun.com's header
+// goes to its page, `navigateOrSearch`): the address asked, the form it
+// shows, and how it was inflected, where it was.
+type WordLead = WordLead {
+    id: String,
+    asked: String,
+    shown: String,
+    how: String,
+}
+
 // The search page's content.
 type SearchShown = SearchShown {
     asked: String,
+    blank: Bool,
+    placeholder: String,
     found: String,
     any: Bool,
+    lead: List<WordLead>,
     chinese: HitColumn,
     japanese: HitColumn,
     korean: HitColumn,
 }
 
-fn search_shown(asked: String, groups: List<Group>) -> SearchShown {
+fn search_shown(asked: String, groups: List<Group>, lead: List<WordLead>) -> SearchShown {
     let none: List<ShownHit> = []
     let hits = List.fold(groups, none, (out, g) => List.concat(out, [hit_shown(g, List.length(out))]))
     let total = List.length(groups)
     SearchShown {
         asked: asked,
+        blank: String.trim(asked) == "",
+        placeholder: "Search the dictionary",
         found: if total == 1 { "Found 1 result" } else { "Found {total} results" },
         any: total > 0,
+        lead: lead,
         chinese: column_of(hits, groups, "chinese", "Chinese"),
         japanese: column_of(hits, groups, "japanese", "Japanese"),
         korean: column_of(hits, groups, "korean", "Korean"),
+    }
+}
+
+fn has_entry(e: Option<Entry>) -> Bool {
+    match e {
+        Some(_) => true,
+        None => false,
+    }
+}
+
+// The word a CJK query leads to: the query itself where it has its own
+// entry, else the first form it resolves to by deinflection.
+fn lead_of(asked: String, own: Option<Entry>, found: List<Resolved>) -> List<WordLead> {
+    let none: List<WordLead> = []
+    match own {
+        Some(_) => [WordLead { id: asked, asked: asked, shown: asked, how: "" }],
+        None => match List.get(found, 0) {
+            Some(r) => [WordLead { id: asked, asked: asked, shown: r.word, how: r.how }],
+            None => none,
+        },
     }
 }
 
@@ -3862,14 +3900,18 @@ fn search_limit() -> Int {
 // it): a CJK query's terms, the query and its variants and aliases; a Latin
 // one as typed; the rows kiokun.com's statements return, grouped by the page
 // each names, the first 60.
-public query Search(q: String) -> SearchShown
+public query Search(asked: Option<String>) -> SearchShown
     freshness   1.hours
     consistency snapshot
     cache       shared
-    key         q
+    key         asked
 {
+    let q = match asked {
+        Some(t) => t,
+        None => "",
+    }
     let none: List<String> = []
-    let cjk = is_cjk(q)
+    let cjk = is_cjk(q) & String.trim(q) != ""
     let trimmed = String.trim(q)
     let first_aliases = if cjk { search_aliases([trimmed]) } else { search_aliases(none) }
     let variants = if cjk { search_variants(characters(trimmed)) } else { search_variants(none) }
@@ -3885,7 +3927,28 @@ public query Search(q: String) -> SearchShown
     let canonical = search_canonical(List.map(List.filter(rows, r => r.language == "japanese"), r => r.word))
     let empty: List<Group> = []
     let groups = List.fold(rows, empty, (gs, r) => group_row(gs, r, canonical, q, terms))
-    search_shown(q, List.take(groups, search_limit()))
+    // The word a CJK query leads to (`resolveWordNavigationUrl`): its own
+    // entry, else the first form deinflection resolves it to, read as the
+    // word page reads them.
+    let no_places: List<Place> = []
+    let own_files = read_entries(if cjk { [place_of(trimmed)] } else { no_places })
+    let own = match List.get(own_files, 0) {
+        Some(f) => recorded(f, trimmed),
+        None => None,
+    }
+    let unread: List<Deinflected> = []
+    let candidates = if cjk & !has_entry(own) { deinflected(trimmed) } else { unread }
+    let asked_words = each_once(List.map(candidates, d => d.word))
+    let asked_files = read_entries(List.map(asked_words, place_of))
+    let asked_hops = read_entries(List.map(redirects_of(asked_files), place_of))
+    let asked_entries = filed(asked_words, asked_files, redirects_of(asked_files), asked_hops)
+    let lookups = List.map(unfit_kana(candidates, asked_entries), r => ReadingFound { reading: r, rows: search_reading(r, 10) })
+    let written = each_once(List.fold(lookups, none, (out, f) => List.concat(out, written_forms(lookups, f.reading))))
+    let written_files = read_entries(List.map(written, place_of))
+    let written_hops = read_entries(List.map(redirects_of(written_files), place_of))
+    let entries = List.concat(asked_entries, filed(written, written_files, redirects_of(written_files), written_hops))
+    let resolutions = resolved(candidates, entries, lookups)
+    search_shown(q, List.take(groups, search_limit()), lead_of(trimmed, own, resolutions))
 }
 
 fn max_of(a: Int, b: Int) -> Int {
@@ -3933,10 +3996,24 @@ view HitColumnView(column: HitColumn) {
     {/if}
 }
 
-// The search page. Its route is `/search/{q}` until a page can read a
-// query string (kiokun.com's `/search?q=`), which is the integrator's.
-page SearchPage(q: String) {
-    route     "/search/{q}"
+// **The site's search box** (`Header.svelte:84-127`): kiokun.com's field,
+// sent as a plain GET form to the search page (ADR-0309), so it needs no
+// script. kiokun.com's suggestions as one types, and its handwriting, are
+// client features, not built.
+view SiteSearch(placeholder: String) {
+    <header class="site-header">
+        <form class="header-search" role="search" method="get" action="/search">
+            <div class="header-search-field">
+                <input id="site-search" name="q" type="search" aria-label="Search the dictionary" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" placeholder="{placeholder}" />
+                <button type="submit" class="visually-hidden">Search</button>
+            </div>
+        </form>
+    </header>
+}
+
+// The search page, at kiokun.com's `/search?q=` (ADR-0309).
+page SearchPage(q: Option<String>) {
+    route     "/search{?q}"
     placement origin
     cache     shared
 
@@ -3945,12 +4022,23 @@ page SearchPage(q: String) {
     view {
         <title>Search Results | Kiokun</title>
         <meta name="robots" content="noindex, follow" />
+        <SiteSearch placeholder={found.placeholder} />
         <main id="main-content" class="search-page">
             <div class="search-header">
                 <h1>Search Results</h1>
-                <p class="search-asked">Results across Chinese, Japanese, and Korean for <strong>{found.asked}</strong></p>
+                {#if found.blank}
+                {:else}
+                    <p class="search-asked">Results across Chinese, Japanese, and Korean for <strong>{found.asked}</strong></p>
+                {/if}
             </div>
-            {#if found.any}
+            {#each found.lead as w (w.id)}
+                <p class="word-lead"><a href="/word/{w.asked}" class="word-lead-link">{w.shown}</a>{#if w.how} <span class="conjugation-detail">({w.how})</span>{/if}</p>
+            {/each}
+            {#if found.blank}
+                <div class="empty-state">
+                    <p>Use the search field above to find a character, word, pronunciation, or meaning.</p>
+                </div>
+            {:else if found.any}
                 <div class="results-header"><p>{found.found}</p></div>
                 <div class="results-container">
                     <HitColumnView column={found.chinese} />

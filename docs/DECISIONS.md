@@ -2326,6 +2326,9 @@ a merge is held to CI's verification run.
   browser spec too; `evidence-fetch` brings the record into docs/evidence
   once the owner approves the download in the integrator's session; what CI
   cannot run stays local and says so.
+- Amended 2026-10-12: a fetch takes no file whose recipe reads what
+  changed between its run's commit and the tree it joins (the planner's
+  rule): the branch merges master and is verified again.
 [ADR-0282](DECISIONS/ADR-0282-what-a-value-holds-is-one-label.md):
 what a value holds is one label (amends ADR-0118, corrects ADR-0128).
 - A secret a declaration answers is held, and one it only uses as a key is
@@ -2731,6 +2734,9 @@ whole dictionary (W6's; the integrator's rulings B1 to B5 of 2026-10-10).
   by the CSV's digest. `is_common` is read as an integer.
 - Held to kiokun.com's `GET` handler in Node over `node:sqlite`. CI holds a
   4,375-row sample from cleared sources.
+- Amended 2026-10-12 (W6's second packet): the page at `/search{?q}`, with
+  kiokun.com's header field as a plain GET form, its empty state, and a CJK
+  query that is a word leading with a link to it.
 
 [ADR-0315](DECISIONS/ADR-0315-kiokun-reading-index-and-homophones.md):
 kiokun's reading index and the word page's Homophones (W6's).
@@ -2756,6 +2762,9 @@ of our own).
   MediaWiki's redirect note does), not kiokun.com's 307.
 - Held to kiokun.com as a black box in Node, never read and never
   committed: 3,873 forms, 0 unnamed differences.
+- Amended 2026-10-12: the word page states its canonical link (ADR-0311),
+  self-referencing on a dictionary form and naming it on an inflected one,
+  with `og:url` from it (ADR-0293's Differences 10 and 12 closed).
 
 [ADR-0317](DECISIONS/ADR-0317-a-component-is-compiled-once-a-process.md): a
 component is compiled once a process (the integrator's; W6's finding of
@@ -2806,4 +2815,23 @@ a delivery goes to the reader's chosen address (W8's, milestones 2 and 3).
 - Found:
   - a `<ready as>` name resolved as a module function (fixed by ADR-0310);
   - the place table first told the two stores' radii apart nowhere.
+
+[ADR-0320](DECISIONS/ADR-0320-a-block-is-told-part-by-part-while-its-arm-stays.md):
+a block is told part by part while its arm stays (the integrator's; W9's
+finding, ADR-0308's amendment; ADR-0146 amended).
+- The plan names each block at the top of a page that renders a query's
+  value, whatever decides it: a query, a value a host computes from one, or
+  anything inside that reads one.
+- A host tells a block whose rendering changed part by part while it shows
+  the arm it showed: text, attributes, captures, keyed lists, inside a
+  conditional that decides as it did or a `{#match}` that shows the arm it
+  showed (`pw_render::block_changes`). It renders the block again whole
+  where it shows another arm, or where something not set in place changed.
+- A block a speculation renders is rendered again whole (ADR-0172).
+- Found:
+  - W9's sentence was never told;
+  - a block was replaced whole for any change inside it, its status region
+    and fields with it;
+  - the feed's unread counts were sent as their whole block;
+  - a member read inside any block is refused (NEXT 3c).
 

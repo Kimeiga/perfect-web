@@ -51,10 +51,11 @@ fn served_with(change: fn(&str) -> String) -> Served {
     assert!(build.refusals().is_empty(), "{:?}", build.refusals());
     let out = dir.path().join("build");
     build.write(&out).expect("the build is written");
-    Served {
-        server: Server::from_build(out.clone(), out).expect("served"),
-        _dir: dir,
-    }
+    let server = Server::from_build(out.clone(), out).expect("served");
+    // The word page states its canonical address (ADR-0311), written with
+    // the deployment's origin.
+    let _ = server.origin.set("http://127.0.0.1:7341".to_string());
+    Served { server, _dir: dir }
 }
 
 /// The line of the word query that decides where the word moves, as
@@ -101,12 +102,19 @@ fn unnamed(app: &str) -> String {
 }
 
 /// The word page given a query part, `{?from}` (ADR-0309), its move
-/// declared `permanent`.
+/// declared `permanent`. Its canonical link goes: a canonical address with a
+/// query is not claimed (ADR-0311, PW5051).
 fn queried(app: &str) -> String {
     const PAGE: &str = "page WordPage(word: String) {\n    route        \"/word/{word}\"\n";
+    const CANONICAL: &str = "        <link rel=\"canonical\" href={WordPage(page.word)} />\n";
     let app = permanent(app);
     assert_eq!(app.matches(PAGE).count(), 1, "the word page's head");
-    app.replace(
+    assert_eq!(
+        app.matches(CANONICAL).count(),
+        1,
+        "the word page's canonical link"
+    );
+    app.replace(CANONICAL, "").replace(
         PAGE,
         "page WordPage(word: String, from: Option<String>) {\n    \
          route        \"/word/{word}{?from}\"\n",

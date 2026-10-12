@@ -23,6 +23,63 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0281 amended, 2026-10-12: a fetch takes no file of code the tree it
+joins does not hold** (the integrator's; track `evidence-current`, merged
+from `668e369`).
+- The day's ruling, made mechanical. `just evidence-fetch` refuses a run's
+  file whose recipe reads what changed between the run's commit and the tree
+  it writes into, by the planner's own rule, and copies nothing. The branch
+  merges master and is verified again. `--skip RECIPE` copies none of a
+  recipe's files, where another run records it.
+- Its first use refused all 19 files of narrowing-2's first run (at
+  `853674f`) on master's tree: the case found by hand that morning.
+Verify 38287219825 green: 22 of 22 mutants.
+
+**2026-10-12: benchmark task T11's patches apply again, and a verify plans
+the recipe that applies them** (the integrator's; NEXT 3b; track
+`t11-patches`, merged from `f14a107`).
+- Holds' merge (ADR-0307) made the benchmark store's Add and Clear
+  `on:press|refusable`. T11's reference and unsafe patches, written against
+  the store before it, no longer applied, and `e14-diffs` failed on master.
+  Each patch is made again against the store as it is.
+- Found: no verify had planned `e14-diffs` since holds' merge. The planner
+  read a script's mutants and tests, not the programs a plain script reads.
+  A script that names a program or benchmark under `benchmarks/` or
+  `examples/` that changed now plans its recipe.
+- Found also: the W8 merge took a failed recipe's output as evidence
+  (restored in `a083520`). `just evidence-fetch` now copies no file a failed
+  recipe wrote.
+Verify 38275359848 green: T11's two patches apply and hold (6 of 6
+mutants), Pleris refuses 9 of 12 wrong fixes, and dealt-by-time's 17 of 17.
+
+**2026-10-12: kiokun's search box and canonical link** (W6's second packet,
+merged from `5b7dc1e`; ADR-0314, ADR-0316 and ADR-0293 amended).
+- The search is at `/search{?q}`, with kiokun.com's header field as a plain
+  GET form on the word and search pages.
+- The word page names its dictionary form's address as its canonical link,
+  with `og:url` from it.
+- The inventory is at kiokun.com's `2391117c`: 102 routes.
+- After ADR-0317 every kiokun test runs at a 1.28 GiB peak in 46 s, from
+  5.21 GiB and 839 s, and W6's thread limits are relaxed again.
+Verify 38264024746 green: kiokun-word 138 of 138 and redirects 15 of 15.
+
+**ADR-0320, 2026-10-12: a block is told part by part while its arm stays**
+(the integrator's; W9's finding; track `fixed-arms`, merged from `124b62b`).
+W9's search sentence, inside the `Some` arm of `{#match q}`, was never told
+when the search's result changed.
+- The plan now names every block at the top of a page that renders a
+  query's value, whatever decides it.
+- A host tells a block whose rendering changed part by part while it shows
+  the arm it showed, as a row is (`pw_render::block_changes`, a `{#match}`
+  looked into too). A status region or a field inside it is kept, which
+  ADR-0146 had deferred.
+- A block a speculation renders is rendered again whole.
+- The sentence is back inside the arm. W9's `given` and its mutant, which
+  then tested nothing a page shows, are gone.
+- The feed's unread counts are now set as text where they are.
+Verify 38263374811 green: 14 of 14 mutants, store-search 32 of 32, five
+re-anchored scripts run whole.
+
 **ADR-0318 and ADR-0319, 2026-10-12: a cart and an order are a user's, and a
 delivery goes to the reader's chosen address** (W8's, track `store-accounts`,
 merged from `3fdcf929`). The store's customer side:

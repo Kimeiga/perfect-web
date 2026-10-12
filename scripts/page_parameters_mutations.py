@@ -48,10 +48,13 @@ MUTANTS = [
         "a block a host renders again is rendered without the page's parameters",
         "cargo",
         SERVER,
-        "        // Each block a query decides, as it renders now (ADR-0146).\n"
-        "        let env = self.document_env(page, session, params, bindings);\n",
-        "        // Each block a query decides, as it renders now (ADR-0146).\n"
-        "        let env = self.document_env(page, session, &Params::new(), bindings);\n",
+        # Re-anchored by ADR-0320, whose block is told part by part.
+        "        let env = self.document_env(page, session, params, bindings);\n"
+        "        let template = self.template_of(page);\n"
+        "        for block in plan[\"blocks\"].as_array().into_iter().flatten() {\n",
+        "        let env = self.document_env(page, session, &Params::new(), bindings);\n"
+        "        let template = self.template_of(page);\n"
+        "        for block in plan[\"blocks\"].as_array().into_iter().flatten() {\n",
     ),
     (
         "a row a change renders is rendered without the page's parameters",
