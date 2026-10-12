@@ -461,7 +461,13 @@ under the integrator's rulings of 2026-10-12 on this ADR's questions.
     above), makes geo-radius a filter of the index. Third-party
     tools' documentation of its web search says results depend on the
     delivery address set. A store that cannot deliver is not a result there.
-  - Not claimed: a toggle to see every store, and distance ranking.
+  - Not claimed: a toggle to see every store, and distance ranking. And
+    a search filtered by the reader's reach is computed per reader: split
+    into a shared search and a per-reader filter once a page can compute
+    from two queries (ADR-0226; the integrator's ruling of 2026-10-12, for
+    KNOWN_LIMITATIONS and NEXT). The full-text match is no longer shared.
+  - Its sentences count as the search's others do: "1 more matches but
+    doesn't", "N more match but don't".
 - **Its tests**:
   - `tests/store_search.rs`, in memory and on PostgreSQL:
     `a_search_lists_the_stores_that_reach_the_chosen_address` (Civic
