@@ -757,15 +757,26 @@ function textOf(v) {
   return typeof v === "string" ? v : String(v);
 }
 
+/** **Every name the page shows a binding's entry by** (ADR-XXXX): its own,
+ * and each alias, its layout's, rendered from the one value. */
+function namesOf(module, binding) {
+  const aliases = Object.entries(module.aliases ?? {})
+    .filter(([, owner]) => owner === binding)
+    .map(([alias]) => alias);
+  return [binding, ...aliases];
+}
+
 function render(module, binding) {
   const state = current(module, binding);
   if (!state || state.value === undefined) return;
   let value = state.value;
   for (const p of state.pending) value = p.transition(value, p.args);
-  for (const [part, read] of Object.entries(module.parts[binding] ?? {})) {
-    setRange(addressOf([], Number(part)), textOf(read(value)));
+  for (const name of namesOf(module, binding)) {
+    for (const [part, read] of Object.entries(module.parts[name] ?? {})) {
+      setRange(addressOf([], Number(part)), textOf(read(value)));
+    }
+    showRegions(module, name, value, state.value);
   }
-  showRegions(module, binding, value, state.value);
 }
 
 let nextSpeculation = 0;
@@ -839,7 +850,8 @@ async function reapplySpeculations() {
   if (!speculationModule) return;
   const module = await speculationModule;
   for (const [binding, state] of speculated) {
-    if (state.pending.length > 0 || module.regions?.[binding]?.length) render(module, binding);
+    const regions = namesOf(module, binding).some((name) => module.regions?.[name]?.length);
+    if (state.pending.length > 0 || regions) render(module, binding);
   }
 }
 
@@ -1202,10 +1214,12 @@ function revertLists() {
   for (const [binding] of speculated) {
     const state = current(speculationLoaded, binding);
     if (!state || state.value === undefined) continue;
-    const values = regionValues(speculationLoaded, binding, state.value);
-    for (const region of speculationLoaded.regions?.[binding] ?? []) {
-      if (region.kind === "list" && shownLists.has(region.part)) {
-        showList(region, listAt(state.value, region.collection), values, state.value, false);
+    for (const name of namesOf(speculationLoaded, binding)) {
+      const values = regionValues(speculationLoaded, name, state.value);
+      for (const region of speculationLoaded.regions?.[name] ?? []) {
+        if (region.kind === "list" && shownLists.has(region.part)) {
+          showList(region, listAt(state.value, region.collection), values, state.value, false);
+        }
       }
     }
   }

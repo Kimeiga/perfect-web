@@ -5663,3 +5663,30 @@ e14-soft-navigation:
        python3 scripts/soft_navigation_mutations.py; \
      } > docs/evidence/E14/soft-navigation.txt
     @grep -E "passed|failed|mutants killed|Error:" docs/evidence/E14/soft-navigation.txt
+
+# ADR-XXXX: a page and its layout show one entry by one value. The
+# speculation module's binding and its alias, run under Node, the host's one
+# entry, the layout's count in three engines, and the mutation controls.
+e14-one-entry:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a page and its layout show one entry by one value"; echo; \
+       echo "produced by: just e14-one-entry"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the store's page's module: one binding, its layout's name an alias (compiler/pw-core/tests/layouts.rs)"; echo; \
+       cargo test --locked -p pw-core --test layouts 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the module run under Node (compiler/pw-conformance/tests/speculation.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test speculation 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host: one entry for the store's cart"; echo; \
+       cargo test --locked -p pw-dev-server -- a_page_and_its_layout_show_one_entry_by_one_value 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the layout's count, in three engines (e2e/layouts.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/layouts.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/one_entry_mutations.py)"; echo; \
+       python3 scripts/one_entry_mutations.py; \
+     } > docs/evidence/E14/one-entry.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/one-entry.txt
