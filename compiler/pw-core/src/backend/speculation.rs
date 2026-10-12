@@ -60,6 +60,11 @@ pub struct Binding {
     /// one unnamed (ADR-0222). The server finds the store's cart by it; any
     /// other binding's value is the one the document shows (ADR-0222).
     pub key: Vec<String>,
+    /// **The other names the page shows this entry by** (ADR-0312): its
+    /// layout's, `cart~StoreLayout`. Each is rendered from this binding's
+    /// value, and has no value, decoder or transition of its own.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
 }
 
 /// One page's speculation module.
@@ -606,6 +611,9 @@ fn page_module(
     let mut transitions: Vec<Transition> = Vec::new();
     // binding name → (resource, its key as written, its value type)
     let mut speculated: Vec<(String, DefId, Vec<String>, Type)> = Vec::new();
+    // Each name a binding shows another's entry by → that binding's name
+    // (ADR-0312).
+    let mut aliases: BTreeMap<String, String> = BTreeMap::new();
 
     for command in commands {
         let Some((cu, cid)) = command_decl(cx.hirs, command) else {
@@ -749,13 +757,22 @@ fn page_module(
                 cbody.expr_span(transition.root),
             ));
             functions.push(f);
+            // **One entry, one value** (ADR-0312): every binding that shows
+            // the entry, the page's and its layout's, shows the first's
+            // value. The others are its aliases, rendered from it, so a
+            // press changes the entry once and the server sends it once.
+            let owner = shown[0].name.clone();
             for shown in &shown {
-                transitions.push(Transition {
-                    command: command.clone(),
-                    binding: shown.name.clone(),
-                    function: functions.len() - 1,
-                    params: params.clone(),
-                });
+                if shown.name == owner {
+                    transitions.push(Transition {
+                        command: command.clone(),
+                        binding: shown.name.clone(),
+                        function: functions.len() - 1,
+                        params: params.clone(),
+                    });
+                } else {
+                    aliases.insert(shown.name.clone(), owner.clone());
+                }
                 if !speculated.iter().any(|(n, ..)| *n == shown.name) {
                     // Each key is an invocation-context call (`context_call`
                     // matched it), written as the server computes it.
@@ -1438,7 +1455,7 @@ fn page_module(
     // A value of a type that contains itself as its nodes, which the server
     // writes by its query's type (ADR-0233). Until then the server wrote it
     // nested, knowing no type, and it was refused here (ADR-0205 §5).
-    for (name, _, _, value) in &speculated {
+    for (name, _, _, value) in speculated.iter().filter(|(n, ..)| !aliases.contains_key(n)) {
         match super::js_pure::decoder_of_nodes(&program, value, "j") {
             Ok(d) => source.push_str(&format!("  {}: (j) => {d},\n", json(name))),
             Err(reason) => {
@@ -1448,6 +1465,11 @@ fn page_module(
                 };
             }
         }
+    }
+    // Each alias, by the binding whose value it is rendered from (ADR-0312).
+    source.push_str("};\n\nexport const aliases = {\n");
+    for (alias, owner) in &aliases {
+        source.push_str(&format!("  {}: {},\n", json(alias), json(owner)));
     }
     source.push_str("};\n\nexport const parts = {\n");
     for (name, ..) in &speculated {
@@ -1542,6 +1564,7 @@ fn page_module(
         page: page.to_string(),
         bindings: speculated
             .iter()
+            .filter(|(name, ..)| !aliases.contains_key(name))
             .map(|(name, resource, key, _)| Binding {
                 binding: name.clone(),
                 resource: crate::resolve::declaration(cx.hirs, *resource)
@@ -1557,6 +1580,11 @@ fn page_module(
                     })
                     .unwrap_or_default(),
                 key: key.clone(),
+                aliases: aliases
+                    .iter()
+                    .filter(|(_, owner)| *owner == name)
+                    .map(|(alias, _)| alias.clone())
+                    .collect(),
             })
             .collect(),
         commands: transitions

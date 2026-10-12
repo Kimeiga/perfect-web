@@ -1194,3 +1194,7 @@ Each a decision for a track, with its date; a track's ADR records it too.
   Correction (the integrator's): the merge's message (a391e95a) says the
   finding stays open in KNOWN_LIMITATIONS and NEXT. Neither recorded it
   until the commit after it; only the ADR's amendment did.
+- **2026-10-12, one entry for a page's and its layout's binding, merged as
+  ADR-0312.** A page's speculation module has one binding for an entry and
+  exports the layout's name as its alias (`aliases`). A test or a runtime
+  change that reads a module's `bindings` finds no layout's name there.

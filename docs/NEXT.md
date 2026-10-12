@@ -774,13 +774,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
             store's pages excluded from the second only to save a reading.
             One path for every page, `broadcast_menu`'s folded into it;
             after W9's merge.
-          - **one entry for a query a page and its layout both bind**
-            (found 2026-10-11, ADR-0191's amendment): read once for the
-            document (ADR-0303), but speculated as two bindings, `cart` and
-            `cart~StoreLayout`, each sent at its own entry and version, and
-            each given the press's transition. One entry for the two names,
-            in the speculation manifest, the host and the runtime. After
-            soft navigation, which changes the layout's runtime.
+          - ~~**one entry for a query a page and its layout both bind**~~
+            (found 2026-10-11, ADR-0191's amendment): one binding for the
+            entry and the layout's name its alias, in the speculation
+            manifest, the host and the runtime (ADR-0312, merged
+            2026-10-12).
 
           The infrastructure follow-ups, after these (the owner's order of
           2026-10-09):

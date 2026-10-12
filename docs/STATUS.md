@@ -23,6 +23,18 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0312, 2026-10-12: a page and its layout show one entry by one value**
+(the integrator's; track `one-entry`, merged from `0ab1afc`). The store's
+pages and their layout both show the session's cart: read once for the
+document (ADR-0303), but speculated as two bindings, `cart` and
+`cart~StoreLayout`, so each press ran its transition twice and each change
+was sent twice, at two versions of one entry. The layout's name is now an
+alias of the page's binding: no decoder, transition or value of its own,
+its parts rendered from the one value. The module exports `aliases`, the
+host sends the entry once, and the runtime renders an entry by every name.
+Verify 38208918670 green: 5 of 5 mutants, and the layouts spec in three
+engines.
+
 **2026-10-12: three mutation scripts' server mutants run the server tests
 that see them** (W6's ruling of 2026-10-09; track `narrowing`, merged from
 `973df1a`). Each ran the development server's whole suite for every

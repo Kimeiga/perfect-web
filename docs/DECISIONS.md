@@ -2688,3 +2688,15 @@ and the ruling of 2026-10-09, Q2).
   - a soft navigation kept the last page's Open Graph and `theme-color`
     (ADR-0306, amended).
 - Corpus C19: A-033, R-063, R-053 changed; generality 45 / 45.
+
+[ADR-0312](DECISIONS/ADR-0312-a-page-and-its-layout-show-one-entry-by-one-value.md):
+a page and its layout show one entry by one value (the integrator's; found
+2026-10-11, ADR-0191's amendment).
+- Where a page's binding and its layout's read the entry a speculation
+  targets, the page's is the entry's binding and the layout's its alias: no
+  decoder, no transition and no value of its own, its parts, computed values
+  and regions rendered from the binding's value under its own name.
+- The module exports `aliases`; the host sends the entry once; the runtime
+  holds and reconciles it once, and renders it by every name.
+- Found: each press ran the cart's transition twice, and each change was
+  sent twice, at two versions of one entry.
