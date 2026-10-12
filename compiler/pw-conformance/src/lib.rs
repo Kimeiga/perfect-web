@@ -107,8 +107,7 @@ impl Runnable {
     pub fn new(compiled: Compiled) -> Runnable {
         let prepared =
             Prepared::compile(&compiled.component.bytes).expect("the engine compiles it");
-        let actual =
-            pw_host::engine::imports_of(&compiled.component.bytes).expect("its imports read");
+        let actual = prepared.imports();
         let grants: BTreeSet<String> = compiled
             .contract
             .required_capabilities

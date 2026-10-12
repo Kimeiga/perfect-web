@@ -305,6 +305,9 @@ refused by name:
   handler that captures a restricted parameter is refused at the view, even
   where every page using it could hold the value. The Marko adapter composes
   no view that holds or names a signal.
+- **A process keeps each component it compiled for its life** (ADR-0317):
+  a host that loads many builds would keep each one's components. None
+  reloads a build yet; a live reload would bound the cells first.
 - **The server patches a page's text parts, its lists and the blocks its
   queries decide, by difference** (ADR-0145, ADR-0146). What a loop's row
   reads of another query is refused by the plan. An interpolated attribute

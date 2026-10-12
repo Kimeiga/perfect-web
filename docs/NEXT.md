@@ -782,15 +782,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
 
           The infrastructure follow-ups, after these (the owner's order of
           2026-10-09):
-          - **the server's components compiled once a process** (W6's
-            finding, 2026-10-09): a kiokun test's server load is 7.7 s, 7.1
-            of them Wasmtime compiling the program's components in a debug
-            build (`pw-host`'s `Component::new`), once a server, and every
-            server test pays it. To measure, then rule: a per-process cache
-            of compiled components in `pw-host`, keyed by a hash of each
-            component's bytes, one `Engine`; and an opt-level for
-            `cranelift-codegen` and `regalloc2` in the dev profile, against
-            what it adds to a cold build and to `target/`;
+          - ~~**the server's components compiled once a process**~~ (W6's
+            finding, 2026-10-09; ADR-0317, merged 2026-10-12): each
+            component's bytes compiled once a process, its imports read from
+            the same compile. The development server's suite, whole, four
+            tests at once on CI: 302 s and a 1.56 GiB peak, from about 950 s
+            and over ADR-0292's 3.9 GiB bound. Still to measure: an
+            opt-level for `cranelift-codegen` and `regalloc2` in the dev
+            profile, against what it adds to a cold build and to `target/`;
           - **a recipe not yet measured is planned at its kind's upper
             quartile** (done, ADR-0290's amendment of 2026-10-09).
           - **a shard dealt within a ceiling under its limit** (done,
