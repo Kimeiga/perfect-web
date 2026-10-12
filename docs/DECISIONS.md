@@ -2864,3 +2864,7 @@ an interaction's answer commits with its writes (the integrator's; NEXT 5).
   first sent, its answer) commits in the command's transaction, on both
   layers; a command recalls it before running, a second host's commit that
   meets it answers what the first recorded, and a record answers a day.
+- ADR-0281 amended (3), 2026-10-12: tracks ready at once go on a train
+  (`track/train-<n>`), each its own merge commit, verified once; master
+  moves to the train when its run is green, and a track whose recipe fails
+  leaves it, as GitHub's merge queue does.

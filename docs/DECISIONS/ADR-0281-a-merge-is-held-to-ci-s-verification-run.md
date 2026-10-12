@@ -75,6 +75,21 @@ hold.
      branch's tests, scripts and recipes, which those recipes read, so a
      fetch after it refused eight more files at related-files' merge. A
      merge is merged, resolved, fetched, then numbered.
+   - **Tracks ready at once go on a train** (the integrator's, 2026-10-12).
+     A merge of code that many recipes read, the compiler's for one, makes
+     every other track's evidence stale by the rule above, and verifying
+     each again in turn costs a full verify per track on a queue that is
+     full. So the integrator merges them, each as its own merge commit with
+     its ADR numbered and its documents, on a branch from master
+     (`track/train-<n>`); runs `just ci` there once; and verifies the train
+     once, which plans every recipe the train's changes reach. Its evidence
+     is the train's last commit, master moves to the train when its run is
+     green, and each merge names the train's run. A recipe that fails names
+     its track: that track leaves the train, which is built again without
+     it, as GitHub's merge queue removes a pull request whose changes failed
+     its merge group (docs.github.com, "Managing a merge queue", read
+     2026-10-12). A track goes on a train with its own run green, or with
+     what that run found fixed and checked where it failed.
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does
