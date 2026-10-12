@@ -23,6 +23,23 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0320, 2026-10-12: a block is told part by part while its arm stays**
+(the integrator's; W9's finding; track `fixed-arms`, merged from `124b62b`).
+W9's search sentence, inside the `Some` arm of `{#match q}`, was never told
+when the search's result changed.
+- The plan now names every block at the top of a page that renders a
+  query's value, whatever decides it.
+- A host tells a block whose rendering changed part by part while it shows
+  the arm it showed, as a row is (`pw_render::block_changes`, a `{#match}`
+  looked into too). A status region or a field inside it is kept, which
+  ADR-0146 had deferred.
+- A block a speculation renders is rendered again whole.
+- The sentence is back inside the arm. W9's `given` and its mutant, which
+  then tested nothing a page shows, are gone.
+- The feed's unread counts are now set as text where they are.
+Verify 38263374811 green: 14 of 14 mutants, store-search 32 of 32, five
+re-anchored scripts run whole.
+
 **ADR-0318 and ADR-0319, 2026-10-12: a cart and an order are a user's, and a
 delivery goes to the reader's chosen address** (W8's, track `store-accounts`,
 merged from `3fdcf929`). The store's customer side:

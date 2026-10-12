@@ -391,3 +391,89 @@ fn an_unkeyed_list_inside_the_row_that_changed_renders_the_row_again() {
     assert_eq!(changes(&row(&["hot"]), &row(&["hot"])), Some(vec![]));
     assert_eq!(changes(&row(&["hot"]), &row(&["hot", "new"])), None);
 }
+
+/// `{#each items as item (item.id)}<li>{#match item.deal}{:Some(deal)}<b>
+/// {deal}</b>{:None}{/match}</li>{/each}`
+fn dealt() -> Template {
+    let st = |s: &str| Chunk::Static(s.to_string());
+    Template {
+        path: "t.E".into(),
+        name: "E".into(),
+        params: vec![],
+        schema: "s".into(),
+        chunks: vec![Chunk::Dynamic(Part::Each {
+            id: PartId(0),
+            collection: "items".into(),
+            binding: "item".into(),
+            key: Some("id".into()),
+            body: vec![
+                st("<li>"),
+                Chunk::Dynamic(Part::Match {
+                    id: PartId(1),
+                    value: "item.deal".into(),
+                    arms: vec![
+                        Arm {
+                            case: "Some".into(),
+                            binding: Some("deal".into()),
+                            fields: vec![],
+                            body: vec![
+                                st("<b>"),
+                                Chunk::Dynamic(Part::Text {
+                                    id: PartId(2),
+                                    value: "deal".into(),
+                                    context: Context::Text,
+                                }),
+                                st("</b>"),
+                            ],
+                        },
+                        Arm {
+                            case: "None".into(),
+                            binding: None,
+                            fields: vec![],
+                            body: vec![],
+                        },
+                    ],
+                }),
+                st("</li>"),
+            ],
+        })],
+    }
+}
+
+/// **A `{#match}` that shows the arm it showed is set where it is**
+/// (ADR-0320), as a conditional that decides as it did is (ADR-0178): the
+/// part that reads its payload. Until 2026-10-12 any change inside one
+/// rendered the row again.
+#[test]
+fn a_match_that_shows_the_arm_it_showed_is_set_where_it_is() {
+    let row = |deal: Option<&str>| {
+        Value::Record(
+            [
+                ("id".to_string(), Value::Text("a".into())),
+                (
+                    "deal".to_string(),
+                    match deal {
+                        Some(d) => Value::Variant {
+                            case: "Some".into(),
+                            payload: Some(Box::new(Value::Text(d.into()))),
+                        },
+                        None => Value::Variant {
+                            case: "None".into(),
+                            payload: None,
+                        },
+                    },
+                ),
+            ]
+            .into(),
+        )
+    };
+    let changes = |was: &Value, now: &Value| {
+        instance_changes(&dealt(), PartId(0), was, now, &Env::new(), &[]).expect("derived")
+    };
+    assert_eq!(
+        changes(&row(Some("2 for 1")), &row(Some("3 for 2"))),
+        Some(vec![(PartId(2), InstanceChange::Text("3 for 2".into()))])
+    );
+    // Another arm: the row is rendered again.
+    assert_eq!(changes(&row(Some("2 for 1")), &row(None)), None);
+}

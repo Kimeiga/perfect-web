@@ -2807,3 +2807,22 @@ a delivery goes to the reader's chosen address (W8's, milestones 2 and 3).
   - a `<ready as>` name resolved as a module function (fixed by ADR-0310);
   - the place table first told the two stores' radii apart nowhere.
 
+[ADR-0320](DECISIONS/ADR-0320-a-block-is-told-part-by-part-while-its-arm-stays.md):
+a block is told part by part while its arm stays (the integrator's; W9's
+finding, ADR-0308's amendment; ADR-0146 amended).
+- The plan names each block at the top of a page that renders a query's
+  value, whatever decides it: a query, a value a host computes from one, or
+  anything inside that reads one.
+- A host tells a block whose rendering changed part by part while it shows
+  the arm it showed: text, attributes, captures, keyed lists, inside a
+  conditional that decides as it did or a `{#match}` that shows the arm it
+  showed (`pw_render::block_changes`). It renders the block again whole
+  where it shows another arm, or where something not set in place changed.
+- A block a speculation renders is rendered again whole (ADR-0172).
+- Found:
+  - W9's sentence was never told;
+  - a block was replaced whole for any change inside it, its status region
+    and fields with it;
+  - the feed's unread counts were sent as their whole block;
+  - a member read inside any block is refused (NEXT 3c).
+

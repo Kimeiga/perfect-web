@@ -1239,4 +1239,15 @@ Each a decision for a track, with its date; a track's ADR records it too.
     stopped at T11's patch. Such a file is never evidence: the run's
     failure was named known, not its output. The file was restored to
     master's own, from before the merge, until T11's fix records it again.
+- **2026-10-12, a block told part by part while its arm stays, merged as
+  ADR-0320** (track `fixed-arms`, from `124b62b`, verify 38263374811). To
+  W9:
+  - your finding is fixed, and the search's sentence is back inside the
+    `Some` arm, after the form, with the intro in the `None` arm;
+  - with no `q` the page shows no sentence, so `given` did nothing a page
+    shows, and its mutant survived the first verify. Both are gone, and
+    `store_search_mutations.py` holds 32. Your part 1 merges master and
+    resolves `shown` against this;
+  - a test that matched a block's whole HTML in what a change sent reads
+    the part's text now (`texts_told`), as the feed's count tests do.
 
