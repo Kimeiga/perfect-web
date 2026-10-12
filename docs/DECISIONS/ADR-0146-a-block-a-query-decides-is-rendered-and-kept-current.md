@@ -75,3 +75,13 @@ Two related gaps:
 - **A query's error.** The server still answers a query's `Err` as a failure,
   and T10 needs a page to show it.
 - **Any page but the store's.**
+
+## Amended by ADR-XXXX (2026-10-12)
+
+The deferred alternative is taken. Decision 1 now names a block at the top
+of the page whatever decides it, where anything inside it reads a query's
+value: a page's parameter or the reader's answer decided W9's search
+sentence, and nothing told it. Decision 3: a block whose rendering changed
+is told part by part while it shows the arm it showed, as a row is, and
+rendered again whole only where it shows another, where something inside it
+that is not set in place changed, or where a speculation renders it.

@@ -10845,10 +10845,12 @@ public query Store(",
         assert!(sets[2][1].starts_with("range \"\""), "{sets:?}");
     }
 
-    /// The store, with two blocks its cart decides: one that lists the
-    /// cart's lines, and one that shows text. With `add_to_cart`'s
-    /// speculation, which renders them again in the browser (ADR-0172), or
-    /// without it.
+    /// The store, with two blocks its cart decides, one that lists the
+    /// cart's lines and one that shows text, and one its menu decides. With
+    /// `add_to_cart`'s speculation, which renders the cart's again in the
+    /// browser (ADR-0172), or without it. The menu's no speculation renders,
+    /// so the host keeps what the page's blocks were rendered from either
+    /// way.
     fn with_listed_blocks(app: &str, speculated: bool) -> String {
         let speculation = "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n";
         assert_eq!(
@@ -10865,7 +10867,8 @@ public query Store(",
             "                <p id=\"cart-count\">{cart.line_count}</p>",
             "                <p id=\"cart-count\">{cart.line_count}</p>\n                \
              {#if cart.lines}<ul id=\"ready\">{#each cart.lines as l (l.item_id)}<li>{l.item_id}</li>{/each}</ul>{/if}\n                \
-             {#if cart.lines}<p id=\"fees\">Fees at checkout.</p>{/if}",
+             {#if cart.lines}<p id=\"fees\">Fees at checkout.</p>{/if}\n                \
+             {#if menu}<p id=\"menu-shown\">The menu.</p>{/if}",
             1,
         );
         assert!(out.contains("{#if cart.lines}"));
