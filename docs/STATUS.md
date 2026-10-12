@@ -23,6 +23,27 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0307, 2026-10-12: a control is shown where its command's predicates
+hold** (the integrator's; track `holds`, merged from `a1a232f`). This is the
+third step of "a refusal is never silent". A page asks a predicate of its
+reader by naming it, `{#if SignedIn}` or `hidden={!SignedIn}`. The
+deployment answers it as it answers `requires`, once a document and for its
+life. A control whose command requires a predicate with no parameters stands
+only where the page asks it and it holds (PW5048), or is `|refusable`. A page
+served to everyone asks nothing (PW5049), and a name that holds no value is
+refused (PW0629).
+- Found:
+  - the feed showed fourteen controls a signed-out reader was refused for;
+  - a name holding no value checked and built, and failed where served;
+  - a block decided by a value static for its document was never rendered
+    again;
+  - an answer read again at each read hid some controls after a sign-out
+    elsewhere and kept the rest. The answers are now the document's for its
+    life.
+Verify 38186484587 green: 8 compiler tests, 24 server tests, the feed's,
+the identity's and the store's browser tests (135 in three engines), and 22
+of 22 mutants.
+
 **ADR-0306 and ADR-0305, 2026-10-11: a navigation keeps the layout, and a
 page's commands run in the order it sent them** (the integrator's; track
 `soft-navigation`, merged from `5ed759d` with track `command-order`). This

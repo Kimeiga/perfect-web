@@ -1,7 +1,8 @@
 ADR-0142 - an input bound to a signal
 
 produced by: just e14-bind
-commit: 4e198b9e35f8d4bda5b131a6807b86767209d9de
+commit: a1a232f5c9e804c5eba9e2123d57fe8637666993
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38186484587 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the binding (compiler/pw-core/tests/bind.rs)
@@ -9,16 +10,16 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test a_binding_binds_a_signal_of_string_by_its_name ... ok
 test a_binding_is_a_value_and_a_handler ... ok
 test a_block_is_rendered_again_only_for_what_it_cannot_set_in_place ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
 
 == what the browser sets in place (compiler/pw-core/tests/signals_render_again.rs)
 
 test a_list_a_signal_holds_is_rendered_again_only_inside_its_block ... ok
-test what_a_handler_captures_in_a_signal_s_block_is_the_block_s ... ok
 test a_signal_read_in_a_block_a_query_decides_is_refused ... ok
 test an_attribute_a_signal_decides_is_set_in_place_or_refused ... ok
 test a_block_a_signal_decides_reads_the_signals_and_its_own_names ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.92s
+test what_a_handler_captures_in_a_signal_s_block_is_the_block_s ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.51s
 
 == mutation controls (scripts/bind_mutations.py)
 
@@ -38,3 +39,4 @@ a block is rendered again for every signal in it: KILLED (1 of 8 tests fail)
 a block reads its own signal alone: KILLED (1 of 8 tests fail)
 a URL attribute is set in place: KILLED (1 of 8 tests fail)
 14 of 14 mutants killed
+memory bound: no process was stopped

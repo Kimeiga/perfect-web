@@ -1,45 +1,46 @@
 ADR-0136 - a view is written where it is used
 
 produced by: just e14-views-compose
-commit: 745a97277f5b843f5a45ad1a74b995febb7a945e
+commit: a1a232f5c9e804c5eba9e2123d57fe8637666993
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38186484587 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == composition (compiler/pw-core/tests/views_compose.rs)
 
-test a_view_that_cannot_compose_is_reported_where_it_is_used ... ok
 test a_signal_a_view_captures_is_refused ... ok
-test what_cannot_be_composed_is_refused_by_name ... ok
 test a_name_the_view_binds_hides_nothing_it_was_given ... ok
-test what_a_view_captures_is_checked_where_it_is_given ... ok
-test a_view_used_twice_has_parts_of_its_own_each_time ... ok
 test a_page_plans_a_composed_view_as_its_own_markup ... ok
-test a_view_s_part_and_handler_are_the_page_s_to_speculate ... ok
-test a_view_is_written_where_it_is_used ... ok
 test a_handler_in_a_view_captures_what_the_page_gave_it ... ok
+test a_view_that_cannot_compose_is_reported_where_it_is_used ... ok
 test a_signal_a_view_shows_is_live_as_the_page_s_own ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.64s
+test a_view_is_written_where_it_is_used ... ok
+test what_cannot_be_composed_is_refused_by_name ... ok
+test a_view_used_twice_has_parts_of_its_own_each_time ... ok
+test what_a_view_captures_is_checked_where_it_is_given ... ok
+test a_view_s_part_and_handler_are_the_page_s_to_speculate ... ok
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.29s
 
 == a view's props (compiler/pw-core/tests/view_elements.rs)
 
-test a_view_imported_from_another_module_composes ... ok
 test a_view_used_in_a_view_composes ... ok
+test a_view_imported_from_another_module_composes ... ok
 test a_capitalised_tag_names_a_view ... ok
 test a_view_is_given_each_of_its_props_once_of_its_type ... ok
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 == a capture read where the page holds it (runtime/pw-render/tests/properties.rs)
 
-test a_capture_that_cannot_be_carried_blocks_the_render ... ok
-test carried_captures_serialize_deterministically ... ok
 test a_captured_value_survives_the_attribute_exactly ... ok
+test a_capture_that_cannot_be_carried_blocks_the_render ... ok
 test a_capture_a_view_names_otherwise_is_read_where_it_is ... ok
+test carried_captures_serialize_deterministically ... ok
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s
 
 == mutation controls (scripts/views_compose_mutations.py)
 
 baseline: 47 passed, 0 failed
 a view is not found where it is used: KILLED (7 of 47 tests fail)
-a parameter reads as its own name, not as the path it was given: KILLED (5 of 47 tests fail)
+a parameter reads as its own name, not as the path it was given: KILLED (7 of 47 tests fail)
 a name the view binds is never renamed: KILLED (1 of 47 tests fail)
 a name the view binds does not hide its parameter: KILLED (1 of 47 tests fail)
 a capture is carried under the page's name for it: KILLED (1 of 47 tests fail)
@@ -56,3 +57,4 @@ a view with values of its own composes: KILLED (2 of 47 tests fail)
 the plan skips what a view shows: KILLED (2 of 47 tests fail)
 a view's handler is not the page's to speculate for: KILLED (1 of 47 tests fail)
 17 of 17 mutants killed
+memory bound: no process was stopped

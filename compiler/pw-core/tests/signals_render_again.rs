@@ -179,9 +179,11 @@ fn what_a_handler_captures_in_a_signal_s_block_is_the_block_s() {
     // Rendered again from the signals alone, a capture of the page's
     // parameter has no value.
     refuses(
-        "{#if open}<button type=\"button\" on:press={() => { let _picked = pick(chosen) }}>Pick</button>{/if}",
+        "{#if open}<button type=\"button\" on:press|refusable={() => { let _picked = pick(chosen) }}>Pick</button>{/if}",
         "reads `chosen` inside a block a signal decides",
     );
     // Control: outside the block, the document carries it as rendered.
-    builds("<button type=\"button\" on:press={() => { let _picked = pick(chosen) }}>Pick</button>");
+    builds(
+        "<button type=\"button\" on:press|refusable={() => { let _picked = pick(chosen) }}>Pick</button>",
+    );
 }

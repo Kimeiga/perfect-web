@@ -1,7 +1,7 @@
 //! **A declaration named as a handler is `(e) => save(e)`** (ADR-0199,
 //! ADR-0195's ruling 12).
 //!
-//! `on:press={clear}` names a command, or a function, where a lambda would
+//! `on:press|refusable={clear}` names a command, or a function, where a lambda would
 //! be written. It is compiled as the lambda that calls it, given the event
 //! where it takes one, and held to every rule that lambda is: the event's
 //! type (PW0602), a sent command's idempotency (PW0338), an answer the runtime
@@ -75,7 +75,7 @@ fn program(extra: &str, handler: &str) -> String {
          idempotent_by InteractionId\n{{\n    1\n}}\n\n\
          {extra}\n\n\
          page P() {{\n    cache private\n\n    \
-         view {{\n        <main><button type=\"button\" on:press={{{handler}}}>Go</button></main>\n    }}\n}}\n"
+         view {{\n        <main><button type=\"button\" on:press|refusable={{{handler}}}>Go</button></main>\n    }}\n}}\n"
     )
 }
 
@@ -206,14 +206,14 @@ fn a_named_handler_is_built_with_an_identity_and_a_module() {
 
 #[test]
 fn a_named_handlers_identity_is_what_its_name_resolves_to() {
-    // The same text, `on:press={clear}`, naming this module's `clear` and
+    // The same text, `on:press|refusable={clear}`, naming this module's `clear` and
     // another's: two behaviours, two identities, as `() => clear()`'s are.
     let other = "module other\n\nopaque type InteractionId = String\n\n\
                  command clear() -> Int\n    requires      SignedIn\n    \
                  idempotent_by InteractionId\n{\n    1\n}\n";
     let imported = "module t\n\nimport other.{ clear }\n\n\
                     page P() {\n    cache private\n\n    \
-                    view {\n        <main><button type=\"button\" on:press={clear}>Go</button></main>\n    }\n}\n";
+                    view {\n        <main><button type=\"button\" on:press|refusable={clear}>Go</button></main>\n    }\n}\n";
     let own = program("", "clear");
     let build = |src: &str| {
         let mut all = units(src);
@@ -250,7 +250,7 @@ fn module_of(src: &str) -> String {
 
 #[test]
 fn a_named_handler_is_given_its_event() {
-    // `on:input={rename}` is `(e) => rename(e)`: the command is sent the
+    // `on:input|refusable={rename}` is `(e) => rename(e)`: the command is sent the
     // event, and the module is the lambda form's, but for its identity.
     let src = |handler: &str| {
         format!(
@@ -259,7 +259,7 @@ fn a_named_handler_is_given_its_event() {
              command rename(e: InputEvent) -> Int\n    requires      SignedIn\n    \
              idempotent_by InteractionId\n{{\n    1\n}}\n\n\
              page P() {{\n    cache private\n\n    \
-             view {{\n        <main><input aria-label=\"Name\" on:input={{{handler}}} /></main>\n    }}\n}}\n"
+             view {{\n        <main><input aria-label=\"Name\" on:input|refusable={{{handler}}} /></main>\n    }}\n}}\n"
         )
     };
     assert_eq!(reported(&src("rename")), Vec::<String>::new());
@@ -302,7 +302,7 @@ fn a_name_that_is_no_function_or_command_is_refused_when_checked() {
     let int = program("", "n").replace("    view {", "    let n = 1\n\n    view {");
     assert_eq!(
         reported(&int),
-        ["PW0614 `on:press` is given `Int`, which is not a function to call"]
+        ["PW0614 `on:press|refusable` is given `Int`, which is not a function to call"]
     );
 }
 
@@ -337,7 +337,7 @@ fn a_named_handler_is_held_to_its_event_by_any_path() {
     ] {
         let src = format!(
             "module t\n\n{import}\n\npage P() {{\n    cache private\n\n    \
-             view {{\n        <main><button type=\"button\" on:press={{{handler}}}>Go</button></main>\n    }}\n}}\n"
+             view {{\n        <main><button type=\"button\" on:press|refusable={{{handler}}}>Go</button></main>\n    }}\n}}\n"
         );
         let mut sources = library();
         sources.push(("other.pw".to_string(), other.to_string()));
@@ -366,7 +366,7 @@ fn a_named_handler_is_named_as_its_lambda_forms_call_is() {
     let names = |handler: &str| {
         let src = format!(
             "module t\n\nimport other\n\npage P() {{\n    cache private\n\n    \
-             view {{\n        <main><button type=\"button\" on:press={{{handler}}}>Go</button></main>\n    }}\n}}\n"
+             view {{\n        <main><button type=\"button\" on:press|refusable={{{handler}}}>Go</button></main>\n    }}\n}}\n"
         );
         let mut all = units(&src);
         all.push(Unit {

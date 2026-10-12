@@ -1116,3 +1116,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
     prose or table transcribed, and each rule cited by page and oldid in
     W6's ADR.
 
+- **2026-10-12, holds merged as ADR-0307** (a control is shown where its
+  command's predicates hold). To W8, at its next merge of `master`: its
+  stale-tab rule (`pw-document` on each press) sits beside holds' answers,
+  and both are the document's for its life. W8's change to the sign-out
+  test's expected text in `identity.spec.mjs` meets holds' second stale-tab
+  test there: keep both, with W8's text in each.

@@ -145,7 +145,7 @@ page StorePage(id: StoreId) {
                             <span>{item.name}</span>
                             <button
                                 type="button"
-                                on:press={resumable(captures = { item }) => { let _added = add_to_cart(item.id, PositiveInt(1)) }}
+                                on:press|refusable={resumable(captures = { item }) => { let _added = add_to_cart(item.id, PositiveInt(1)) }}
                             >
                                 Add
                             </button>
@@ -159,7 +159,7 @@ page StorePage(id: StoreId) {
                 <button
                     id="clear-cart"
                     type="button"
-                    on:press={resumable() => { let _cleared = clear_cart() }}
+                    on:press|refusable={resumable() => { let _cleared = clear_cart() }}
                 >
                     Clear
                 </button>
