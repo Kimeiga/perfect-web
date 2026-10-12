@@ -21,9 +21,15 @@
 //!   layers cannot rank differently: [`found`] orders and cuts the stores
 //!   and their dishes, and writes the program's value.
 //!
-//! **A store's cuisine** is search's own: [`cuisine_of`] in memory, the table
-//! `store_cuisines` on PostgreSQL (`migrations/store/0010_search.sql`), the
-//! same rows. The store's own rows are left as they are.
+//! **A store's cuisine** is the store's own field (ADR-0308, amended):
+//! `StoreRow::cuisine`, first [`cuisine_of`] in memory and the column
+//! `stores.cuisine` on PostgreSQL (`migrations/store/0011_store_cuisine.sql`),
+//! the same rows.
+//!
+//! **A reader's search** (`search#find-for`) lists only the stores that reach
+//! the reader's chosen address, by the store's one rule
+//! (`store::coverage`, ADR-0319), and counts the rest; with no address
+//! chosen, every store, as `search#find` does.
 
 use super::*;
 use crate::data::Ops;
@@ -145,8 +151,9 @@ pub(crate) struct Matched {
     pub(crate) dishes: Vec<Dish>,
 }
 
-/// **Each store's cuisine, as the store is first**: the in-memory layer's,
-/// as `migrations/store/0010_search.sql` is PostgreSQL's.
+/// **Each store's cuisine, as the store is first**: the in-memory layer's
+/// seed (`State::seed`), as `migrations/store/0010_search.sql` and
+/// `0011_store_cuisine.sql` are PostgreSQL's.
 pub(crate) fn cuisine_of(store: &str) -> &'static str {
     match store {
         "47" => "Coffee",
@@ -170,13 +177,12 @@ pub(crate) fn scan<R: Rows + ?Sized>(r: &mut R, terms: &[String]) -> Result<Vec<
     let mut stores = Vec::new();
     for s in r.stores()? {
         let menu = r.menu(&s.id)?;
-        let cuisine = cuisine_of(&s.id).to_string();
         stores.push((
             StoreText {
                 id: s.id,
                 name: s.name,
                 description: s.description,
-                cuisine,
+                cuisine: s.cuisine,
             },
             menu,
         ));
@@ -252,10 +258,46 @@ pub(crate) fn ordered(mut matched: Vec<Matched>) -> Vec<Matched> {
     matched
 }
 
+/// **Where a search was for**: whether the reader chose an address, its
+/// label, and how many stores matched that do not reach it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Near {
+    pub(crate) chosen: bool,
+    pub(crate) to: String,
+    pub(crate) beyond: usize,
+}
+
+/// **The stores of `matched` that reach `reader`'s chosen address**, and
+/// where that is: every store, where none is chosen.
+pub(crate) fn reaching(
+    r: &mut dyn Rows,
+    matched: Vec<Matched>,
+    reader: &str,
+) -> Result<(Vec<Matched>, Near), String> {
+    let mut kept = Vec::new();
+    let mut near = Near::default();
+    for m in matched {
+        match crate::store::coverage(r, &m.id, reader)? {
+            None => kept.push(m),
+            Some(reach) => {
+                near.chosen = true;
+                near.to = reach.label;
+                if reach.delivers {
+                    kept.push(m);
+                } else {
+                    near.beyond += 1;
+                }
+            }
+        }
+    }
+    Ok((kept, near))
+}
+
 /// **What a search found, as the program's `SearchFound` is**: the stores in
 /// their order, the first [`MOST_STORES`], each with its first
-/// [`MOST_DISHES`] dishes, and how many of each are left.
-pub(crate) fn found(matched: Vec<Matched>) -> Val {
+/// [`MOST_DISHES`] dishes, and how many of each are left; and `near`, where
+/// it was for.
+pub(crate) fn found(matched: Vec<Matched>, near: &Near) -> Val {
     let ordered = ordered(matched);
     let more_stores = ordered.len().saturating_sub(MOST_STORES);
     let stores = ordered
@@ -293,37 +335,58 @@ pub(crate) fn found(matched: Vec<Matched>) -> Val {
     Val::Record(vec![
         ("stores".into(), Val::List(stores)),
         ("more-stores".into(), Val::S64(more_stores as i64)),
+        ("chosen".into(), Val::Bool(near.chosen)),
+        ("to".into(), Val::String(near.to.clone())),
+        ("beyond".into(), Val::S64(near.beyond as i64)),
     ])
 }
 
-/// **The search's operation** (`store:data/search#find`), over `with`, the
-/// layer's rows: the text's terms matched by the layer's
-/// [`Rows::search`], or the declared error the text is.
+/// **The search's operations**, over `with`, the layer's rows: the text's
+/// terms matched by the layer's [`Rows::search`], or the declared error the
+/// text is. `store:data/search#find` lists every store that matched;
+/// `store:data/search#find-for` (ADR-0308, amended) those that reach the
+/// reader's chosen address, the rest counted.
 pub(crate) fn ops(with: With) -> Ops {
     let mut ops: Ops = BTreeMap::new();
+    let w = with.clone();
     ops.insert(
         "store:data/search#find".to_string(),
-        Arc::new(move |args: &[Val]| {
-            let [Val::String(text)] = args else {
-                return Err(format!("search#find received {args:?}"));
-            };
-            let case = |c: &str| {
-                vec![Val::Result(Err(Some(Box::new(Val::Variant(
-                    c.into(),
-                    None,
-                )))))]
-            };
-            match asked(text) {
-                Asked::Blank => Ok(case("blank")),
-                Asked::TooLong => Ok(case("too-long")),
-                Asked::Terms(terms) => with(&mut |r| {
-                    let matched = r.search(&terms)?;
-                    Ok(vec![Val::Result(Ok(Some(Box::new(found(matched)))))])
-                }),
-            }
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(text)] => answer(&w, text, None),
+            _ => Err(format!("search#find received {args:?}")),
+        }),
+    );
+    ops.insert(
+        "store:data/search#find-for".to_string(),
+        Arc::new(move |args: &[Val]| match args {
+            [Val::String(text), Val::String(reader)] => answer(&with, text, Some(reader)),
+            _ => Err(format!("search#find-for received {args:?}")),
         }),
     );
     ops
+}
+
+/// **A search's answer**: `text`'s declared error, or what its terms match,
+/// for `reader` where one is given.
+fn answer(with: &With, text: &str, reader: Option<&str>) -> Result<Vec<Val>, String> {
+    let case = |c: &str| {
+        vec![Val::Result(Err(Some(Box::new(Val::Variant(
+            c.into(),
+            None,
+        )))))]
+    };
+    match asked(text) {
+        Asked::Blank => Ok(case("blank")),
+        Asked::TooLong => Ok(case("too-long")),
+        Asked::Terms(terms) => with(&mut |r| {
+            let matched = r.search(&terms)?;
+            let (kept, near) = match reader {
+                Some(reader) => reaching(r, matched, reader)?,
+                None => (matched, Near::default()),
+            };
+            Ok(vec![Val::Result(Ok(Some(Box::new(found(kept, &near)))))])
+        }),
+    }
 }
 
 /// **PostgreSQL's search** (`store_pg.rs`'s `Rows::search`): two statements
@@ -401,19 +464,19 @@ const DISHES_SQL: &str = "\
 /// dish that does, with its cuisine and its tier where it matched itself.
 const STORES_SQL: &str = "\
     SELECT id, name, description, cuisine, tier FROM (\
-      SELECT s.id, s.name, s.description, coalesce(k.cuisine, '') AS cuisine, \
+      SELECT s.id, s.name, s.description, s.cuisine, \
         CASE \
           WHEN (SELECT bool_and(lower(s.name COLLATE pg_c_utf8) LIKE p ESCAPE '\\') \
                 FROM unnest($1::text[]) AS p) THEN 0 \
           WHEN (SELECT bool_and(lower(s.name COLLATE pg_c_utf8) LIKE p ESCAPE '\\' \
-                             OR lower(coalesce(k.cuisine, '') COLLATE pg_c_utf8) LIKE p ESCAPE '\\') \
+                             OR lower(s.cuisine COLLATE pg_c_utf8) LIKE p ESCAPE '\\') \
                 FROM unnest($1::text[]) AS p) THEN 1 \
           WHEN (SELECT bool_and(lower(s.name COLLATE pg_c_utf8) LIKE p ESCAPE '\\' \
-                             OR lower(coalesce(k.cuisine, '') COLLATE pg_c_utf8) LIKE p ESCAPE '\\' \
+                             OR lower(s.cuisine COLLATE pg_c_utf8) LIKE p ESCAPE '\\' \
                              OR lower(s.description COLLATE pg_c_utf8) LIKE p ESCAPE '\\') \
                 FROM unnest($1::text[]) AS p) THEN 2 \
         END AS tier \
-      FROM stores s LEFT JOIN store_cuisines k ON k.store = s.id\
+      FROM stores s\
     ) AS m WHERE tier IS NOT NULL OR id = ANY($2::text[])";
 
 #[cfg(test)]
@@ -847,7 +910,7 @@ mod tests {
                 .map(|(_, v)| v.clone())
         };
         let all: Vec<Matched> = (0..MOST_STORES + 2).rev().map(|n| store(n, 7)).collect();
-        let Val::Record(fields) = found(all) else {
+        let Val::Record(fields) = found(all, &Near::default()) else {
             panic!("a record")
         };
         assert_eq!(field(&fields, "more-stores"), Some(Val::S64(2)));
@@ -866,7 +929,7 @@ mod tests {
         assert_eq!(dishes.len(), MOST_DISHES);
         // At the bounds, nothing is counted.
         let all: Vec<Matched> = (0..MOST_STORES).map(|n| store(n, MOST_DISHES)).collect();
-        let Val::Record(fields) = found(all) else {
+        let Val::Record(fields) = found(all, &Near::default()) else {
             panic!("a record")
         };
         assert_eq!(field(&fields, "more-stores"), Some(Val::S64(0)));
@@ -899,16 +962,17 @@ mod tests {
         c.batch_execute("TRUNCATE stores CASCADE").expect("emptied");
         for (position, (s, menu)) in fixture().into_iter().enumerate() {
             c.execute(
-                "INSERT INTO stores (id, position, name, description, opens_minute, closes_minute) \
-                 VALUES ($1, $2, $3, $4, 420, 1140)",
-                &[&s.id, &(position as i32), &s.name, &s.description],
+                "INSERT INTO stores (id, position, name, description, cuisine, opens_minute, \
+                     closes_minute) VALUES ($1, $2, $3, $4, $5, 420, 1140)",
+                &[
+                    &s.id,
+                    &(position as i32),
+                    &s.name,
+                    &s.description,
+                    &s.cuisine,
+                ],
             )
             .expect("a store");
-            c.execute(
-                "INSERT INTO store_cuisines (store, cuisine) VALUES ($1, $2)",
-                &[&s.id, &s.cuisine],
-            )
-            .expect("its cuisine");
             for (at, i) in menu.iter().enumerate() {
                 c.execute(
                     "INSERT INTO categories (store, id, name) VALUES ($1, $2, $3) \
@@ -977,10 +1041,7 @@ mod tests {
         // there is found, as no table in this file could find it.
         layer
             .sql()
-            .execute(
-                "UPDATE store_cuisines SET cuisine = 'Ramen' WHERE store = '47'",
-                &[],
-            )
+            .execute("UPDATE stores SET cuisine = 'Ramen' WHERE id = '47'", &[])
             .expect("changed");
         let ops = crate::data::DataLayer::reads(&layer, "s", None);
         let find = ops.get("store:data/search#find").expect("registered");
@@ -1002,10 +1063,7 @@ mod tests {
         let layer = crate::store_pg::StorePg::for_test(&url).expect("the layer");
         let rows = layer
             .sql()
-            .query(
-                "SELECT store, cuisine FROM store_cuisines ORDER BY store",
-                &[],
-            )
+            .query("SELECT id, cuisine FROM stores ORDER BY id", &[])
             .expect("read");
         let pg: Vec<(String, String)> = rows.iter().map(|r| (r.get(0), r.get(1))).collect();
         let mem: Vec<(String, String)> = ["47", "48"]

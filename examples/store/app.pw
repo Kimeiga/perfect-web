@@ -498,6 +498,7 @@ user page StorePage(id: StoreId) {
         <meta name="description" content={store.description} />
         <main>
             <h1 id="store-name">{store.name}</h1>
+            <p id="store-cuisine">{store.cuisine}</p>
             <p id="store-description">{store.description}</p>
             <p id="menu-line">{line}</p>
 
@@ -749,10 +750,14 @@ user page HomePage() {
         <meta name="description" content="Order from the stores near you, for delivery or pickup." />
         <main>
             <h1>Stores</h1>
+            <!-- TRACK SEAM (store-search): the search box, a plain GET form
+                 to the search's route (ADR-0308, amended; ADR-0309). -->
+            <form id="home-search" method="get" action="/search" role="search"><label>Stores and dishes <input type="search" name="q" /></label><button>Search</button></form>
             <ul id="stores">
                 {#each stores as store (store.id)}
                     <li>
                         <h2><a href="/stores/{store.id}">{store.name}</a></h2>
+                        <p class="cuisine">{store.cuisine}</p>
                         <p>{store.description}</p>
                     </li>
                 {/each}

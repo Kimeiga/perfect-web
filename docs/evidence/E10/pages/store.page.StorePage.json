@@ -153,6 +153,16 @@
     },
     {
       "part": 2,
+      "path": "store.cuisine",
+      "binding": "store",
+      "steps": [
+        {
+          "field": "cuisine"
+        }
+      ]
+    },
+    {
+      "part": 3,
       "path": "store.description",
       "binding": "store",
       "steps": [
@@ -162,13 +172,13 @@
       ]
     },
     {
-      "part": 3,
+      "part": 4,
       "path": "line",
       "binding": "line",
       "steps": []
     },
     {
-      "part": 22,
+      "part": 23,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -178,7 +188,7 @@
       ]
     },
     {
-      "part": 34,
+      "part": 35,
       "path": "cart.subtotal.display",
       "binding": "cart",
       "steps": [
@@ -203,20 +213,20 @@
   ],
   "live": [
     {
-      "part": 36,
+      "part": 37,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
     }
   ],
   "blocks": [
-    4,
-    7,
-    35
+    5,
+    8,
+    36
   ],
   "streams": [
     {
-      "part": 10,
+      "part": 11,
       "resource": "store.page.Estimate",
       "args": [
         "id",
@@ -238,7 +248,7 @@
       "streamed": true
     },
     {
-      "part": 38,
+      "part": 39,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -300,9 +310,9 @@
     }
   ],
   "attributes": [
-    23
+    24
   ],
-  "title": 41,
+  "title": 42,
   "scope": "user:",
   "layout": {
     "path": "store.page.StoreLayout",

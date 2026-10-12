@@ -118,6 +118,9 @@ pub(crate) struct StoreRow {
     pub(crate) id: String,
     pub(crate) name: String,
     pub(crate) description: String,
+    /// **What it serves, in its own words** ("Café, Bakery"; ADR-0308,
+    /// amended): what the home page, its page and a search show and match.
+    pub(crate) cuisine: String,
     pub(crate) opens_minute: i64,
     pub(crate) closes_minute: i64,
     /// **Where it is and how far it delivers** (track `store-accounts`,
@@ -318,6 +321,9 @@ fn store_val(row: &StoreRow) -> Val {
         // A program whose `Store` declares none is not given it (ADR-0166):
         // the benchmark's.
         ("description".into(), Val::String(row.description.clone())),
+        // What it serves (ADR-0308, amended); a program whose `Store`
+        // declares none is not given it (ADR-0166).
+        ("cuisine".into(), Val::String(row.cuisine.clone())),
         (
             "hours".into(),
             Val::Record(vec![
@@ -1585,6 +1591,7 @@ impl State {
             id: id.to_string(),
             name: store_named(id).unwrap_or_default().to_string(),
             description: store_description(id).to_string(),
+            cuisine: crate::search::cuisine_of(id).to_string(),
             opens_minute: 7 * 60,
             closes_minute: 19 * 60,
             zone: zone_of(id),

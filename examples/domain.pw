@@ -139,11 +139,13 @@ type StoreHours = StoreHours {
     closes_minute: Int,
 }
 
-// What the store says of itself since ADR-0166, charter §15.1's.
+// What the store says of itself since ADR-0166, charter §15.1's; what it
+// serves, in its own words, since ADR-0308's amendment.
 type Store = Store {
     id: StoreId,
     name: String,
     description: String,
+    cuisine: String,
     hours: StoreHours,
 }
 

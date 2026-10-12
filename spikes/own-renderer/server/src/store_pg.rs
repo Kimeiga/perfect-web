@@ -53,6 +53,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0010_search",
         include_str!("../migrations/store/0010_search.sql"),
     ),
+    // And the cuisine, the store's own column (ADR-0308, amended).
+    (
+        "0011_store_cuisine",
+        include_str!("../migrations/store/0011_store_cuisine.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -218,7 +223,7 @@ impl Rows for PgRows<'_> {
             .0
             .query(
                 "SELECT id, name, description, opens_minute, closes_minute, \
-                        lat_e6, lon_e6, radius_m \
+                        lat_e6, lon_e6, radius_m, cuisine \
                  FROM stores ORDER BY position",
                 &[],
             )
@@ -236,6 +241,7 @@ impl Rows for PgRows<'_> {
                     lon_e6: r.get(6),
                     radius_m: r.get(7),
                 },
+                cuisine: r.get(8),
             })
             .collect())
     }

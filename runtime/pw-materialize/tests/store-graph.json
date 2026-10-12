@@ -433,13 +433,15 @@
       "path": "store.search.Search",
       "name": "Search",
       "node": "resource",
-      "partition": "shared",
-      "privacy": "public",
+      "partition": "private",
+      "privacy": "user",
       "key": [
-        "q"
+        "q",
+        "reader"
       ],
       "params": [
-        "q"
+        "q",
+        "reader"
       ]
     },
     {
@@ -894,6 +896,14 @@
     },
     {
       "from": "store.search.Search",
+      "to": "Events.AddressesChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "reader"
+      ]
+    },
+    {
+      "from": "store.search.Search",
       "to": "Events.InventoryChanged",
       "kind": "invalidated_by",
       "key": [
@@ -922,7 +932,8 @@
       "to": "store.search.Search",
       "kind": "reads",
       "key": [
-        "q"
+        "q",
+        "current_user()"
       ]
     }
   ],

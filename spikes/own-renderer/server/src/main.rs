@@ -16856,7 +16856,8 @@ public query Store(",
             // controls ask nothing, track `store-accounts`.)
             // them; and ADR-0303: the layout's count is part 0, before all.
             // Track `store-accounts`: and where deliveries go, before them.
-            whole.ends_with("</template><!--/pw-38--></body>\n</html>\n"),
+            // ADR-0308, amended: and the store's cuisine.
+            whole.ends_with("</template><!--/pw-39--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the
