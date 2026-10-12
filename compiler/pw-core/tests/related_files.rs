@@ -95,12 +95,10 @@ fn a_layouts_note_is_in_the_layouts_file() {
     assert_eq!(note.file.as_deref(), Some("shell.pw"), "{note:?}");
     assert_eq!(marked(&files, "page.pw", note), "Shell");
     // The control: both in one file, the note names none.
-    let one = format!(
-        "module page\n\nsession layout Shell {{\n    view {{\n        <header><p>Shell</p></header>\n        \
-         <slot />\n    }}\n}}\n\npage P() {{\n    route  \"/p\"\n    layout Shell\n\n    \
-         view {{\n        <title>P</title>\n        <h1>P</h1>\n    }}\n}}\n"
-    );
-    let files = [("page.pw", one.as_str())];
+    let one = "module page\n\nsession layout Shell {\n    view {\n        <header><p>Shell</p></header>\n        \
+               <slot />\n    }\n}\n\npage P() {\n    route  \"/p\"\n    layout Shell\n\n    \
+               view {\n        <title>P</title>\n        <h1>P</h1>\n    }\n}\n";
+    let files = [("page.pw", one)];
     let d = found(&files, "page.pw", "PW5046");
     assert_eq!(d.len(), 1, "{d:#?}");
     assert_eq!(d[0].related[0].file, None);
