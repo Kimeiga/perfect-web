@@ -499,3 +499,12 @@ under the integrator's rulings of 2026-10-12 on this ADR's questions.
 
   Three are re-anchored on the new code. The integrator's fixed-arms track
   drops one ("an address with no q is told it searched for nothing").
+  Verify 38294475263 found one equivalent: "PostgreSQL's layer searches as
+  memory does". The two layers hold one meaning, and the cuisine is now
+  the store's row on both, so nothing observable tells them apart. It is
+  dropped, with why, leaving 38. That the statements run in the database
+  is what the PostgreSQL mutants show, since only the SQL can kill them.
+- **Another track's mutant moved**: `descriptions_mutations.py`'s "the
+  store says too little for WebKit to paint it before its slots" survived
+  (verify 38294475263). The cuisine's paragraph said enough. Its anchor
+  now spans the cuisine, which it takes away too.

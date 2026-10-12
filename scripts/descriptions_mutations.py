@@ -35,6 +35,9 @@ STORE = ROOT / "examples/store/app.pw"
 # menu is grouped by category.
 # Re-anchored by ADR-0277: the menu counted, a line after the store's own.
 BOTH_DESCRIPTIONS = (
+    # Re-anchored by ADR-0308's amendment: the store's cuisine, before its
+    # description, which says more of the store too.
+    "            <p id=\"store-cuisine\">{store.cuisine}</p>\n"
     "            <p id=\"store-description\">{store.description}</p>\n"
     "            <p id=\"menu-line\">{line}</p>\n"
     "\n"
@@ -155,6 +158,8 @@ MUTANTS = [
         BOTH_DESCRIPTIONS.replace(
             "            <p id=\"store-description\">{store.description}</p>\n", ""
         )
+        # And the store's cuisine (ADR-0308, amended), likewise.
+        .replace("            <p id=\"store-cuisine\">{store.cuisine}</p>\n", "")
         .replace("            <p id=\"menu-line\">{line}</p>\n", "")
         .replace("                                    <p>{item.description}</p>\n", "")
         # And where deliveries go (track store-accounts), which says more of
