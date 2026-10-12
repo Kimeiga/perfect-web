@@ -35,7 +35,7 @@ fn searched(s: &Server, path: &str) -> (String, String, String) {
 #[test]
 fn a_search_lists_the_stores_and_dishes_that_match() {
     let s = served();
-    let (status, html, text) = searched(&s, "/search/coffee");
+    let (status, html, text) = searched(&s, "/search?q=coffee");
     assert!(status.starts_with("HTTP/1.1 200"), "{status}");
     assert!(text.contains("2 stores match “coffee”."), "{text}");
     let harbor = text
@@ -51,7 +51,10 @@ fn a_search_lists_the_stores_and_dishes_that_match() {
     // Each store and each of its dishes links to the store's page.
     assert_eq!(html.matches("href=\"/stores/48\"").count(), 2, "{html}");
     assert_eq!(html.matches("href=\"/stores/47\"").count(), 4, "{html}");
-    assert!(html.contains("<title>Search: coffee</title>"), "{html}");
+    assert!(
+        html.contains("<title>Search for “coffee”</title>"),
+        "{html}"
+    );
     assert!(html.contains("noindex"), "{html}");
     // In the store's layout: the way home, and the reader's cart.
     assert!(html.contains("id=\"header-cart-count\""), "{html}");
@@ -61,16 +64,16 @@ fn a_search_lists_the_stores_and_dishes_that_match() {
 #[test]
 fn case_is_ignored_and_accents_are_not() {
     let s = served();
-    let (_, _, text) = searched(&s, "/search/CAF%C3%89");
+    let (_, _, text) = searched(&s, "/search?q=CAF%C3%89");
     assert!(text.contains("1 store matches “CAFÉ”."), "{text}");
     assert!(text.contains("Harbor Coffee"), "{text}");
     assert!(!text.contains("Blue Bottle Coffee Small"), "{text}");
-    let (_, _, text) = searched(&s, "/search/BLUEBERRY%20scone");
+    let (_, _, text) = searched(&s, "/search?q=BLUEBERRY+scone");
     assert!(
         text.contains("Blueberry Scone Bakery"),
         "several terms: {text}"
     );
-    let (_, _, text) = searched(&s, "/search/cafe");
+    let (_, _, text) = searched(&s, "/search?q=cafe");
     assert!(
         text.contains("Harbor Coffee"),
         "\"cafe\" is in its description: {text}"
@@ -84,20 +87,20 @@ fn no_text_fails_the_page() {
     let s = served();
     for (path, said) in [
         (
-            "/search/%20",
+            "/search?q=+",
             "Type a store, a dish or a cuisine to search for.",
         ),
         (
-            "/search/%09%E3%80%80",
+            "/search?q=%09%E3%80%80",
             "Type a store, a dish or a cuisine to search for.",
         ),
-        ("/search/%25", "No stores or dishes match “%”."),
-        ("/search/_", "No stores or dishes match “_”."),
-        ("/search/%5C", "No stores or dishes match “\\”."),
-        ("/search/'%22", "No stores or dishes match “'\"”."),
-        ("/search/%25%25%20_", "No stores or dishes match “%% _”."),
+        ("/search?q=%25", "No stores or dishes match “%”."),
+        ("/search?q=_", "No stores or dishes match “_”."),
+        ("/search?q=%5C", "No stores or dishes match “\\”."),
+        ("/search?q='%22", "No stores or dishes match “'\"”."),
+        ("/search?q=%25%25%20_", "No stores or dishes match “%% _”."),
         (
-            "/search/%3Cb%3Ex%3C%2Fb%3E",
+            "/search?q=%3Cb%3Ex%3C%2Fb%3E",
             "No stores or dishes match “&lt;b&gt;x&lt;/b&gt;”.",
         ),
     ] {
@@ -110,14 +113,17 @@ fn no_text_fails_the_page() {
             "{path}: nothing listed"
         );
     }
-    let long = format!("/search/{}", "x".repeat(crate::search::MOST_CHARACTERS + 1));
+    let long = format!(
+        "/search?q={}",
+        "x".repeat(crate::search::MOST_CHARACTERS + 1)
+    );
     let (status, _, text) = searched(&s, &long);
     assert!(status.starts_with("HTTP/1.1 200"), "{status}");
     assert!(
         text.contains("That search is too long: 100 characters at most."),
         "{text}"
     );
-    let edge = format!("/search/{}", "x".repeat(crate::search::MOST_CHARACTERS));
+    let edge = format!("/search?q={}", "x".repeat(crate::search::MOST_CHARACTERS));
     let (_, _, text) = searched(&s, &edge);
     assert!(
         text.contains("No stores or dishes match"),
@@ -130,7 +136,7 @@ fn no_text_fails_the_page() {
 #[test]
 fn a_menu_change_reaches_a_kept_search() {
     let s = served();
-    let (_, _, before) = searched(&s, "/search/flat%20white");
+    let (_, _, before) = searched(&s, "/search?q=flat%20white");
     assert!(
         before.contains("No stores or dishes match “flat white”."),
         "{before}"
@@ -143,7 +149,7 @@ fn a_menu_change_reaches_a_kept_search() {
         "",
     );
     assert!(answer.starts_with("HTTP/1.1 202"), "{answer}");
-    let (_, html, after) = searched(&s, "/search/flat%20white");
+    let (_, html, after) = searched(&s, "/search?q=flat%20white");
     assert!(after.contains("1 store matches “flat white”."), "{after}");
     assert!(after.contains("Blue Bottle Coffee"), "{after}");
     assert!(
@@ -209,4 +215,53 @@ fn a_menu_change_tells_the_stores_page_once() {
         .collect();
     let inserting = told.iter().filter(|f| f.contains("Add Flat White")).count();
     assert_eq!(inserting, 1, "the dish's row, once: {told:#?}");
+}
+
+/// **The search's address is its route's query** (ADR-0309): `/search{?q}`.
+/// No `q` asks what to search for; an empty one is a blank search; a `+` is
+/// a space; the first `q` is taken, and a name the route does not give is
+/// ignored. Its search box is a GET form to the same address, holding what
+/// was asked.
+#[test]
+fn the_search_is_at_its_routes_query() {
+    let s = served();
+    let (status, html, text) = searched(&s, "/search");
+    assert!(status.starts_with("HTTP/1.1 200"), "{status}");
+    assert!(
+        text.contains("Search the stores by name or cuisine"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("Type a store"),
+        "no `q` is not a blank one: {text}"
+    );
+    assert!(!html.contains("href=\"/stores/"), "nothing listed: {html}");
+    assert!(html.contains("<title>Search</title>"), "{html}");
+    assert!(
+        html.contains("method=\"get\" action=\"/search\""),
+        "the search box: {html}"
+    );
+    let (_, html, text) = searched(&s, "/search?q=");
+    assert!(
+        text.contains("Type a store, a dish or a cuisine to search for."),
+        "{text}"
+    );
+    assert!(html.contains("<title>Search</title>"), "{html}");
+    let (_, html, text) = searched(&s, "/search?q=blueberry+scone");
+    assert!(
+        text.contains("1 store matches “blueberry scone”."),
+        "{text}"
+    );
+    assert!(
+        html.contains("value=\"blueberry scone\""),
+        "the box holds it: {html}"
+    );
+    let (_, _, text) = searched(&s, "/search?utm_source=mail&q=scone&q=espresso");
+    assert!(
+        text.contains("1 store matches “scone”."),
+        "the first `q`: {text}"
+    );
+    assert!(text.contains("Harbor Coffee"), "{text}");
+    let (status, _, _) = searched(&s, "/search?q=%FF");
+    assert!(status.starts_with("HTTP/1.1 400"), "no UTF-8: {status}");
 }
