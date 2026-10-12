@@ -86,7 +86,9 @@ layer to one meaning** (W9's, track `store-search`, merged from `00ecfc6`).
   of one of a record's fields, tiers by where the terms were found, and one
   order, cut and bound, which `search.rs` alone applies to what either
   layer matched.
-- The page is at `route "/search/{q}"` until a route reads its query part.
+- Its page is at `route "/search{?q}"` (ADR-0309), with a plain GET form
+  that works with scripts off (amended the same day, 33 of 33 mutants,
+  verify 38217251355).
 - Found:
   - the menu route's drop told only the store's own pages, and now tells
     each open page that reads what it dropped;

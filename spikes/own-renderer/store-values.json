@@ -18,6 +18,8 @@
   "cart.lines": [],
   "cart.subtotal.display": "$0.00",
   "search.asked": "coffee",
+  "search.title": "Search for “coffee”",
+  "q": { "$case": "some", "value": "coffee" },
   "search.said": "2 stores match “coffee”.",
   "search.stores": [],
   "search.more": ""

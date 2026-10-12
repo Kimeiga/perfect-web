@@ -83,26 +83,31 @@ type ShownStore = ShownStore {
     more: String,
 }
 
-// **What the page says of a search**: what was asked, a sentence for what
-// was found or why nothing was, the stores, and how many more, in words.
+// **What the page says of a search**: what was asked, the page's title, a
+// sentence for what was found or why nothing was, the stores, and how many
+// more, in words.
 type SearchShown = SearchShown {
     asked: String,
+    title: String,
     said: String,
     stores: List<ShownStore>,
     more: String,
 }
 
-fn shown(asked: String, answer: Result<SearchFound, SearchError>) -> SearchShown {
+fn shown(asked: String, given: Bool, answer: Result<SearchFound, SearchError>) -> SearchShown {
     let none: List<ShownStore> = []
+    let title = if asked == "" { "Search" } else { "Search for “{asked}”" }
+    let blank = if given { "Type a store, a dish or a cuisine to search for." } else { "" }
     match answer {
         Ok(found) => SearchShown {
             asked: asked,
+            title: title,
             said: summary(asked, found),
             stores: List.map(found.stores, s => shown_store(s)),
             more: more(found.more_stores, "store", "stores"),
         },
-        Err(SearchError.Blank) => SearchShown { asked: asked, said: "Type a store, a dish or a cuisine to search for.", stores: none, more: "" },
-        Err(SearchError.TooLong) => SearchShown { asked: asked, said: "That search is too long: 100 characters at most.", stores: none, more: "" },
+        Err(SearchError.Blank) => SearchShown { asked: asked, title: title, said: blank, stores: none, more: "" },
+        Err(SearchError.TooLong) => SearchShown { asked: asked, title: title, said: "That search is too long: 100 characters at most.", stores: none, more: "" },
     }
 }
 
@@ -130,7 +135,7 @@ fn summary(asked: String, found: SearchFound) -> String {
 
 // **A search** (track `store-search`): every reader's, so kept shared and
 // keyed by its text, and dropped when any store's menu or stock changes.
-public query Search(q: String) -> SearchShown
+public query Search(q: Option<String>) -> SearchShown
     freshness      30.seconds
     consistency    snapshot
     cache          shared
@@ -142,8 +147,18 @@ public query Search(q: String) -> SearchShown
 {
     // The host call is in the query's own body: a call reached only
     // through a helper is not among the component's imports.
-    let answer = find(q)
-    shown(q, answer)
+    // An address with no `q` is searched as a blank text is, and says what
+    // to search for rather than that nothing was typed.
+    let text = match q {
+        Some(t) => t,
+        None => "",
+    }
+    let given = match q {
+        Some(_) => true,
+        None => false,
+    }
+    let answer = find(text)
+    shown(text, given, answer)
 }
 
 // **"5 more dishes"**, or nothing where there are none.
@@ -156,13 +171,13 @@ fn more(n: Int, one: String, many: String) -> String !{} {
         "{n} more {many}"
     }
 }
-
-// **The search page** (track `store-search`). TEMPORARY: its address is
-// `/search/{q}`, and it has no search box, until a route reads its query
-// part (docs/PARALLEL.md, 2026-10-11); then `/search{?q}` and a plain
-// `<form method="get" action="/search">`, and `q` stays its parameter.
-session page SearchPage(q: String) {
-    route     "/search/{q}"
+// **The search page** (track `store-search`, ADR-0308; its address
+// ADR-0309's): at `/search{?q}`, its search box a plain GET form that makes
+// the address, with scripts on or off. With no `q` it asks what to search
+// for; with one, it says what was found. A navigation gives no query, so a
+// link or the form reaches it.
+session page SearchPage(q: Option<String>) {
+    route     "/search{?q}"
     layout    StoreLayout
     placement origin
     cache     private
@@ -170,10 +185,19 @@ session page SearchPage(q: String) {
     let search = query Search(q)
 
     view {
-        <title>Search: {search.asked}</title>
+        <title>{search.title}</title>
         <meta name="robots" content="noindex, follow" />
         <main>
-            <h1>Search</h1>
+            <h1>{search.title}</h1>
+            <!-- With no `q`, what can be searched for. -->
+            {#match q}
+            {:Some(_)}
+            {:None}<p id="search-intro">Search the stores by name or cuisine, and their dishes by name or what they are.</p>
+            {/match}
+            <form id="search-form" method="get" action="/search" role="search">
+                <label>Stores and dishes <input id="search-q" type="search" name="q" value={search.asked} /></label>
+                <button>Search</button>
+            </form>
             <p id="search-said" role="status">{search.said}</p>
             <ul id="search-stores">
                 {#each search.stores as store (store.id)}

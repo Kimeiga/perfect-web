@@ -361,3 +361,67 @@ ADR-0207 (a source states what it guarantees).
   three engines, **30 of 30 mutants killed**; ci 38207475089 green at
   `6a69b62c`.
 - **Not claimed**: as above.
+
+## Amendment, 2026-10-12: the search's address is its route's query (ADR-0309)
+
+Proposed by W9 on `track/store-search` after ADR-0309 merged (`14410fba`),
+under the integrator's instruction of 2026-10-12. The route stops being
+temporary; everything above that says `/search/{q}`, "TEMPORARY" or "no
+search box" is replaced by this.
+
+- **The address.** `session page SearchPage(q: Option<String>)`, `route
+  "/search{?q}"`. The host reads the query as ADR-0309 rules: `+` and `%20`
+  a space, the first `q` taken, a name the route does not give ignored,
+  bytes that are no UTF-8 refused (400).
+- **The search box** is a plain `<form method="get" action="/search"
+  role="search">` with one field, `name="q"`, labelled "Stores and dishes"
+  and holding what was asked; PW5050 holds its field to the route's names.
+  It works with scripts off: the browser writes the address.
+- **No `q`** (`None`) asks what can be searched for (`{#match q}`'s `None`
+  arm), lists nothing and says nothing in the status. **An empty `q`**
+  (`Some("")`, a box sent empty) is a blank search, told as before. The
+  query `Search(q: Option<String>)` is keyed by the `Option` and searches
+  `None` as a blank text, its sentence the only difference.
+- **The title names the heading**: "Search", or "Search for “coffee”",
+  each the page's `<h1>` as the audit's `document-title-identifies` asks.
+- **A navigation gives no query** (ADR-0280, ADR-0309): a link or the form
+  reaches the page.
+- **The home page's search form waits for W8's merge**: it is
+  `examples/store/app.pw`, W8's until then.
+
+### Found
+
+- **A text part inside a `{#match q}` arm was not told.** With the status
+  sentence written inside the `Some` arm, a menu change sent the open page
+  the dish's row and not the new sentence ("1 store matches ..."):
+  `an_open_search_page_is_told_of_a_menu_change` failed. The sentence is
+  outside the match now, and the match holds only what no change moves (the
+  intro). Whether a part inside an arm whose subject did not change should
+  be told is the integrator's question (below).
+
+### Acceptance
+
+- `tests/store_search.rs`, in memory and on PostgreSQL: the earlier tests
+  at `?q=` addresses, and `the_search_is_at_its_routes_query` (no `q`, an
+  empty one, `+`, the first of two `q`s beside a foreign name, the box
+  holding what was asked, the title, a 400 for bytes that are no UTF-8).
+- `e2e/store-search.spec.mjs`, three engines, 27 of 27 here: the earlier
+  tests at `?q=` addresses, the box with scripts on and with scripts off,
+  an empty and a repeated `q`, and the audit without a `q`.
+- `scripts/store_search_mutations.py`, 33 mutants: three more, of the
+  program (an address with no `q` told it searched for nothing; the box
+  holding nothing of what was asked; the title naming no search), each
+  checked killed here.
+- Regenerated: the store's IR, the WIT (`Search`'s parameter an `Option`),
+  the graph (unchanged), the contracts (unchanged).
+
+### Questions for the integrator, answered at the merge (2026-10-12)
+
+1. **This amendment, or a new ADR?** An amendment: it completes what this
+   ADR named temporary, the route waiting for a query part (ADR-0309).
+2. **A part inside a `{#match}` arm** whose subject did not change is not
+   told when what it reads changes (Found above). **The host's to fix, not
+   the program's to avoid**: the sentence reads the search's result, not
+   `q`, and a part is told when what it reads changes, wherever it stands.
+   The integrator takes it, with a test and a mutant; the sentence stays
+   outside the match until then.
