@@ -425,3 +425,71 @@ search box" is replaced by this.
    `q`, and a part is told when what it reads changes, wherever it stands.
    The integrator takes it, with a test and a mutant; the sentence stays
    outside the match until then.
+
+## Amendment, 2026-10-12 (2): a store's cuisine, the home page's search box, and a reader's search
+
+Proposed by W9 after W8's merge (ADR-0318, ADR-0319, master `4e98e633`),
+under the integrator's rulings of 2026-10-12 on this ADR's questions.
+
+- **The cuisine is the store's own field** (question 1's ruling):
+  `StoreRow::cuisine`, `domain.pw`'s `Store.cuisine`, and the column
+  `stores.cuisine`. Migration `0011_store_cuisine.sql` copies 0010's
+  `store_cuisines` into it and drops the table. Text as written ("Café,
+  Bakery"), no tags. The in-memory seed is still `search::cuisine_of`. The
+  store's page shows it under its name (`#store-cuisine`), the home page
+  under each store's, and the search matches it from the row on both
+  layers.
+- **The home page's search box**: `<form method="get" action="/search"
+  role="search">` with one field, `q` (PW5050). It sits at a line marked
+  `TRACK SEAM (store-search)` in `app.pw`.
+- **A reader's search lists the stores that reach their chosen address,
+  by default.**
+  - `Search` becomes `user query Search(q, reader)`: private, keyed by the
+    text and the reader, and dropped by `AddressesChanged(reader)` as well
+    as any menu or stock change.
+  - It calls `store:data/search#find-for(text, reader)`. That keeps the
+    stores `store::coverage` says deliver to the chosen address, the one
+    rule of ADR-0319, before the order and the cut. It counts the rest
+    (`beyond`), and says so: "Showing the stores that deliver to Home; 1
+    more matches but doesn't."
+  - With no address chosen, every store is listed, with "Choose a delivery
+    address to see only the stores that deliver to it."
+  - `search#find` stays, for every reader alike.
+  - Why the default and not a filter the reader picks: DoorDash's search is
+    location-aware. Its CDAO Fall 2024 deck calls it "Geo-Aware", and its
+    2024 engineering post, read through ByteByteGo's summary (Research
+    above), makes geo-radius a filter of the index. Third-party
+    tools' documentation of its web search says results depend on the
+    delivery address set. A store that cannot deliver is not a result there.
+  - Not claimed: a toggle to see every store, and distance ranking.
+- **Its tests**:
+  - `tests/store_search.rs`, in memory and on PostgreSQL:
+    `a_search_lists_the_stores_that_reach_the_chosen_address` (Civic
+    Center, which store 47 reaches and store 48 does not; another reader
+    unaffected) and `a_stores_cuisine_is_shown_on_the_home_page_and_its_page`.
+  - `search.rs`'s PostgreSQL tests read and change `stores.cuisine`.
+  - The spec in three engines, 33 of 33 here: the home page's cuisines and
+    its box going to the search, and an address saved and the search
+    filtered by it.
+- **What moved with it**:
+  - The store's IR, graph, WIT and contracts.
+  - `just e10-component`: `store.page.Store` and the store page's plan.
+  - `A-012`'s decoder reads `cuisine`.
+  - `one_checker`'s store holds `search.pw`, since the home form names its
+    route.
+  - The platform contract's hash.
+  - `data_sources`' counts.
+  - `accessibility.spec.mjs`'s tree of the store's page.
+  - The slots test's last part, `pw-39`.
+  - `store-values.json`.
+- **Mutants**: seven more in `scripts/store_search_mutations.py`:
+  - the cuisine not given to the program;
+  - a store out of reach listed;
+  - one left out not counted;
+  - an address chosen not said;
+  - the page searching every store;
+  - the home page's box gone;
+  - the migration not copying the cuisine.
+
+  Three are re-anchored on the new code. The integrator's fixed-arms track
+  drops one ("an address with no q is told it searched for nothing").
