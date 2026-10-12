@@ -1,8 +1,8 @@
 ADR-0162 - each store at its route
 
 produced by: just e14-stores
-commit: d65f2785ad21bf9bd599e639aec2c156d25c0a51
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38203954490 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: bd5c64242c0b19efa798fc3fa7e07edb486b105a
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38283022346 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
@@ -11,22 +11,22 @@ playwright: Version 1.58.0
 test tests::a_change_to_one_stores_menu_reaches_that_stores_pages_only ... ok
 test tests::a_path_gives_a_route_its_parameters ... ok
 test tests::each_store_is_served_at_its_route ... ok
-test result: ok. 392 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 585.70s
+test result: ok. 463 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 344.09s
 
 == each store at its route, and test 11 (e2e/stores.spec.mjs), three engines
 
-  24 passed (1.5m)
+  24 passed (1.2m)
 
 == mutation controls (scripts/stores_mutations.py)
 
-baseline (cargo): 392 passed, 0 failed
+baseline (cargo): 463 passed, 0 failed
 baseline (browser): 8 passed, 0 failed
-a path's segment is decoded as a query: KILLED (1 of 392 tests fail)
-a path of another length is taken for the route: KILLED (16 of 392 tests fail)
+a path's segment is decoded as a query: KILLED (1 of 463 tests fail)
+a path of another length is taken for the route: KILLED (23 of 463 tests fail)
 no page is named by its route: KILLED (1 of 1 tests fail)
-a page's parameter is the default store's: KILLED (64 of 392 tests fail)
-the second store is not held: KILLED (3 of 392 tests fail)
-one menu fragment for every store: KILLED (1 of 392 tests fail)
-a change to one store's menu reaches every store's pages: KILLED (4 of 392 tests fail)
+a page's parameter is the default store's: KILLED (86 of 463 tests fail)
+the second store is not held: KILLED (8 of 463 tests fail)
+one menu fragment for every store: KILLED (1 of 463 tests fail)
+a change to one store's menu reaches every store's pages: KILLED (4 of 463 tests fail)
 7 of 7 mutants killed
 memory bound: no process was stopped
