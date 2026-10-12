@@ -2756,3 +2756,18 @@ of our own).
   MediaWiki's redirect note does), not kiokun.com's 307.
 - Held to kiokun.com as a black box in Node, never read and never
   committed: 3,873 forms, 0 unnamed differences.
+
+[ADR-0317](DECISIONS/ADR-0317-a-component-is-compiled-once-a-process.md): a
+component is compiled once a process (the integrator's; W6's finding of
+2026-10-09, and the memory bound's stops of 2026-10-12).
+- `Prepared::compile` keeps one cell for each component's bytes, for the
+  process's life. A second caller takes it or waits for it, and a failed
+  compile stays failed.
+- Authority is never cached: a call's linker is built from its own grants.
+- A component's imports are read from that compile (`Prepared::imports`), by
+  the development server, `imports_of` and pw-conformance.
+- Found: each server compiled every component twice, and every test's
+  server again. The development server's suite, whole, four tests at once,
+  held more than ADR-0292's bound after kiokun's merge. It now runs in
+  302 s at a 1.56 GiB peak on CI, from about 950 s and over the bound.
+
