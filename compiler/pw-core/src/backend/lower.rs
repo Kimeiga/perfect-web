@@ -6173,6 +6173,7 @@ fn construct_name(e: &Expr) -> &'static str {
         Expr::Literal(_) => "a literal",
         Expr::Field { .. } => "a field access",
         Expr::Call { .. } => "a call",
+        Expr::Address { .. } => "a page's address",
         Expr::Lambda { .. } => "a lambda",
         Expr::Binary { .. } => "a binary operator",
         Expr::Cast { .. } => "a cast",

@@ -1165,16 +1165,10 @@ fn unresolved_uses(
             }
         }
 
-        // A canonical link's address names a page, which no call may
-        // (ADR-XXXX): what it names is PW5051's.
-        let addresses = crate::canonical::address_calls(body);
         for id in reachable {
             let Expr::Call { callee, .. } = body.expr(id) else {
                 continue;
             };
-            if addresses.contains(&id) {
-                continue;
-            }
             let path = path_of(body, *callee);
             // A name some scope binds is the value it holds, whatever a
             // declaration elsewhere is called (ADR-0066).
@@ -4736,7 +4730,7 @@ fn canonical_addresses(
                 continue;
             }
             Some(AttrValue::Expr(e)) => match body.expr(*e) {
-                Expr::Call { callee, args } => (*e, *callee, args),
+                Expr::Address { page, args } => (*e, page.clone(), args),
                 Expr::Interpolated { .. } | Expr::Literal(_) => {
                     refuse(
                         format!(
@@ -4761,8 +4755,7 @@ fn canonical_addresses(
                 }
             },
         };
-        let (e, callee, args) = call;
-        let name = path_of(body, callee);
+        let (e, name, args) = call;
         let def = crate::canonical::page_named(ws, unit, &name);
         let kind = def.and_then(|d| sigs.kind_of(d)).or_else(|| {
             // What it names otherwise, said by its kind, as `navigate`'s is.

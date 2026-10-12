@@ -1915,11 +1915,10 @@ fn lower_canonical(
     let Some(e) = crate::canonical::address(body, n) else {
         return blocked("a canonical address is a page's (PW5051)");
     };
-    let Expr::Call { callee, args } = body.expr(e) else {
+    let Expr::Address { page: name, args } = body.expr(e) else {
         return blocked("a canonical address is a page's (PW5051)");
     };
-    let name = crate::values::path_of(body, *callee);
-    let Some((def, page)) = crate::canonical::page_named(ws, unit, &name).and_then(|d| {
+    let Some((def, page)) = crate::canonical::page_named(ws, unit, name).and_then(|d| {
         crate::resolve::declaration(hirs, d)
             .filter(|p| p.kind == crate::hir::DeclKind::Page)
             .map(|p| (d, p))

@@ -656,10 +656,6 @@ struct Typer<'a> {
     /// that leads back to itself, `Empty == Empty`, answers nothing rather
     /// than loops (ADR-0201).
     expecting: RefCell<BTreeSet<ExprId>>,
-    /// **The calls that are a page's address** (ADR-XXXX): a canonical
-    /// link's `href={ItemPage(name)}`, its page named among the views as
-    /// `navigate`'s is, and the address text.
-    addresses: BTreeSet<ExprId>,
 }
 
 /// **The integers a value can be, as far as the build can bound it**
@@ -1345,7 +1341,6 @@ impl<'a> Typer<'a> {
                 })
                 .collect(),
             expecting: RefCell::new(BTreeSet::new()),
-            addresses: crate::canonical::address_calls(body),
         };
 
         // What the program implies: an unannotated `let` or `use` takes its
@@ -1378,7 +1373,7 @@ impl<'a> Typer<'a> {
             Expr::Interpolated { .. } => Ty::Primitive(Primitive::Str),
             Expr::Name(n) => self.name(id, n),
             Expr::Field { base, name } => self.field(id, *base, name),
-            Expr::Call { .. } => self.call(id).result,
+            Expr::Call { .. } | Expr::Address { .. } => self.call(id).result,
             // `let store = query Store(id)` binds what the query produces when
             // it succeeds: the page renders `{store.name}`, and its loading and
             // failure states are the page's to render, not the binding's. The
@@ -2227,11 +2222,8 @@ impl<'a> Typer<'a> {
         // as `navigate` names it (ADR-0280), given its parameters as a call
         // gives them; the address it makes is text. What else the path
         // names is PW5051's to say.
-        if let Expr::Call { callee, args } = self.body.expr(id)
-            && self.addresses.contains(&id)
-        {
-            let path = path_of(self.body, *callee);
-            let Some(sig) = crate::canonical::page_named(self.ws, self.at, &path)
+        if let Expr::Address { page, args } = self.body.expr(id) {
+            let Some(sig) = crate::canonical::page_named(self.ws, self.at, page)
                 .and_then(|d| self.sigs.by_def(d))
             else {
                 return unknown;
@@ -4063,7 +4055,7 @@ impl<'a> Typer<'a> {
                     ));
                 }
             }
-            Expr::Call { .. } => out.extend(self.call(id).relations),
+            Expr::Call { .. } | Expr::Address { .. } => out.extend(self.call(id).relations),
             // `navigate Page(..)` gives the page its parameters (ADR-0280):
             // each argument related as a call's is.
             Expr::Keyword {

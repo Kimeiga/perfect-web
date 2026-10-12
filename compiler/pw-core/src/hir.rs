@@ -816,6 +816,8 @@ impl Body {
                 v.extend(args.iter().map(|a| a.value));
                 v
             }
+            // Its arguments, which are read; the page it names is no value.
+            Expr::Address { args, .. } => args.iter().map(|a| a.value).collect(),
             Expr::Lambda {
                 descriptor, body, ..
             } => {
@@ -977,6 +979,18 @@ pub enum Expr {
     },
     Call {
         callee: ExprId,
+        args: Vec<Arg>,
+    },
+    /// **A page's address** (ADR-XXXX): `{StorePage(id)}` in a canonical
+    /// link's `href`, a page named by its declaration and given its
+    /// parameters, as `navigate` names one (ADR-0280). Not a call: it names a
+    /// page and runs nothing, so nothing that reads a call (what it performs,
+    /// what it reads, the label it carries) reads it as one. Until it was its
+    /// own node a shared page naming a session page's address was refused as
+    /// the session's (PW5001).
+    Address {
+        /// The page, as written: `StorePage`, or `store.StorePage`.
+        page: String,
         args: Vec<Arg>,
     },
     Lambda {

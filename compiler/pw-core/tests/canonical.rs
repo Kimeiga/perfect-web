@@ -280,3 +280,38 @@ fn open_graph_s_address_is_the_host_s() {
     ));
     assert_eq!(reported(&title), Vec::<String>::new());
 }
+
+#[test]
+fn an_address_carries_nothing_of_the_page_it_names() {
+    // A page's address is a path: it runs nothing, and holds no value of the
+    // page it names. A shared page naming a session page's address is
+    // public. While the address was lowered as a call of the page, the page
+    // was read as reading it, and refused as the session's (PW5001).
+    let src = "module t\n\n\
+               session page Cart() {\n    route \"/cart\"\n    cache private\n\n    \
+               view {\n        <title>Cart</title>\n        <main><h1>Cart</h1></main>\n    }\n}\n\n\
+               page About() {\n    route \"/about\"\n    cache shared\n\n    view {\n        \
+               <title>About</title>\n        <link rel=\"canonical\" href={Cart()} />\n        \
+               <main><h1>About</h1></main>\n    }\n}\n";
+    assert_eq!(reported(src), Vec::<String>::new());
+    // Lowered as an address, never as a call.
+    let hir = lower_file(src, &parse_tree(src).green);
+    let (_, about) = hir
+        .all_decls()
+        .find(|(_, d)| d.name == "About")
+        .expect("the page");
+    let body = hir.body(about.body.expect("a body"));
+    let written: Vec<&pw_core::hir::Expr> = body.walk().into_iter().map(|e| body.expr(e)).collect();
+    assert!(
+        written
+            .iter()
+            .any(|e| matches!(e, pw_core::hir::Expr::Address { page, .. } if page == "Cart")),
+        "{written:?}"
+    );
+    assert!(
+        !written
+            .iter()
+            .any(|e| matches!(e, pw_core::hir::Expr::Call { .. })),
+        "{written:?}"
+    );
+}

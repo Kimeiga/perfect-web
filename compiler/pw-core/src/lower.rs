@@ -1583,12 +1583,19 @@ impl Lowerer<'_> {
             K::Element => {
                 let open = node.children().find(|c| c.kind() == K::OpenTag);
                 let tag = open.as_ref().and_then(first_name).unwrap_or_default();
+                // A canonical link's `href` is a page's address (ADR-XXXX).
+                let canonical = tag == "link"
+                    && open.as_ref().is_some_and(|o| {
+                        o.children()
+                            .filter(|c| c.kind() == K::Attr)
+                            .any(|a| self.static_rel_names_canonical(&a))
+                    });
                 let attrs = open
                     .as_ref()
                     .map(|o| {
                         o.children()
                             .filter(|c| c.kind() == K::Attr)
-                            .flat_map(|a| self.attrs(b, &a))
+                            .flat_map(|a| self.attrs(b, &a, canonical))
                             .collect()
                     })
                     .unwrap_or_default();
@@ -1688,8 +1695,8 @@ impl Lowerer<'_> {
     /// typed. Lowered to them, so every rule reads them as it reads any
     /// attribute and handler. A binding of anything but a name stays as
     /// written, for the rule on what a binding binds to refuse.
-    fn attrs(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> Vec<Attr> {
-        let attr = self.attr(b, node);
+    fn attrs(&mut self, b: &mut BodyBuilder, node: &SyntaxNode, canonical: bool) -> Vec<Attr> {
+        let attr = self.attr(b, node, canonical);
         if attr.name != "bind:value" {
             return vec![attr];
         }
@@ -1747,7 +1754,46 @@ impl Lowerer<'_> {
         ]
     }
 
-    fn attr(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> Attr {
+    /// Whether an attribute is `rel`, written as text that names `canonical`
+    /// among its relations, as HTML compares keywords, ignoring ASCII case.
+    fn static_rel_names_canonical(&self, node: &SyntaxNode) -> bool {
+        let named_rel = node
+            .children()
+            .find(|c| c.kind() == K::AttrName)
+            .is_some_and(|n| n.text() == "rel");
+        let Some(v) = node.children().find(|c| c.kind() == K::AttrValue) else {
+            return false;
+        };
+        named_rel
+            && v.children().all(|c| c.kind() != K::Interpolation)
+            && crate::canonical::names_canonical(
+                text(self.src, &v).trim_matches(|c| c == '"' || c == '\''),
+            )
+    }
+
+    /// **A page's address** (ADR-XXXX): a call of a path, `StorePage(id)`, in
+    /// a canonical link's `href`, lowered as an address and not a call. Its
+    /// page stays the path as written, never an expression a name check
+    /// would read as a value. `None` for anything else, which is lowered as
+    /// written and refused by PW5051.
+    fn address(&mut self, b: &mut BodyBuilder, node: &SyntaxNode) -> Option<ExprId> {
+        if node.kind() != K::CallExpr {
+            return None;
+        }
+        let callee = node.children().next().filter(names_a_path)?;
+        let page = text(self.src, &callee)
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect();
+        let args = node
+            .children()
+            .find(|c| c.kind() == K::ArgList)
+            .map(|l| self.args(b, &l))
+            .unwrap_or_default();
+        Some(b.expr(Expr::Address { page, args }, span_of(node)))
+    }
+
+    fn attr(&mut self, b: &mut BodyBuilder, node: &SyntaxNode, canonical: bool) -> Attr {
         let name = node
             .children()
             .find(|c| c.kind() == K::AttrName)
@@ -1757,6 +1803,10 @@ impl Lowerer<'_> {
             None => AttrValue::None,
             Some(v) => match v.children().find(|c| c.kind() == K::Interpolation) {
                 Some(i) => match i.children().find(|c| is_expr(c.kind())) {
+                    Some(e) if canonical && name == "href" => match self.address(b, &e) {
+                        Some(address) => AttrValue::Expr(address),
+                        None => AttrValue::Expr(self.expr(b, &e)),
+                    },
                     Some(e) => AttrValue::Expr(self.expr(b, &e)),
                     None => AttrValue::None,
                 },

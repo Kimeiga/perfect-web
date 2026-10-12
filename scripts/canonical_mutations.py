@@ -11,8 +11,8 @@ Each mutant undoes one piece:
   address names called (PW0027);
 - the value relations: an address's arguments not related to the page's
   parameters (PW0604, PW0605);
-- the analyses: an address read as a call of its page, by effect inference
-  or by the callee every other analysis reads;
+- the HIR: an address lowered as a call of its page, which every analysis
+  that reads a call then reads, its privacy label among them;
 - the template IR: the link lowered in the body, and an argument given by
   its place only;
 - the renderer: the address written without the origin, a value unescaped,
@@ -23,11 +23,10 @@ Each mutant undoes one piece:
 - the browser: the server not given its origin, and a navigation taking
   only the next page's description.
 
-A checker, relations or IR mutant must fail `compiler/pw-core/tests/
+A checker, HIR, relations or IR mutant must fail `compiler/pw-core/tests/
 canonical.rs` or `links.rs`; a renderer mutant, `runtime/pw-render/tests/
-canonical.rs`; a host or analysis mutant, the host's tests of a canonical
-address and of an origin; the browser's, `e2e/canonical.spec.mjs` in
-Chromium.
+canonical.rs`; a host mutant, the host's tests of a canonical address and of
+an origin; the browser's, `e2e/canonical.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-canonical` records the output.
 The source is restored after every mutant, whatever happens.
@@ -44,8 +43,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHECK = ROOT / "compiler/pw-core/src/check.rs"
 CANONICAL = ROOT / "compiler/pw-core/src/canonical.rs"
 VALUES = ROOT / "compiler/pw-core/src/values.rs"
-INFER = ROOT / "compiler/pw-core/src/infer.rs"
-EFFECTS = ROOT / "compiler/pw-core/src/effects.rs"
+LOWER = ROOT / "compiler/pw-core/src/lower.rs"
 TEMPLATE = ROOT / "compiler/pw-core/src/template_ir.rs"
 RENDER = ROOT / "runtime/pw-render/src/lib.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
@@ -95,10 +93,8 @@ MUTANTS = [
         "a page served at no route is an address",
         "core",
         CHECK,
-        "            None => refuse(\n                format!(\n"
-        "                    \"`<link rel=\\\"canonical\\\">` in `{}` names `{name}`, which is served at no \\\n",
-        "            None if false => refuse(\n                format!(\n"
-        "                    \"`<link rel=\\\"canonical\\\">` in `{}` names `{name}`, which is served at no \\\n",
+        "        match route {\n",
+        "        match route.or(Some(String::new())) {\n",
     ),
     (
         "an argument computed in place is given",
@@ -115,19 +111,18 @@ MUTANTS = [
         "                .is_some_and(|v| v.eq_ignore_ascii_case(\"og:url\") && false)\n",
     ),
     (
-        "the page an address names is called",
+        "an address is lowered as a call of its page",
         "core",
-        CHECK,
-        "            if addresses.contains(&id) {\n                continue;\n            }\n"
-        "            let path = path_of(body, *callee);\n",
-        "            let path = path_of(body, *callee);\n",
+        LOWER,
+        "                    Some(e) if canonical && name == \"href\" => match self.address(b, &e) {\n",
+        "                    Some(e) if false && canonical && name == \"href\" => match self.address(b, &e) {\n",
     ),
     (
         "an address's arguments are not the page's parameters",
         "core",
         VALUES,
-        "            && self.addresses.contains(&id)\n",
-        "            && self.addresses.contains(&id)\n            && false\n",
+        "        if let Expr::Address { page, args } = self.body.expr(id) {\n",
+        "        if let Expr::Address { page, args } = self.body.expr(id)\n            && false\n        {\n",
     ),
     (
         "the link is lowered in the body",
@@ -177,21 +172,6 @@ MUTANTS = [
         RENDER,
         "            if text.is_empty() || text == \".\" || text == \"..\" {\n",
         "            if false {\n",
-    ),
-    (
-        "an address is read as a call of its page by effect inference",
-        "host",
-        EFFECTS,
-        "            if addresses.contains(&id) {\n                continue;\n            }\n"
-        "            let path = path_of(body, *callee);\n            if path.is_empty() {\n",
-        "            let path = path_of(body, *callee);\n            if path.is_empty() {\n",
-    ),
-    (
-        "an address is read as a call of its page by the analyses",
-        "host",
-        INFER,
-        "        if self.addresses.contains(&callee) {\n",
-        "        if false && self.addresses.contains(&callee) {\n",
     ),
     (
         "an origin may carry a path",

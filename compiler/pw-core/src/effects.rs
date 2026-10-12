@@ -558,9 +558,6 @@ impl<'a> Inference<'a> {
     /// independently of the declaration's body rather than as part of it.
     pub fn infer_rooted(&self, unit: usize, body: &Body, root: ExprId) -> Inferred {
         let mut out = Inferred::default();
-        // A page's address names a page and runs nothing (ADR-XXXX): its
-        // effects are not the address's.
-        let addresses = crate::canonical::address_calls(body);
         // Lambdas are visited through their enclosing call, so the reason can
         // say *which* function the callback was handed to.
         let mut inside_callback: BTreeMap<ExprId, String> = BTreeMap::new();
@@ -594,9 +591,6 @@ impl<'a> Inference<'a> {
             let Expr::Call { callee, .. } = body.expr(id) else {
                 continue;
             };
-            if addresses.contains(&id) {
-                continue;
-            }
             let path = path_of(body, *callee);
             if path.is_empty() {
                 continue;

@@ -7,11 +7,10 @@
 //!
 //! Where a page's canonical link is, and what it addresses, is read here
 //! once, for three readers: the checker (PW5035 where it is, PW5051 what it
-//! addresses, and no PW0027 for the page its address names), the value
-//! relations, which relate its arguments to the page's parameters, and the
-//! template IR, which lowers it to a part of the head.
-
-use std::collections::BTreeSet;
+//! addresses), the value relations, which relate its arguments to the
+//! page's parameters, and the template IR, which lowers it to a part of the
+//! head. The address itself is its own node in the HIR, `Expr::Address`,
+//! never a call, so nothing that reads a call reads it.
 
 use crate::hir::{AttrValue, Body, Decl, DeclKind, Expr, ExprId, Node, NodeId};
 use crate::resolve::{DefId, Namespace, Resolution, Workspace};
@@ -50,28 +49,17 @@ pub(crate) fn page_link(decl: &Decl, body: &Body) -> Option<NodeId> {
 }
 
 /// **The address a canonical link states**: its `href`, where that is a
-/// call, `ItemPage(name)`. Anything else is refused (PW5051).
+/// page's address, `{ItemPage(name)}`, which the HIR lowers as one
+/// (`Expr::Address`) and not as a call. Anything else is refused (PW5051).
 pub(crate) fn address(body: &Body, link: NodeId) -> Option<ExprId> {
     let Node::Element { attrs, .. } = body.node(link) else {
         return None;
     };
     let href = attrs.iter().find(|a| a.name == "href")?;
     match &href.value {
-        AttrValue::Expr(e) if matches!(body.expr(*e), Expr::Call { .. }) => Some(*e),
+        AttrValue::Expr(e) if matches!(body.expr(*e), Expr::Address { .. }) => Some(*e),
         _ => None,
     }
-}
-
-/// **The calls in a body that are a page's address**: each canonical link's,
-/// the page's own and any other, which PW5035 refuses saying where one goes,
-/// not that a page is called. A call elsewhere that names a page is refused
-/// (PW0027): a page is reached by its route, not called.
-pub(crate) fn address_calls(body: &Body) -> BTreeSet<ExprId> {
-    body.walk_markup(&crate::template_ir::roots_of(body))
-        .into_iter()
-        .filter(|n| is_canonical_link(body, *n))
-        .filter_map(|n| address(body, n))
-        .collect()
 }
 
 /// **The page an address names**, by its declaration, among the views, as

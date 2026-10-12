@@ -36,11 +36,17 @@ word with its dictionary form's entry (PARALLEL.md, 2026-10-12).
   properties and `theme-color`, which browsers read live, and lacked the
   next page's.
 - **Found on the way: an address read as a call.** `href={StorePage(id)}`
-  is a call in the language's syntax, and effect inference looks a call up
-  by its path. So the store's page, stating its own address, was charged
-  its own reads, `database.read` and `session.read`, as a value its
-  template computes (PW0401, PW0334), and did not build. An address names a
-  page and runs nothing.
+  is a call in the language's syntax, and the analyses that read a call
+  looked it up by its path.
+  - Effect inference charged the store's page, stating its own address,
+    with its own reads, `database.read` and `session.read`, as a value its
+    template computes (PW0401, PW0334). The page did not build.
+  - The privacy label joined the label of the page an address names. A
+    shared page naming a session page's address was refused as the
+    session's (PW5001). This ADR's mutation controls found it: exempting
+    the address in effect inference and in the callee the other analyses
+    read was not enough, and a mutant of the second survived.
+  An address names a page and runs nothing.
 
 ## Research (primary sources, read 2026-10-12)
 
@@ -100,9 +106,16 @@ word with its dictionary form's entry (PARALLEL.md, 2026-10-12).
 
    Its invariant now names the exception. A call that names a page outside
    a canonical link's address is still PW0027.
-4. **An address runs nothing.** The value relations type it as text. Effect
-   inference, and the callee every other analysis reads, do not read it as a
-   call of the page.
+4. **An address is its own node in the HIR, `Expr::Address`, never a
+   call.** A canonical link's `href` that calls a path is lowered as one.
+   - Its page stays the path as written, and is not an expression a name
+     check reads as a value.
+   - Its arguments are its children, and are read as values are.
+   - Nothing that reads a call reads it: what a body performs, what it
+     reads, and the label it carries.
+   - The value relations type it as text, and relate its arguments to the
+     page's parameters.
+   - A call naming a page anywhere else is still a call, refused (PW0027).
 5. **The host writes it into the head, absolute**, after the page's
    metadata (a part of the head, numbered after the metadata).
    - It is the deployment's public origin followed by the route's path,
@@ -155,10 +168,17 @@ word with its dictionary form's entry (PARALLEL.md, 2026-10-12).
   configuration the host has.
 - **The request's `Host`.** It is what kiokun.com uses, and it is the
   client's to choose. An address made from it is the attacker's.
-- **Read the address as a keyword in the HIR**, as `navigate` is. Fifty
-  places match a keyword expression, several of them generically.
-  Exempting the address where a call is resolved to a declaration is two
-  places.
+- **Exempt the address wherever a call is read.** This was tried first.
+  - Effect inference, PW0027 and the callee the other analyses read were
+    exempted.
+  - The privacy label still read the address as a call of the page it
+    names (above).
+  - About ninety places match a call, in twenty-five files. A list of
+    exemptions is one that a new analysis forgets.
+- **Read the address as a keyword**, as `navigate` is. Fifty places match
+  a keyword expression, several of them generically, and would each have to
+  be read again. Its own node is named where it must be: Rust's exhaustive
+  matches named the two places, the backend's construct names and Koka's.
 - **`alternate` links**, for a language or a feed: refused as before. Each
   needs its own reading (`hreflang`, `type`, `media`), and no page needs one
   yet.
@@ -172,6 +192,8 @@ Recorded by `just e14-canonical` in `docs/evidence/E14/canonical.txt`:
   - arguments by place, by name and as text, and another page's address;
   - each PW5035 and PW5051 refusal, PW0604 and PW0605;
   - PW0027 elsewhere still;
+  - a shared page naming a session page's address checks clean, its
+    address lowered as an address and never as a call;
   - `og:url` refused, and Open Graph's title not.
 - **`pw-render`, `tests/canonical.rs`:**
   - the head's address, absolute, escaped as a link's hole, and `og:url`;
@@ -190,7 +212,7 @@ Recorded by `just e14-canonical` in `docs/evidence/E14/canonical.txt`:
     host's.
 - **The corpus at C20**: `corpus-check`, `checking_source.rs`, and
   generality 45 / 45.
-- **Mutation controls**: `scripts/canonical_mutations.py`, 23 mutants. Two
+- **Mutation controls**: `scripts/canonical_mutations.py`, 21 mutants. Two
   of `metadata_mutations.py`'s were re-anchored, and its script was run
   whole.
 
