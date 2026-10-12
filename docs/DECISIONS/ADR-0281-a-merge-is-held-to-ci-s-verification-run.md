@@ -2,7 +2,9 @@
 
 Status: accepted under the owner's delegation of 2026-10-02, on the owner's
 decision of 2026-10-08, 22:45 (relayed). Date: 2026-10-08. Milestone: E14.
-Amends the integrator's practice under ADR-0245.
+Amends the integrator's practice under ADR-0245. Amended 2026-10-12 (the
+integrator's): a fetch takes no file of code the tree it joins does not
+hold.
 
 ## Context
 
@@ -57,6 +59,17 @@ Amends the integrator's practice under ADR-0245.
      2026-10-09): `download-artifact` extracts a lone match into the path
      itself, so the summary found no shard and failed every run that planned
      one (W6's 1b, run 37889326640, passed its recipe and reported none).
+   - **A file is taken only where it is evidence of the tree it joins**
+     (amended 2026-10-12). A run records each recipe over its commit.
+     Where what a recipe reads changed between that commit and the tree
+     the fetch writes into, staged or not, as `ci_plan.py --changed`
+     would plan that range, the fetch refuses its files: the branch
+     merges master and is verified again. `--skip RECIPE` copies none of
+     a recipe's files, where another run records it (a head that changes
+     only tests, PARALLEL.md, 2026-10-12). Found at narrowing-2's merge:
+     its run at `853674f` recorded scripts that run the server's tests by
+     name, and W8, fixed-arms and W6's packet had changed that server on
+     master since. A file no recipe of the run wrote is refused too.
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does
@@ -81,6 +94,12 @@ Amends the integrator's practice under ADR-0245.
   nothing.
 - **The first merges under it**: ADR-0280's and the soundness ruling's,
   each naming its verification run.
+- **Amended 2026-10-12**: three tests in `test_ci_scripts.py` (a file
+  whose recipe reads what changed since its run is refused, and one
+  skipped is not copied; what changed is the planner's, from the run's
+  commit to the tree here; the tree here is what is staged and what is
+  not), and five mutants in `scripts/dealt_by_time_mutations.py`, each
+  killed (`just e14-dealt-by-time`).
 
 ## Not claimed
 

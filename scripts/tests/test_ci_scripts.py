@@ -12,9 +12,10 @@
 - `ci_summary.py` fails a run where a recipe failed, a mutant survived, or a
   shard reported nothing;
 - `evidence_fetch.py` names the run after a file's `commit:` line, and
-  refuses a file of another commit, and a run that failed anywhere but in
-  the jobs it is told are known; and keeps the seconds of each recipe that
-  ran to its end.
+  refuses a file of another commit, a file whose recipe reads what changed
+  since the run, against the tree here, and a run that failed anywhere but
+  in the jobs it is told are known; and keeps the seconds of each recipe
+  that ran to its end.
 """
 
 import importlib.util
@@ -24,7 +25,9 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 import unittest
+from unittest import mock
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
 
@@ -143,6 +146,28 @@ class Plan(unittest.TestCase):
         self.assertNotIn(
             "accessibility_mutations.py",
             plan.touched_scripts({"spikes/own-renderer/e2e/nothing.spec.mjs": [(1, 1)]}, 30),
+        )
+
+    def test_a_recipe_is_planned_where_its_script_reads_what_changed(self) -> None:
+        # W8's finding, 2026-10-12: holds' merge changed the benchmark's
+        # baseline store, and no verify planned `e14-diffs`, whose script
+        # applies each task's patches to it. A change to the baseline, to a
+        # task's patch, or to the script itself plans it now.
+        names = plan.recipes()
+        for changed in [
+            "benchmarks/baselines/pleris/store/app.pw",
+            "benchmarks/tasks/T11-confirm-clear/reference/pleris.patch",
+            "scripts/semantic_diffs.py",
+        ]:
+            self.assertIn("e14-diffs", plan.recipes_for({changed: [(1, 1)]}, 30, names), changed)
+        self.assertIn(
+            "benchmarks/baselines/pleris",
+            plan.data_inputs(plan.ROOT / "scripts/semantic_diffs.py"),
+        )
+        # The control: what it does not read plans nothing of it.
+        self.assertNotIn(
+            "e14-diffs",
+            plan.recipes_for({"benchmarks/baselines/sveltekit/README.md": [(1, 1)]}, 30, names),
         )
 
     def test_a_recipe_in_an_imported_file_is_read_and_planned(self) -> None:
@@ -503,6 +528,77 @@ class Fetch(unittest.TestCase):
         self.assertIn("in_progress", fetch.refusal({"status": "in_progress", "conclusion": None}, jobs, []))
         self.assertIsNone(fetch.refusal({"status": "completed", "conclusion": "success"}, jobs, []))
         self.assertIn("no job", fetch.refusal(run, [{"name": "recipes 0", "conclusion": "success"}], ["x"]))
+
+    def test_what_a_failed_recipe_wrote_is_not_copied(self) -> None:
+        # 2026-10-12: W8's merge, its run's failure known, took e14-diffs'
+        # output with its evidence, stopped at a patch that did not apply.
+        results = [
+            {"recipe": "e14-diffs", "status": 1, "seconds": 9, "wrote": ["docs/evidence/E14/semantic-diffs.txt"]},
+            {"recipe": "e14-feed", "status": 0, "seconds": 9, "wrote": ["docs/evidence/E14/feed.txt"]},
+            {"recipe": "e14-old", "status": 0, "seconds": 9},
+        ]
+        self.assertEqual(fetch.failed_files(results), {"docs/evidence/E14/semantic-diffs.txt"})
+        self.assertEqual(fetch.failed_files(results[1:]), set())
+
+    def test_a_file_whose_recipe_reads_what_changed_since_its_run_is_refused(self) -> None:
+        # ADR-0281, amended 2026-10-12: narrowing-2's run at 853674f was of
+        # scripts that run the server's tests by name, and master had
+        # changed that server since; its files were evidence of code master
+        # would not hold.
+        results = [
+            {"recipe": "e14-diffs", "status": 0, "seconds": 9, "wrote": ["docs/evidence/E14/semantic-diffs.txt"]},
+            {"recipe": "e14-feed", "status": 0, "seconds": 9, "wrote": ["docs/evidence/E14/feed.txt"]},
+        ]
+        by = fetch.recorded(results)
+        self.assertEqual(by, {
+            "docs/evidence/E14/semantic-diffs.txt": "e14-diffs",
+            "docs/evidence/E14/feed.txt": "e14-feed",
+        })
+        moved = {"e14-diffs"}
+        self.assertIn("reads what changed", fetch.verdict("e14-diffs", moved, []))
+        self.assertIsNone(fetch.verdict("e14-feed", moved, []))
+        # Skipped, where another run records it: neither copied nor refused.
+        self.assertEqual(fetch.verdict("e14-diffs", moved, ["e14-diffs"]), "skipped")
+        self.assertEqual(fetch.verdict("e14-feed", set(), ["e14-feed"]), "skipped")
+        # A file no recipe of the run says it wrote is no one's evidence.
+        self.assertIn("no recipe", fetch.verdict(None, set(), []))
+
+    def test_what_changed_since_a_run_is_the_planners_against_the_tree_here(self) -> None:
+        # A push plans by `ci_plan.py`'s rule; a fetch reads the same, from
+        # the run's commit to the tree here, a merge not yet committed.
+        seen = []
+
+        def hunks(base, head):
+            seen.append((base, head))
+            return {"benchmarks/baselines/pleris/store/app.pw": [(1, 1)]}
+
+        planner = types.SimpleNamespace(hunks=hunks, recipes_for=plan.recipes_for, NEAR=plan.NEAR)
+        with mock.patch.dict(sys.modules, {"ci_plan": planner}):
+            moved = fetch.moved_on(self.SHA, ["e14-diffs", "e14-feed"])
+        self.assertEqual(moved, {"e14-diffs"})
+        self.assertEqual(seen, [(self.SHA, None)])
+
+    def test_the_tree_here_is_what_is_staged_and_what_is_not(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+
+            def git(*args: str) -> None:
+                subprocess.run(
+                    ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", *args],
+                    cwd=root, check=True, capture_output=True,
+                )
+
+            git("init", "-q")
+            (root / "a.txt").write_text("1\n2\n")
+            git("add", "a.txt")
+            git("commit", "-q", "-m", "a")
+            (root / "a.txt").write_text("1\ntwo\n")
+            (root / "b.txt").write_text("b\n")
+            git("add", "b.txt")
+            with mock.patch.object(plan, "ROOT", root):
+                self.assertEqual(plan.hunks("HEAD", None), {"a.txt": [(2, 2)], "b.txt": [(1, 1)]})
+                # Between commits, what is not committed is not read.
+                self.assertEqual(plan.hunks("HEAD", "HEAD"), {})
 
     def test_a_recipe_that_ran_to_its_end_has_its_seconds_kept(self) -> None:
         # ADR-0290: the plan deals the next runs by them.

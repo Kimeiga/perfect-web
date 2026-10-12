@@ -88,7 +88,11 @@ BROWSER = ["e2e/stores.spec.mjs"]
 # How long one command may run. A mutant can make a test wait for ever (a
 # lock taken twice); past the bound it is killed with everything it started,
 # and the run counts as failing.
-BOUND = 900
+# 1800 s while its server command runs the development server's whole
+# suite, about 950 s on CI at 420 tests (the integrator's ruling of
+# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
+# see its mutants, it needs far less (W6's ruling of 2026-10-09).
+BOUND = 1800
 
 
 def bounded(cmd, **kw):

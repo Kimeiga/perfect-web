@@ -23,6 +23,56 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0281 amended, 2026-10-12: a fetch takes no file of code the tree it
+joins does not hold** (the integrator's; track `evidence-current`, merged
+from `668e369`).
+- The day's ruling, made mechanical. `just evidence-fetch` refuses a run's
+  file whose recipe reads what changed between the run's commit and the tree
+  it writes into, by the planner's own rule, and copies nothing. The branch
+  merges master and is verified again. `--skip RECIPE` copies none of a
+  recipe's files, where another run records it.
+- Its first use refused all 19 files of narrowing-2's first run (at
+  `853674f`) on master's tree: the case found by hand that morning.
+Verify 38287219825 green: 22 of 22 mutants.
+
+**2026-10-12: eight more mutation scripts' server mutants run the server
+tests that see them** (W6's ruling of 2026-10-09; track `narrowing-2`, merged
+from `bd5c642`).
+- Measured by `scripts/mutant_killers.py` against the whole suite, two
+  killers kept per mutant where two fail:
+  - `e14-test-controls` 9,697 → 939 s;
+  - `e14-patch-set` 5,811 → 1,118 s;
+  - `e14-descriptions` 8,598 → 1,360 s;
+  - `e14-streams` 6,614 → 1,742 s;
+  - `e14-materializer-failure` 7,972 → 1,282 s;
+  - `e14-shared-output` 5,520 → 1,418 s;
+  - `e14-documents` 5,570 → 1,420 s;
+  - `e14-estimate-range` 5,504 → 1,207 s.
+- 55,286 → 10,486 s together, every mutant still killed,
+  with ADR-0317's faster suite beside it.
+- Eleven scripts whose server mutants still run the whole suite are bounded
+  at 1800 s a command until they are measured (the integrator's ruling of
+  2026-10-12).
+Verify 38283022346 green, over master's code: the branch merged master and was
+verified again (PARALLEL.md, 2026-10-12).
+
+**2026-10-12: benchmark task T11's patches apply again, and a verify plans
+the recipe that applies them** (the integrator's; NEXT 3b; track
+`t11-patches`, merged from `f14a107`).
+- Holds' merge (ADR-0307) made the benchmark store's Add and Clear
+  `on:press|refusable`. T11's reference and unsafe patches, written against
+  the store before it, no longer applied, and `e14-diffs` failed on master.
+  Each patch is made again against the store as it is.
+- Found: no verify had planned `e14-diffs` since holds' merge. The planner
+  read a script's mutants and tests, not the programs a plain script reads.
+  A script that names a program or benchmark under `benchmarks/` or
+  `examples/` that changed now plans its recipe.
+- Found also: the W8 merge took a failed recipe's output as evidence
+  (restored in `a083520`). `just evidence-fetch` now copies no file a failed
+  recipe wrote.
+Verify 38275359848 green: T11's two patches apply and hold (6 of 6
+mutants), Pleris refuses 9 of 12 wrong fixes, and dealt-by-time's 17 of 17.
+
 **2026-10-12: kiokun's search box and canonical link** (W6's second packet,
 merged from `5b7dc1e`; ADR-0314, ADR-0316 and ADR-0293 amended).
 - The search is at `/search{?q}`, with kiokun.com's header field as a plain
