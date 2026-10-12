@@ -344,8 +344,8 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     // Each query but `Recommendations`, which asks `eventual`; `Estimate`
     // once for each resource it reads, the estimates and the reader's
     // addresses (track `store-accounts`); and the search (track
-    // `store-search`) once for each of the two it reads, the stores and
-    // their menus.
+    // `store-search`) once for each of the three it reads, the stores, their
+    // menus and the reader's addresses (ADR-0308, amended).
     assert_eq!(
         named("PW0344"),
         [
@@ -359,6 +359,7 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "Places",
             "Reach",
             "Order",
+            "Search",
             "Search",
             "Search"
         ]
@@ -390,5 +391,5 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     ];
     assert_eq!(named("PW0347"), commands);
     assert_eq!(named("PW0348"), commands);
-    assert_eq!(found.len(), 36, "{found:#?}");
+    assert_eq!(found.len(), 37, "{found:#?}");
 }

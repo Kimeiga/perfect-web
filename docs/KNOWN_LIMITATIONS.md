@@ -626,6 +626,12 @@ awaited in order. What remains:
   continuation and a literal query part are refused, and `navigate` gives
   no query parameter. A page whose parameter is a query's is reached by a
   link or a GET form.
+- **A reader's store search is computed for that reader** (ADR-0308's
+  second amendment): filtered by the stores that reach their chosen
+  address, its full-text match is no longer shared between readers. It
+  splits into a shared `Search(q)` and a per-reader reach once a page can
+  compute from two queries (ADR-0226 reads one) or key a query by another's
+  value (NEXT). No toggle shows every store, and none is ranked by distance.
 - **The store's search folds nothing, and matches each record by its own
   fields** (ADR-0308): no accent or stem is folded, no word is corrected,
   and a store's dishes do not make its own name match. Its meaning is

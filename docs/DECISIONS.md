@@ -2632,6 +2632,12 @@ track `store-search`, accepted at the merge).
   tells each open page that reads what it dropped. The verify found a
   survivor whose dish moved tier on PostgreSQL alone, which the test's table
   did not show: the test now compares every record whole.
+- Amended 2026-10-12 (2, W9's): a store's cuisine is its own field, shown on
+  its page and the home page's; the home page has a GET search box; and a
+  reader's search lists the stores that reach their chosen address, by
+  default, saying how many more match and don't (`user query Search(q,
+  reader)`); a search is two statements on PostgreSQL whatever the number
+  of stores, the layer's statements counted.
 
 [ADR-0309](DECISIONS/ADR-0309-a-pages-query-parameters-are-typed.md): a page's
 query parameters are typed, and a GET form makes them (the integrator's; for

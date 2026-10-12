@@ -21,8 +21,9 @@ Each mutant undoes one piece:
   of what was asked; the title naming no search; a long text told as a blank
   one; a store's dishes not shown; a search kept past a menu's change;
 - PostgreSQL: `%`, `_` or `\\` not escaped in a term's pattern; the layer's
-  own statements not run (the seam in `store_pg.rs`); a dish's name lowered
-  under the `C` collation; a store's cuisine, or a dish's category, not
+  own statements not run, each store's menu read and matched on the host
+  (the seam in `store_pg.rs`); a dish's name lowered under the `C`
+  collation; a store's cuisine, or a dish's category, not
   read for its tier; a store holding a matched dish not listed; the
   migration's cuisine not the in-memory layer's.
 
@@ -49,6 +50,8 @@ STORE_PG = ROOT / "spikes/own-renderer/server/src/store_pg.rs"
 SERVER_RS = ROOT / "spikes/own-renderer/server/src/main.rs"
 MIGRATION = ROOT / "spikes/own-renderer/server/migrations/store/0010_search.sql"
 PROGRAM = ROOT / "examples/store/search.pw"
+APP = ROOT / "examples/store/app.pw"
+CUISINE_MIGRATION = ROOT / "spikes/own-renderer/server/migrations/store/0011_store_cuisine.sql"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
@@ -107,8 +110,9 @@ MUTANTS = [
         "a store's cuisine is not read in memory",
         "server",
         SEARCH,
-        "        let cuisine = cuisine_of(&s.id).to_string();\n",
-        "        let cuisine = String::new();\n",
+        # Re-anchored by ADR-0308's amendment: the cuisine is the store's.
+        "                cuisine: s.cuisine,\n",
+        "                cuisine: String::new(),\n",
     ),
     (
         "a store is listed only where it matched itself",
@@ -165,8 +169,60 @@ MUTANTS = [
         "a blank text's case is misnamed",
         "server",
         SEARCH,
-        '                Asked::Blank => Ok(case("blank")),\n',
-        '                Asked::Blank => Ok(case("empty")),\n',
+        '        Asked::Blank => Ok(case("blank")),\n',
+        '        Asked::Blank => Ok(case("empty")),\n',
+    ),
+    # --- the store's cuisine, and a reader's search (ADR-0308, amended) -------
+    (
+        "a store's cuisine is not given to the program",
+        "server",
+        STORE_DATA,
+        '        ("cuisine".into(), Val::String(row.cuisine.clone())),\n',
+        "",
+    ),
+    (
+        "a reader's search lists a store that does not reach them",
+        "server",
+        SEARCH,
+        "                if reach.delivers {\n",
+        "                if true {\n",
+    ),
+    (
+        "a store left out is not counted",
+        "server",
+        SEARCH,
+        "                    near.beyond += 1;\n",
+        "",
+    ),
+    (
+        "a reader's search does not say an address is chosen",
+        "server",
+        SEARCH,
+        "                near.chosen = true;\n",
+        "",
+    ),
+    (
+        "the page searches every store, whatever the reader's address",
+        "server",
+        PROGRAM,
+        "    let answer = find_for(text, reader)\n",
+        "    let answer = find(text)\n",
+    ),
+    (
+        "the home page has no search box",
+        "server",
+        APP,
+        '            <form id="home-search" method="get" action="/search" role="search">'
+        '<label>Stores and dishes <input type="search" name="q" /></label>'
+        '<button>Search</button></form>\n',
+        "",
+    ),
+    (
+        "the migration does not copy the cuisine into the store's row",
+        "postgres",
+        CUISINE_MIGRATION,
+        "UPDATE stores SET cuisine = c.cuisine FROM store_cuisines c WHERE c.store = stores.id;\n",
+        "",
     ),
     (
         "the operation is not registered with the catalogue",
@@ -201,8 +257,9 @@ MUTANTS = [
         "a search is kept past a menu's change",
         "server",
         PROGRAM,
-        "    invalidates_on MenuChanged(_), InventoryChanged(_, _)\n",
-        "",
+        # Re-anchored by ADR-0308's amendment: a reader's search.
+        "    invalidates_on MenuChanged(_), InventoryChanged(_, _), AddressesChanged(reader)\n",
+        "    invalidates_on AddressesChanged(reader)\n",
     ),
     (
         "the search box holds nothing of what was asked",
@@ -244,7 +301,7 @@ MUTANTS = [
         "PostgreSQL's layer searches as memory does",
         "postgres",
         STORE_PG,
-        "        crate::search::on_postgres(self.0, terms)\n",
+        "        crate::search::on_postgres(&mut self.0, terms)\n",
         "        crate::search::scan(self, terms)\n",
     ),
     (
@@ -258,7 +315,8 @@ MUTANTS = [
         "a store's cuisine is not its second field on PostgreSQL",
         "postgres",
         SEARCH,
-        "                             OR lower(coalesce(k.cuisine, '') COLLATE pg_c_utf8) LIKE p ESCAPE '\\\\') \\\n",
+        # Re-anchored by ADR-0308's amendment: the cuisine is the store's.
+        "                             OR lower(s.cuisine COLLATE pg_c_utf8) LIKE p ESCAPE '\\\\') \\\n",
         "                             OR lower(s.description COLLATE pg_c_utf8) LIKE p ESCAPE '\\\\') \\\n",
     ),
     (

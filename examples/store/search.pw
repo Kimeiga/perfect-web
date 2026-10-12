@@ -33,8 +33,12 @@ import List
 // The data the search reads: the stores, and their menus.
 import Stores
 import Menus
+// And the reader's chosen address, which a store reaches or not.
+import Addresses
 import domain.{ StoreId, MenuItemId, Money, USD }
-import Events.{ MenuChanged, InventoryChanged }
+import capability.{ User, UserId }
+import context.{ current_user }
+import Events.{ MenuChanged, InventoryChanged, AddressesChanged }
 import store.page.{ StoreLayout }
 
 // **A dish that matched**, as the search shows it: its store's page is
@@ -58,10 +62,15 @@ type StoreHit = StoreHit {
     more_dishes: Int,
 }
 
-// **What a search found**: the stores, the first twenty, with how many more.
+// **What a search found**: the stores, the first twenty, with how many more;
+// and for a reader (`find_for`), whether they chose an address, its label,
+// and how many stores matched that do not reach it, left out.
 type SearchFound = SearchFound {
     stores: List<StoreHit>,
     more_stores: Int,
+    chosen: Bool,
+    to: String,
+    beyond: Int,
 }
 
 // **What the data layer refuses to search**: text with no term in it, and
@@ -73,6 +82,12 @@ type SearchError =
 // **The store's search, in its data layer** (`store:data/search#find`).
 fn find(text: String) -> Result<SearchFound, SearchError> !{ database.read<Stores>, database.read<Menus> }
     host "store:data/search#find"
+
+// **A reader's search** (`store:data/search#find-for`): the stores that reach
+// the reader's chosen address, by the store's one rule (ADR-0319); every
+// store where none is chosen.
+fn find_for(text: String, reader: User<UserId>) -> Result<SearchFound, SearchError> !{ database.read<Stores>, database.read<Menus>, database.read<Addresses> }
+    host "store:data/search#find-for"
 
 // **A store as the page shows it**: its dishes, and how many more there
 // are, in words.
@@ -92,6 +107,7 @@ type SearchShown = SearchShown {
     asked: String,
     title: String,
     said: String,
+    near: String,
     stores: List<ShownStore>,
     more: String,
 }
@@ -105,11 +121,12 @@ fn shown(asked: String, answer: Result<SearchFound, SearchError>) -> SearchShown
             asked: asked,
             title: title,
             said: summary(asked, found),
+            near: near(found),
             stores: List.map(found.stores, s => shown_store(s)),
             more: more(found.more_stores, "store", "stores"),
         },
-        Err(SearchError.Blank) => SearchShown { asked: asked, title: title, said: blank, stores: none, more: "" },
-        Err(SearchError.TooLong) => SearchShown { asked: asked, title: title, said: "That search is too long: 100 characters at most.", stores: none, more: "" },
+        Err(SearchError.Blank) => SearchShown { asked: asked, title: title, said: blank, near: "", stores: none, more: "" },
+        Err(SearchError.TooLong) => SearchShown { asked: asked, title: title, said: "That search is too long: 100 characters at most.", near: "", stores: none, more: "" },
     }
 }
 
@@ -124,6 +141,21 @@ fn shown_store(s: StoreHit) -> ShownStore {
     }
 }
 
+// **Where the search was for**: the stores that deliver to the chosen
+// address, and how many that match do not; or, with none chosen, how to
+// see only those.
+fn near(found: SearchFound) -> String {
+    if !found.chosen {
+        "Choose a delivery address to see only the stores that deliver to it."
+    } else if found.beyond == 0 {
+        "Showing the stores that deliver to {found.to}."
+    } else if found.beyond == 1 {
+        "Showing the stores that deliver to {found.to}; 1 more matches but doesn't."
+    } else {
+        "Showing the stores that deliver to {found.to}; {found.beyond} more match but don't."
+    }
+}
+
 fn summary(asked: String, found: SearchFound) -> String {
     let n = List.length(found.stores) + found.more_stores
     if n == 0 {
@@ -135,14 +167,17 @@ fn summary(asked: String, found: SearchFound) -> String {
     }
 }
 
-// **A search** (track `store-search`): every reader's, so kept shared and
-// keyed by its text, and dropped when any store's menu or stock changes.
-public query Search(q: Option<String>) -> SearchShown
+// **A reader's search** (track `store-search`, ADR-0308 amended): the
+// stores that reach the reader's chosen address, so the reader's own, kept
+// by its text and the reader, and dropped when any store's menu or stock
+// changes or the reader's addresses do. What it matches is the public
+// catalogue.
+user query Search(q: Option<String>, reader: User<UserId>) -> SearchShown
     freshness      30.seconds
-    consistency    snapshot
-    cache          shared
-    key            q
-    invalidates_on MenuChanged(_), InventoryChanged(_, _)
+    consistency    read_your_writes
+    cache          private
+    key            q, reader
+    invalidates_on MenuChanged(_), InventoryChanged(_, _), AddressesChanged(reader)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
@@ -156,7 +191,7 @@ public query Search(q: Option<String>) -> SearchShown
         Some(t) => t,
         None => "",
     }
-    let answer = find(text)
+    let answer = find_for(text, reader)
     shown(text, answer)
 }
 
@@ -182,7 +217,7 @@ user page SearchPage(q: Option<String>) {
     placement origin
     cache     private
 
-    let search = query Search(q)
+    let search = query Search(q, current_user())
 
     view {
         <title>{search.title}</title>
@@ -197,7 +232,7 @@ user page SearchPage(q: Option<String>) {
                  The sentence is told where it is when the search's result
                  changes, its arm being the document's (ADR-0320). -->
             {#match q}
-            {:Some(_)}<p id="search-said" role="status">{search.said}</p>
+            {:Some(_)}<p id="search-said" role="status">{search.said}</p><p id="search-near">{search.near}</p>
             {:None}<p id="search-intro">Search the stores by name or cuisine, and their dishes by name or what they are.</p>
             {/match}
             <ul id="search-stores">

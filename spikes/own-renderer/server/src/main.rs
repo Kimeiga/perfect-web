@@ -17292,8 +17292,9 @@ public query Store(",
             // them; and ADR-0303: the layout's count is part 0, before all.
             // Track `store-accounts`: and where deliveries go, before them.
             // ADR-0323: and the cart's link, a block and the subtotal it
-            // says while the cart holds a line.
-            whole.ends_with("</template><!--/pw-40--></body>\n</html>\n"),
+            // says while the cart holds a line. ADR-0308, amended: and the
+            // store's cuisine.
+            whole.ends_with("</template><!--/pw-41--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the

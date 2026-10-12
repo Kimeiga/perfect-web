@@ -4183,8 +4183,13 @@
   {
     "component_id": "store.search.Search",
     "capability_mapping": 1,
-    "abi_schema": "d7e577e092fd4d47",
+    "abi_schema": "d26c16946c40ccae",
     "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Addresses"
+      },
       {
         "family": "database",
         "operation": "read",
@@ -4202,7 +4207,7 @@
     "imports": [
       {
         "interface": "store:data/search",
-        "name": "find",
+        "name": "find-for",
         "capability": "database.read<Stores>",
         "capabilities": [
           {
@@ -4214,12 +4219,29 @@
             "family": "database",
             "operation": "read",
             "argument": "Menus"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
           }
         ],
         "signature": {
           "params": [
             {
               "primitive": "String"
+            },
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
             }
           ],
           "result": {
@@ -4251,7 +4273,21 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "transferable"
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 1",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "SearchShown"
+              }
+            ]
           }
         },
         "component": {
@@ -4264,8 +4300,13 @@
   {
     "component_id": "store.search.SearchPage",
     "capability_mapping": 1,
-    "abi_schema": "99aebc4fbc66d85e",
-    "required_capabilities": [],
+    "abi_schema": "6f777e8ea6bc2c28",
+    "required_capabilities": [
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
     "allowed_placements": [
       "origin"
     ],
@@ -4275,6 +4316,34 @@
         "name": "Search",
         "owner": "external",
         "kind": "component"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
       }
     ],
     "exports": [

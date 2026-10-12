@@ -451,7 +451,9 @@ fn the_trusted_platform_contract_is_hashed() {
     // item's store that does not reach the reader's chosen address, and
     // `OrderError` `NoCoverage`, an order such a store's item is in (track
     // `store-accounts`, milestone 2).
-    const EXPECTED: u64 = 0x57dbcf4ff8602699;
+    // 2026-10-12: `examples/domain.pw`'s `Store` gains `cuisine`, what the
+    // store serves in its own words (ADR-0308, amended).
+    const EXPECTED: u64 = 0x60cee521efeee55a;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

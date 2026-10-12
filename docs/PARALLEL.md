@@ -1391,3 +1391,14 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - The store's migration is `0005_interactions`, in the numbers left free
     below `0010_search`; a database that ran 0010 first runs it after, as
     the runner applies each migration it has not recorded.
+- **2026-10-12, W9's store search, part 1, merged as ADR-0308's second
+  amendment** (from `9bc4ff0`; Verify TRAIN_RUN green, with the train.). The integrator's rulings, logged:
+  - (a) the reach filter is on by default, with the count of the rest
+    ("N more match but don't"): accepted, as DoorDash's search is
+    location-aware;
+  - (b) `user query Search(q, reader)`, the reader's, is correct: the result
+    is derived from the reader's private address. Its cost, the match no
+    longer shared, is in KNOWN_LIMITATIONS and NEXT ("a value computed from
+    two queries");
+  - the reach sentence inside `{#match q}`'s `Some` arm, the block test's
+    control quieting both sentences (ADR-0320's reading).

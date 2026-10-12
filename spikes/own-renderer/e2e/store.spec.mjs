@@ -75,8 +75,9 @@ test.describe("the document the server produced", () => {
     // deliveries go (track `store-accounts`): whether an address is chosen,
     // its block 2, and whether the store reaches it, its block 2 = 4. And
     // the cart's link, "Checkout" with its subtotal while the cart holds a
-    // line (ADR-0323): its block 2. 80 in all.
-    expect(shape.anchors).toBe(80);
+    // line (ADR-0323): its block 2. And the store's cuisine (ADR-0308,
+    // amended): 2. 82 in all.
+    expect(shape.anchors).toBe(82);
     // Three Add buttons and one Clear button. The Clear button exists so that
     // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`. And
     // the cart's empty message, whose `hidden` reads the cart (ADR-0172).

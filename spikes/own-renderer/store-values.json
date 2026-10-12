@@ -1,9 +1,10 @@
 {
   "store.name": "Blue Bottle",
+  "store.cuisine": "Coffee",
   "store.description": "Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning.",
   "stores": [
-    { "id": "47", "name": "Blue Bottle", "description": "Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning." },
-    { "id": "48", "name": "Harbor Coffee", "description": "A neighborhood cafe by the water, pouring drip coffee brewed to order and matcha whisked by hand." }
+    { "id": "47", "name": "Blue Bottle", "cuisine": "Coffee", "description": "Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning." },
+    { "id": "48", "name": "Harbor Coffee", "cuisine": "Café, Bakery", "description": "A neighborhood cafe by the water, pouring drip coffee brewed to order and matcha whisked by hand." }
   ],
   "order": { "$case": "none" },
   "menu": [
@@ -27,6 +28,7 @@
   "search.title": "Search for “coffee”",
   "q": { "$case": "some", "value": "coffee" },
   "search.said": "2 stores match “coffee”.",
+  "search.near": "Choose a delivery address to see only the stores that deliver to it.",
   "search.stores": [],
   "search.more": ""
 }

@@ -148,3 +148,33 @@ test("the search page without a q keeps every rule", async ({ page }) => {
   await ready(page, "/search");
   expect(await page.evaluate(violations)).toEqual([]);
 });
+
+test("the home page shows each store's cuisine, and its search box goes to the search", async ({
+  page,
+}) => {
+  await ready(page, "/");
+  await expect(page.locator("#stores .cuisine")).toHaveText(["Coffee", "Café, Bakery"]);
+  await page.locator("#home-search").getByLabel("Stores and dishes").fill("matcha");
+  await page.locator("#home-search").getByRole("button", { name: "Search" }).click();
+  await page.waitForURL(/\/search\?q=matcha$/);
+  await expect(dishes(page, "Harbor Coffee")).toHaveText(["Matcha Latte"]);
+  await expect(page.locator("#search-near")).toHaveText(
+    "Choose a delivery address to see only the stores that deliver to it.",
+  );
+});
+
+test("a reader's search lists the stores that reach their chosen address", async ({ page }) => {
+  // Civic Center: store 47 delivers there, store 48 does not (ADR-0319).
+  await ready(page, "/stores/48/address");
+  await page.locator("#label").fill("Home");
+  const saved = page.waitForResponse("**/command/store.page.add_address");
+  await page.getByRole("button", { name: "Save Civic Center, San Francisco" }).click();
+  await saved;
+  await page.waitForURL(/\/stores\/48$/);
+  await ready(page, "/search?q=coffee");
+  await expect(said(page)).toHaveText("1 store matches “coffee”.");
+  await expect(stores(page)).toHaveText(["Blue Bottle"]);
+  await expect(page.locator("#search-near")).toHaveText(
+    "Showing the stores that deliver to Home; 1 more matches but doesn't.",
+  );
+});

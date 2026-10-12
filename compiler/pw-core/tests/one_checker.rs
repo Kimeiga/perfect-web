@@ -80,7 +80,13 @@ fn the_build_refuses_what_check_refuses() {
 /// The control: a program that checks builds, the store.
 #[test]
 fn a_program_that_checks_builds() {
-    let files = program(&["examples/store/app.pw", "examples/store/menu.pw"]);
+    // And its search, which the home page's search box names (ADR-0308,
+    // amended).
+    let files = program(&[
+        "examples/store/app.pw",
+        "examples/store/menu.pw",
+        "examples/store/search.pw",
+    ]);
     if let Err(e) = build(&units(&files)) {
         panic!("the store does not build: {e}");
     }

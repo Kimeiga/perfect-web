@@ -23,6 +23,23 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0308 amended (2), 2026-10-12: a store's cuisine, the home page's
+search box, and a reader's search by their address** (W9's, track
+`store-search`, merged from `9bc4ff0`).
+- A store's cuisine is its own field, on both layers (migration 0011), shown
+  under its name on its page and on the home page, and matched by the
+  search.
+- The home page has the search's box, a plain GET form to `/search{?q}`.
+- A reader's search lists the stores that reach their chosen address, by
+  default, as DoorDash's does, and says the rest: "Showing the stores that
+  deliver to Home; 1 more matches but doesn't." With no address chosen,
+  every store is listed.
+- A search on PostgreSQL is two statements whatever the number of stores:
+  the layer counts its statements, as Django's `assertNumQueries` counts
+  queries, and the mutant that searched as memory does is killed by it
+  (the integrator's ruling: it was no equivalent mutant).
+Verify TRAIN_RUN green, with the train.
+
 **ADR-0325, 2026-10-12: an interaction's answer commits with its writes**
 (the integrator's; NEXT 5; track `interactions-committed`, merged from
 `51998bc`).

@@ -20,11 +20,14 @@ fn decode_store(raw: Unknown) -> Result<Store, DecodeError> !{} {
     let name = field(raw, "name", string)?
     // Charter §15.1's, since ADR-0166.
     let description = field(raw, "description", string)?
+    // What it serves, since ADR-0308's amendment.
+    let cuisine = field(raw, "cuisine", string)?
     let hours = field(raw, "hours", decode_hours)?
     Ok(Store {
         id: StoreId.from_string(id)?,
         name: name,
         description: description,
+        cuisine: cuisine,
         hours: hours,
     })
 }

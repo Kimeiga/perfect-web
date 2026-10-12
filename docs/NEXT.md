@@ -781,6 +781,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
             recursive `Json` from a query across the component boundary
             (ADR-0205), so it waits for a page that asks for it; kiokun's
             Difference 13 meanwhile;
+          - **a value computed from two queries** (found by W9's reader's
+            search, 2026-10-12): a page computes from one query's value
+            (ADR-0226), so the store's search, filtered by the reader's
+            reach, is a `user` query whose full-text match is no longer
+            shared. With two, it splits into a shared `Search(q)` and the
+            reader's reach, and the match is kept once for every reader;
           - **one telling path for every page a change reaches** (W9's
             finding, 2026-10-11): a menu change tells the store's pages by
             `broadcast_menu`'s own patches, and every other page by what

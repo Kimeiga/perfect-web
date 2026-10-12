@@ -199,8 +199,8 @@ interface store-page-rename-address-api {
 }
 
 interface store-search-search-api {
-    use pw:types/types.{store-search-search-shown};
-    search: func(arg0: option<string>) -> store-search-search-shown;
+    use pw:types/types.{capability-user-id, store-search-search-shown};
+    search: func(arg0: option<string>, arg1: capability-user-id) -> store-search-search-shown;
 }
 
 interface store-search-search-page-api {
@@ -457,6 +457,7 @@ world store-search-search {
 }
 
 world store-search-search-page {
+    import pw:host/principal;
     import store-search-search-api;
     export store-search-search-page-api;
 }
@@ -499,6 +500,7 @@ package pw:types {
             id: domain-store-id,
             name: string,
             description: string,
+            cuisine: string,
             hours: domain-store-hours,
         }
         variant domain-store-error {
@@ -611,6 +613,9 @@ package pw:types {
         record store-search-search-found {
             stores: list<store-search-store-hit>,
             more-stores: s64,
+            chosen: bool,
+            to: string,
+            beyond: s64,
         }
         variant store-search-search-error {
             blank,
@@ -628,6 +633,7 @@ package pw:types {
             asked: string,
             title: string,
             said: string,
+            near: string,
             stores: list<store-search-shown-store>,
             more: string,
         }
@@ -686,8 +692,8 @@ package store:data {
         for-store: func(arg0: domain-store-id) -> result<list<domain-recommendation>, domain-recommendation-error>;
     }
     interface search {
-        use pw:types/types.{store-search-search-error, store-search-search-found};
-        find: func(arg0: string) -> result<store-search-search-found, store-search-search-error>;
+        use pw:types/types.{capability-user-id, store-search-search-error, store-search-search-found};
+        find-for: func(arg0: string, arg1: capability-user-id) -> result<store-search-search-found, store-search-search-error>;
     }
     interface stores {
         use pw:types/types.{domain-store, domain-store-error, domain-store-id};

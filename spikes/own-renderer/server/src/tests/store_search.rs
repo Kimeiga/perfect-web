@@ -306,3 +306,75 @@ fn the_search_is_at_its_routes_query() {
     let (status, _, _) = searched(&s, "/search?q=%FF");
     assert!(status.starts_with("HTTP/1.1 400"), "no UTF-8: {status}");
 }
+
+/// **A reader's search lists the stores that reach their chosen address**
+/// (ADR-0308, amended; ADR-0319's one rule): with none chosen, every store,
+/// and how to see only those; with Civic Center chosen, which store 47
+/// reaches and store 48 does not, store 47 alone, and the other counted.
+#[test]
+fn a_search_lists_the_stores_that_reach_the_chosen_address() {
+    let s = served();
+    let (_, html, text) = searched(&s, "/search?q=coffee");
+    assert!(text.contains("2 stores match “coffee”."), "{text}");
+    assert!(
+        text.contains("Choose a delivery address to see only the stores that deliver to it."),
+        "{text}"
+    );
+    assert!(html.contains("href=\"/stores/48\""), "{html}");
+    let answered = s
+        .command_answered(
+            "store.page.add_address",
+            "a",
+            &[
+                Val::String("Home".into()),
+                Val::String("civic-center".into()),
+            ],
+            None,
+        )
+        .expect("answered");
+    assert!(answered.committed, "the address is saved and chosen");
+    let (_, html, text) = searched(&s, "/search?q=coffee");
+    assert!(text.contains("1 store matches “coffee”."), "{text}");
+    assert!(
+        text.contains("Showing the stores that deliver to Home; 1 more matches but doesn't."),
+        "{text}"
+    );
+    assert!(html.contains("href=\"/stores/47\""), "{html}");
+    assert!(!html.contains("href=\"/stores/48\""), "{html}");
+    // Another reader, with no address, still sees both.
+    let other: String = fetched_as(&s, "/search?q=coffee", Some("b"))
+        .into_iter()
+        .map(|(_, c)| c)
+        .collect();
+    assert!(
+        other.contains("href=\"/stores/48\""),
+        "the reader's own: {other}"
+    );
+}
+
+/// **A store's cuisine is its own field** (ADR-0308, amended): shown on the
+/// home page, beside the search box, and on the store's page.
+#[test]
+fn a_stores_cuisine_is_shown_on_the_home_page_and_its_page() {
+    let s = served();
+    let home: String = fetched_as(&s, "/", Some("a"))
+        .into_iter()
+        .map(|(_, c)| c)
+        .collect();
+    let text = visible(&home)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(text.contains("Harbor Coffee Café, Bakery"), "{text}");
+    assert!(text.contains("Blue Bottle Coffee"), "{text}");
+    assert!(
+        home.contains("method=\"get\" action=\"/search\""),
+        "the home page's search box: {home}"
+    );
+    assert!(home.contains("name=\"q\""), "{home}");
+    let page: String = fetched_as(&s, "/stores/48", Some("a"))
+        .into_iter()
+        .map(|(_, c)| c)
+        .collect();
+    assert!(visible(&page).contains("Café, Bakery"), "{page}");
+}
