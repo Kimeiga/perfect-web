@@ -1,0 +1,32 @@
+// @corpus: fixture
+// @id: DEMO-search
+// @category: navigation — a page's query, made by a GET form
+// @charter: §8.2
+// @milestone: E14
+//
+// ADR-0309: a route's query part, `{?q}`, names a parameter an address may
+// leave out, which the page is given as an `Option` of text. A plain GET
+// form makes the address, with scripts on or off, and a link may give it.
+
+module demo.search
+
+page SearchPage(q: Option<String>) {
+    route "/demo/search{?q}"
+    cache private
+
+    view {
+        <title>Search</title>
+        <main>
+            <h1>Search</h1>
+            <form method="get" action="/demo/search">
+                <label>Find <input id="q" type="search" name="q" /></label>
+                <button>Search</button>
+            </form>
+            {#match q}
+            {:Some(text)}<p id="asked">You searched for {text}.</p>
+            {:None}<p id="asked">Nothing searched yet.</p>
+            {/match}
+            <p><a id="pie" href="/demo/search?q=apple+pie">Apple pie</a></p>
+        </main>
+    }
+}

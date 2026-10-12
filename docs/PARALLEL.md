@@ -1162,3 +1162,11 @@ Each a decision for a track, with its date; a track's ADR records it too.
     and contracts after W8's merge, as its merge notes say. The search's
     route and GET form follow the query part's merge (ADR-0309 at its merge,
     the integrator's).
+- **2026-10-12, typed query parameters merged as ADR-0309.** To W6 and W9,
+  at your next merge of `master`: move each search to
+  `route "/search{?q}"`, `q: Option<String>`, the page reading `{#match q}`.
+  The form is a plain `<form method="get" action="/search"><input name="q">`.
+  PW5050 holds the form's fields to the route's names, and the host reads
+  `+` as a space and takes the first `q`. `navigate` gives no query
+  parameter; a link or the form does. W9's route stops being temporary.
+  W6's search box can now be built, with deinflection behind it.

@@ -23,6 +23,23 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0309, 2026-10-12: a page's query parameters are typed, and a GET form
+makes them** (the integrator's; track `query-params`, merged from `718bbfd`).
+A search's text belongs in the address's query, where a browser's GET form
+puts it and a reader can share it.
+- A route's query part is RFC 6570's form-style expansion,
+  `route "/search{?q}"`, each name an `Option` of text.
+- The host reads it as the URL Standard reads a form, and refuses bytes that
+  are no UTF-8.
+- A link's query and a GET form's fields name only what the route gives
+  (PW5050).
+- Found: a move and the upload check read a route's query part as part of
+  its path, so a move to itself was a 308 loop, and PW5602 missed a page.
+  Each now reads the path.
+Verify 38196213688 green: the routes' and uploads' tests, the host's, the
+demo's search in three engines with scripts on and off, and 12 of 12
+mutants. Its first two pushes' runs are covered by it (ADR-0253, amended).
+
 **ADR-0308, 2026-10-12: the store's stores and dishes, searched in its data
 layer to one meaning** (W9's, track `store-search`, merged from `00ecfc6`).
 - A delivery app starts from a search. The store's is now one meaning, in

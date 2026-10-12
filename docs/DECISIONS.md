@@ -2629,3 +2629,23 @@ track `store-search`, accepted at the merge).
   tells each open page that reads what it dropped. The verify found a
   survivor whose dish moved tier on PostgreSQL alone, which the test's table
   did not show: the test now compares every record whole.
+
+[ADR-0309](DECISIONS/ADR-0309-a-pages-query-parameters-are-typed.md): a page's
+query parameters are typed, and a GET form makes them (the integrator's; for
+W6's and W9's searches).
+- A route's query part is RFC 6570's form-style expansion at its end,
+  `route "/search{?q}"`. Each name is a page parameter, an `Option` of text
+  (PW0630), as an address may leave it out.
+- The host reads a query as the URL Standard reads a form's: `+` and `%20`
+  a space, the first of a name taken, and a foreign name ignored. It refuses
+  bytes that are no UTF-8 (400), where the URL Standard would replace them.
+- A link's query and a GET form's fields give only what the route names
+  (PW5050). Two routes that differ only in their query are one (PW0341). A
+  page is at its route's path: a move (ADR-0295) fills the path and keeps
+  the query, and PW5602 compares an upload's paths with a page's path.
+- Found:
+  - `navigate` cannot carry a form (ADR-0280 keeps it for a commit), so
+    W6's first search ruling could not be written. The forms are GET forms,
+    with no script.
+  - The host's move read a route's query part as part of its path: a move
+    to itself became a 308 loop. PW5602 missed a page at a query route.

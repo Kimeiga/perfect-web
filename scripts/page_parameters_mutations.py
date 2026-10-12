@@ -35,11 +35,13 @@ MUTANTS = [
         "a page that binds a query is rendered without its parameters",
         "cargo",
         SERVER,
-        "        for (name, given) in params {\n"
-        "            env = env.set(name, Value::Text(given.clone()));\n"
+        "            if let Some(v) = param_val(plan, name, params) {\n"
+        "                env = env.set(name, val_to_value(&v));\n"
+        "            }\n"
         "        }\n"
         "        // Each binding's whole value, so a block a query decides, and what is\n",
-        "        let _ = params;\n"
+        "            let _ = (name, params);\n"
+        "        }\n"
         "        // Each binding's whole value, so a block a query decides, and what is\n",
     ),
     (

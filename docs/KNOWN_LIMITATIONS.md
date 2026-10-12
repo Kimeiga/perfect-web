@@ -600,6 +600,11 @@ awaited in order. What remains:
 - **A layout is one, unnested, and given nothing** (ADR-0303): a page names
   one layout; a layout is shown in no other, is given none of the page's
   parameters, has no title template of its own, and holds one slot.
+- **A page's query parameters are text, and given by a link or a form**
+  (ADR-0309): a list (`{?tag*}`) or a typed number is not read, `{&name}`
+  continuation and a literal query part are refused, and `navigate` gives
+  no query parameter. A page whose parameter is a query's is reached by a
+  link or a GET form.
 - **The store's search folds nothing, and matches each record by its own
   fields** (ADR-0308): no accent or stem is folded, no word is corrected,
   and a store's dishes do not make its own name match. Its meaning is

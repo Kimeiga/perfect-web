@@ -724,14 +724,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
              the store's hours (**W9's** `track/store-hours`, after W8's
              merge, on the integrator's design: PARALLEL.md, 2026-10-11);
              orders scheduled;
-          4a. **typed page query parameters, the integrator's next**
-             (2026-10-11): a route's query part, `route "/search{?q}"` as
-             RFC 6570's form-style expansion (to check at the RFC), each a
-             page parameter typed like a path's, an absent one an `Option`.
-             A plain `<form method="get">` and a link make the address. It
-             blocks W6's kiokun search box and W9's store search, which have
-             no form until it lands (PARALLEL.md, the ruling of 2026-10-11:
-             `navigate` follows only a commit);
+          4a. ~~**typed page query parameters**~~ (ADR-0309, merged
+             2026-10-12): a route's query part, `route "/search{?q}"`,
+             RFC 6570's form-style expansion; each name an `Option` of
+             text; a plain `<form method="get">` and a link make the
+             address. W6's kiokun search box and W9's store search move to
+             it;
           5. **idempotency committed with the writes** (PW0348, ADR-0246's
              Not claimed), before a payment depends on it: an interaction's
              answer kept in the transaction that commits its command, in
