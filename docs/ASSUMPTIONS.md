@@ -485,3 +485,23 @@ PW0200 already treats one for a shared cache), and saying what `strong`
 means beside one. **If false** (if a command must reach every reader of what
 it writes): PW5106 would hold every reader, and a public aggregate read by
 many would be invalidated by every write.
+
+## A-027 — kiokun's search index holds `is_common` as an integer
+
+**Status:** `open`, the owner asked (2026-10-12).
+
+Track `kiokun` (W6, 2026-10-11). The rewrite's search index and kiokun.com's
+oracle hold `is_common` as an integer, as the builder's committed
+`output_search_index.sql` writes it. Loaded as text, which is how sqlite3's
+`.import` loads a CSV, as kiokun-data's notes describe, 331 of the oracle's
+355 answers differ, and every hit is marked Common (6,542 of 6,542, against
+2,183 as integers), since `ORDER BY is_common DESC` then orders nothing. How
+production loaded it is not known: robots.txt keeps the live site from this
+track.
+
+**Validated by** the owner saying how production loaded the index (asked
+2026-10-12; one search on the live site shows it: every result Common is the
+text loading). **If false** (if production loaded it as text): live
+kiokun.com marks every hit Common, a bug of kiokun.com's own for the owner,
+and the rewrite's oracle names that as a Difference rather than matching it.
+
