@@ -142,7 +142,15 @@ MUTANTS = [
 
 TESTS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "redirects"],
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "tests::redirects"],
+    # Three test threads, not one per core: each of the six tests builds and
+    # serves its own variant of kiokun's program, and the program grew. Their
+    # binary's peak footprint as ADR-0292's bound reads it (macOS
+    # phys_footprint, 2026-10-12, at kiokun's 98a1f1e1): 4.22 GiB on four
+    # threads, over the bound, as verify 38235212974 stopped it; 2.77 GiB on
+    # three; 2.55 GiB on two. The lasting fix is NEXT's infrastructure item
+    # "the server's components compiled once a process": every server
+    # compiles the program's components again.
+    ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "tests::redirects", "--", "--test-threads=3"],
 ]
 
 
