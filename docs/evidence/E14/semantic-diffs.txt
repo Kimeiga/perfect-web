@@ -1,20 +1,20 @@
 ADR-0149 - pw diff, what a change means, for review
 
 produced by: just e14-diffs
-commit: ae555e9a08ef808665f519c4b10341c6b8d94133
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37888911377 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: f14a107b1e591731776d25b18146e64c671cab3a
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38275359848 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the tests (compiler/pw-core/tests/semantic_diff.rs)
 
 test a_comment_or_a_reflow_changes_nothing ... ok
+test a_new_query_brings_its_effects_capabilities_and_policies ... ok
+test a_freshness_change_is_a_cache_change ... ok
 test a_new_case_is_a_domain_change ... ok
 test a_program_that_does_not_check_has_no_model ... ok
-test a_freshness_change_is_a_cache_change ... ok
-test a_new_query_brings_its_effects_capabilities_and_policies ... ok
 test the_same_program_changes_nothing ... ok
 test a_streamed_region_is_a_page_change ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.68s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.92s
 
 == each task's Pleris patches (scripts/semantic_diffs.py)
 
@@ -45,8 +45,8 @@ Pages
 - none
 
 Client impact
-- added the speculation of `store.page.StorePage`, 2549 bytes
-- the browser's compiled code: 4605 bytes, was 2056
+- added the speculation of `store.page.StorePage`, 2578 bytes
+- the browser's compiled code: 4634 bytes, was 2056
 
 Server components
 - none
@@ -342,8 +342,8 @@ Pages
 Client impact
 - added the handler a5e94305 in `store.page.StorePage`, 1051 bytes
 - added the handler f9efa45e in `store.page.StorePage`, 335 bytes
-- the speculation of `store.page.StorePage`: 2550 bytes, was 2549
-- the browser's compiled code: 5992 bytes, was 4605
+- the speculation of `store.page.StorePage`: 2579 bytes, was 2578
+- the browser's compiled code: 6021 bytes, was 4634
 
 Server components
 - none
@@ -675,7 +675,7 @@ Client impact
 - added the handler 2148f1ab in `store.page.StorePage`, 266 bytes
 - added the handler 6cc02212 in `store.page.StorePage`, 265 bytes
 - the handler `clear_cart` in `store.page.StorePage` changed: 891 bytes, was 814
-- the browser's compiled code: 5213 bytes, was 4605
+- the browser's compiled code: 5242 bytes, was 4634
 
 Server components
 - none
@@ -763,3 +763,4 @@ a stream a page gained is not reported: KILLED (1 of 15 tests fail)
 a program that does not check is compared: KILLED (1 of 15 tests fail)
 a stream's query is its page's authority: KILLED (1 of 15 tests fail)
 6 of 6 mutants killed
+memory bound: no process was stopped
