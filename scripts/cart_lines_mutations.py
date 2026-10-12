@@ -28,11 +28,11 @@ Each mutant undoes one piece:
   attribute or a block not rendered again; a new row not inserted; the
   document's regions not served.
 
-A mutant must fail the suite it is listed with: `pw-core`'s four test
-targets that see the core mutants (measured, below), `pw-conformance`'s
-tests, `pw-render`'s, `pw-render-wasm`'s, `pw-host`'s with the engine, the
-development server's, or `e2e/cart.spec.mjs` in Chromium, each of these
-run whole.
+A mutant must fail the suite it is listed with: `pw-core`'s four test targets
+that see the core mutants, or the development server's tests that see the
+server's (each measured, below); `pw-conformance`'s tests, `pw-render`'s,
+`pw-render-wasm`'s, or `pw-host`'s with the engine, each run whole; or
+`e2e/cart.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-cart-lines` records the output.
 The source is restored after every mutant, whatever happens.
@@ -425,17 +425,29 @@ CARGO = {
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render"],
     "render-wasm": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render-wasm"],
     "host": ["cargo", "test", "--quiet", "--locked", "-p", "pw-host", "--features", "engine"],
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The development server's tests that see its mutants' rules (W6's ruling
+    # of 2026-10-09: a mutant that takes long is given the tests that can see
+    # its rule), measured by `scripts/mutant_killers.py` on 2026-10-12 against
+    # its whole suite: six of the eight are failed by one test alone, and
+    # these five see all eight. The whole suite ran for every server mutant,
+    # and the recipe took 13,798 s of a verify.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_line_records_the_stores_name_and_price_not_the_requests",
+        "tests::a_lines_steps_reach_the_data_layer",
+        "tests::a_post_is_shown_before_the_server_answers_and_the_page_told_when_it_holds_it",
+        "tests::a_sessions_changes_wait_for_the_one_in_progress",
+        "tests::a_speculating_page_is_sent_its_carts_value",
+    ],
 }
 BROWSER = ["e2e/cart.spec.mjs", "--project=chromium"]
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
-# 1800 s while its server command runs the development server's whole
-# suite, about 950 s on CI at 420 tests (the integrator's ruling of
-# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
-# see its mutants, it needs far less (W6's ruling of 2026-10-09).
-BOUND = 1800
+# 1800 from 2026-10-12 while its server command ran the development
+# server's whole suite, about 950 s on CI at 420 tests (the integrator's
+# ruling, PARALLEL.md); it runs the tests that see its mutants since.
+BOUND = 1200
 
 
 def bounded(cmd, **kw):
