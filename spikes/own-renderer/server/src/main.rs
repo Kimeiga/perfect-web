@@ -1111,10 +1111,10 @@ fn components() -> BTreeMap<String, Loaded> {
                 path.display()
             )
         });
-        let imports = pw_host::engine::imports_of(&bytes)
-            .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        // Compiled once, its imports read from it (ADR-XXXX).
         let prepared = pw_host::engine::Prepared::compile(&bytes)
             .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let imports = prepared.imports();
         out.insert(id.to_string(), Loaded { prepared, imports });
     }
     out
@@ -1149,10 +1149,10 @@ fn components_in(dir: &std::path::Path) -> Result<BTreeMap<String, Loaded>, Stri
             continue;
         };
         let bytes = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let imports =
-            pw_host::engine::imports_of(&bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+        // Compiled once, its imports read from it (ADR-XXXX).
         let prepared = pw_host::engine::Prepared::compile(&bytes)
             .map_err(|e| format!("{}: {e}", path.display()))?;
+        let imports = prepared.imports();
         out.insert(id.to_string(), Loaded { prepared, imports });
     }
     Ok(out)

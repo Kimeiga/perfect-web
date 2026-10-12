@@ -914,16 +914,24 @@ pub mod engine {
     /// Errors rather than returning an empty list. An empty list means "imports
     /// nothing", which passes every audit — so a failure to read must never be
     /// able to produce one.
+    ///
+    /// Read from the component [`Prepared::compile`] compiled, once a process
+    /// for its bytes (ADR-XXXX): until 2026-10-12 a server loading a build
+    /// compiled each component twice, once to read its imports and once to
+    /// run it, and every test's server did so again.
     pub fn imports_of(bytes: &[u8]) -> Result<Vec<String>, String> {
-        use wasmtime::Engine;
-        use wasmtime::component::Component;
+        Ok(Prepared::compile(bytes)?.imports())
+    }
 
-        let engine = Engine::new(&engine_config()).map_err(|e| e.to_string())?;
-        let component = Component::new(&engine, bytes).map_err(|e| e.to_string())?;
+    /// [`imports_of`], for a component `engine` compiled.
+    fn imports_in(
+        engine: &wasmtime::Engine,
+        component: &wasmtime::component::Component,
+    ) -> Vec<String> {
         let ty = component.component_type();
 
         let mut out = Vec::new();
-        for (name, item) in ty.imports(&engine) {
+        for (name, item) in ty.imports(engine) {
             match item.ty {
                 ComponentItem::ComponentInstance(instance) => {
                     // An instance's OPERATIONS are what it asks for: its
@@ -934,7 +942,7 @@ pub mod engine {
                     // grants (E10-I, 2026-09-24). A `wasi:*` instance is
                     // always reported, whatever it holds.
                     let mut any = false;
-                    for (func, export) in instance.exports(&engine) {
+                    for (func, export) in instance.exports(engine) {
                         if matches!(
                             export.ty,
                             ComponentItem::ComponentFunc(_) | ComponentItem::Resource(_)
@@ -953,7 +961,7 @@ pub mod engine {
         }
         out.sort();
         out.dedup();
-        Ok(out)
+        out
     }
 
     /// Authorization requirements for the exact export being invoked.
@@ -1178,21 +1186,69 @@ pub mod engine {
     /// was found (E10-I, 2026-09-24). Authority is NOT cached: every call
     /// builds its linker from that call's `Granted`, so a grant revoked
     /// between two calls is revoked for the second.
+    ///
+    /// **Compiled once a process for each component's bytes** (ADR-XXXX):
+    /// a compiled component is immutable, and an engine and its component
+    /// are each shared by reference, so every server a process loads with
+    /// those bytes runs the one compiled code. Until 2026-10-12 each server
+    /// compiled every component of its build, and a test process's servers
+    /// each compiled kiokun's again: seven of a kiokun test's eight seconds
+    /// were Wasmtime compiling (W6's finding, 2026-10-09), and the
+    /// development server's suite, four at once, held more than CI's memory
+    /// bound (ADR-0292).
+    #[derive(Clone)]
     pub struct Prepared {
         engine: wasmtime::Engine,
         component: wasmtime::component::Component,
     }
 
+    /// Each component compiled in this process, by its bytes. A cell each,
+    /// so a second caller with the same bytes waits for the first's compile
+    /// rather than compiling them again.
+    type Compiled = std::sync::Arc<std::sync::OnceLock<Result<Prepared, String>>>;
+    static COMPILED: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<Vec<u8>, Compiled>>,
+    > = std::sync::OnceLock::new();
+
+    /// How many components this process has compiled, which a test reads.
+    static COMPILES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
     impl Prepared {
-        /// Compile a component. The engine meters fuel, so a call can be
-        /// given a budget; a call with none gets the whole range.
+        /// Compile a component, or take the one this process compiled from
+        /// the same bytes. The engine meters fuel, so a call can be given a
+        /// budget; a call with none gets the whole range.
         pub fn compile(bytes: &[u8]) -> Result<Prepared, String> {
+            let cell = {
+                let mut compiled = COMPILED
+                    .get_or_init(Default::default)
+                    .lock()
+                    .map_err(|_| "the compiled components' table is poisoned".to_string())?;
+                match compiled.get(bytes) {
+                    Some(cell) => cell.clone(),
+                    None => compiled.entry(bytes.to_vec()).or_default().clone(),
+                }
+            };
+            cell.get_or_init(|| Prepared::compiled_now(bytes)).clone()
+        }
+
+        fn compiled_now(bytes: &[u8]) -> Result<Prepared, String> {
+            COMPILES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let mut config = engine_config();
             config.consume_fuel(true);
             let engine = wasmtime::Engine::new(&config).map_err(|e| e.to_string())?;
             let component =
                 wasmtime::component::Component::new(&engine, bytes).map_err(|e| e.to_string())?;
             Ok(Prepared { engine, component })
+        }
+
+        /// How many components this process has compiled.
+        pub fn compiles() -> usize {
+            COMPILES.load(std::sync::atomic::Ordering::Relaxed)
+        }
+
+        /// Every instance the component imports ([`imports_of`]).
+        pub fn imports(&self) -> Vec<String> {
+            imports_in(&self.engine, &self.component)
         }
 
         /// [`call_within`], on the compiled component.
