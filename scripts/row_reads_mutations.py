@@ -18,8 +18,8 @@ Each mutant undoes one piece:
 - `display`: an amount owed back negated whole, or its cents its
   remainder; thousands not grouped, or a group's zeros dropped.
 
-A typer, lowering or plan mutant must fail `pw-core`'s tests, all of them
-run; a server mutant, the server's; a renderer mutant, `pw-render`'s; a
+A typer, lowering or plan mutant must fail `pw-core`'s `row_reads` or
+`member_reads_in_blocks` tests; a server mutant, the server's; a renderer mutant, `pw-render`'s; a
 `display` mutant, the compiled component's own tests, after it is compiled
 again from the mutated source.
 
@@ -269,8 +269,15 @@ CARGO = {
     # 2026-10-09: a mutant that takes long is given the tests that can see
     # its rule): each of the 13 killed by it alone, run narrowed by
     # `scripts/mutant_killers.py` on 2026-10-12, where each ran pw-core's
-    # 211 targets, relinked, and the recipe took 5,879 s of a verify.
-    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "row_reads"],
+    # 211 targets, relinked, and the recipe took 5,879 s of a verify. Since
+    # ADR-XXXX a member read outside a row is computed, and the one left
+    # refused outside text, a loop's list read through a member, is
+    # `member_reads_in_blocks`' test: "a member read outside text no host
+    # computes passes silently" survived without it (verify 38296433715).
+    "core": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
+        "--test", "row_reads", "--test", "member_reads_in_blocks",
+    ],
     "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render"],
     "display": [
