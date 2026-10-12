@@ -19,6 +19,7 @@ import 'just/uploads.just'
 import 'just/notifications.just'
 import 'just/messages.just'
 import 'just/kiokun.just'
+import 'just/store-accounts.just'
 import 'just/store-search.just'
 
 default:
@@ -382,7 +383,7 @@ e9-values:
 # `evidence_is_current`.
 e10-component:
     @mkdir -p docs/evidence/E10
-    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart domain.line_count domain.display domain.count domain.total domain.subtotal store.page.MenuSize store.page.MenuLine; do \
+    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart store.page.Reach UserCarts.line_count domain.display domain.count domain.total UserCarts.subtotal store.page.MenuSize store.page.MenuLine; do \
       cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
         --out "docs/evidence/E10/$id.wasm" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
@@ -463,7 +464,7 @@ e10-build:
        cargo test --locked -p pw-core --test build 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; \
        echo "Since ADR-0125 the development server runs the store's queries and"; \
-       echo "domain.line_count by pages/store.page.StorePage.json. NOT CLAIMED: their"; \
+       echo "the cart's count (UserCarts.line_count since track store-accounts) by"; echo "pages/store.page.StorePage.json. NOT CLAIMED: their"; \
        echo "policies (freshness, cache, key, concurrency); E14-Q's second slice. The"; \
        echo "four Resources.* queries are 'todo' in the library, and nothing the store"; \
        echo "builds depends on them."; \
@@ -5790,6 +5791,28 @@ e14-one-entry:
        python3 scripts/one_entry_mutations.py; \
      } > docs/evidence/E14/one-entry.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/one-entry.txt
+
+# ADR-0317: a component is compiled once a process. The host's cache
+# (runtime/pw-host/tests/compiled_once.rs, the engine's proposals), the
+# conformance harness that reads a component's imports from it, the
+# development server's suite whole at four tests at once against ADR-0292's
+# bound (scripts/suite_memory.py), and the mutation controls.
+e14-compiled-once:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0317 - a component is compiled once a process"; echo; \
+       echo "produced by: just e14-compiled-once"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== compiled once, its imports read from it (runtime/pw-host/tests/compiled_once.rs, engine_proposals.rs)"; echo; \
+       cargo test --locked -p pw-host --features engine --test compiled_once --test engine_proposals 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the conformance harness (compiler/pw-conformance)"; echo; \
+       cargo test --locked -p pw-conformance 2>&1 | grep -E '^test result|panicked at'; \
+       echo; echo "== the development server's suite, whole, four tests at once (scripts/suite_memory.py)"; echo; \
+       python3 scripts/suite_memory.py --threads 4; \
+       echo; echo "== mutation controls (scripts/compiled_once_mutations.py)"; echo; \
+       python3 scripts/compiled_once_mutations.py; \
+     } > docs/evidence/E14/compiled-once.txt
+    @grep -E "^test result|mutants killed|panicked at|peak resident|within the bound|OVER THE BOUND|^wall" docs/evidence/E14/compiled-once.txt
 
 # ADR-XXXX: a related note is shown in its own file. The checker's notes in
 # another file name it (compiler/pw-core/tests/related_files.rs); `pw check`

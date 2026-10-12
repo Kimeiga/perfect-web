@@ -294,6 +294,10 @@ test("the tree a screen reader reads is the page's", async ({ page, request }) =
       - heading "Blue Bottle" [level=1]
       - paragraph: Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning.
       - paragraph: 3 items in 1 section
+      - paragraph:
+        - text: No delivery address yet
+        - link "Change the address":
+          - /url: /stores/47/address
       - region "Delivery":
         - paragraph: Delivery in 25 to 35 min
       - region "Menu":
@@ -380,6 +384,8 @@ test("every control is reached from the keyboard, in the order it is read, and s
     // and the cart, counted.
     "Stores",
     "Cart 1",
+    // Where deliveries go (track `store-accounts`), above the menu.
+    "Change the address",
     "Add Espresso",
     "Add Cortado",
     "Add Cold Brew",

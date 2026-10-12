@@ -66,6 +66,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "a value the template computes",
     // ADR-0311, corpus C19: a page states its canonical address.
     "page states its canonical address",
+    // ADR-0318 (track `store-accounts`), corpus C20: a `user` query, imported.
+    "a user's query read on a user's page of another module",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -158,6 +160,10 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a session read through a query of a built page's own",
     // ADR-0311, corpus C19: PW5051.
     "a canonical address written as text",
+    // ADR-0318 (track `store-accounts`), corpus C20: PW5007, a `private`
+    // query's record the user's.
+    "a private query's record captured into a public manifest from a view's parameter",
+    "a user's query's record captured into a public page's manifest",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

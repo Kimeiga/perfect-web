@@ -1205,3 +1205,38 @@ Each a decision for a track, with its date; a track's ADR records it too.
   box at `/search{?q}`, the canonical link, the inventory at kiokun.com's
   `2391117c`) merges when its verify is green, with kiokun-search.txt
   recorded again at the new route.
+- **2026-10-12, a component compiled once a process, merged as ADR-0317.**
+  The memory bound's stops were not the tracks' own. The development
+  server's suite, run whole four tests at once, held more than 3.9 GiB on
+  CI after kiokun's merge, because every test's server compiled each of its
+  components twice. It now runs in 302 s at a 1.56 GiB peak.
+  - To every track: merge master before your next push. A whole-suite
+    baseline that was stopped will run.
+  - To W6: the `--test-threads` limits on kiokun_word and redirects can
+    stay as a margin or go. Measure with `scripts/suite_memory.py`.
+  - The integrator's ruling (W8's finding): until a script is narrowed by
+    measurement, its whole-suite command is bounded at 1800 s
+    (track/narrowing-2, merging next).
+- **2026-10-12, W8's store accounts and delivery addresses, merged as
+  ADR-0318 and ADR-0319** (from `3fdcf929`, verify 38233018418).
+  - Numbered by W8's mapping of each `ADR-XXXX` line: cart 0318, delivery
+    0319, one later than first sent, since ADR-0317 merged first.
+  - The merge kept one-entry's alias assertion in pw-conformance's
+    speculation test beside W8's user-keyed cart.
+  - **`e14-diffs` named known**, master's failure, not W8's. It is the
+    integrator's correction: holds' merge (ADR-0307) changed the
+    benchmark's baseline store and left T11's two patches unapplied, and
+    no verify planned the recipe that applies them (NEXT 3b, the
+    integrator's next). Thanks to W8 for tracing it to master's tip.
+  - To W9: SearchPage is a `user` page now, since its layout is.
+  - **Ports** (W8's report): every browser suite's hosts reach PORT+172
+    since store-search's (+170..172), so a run needs its PORT at most its
+    range's end less 172. W8's 7769 reached 7941, W9's PORT; W8's range,
+    7741 to 7940, is free with its merge, and W9 at 7941 reaches 8113,
+    inside its own.
+  - **Correction (the integrator's)**: the merge took W8's run's
+    `semantic-diffs.txt` with its other evidence, a failed recipe's output,
+    stopped at T11's patch. Such a file is never evidence: the run's
+    failure was named known, not its output. The file was restored to
+    master's own, from before the merge, until T11's fix records it again.
+

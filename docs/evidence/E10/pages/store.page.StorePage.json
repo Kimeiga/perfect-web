@@ -9,11 +9,11 @@
       "binding": "cart~StoreLayout",
       "resource": "store.page.Cart",
       "args": [
-        "current_session()"
+        "current_user()"
       ],
       "policy": {
         "cache": "private",
-        "privacy": "session",
+        "privacy": "private",
         "freshness_ms": 0,
         "timeout_ms": 2000,
         "attempts": 1,
@@ -93,17 +93,38 @@
       "binding": "cart",
       "resource": "store.page.Cart",
       "args": [
-        "current_session()"
+        "current_user()"
       ],
       "policy": {
         "cache": "private",
-        "privacy": "session",
+        "privacy": "private",
         "freshness_ms": 0,
         "timeout_ms": 2000,
         "attempts": 1,
         "parallel": false,
         "key": [
           0
+        ],
+        "on_key_change": "cancel"
+      }
+    },
+    {
+      "binding": "reach",
+      "resource": "store.page.Reach",
+      "args": [
+        "id",
+        "current_user()"
+      ],
+      "policy": {
+        "cache": "private",
+        "privacy": "private",
+        "freshness_ms": 0,
+        "timeout_ms": 2000,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0,
+          1
         ],
         "on_key_change": "cancel"
       }
@@ -116,7 +137,7 @@
       "binding": "cart~StoreLayout",
       "steps": [
         {
-          "member": "domain.line_count"
+          "member": "UserCarts.line_count"
         }
       ]
     },
@@ -147,22 +168,22 @@
       "steps": []
     },
     {
-      "part": 16,
+      "part": 22,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
         {
-          "member": "domain.line_count"
+          "member": "UserCarts.line_count"
         }
       ]
     },
     {
-      "part": 31,
+      "part": 34,
       "path": "cart.subtotal.display",
       "binding": "cart",
       "steps": [
         {
-          "member": "domain.subtotal"
+          "member": "UserCarts.subtotal"
         },
         {
           "member": "domain.display"
@@ -182,38 +203,42 @@
   ],
   "live": [
     {
-      "part": 33,
+      "part": 36,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
     }
   ],
   "blocks": [
-    32
+    4,
+    7,
+    35
   ],
   "streams": [
     {
-      "part": 4,
+      "part": 10,
       "resource": "store.page.Estimate",
       "args": [
-        "current_session()"
+        "id",
+        "current_user()"
       ],
       "policy": {
         "cache": "private",
-        "privacy": "session",
+        "privacy": "private",
         "freshness_ms": 0,
         "timeout_ms": 3000,
         "attempts": 1,
         "parallel": false,
         "key": [
-          0
+          0,
+          1
         ],
         "on_key_change": "cancel"
       },
       "streamed": true
     },
     {
-      "part": 36,
+      "part": 38,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -275,17 +300,14 @@
     }
   ],
   "attributes": [
-    17
+    23
   ],
-  "title": 39,
-  "scope": "session:",
+  "title": 41,
+  "scope": "user:",
   "layout": {
     "path": "store.page.StoreLayout",
     "schema": "d92ef64b146df5d6",
     "parts": 1,
     "elements": 0
-  },
-  "predicates": [
-    "SignedIn"
-  ]
+  }
 }

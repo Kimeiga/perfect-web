@@ -622,6 +622,42 @@ fn forgetting_a_command_keeps_what_must_not_run_twice() {
     assert!(!rt.forget_command("never-run"));
 }
 
+/// **A finished command's outcome is read without running anything** (track
+/// `store-accounts`): a known outcome is read; none is read where nothing
+/// was kept, where it was forgotten, where the command is still running,
+/// or where a panic left it unknown, and reading runs no command.
+#[test]
+fn a_kept_outcome_is_read_without_running_anything() {
+    let (rt, _, _, _) = runtime();
+    assert_eq!(rt.command_outcome("press"), None, "nothing kept");
+    assert_eq!(rt.try_command("press", || "done".into()), Ok("done".into()));
+    assert_eq!(rt.command_outcome("press"), Some("done".into()));
+    assert_eq!(rt.commands_held(), 1, "reading kept nothing new");
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        rt.try_command("uncertain", || panic!("after side effect"))
+    }));
+    assert_eq!(rt.command_outcome("uncertain"), None, "an unknown outcome");
+    assert!(rt.forget_command("press"));
+    assert_eq!(rt.command_outcome("press"), None, "forgotten");
+    // Still running: read as none, and not waited for.
+    let (started_tx, started) = mpsc::channel();
+    let (release, release_rx) = mpsc::channel::<()>();
+    let held = &rt;
+    std::thread::scope(|scope| {
+        scope.spawn(move || {
+            held.try_command("running", || {
+                started_tx.send(()).expect("started");
+                release_rx.recv().expect("released");
+                "late".into()
+            })
+        });
+        started.recv().expect("the command started");
+        assert_eq!(rt.command_outcome("running"), None, "still running");
+        release.send(()).expect("release");
+    });
+    assert_eq!(rt.command_outcome("running"), Some("late".into()));
+}
+
 /// **A host can keep a declaration uncached, drop one entry, and forget what
 /// it no longer needs** (ADR-0127).
 #[test]

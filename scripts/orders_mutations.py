@@ -35,17 +35,19 @@ MUTANTS = [
         STORE_DATA,
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
-        "                if lines.is_empty() {\n"
-        '                    return Ok(declared("nothing-to-order"));\n',
-        "                if false {\n"
-        '                    return Ok(declared("nothing-to-order"));\n',
+        # Re-anchored by track store-accounts: an owner's, a session's or a user's.
+        "                    if lines.is_empty() {\n"
+        '                        return Ok(declared("nothing-to-order"));\n',
+        "                    if false {\n"
+        '                        return Ok(declared("nothing-to-order"));\n',
     ),
     (
         "a placed order leaves the cart as it was",
         STORE_DATA,
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
-        "                r.set_cart(&this, &[])?;\n",
+        # Re-anchored by track store-accounts: an owner's, a session's or a user's.
+        "                    r.set_cart(owner, &[])?;\n",
         "",
     ),
     (
@@ -53,7 +55,8 @@ MUTANTS = [
         STORE_DATA,
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
-        "                r.place(&this, &lines)?;\n",
+        # Re-anchored by track store-accounts: an owner's, a session's or a user's.
+        "                    r.place(owner, &lines)?;\n",
         "",
     ),
     (
@@ -61,7 +64,14 @@ MUTANTS = [
         SERVER,
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
-        '                |_| server.session_changed(&session, "Events.OrderChanged", &order_entry(&session)),\n',
+        # Re-anchored by track store-accounts: an owner's, a session's or a user's.
+        "                |_| {\n"
+        "                    server.session_changed(\n"
+        "                        &session,\n"
+        "                        server.order_event(),\n"
+        "                        &server.order_entry(&session),\n"
+        "                    )\n"
+        "                },\n",
         "                |_| {},\n",
     ),
     (

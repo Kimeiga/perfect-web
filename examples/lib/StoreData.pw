@@ -28,9 +28,10 @@ import Menus
 import Carts
 import Orders
 import Estimates
+import Addresses
 
 source StoreData
-    holds        Stores, Menus, Carts, Orders, Estimates
+    holds        Stores, Menus, Carts, Orders, Estimates, Addresses
     transactions serializable
     reads        strong
     changes      none

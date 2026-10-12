@@ -701,10 +701,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              2026-10-11, with ADR-0305, a page's commands in the order it
              sent them);
           2. ~~**accounts in the store**~~ and 3. ~~**delivery
-             addresses**~~: **W8's since 2026-10-09** (the owner: DoorDash
-             faster, with a third worker; PARALLEL.md, "the DoorDash track"),
-             launched first in the next free slot after W5's merge, whose
-             tables they change. Accepted by the owner's own Next.js bug:
+             addresses**~~: **W8's**, merged 2026-10-12 (ADR-0318, ADR-0319;
+             the owner: DoorDash faster, with a third worker; PARALLEL.md,
+             "the DoorDash track"). Accepted by the owner's own Next.js bug:
              save an address, go to a store, and its page shows the new
              address's estimate, with no cache-busting parameter, no reload
              and, once item 1 lands, no header mounted again, in three
@@ -718,6 +717,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
              the user's scope or becomes "not importable" alone is the
              integrator's ruling, a change to every program that says it
              (the feed's notifications and messages);
+          3b. **benchmark task T11's patches apply again** (open, the
+             integrator's; named known by W8's merge, 2026-10-12): holds'
+             merge (ADR-0307) changed `benchmarks/baselines/pleris/store/
+             app.pw` and left T11's reference and unsafe patches unapplied,
+             so `e14-diffs` fails at `git apply`. With it, the planner gap
+             that let it through: a change to a benchmark's baseline planned
+             no recipe that applies patches to it;
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled.
              In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
@@ -782,15 +788,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
 
           The infrastructure follow-ups, after these (the owner's order of
           2026-10-09):
-          - **the server's components compiled once a process** (W6's
-            finding, 2026-10-09): a kiokun test's server load is 7.7 s, 7.1
-            of them Wasmtime compiling the program's components in a debug
-            build (`pw-host`'s `Component::new`), once a server, and every
-            server test pays it. To measure, then rule: a per-process cache
-            of compiled components in `pw-host`, keyed by a hash of each
-            component's bytes, one `Engine`; and an opt-level for
-            `cranelift-codegen` and `regalloc2` in the dev profile, against
-            what it adds to a cold build and to `target/`;
+          - ~~**the server's components compiled once a process**~~ (W6's
+            finding, 2026-10-09; ADR-0317, merged 2026-10-12): each
+            component's bytes compiled once a process, its imports read from
+            the same compile. The development server's suite, whole, four
+            tests at once on CI: 302 s and a 1.56 GiB peak, from about 950 s
+            and over ADR-0292's 3.9 GiB bound. Still to measure: an
+            opt-level for `cranelift-codegen` and `regalloc2` in the dev
+            profile, against what it adds to a cold build and to `target/`;
           - **a recipe not yet measured is planned at its kind's upper
             quartile** (done, ADR-0290's amendment of 2026-10-09).
           - **a shard dealt within a ceiling under its limit** (done,

@@ -196,17 +196,20 @@ fn the_real_add_to_cart_lowers_to_its_import_calls() {
         host,
         [
             "pw:host/invalidations#store-page-cart",
-            "pw:host/outbox#cart-changed",
-            "pw:host/session#read",
-            "pw:host/session#read",
-            "pw:host/session#read",
-            "store:data/carts#add",
-            "store:data/menus#is-available"
+            "pw:host/outbox#user-cart-changed",
+            "pw:host/principal#read",
+            "pw:host/principal#read",
+            "pw:host/principal#read",
+            "pw:host/principal#read",
+            "store:data/coverage#reaches",
+            "store:data/menus#is-available",
+            "store:data/user-carts#add"
         ],
         "the callables it invokes, by the identity the ARTIFACT will carry: \
-         since ADR-0157 it asks whether the item can be ordered, and since \
-         ADR-0208 and ADR-0209 it reads the session for its entry's and its \
-         event's keys and hands them to the platform"
+         since ADR-0157 it asks whether the item can be ordered, since \
+         ADR-0208 and ADR-0209 it reads the reader for its entry's and its \
+         event's keys and hands them to the platform, and since track \
+         `store-accounts` the reader is its user, and the cart theirs"
     );
 
     // And the authority, which is a separate fact: five callables, two of
@@ -218,6 +221,9 @@ fn the_real_add_to_cart_lowers_to_its_import_calls() {
     assert_eq!(
         declared,
         [
+            // Whether its store reaches the reader's address (track
+            // `store-accounts`).
+            "database.read<Addresses>",
             "database.read<Menus>",
             "database.write<Carts>",
             "outbox.write",

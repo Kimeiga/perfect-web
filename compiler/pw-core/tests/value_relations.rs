@@ -745,9 +745,9 @@ fn the_store_program_is_decided_not_merely_silent() {
     assert!(
         store.iter().any(|r| r.declaration == "add_to_cart"
             && r.kind == RelationKind::Argument
-            && r.target == "Carts.add"
+            && r.target == "UserCarts.add"
             && r.outcome == Outcome::Agree),
-        "`add_to_cart`'s call to `Carts.add` must be checked and agree"
+        "`add_to_cart`'s call to `UserCarts.add` must be checked and agree (a user's cart since track `store-accounts`)"
     );
 }
 

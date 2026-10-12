@@ -40,19 +40,16 @@ MUTANTS = [
         "a sign-in keeps the session the browser came with (fixation)",
         IDENTITY,
         "        let rotated = new_session_id();\n"
-        "        self.principals.close(session);\n"
-        "        self.principals.open(&rotated, principal);\n",
+        "        // A guest's, where no sign-in opened the session it came with: a\n",
         "        let rotated = session.to_string();\n"
-        "        self.principals.open(&rotated, principal);\n",
+        "        // A guest's, where no sign-in opened the session it came with: a\n",
     ),
     (
         "a sign-in leaves the session it replaced signed in",
         IDENTITY,
-        "        let rotated = new_session_id();\n"
         "        self.principals.close(session);\n"
-        "        self.principals.open(&rotated, principal);\n",
-        "        let rotated = new_session_id();\n"
-        "        self.principals.open(&rotated, principal);\n",
+        "        self.principals.open(&rotated, principal.clone());\n",
+        "        self.principals.open(&rotated, principal.clone());\n",
     ),
     (
         "signing out leaves the session signed in",
