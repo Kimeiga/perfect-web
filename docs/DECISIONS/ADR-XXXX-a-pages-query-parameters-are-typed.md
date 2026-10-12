@@ -71,8 +71,10 @@ search form "sent by `navigate`").
    of the form is one of that route's query names. A field the route does
    not declare would carry its value to nothing; it is refused, said with
    the route's names.
-6. **One path is one page's** (PW0341): two routes that differ only in
-   their query part are the same route.
+6. **A page is at its route's path.** Two routes that differ only in their
+   query part are the same route (PW0341). An upload's paths are compared
+   with a page's path (PW5602). A move (ADR-0295) fills the path's one
+   parameter and keeps the address's query.
 
 ## Consequences
 
@@ -97,10 +99,13 @@ search form "sent by `navigate`").
   text (PW0630); a query part ends the route and names each parameter once
   (PW0340); two routes that differ only in their query are one (PW0341); a
   link's query and a GET form's fields give only what the route names
-  (PW5050), and the controls.
+  (PW5050), and the controls. `uploads.rs`: a page whose route has a query
+  part, at an upload's route, is PW5602.
 - The host's `a_query_is_read_as_a_browsers_form_writes_it`: `+` and `%20`
   a space, `%2B` a plus, the first of a name, a foreign name ignored,
-  bytes that are no UTF-8 refused, and what a page is given.
+  bytes that are no UTF-8 refused, and what a page is given. The host's
+  `a_route_with_a_query_part_is_moved_by_its_path`: a move fills the path
+  and keeps the query, and a move to itself is still refused, not a loop.
 - `examples/demo/search.pw` and `e2e/query.spec.mjs`, in three engines: a
   GET form with scripts on and off, a link, `None` where nothing is given,
   the first of a name, and a 400 for bytes that are no UTF-8.

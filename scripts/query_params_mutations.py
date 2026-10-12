@@ -5,13 +5,16 @@ GET form makes them.
 Each mutant undoes one piece:
 - the checker: a route's query part not read; a query's parameter not held
   to an `Option` of text (PW0630); a link's query, or a GET form's fields,
-  naming anything (PW5050); two routes that differ in their query two;
+  naming anything (PW5050); two routes that differ in their query two; an
+  upload's path compared with a page's whole route (PW5602);
 - the host: a `+` read as itself in a query; the last of a name taken; bytes
-  that are no UTF-8 replaced; a query's parameter given as text;
+  that are no UTF-8 replaced; a query's parameter given as text; a moved
+  page's route read whole, its query part a segment (ADR-0295);
 - the request: a routed page's query not read at all.
 
-A checker mutant must fail `compiler/pw-core/tests/routes.rs`; a host
-mutant, the host's test of a query read as a browser's form writes it; the
+A checker mutant must fail `compiler/pw-core/tests/routes.rs` or
+`uploads.rs`; a host mutant, the host's test of a query read as a browser's
+form writes it, or of a route with a query part moved by its path; the
 request's, `e2e/query.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-query-params` records the output.
@@ -27,6 +30,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ROUTES = ROOT / "compiler/pw-core/src/routes.rs"
+UPLOADS = ROOT / "compiler/pw-core/src/uploads.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 
 # (what, suite, file, anchor, replacement)
@@ -68,6 +72,13 @@ MUTANTS = [
         "    let shape = |route: &str| -> String {\n        route\n",
     ),
     (
+        "an upload's path is compared with a page's whole route",
+        "core",
+        UPLOADS,
+        "                    .find(|(r, _)| route_matches(crate::routes::route_parts(r).0, &path));\n",
+        "                    .find(|(r, _)| route_matches(r, &path));\n",
+    ),
+    (
         "a `+` is itself in a query",
         "host",
         SERVER,
@@ -96,6 +107,13 @@ MUTANTS = [
         "    if false && route_query_names(route).contains(&name) {\n",
     ),
     (
+        "a moved page's route is read whole",
+        "host",
+        SERVER,
+        "    let route = route_path(plan[\"route\"].as_str().unwrap_or_default());\n",
+        "    let route = plan[\"route\"].as_str().unwrap_or_default();\n",
+    ),
+    (
         "a routed page's query is not read",
         "browser",
         SERVER,
@@ -105,11 +123,15 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "routes"],
+    "core": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "routes",
+        "--test", "uploads",
+    ],
     "host": [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
         "a_query_is_read_as_a_browsers_form_writes_it",
         "each_store_is_served_at_its_route",
+        "a_route_with_a_query_part_is_moved_by_its_path",
     ],
 }
 SPEC = ["e2e/query.spec.mjs", "--project=chromium"]

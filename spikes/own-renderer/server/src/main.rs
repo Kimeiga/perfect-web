@@ -8423,7 +8423,9 @@ fn moved(
     permanent: bool,
 ) {
     let plan = server.plan_of(page);
-    let route = plan["route"].as_str().unwrap_or_default();
+    // The route's path: its query part (ADR-XXXX) names no segment, and the
+    // address's own query is kept below.
+    let route = route_path(plan["route"].as_str().unwrap_or_default());
     let holes: Vec<&str> = route
         .split('/')
         .filter_map(|s| s.strip_prefix('{').and_then(|s| s.strip_suffix('}')))

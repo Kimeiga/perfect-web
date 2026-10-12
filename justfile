@@ -5651,10 +5651,10 @@ e14-query-params:
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
-       echo "== a route's query part, and what an address gives (compiler/pw-core/tests/routes.rs)"; echo; \
-       cargo test --locked -p pw-core --test routes 2>&1 | grep -E '^(test |test result)|panicked at'; \
-       echo; echo "== the host reads a query as a browser's form writes it"; echo; \
-       cargo test --locked -p pw-dev-server -- a_query_is_read_as_a_browsers_form_writes_it 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo "== a route's query part, and what an address gives (compiler/pw-core/tests/routes.rs, uploads.rs)"; echo; \
+       cargo test --locked -p pw-core --test routes --test uploads 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host reads a query as a browser's form writes it, and moves a page by its path"; echo; \
+       cargo test --locked -p pw-dev-server -- a_query_is_read_as_a_browsers_form_writes_it a_route_with_a_query_part_is_moved_by_its_path 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the demo's search, in three engines (e2e/query.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/query.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \

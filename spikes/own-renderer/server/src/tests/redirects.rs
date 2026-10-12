@@ -100,6 +100,19 @@ fn unnamed(app: &str) -> String {
     declared(&moving(app), None)
 }
 
+/// The word page given a query part, `{?from}` (ADR-XXXX), its move
+/// declared `permanent`.
+fn queried(app: &str) -> String {
+    const PAGE: &str = "page WordPage(word: String) {\n    route        \"/word/{word}\"\n";
+    let app = permanent(app);
+    assert_eq!(app.matches(PAGE).count(), 1, "the word page's head");
+    app.replace(
+        PAGE,
+        "page WordPage(word: String, from: Option<String>) {\n    \
+         route        \"/word/{word}{?from}\"\n",
+    )
+}
+
 /// The response to `GET path`, whole.
 fn fetched(s: &Server, path: &str) -> String {
     fetched_as(s, path, Some("a"))
@@ -179,6 +192,26 @@ fn a_move_to_itself_or_to_no_segment_is_the_programs_fault() {
         "{dots}"
     );
     assert!(dots.contains("`..` is no segment of an address"), "{dots}");
+}
+
+#[test]
+fn a_route_with_a_query_part_is_moved_by_its_path() {
+    // The query part names no segment: the move fills the path's one
+    // `{word}`, and the address's query is kept, as at any route.
+    let s = served_with(queried);
+    let moved = fetched(&s, "/word/old?from=x");
+    assert!(
+        head(&moved).contains("\r\nlocation: /word/%E9%AD%9A?from=x\r\n"),
+        "{moved}"
+    );
+    // And a move to itself is still the program's fault, not a loop: the
+    // path's parameter is the one compared.
+    let same = fetched(&s, "/word/same?from=x");
+    assert!(
+        same.starts_with("HTTP/1.1 500 Internal Server Error\r\n"),
+        "{same}"
+    );
+    assert!(same.contains("moves `same` to itself"), "{same}");
 }
 
 #[test]

@@ -282,7 +282,11 @@ fn taken(hirs: &[&Hir], unit: usize, out: &mut Vec<Diagnostic>) {
                 (format!("{}/{{key}}", u_clauses.serves), "what it serves"),
             ];
             for (path, what) in paths {
-                let page = pages.iter().find(|(r, _)| route_matches(r, &path));
+                // A page's path, its query part aside (ADR-XXXX): `/a{?q}`
+                // is served at `/a`.
+                let page = pages
+                    .iter()
+                    .find(|(r, _)| route_matches(crate::routes::route_parts(r).0, &path));
                 let upload = claimed.get(&path).filter(|other| **other != decl.name);
                 let by = match (page, upload) {
                     (Some((route, name)), _) => format!("the page `{name}`, at `{route}`"),
