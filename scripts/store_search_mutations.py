@@ -20,8 +20,10 @@ Each mutant undoes one piece:
 - the program (`examples/store/search.pw`): the search box holding nothing
   of what was asked; the title naming no search; a long text told as a blank
   one; a store's dishes not shown; a search kept past a menu's change;
-- PostgreSQL: `%`, `_` or `\\` not escaped in a term's pattern; a dish's
-  name lowered under the `C` collation; a store's cuisine, or a dish's category, not
+- PostgreSQL: `%`, `_` or `\\` not escaped in a term's pattern; the layer's
+  own statements not run, each store's menu read and matched on the host
+  (the seam in `store_pg.rs`); a dish's name lowered under the `C`
+  collation; a store's cuisine, or a dish's category, not
   read for its tier; a store holding a matched dish not listed; the
   migration's cuisine not the in-memory layer's.
 
@@ -295,13 +297,13 @@ MUTANTS = [
         "        if matches!(c, '\\\\' | '%' | '_') {\n",
         "        if matches!(c, '%' | '_') {\n",
     ),
-    # No mutant runs PostgreSQL's search as memory's (`scan` over its rows):
-    # the two hold one meaning, so its answers are alike by design, and
-    # since ADR-0308's amendment its cuisine is the store's row on both, so
-    # nothing observable tells the two apart (verify 38294475263: it
-    # survived). That the statements run in the database is shown by their
-    # own mutants, the escapes, the collation, the cuisine as a second field
-    # and the stores holding a dish, which only the SQL can be killed by.
+    (
+        "PostgreSQL's layer searches as memory does",
+        "postgres",
+        STORE_PG,
+        "        crate::search::on_postgres(&mut self.0, terms)\n",
+        "        crate::search::scan(self, terms)\n",
+    ),
     (
         "a dish's name is lowered under the C collation",
         "postgres",
