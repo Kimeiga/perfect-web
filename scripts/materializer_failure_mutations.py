@@ -10,9 +10,9 @@ Each mutant undoes one piece:
 - the subscription: a page's request does not drain its session;
 - the control: `/bench/materializer` arms nothing.
 
-A drain, answer or control mutant must fail the development server's tests,
-all of them run; the subscription's, `e2e/materializer.spec.mjs` in
-Chromium.
+A drain, answer or control mutant must fail the development server's test
+that sees its rule (measured, below); the subscription's,
+`e2e/materializer.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-materializer-failure` records the
 output. The source is restored after every mutant, whatever happens.
@@ -77,7 +77,13 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The server test that fails under its mutants, measured against the
+    # whole suite by `scripts/mutant_killers.py` on 2026-10-12 (W6's ruling
+    # of 2026-10-09): it alone fails under each of the five.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_regeneration_that_fails_sends_nothing_and_is_tried_again",
+    ],
 }
 BROWSER = ["e2e/materializer.spec.mjs", "--project=chromium"]
 

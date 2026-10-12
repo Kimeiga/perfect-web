@@ -137,7 +137,11 @@ CARGO = {
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
-BOUND = 1200
+# 1800 s while its server command runs the development server's whole
+# suite, about 950 s on CI at 420 tests (the integrator's ruling of
+# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
+# see its mutants, it needs far less (W6's ruling of 2026-10-09).
+BOUND = 1800
 
 
 def bounded(cmd, **kw):

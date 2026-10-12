@@ -11,8 +11,8 @@ Each mutant undoes one piece:
 - the controls: `/bench/fail?next=write` arms nothing; `/bench/cart` sets
   another session's delay; `/bench/store` leaves the kept store in place.
 
-A fault or drain mutant must fail the development server's tests, all of
-them run; a control mutant, `e2e/controls.spec.mjs` and
+A fault or drain mutant must fail the development server's tests that see
+its rule (measured, below); a control mutant, `e2e/controls.spec.mjs` and
 `e2e/resource-path.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-test-controls` records the output.
@@ -137,7 +137,21 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The development server's tests that see the server mutants' rules
+    # (W6's ruling of 2026-10-09), measured by `scripts/mutant_killers.py` on
+    # 2026-10-12 against its whole suite: each of the seven failed by two of
+    # these where two fail at all. One mutant, every session waiting a cart's
+    # delay, hung the whole suite past its hour; 34 tests failed before it,
+    # and two of them are here. Its whole suite ran for every mutant, and
+    # the recipe took 8,924 s of a verify.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_block_whose_rendering_changed_is_rendered_again",
+        "tests::a_delay_slows_what_it_names_and_nothing_else",
+        "tests::a_failed_origin_is_answered_with_the_last_public_value_kept",
+        "tests::a_one_shot_read_error_fails_the_next_read_once",
+        "tests::a_one_shot_write_error_fails_the_next_write_once",
+    ],
 }
 BROWSER = ["e2e/controls.spec.mjs", "e2e/resource-path.spec.mjs", "--project=chromium"]
 

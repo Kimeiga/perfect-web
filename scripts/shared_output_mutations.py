@@ -82,7 +82,16 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The server tests that fail under its mutants, measured against the
+    # whole suite by `scripts/mutant_killers.py` on 2026-10-12 (W6's ruling
+    # of 2026-10-09), two per mutant where two fail.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_session_s_response_is_kept_by_no_cache_and_a_build_s_names_no_session",
+        "tests::messages::a_third_user_signed_in_and_not_sees_none_of_it",
+        "tests::redirects::a_page_at_another_address_of_the_page_is_moved_there_for_good",
+        "tests::what_a_shared_cache_keeps_holds_nothing_a_session_put_in_it",
+    ],
 }
 BROWSER = ["e2e/shared-output.spec.mjs", "--project=chromium"]
 
