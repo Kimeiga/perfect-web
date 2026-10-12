@@ -1,20 +1,20 @@
 ADR-0306 - a navigation keeps the layout, and shows the next page in it
 
 produced by: just e14-soft-navigation
-commit: d65f2785ad21bf9bd599e639aec2c156d25c0a51
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38203954490 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 0ab1afcabe67d8ff0cbae59463ae0d2a3217c4d0
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38208918670 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
 
 == the store's pages, followed softly, in three engines (e2e/soft-navigation.spec.mjs)
 
-  42 passed (1.7m)
+  42 passed (1.9m)
 
 == a handler's navigation after its commit, in three engines (e2e/navigate.spec.mjs)
 
   2 skipped
-  28 passed (1.5m)
+  28 passed (1.4m)
 
 == mutation controls (scripts/soft_navigation_mutations.py)
 

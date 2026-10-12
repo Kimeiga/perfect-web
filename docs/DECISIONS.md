@@ -2688,3 +2688,71 @@ and the ruling of 2026-10-09, Q2).
   - a soft navigation kept the last page's Open Graph and `theme-color`
     (ADR-0306, amended).
 - Corpus C19: A-033, R-063, R-053 changed; generality 45 / 45.
+
+[ADR-0312](DECISIONS/ADR-0312-a-page-and-its-layout-show-one-entry-by-one-value.md):
+a page and its layout show one entry by one value (the integrator's; found
+2026-10-11, ADR-0191's amendment).
+- Where a page's binding and its layout's read the entry a speculation
+  targets, the page's is the entry's binding and the layout's its alias: no
+  decoder, no transition and no value of its own, its parts, computed values
+  and regions rendered from the binding's value under its own name.
+- The module exports `aliases`; the host sends the entry once; the runtime
+  holds and reconciles it once, and renders it by every name.
+- Found: each press ran the cart's transition twice, and each change was
+  sent twice, at two versions of one entry.
+
+[ADR-0313](DECISIONS/ADR-0313-kiokun-contains-and-appears-in.md): kiokun's
+word page shows Contains and Appears in (W6's, track `kiokun`).
+- The layer reads each entry's four lists as `Preview` records. kiokun.com's
+  ordering rules are ported as it writes them, an equivalent form's lists
+  merged as its loader merges them, and the component glosses read for the
+  previews too.
+- The first ten of each list are shown, and the rest are behind a
+  `<details>` disclosure, as Japanese Names are.
+- Held to kiokun.com's own code (`just e14-kiokun-contains`, local): 5,513
+  sampled words, the same. CI holds each list's length and its first 20 and
+  last 5 items.
+- Amends ADR-0285: kiokun-data is read at HEAD. Records the repository's
+  kiokun data, cleared.
+- Found: a test reader decoded each TCP read on its own, splitting a
+  character (the shared helper's fix taken).
+
+[ADR-0314](DECISIONS/ADR-0314-kiokun-search.md): kiokun's search, over the
+whole dictionary (W6's; the integrator's rulings B1 to B5 of 2026-10-10).
+- kiokun.com's two FTS5 statements run in the data layer as written, over
+  migration 0005's schema (`source KiokunSearch`, host operations
+  `search#cjk`, `#latin`, `#aliases`, `#variants`, `#canonical`). The
+  program keeps the rest: detection, expansion, grouping, the score, the
+  cut.
+- Ranking stays FTS5's. A platform full-text source waits for a second use.
+- A search does not fail on what a reader types: each term is bound as an
+  FTS5 string.
+- The index is built once per process into `target/kiokun-search/`, keyed
+  by the CSV's digest. `is_common` is read as an integer.
+- Held to kiokun.com's `GET` handler in Node over `node:sqlite`. CI holds a
+  4,375-row sample from cleared sources.
+
+[ADR-0315](DECISIONS/ADR-0315-kiokun-reading-index-and-homophones.md):
+kiokun's reading index and the word page's Homophones (W6's).
+- The reading statement is the layer's (`search#reading`). The program keeps
+  the readings, the limit of 20, the groups and the common mark.
+- The section is rendered with the page, needs no script, and groups by the
+  readings' order.
+- Held to kiokun.com's endpoint, run in Node.
+
+[ADR-0316](DECISIONS/ADR-0316-kiokun-deinflection.md): kiokun's
+deinflection, our own rules (W6's; the owner's answer of 2026-10-11, rules
+of our own).
+- The facts come from three cited CC BY-SA 4.0 revisions (Wikipedia's
+  "Japanese conjugation", Wiktionary's verb and adjective appendices).
+  Facts only: the structure, names, reason labels and algorithm are the
+  rewrite's. Nothing is taken from 10ten-ja-reader's GPL-3.0 table.
+- Word classes with their bases, closings and auxiliaries, and up to six
+  rounds read back. The resolution is kiokun.com's own: the candidates'
+  files, part of speech checked, hiragana retried through the reading
+  index, at most five forms.
+- The inflected address answers 200 with the first form's entry, a note
+  "asked → form (how)" and the other forms, and keeps the address (as
+  MediaWiki's redirect note does), not kiokun.com's 307.
+- Held to kiokun.com as a black box in Node, never read and never
+  committed: 3,873 forms, 0 unnamed differences.

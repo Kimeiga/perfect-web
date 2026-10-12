@@ -102,10 +102,21 @@ test("the layout's count moves with the page's before the server answers", async
   await expect.poll(() => held.length).toBe(1);
   await expect(page.locator("#cart-count")).toHaveText("1");
   await expect(page.locator("#header-cart-count")).toHaveText("1");
+  // One entry, one speculation (ADR-0312): the layout's count is rendered
+  // from the cart's value, not moved as a value of its own.
+  expect(
+    await page.evaluate(() =>
+      window.__pw.log.filter((l) => l.startsWith("speculated store.page.add_to_cart")),
+    ),
+  ).toEqual(["speculated store.page.add_to_cart on cart"]);
   const answered = page.waitForResponse("**/command/store.page.add_to_cart");
   held.splice(0).forEach((release) => release());
   await answered;
   await expect(page.locator("#header-cart-count")).toHaveText("1");
+  // And the server's value reconciles it once, for the one entry.
+  await expect
+    .poll(() => page.evaluate(() => window.__pw.log.filter((l) => l.startsWith("reconciled ")).length))
+    .toBe(1);
 });
 
 test.describe("without a script", () => {

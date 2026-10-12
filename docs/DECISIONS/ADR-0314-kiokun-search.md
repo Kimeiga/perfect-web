@@ -1,4 +1,4 @@
-# ADR-XXXX: kiokun's search, over the whole dictionary
+# ADR-0314: kiokun's search, over the whole dictionary
 
 Status: accepted under the owner's delegation of 2026-10-02, on the
 integrator's rulings for track `kiokun` (docs/PARALLEL.md; its rulings of

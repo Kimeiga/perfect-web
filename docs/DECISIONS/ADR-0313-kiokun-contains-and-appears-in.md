@@ -1,4 +1,4 @@
-# ADR-XXXX: kiokun's word page shows Contains and Appears in
+# ADR-0313: kiokun's word page shows Contains and Appears in
 
 Status: accepted under the owner's delegation of 2026-10-02, on the
 integrator's rulings for track `kiokun` (docs/PARALLEL.md). Date:

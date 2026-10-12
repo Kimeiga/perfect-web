@@ -1,7 +1,8 @@
-# ADR-XXXX: kiokun's reading index and the word page's Homophones
+# ADR-0315: kiokun's reading index and the word page's Homophones
 
-Status: proposed (track `kiokun`, W6), under the owner's delegation of
-2026-10-02. Date: 2026-10-11. Milestone: E14.
+Status: accepted under the owner's delegation of 2026-10-02 (W6's, track
+`kiokun`; accepted at its merge, 2026-10-12). Date: 2026-10-11. Milestone:
+E14.
 
 ## Context
 

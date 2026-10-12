@@ -774,13 +774,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
             store's pages excluded from the second only to save a reading.
             One path for every page, `broadcast_menu`'s folded into it;
             after W9's merge.
-          - **one entry for a query a page and its layout both bind**
-            (found 2026-10-11, ADR-0191's amendment): read once for the
-            document (ADR-0303), but speculated as two bindings, `cart` and
-            `cart~StoreLayout`, each sent at its own entry and version, and
-            each given the press's transition. One entry for the two names,
-            in the speculation manifest, the host and the runtime. After
-            soft navigation, which changes the layout's runtime.
+          - ~~**one entry for a query a page and its layout both bind**~~
+            (found 2026-10-11, ADR-0191's amendment): one binding for the
+            entry and the layout's name its alias, in the speculation
+            manifest, the host and the runtime (ADR-0312, merged
+            2026-10-12).
 
           The infrastructure follow-ups, after these (the owner's order of
           2026-10-09):
@@ -907,7 +905,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
             W9's, after W8's merge: the home page's form, the cuisine as the
             store's own field (ruled 2026-10-12), `user`, and results
             filtered to the stores that reach the reader's address, through
-            W8's `Reach`;
+            W8's `Reach`. The integrator's, first: a part inside an arm whose
+            subject did not change is told when the query it reads changes
+            (ADR-0308's Found), and the sentence goes back inside the arm;
           - **W9, ratings and reviews** of orders and stores, after
             accounts.
 
@@ -923,9 +923,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
           rewritten in Pleris and served, from the kiokun slice (ADR-0037,
           ADR-0041). Its inventory and its word page are merged (ADR-0285,
           ADR-0286, ADR-0288, ADR-0289, ADR-0293, ADR-0299, and the page's
-          moves, ADR-0301, 2026-10-10); next (W6), the whole dictionary's
-          sample timed again, Contains and Appears-in, then step 2, search;
-          `/{word}` once `/_pw/` lands. Real
+          moves, ADR-0301, 2026-10-10), and so are Contains and Appears in,
+          search, the reading index with Homophones, and deinflection
+          (ADR-0313 to ADR-0316, 2026-10-12); next (W6), the search box at
+          `/search{?q}` and the word page's canonical link (W6's next
+          packet), then `/{word}` once `/_pw/` lands. Real
           users, data, devices and deploys are the strongest
           evidence there is. Its conditions: parity with the live site,
           measured; served first on a preview origin beside the live site;

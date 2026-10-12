@@ -311,6 +311,11 @@ refused by name:
   renders and is not patched, and neither is a shared list other than the
   menu. A query's error is the server's failure, not a value a page shows.
   kiokun's pages are static.
+  A part inside a block whose subject the page's parameters give, not a
+  query, is not told when a query it reads changes (ADR-0308's Found, W9's
+  `{#match q}`): the plan names a block only when a query's value decides
+  it. The integrator's to fix next; the search's sentence stands outside
+  its match until then.
 - **A clause's words are the clause's** (ADR-0047). Every name resolves in
   lexical scope, but `scope application`'s `application`, or `load`'s
   `on_first_interaction`, is a word of its clause and not a name. A word
@@ -385,6 +390,17 @@ refused by name:
 - **A statement keyword cannot name a value** (PW0013, ADR-0041, ruling
   needed). `let query = ..` is refused rather than read as a `query ..`
   statement at every use.
+
+**kiokun's search** (ADR-0314) runs kiokun.com's two FTS5 statements in its
+data layer, over the whole dictionary's index:
+- **Its page is at `/search/{q}`, with no search box**, until W6's next
+  packet moves it to `/search{?q}` with a plain GET form (ADR-0309). There
+  is no `/api/search`: a route that answers JSON has no form yet, and the
+  header's suggestions and handwriting input are the client's.
+- **Its ranking is FTS5's**, not Pleris's: a program cannot declare a
+  full-text index or its ranking, and a platform full-text source waits for
+  a second use. Whether production loaded `is_common` as text is the owner's
+  question (A-027).
 
 **The kiokun slice** (ADR-0037, ADR-0041) is one shard of kiokun.com, with
 its logic in Pleris and its data layer in the host:
@@ -674,15 +690,20 @@ awaited in order. What remains:
   yet place it elsewhere; a page without its runtime sends no command to
   refuse.
 - **kiokun's word page is its words, its labels, its character header,
-  its written forms, its head's title and description, its examples and its
-  pitch accent** (ADR-0286, ADR-0288, ADR-0289, ADR-0293, ADR-0299): the
-  mnemonic's text and components, contains and appears in (a list renders in its length since
-  ADR-0294; re-timed when W6 records the sample again), and the canonical
-  redirect (`KiokunError.Moved` is declared, and a page can answer it since
-  ADR-0295; kiokun's query does not return it yet) are still to come; the head has no canonical link, `og:url`
-  or JSON-LD until the integrator's canonical and std `Json` land, and no
-  preview image (`og:image`, `twitter:card`) until the owner approves an
-  image renderer; its title and description match kiokun.com's own code on
+  its written forms, its head's title and description, its examples, its
+  pitch accent, Contains and Appears in, Homophones, and an inflected
+  word's dictionary form** (ADR-0286, ADR-0288, ADR-0289, ADR-0293,
+  ADR-0299, ADR-0313, ADR-0315, ADR-0316): the mnemonic's text and
+  components, and the canonical redirect (`KiokunError.Moved` is declared,
+  and a page can answer it since ADR-0295; kiokun's query does not return
+  it yet) are still to come; Contains and Appears in send their whole lists,
+  the rest behind a disclosure, not read on demand (ADR-0313); Korean is not
+  deinflected (`korean-deinflect.ts`, the owner's own, not yet
+  reimplemented), and a form kiokun.com knows that the rewrite's own
+  conjugator does not ask is not compared (ADR-0316); the head has no
+  canonical link or `og:url` until W6's next packet states one (ADR-0311),
+  no JSON-LD until std `Json` lands, and no preview image (`og:image`,
+  `twitter:card`) until the owner approves an image renderer; its title and description match kiokun.com's own code on
   5,513 sampled words, read raw, where a stub's or a merged form's page is
   held by the server's tests alone; the route is `/word/{word}` until `/_pw/` lands; the tests
   run on the repository's sample, and no page was rendered beside

@@ -1,8 +1,8 @@
-# ADR-XXXX: kiokun's deinflection, our own rules
+# ADR-0316: kiokun's deinflection, our own rules
 
-Status: proposed (track `kiokun`, W6), under the owner's delegation of
-2026-10-02 and the owner's answer of 2026-10-11. Date: 2026-10-11.
-Milestone: E14.
+Status: accepted under the owner's delegation of 2026-10-02 and the owner's
+answer of 2026-10-11 (W6's, track `kiokun`; accepted at its merge,
+2026-10-12). Date: 2026-10-11. Milestone: E14.
 
 ## Context
 

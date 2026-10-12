@@ -19,7 +19,7 @@ it. Date: 2026-10-08. Milestone: E14, the owner's production target.
 - **What was read.** The app's source, in the owner's kiokun-data checkout
   (`sveltekit-app/`), at `abf71a89`. The working tree was read as it stood,
   with the owner's uncommitted changes to 11 files. **Amended 2026-10-10**
-  (the integrator's ruling, logged in ADR-XXXX, Contains and Appears in):
+  (the integrator's ruling, logged in ADR-0313, Contains and Appears in):
   the inventory and the oracles read kiokun-data's committed tree at HEAD,
   never its working tree, since the evidence names a commit; the
   uncommitted route `/api/character-lesson/[character]` and feature
