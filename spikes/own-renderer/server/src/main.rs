@@ -13003,6 +13003,24 @@ public query Store(",
             .expect_err("the same interaction is the same request");
         assert!(err.contains("first sent with other arguments"), "{err}");
         assert_eq!(s.cart_value("session-r"), 2, "no refusal moved the state");
+
+        // **One that committed nothing is held by the session's memory
+        // alone** (ADR-XXXX): a declared error records nothing, so the
+        // interaction sent again with other arguments is refused by what the
+        // session kept, as before a record was committed (ADR-0121), and is
+        // not answered the first's outcome.
+        s.stock_untold("cortado", false);
+        let declared = s
+            .command_json(ADD, "session-r", &other, Some("press-c"))
+            .expect("well-formed")
+            .expect_err("sold out");
+        assert!(declared.contains("item-unavailable"), "{declared}");
+        let err = s
+            .command_json(ADD, "session-r", &espresso, Some("press-c"))
+            .expect_err("the same interaction is the same request");
+        assert!(err.contains("first sent with other arguments"), "{err}");
+        assert_eq!(s.cart_value("session-r"), 2, "nothing moved the state");
+        s.stock_untold("cortado", true);
     }
 
     /// **What an idempotent command keeps is bounded** (ADR-0121, and E10
