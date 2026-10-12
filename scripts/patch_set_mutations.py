@@ -154,7 +154,20 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "server": ["cargo", "test", "--quiet", "-p", "pw-dev-server"],
+    # The development server's tests that see the server mutants' rules
+    # (W6's ruling of 2026-10-09), measured by `scripts/mutant_killers.py` on
+    # 2026-10-12 against its whole suite: each mutant failed by two of these
+    # where two fail at all. Its whole suite ran for every mutant.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_keyed_read_is_applied_as_one_patch_set",
+        "tests::a_list_inside_a_querys_value_is_rendered_and_patched_where_it_is",
+        "tests::a_list_moves_what_moved_and_sets_what_changed_where_it_is",
+        "tests::a_menu_changed_at_its_source_shows_once_its_value_is_read_again",
+        "tests::an_insert_and_what_changed_with_it_are_derived_from_the_menu",
+        "tests::each_change_is_derived_from_the_last_one_sent",
+        "tests::the_menu_is_no_session_s_list",
+    ],
     "protocol": ["cargo", "test", "--quiet", "--locked", "-p", "pw-protocol"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render", "--test", "plan_lists"],
 }

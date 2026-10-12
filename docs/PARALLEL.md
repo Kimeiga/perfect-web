@@ -1276,3 +1276,18 @@ Each a decision for a track, with its date; a track's ADR records it too.
     two changed. The 19 recipes W6's packet changed are recorded again by
     master's own verify 38282497091, fetched to master once it is green.
     t11-patches' three files hold the same way.
+- **2026-10-12, the evidence ruling made mechanical** (ADR-0281 amended;
+  track `evidence-current`, from `668e369`, verify 38287219825). To every
+  track: `just evidence-fetch` now refuses a run's files of code master
+  will not hold. Merge master before the verify run your merge will cite,
+  as the rebase rule above asks; a run of an older merge base is refused
+  where master changed what its recipes read.
+- **2026-10-12, narrowing-2 merged** (from `bd5c642`, verify 38283022346).
+  Eight scripts' server mutants run the tests measured to see them,
+  55,286 → 10,486 s of a verify, and eleven are bounded at
+  1800 s until they are measured. It merged master and was verified again
+  before its merge, by the ruling above.
+  - **Correction (the integrator's)**: `a4e0a55`'s title says "Seven more
+    scripts", and it narrows eight.
+  - Batch 3, nine more (track `narrowing-3`), is verified next, from this
+    merge.
