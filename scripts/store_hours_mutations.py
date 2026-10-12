@@ -80,10 +80,10 @@ MUTANTS = [
         HOURS_PW,
         "    let all = spans(h, zone, today)\n"
         "    match List.find(all, s => clock.passed(s.opens) & !clock.passed(s.closes)) {\n"
-        "        Some(s) => Open(",
+        "        Some(s) => OpenState.Open(",
         "    let all = spans(h, zone, today)\n"
         "    match List.find(all, s => !clock.passed(s.closes)) {\n"
-        "        Some(s) => Open(",
+        "        Some(s) => OpenState.Open(",
     ),
     (
         "the day after is said tomorrow",
