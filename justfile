@@ -99,8 +99,11 @@ verify-plan *args:
 
 test: test-unit test-compile
 
+# Every test binary runs, so one failure hides no other: a red run says
+# all it found (2026-10-12: `pw-conformance` failing first left
+# `pw-core`'s `value_relations` unrun, and a second round found it).
 test-unit:
-    cargo test --workspace
+    cargo test --workspace --no-fail-fast
 
 # Validates the accepted/rejected corpus. Four phases since E2:
 #   0. pw fmt --check — the corpus is canonically formatted (ADR-0013)
