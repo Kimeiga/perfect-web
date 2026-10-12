@@ -365,6 +365,19 @@ pub enum Part {
         key: String,
         content: Vec<TitlePiece>,
     },
+    /// `<link rel="canonical" href={StorePage(id)} />` at the top of a
+    /// page's view (ADR-0311): the address the page names its own. Its host
+    /// writes it into the document's `<head>`, absolute with the
+    /// deployment's origin, and Open Graph's `og:url` from it; it renders
+    /// nothing in the body. Numbered after the metadata.
+    Canonical {
+        id: PartId,
+        /// The route of the page it names, as declared: `/stores/{id}`.
+        route: String,
+        /// Each `{name}` of the route, and what fills it: text, or a value
+        /// the page reads.
+        args: Vec<(String, TitlePiece)>,
+    },
     /// Verbatim bytes.
     ///
     /// Reachable only from a value whose type carries the raw-HTML capability.
@@ -487,7 +500,8 @@ impl Part {
             | Part::Instance { id, .. }
             | Part::RawHtml { id, .. }
             | Part::Title { id, .. }
-            | Part::Meta { id, .. } => *id,
+            | Part::Meta { id, .. }
+            | Part::Canonical { id, .. } => *id,
             Part::Blocked { .. } => return None,
         })
     }
@@ -517,7 +531,7 @@ impl Part {
             | Part::Stream { .. }
             | Part::Instance { .. }
             | Part::RawHtml { .. } => Anchor::Range,
-            Part::Title { .. } | Part::Meta { .. } => Anchor::Document,
+            Part::Title { .. } | Part::Meta { .. } | Part::Canonical { .. } => Anchor::Document,
             Part::Blocked { .. } => return None,
         })
     }
@@ -537,6 +551,7 @@ impl Part {
             Part::RawHtml { .. } => "raw_html",
             Part::Title { .. } => "title",
             Part::Meta { .. } => "meta",
+            Part::Canonical { .. } => "canonical",
             Part::Blocked { .. } => "blocked",
         }
     }
@@ -890,6 +905,15 @@ impl Template {
                         | Part::Meta { content, .. } => content
                             .iter()
                             .filter_map(|p| match p {
+                                TitlePiece::Value(v) => Some(v.as_str()),
+                                TitlePiece::Text(_) => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                        // Every value its address reads, in the route's order.
+                        Part::Canonical { args, .. } => args
+                            .iter()
+                            .filter_map(|(_, p)| match p {
                                 TitlePiece::Value(v) => Some(v.as_str()),
                                 TitlePiece::Text(_) => None,
                             })
@@ -1251,12 +1275,16 @@ pub fn lowered(
     // A page's title is lowered after the rest of its view, wherever it is
     // written, so writing one moves no other part's number (ADR-0183).
     // Its metadata after its title, for the same reason (ADR-0186).
+    // And its canonical address after its metadata (ADR-0311).
     let page = decl.kind == crate::hir::DeclKind::Page;
+    let canonical = crate::canonical::page_link(decl, body);
     let (head, rest): (Vec<NodeId>, Vec<NodeId>) = roots_of(body)
         .into_iter()
-        .partition(|r| page && (is_title(body, *r) || is_meta(body, *r)));
-    let (titles, metas): (Vec<NodeId>, Vec<NodeId>) =
-        head.into_iter().partition(|r| is_title(body, *r));
+        .partition(|r| page && (is_title(body, *r) || is_meta(body, *r) || canonical == Some(*r)));
+    let (titles, metas): (Vec<NodeId>, Vec<NodeId>) = head
+        .into_iter()
+        .filter(|r| canonical != Some(*r))
+        .partition(|r| is_title(body, *r));
     // **The layout the page is shown in** (ADR-0303): its markup lowered
     // first, so its parts and elements are numbered the same on every page
     // that names it, and the page's own after them, placed in its slot.
@@ -1292,6 +1320,11 @@ pub fn lowered(
     }
     for meta in metas {
         chunks.push(Chunk::Dynamic(lower_meta(body, meta, &ctx, &mut ix)));
+    }
+    if let Some(link) = canonical {
+        chunks.push(Chunk::Dynamic(lower_canonical(
+            hirs, ws, unit, body, link, &ctx, &mut ix,
+        )));
     }
     let chunks = coalesce(chunks);
     let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
@@ -1932,6 +1965,87 @@ fn lower_meta(body: &Body, n: NodeId, ctx: &Lowering<'_>, ix: &mut Indexer) -> P
         attribute: attribute.to_string(),
         key,
         content,
+    }
+}
+
+/// **A page's canonical address** (ADR-0311): the route of the page its
+/// `href` names, each `{name}` of it given the argument its parameter takes,
+/// text or a value the page reads, by its path. Anything else is refused at
+/// check (PW5035, PW5051, PW0604), and blocked here.
+fn lower_canonical(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    unit: usize,
+    body: &Body,
+    n: NodeId,
+    ctx: &Lowering<'_>,
+    ix: &mut Indexer,
+) -> Part {
+    let blocked = |reason: &str| Part::Blocked {
+        reason: reason.to_string(),
+        at: "<link rel=\"canonical\">".to_string(),
+    };
+    let Some(e) = crate::canonical::address(body, n) else {
+        return blocked("a canonical address is a page's (PW5051)");
+    };
+    let Expr::Address { page: name, args } = body.expr(e) else {
+        return blocked("a canonical address is a page's (PW5051)");
+    };
+    let Some((def, page)) = crate::canonical::page_named(ws, unit, name).and_then(|d| {
+        crate::resolve::declaration(hirs, d)
+            .filter(|p| p.kind == crate::hir::DeclKind::Page)
+            .map(|p| (d, p))
+    }) else {
+        return blocked("a canonical address names a page (PW5051)");
+    };
+    let Some(route) = crate::routes::declared_route(hirs[def.unit], page) else {
+        return blocked("a canonical address names a page served at a route (PW5051)");
+    };
+    if route.contains("{?") {
+        return blocked("a canonical address with a query is not claimed (PW5051)");
+    }
+    let params: Vec<&str> = page.params.iter().map(|p| p.name.as_str()).collect();
+    if args.len() != params.len() {
+        return blocked("a page's address gives each of its parameters (PW0604)");
+    }
+    // Each argument by the parameter it gives: its name where one is
+    // written, its place otherwise.
+    let mut given: BTreeMap<String, (TitlePiece, Option<(String, ExprId)>)> = BTreeMap::new();
+    for (i, a) in args.iter().enumerate() {
+        let param = a.name.clone().unwrap_or_else(|| params[i].to_string());
+        let piece = match body.expr(a.value) {
+            Expr::Literal(l @ crate::hir::Literal::Str(_)) => match l.string_value() {
+                Some(t) => (TitlePiece::Text(t), None),
+                None => return blocked("an argument is text, or a value the page reads"),
+            },
+            _ => {
+                let Some(path) = ctx.path(body, a.value) else {
+                    return blocked("a value in a canonical address is read by its path (PW5051)");
+                };
+                let read = ctx.read(path);
+                (TitlePiece::Value(read.clone()), Some((read, a.value)))
+            }
+        };
+        given.insert(param, piece);
+    }
+    // In the route's order, each `{name}` given.
+    let mut filled = Vec::new();
+    let mut values = Vec::new();
+    for hole in crate::routes::route_holes(&route) {
+        let Some((piece, value)) = given.remove(hole.as_str()) else {
+            return blocked("a page's address gives each of its route's parameters (PW0604)");
+        };
+        values.extend(value);
+        filled.push((hole, piece));
+    }
+    let id = ix.part();
+    for (path, e) in values {
+        ix.read(id, &path, ReadKind::Meta, ReadAt::Expr(e), ctx);
+    }
+    Part::Canonical {
+        id,
+        route,
+        args: filled,
     }
 }
 
@@ -3422,6 +3536,22 @@ fn schema_of(params: &[String], chunks: &[Chunk]) -> String {
                                 feed(h, key.as_bytes());
                             }
                             for p in content {
+                                match p {
+                                    TitlePiece::Text(t) => {
+                                        feed(h, b"T");
+                                        feed(h, t.as_bytes());
+                                    }
+                                    TitlePiece::Value(v) => {
+                                        feed(h, b"V");
+                                        feed(h, v.as_bytes());
+                                    }
+                                }
+                            }
+                        }
+                        Part::Canonical { route, args, .. } => {
+                            feed(h, route.as_bytes());
+                            for (name, p) in args {
+                                feed(h, name.as_bytes());
                                 match p {
                                     TitlePiece::Text(t) => {
                                         feed(h, b"T");

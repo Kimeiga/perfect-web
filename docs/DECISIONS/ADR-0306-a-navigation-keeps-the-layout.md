@@ -170,3 +170,18 @@ after a commit, read after it), ADR-0219 (a live document is told), ADR-0122
   style to show.
 - **The document left lingers on the server** until its subscriber is idle
   (120 s): there is no release yet.
+
+## Amended, 2026-10-12: a navigation takes the next page's head whole
+
+Found by ADR-0311 (a page states its canonical address). Decision 4's swap
+took the next document's title, `description` and style, and no other of
+the head's metadata. ADR-0186 lets a page state any name and any property.
+So after a navigation the head kept the last page's Open Graph properties
+and its `theme-color`, which a browser reads live, and lacked the next
+page's. The swap now takes everything the page states of itself:
+- every `<meta>` but the host's charset and viewport;
+- its canonical address and `og:url` (ADR-0311);
+- its style.
+
+The host's own stay. `e2e/canonical.spec.mjs` holds it in three engines,
+and a mutant in `scripts/canonical_mutations.py`.

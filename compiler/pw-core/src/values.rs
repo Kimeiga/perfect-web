@@ -1373,7 +1373,7 @@ impl<'a> Typer<'a> {
             Expr::Interpolated { .. } => Ty::Primitive(Primitive::Str),
             Expr::Name(n) => self.name(id, n),
             Expr::Field { base, name } => self.field(id, *base, name),
-            Expr::Call { .. } => self.call(id).result,
+            Expr::Call { .. } | Expr::Address { .. } => self.call(id).result,
             // `let store = query Store(id)` binds what the query produces when
             // it succeeds: the page renders `{store.name}`, and its loading and
             // failure states are the page's to render, not the binding's. The
@@ -2228,6 +2228,27 @@ impl<'a> Typer<'a> {
             Expr::Call { callee, .. } => self.body.expr_span(*callee),
             _ => self.body.expr_span(id),
         };
+        // **A page's address** (ADR-0311): the page named among the views,
+        // as `navigate` names it (ADR-0280), given its parameters as a call
+        // gives them; the address it makes is text. What else the path
+        // names is PW5051's to say.
+        if let Expr::Address { page, args } = self.body.expr(id) {
+            let Some(sig) = crate::canonical::page_named(self.ws, self.at, page)
+                .and_then(|d| self.sigs.by_def(d))
+            else {
+                return unknown;
+            };
+            let given = args.iter().map(|a| (a.name.clone(), a.value)).collect();
+            let mut solved = self.apply(
+                self.body.expr_span(id),
+                callee_span,
+                None,
+                Target::Callable(sig),
+                given,
+            );
+            solved.result = Ty::Primitive(Primitive::Str);
+            return solved;
+        }
         // A call through a binding in scope: a function value, whatever
         // declaration shares its name (ADR-0068).
         if let Expr::Call { callee, args } = self.body.expr(id)
@@ -4044,7 +4065,7 @@ impl<'a> Typer<'a> {
                     ));
                 }
             }
-            Expr::Call { .. } => out.extend(self.call(id).relations),
+            Expr::Call { .. } | Expr::Address { .. } => out.extend(self.call(id).relations),
             // `navigate Page(..)` gives the page its parameters (ADR-0280):
             // each argument related as a call's is.
             Expr::Keyword {

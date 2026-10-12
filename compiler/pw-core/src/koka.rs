@@ -328,6 +328,8 @@ fn lower_expr(b: &Body, id: ExprId) -> Result<String, &'static str> {
         Expr::List { .. } => return Err("a collection literal"),
         Expr::Keyword { .. } => return Err("a body-level statement"),
         Expr::Template { .. } => return Err("markup"),
+        // Written only in a canonical link's `href`, which is markup's.
+        Expr::Address { .. } => return Err("a page's address"),
         // Deliberately refused rather than erased. ADR-0015 keeps the Koka
         // backend to the pure subset, and a cast is exactly the boundary the
         // corpus says must go through a decoder — emitting one silently would

@@ -1,0 +1,26 @@
+// @corpus: accepted
+// @id: A-033
+// @category: page states its canonical address
+// @charter: §8.2
+// @milestone: 14
+//
+// A page states the address it is at, for a search engine and a link's
+// preview, at the top of its view beside its title and its metadata
+// (ADR-0311): a page and its arguments, checked as a navigation's are. Its
+// host writes it into the head, absolute with the deployment's origin, and
+// Open Graph's address from it. A self-referencing one, as search engines
+// advise.
+
+module store.store_about
+
+import domain.{ StoreId }
+
+page StoreAbout(id: StoreId) !{} {
+    route "/stores/{id}/about"
+    view {
+        <title>About the store</title>
+        <meta name="description" content="Where the store is, and when it opens." />
+        <link rel="canonical" href={StoreAbout(id)} />
+        <main><h1>About the store</h1></main>
+    }
+}

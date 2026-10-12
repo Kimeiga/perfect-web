@@ -861,3 +861,33 @@ Generality at open:        44/44 invariants generality-tested
 | R-060 | added: a `public query` answering `Secret<Payments>`, kept in a `partition public` fragment (`PW5101`) | new category |
 | R-061 | added: a fragment of the session's cart placed at build (`PW5002`) | new category |
 | R-062 | added: a page placed at build reading the session through a query of its own (`PW5002`) | new category |
+
+## C19: a page states its canonical address, 2026-10-12
+
+Opened because the specification changed. A page states its canonical
+address with `<link rel="canonical" href={Page(args)} />` once, at the top of
+its view: a page's address, checked as a navigation's is (`PW5051`). Anywhere
+else a canonical link is still refused (`PW5035`).
+[ADR-0311](DECISIONS/ADR-0311-a-page-states-its-canonical-address.md) is the
+decision. No invariant is retired. One fixture changed:
+
+- **R-053**: its canonical link, which was at the top of the page's view, is
+  now inside `<main>`. At the top it would be the page's own address,
+  refused only for its text (R-063's defect).
+- **R-053's `@expect-error` lines**: they now say where the link is, and
+  quote PW5035's invariant as it names the exception.
+
+```text
+Corpus version:            C19
+Accepted programs:         33
+Rejected programs:         63
+Charter categories:        33/33 accepted, 63/63 rejected
+Generality at open:        45/45 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-033 | added: a page's own canonical address, beside its title and its description | new category, `page states its canonical address` |
+| R-053 | changed: its canonical link inside `<main>` (`PW5035`) | its category kept |
+| R-063 | added: a canonical address written as text (`PW5051`) | new category |
+| `canonical_address` | a GENERAL witness, an address that calls a view, and a NEIGHBOUR one, another page's address given by name in another order | new invariant |

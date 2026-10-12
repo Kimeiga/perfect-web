@@ -64,6 +64,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "a form control's value where HTML reads it",
     // ADR-0226, corpus C16: a value the template computes.
     "a value the template computes",
+    // ADR-0311, corpus C19: a page states its canonical address.
+    "page states its canonical address",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -154,6 +156,8 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a secret a query answers, kept in a shared fragment",
     "a fragment of a session's data, built before any request",
     "a session read through a query of a built page's own",
+    // ADR-0311, corpus C19: PW5051.
+    "a canonical address written as text",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0311, 2026-10-12: a page states its canonical address** (the
+integrator's; track `canonical`, merged from `d65f278`). kiokun's word page
+answers an inflected word with its dictionary form's entry, so it names
+that entry's address its own. `<link rel="canonical" href={Page(args)} />`
+at the top of a page's view is a page's address, checked as a navigation's
+is. The host writes it absolute with `PW_ORIGIN`, never the request's
+`Host`, and writes `og:url` from it.
+- Found: lowered as a call, an address took on the effects and the privacy
+  label of the page it names. Exempting the analyses one at a time missed
+  the label, and the mutation controls found it. An address is now its own
+  node in the HIR, which no analysis reads as a call.
+- Found: a soft navigation kept the last page's Open Graph properties and
+  `theme-color` (ADR-0306, amended): the next page's head is taken whole.
+Verify 38203954490 green: 21 of 21 mutants, the corpus (C19 at the merge,
+written C20 on the track), and the canonical spec in three engines.
+
 **ADR-0310, 2026-10-12: a name means its binding, in every analysis** (the
 integrator's; track `shadowing`, merged from `02a6319`). ADR-0063 ruled that
 every name means one binding, and three analyses still read names by their

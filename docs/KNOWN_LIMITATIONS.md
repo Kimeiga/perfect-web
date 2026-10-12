@@ -594,6 +594,11 @@ awaited in order. What remains:
 - **A layout is one, unnested, and given nothing** (ADR-0303): a page names
   one layout; a layout is shown in no other, is given none of the page's
   parameters, has no title template of its own, and holds one slot.
+- **A page's canonical address names a page without a query part, and only
+  `canonical` is hoisted** (ADR-0311): `alternate`, `icon` and `manifest`
+  links stay refused, as does a canonical address with a query. Whether
+  the named page's content duplicates this one's, as RFC 6596 asks, is the
+  program's to decide.
 - **A page's query parameters are text, and given by a link or a form**
   (ADR-0309): a list (`{?tag*}`) or a typed number is not read, `{&name}`
   continuation and a literal query part are refused, and `navigate` gives

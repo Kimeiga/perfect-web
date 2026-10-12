@@ -759,6 +759,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
             inventory names; Pleris has pages and uploads, and no form for
             a route whose answer is JSON.
 
+          - ~~**a page's canonical address**~~ (ADR-0311, merged
+            2026-10-12; Q2 of 2026-10-09). Next by the same ruling, **a
+            page's structured data** (Q3): JSON-LD typed as a std `Json`,
+            written by the host at the top of a page's view. It needs a
+            float among the renderer's values (JSON's numbers) and a
+            recursive `Json` from a query across the component boundary
+            (ADR-0205), so it waits for a page that asks for it; kiokun's
+            Difference 13 meanwhile;
           - **one telling path for every page a change reaches** (W9's
             finding, 2026-10-11): a menu change tells the store's pages by
             `broadcast_menu`'s own patches, and every other page by what

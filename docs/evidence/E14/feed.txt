@@ -1,8 +1,8 @@
 ADR-0220 - the feed reference app, served in browsers by the host that serves the store
 
 produced by: just e14-feed
-commit: a1a232f5c9e804c5eba9e2123d57fe8637666993
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38186484587 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: d65f2785ad21bf9bd599e639aec2c156d25c0a51
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38203954490 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -12,7 +12,7 @@ playwright: Version 1.58.0
 test tests::a_guests_post_names_the_guest_to_every_reader ... ok
 test tests::the_feeds_page_opening_its_stream_is_not_told_to_reload ... ok
 test tests::a_page_carries_its_data_layers_style_and_no_other ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 394 filtered out; finished in 12.15s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 393 filtered out; finished in 14.19s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
