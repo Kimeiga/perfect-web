@@ -24,8 +24,11 @@ Milestone: E14.
     cleared grammar reference, in our own structure, reason labels and
     algorithm, with kiokun.com's behaviour as an oracle and each
     disagreement named.
-- **The resolution around the rules is kiokun.com's own code** (MIT, the
-  owner's), read for this ADR:
+- **The resolution around the rules is kiokun.com's own code, the owner's**
+  (kiokun-data's LICENSE has reserved all rights since 1a9a8adb, 2026-10-04,
+  and the app names no other licence). It is reimplemented here because
+  the owner directs the rewrite, as ADR-0293's page head is, and its source
+  is never committed (Q3 of 2026-10-09). Read for this ADR:
   - each candidate is tried, fewest reasons first;
   - its entry is fetched, following redirects (up to three);
   - its entry's Japanese parts of speech are checked against the
@@ -247,8 +250,10 @@ Numbered after the reading index ADR's 33.
 
 ## Not claimed
 
-- **Korean deinflection** (`korean-deinflect.ts`): kiokun.com's own, its
-  source not yet checked.
+- **Korean deinflection** (`korean-deinflect.ts`): the owner's own (its
+  first commit ba343f46, 2026-02-16, names no outside source; checked from
+  its header and history by the integrator). It may be reimplemented on
+  the same terms as the resolution; it is not claimed yet.
 - **The search box's deinflection** (`navigateOrSearch`): there is no search
   box until a route reads its query part (the search ADR).
 - **The conjugation table** (`ConjugationTable.svelte`): the inventory's.

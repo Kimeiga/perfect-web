@@ -49,7 +49,7 @@ WORDS = "人市魚酒時夢空青上多面色聲樂錢園終半形博" + "谚諺
 
 # The sources the kept fields come from, each read at its source.
 SOURCES = {
-    "builder": "kiokun-data's builder (MIT, Hakan Alpay): the entry's structure",
+    "builder": "kiokun-data's builder, kiokun.com's own (the owner's, Hakan Alpay; all rights reserved): the entry's structure",
     "cc-cedict": "CC-CEDICT (MDBG), CC BY-SA 4.0, through Dong Chinese's export of it "
     "(data/chinese_dictionary_word_2025-06-25.jsonl, items tagged `cedict`)",
     "cc-canto": "Pleco's CC-Canto readings for CC-CEDICT, CC BY-SA 3.0 "

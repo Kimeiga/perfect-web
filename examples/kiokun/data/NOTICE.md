@@ -134,7 +134,11 @@ Each was read at its primary source on **2026-10-10**.
   - Through Lyroxide's Yomitan export (`data/krdict-en`). Its Korean IPA
     (`data/krdict-ipa`), whose terms are not stated, is not here.
 - **kiokun-data's builder**: each entry's structure: its `key` and the
-  characters' own forms. MIT, © Hakan Alpay (`kiokun-data/LICENSE`).
+  characters' own forms. The builder is kiokun.com's own, the owner's (©
+  Hakan Alpay): kiokun-data's LICENSE has reserved all rights since
+  1a9a8adb (2026-10-04), and earlier revisions were MIT. The structure is
+  here because the owner directs the rewrite; none of the builder's source
+  is here.
   - **`redirect` and `simplified_form_of`**, which name the entry a word's
     page is, are the builder's output, and its input for them is Dong
     Chinese's character data (its traditional variants, `src/main.rs`) or,
