@@ -117,6 +117,12 @@ ADR-0231 (a page's parameter is the document's for its life) and ADR-0307
     `the_sentence_inside_its_arm_is_told_where_it_is` (a `ReplaceText`, no
     `ReplaceRange`). The sentence is back inside the `Some` arm, after the
     form, with the intro in the `None` arm.
+  - With no `q` the page has no sentence, so the query computes none for
+    it: its `given`, which made the sentence empty for no `q`, is gone. W9's
+    mutant of it ("an address with no q is told it searched for nothing")
+    survived the first verify (38234706926): it changed what no page shows.
+    It goes with the code it mutated, and `store_search_mutations.py` holds
+    32.
 - `e2e/store-search.spec.mjs`, three engines: the status region is the
   element it was across a menu change and back. With no `q` there is no
   status.
