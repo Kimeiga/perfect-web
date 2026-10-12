@@ -1,8 +1,8 @@
-ADR-XXXX - a page's commands run in the order it sent them
+ADR-0305 - a page's commands run in the order it sent them
 
 produced by: just e14-command-order
-commit: 5ed759ddf9fd0ecc3a17ca7e519c97258c9dd549
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38157805656 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: a1a232f5c9e804c5eba9e2123d57fe8637666993
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38186484587 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -12,8 +12,8 @@ playwright: Version 1.58.0
 test order::tests::a_command_that_vanished_is_waited_for_again ... ok
 test order::tests::a_command_whose_named_one_was_answered_early_is_answered_early ... ok
 test order::tests::a_command_whose_named_one_was_answered_runs ... ok
-test order::tests::a_command_waits_for_the_one_it_names_to_arrive_and_run ... ok
 test order::tests::a_command_whose_named_one_never_comes_is_answered_early_after_the_wait ... ok
+test order::tests::a_command_waits_for_the_one_it_names_to_arrive_and_run ... ok
 test order::tests::a_session_forgotten_takes_its_fates ... ok
 test order::tests::another_sessions_command_of_the_same_name_is_not_the_one_named ... ok
 test order::tests::a_command_still_here_is_kept_past_the_bound ... ok
@@ -21,13 +21,13 @@ test tests::a_pages_command_whose_first_never_comes_is_answered_early_and_runs_n
 test tests::a_session_forgotten_takes_its_commands_order ... ok
 test tests::a_pages_command_after_one_closed_unrun_waits_for_it_sent_again ... ok
 test tests::a_pages_command_here_before_the_one_it_follows_runs_after_it ... ok
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 372 filtered out; finished in 6.67s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 385 filtered out; finished in 5.34s
 
 == in three engines (e2e/command-order.spec.mjs; optimistic.spec, navigate.spec)
 
-  12 passed (2.4m)
+  12 passed (1.6m)
   2 skipped
-  43 passed (2.6m)
+  43 passed (1.6m)
 
 == mutation controls (scripts/command_order_mutations.py)
 

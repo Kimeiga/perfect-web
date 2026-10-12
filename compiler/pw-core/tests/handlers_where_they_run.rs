@@ -55,8 +55,8 @@ fn a_page_built_ahead_may_have_a_button_that_sends_a_command() {
     // A lambda that calls the command, and the command named as the
     // handler (ADR-0199): each a request the command performs.
     for button in [
-        "<button type=\"button\" on:press={() => SaveAll()}>Save</button>",
-        "<button type=\"button\" on:press={SaveAll}>Save</button>",
+        "<button type=\"button\" on:press|refusable={() => SaveAll()}>Save</button>",
+        "<button type=\"button\" on:press|refusable={SaveAll}>Save</button>",
     ] {
         assert_eq!(reported(&shop(button)), Vec::<String>::new(), "{button}");
     }
@@ -66,7 +66,7 @@ fn a_page_built_ahead_may_have_a_button_that_sends_a_command() {
 fn a_handler_that_writes_itself_is_still_refused_where_it_runs() {
     // The control on the handler's side: the browser cannot grant a write.
     let found = reported(&shop(
-        "<button type=\"button\" on:press={() => write_thing(\"x\")}>Save</button>",
+        "<button type=\"button\" on:press|refusable={() => write_thing(\"x\")}>Save</button>",
     ));
     assert_eq!(
         found,

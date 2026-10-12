@@ -2588,3 +2588,24 @@ step to the parts two pages share kept in place).
     rule that had a copy on each path out of a page; each rule is now one
     function both paths call.
 
+
+[ADR-0307](DECISIONS/ADR-0307-a-control-is-shown-where-its-commands-predicates-hold.md):
+a control is shown where its command's predicates hold (the integrator's,
+the third step of "a refusal is never silent").
+- A page asks a predicate of its reader by naming it, `{#if SignedIn}` or
+  `hidden={!SignedIn}`. The deployment answers it as it answers `requires`
+  (`Identity::answers`), once a document and for the document's life. The
+  plan names what a page asks, and the document carries the answers to the
+  browser.
+- A control whose command requires a predicate with no parameters stands
+  where the page asks it and it holds (PW5048). `|refusable` marks one no
+  reader's answer decides. A page served to everyone asks its reader nothing
+  (PW5049). A name that holds no value is refused (PW0629).
+- Found:
+  - a name holding no value checked and built, and failed where it was
+    served;
+  - the feed showed fourteen controls a signed-out reader was refused for;
+  - a block decided by a value static for its document was never rendered
+    again;
+  - an answer read again at each read hid some controls after a sign-out
+    elsewhere and kept the rest.

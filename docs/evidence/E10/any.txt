@@ -1,99 +1,100 @@
 ADR-0065 - a value that holds at every type
 
 produced by: just e10-any
-commit: ae555e9a08ef808665f519c4b10341c6b8d94133
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37888911377 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: a1a232f5c9e804c5eba9e2123d57fe8637666993
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38186484587 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == None, [], Err, todo, a free parameter, a let mut (compiler/pw-core/tests/any_type.rs)
 
 test a_case_passed_as_a_function_keeps_its_link ... ok
-test a_generic_case_nothing_fixes_is_any_instance ... ok
 test a_failure_is_a_result_of_any_success ... ok
+test a_generic_case_nothing_fixes_is_any_instance ... ok
 test a_mutable_binding_is_one_type ... ok
 test a_parameter_no_field_mentions_is_any_type ... ok
-test a_folds_accumulator_is_what_its_function_builds ... ok
 test a_value_of_any_type_fixes_no_variable ... ok
+test a_folds_accumulator_is_what_its_function_builds ... ok
 test an_early_return_is_any_success ... ok
-test todo_is_any_value ... ok
 test none_is_an_option_of_anything ... ok
+test todo_is_any_value ... ok
 test an_empty_list_is_a_list_of_anything ... ok
 test a_seed_its_context_does_not_type_is_built_at_the_folds_type ... ok
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
 
 == what the value relations decide: the store program
 
 44 file(s)
-  Arity       agree                            112
-  Argument    agree                            150
-  Field       agree                            34
-  Return      agree                            92
+  Arity       agree                            116
+  Argument    agree                            151
+  Field       agree                            37
+  Return      agree                            103
   Return      undecided: Unknown               1
   Binding     agree                            3
-  Annotation  agree                            516
-  Operand     agree                            88
-  Assignment  agree                            24
-  Member      agree                            100
+  Annotation  agree                            542
+  Operand     agree                            125
+  Assignment  agree                            23
+  Member      agree                            103
   Case        agree                            7
   Fields      agree                            12
-  Branches    agree                            9
+  Branches    agree                            10
   Items       agree                            1
-  Literal     agree                            30
+  Literal     agree                            46
   Handler     agree                            10
-  Truth       agree                            5
-  Text        agree                            54
-  Invariant   agree                            5
+  Truth       agree                            14
+  Text        agree                            55
+  Invariant   agree                            6
   Transition  agree                            4
 
 == what the value relations decide: kiokun
 
 26 file(s)
-  Arity       agree                            74
+  Arity       agree                            77
   Argument    agree                            131
-  Field       agree                            30
-  Return      agree                            79
+  Field       agree                            33
+  Return      agree                            90
   Return      undecided: Unknown               1
   Binding     agree                            1
-  Annotation  agree                            400
-  Operand     agree                            173
+  Annotation  agree                            426
+  Operand     agree                            210
   Assignment  agree                            1
-  Member      agree                            105
+  Member      agree                            107
   Case        agree                            4
   Fields      agree                            6
-  Branches    agree                            5
+  Branches    agree                            6
   Items       agree                            1
-  Literal     agree                            79
+  Literal     agree                            95
   Truth       agree                            8
   Text        agree                            39
+  Invariant   agree                            1
 
 == what the value relations decide: the accepted corpus as one program
 
 74 file(s)
-  Arity       agree                            109
+  Arity       agree                            112
   Argument    agree                            162
   Argument    undecided: Unknown               5
-  Field       agree                            51
-  Return      agree                            103
+  Field       agree                            54
+  Return      agree                            114
   Return      undecided: Unknown               1
   Binding     agree                            2
   Binding     undecided: Unknown               3
-  Annotation  agree                            558
-  Operand     agree                            122
+  Annotation  agree                            584
+  Operand     agree                            159
   Operand     undecided: Unknown               3
   Assignment  agree                            2
-  Member      agree                            106
+  Member      agree                            108
   Member      undecided: Unknown               2
   Case        agree                            7
   Fields      agree                            18
-  Branches    agree                            11
+  Branches    agree                            12
   Branches    undecided: Unknown               1
   Items       agree                            3
-  Literal     agree                            43
+  Literal     agree                            59
   Handler     agree                            2
-  Truth       agree                            3
+  Truth       agree                            4
   Text        agree                            42
   Text        undecided: Unknown               2
-  Invariant   agree                            4
+  Invariant   agree                            5
   Transition  agree                            1
 
 == mutation controls (scripts/any_type_mutations.py)
@@ -114,6 +115,7 @@ a `let mut` holds any type its first value holds at: KILLED (1 of 12 tests fail)
 an assignment does not complete a `let mut`'s type: KILLED (1 of 12 tests fail)
 a value of any type is no number: KILLED (1 of 12 tests fail)
 14 of 14 mutants killed
+memory bound: no process was stopped
 
 NOT CLAIMED: a generic function's result its arguments do not fix, which
 stays unknown. Each undecided relation above is counted, never agreement.

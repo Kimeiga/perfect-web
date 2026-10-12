@@ -51,7 +51,7 @@ fn unit_is_built() {
                command clear() -> ()\n    requires      SignedIn\n    \
                idempotent_by InteractionId\n{\n    ()\n}\n\n\
                page P() {\n    cache private\n\n    \
-               view {\n        <main><button type=\"button\" on:press={() => clear()}>Go</button></main>\n    }\n}\n";
+               view {\n        <main><button type=\"button\" on:press|refusable={() => clear()}>Go</button></main>\n    }\n}\n";
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut units = Vec::new();
     for dir in ["packages/pw-std", "packages/pw-platform-web"] {

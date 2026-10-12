@@ -1,7 +1,8 @@
 E14-A - one store contract, three stacks
 
 produced by: just e14-contract
-commit: bf88f3b90a957960637898c4242b197999c83e98
+commit: a1a232f5c9e804c5eba9e2123d57fe8637666993
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38186484587 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 node: v22.21.1  pnpm: 10.15.1
   @playwright/test   1.58.0  (benchmarks/harness)
   @sveltejs/kit      2.70.3  (benchmarks/baselines/sveltekit)
@@ -21,7 +22,7 @@ node: v22.21.1  pnpm: 10.15.1
 
 == the contract, every stack, three times (benchmarks/harness/contract)
 
-  81 passed (23.1s)
+  81 passed (42.7s)
 
 == negative controls (scripts/bench_contract_mutations.py)
 
@@ -29,9 +30,9 @@ baseline pleris: 9 passed, 0 failed
 baseline next-react: 9 passed, 0 failed
 baseline sveltekit: 9 passed, 0 failed
 next-react: the count is distinct items, not their quantities: KILLED (4 of 9 contract tests fail)
-next-react: every session reads the first session's cart: KILLED (4 of 9 contract tests fail)
+next-react: every session reads the first session's cart: KILLED (5 of 9 contract tests fail)
 sveltekit: the count is distinct items, not their quantities: KILLED (4 of 9 contract tests fail)
-sveltekit: every session reads the first session's cart: KILLED (4 of 9 contract tests fail)
+sveltekit: every session reads the first session's cart: KILLED (5 of 9 contract tests fail)
 pleris: Add adds two: KILLED (6 of 9 contract tests fail)
 5 of 5 mutants killed
 memory bound: no process was stopped

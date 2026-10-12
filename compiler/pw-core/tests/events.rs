@@ -188,7 +188,9 @@ fn a_modifier_is_one_the_runtime_applies() {
     let found = reported(&form("|prevnt"));
     assert_eq!(
         found,
-        ["PW5027 `on:submit|prevnt` names no modifier the runtime applies: `prevent` or `stop`"]
+        [
+            "PW5027 `on:submit|prevnt` names no modifier the runtime applies: `prevent`, `stop` or `refusable`"
+        ]
     );
     for ok in ["|prevent", "|stop", "|prevent|stop", ""] {
         assert_eq!(reported(&form(ok)), Vec::<String>::new(), "{ok}");

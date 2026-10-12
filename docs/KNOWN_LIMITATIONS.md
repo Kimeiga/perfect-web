@@ -600,6 +600,13 @@ awaited in order. What remains:
 - **A layout is one, unnested, and given nothing** (ADR-0303): a page names
   one layout; a layout is shown in no other, is given none of the page's
   parameters, has no title template of its own, and holds one slot.
+- **A page asks only a predicate with no parameters of its reader**
+  (ADR-0307): a control whose command requires one with parameters
+  (`OwnsPost(post)`, `MayMessage(to)`) is not held to where it stands, and
+  the feed's Delete is shown where the program's own `mine` says. A view's
+  control is held in the view's own markup, not by a page's `{#if}` around
+  its use. An answer is the document's for its life: a reader signed out in
+  another tab is told at the next press (ADR-0302).
 - **A navigation keeps a layout, not more** (ADR-0306): between two pages
   of one layout and one build, the layout's regions stay; a page of another
   layout, another build, or none is loaded whole (ADR-0280), so the parts
