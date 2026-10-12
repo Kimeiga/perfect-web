@@ -745,12 +745,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
              crate, and with test keys only.
 
           Then the language's, found on the way:
-          - **a template's bindings shadow module members** (W8's finding,
-            2026-10-09): `<ready as={estimate}>` resolved to an imported
-            module's function `estimate` (PW0401) though the page bound the
-            name. Names a template binds (`<ready as>`, `<failed as>`,
-            `{#each … as}`, a match arm's binders) shadow module members and
-            imports, as a `let` does: a test for each form;
+          - ~~**a template's bindings shadow module members**~~ (ADR-0310,
+            merged 2026-10-12): a name means its binding in every analysis,
+            the template's bindings, a call through a local and a loop's
+            name beside a page's binding among them;
           - **a full-text source a program declares** (the integrator's
             ruling for W6, 2026-10-10): its index's columns, tokenizer and
             ranking, designed from two real uses, kiokun's search (whose

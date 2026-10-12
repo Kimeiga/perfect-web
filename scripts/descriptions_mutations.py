@@ -36,7 +36,7 @@ STORE = ROOT / "examples/store/app.pw"
 # Re-anchored by ADR-0277: the menu counted, a line after the store's own.
 BOTH_DESCRIPTIONS = (
     "            <p id=\"store-description\">{store.description}</p>\n"
-    "            <p id=\"menu-line\">{summary}</p>\n"
+    "            <p id=\"menu-line\">{line}</p>\n"
     "\n"
     "            <section aria-label=\"Delivery\" aria-live=\"polite\">\n"
     "                <stream query={Estimate(current_session())}>\n"
@@ -145,7 +145,7 @@ MUTANTS = [
         BOTH_DESCRIPTIONS.replace(
             "            <p id=\"store-description\">{store.description}</p>\n", ""
         )
-        .replace("            <p id=\"menu-line\">{summary}</p>\n", "")
+        .replace("            <p id=\"menu-line\">{line}</p>\n", "")
         .replace("                                    <p>{item.description}</p>\n", ""),
     ),
 ]

@@ -583,12 +583,6 @@ awaited in order. What remains:
   making recomputes its body whole, asking it again for each read it
   lacks; `regenerate on_read` is not run. One that declares no type is a
   fragment the host renders, the store's still wired by hand.
-- **A loop's name that shadows a page's binding is read as the binding**
-  (found 2026-10-08, ADR-0277). The page plan types a read by its root's
-  name among the page's bindings before its loops: on the store's page, a
-  binding named `line` beside the cart's `{#each cart.lines as line}` was
-  read for `line.name` inside the loop, and the build refused. The checker
-  accepts the shadowing; the binding is named `summary`.
 - **The clock is read by comparison alone** (ADR-0304): no value of "now"
   is kept or shown, so a countdown ("closes in 12 minutes") is not
   written; a handler reads no clock; a page built once and a public

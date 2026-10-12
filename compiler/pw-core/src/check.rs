@@ -2496,6 +2496,13 @@ fn handlers_run_in_the_browser(
                     let Expr::Call { callee, .. } = body.expr(*e) else {
                         return false;
                     };
+                    // A call through a local is the local's, never a
+                    // command of its spelling's (ADR-0063).
+                    if matches!(body.expr(*callee), Expr::Name(_))
+                        && lexical.binder(*callee).is_some()
+                    {
+                        return false;
+                    }
                     let path = path_of(body, *callee);
                     let resolution = match path.contains('.') {
                         true => workspace.resolve_path(unit, &path),
@@ -8136,6 +8143,14 @@ fn reads_label_with_source(
         // `query Cart(session)` parses as a keyword statement; `Cart(session)`
         // as a call. Both name a declaration.
         let called = match body.expr(id) {
+            // A call through a local is the local's, never a declaration
+            // of its spelling's (ADR-0063).
+            Expr::Call { callee, .. }
+                if matches!(body.expr(*callee), Expr::Name(_))
+                    && inference.local(at, body, *callee) =>
+            {
+                continue;
+            }
             Expr::Call { callee, .. } => path_of(body, *callee),
             Expr::Keyword {
                 keyword, modifiers, ..
@@ -8422,6 +8437,14 @@ fn reads_of(
     let mut out = Vec::new();
     for id in body.walk() {
         let read = match body.expr(id) {
+            // A call through a local is the local's, never a declaration
+            // of its spelling's (ADR-0063).
+            Expr::Call { callee, .. }
+                if matches!(body.expr(*callee), Expr::Name(_))
+                    && inference.local(at, body, *callee) =>
+            {
+                continue;
+            }
             Expr::Call { callee, .. } => path_of(body, *callee),
             Expr::Keyword {
                 keyword, modifiers, ..
@@ -8453,6 +8476,14 @@ fn observed_from(
     let body = hir.body(decl.body?);
     for id in body.walk() {
         let called = match body.expr(id) {
+            // A call through a local is the local's, never a declaration
+            // of its spelling's (ADR-0063).
+            Expr::Call { callee, .. }
+                if matches!(body.expr(*callee), Expr::Name(_))
+                    && inference.local(at, body, *callee) =>
+            {
+                continue;
+            }
             Expr::Call { callee, .. } => path_of(body, *callee),
             Expr::Keyword {
                 keyword, modifiers, ..

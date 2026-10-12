@@ -49,14 +49,16 @@ MUTANTS = [
     (
         "a name the view binds is never renamed",
         TEMPLATE,
-        "            if hides {\n",
-        "            if hides && written.len() > usize::MAX {\n",
+        # Re-anchored by the name bindings' ADR, whose rename is a value.
+        "            let name = if hides {\n",
+        "            let name = if hides && written.len() > usize::MAX {\n",
     ),
     (
         "a name the view binds does not hide its parameter",
         TEMPLATE,
-        "        for b in bound {\n            inner.names.remove(b);\n        }\n",
-        "",
+        # Re-anchored by the name bindings' ADR: the loop hides a signal too.
+        "            inner.names.remove(b);\n            inner.signals.remove(b);\n",
+        "            inner.signals.remove(b);\n",
     ),
     (
         "a capture is carried under the page's name for it",

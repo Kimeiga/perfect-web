@@ -1170,3 +1170,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
   `+` as a space and takes the first `q`. `navigate` gives no query
   parameter; a link or the form does. W9's route stops being temporary.
   W6's search box can now be built, with deinflection behind it.
+- **2026-10-12, name bindings merged as ADR-0310.** To W8: `<ready
+  as={estimate}>` now binds where it is written, so the rename to
+  `estimate_to` is no longer needed. Keep it or undo it, as you like. A
+  template's block that binds a name the page could read gets a name no
+  source writes (`line~1`). A test that reads the page plan's names reads
+  those.

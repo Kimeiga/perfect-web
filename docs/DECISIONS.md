@@ -2649,3 +2649,20 @@ W6's and W9's searches).
     with no script.
   - The host's move read a route's query part as part of its path: a move
     to itself became a 308 loop. PW5602 missed a page at a query route.
+
+[ADR-0310](DECISIONS/ADR-0310-a-name-means-its-binding-in-every-analysis.md):
+a name means its binding, in every analysis (the integrator's; the first of
+"the language's, found on the way").
+- `<ready as={x}>` and `<failed as={e}>` bind where they are written.
+- A call through a local is that local's. Effect inference, privacy's
+  reads and a handler's requests charge no declaration of its spelling.
+- Each name a template reads is one binding's. A block binding a name the
+  template could already read, and every binding a layout makes, gets a
+  name no source writes.
+- Found:
+  - W8's `<ready as={estimate}>` was charged a module function's row
+    (PW0401);
+  - a call through a `let` was charged its namesake's row (ADR-0283's
+    limitation);
+  - the page plan read a loop's `line` as the page's binding `line`
+    (ADR-0277's limitation). The store's binding is `line` again.
