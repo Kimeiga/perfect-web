@@ -1,0 +1,4 @@
+# kiokun's entries are raw DEFLATE. One with no NUL byte is diffed as text by
+# default, which put raw bytes into `git diff` and stopped ci_plan.py's plan
+# (verify 38211884690). They are binary.
+*.json.deflate binary

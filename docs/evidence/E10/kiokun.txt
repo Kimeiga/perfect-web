@@ -1,7 +1,7 @@
 E10 - the kiokun slice
 
 produced by: just e10-kiokun
-commit: 22eb45996657eb7a917058c52eff45eef57b6a76 + uncommitted changes
+commit: c45fd9180282456aa9dfd0a80e60a395c1630d0c
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == pw build, examples/kiokun
@@ -21,7 +21,7 @@ pw build: 2 template(s), 0 handler(s), 4 component(s), 6 contract(s) -> docs/evi
 
 == the sample shard (examples/kiokun/data/han-1char-3/MANIFEST.txt)
 
-kiokun.com shard han-1char-3: 28 files copied byte for byte by scripts/kiokun_sample.py
+kiokun.com shard han-1char-3: 28 entries read from kiokun-data's output and written
 
 == the host (spikes/kiokun/server)
 
@@ -44,7 +44,7 @@ test tests::the_compiled_shard_rule_places_every_word_kiokun_has ... ignored, re
 test tests::the_pages_are_the_compiled_templates_with_no_script ... ok
 test tests::the_sample_is_one_shard ... sample: 28 entries, 293 rows, 4 aliases
 test tests::the_shard_rule_is_kiokuns ... ok
-test result: ok. 10 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 3.55s
+test result: ok. 10 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 3.02s
 
 == the whole shard, and every word kiokun has
 
@@ -52,4 +52,4 @@ test result: ok. 10 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; fin
 
 == in browser engines (spikes/own-renderer/e2e/kiokun.spec.mjs)
 
-  21 passed (50.3s)
+  21 passed (48.2s)

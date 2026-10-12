@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Mutation controls for kiokun.com's parity inventory check.
+"""Mutation controls for kiokun.com's parity inventory check, for the
+oracles' copy of kiokun.com's files, and for the repository's sample.
 
 A test that passes with the check removed is not evidence for it. Each
-mutant undoes one thing `kiokun_inventory.py` holds the inventory to, and
-at least one of its tests (scripts/tests/test_kiokun_inventory.py) must
+mutant undoes one thing `kiokun_inventory.py` holds the inventory to, or
+one thing `kiokun_app_source.py` holds an oracle's copy to (the commit at
+HEAD, never the working tree), and at least one of their tests
+(scripts/tests/test_kiokun_inventory.py, test_kiokun_app_source.py) must
 then fail.
 
 Run from the repository root. The sources are restored after every mutant,
@@ -18,6 +21,9 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts/kiokun_inventory.py"
 PLAN = ROOT / "scripts/ci_plan.py"
+SOURCE = ROOT / "scripts/kiokun_app_source.py"
+SAMPLE = ROOT / "scripts/kiokun_sample.py"
+SEARCH_SAMPLE = ROOT / "scripts/kiokun_search_sample.py"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
@@ -30,8 +36,116 @@ MUTANTS = [
     (
         "an endpoint is not a route",
         SCRIPT,
-        '        endpoint = "+server.ts" in names or "+server.js" in names',
+        '        endpoint = "+server.ts" in names[directory] or "+server.js" in names[directory]',
         "        endpoint = False",
+    ),
+    (
+        "the index is read, which holds files staged and not committed",
+        SCRIPT,
+        '    r = git(app, "ls-tree", "-r", "--name-only", "HEAD", "--", "src/routes")',
+        '    r = git(app, "ls-files", "--", "src/routes")',
+    ),
+    (
+        "the owner's work is not named as not read",
+        SCRIPT,
+        '    return [line[3:] for line in git(app, "status", "--porcelain", "--", "src/routes").stdout.splitlines()]',
+        "    return []",
+    ),
+    (
+        "an oracle copies the working tree",
+        SOURCE,
+        '        shown = git(app, "show", f"HEAD:./{path}")\n',
+        '        shown = subprocess.run(["cat", str(app / path)], capture_output=True)\n',
+    ),
+    (
+        "an oracle's copy names no uncommitted work",
+        SOURCE,
+        "    if unread:\n",
+        "    if False:\n",
+    ),
+    (
+        "an oracle's digest is of nothing",
+        SOURCE,
+        '        digests.append(f"{path} {hashlib.sha256(shown.stdout).hexdigest()[:12]}")\n',
+        '        digests.append(f"{path} {hashlib.sha256(b\"\").hexdigest()[:12]}")\n',
+    ),
+    (
+        "the sample keeps every Chinese item, Dong Chinese's too",
+        SAMPLE,
+        '        word["items"] = [i for i in word.get("items", []) if i.get("source") == "cedict"]\n',
+        '        word["items"] = list(word.get("items", []))\n',
+    ),
+    (
+        "the sample keeps KANJIDIC2's contributed readings",
+        SAMPLE,
+        '        group["readings"] = [r for r in group.get("readings", []) if r.get("type") in KANJI_READINGS]\n',
+        "        pass\n",
+    ),
+    (
+        "the sample keeps whole what it names a part of",
+        SAMPLE,
+        '        return {k: kept(value[k], sub) for k, sub in node.items() if k in value}\n',
+        "        return value\n",
+    ),
+    (
+        "the sample keeps the owner's mnemonics",
+        SAMPLE,
+        '    ("key", "builder"),\n',
+        '    ("key", "builder"),\n    ("semantic_mnemonic", "builder"),\n',
+    ),
+    (
+        "the sample keeps a relation Unihan does not state",
+        SAMPLE,
+        "        if not stated:\n            del entry[field]\n",
+        "        if not stated:\n            pass\n",
+    ),
+    (
+        "Unihan's kSimplifiedVariant is read as naming traditional forms",
+        SAMPLE,
+        '            pair = (other, c) if field == "kSimplifiedVariant" else (c, other)\n',
+        "            pair = (c, other)\n",
+    ),
+    (
+        "the sample reads every variant field of Unihan's",
+        SAMPLE,
+        '        if field not in ("kSimplifiedVariant", "kTraditionalVariant"):\n            continue\n',
+        "        pass\n",
+    ),
+    (
+        "the deinflection sample keeps every cleared field",
+        SAMPLE,
+        '    return {k: out[k] for k in ("key", "japanese_words") if k in out}\n',
+        "    return out\n",
+    ),
+    (
+        "the NOTICE links Unicode's licence and reproduces none",
+        ROOT / "examples/kiokun/data/NOTICE.md",
+        "`LICENSE-UNICODE.txt`, beside this file",
+        "<https://www.unicode.org/license.txt>",
+    ),
+    (
+        "the search sample keeps every Chinese row",
+        SEARCH_SAMPLE,
+        '        if language == "chinese" and (word, row[at["definition"]]) not in chinese:\n',
+        "        if False:\n",
+    ),
+    (
+        "the search sample keeps no row for the word sample's homophones",
+        SEARCH_SAMPLE,
+        '        homophone = row[at["language"]] == "japanese" and row[at["pronunciation"]] in readings\n',
+        "        homophone = False\n",
+    ),
+    (
+        "the search sample keeps any language's row read as a sample reading",
+        SEARCH_SAMPLE,
+        '        homophone = row[at["language"]] == "japanese" and row[at["pronunciation"]] in readings\n',
+        '        homophone = row[at["pronunciation"]] in readings\n',
+    ),
+    (
+        "the search sample keeps the Korean IPA",
+        SEARCH_SAMPLE,
+        '            row[at["pronunciation"]] = ""\n',
+        "            pass\n",
     ),
     (
         "a route listed twice passes",
@@ -77,7 +191,17 @@ MUTANTS = [
     ),
 ]
 
-TESTS = [[sys.executable, "-m", "unittest", "scripts/tests/test_kiokun_inventory.py"]]
+TESTS = [
+    [
+        sys.executable,
+        "-m",
+        "unittest",
+        "scripts/tests/test_kiokun_inventory.py",
+        "scripts/tests/test_kiokun_app_source.py",
+        "scripts/tests/test_kiokun_sample.py",
+        "scripts/tests/test_kiokun_search_sample.py",
+    ]
+]
 
 
 def run_tests():

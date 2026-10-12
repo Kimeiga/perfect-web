@@ -23,6 +23,21 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0313 to ADR-0316, 2026-10-12: kiokun's Contains and Appears in, its
+search, its reading index and Homophones, and its deinflection** (W6's,
+track `kiokun`, merged from `fc77a5a2`). Each is held to kiokun.com's own
+code, run locally and never committed:
+- Contains and Appears in: 5,513 sampled words, the same;
+- search: kiokun.com's two FTS5 statements in the data layer, over its
+  migration 0005;
+- Homophones: rendered with the page, and needing no script;
+- deinflection: our own rules from three cited CC BY-SA revisions, none of
+  10ten's GPL table. 3,873 forms, 0 unnamed differences. An inflected
+  address answers 200 with its dictionary form's entry and a note.
+Verify 38212356198 green: kiokun-word's 132 of 132 mutants, redirects' 15
+and dealt-by-time's 17. A search fails on nothing a reader types.
+`is_common`'s loading is the owner's question (A-027).
+
 **ADR-0312, 2026-10-12: a page and its layout show one entry by one value**
 (the integrator's; track `one-entry`, merged from `0ab1afc`). The store's
 pages and their layout both show the session's cart: read once for the

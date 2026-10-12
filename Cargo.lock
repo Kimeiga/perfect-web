@@ -1272,6 +1272,7 @@ dependencies = [
  "pw-resource",
  "pw-syntax",
  "pw-time",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.11.0",

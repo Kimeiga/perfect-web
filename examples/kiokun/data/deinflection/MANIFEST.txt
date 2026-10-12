@@ -1,0 +1,31 @@
+The deinflection sample: 27 entries read from kiokun-data's output and written
+by scripts/kiokun_sample.py with their key and their Japanese words alone (JMdict's,
+the fields the han-1char-3 MANIFEST names under japanese_words); see ../NOTICE.md.
+
+51/食べる.json.deflate     459  d83cc32cb117420d08f5b5cc5cff19cbc5a1df4cd092456a7770ff8e21024b13
+60/見る.json.deflate     961  b99d52b1618965d099dc6b5694bda0bb9906cb92dc9bebd39e25c51d9cfaefc9
+57/書く.json.deflate     354  fa2261473efecf7453286b61ed63dd6e2b167b04222d4613d9c31e195a34e993
+83/行く.json.deflate    1091  08e9ece26f28df5b537414caf6076b64c9b454adbcc82502864bec9aaa2d531c
+bd/泳ぐ.json.deflate     434  c806b8715aa26eac183dc93e7ca08b5cdb0bb81179ebe621d3ef46154083bcd5
+08/話す.json.deflate     568  561c0751cd321d04a5b1ea477753d87246347c2037b59f200bde847a9222f191
+7f/待つ.json.deflate     412  0e7ae70b3a9d531bc9e0620c566a7c01f55d45030d0735d6e81bfe6720bef1fc
+51/死ぬ.json.deflate     395  e27d2e4e665b417ae2a0f910bcbaae47ac4133c20f8dabdaa6ffb79408264881
+6c/遊ぶ.json.deflate     871  b4c8cd8b416fe69c86b3447fb84823c67b4cf75f55ca7bfd747391d89c95d6a6
+73/読む.json.deflate     825  d721b1ec7d793a59d8b95c57e75944774f492e6c11e635a0a1c4e717cfe3f548
+5b/帰る.json.deflate     517  40b7f0b6cd57df5db7491c5c18334ad98dae60ab8a612e84c0d782d287e1492a
+6f/買う.json.deflate     686  210ceb18e83333f5ce6a68bac72c8d11abe480c6d30510b48605b593b926ce06
+d7/問う.json.deflate     624  8ae3ccb5b00c5b391dd3d8bdbe1c620bc8ad765be2df7e11a3eabbe67a23c8e1
+c6/来る.json.deflate     710  4a56c98aeb2dcfe1881de5e4e197c6ce13616843f8469b652cf39cde27eb6d62
+8e/勉強.json.deflate     431  6a543354dafc9d969c0db38cf053ddee4cea266b1a4e28b7c2e81c2cd1cb2869
+ad/愛する.json.deflate     324  fd903bf666fca150c9f3a1cdc7516167e6a6eba617f9416c4d1b750f34e2229a
+9e/愛す.json.deflate     188  472a1f92ae462231b80d5217b84be68c64c5387f73b072f4107ed6dcd522729f
+6c/高い.json.deflate     756  26434eda6e975c27246798eec8e5dec68523f774b8eea15bce939213f72f342d
+80/いい.json.deflate     908  9d562715726c3d16cc56ea970416606c60bc1bc60294d1dd9599f1f8180023f2
+b5/良い.json.deflate     586  6d19e140497353f8380985040b0723db63542a59d43c9694c88a0f32ab52c75a
+8a/履く.json.deflate     471  1ccf1eb8f588dfd3c85baad881e0d72936ad5a0f4c8d7a021b66604a8b3c2858
+3f/吐く.json.deflate     613  462473c666ffdeec85efee6aa749e4d6b9a42e053b5689f508a2dd881cf3e5fe
+2c/掃く.json.deflate     343  5d804dbacbd68b408d15f546e3fa82ec4b116e23287c198d4ba1f98f62a54516
+27/ケチ臭い.json.deflate     288  ebdbaa97ec1cd6ec52d7481e914f478a6897b4045de91cbec4e2368494283cac
+27/けち臭い.json.deflate     293  7c5f85dcb713b792146ec113d3e351edfa16d4188c884335577e242344e8218a
+12/口を滑らす.json.deflate     286  4dae362fdc68b910cea358fcc2c444cddf3659c33302eb2f13ecc9be78a45d48
+f7/口を滑らせる.json.deflate     417  b8d14d5d78d3c05ff3badd47fd8c32109fadc41c30970ebc07f3163ac03e3570

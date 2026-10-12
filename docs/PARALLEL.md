@@ -1198,3 +1198,10 @@ Each a decision for a track, with its date; a track's ADR records it too.
   ADR-0312.** A page's speculation module has one binding for an entry and
   exports the layout's name as its alias (`aliases`). A test or a runtime
   change that reads a module's `bindings` finds no layout's name there.
+- **2026-10-12, W6's Contains and Appears in, search, reading index and
+  Homophones, and deinflection, merged as ADR-0313 to ADR-0316** (from
+  `fc77a5a2`, verify 38212356198). Numbered by the words beside each
+  `ADR-XXXX`, as W6 listed them. W6's next packet (`98a1f1e1`: the search
+  box at `/search{?q}`, the canonical link, the inventory at kiokun.com's
+  `2391117c`) merges when its verify is green, with kiokun-search.txt
+  recorded again at the new route.

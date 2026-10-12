@@ -923,9 +923,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
           rewritten in Pleris and served, from the kiokun slice (ADR-0037,
           ADR-0041). Its inventory and its word page are merged (ADR-0285,
           ADR-0286, ADR-0288, ADR-0289, ADR-0293, ADR-0299, and the page's
-          moves, ADR-0301, 2026-10-10); next (W6), the whole dictionary's
-          sample timed again, Contains and Appears-in, then step 2, search;
-          `/{word}` once `/_pw/` lands. Real
+          moves, ADR-0301, 2026-10-10), and so are Contains and Appears in,
+          search, the reading index with Homophones, and deinflection
+          (ADR-0313 to ADR-0316, 2026-10-12); next (W6), the search box at
+          `/search{?q}` and the word page's canonical link (W6's next
+          packet), then `/{word}` once `/_pw/` lands. Real
           users, data, devices and deploys are the strongest
           evidence there is. Its conditions: parity with the live site,
           measured; served first on a preview origin beside the live site;

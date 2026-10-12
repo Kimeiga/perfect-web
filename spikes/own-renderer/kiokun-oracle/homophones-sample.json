@@ -1,0 +1,1626 @@
+{
+ "kiokun_commit": "abf71a89af1111f4039578cd1fde58e06f14c4bf",
+ "node": "v22.21.1",
+ "oracle": {
+  "answered": 21,
+  "answers": {
+   "上": [
+    {
+     "reading": "うえ",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "うえ",
+       "word": "飢え"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "うえ",
+       "word": "筌"
+      }
+     ]
+    },
+    {
+     "reading": "かみ",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "かみ",
+       "word": "紙"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "かみ",
+       "word": "神"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "かみ",
+       "word": "髪"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "かみ",
+       "word": "加味"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "かみ",
+       "word": "守"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "かみ",
+       "word": "佳味"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "かみ",
+       "word": "ネ申"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "かみ",
+       "word": "長官"
+      }
+     ]
+    },
+    {
+     "reading": "じょう",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "じょう",
+       "word": "嬢"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "じょう",
+       "word": "情"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "じょう",
+       "word": "状"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "じょう",
+       "word": "畳"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "じょう",
+       "word": "錠"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "尉"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "冗"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "条"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "乗"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "城"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "穣"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "丈"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "杖"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "帖"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "場"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "諚"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じょう",
+       "word": "定"
+      }
+     ]
+    }
+   ],
+   "人": [
+    {
+     "reading": "と",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "と",
+       "word": "戸"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "と",
+       "word": "斗"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "と",
+       "word": "途"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "と",
+       "word": "徒"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "と",
+       "word": "都"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "と",
+       "word": "砥"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "と",
+       "word": "堵"
+      }
+     ]
+    },
+    {
+     "reading": "ひと",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "ひと",
+       "word": "一"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "ひと",
+       "word": "匪徒"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "ひと",
+       "word": "非と"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "ひと",
+       "word": "費途"
+      }
+     ]
+    },
+    {
+     "reading": "にん",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "にん",
+       "word": "任"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "にん",
+       "word": "忍"
+      }
+     ]
+    },
+    {
+     "reading": "じん",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "じん",
+       "word": "仁"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じん",
+       "word": "壬"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じん",
+       "word": "陣"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じん",
+       "word": "仞"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じん",
+       "word": "塵"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じん",
+       "word": "尽"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じん",
+       "word": "腎"
+      }
+     ]
+    }
+   ],
+   "半": [
+    {
+     "reading": "はん",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "はん",
+       "word": "判"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "はん",
+       "word": "反"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "はん",
+       "word": "版"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "はん",
+       "word": "班"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "はん",
+       "word": "藩"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "はん",
+       "word": "汎"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "はん",
+       "word": "範"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "はん",
+       "word": "煩"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "はん",
+       "word": "犯"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "はん",
+       "word": "繁"
+      }
+     ]
+    }
+   ],
+   "博": [
+    {
+     "reading": "はく",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "はく",
+       "word": "伯"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "はく",
+       "word": "掃く"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "はく",
+       "word": "履く"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "はく",
+       "word": "吐く"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "はく",
+       "word": "泊"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "はく",
+       "word": "箔"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "はく",
+       "word": "魄"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "はく",
+       "word": "拍"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "はく",
+       "word": "帛"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "はく",
+       "word": "白"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "はく",
+       "word": "刷く"
+      }
+     ]
+    },
+    {
+     "reading": "ばく",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "ばく",
+       "word": "獏"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "ばく",
+       "word": "爆"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "ばく",
+       "word": "縛"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "ばく",
+       "word": "漠"
+      }
+     ]
+    }
+   ],
+   "園": [
+    {
+     "reading": "その",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "その",
+       "word": "其の"
+      }
+     ]
+    },
+    {
+     "reading": "えん",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "えん",
+       "word": "円"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "えん",
+       "word": "縁"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "えん",
+       "word": "冤"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "えん",
+       "word": "艶"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "えん",
+       "word": "炎"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "えん",
+       "word": "塩"
+      }
+     ]
+    }
+   ],
+   "多": [
+    {
+     "reading": "た",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "た",
+       "word": "田"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "た",
+       "word": "他"
+      }
+     ]
+    }
+   ],
+   "夢": [
+    {
+     "reading": "ゆめ",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "ゆめ",
+       "word": "努"
+      }
+     ]
+    }
+   ],
+   "市": [
+    {
+     "reading": "いち",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "いち",
+       "word": "一"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "いち",
+       "word": "位置"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "いち",
+       "word": "逸"
+      }
+     ]
+    },
+    {
+     "reading": "し",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "し",
+       "word": "死"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "し",
+       "word": "誌"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "し",
+       "word": "四"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "し",
+       "word": "詩"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "し",
+       "word": "史"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "し",
+       "word": "氏"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "仕"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "刺"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "師"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "枝"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "糸"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "其"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "子"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "觜"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "司"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "姉"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "巵"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "し",
+       "word": "視"
+      }
+     ]
+    }
+   ],
+   "形": [
+    {
+     "reading": "よう",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "よう",
+       "word": "用"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "よう",
+       "word": "様"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "よう",
+       "word": "陽"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "よう",
+       "word": "酔う"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "よう",
+       "word": "要"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "よう",
+       "word": "葉"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "よう",
+       "word": "杳"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "よう",
+       "word": "癰"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "よう",
+       "word": "庸"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "よう",
+       "word": "洋"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "よう",
+       "word": "幼"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "よう",
+       "word": "俑"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "よう",
+       "word": "良う"
+      }
+     ]
+    },
+    {
+     "reading": "かた",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "かた",
+       "word": "潟"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "かた",
+       "word": "型"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "かた",
+       "word": "肩"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "かた",
+       "word": "方"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "かた",
+       "word": "過多"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "かた",
+       "word": "片"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "かた",
+       "word": "夥多"
+      }
+     ]
+    },
+    {
+     "reading": "がた",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "がた",
+       "word": "方"
+      }
+     ]
+    },
+    {
+     "reading": "なり",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "なり",
+       "word": "鳴り"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "なり",
+       "word": "也"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "なり",
+       "word": "生り"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "なり",
+       "word": "成り"
+      }
+     ]
+    },
+    {
+     "reading": "けい",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "けい",
+       "word": "刑"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "けい",
+       "word": "系"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "けい",
+       "word": "計"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "けい",
+       "word": "軽"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "桂"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "径"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "敬"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "兄"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "頃"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "奎"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "磬"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "罫"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "景"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "経"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "けい",
+       "word": "卿"
+      }
+     ]
+    }
+   ],
+   "時": [
+    {
+     "reading": "とき",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "とき",
+       "word": "斎"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "とき",
+       "word": "鬨"
+      }
+     ]
+    },
+    {
+     "reading": "じ",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "じ",
+       "word": "字"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "じ",
+       "word": "痔"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じ",
+       "word": "児"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じ",
+       "word": "璽"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じ",
+       "word": "次"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じ",
+       "word": "辞"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じ",
+       "word": "事"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じ",
+       "word": "路"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じ",
+       "word": "自"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じ",
+       "word": "寺"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じ",
+       "word": "地"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "じ",
+       "word": "持"
+      }
+     ]
+    },
+    {
+     "reading": "どき",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "どき",
+       "word": "土器"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "どき",
+       "word": "怒気"
+      }
+     ]
+    }
+   ],
+   "樂": [
+    {
+     "reading": "らく",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "らく",
+       "word": "酪"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "らく",
+       "word": "洛"
+      }
+     ]
+    },
+    {
+     "reading": "がく",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "がく",
+       "word": "額"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "がく",
+       "word": "学"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "がく",
+       "word": "萼"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "がく",
+       "word": "顎"
+      }
+     ]
+    }
+   ],
+   "空": [
+    {
+     "reading": "くう",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "くう",
+       "word": "食う"
+      }
+     ]
+    },
+    {
+     "reading": "から",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "から",
+       "word": "殻"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "から",
+       "word": "幹"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "から",
+       "word": "唐"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "から",
+       "word": "辛"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "から",
+       "word": "掛絡"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "から",
+       "word": "加羅"
+      }
+     ]
+    },
+    {
+     "reading": "うろ",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "うろ",
+       "word": "迂路"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "うろ",
+       "word": "雨露"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "うろ",
+       "word": "烏鷺"
+      }
+     ]
+    }
+   ],
+   "終": [
+    {
+     "reading": "つい",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "つい",
+       "word": "対"
+      }
+     ]
+    },
+    {
+     "reading": "おわり",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "おわり",
+       "word": "尾張"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "おわり",
+       "word": "糸冬"
+      }
+     ]
+    }
+   ],
+   "聲": [
+    {
+     "reading": "こえ",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "こえ",
+       "word": "肥"
+      }
+     ]
+    },
+    {
+     "reading": "しょう",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "しょう",
+       "word": "商"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しょう",
+       "word": "症"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しょう",
+       "word": "章"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しょう",
+       "word": "象"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しょう",
+       "word": "賞"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しょう",
+       "word": "将"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しょう",
+       "word": "小"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しょう",
+       "word": "少"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しょう",
+       "word": "相"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "称"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "衝"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "笙"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "省"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "床"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "頌"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "簫"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "升"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "荘"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "抄"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょう",
+       "word": "正"
+      }
+     ]
+    }
+   ],
+   "色": [
+    {
+     "reading": "しょく",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "しょく",
+       "word": "職"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しょく",
+       "word": "食"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょく",
+       "word": "燭"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょく",
+       "word": "蜀"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょく",
+       "word": "食"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょく",
+       "word": "初句"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しょく",
+       "word": "諸苦"
+      }
+     ]
+    },
+    {
+     "reading": "しき",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "しき",
+       "word": "式"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しき",
+       "word": "四季"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しき",
+       "word": "士気"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "しき",
+       "word": "指揮"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "識"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "鋪"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "職"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "死期"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "始期"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "紙器"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "私記"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "志気"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "史記"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "敷き"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "四気"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しき",
+       "word": "子規"
+      }
+     ]
+    }
+   ],
+   "諺": [],
+   "貪": [
+    {
+     "reading": "たん",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "たん",
+       "word": "単"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "たん",
+       "word": "反"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "たん",
+       "word": "痰"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "たん",
+       "word": "嘆"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "たん",
+       "word": "短"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "たん",
+       "word": "端"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "たん",
+       "word": "譚"
+      }
+     ]
+    },
+    {
+     "reading": "とん",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "とん",
+       "word": "豚"
+      }
+     ]
+    },
+    {
+     "reading": "どん",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "どん",
+       "word": "鈍"
+      }
+     ]
+    }
+   ],
+   "酒": [
+    {
+     "reading": "さけ",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "さけ",
+       "word": "鮭"
+      }
+     ]
+    },
+    {
+     "reading": "ささ",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "ささ",
+       "word": "笹"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "ささ",
+       "word": "細"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "ささ",
+       "word": "些些"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "ささ",
+       "word": "然然"
+      }
+     ]
+    },
+    {
+     "reading": "しゅ",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "しゅ",
+       "word": "主"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しゅ",
+       "word": "種"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しゅ",
+       "word": "腫"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しゅ",
+       "word": "首"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しゅ",
+       "word": "朱"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しゅ",
+       "word": "株"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しゅ",
+       "word": "取"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "しゅ",
+       "word": "銖"
+      }
+     ]
+    },
+    {
+     "reading": "さか",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "さか",
+       "word": "坂"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "さか",
+       "word": "逆"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "さか",
+       "word": "茶菓"
+      }
+     ]
+    }
+   ],
+   "錢": [
+    {
+     "reading": "せん",
+     "words": [
+      {
+       "is_common": 1,
+       "pronunciation": "せん",
+       "word": "千"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "せん",
+       "word": "線"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "せん",
+       "word": "栓"
+      },
+      {
+       "is_common": 1,
+       "pronunciation": "せん",
+       "word": "選"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "仙"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "先"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "煎"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "腺"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "戦"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "撰"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "繊"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "箋"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "専"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "倩"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "洗"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "疝"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "宣"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "詮"
+      },
+      {
+       "is_common": 0,
+       "pronunciation": "せん",
+       "word": "暹"
+      }
+     ]
+    }
+   ],
+   "青": [
+    {
+     "reading": "あお",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "あお",
+       "word": "襖"
+      }
+     ]
+    }
+   ],
+   "魚": [
+    {
+     "reading": "さかな",
+     "words": [
+      {
+       "is_common": 0,
+       "pronunciation": "さかな",
+       "word": "肴"
+      }
+     ]
+    }
+   ]
+  },
+  "failed": [],
+  "lookups": 59,
+  "named": {},
+  "provenance": {
+   "reading, words[].word, words[].pronunciation, words[].is_common": "JMdict (EDRDG, CC BY-SA 4.0, through jmdict-simplified 3.6.1): each Japanese word's kana, and the search index's Japanese rows (a JMdict entry's first kanji or kana, its first kana, its common flag), as kiokun-data's builder writes them",
+   "the index": "kiokun-data's output_search_index.csv at a47956fb, or the repository's sample of it (examples/kiokun/data/search-sample.csv)"
+  },
+  "read": 28,
+  "stride": 1
+ },
+ "pleris_commit": "b0611710e64a5c585b98c744453626c27afeb580",
+ "produced_by": "just e14-kiokun-homophones"
+}
