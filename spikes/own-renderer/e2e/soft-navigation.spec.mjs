@@ -211,14 +211,17 @@ test("the layout shows what the next page's document read, though this one heard
   await other.getByRole("button", { name: "Add Espresso" }).click();
   await answered;
   await expect(page.locator("#header-cart-count")).toHaveText("0");
-  await page.unroute("**/stream?*");
-  // Followed to the cart: the header kept, its count the one the next
-  // document read, which the host derives the next document's patches from.
+  // Followed to the cart, still hearing nothing: the header kept, its count
+  // the one the next document read, which the host derives the next
+  // document's patches from. Until 2026-10-10 the page heard again before it
+  // left, and under load it could be told the change itself: a layout kept
+  // whole then passed too (the mutation controls' survivor).
   await page.locator("#header-cart").click();
   await expect(page).toHaveURL(/\/cart$/);
   await settled(page);
   expect((await kept(page)).header).toBe(true);
   await expect(page.locator("#header-cart-count")).toHaveText("1");
+  await page.unroute("**/stream?*");
 });
 
 test("what this page is told while it leaves is applied to nothing", async ({ page }) => {

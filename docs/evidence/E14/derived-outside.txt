@@ -1,20 +1,20 @@
-ADR-XXXX - a change is derived outside the table, and what reaches a document is recorded
+ADR-0296 - a change is derived outside the table, and what reaches a document is recorded
 
 produced by: just e14-derived-outside
-commit: 0efa5cad088d29a44297f6c100228b6726551de1
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 6964ee77b89b8ab24ab7fac6e5b651efa878aeb2
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37993980886 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 python: Python 3.12.3
 
 == the development server (the table while a change derives, the attempts, the trail)
 
+test tests::a_keyed_read_whose_document_changed_while_it_derived_is_derived_again ... ok
+test tests::a_document_changed_while_its_change_is_derived_is_derived_against_again ... ok
 test tests::a_documents_trail_says_what_happened_to_its_frames ... ok
 test tests::a_document_changed_at_every_attempt_is_still_told ... ok
-test tests::a_document_changed_while_its_change_is_derived_is_derived_against_again ... ok
-test tests::a_keyed_read_whose_document_changed_while_it_derived_is_derived_again ... ok
-test tests::the_table_is_free_while_a_telling_derives ... ok
 test tests::the_table_is_free_while_a_keyed_read_derives ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 329 filtered out; finished in 19.91s
+test tests::the_table_is_free_while_a_telling_derives ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 360 filtered out; finished in 29.61s
 
 == a red baseline's records (scripts/tests/test_mutation_baseline.py)
 
@@ -34,7 +34,7 @@ test_explain_runs_nothing_again (scripts.tests.test_mutation_baseline.Heard.test
 test_explain_shows_a_failing_tests_records (scripts.tests.test_mutation_baseline.Heard.test_explain_shows_a_failing_tests_records) ... ok
 test_only_the_last_commands_are_kept (scripts.tests.test_mutation_baseline.Heard.test_only_the_last_commands_are_kept) ... ok
 test_what_a_command_said_is_kept_with_how_it_ended (scripts.tests.test_mutation_baseline.Heard.test_what_a_command_said_is_kept_with_how_it_ended) ... ok
-Ran 16 tests in 5.032s
+Ran 16 tests in 5.333s
 OK
 
 == mutation controls (scripts/derived_outside_mutations.py)

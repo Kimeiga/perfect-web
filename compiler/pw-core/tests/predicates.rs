@@ -1,5 +1,5 @@
 //! **A predicate a program declares says what a refusal by it is told**
-//! (ADR-XXXX).
+//! (ADR-0302).
 //!
 //! `predicate OwnsPost(post: PostId)  says "…"`: the deployment says what a
 //! predicate means (ADR-0115), and words of its own; a program may declare

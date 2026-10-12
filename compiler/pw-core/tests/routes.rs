@@ -126,6 +126,27 @@ fn one_route_is_one_pages() {
     assert!(found.is_empty(), "{found:#?}");
 }
 
+/// Two pages of one name, in two modules, at one route: each is named by its
+/// module. Until 2026-10-11 the message named one page twice: "`CartPage` is
+/// served at `/cart`, and so is `CartPage`".
+#[test]
+fn two_pages_of_one_name_are_told_apart_by_their_modules() {
+    let file = |module: &str| {
+        (
+            format!("{module}.pw"),
+            format!("module {module}\n\n{}", page("CartPage", "", "/cart")),
+        )
+    };
+    let found: Vec<String> = check_sources(&[file("shop"), file("forms")])
+        .into_iter()
+        .flat_map(|(_, ds)| ds.into_iter().map(|d| format!("{} {}", d.code, d.message)))
+        .collect();
+    assert_eq!(
+        found,
+        ["PW0341 `forms.CartPage` is served at `/cart`, and so is `shop.CartPage`"]
+    );
+}
+
 /// **The page's plan carries its route** (ADR-0160), where a host serves
 /// it; a page that declares none carries none.
 #[test]

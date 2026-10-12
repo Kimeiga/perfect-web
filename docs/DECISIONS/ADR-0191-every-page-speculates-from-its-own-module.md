@@ -57,3 +57,21 @@ Recorded by `just e14-page-speculation` in
 - **A speculation on a value other than the session's cart.** The server
   computes one key, `current_session()`, as it computes an event's
   (ADR-0104).
+
+## Amended, 2026-10-11: each page is held to its own entry's value
+
+Found by the nightly verification of 2026-10-10, whose `e14-page-speculation`
+found "a speculated value is sent to the store's documents alone" surviving.
+Since ADR-0303, the store's pages are shown in `StoreLayout`, which binds
+`Cart(current_session())` too, and each page speculates on both bindings: its
+own `cart`, the materializer's entry, and the layout's `cart~StoreLayout`,
+sent at an entry of its own (ADR-0222). The test counted a value at any entry,
+so the layout's satisfied it whatever was sent at the page's own entry. It now
+counts the values at the entry the page's patches are derived from: 4 of 4
+mutants killed.
+
+Found on the way, and not fixed here: a query that a page and its layout both
+bind is read once for the document (ADR-0303), but it is still speculated as
+two entries. That means two values a change, each at its own version, and two
+transitions a press. One entry for the two names is NEXT's.
+

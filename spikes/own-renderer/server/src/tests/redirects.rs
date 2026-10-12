@@ -57,40 +57,47 @@ fn served_with(change: fn(&str) -> String) -> Served {
     }
 }
 
-/// The word query's answer, as written in `app.pw`.
-const ANSWER: &str = "    match page {\n        Some(l) => Ok(shown(word, l, labels, glosses, pitches)),\n        None => Err(NotFound),\n    }\n";
+/// The line of the word query that decides where the word moves, as
+/// written in `app.pw` (kiokun.com's `equivalentTraditionalTarget`).
+const DECIDED: &str = "    let moved = moved_from(first, word)\n";
 
-/// The query answering `Moved` for the words the tests choose: `old` is
-/// 魚's, `same` its own, and `dots` an address no segment can carry.
+/// The query answering `Moved` for the words the tests choose besides
+/// kiokun's own: `old` is 魚's, `same` its own, and `dots` an address no
+/// segment can carry.
 fn moving(app: &str) -> String {
-    assert_eq!(app.matches(ANSWER).count(), 1, "the word query's answer");
+    assert_eq!(app.matches(DECIDED).count(), 1, "the word query's move");
     app.replace(
-        ANSWER,
-        "    if word == \"old\" {\n        Err(Moved(\"魚\"))\n    } else {\n        \
-         if word == \"same\" {\n            Err(Moved(\"same\"))\n        } else {\n            \
-         if word == \"dots\" {\n                Err(Moved(\"..\"))\n            } else {\n\
-         \x20               match page {\n                    \
-         Some(l) => Ok(shown(word, l, labels, glosses, pitches)),\n                    \
-         None => Err(NotFound),\n                }\n            }\n        }\n    }\n",
+        DECIDED,
+        "    let moved = if word == \"old\" { Some(\"魚\") } else { \
+         if word == \"same\" { Some(\"same\") } else { \
+         if word == \"dots\" { Some(\"..\") } else { moved_from(first, word) } } }\n",
     )
 }
 
-/// The page's clause, `how` the move is.
-fn declared(app: &str, how: &str) -> String {
-    let clause = "    not_found_on KiokunError.NotFound\n";
-    assert_eq!(app.matches(clause).count(), 1, "the page's clause");
+/// The page's clause, as `app.pw` declares it.
+const CLAUSE: &str = "    redirect_on  KiokunError.Moved permanent\n";
+
+/// The page's clause made `how`, or taken away where `how` is `None`.
+fn declared(app: &str, how: Option<&str>) -> String {
+    assert_eq!(app.matches(CLAUSE).count(), 1, "the page's clause");
     app.replace(
-        clause,
-        &format!("{clause}    redirect_on  KiokunError.Moved {how}\n"),
+        CLAUSE,
+        &how.map_or(String::new(), |h| {
+            format!("    redirect_on  KiokunError.Moved {h}\n")
+        }),
     )
 }
 
 fn permanent(app: &str) -> String {
-    declared(&moving(app), "permanent")
+    declared(&moving(app), Some("permanent"))
 }
 
 fn temporary(app: &str) -> String {
-    declared(&moving(app), "temporary")
+    declared(&moving(app), Some("temporary"))
+}
+
+fn unnamed(app: &str) -> String {
+    declared(&moving(app), None)
 }
 
 /// The response to `GET path`, whole.
@@ -178,7 +185,7 @@ fn a_move_to_itself_or_to_no_segment_is_the_programs_fault() {
 fn a_case_the_page_does_not_name_is_a_failure_like_any_other() {
     // The query answers `Moved`, and the page says nothing of it: the host
     // cannot read it as a move, and the page cannot be shown now.
-    let s = served_with(moving);
+    let s = served_with(unnamed);
     assert!(!word_plan(&s).to_string().contains("redirect"));
     let failed = fetched(&s, "/word/old");
     assert!(

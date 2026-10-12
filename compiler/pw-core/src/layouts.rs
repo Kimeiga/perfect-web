@@ -1,4 +1,4 @@
-//! **A page's layout** (ADR-XXXX): the markup and the bindings the pages
+//! **A page's layout** (ADR-0303): the markup and the bindings the pages
 //! that name it share, each page shown in its `<slot />`.
 //!
 //! ```text
@@ -92,7 +92,7 @@ pub fn bound(layout: &str, name: &str) -> String {
     format!("{name}~{layout}")
 }
 
-/// **What a layout and the pages that name it are held to** (ADR-XXXX):
+/// **What a layout and the pages that name it are held to** (ADR-0303):
 ///
 /// - a page's `layout` names a layout, once (PW0352);
 /// - a layout is given nothing: no parameters (PW0353);

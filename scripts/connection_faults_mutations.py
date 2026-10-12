@@ -40,7 +40,7 @@ MUTANTS = [
         "            .and_then(|f| f.drop_command)\n",
     ),
     (
-        # Re-anchored by ADR-XXXX: a command closed unrun is not yet the one
+        # Re-anchored by ADR-0305: a command closed unrun is not yet the one
         # before what follows it.
         "`before` runs the command",
         "server",

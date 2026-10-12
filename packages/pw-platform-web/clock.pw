@@ -26,3 +26,93 @@ fn now() -> Int !{ clock.read } { 0 }
 fn now_wall() -> Int !{ clock.wall } { 0 }
 
 fn today() -> String !{ clock.wall } { "" }
+
+// --- the clock a kept value reads, and the calendar (ADR-0304) ----------------
+
+// **A time zone**: an IANA name, as the host's tz database names it
+// ("America/Los_Angeles"). A host refuses a name its database lacks.
+opaque type TimeZone = String
+
+// **A date in no zone**: the days since 1970-01-01, in the proleptic
+// Gregorian calendar. A store's holiday; the day an order is scheduled for.
+opaque type LocalDate = Int
+
+// **A time of day in no zone**: the minutes since midnight. Minutes, as a
+// store's hours are written.
+opaque type LocalTime = Int where value >= 0 & value <= 1439
+
+// **A day of the week**, Monday first, as ISO 8601 orders them.
+type Weekday =
+    | Monday
+    | Tuesday
+    | Wednesday
+    | Thursday
+    | Friday
+    | Saturday
+    | Sunday
+
+// **Whether `at` has passed** (ADR-0304): the one way a value that is kept,
+// shared or shown reads the wall clock. A value that asked holds until `at`,
+// and is read again, and told to every page that shows it, then.
+fn passed(at: Instant) -> Bool !{ clock.compare }
+    host "pw:host/clock#passed"
+
+// **Today's date in `zone`** (ADR-0304): held until the zone's next day
+// begins.
+fn today_in(zone: TimeZone) -> LocalDate !{ clock.compare }
+    host "pw:host/clock#today"
+
+// **The instant `time` on `date` names in `zone`** (RFC 5545, 3.3.5): a time
+// a transition skips is read with the offset before it, so 02:30 on the day
+// the clocks go from 02:00 to 03:00 is 03:30; one it repeats is its first.
+fn at(date: LocalDate, time: LocalTime, zone: TimeZone) -> Instant !{ clock.zone }
+    host "pw:host/clock#at"
+
+// **`at`'s date in `zone`.**
+fn date_of(at: Instant, zone: TimeZone) -> LocalDate !{ clock.zone }
+    host "pw:host/clock#date"
+
+// **`at`'s time of day in `zone`**, to the minute.
+fn time_of(at: Instant, zone: TimeZone) -> LocalTime !{ clock.zone }
+    host "pw:host/clock#time"
+
+// **The day of the week `date` is**: 1970-01-01 was a Thursday.
+fn weekday(date: LocalDate) -> Weekday !{} {
+    let day = (date.value + 3) % 7
+    let monday_first = if day < 0 { day + 7 } else { day }
+    if monday_first == 0 {
+        Monday
+    } else if monday_first == 1 {
+        Tuesday
+    } else if monday_first == 2 {
+        Wednesday
+    } else if monday_first == 3 {
+        Thursday
+    } else if monday_first == 4 {
+        Friday
+    } else if monday_first == 5 {
+        Saturday
+    } else {
+        Sunday
+    }
+}
+
+// **The zone named `name`**, as the host's tz database names it. A name the
+// database lacks is refused where the zone is used.
+fn zone(name: String) -> TimeZone !{} {
+    TimeZone(name)
+}
+
+// **The time of day `hour`:`minute`**, or none where it names no time.
+fn time(hour: Int, minute: Int) -> Option<LocalTime> !{} {
+    if hour >= 0 & hour <= 23 & minute >= 0 & minute <= 59 {
+        Some(LocalTime(hour * 60 + minute))
+    } else {
+        None
+    }
+}
+
+// **The day after `date`.**
+fn next_day(date: LocalDate) -> LocalDate !{} {
+    LocalDate(date.value + 1)
+}

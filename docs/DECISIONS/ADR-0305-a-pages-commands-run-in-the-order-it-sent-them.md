@@ -1,7 +1,7 @@
-# ADR-XXXX: a page's commands run in the order it sent them
+# ADR-0305: a page's commands run in the order it sent them
 
 Status: accepted under the owner's delegation of 2026-10-02, on a finding of
-the soft navigation's evidence run. Date: 2026-10-10. Milestone: E14.
+ADR-0306's evidence run (the soft navigation). Date: 2026-10-10. Milestone: E14.
 Completes ADR-0152's "presses run in the order they were made", which
 ordered handlers and not what they commit; keeps its "a slow command does
 not hold up the press after it": the next press is shown and its handler

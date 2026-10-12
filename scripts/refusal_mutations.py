@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-XXXX: a refusal is told where the press was.
+"""Mutation controls for ADR-0302: a refusal is told where the press was.
 
 Each mutant undoes one piece:
 - the checker (PW0351): a predicate that says nothing, words that are two
@@ -156,10 +156,10 @@ MUTANTS = [
         "host",
         SERVER,
         ".unwrap_or_default());\n"
-        "    // Where a failed press is said (ADR-XXXX), from the first byte.\n"
+        "    // Where a failed press is said (ADR-0302), from the first byte.\n"
         "    let announcer = pw_render::ANNOUNCER;\n",
         ".unwrap_or_default());\n"
-        "    // Where a failed press is said (ADR-XXXX), from the first byte.\n"
+        "    // Where a failed press is said (ADR-0302), from the first byte.\n"
         '    let announcer = "";\n',
     ),
     (
@@ -167,10 +167,10 @@ MUTANTS = [
         "host",
         SERVER,
         "    };\n"
-        "    // Where a failed press is said (ADR-XXXX), from the first byte.\n"
+        "    // Where a failed press is said (ADR-0302), from the first byte.\n"
         "    let announcer = pw_render::ANNOUNCER;\n",
         "    };\n"
-        "    // Where a failed press is said (ADR-XXXX), from the first byte.\n"
+        "    // Where a failed press is said (ADR-0302), from the first byte.\n"
         '    let announcer = "";\n',
     ),
     (
@@ -267,7 +267,12 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core"],
+    # The tests that can see a predicate's rules (W6's ruling of 2026-10-09:
+    # a mutant that takes long is given the tests that can see its rule).
+    # Each core mutant ran pw-core's tests whole, linking every test target
+    # again, and the script took 3.5 h of CI (ADR-0302's verify); each is
+    # killed by these alone (8 of 8, 103 s, 2026-10-10).
+    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "predicates"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render", "--test", "titles"],
     "host": [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",

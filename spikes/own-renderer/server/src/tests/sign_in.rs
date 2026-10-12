@@ -413,7 +413,7 @@ fn body_of(answer: &str) -> serde_json::Value {
     serde_json::from_str(body).unwrap_or_else(|e| panic!("{e}: {answer}"))
 }
 
-/// **A refusal says the program's words for its predicate** (ADR-XXXX): the
+/// **A refusal says the program's words for its predicate** (ADR-0302): the
 /// feed declares `predicate SignedIn  says "…"`, and a post refused by it is
 /// answered with those words, the predicate's name, and nothing the
 /// predicate read.
@@ -433,7 +433,7 @@ fn a_refusal_says_the_programs_words_for_its_predicate() {
 }
 
 /// **Where the program declares no words, the deployment's are said**
-/// (ADR-XXXX): the deployment that gives a predicate its meaning gives it
+/// (ADR-0302): the deployment that gives a predicate its meaning gives it
 /// words too.
 #[test]
 fn a_refusal_the_program_gives_no_words_is_told_in_the_deployments() {
@@ -450,8 +450,8 @@ fn a_refusal_the_program_gives_no_words_is_told_in_the_deployments() {
     assert_eq!(body_of(&answer)["says"], "Sign in to do this.");
 }
 
-/// **A refused press sent again is refused again, as it was** (ADR-XXXX):
-/// the refusal is kept with its interaction. Until ADR-XXXX it lived only
+/// **A refused press sent again is refused again, as it was** (ADR-0302):
+/// the refusal is kept with its interaction. Until ADR-0302 it lived only
 /// on the thread that ran `requires`, and a resend, answered from what was
 /// kept, was answered 202 as a command that did not commit, with nothing
 /// to tell the reader.
@@ -464,7 +464,7 @@ fn a_refused_press_sent_again_is_refused_again() {
     assert_eq!(body_of(&first), body_of(&again));
 }
 
-/// **A page holds its announcer from the first byte** (ADR-XXXX): where a
+/// **A page holds its announcer from the first byte** (ADR-0302): where a
 /// failed press is said, once, empty, before the runtime that says it. A
 /// live region added with its words is not reliably said (ADR-0182).
 #[test]
@@ -481,7 +481,7 @@ fn a_page_holds_its_announcer_from_the_first_byte() {
 }
 
 /// **A program is not served by a deployment that cannot evaluate a
-/// predicate it requires or declares** (ADR-XXXX): each press of its
+/// predicate it requires or declares** (ADR-0302): each press of its
 /// commands would be answered with nothing to tell.
 #[test]
 fn a_predicate_the_deployment_cannot_evaluate_is_refused_at_start() {

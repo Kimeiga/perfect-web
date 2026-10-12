@@ -110,7 +110,7 @@ test("one press rejected among two keeps the other's speculation", async ({ page
     } else {
       // The second sent again: the first, refused here, never reached the
       // server, which answered the second early once it had waited for it
-      // (ADR-XXXX).
+      // (ADR-0305).
       await route.continue();
     }
   });

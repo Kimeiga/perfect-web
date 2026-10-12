@@ -1,4 +1,4 @@
-# ADR-XXXX: a refusal is told where the press was
+# ADR-0302: a refusal is told where the press was
 
 Status: accepted under the owner's delegation of 2026-10-02, on the owner's
 finding of 2026-10-08 23:30 (using the feed by hand). Date: 2026-10-09.

@@ -1,7 +1,8 @@
 ADR-0121 - an idempotent command runs once per interaction
 
 produced by: just e14-idempotent-commands
-commit: 0942edb38a031140bff514cdaf4d4442473687c6
+commit: 6964ee77b89b8ab24ab7fac6e5b651efa878aeb2
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/37993980886 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the contract carries it (compiler/pw-core/tests/component_contract.rs)
@@ -12,36 +13,38 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; fin
 == the reservation keeps what must not run twice (runtime/pw-resource)
 
 test forgetting_a_command_keeps_what_must_not_run_twice ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s
 
 == the server (spikes/own-renderer/server)
 
+test tests::store_pg::on_postgres_a_retried_interaction_runs_its_command_once ... ok
 test tests::a_retried_interaction_runs_its_command_once ... ok
 test tests::interactions_kept_are_bounded_per_session ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.08s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 363 filtered out; finished in 1.53s
 
 == the browser, each engine alone (e2e/idempotent-command.spec.mjs)
 
-  ✓  3 [chromium] › e2e/idempotent-command.spec.mjs:47:1 › a command request without an interaction is refused (451ms)
-  ✓  1 [chromium] › e2e/idempotent-command.spec.mjs:38:1 › two presses are two interactions (710ms)
-  ✓  2 [chromium] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (753ms)
-  3 passed (11.6s)
-  ✓  1 [firefox] › e2e/idempotent-command.spec.mjs:47:1 › a command request without an interaction is refused (5.5s)
-  ✓  2 [firefox] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (6.3s)
-  ✓  3 [firefox] › e2e/idempotent-command.spec.mjs:38:1 › two presses are two interactions (5.0s)
-  3 passed (17.3s)
-  ✓  3 [webkit] › e2e/idempotent-command.spec.mjs:47:1 › a command request without an interaction is refused (2.5s)
-  ✓  2 [webkit] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (3.0s)
-  ✓  1 [webkit] › e2e/idempotent-command.spec.mjs:38:1 › two presses are two interactions (3.1s)
-  3 passed (7.8s)
+  ✓  1 [chromium] › e2e/idempotent-command.spec.mjs:40:1 › two presses are two interactions (1.6s)
+  ✓  3 [chromium] › e2e/idempotent-command.spec.mjs:49:1 › a command request without an interaction is refused (539ms)
+  ✓  2 [chromium] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (2.3s)
+  3 passed (2.0m)
+  ✓  2 [firefox] › e2e/idempotent-command.spec.mjs:40:1 › two presses are two interactions (2.8s)
+  ✓  1 [firefox] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (3.0s)
+  ✓  3 [firefox] › e2e/idempotent-command.spec.mjs:49:1 › a command request without an interaction is refused (803ms)
+  3 passed (2.0m)
+  ✓  2 [webkit] › e2e/idempotent-command.spec.mjs:40:1 › two presses are two interactions (2.4s)
+  ✓  1 [webkit] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (2.9s)
+  ✓  3 [webkit] › e2e/idempotent-command.spec.mjs:49:1 › a command request without an interaction is refused (771ms)
+  3 passed (2.0m)
 
 == mutation controls (scripts/idempotent_commands_mutations.py)
 
-baseline: 55 passed, 0 failed
-the contract does not carry idempotent_by: KILLED (1 of 55 tests fail)
-the host runs a keyed command every time: KILLED (2 of 55 tests fail)
-a request without an interaction runs unkeyed: KILLED (1 of 55 tests fail)
-an interaction reused with other arguments shares the first outcome: KILLED (1 of 55 tests fail)
-every interaction is kept: KILLED (1 of 55 tests fail)
-an unknown outcome is forgotten: KILLED (1 of 55 tests fail)
+baseline: 59 passed, 0 failed
+the contract does not carry idempotent_by: KILLED (1 of 59 tests fail)
+the host runs a keyed command every time: KILLED (2 of 59 tests fail)
+a request without an interaction runs unkeyed: KILLED (1 of 59 tests fail)
+an interaction reused with other arguments shares the first outcome: KILLED (1 of 59 tests fail)
+every interaction is kept: KILLED (1 of 59 tests fail)
+an unknown outcome is forgotten: KILLED (1 of 59 tests fail)
 6 of 6 mutants killed
+memory bound: no process was stopped

@@ -4,8 +4,9 @@
   ends soonest, its setup counted, by the seconds each last took, the same
   way every time; leaves out the measurements of a machine; gives the
   recipes run against a database shards and a PostgreSQL of their own, as
-  many as end the run soonest; and reaches from a change to the mutation
-  scripts it touches;
+  many as end the run soonest; takes more shards than it is asked for where
+  its number would end a shard past the ceiling under a shard's limit; and
+  reaches from a change to the mutation scripts it touches;
 - `ci_recipes.py` takes what a recipe wrote to be the files whose bytes
   changed while it ran, and frees what its builds leave;
 - `ci_summary.py` fails a run where a recipe failed, a mutant survived, or a
@@ -300,6 +301,59 @@ class Plan(unittest.TestCase):
                     self.assertEqual(shards[0]["recipes"], [longest])
         finally:
             plan.SECONDS, sys.argv = real, argv
+
+    def test_a_run_takes_more_shards_than_it_asks_where_its_would_end_past_the_ceiling(self) -> None:
+        # ADR-0290, amended 2026-10-10: track/command-order's verify dealt
+        # 13,959 s into a shard that its limit then stopped. Four recipes of
+        # 8,000 s each, asked for in two shards, would end at 16,042 s
+        # each: the run takes four.
+        costs = {n: 8000 for n in "abcd"}
+        self.assertEqual(plan.ends(plan.plan(list(costs), costs, 2), costs), 16042)
+        dealt = plan.planned(list(costs), costs, 2)
+        self.assertEqual(len(dealt), 4)
+        self.assertLessEqual(plan.ends(dealt, costs), plan.CEILING)
+        # The control: where the asked number ends within it, it is kept.
+        small = {n: 1000 for n in "abcd"}
+        self.assertEqual(len(plan.planned(list(small), small, 2)), 2)
+
+    def test_a_recipe_longer_than_the_ceiling_alone_is_not_paid_for_in_shards(self) -> None:
+        # One recipe longer than the ceiling ends its shard past it however
+        # many shards there are: it is dealt a shard of its own, and the
+        # others within the ceiling, not a shard each.
+        costs = {"long": plan.CEILING + 2000, "a": 5000, "b": 5000, "c": 5000}
+        dealt = plan.planned(list(costs), costs, 2)
+        self.assertEqual(len(dealt), 3)
+        self.assertIn({"index": 0, "recipes": ["long"], "browsers": False, "build": False, "database": False}, dealt)
+        for shard in dealt:
+            if shard["recipes"] != ["long"]:
+                self.assertLessEqual(plan.ends([shard], costs), plan.CEILING)
+
+    def test_main_deals_a_run_within_the_ceiling(self) -> None:
+        # The workflow's own call: four recipes of 8,000 s asked for in two
+        # shards are dealt into four.
+        import contextlib
+        import io
+
+        names = ["e10-affine-bindings", "e10-attribute-case", "e10-built-pages", "e10-clause-keys"]
+        real, argv = plan.SECONDS, sys.argv
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                plan.SECONDS = pathlib.Path(d) / "seconds.json"
+                plan.SECONDS.write_text(json.dumps({n: 8000 for n in names}))
+                sys.argv = ["ci_plan.py", "--shards", "2", *names]
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    self.assertEqual(plan.main(), 0)
+                shards = json.loads(out.getvalue().strip()[len("shards="):])
+                self.assertEqual(len(shards), 4)
+        finally:
+            plan.SECONDS, sys.argv = real, argv
+
+    def test_the_ceiling_is_within_the_shards_limit(self) -> None:
+        # A shard is stopped at verify.yml's `timeout-minutes`.
+        workflow = (SCRIPTS.parent / ".github/workflows/verify.yml").read_text()
+        limits = [int(m) for m in __import__("re").findall(r"timeout-minutes: (\d+)", workflow)]
+        self.assertLess(plan.CEILING, max(limits) * 60)
 
     def test_the_seconds_are_read_where_the_fetch_keeps_them(self) -> None:
         self.assertEqual(plan.SECONDS, fetch.SECONDS)

@@ -375,6 +375,13 @@ refused by name:
   the backend types an argument by its parameter's declared type, and does
   not carry into it what the earlier arguments fixed. A list operation's
   function, and a non-generic declaration's, are typed.
+- **A lambda passed before the argument that fixes its type parameter is
+  typed by what came before it** (ADR-0053, amended 2026-10-11). In
+  `later(xs => xs + 1, w)`, where `fn later<T>(f: fn(List<T>) -> Int, x: T)`,
+  `xs` is a `List<?>` and not a `List<Word>`. It is checked by what is known,
+  so `xs + 1` is refused, but `xs`'s elements are not typed. TypeScript types
+  a context-sensitive argument after the others. Every callback in `pw-std`
+  is its function's last parameter.
 - **A statement keyword cannot name a value** (PW0013, ADR-0041, ruling
   needed). `let query = ..` is refused rather than read as a `query ..`
   statement at every use.
@@ -576,14 +583,36 @@ awaited in order. What remains:
   making recomputes its body whole, asking it again for each read it
   lacks; `regenerate on_read` is not run. One that declares no type is a
   fragment the host renders, the store's still wired by hand.
-- **A navigation is a document load** (ADR-0280): the page a handler goes
-  to replaces this one whole, so the parts the two share are rendered
-  again, not kept in place with their focus and scroll; a soft navigation
-  is next. A navigation the user stops lets the page take presses again
-  only where the browser says it stopped (Chromium's Navigation API):
-  Firefox 146 has none, and WebKit 26.0's aborts nothing, so there the page
-  stays leaving until it is loaded again. A press that never answers holds
-  the navigation as long as the browser waits for it.
+- **The clock is read by comparison alone** (ADR-0304): no value of "now"
+  is kept or shown, so a countdown ("closes in 12 minutes") is not
+  written; a handler reads no clock; a page built once and a public
+  materialization are refused a comparison, since nothing would tell them
+  when it changes. One host's clock, moved forward only (`/bench/clock`);
+  a tz database that changes under a kept value is not noticed until the
+  value is read again. A host function whose effect needs no authority is
+  never linked (`pw-host`'s `linkable`), so the zone reads are granted.
+- **A layout is one, unnested, and given nothing** (ADR-0303): a page names
+  one layout; a layout is shown in no other, is given none of the page's
+  parameters, has no title template of its own, and holds one slot.
+- **A navigation keeps a layout, not more** (ADR-0306): between two pages
+  of one layout and one build, the layout's regions stay; a page of another
+  layout, another build, or none is loaded whole (ADR-0280), so the parts
+  two such pages share are rendered again. A loop or a view that contains
+  itself in the layout is taken whole from the next document, not merged
+  row by row. No view transition is run, and nothing is fetched before the
+  press (no prefetch on hover). The document a page left lingers on the
+  host until it is forgotten as idle (120 s). A whole load the user stops
+  lets the page take presses again only where the browser says it stopped
+  (Chromium's Navigation API): Firefox 146 has none, and WebKit 26.0's
+  aborts nothing, so there the page stays leaving until it is loaded again.
+  A press that never answers holds the navigation as long as the browser
+  waits for it.
+- **A page's commands are ordered by one host** (ADR-0305): the host that
+  answers keeps each page's order, so hosts behind a balancer would share
+  it or pin a page to one. A command lost on its way from a page that has
+  left is never sent again, so the next is answered early after two seconds
+  and is lost with it. An answer made by something between the page and the
+  host (a proxy's error) costs the next command the two seconds.
 - **A link's hole that is `.` or `..`** (found with ADR-0280): the URL
   parser resolves `/stores/..` to `/`, so such a link goes elsewhere, and
   PW5009 matched its text to the route. `navigate` refuses such a value; a
@@ -612,6 +641,13 @@ awaited in order. What remains:
   (ADR-0287): `post_paint` and `frame` run in the browser too, but only a
   handler's work is held where it runs. No program places a page with frame
   phases anywhere but the browser.
+- **A refusal is told in one language, the first failing predicate's**
+  (ADR-0302): a program has one set of words, keyed by predicate, and the
+  host stops at the first predicate that fails, in declared order. A
+  predicate over another's data may tell, by refusing, that the data is
+  there. The message is the control's next sibling, and an author cannot
+  yet place it elsewhere; a page without its runtime sends no command to
+  refuse.
 - **kiokun's word page is its words, its labels, its character header,
   its written forms, its head's title and description, its examples and its
   pitch accent** (ADR-0286, ADR-0288, ADR-0289, ADR-0293, ADR-0299): the

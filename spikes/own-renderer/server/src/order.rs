@@ -1,4 +1,4 @@
-//! **A page's commands run in the order the page sent them** (ADR-XXXX).
+//! **A page's commands run in the order the page sent them** (ADR-0305).
 //!
 //! Each command a page sends names the one it sent before it and has not
 //! been answered (`pw-after`, that one's interaction). The network brings

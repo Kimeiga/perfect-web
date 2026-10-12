@@ -56,7 +56,7 @@ pub struct Build {
     /// a host holds a browser's file to.
     pub uploads: Vec<crate::uploads::UploadClauses>,
     /// **The words each predicate the program declares is told in**
-    /// (ADR-XXXX), which a host answers a refusal by it with.
+    /// (ADR-0302), which a host answers a refusal by it with.
     pub predicates: std::collections::BTreeMap<String, String>,
 }
 
@@ -80,7 +80,7 @@ impl Build {
     /// DIR/sources.json              what each data source guarantees, which
     ///                               a host holds its database to (ADR-0246)
     /// DIR/predicates.json           the words a refusal by each predicate the
-    ///                               program declares is told in (ADR-XXXX);
+    ///                               program declares is told in (ADR-0302);
     ///                               none where it declares none
     /// DIR/speculations/<page>.*     each page's speculations (ADR-0122)
     /// DIR/computed/<page>.mjs       what each page computes from its
@@ -184,7 +184,7 @@ impl Build {
             write("uploads.json", format!("{uploads}\n").as_bytes())?;
         }
         // The words a refusal by each predicate the program declares is told
-        // in (ADR-XXXX). A program that declares none has no file, and its
+        // in (ADR-0302). A program that declares none has no file, and its
         // host tells each in the deployment's words.
         if !self.predicates.is_empty() {
             let words =
@@ -353,7 +353,7 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
 
     let sources: Vec<&str> = units.iter().map(|u| u.src.as_str()).collect();
     let templates = templates(&hirs, &sources, &sigs);
-    // Each layout alone (ADR-XXXX), which no template holds where no page
+    // Each layout alone (ADR-0303), which no template holds where no page
     // names it.
     let layouts = crate::template_ir::layouts(&hirs, &sigs, &crate::template_ir::Handlers::new());
     // A part the renderer refuses is a template that fails every render.

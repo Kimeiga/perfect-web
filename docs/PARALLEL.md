@@ -836,3 +836,231 @@ Each a decision for a track, with its date; a track's ADR records it too.
 - **2026-10-09, ADR-0300 (the build id) merged** before the refusal ruling,
   whose verify still ran: the numbers follow merge order, so the refusal
   ruling takes the next.
+- **2026-10-10, W6's word page moves merged** as ADR-0301, from `4cbe3aa`, before
+  the refusal ruling, whose PostgreSQL shard ran again:
+  verify 38006256503 and ci 38006256479 green, `e14-kiokun-word` 69 of 69
+  and `e14-redirects` 15 of 15 from that run, the moves' oracle (local)
+  1,643 words with 3 moves. W6 next, in order: the whole-dictionary sample
+  timed again at low load, Contains and Appears-in, then step 2, search.
+  Step 4, kiokun's accounts (notes, review cards, custom words), stays W6's:
+  kiokun's own data, on the platform's identity (ADR-0258, ADR-0263,
+  ADR-0270) and W8's `user` visibility once it is merged; anything it needs
+  of the identity layer or the principal is asked of the integrator first.
+- **2026-10-10, the refusal ruling merged** as ADR-0302, from `6964ee7`:
+  verify 37993980886 green, its PostgreSQL shard run again after a start
+  that failed in 43 s; 30 of 30 mutants. Its mutation script took 3.5 h of
+  CI (each core mutant ran pw-core's tests whole, each browser mutant built
+  `run.sh` and `feed.sh` again): its core mutants are given the tests that
+  can see their rule next, the integrator's, as W6's ruling of 2026-10-09
+  says.
+- **2026-10-10, ports and targets (the coordinator's).** A worker's port
+  range avoids what the owner's own apps listen on (Spotify holds 7768 on
+  this machine) and what any session left listening: a `python3 -m
+  http.server 7801` from the integrator's 2026-10-04 layout-shift probe held
+  7801 inside W8's 7741-7940 until the coordinator stopped it. A session
+  stops the servers it starts; a probe's server runs in the background only
+  with its stop in the same command. Workers build in their own targets
+  (`.claude/worktrees/agent-*/target`); only the integrator's worktrees
+  share master's `target/`, one build at a time.
+- **2026-10-10, W6's questions, ruled.** (1) The Contains/Appears-in
+  fixture: a NOTICE.md beside kiokun-oracle's `*-sample.json` (also closing
+  the gap for `seo-sample.json` and `examples-sample.json`); the fixture
+  trimmed to each list's first 20 and last 5 items with its length, the
+  rule recorded in the fixture and the ADR. (2) The guards and oracles read
+  kiokun-data's committed HEAD (`git ls-tree`, `git show HEAD:./path`), never
+  its working tree: the evidence names a commit, and only a commit is
+  reproducible; the owner's uncommitted work is named, not read (ADR-0285
+  amended in the Contains ADR). (3) Licences, checked at each primary
+  source: KRDICT's text CC BY-SA 2.0 KR (its media licensed per file, never
+  committed), EDRDG's files CC BY-SA 4.0 (KANJIDIC2's contributors named
+  where their fields are kept), Wiktionary CC BY-SA 4.0 with the GFDL,
+  CC-CEDICT CC BY-SA 4.0, Tatoeba CC BY 2.0 FR (each sentence's author, by
+  its id). Every committed fixture's NOTICE names each source present, from
+  the builder's source, with its licence, version, address and the date
+  checked; the fixtures are CC BY-SA 4.0; track `kiokun` merges with it.
+  (4) Search: the committed CSV now (no Cantonese romanization, a data
+  difference) and a current one asked of the owner; kiokun's two statements
+  run in the kiokun layer over FTS5, declared as a source's operations, the
+  program doing the rest; a platform full-text source and a route that
+  answers JSON are the integrator's, later (NEXT).
+- **2026-10-10, W6's finding: `fetched_as` decoded each TCP read alone**:
+  a character a read ended inside became U+FFFD ("に��める" under load).
+  Fixed on master: the incomplete sequence is carried to the next read,
+  and bytes that are no UTF-8 are refused, not replaced.
+- **2026-10-10, the layouts merged** as ADR-0303, from `328720e`: verify
+  38006542533 green but for Firefox's navigate.spec "its answer first" (the
+  command order's finding, named known), 23 of 23 mutants; the store's page
+  plan made again over the build id (`just e10-component`). **W8:**
+  `StoreLayout` binds `Cart(current_session())`; at `track/store-accounts`'
+  next master merge, the layout's cart is its pages' (the user's), and the
+  layout is declared `user` (PW5046 holds a page to its layout's audience).
+- **2026-10-10, ADR-0243's amendment merged** (markup on one line is one
+  region, and no operand), from `31eeb3c`: verify 38013103417 green, 32 of
+  32 mutants; its PW5047 beside ADR-0303's PW5046.
+- **2026-10-10, a verify dealt within a ceiling** (ADR-0290 amended).
+  `track/command-order`'s verify 38015617597 was stopped at 345 minutes in
+  its shard 7 (two recipes took twice their seconds: mutants that hang under
+  the command order's wait, killed at their bound), and
+  `track/soft-navigation`'s was dealt 21,900 s into five of its nine shards.
+  The planner now deals no shard of more than one recipe past 13,800 s and
+  takes more shards where a track's 9 would; their jobs past the Free plan's
+  20 wait. Both tracks run again on it.
+- **2026-10-10, the clock merged** as ADR-0304, from `4c079dc` (verify
+  38022822226 green, 25 of 25 mutants), ahead of the command order and the
+  soft navigation, whose verifies run again on the planner's ceiling: they
+  take 0305 and 0306. Its host read is merged with ADR-0303's: a document's
+  bindings are read once each, inside the clock's noting of what they
+  compared. Store hours' step 2 waits for W8's merge.
+- **2026-10-11, W9: the DoorDash customer side, search now, store hours
+  after W8** (the owner, relayed by the coordinator 2026-10-11: more
+  parallel work on DoorDash, the third slot once the disk allows; the
+  integrator pruned its merged worktrees and `master`'s target the same
+  day, 21 to 58 GiB free). The slots: W6 (kiokun), W8 (store accounts),
+  **W9**; W7 (TodoMVC) waits for the next one. Checkout and payments, and
+  ratings and reviews (W10), wait behind W8: they touch the cart and orders.
+  - **Track `store-search`**, branch `track/store-search`, from `master`
+    now. Its ADRs are `ADR-XXXX`, numbered at the merge; its recipes live in
+    `just/store-search.just`; its code block is **PW63**
+    (`Owner::StoreSearch => "PW63"`); its Playwright runs use PORT=7941
+    (7941 to 8140, nothing listening there on 2026-10-11), its hosts at
+    PORT+170..172 (`STORE_SEARCH_PORTS`). Search needs no migration; one it
+    finds it needs is the store's from `0010`, W8 holding `0003` to `0009`,
+    and is numbered again at the merge if W8 needs more.
+  - **What**: a reader searches the stores and their menus by text, and a
+    search page lists the stores and the dishes that match, each dish under
+    its store, linking to it. Its research (DoorDash's search, cited in its
+    ADR) decides what it shows; these are the rules it holds to:
+    1. **The address.** A search's text belongs in the page's query string,
+       a typed page query parameter, which is the integrator's to build
+       next (as ruled for W6's `?q=`). The search box is then a plain
+       `<form method="get">`, which needs no script. Until it lands, the
+       page is at `route "/search/{q}"`, reached by its address. It has no
+       form, since `navigate` follows only a committed command (ADR-0280).
+       `q` stays a page parameter, so the move changes only the route clause
+       and adds the form. Both are named temporary in the ADR (corrected
+       2026-10-11, W6's finding).
+    2. **One meaning on both layers.** The search runs in the store's data
+       layer, as its operations (as W6's runs in kiokun's), in memory and on
+       PostgreSQL, and both hold one stated meaning, tested on the same
+       fixtures:
+       - case is ignored (each layer's Unicode lowercase, with non-ASCII
+         names in the fixtures);
+       - every whitespace-separated term matches, each a substring of a
+         store's name, description or cuisine, or of an item's name,
+         description or category;
+       - results are ranked by a stated rule, the same on both layers,
+         ties by name and then id.
+       Accents and stems are not folded, since the layers would differ
+       without a new crate or a PostgreSQL extension; that goes in
+       KNOWN_LIMITATIONS.
+    3. **No input fails the page.** PostgreSQL's `LIKE` escapes `%`, `_`
+       and `\` (an `ESCAPE` clause), and every value is bound, never
+       interpolated. A blank query shows no results and says so. A query
+       past a bound the ADR states is a declared error, told.
+    4. **Public data on a reader's page.** The catalog is public, so its
+       queries are public and may be shared. The page is shown in
+       `StoreLayout`, which shows the reader's cart, so it is the session's
+       now, and the user's once W8 merges (PW5046).
+    5. **Its own files.** `examples/store/search.pw` (its page, queries and
+       views), `spikes/own-renderer/server/src/search.rs` (the layer's
+       operations, both layers), `e2e/store-search.spec.mjs` and its
+       fixtures. Where the layers register operations (`store.rs`,
+       `store_pg.rs`) and the host routes, it adds one marked line each
+       (`TRACK SEAM (store-search)`). It does not touch
+       `examples/store/app.pw`, which is W8's until it merges.
+    6. **Its tests.** Both layers answer the same table of queries:
+       - blank;
+       - `%`, `_`, `\` and quotes;
+       - mixed case, non-ASCII, several terms and none matching.
+       The page is tested in three engines. Its mutation controls are
+       narrowed from the start: each mutant is given the tests that can see
+       its rule, measured with `scripts/mutant_killers.py`, so its verify
+       stays within the planner's ceiling.
+  - **Its seams with W8.** W8 owns the store program's user, cart, order
+    and address code, and `app.pw`, until it merges. Then W9 merges `master`
+    and, in its own commits:
+    - the search page becomes `user`, as `StoreLayout` will be;
+    - the home page gets its search form (one marked line);
+    - results may be filtered to the stores that reach the reader's
+      address, through W8's `Reach`.
+  - **Track `store-hours`**, branch `track/store-hours`, from `master` after
+    W8's merge, since it needs `place_order` and the user's cart. It is the
+    integrator's design of 2026-10-10 (NEXT, DoorDash item 4, step 2), ruled
+    here:
+    1. **The hours.** A store's weekly periods in its IANA zone (`closes <=
+       opens` runs past midnight), and its special dates (closed, or other
+       hours). Both layers hold them, with a PostgreSQL migration numbered
+       after W8's.
+    2. **What a page shows.** A `StoreStatus` query, `Open { until }` or
+       `Closed { opens: Option<Instant> }`, read by comparison with the
+       platform's clock. A page is told when the clock passes the instant
+       (ADR-0304). It is shown on the store page, on each store on the home
+       page, in search results ("open now"), and in the cart.
+    3. **Ordering while closed is refused.** `place_order` answers a declared
+       `Closed { opens }` from its transaction, with a last-order cut-off the
+       store sets (DoorDash's is 20 minutes before close). Adding to a cart
+       while closed is allowed, since that is browsing. The refusal is told
+       where the press was (ADR-0302).
+    4. **Its tests**, on both layers:
+       - a page told at the closing instant, by a test clock advanced as
+         ADR-0304's are;
+       - an order refused at close minus the cut-off;
+       - a DST day in the store's zone (RFC 5545's rule for a skipped or
+         repeated local time, as the clock's ADR has it);
+       - hours that run past midnight;
+       - a special date closed.
+    5. **Research to cite**: DoorDash's store hours (`open_hours`,
+       `special_hours`), schema.org's `OpeningHoursSpecification`, and RFC
+       5545 §3.3.5.
+- **2026-10-11, W6: no search form before the route reads its query
+  part.** W6 found that "the form sent by `navigate`" cannot be written.
+  `navigate` goes only at the end of a command's `Ok` arm (ADR-0280, PW5043),
+  a command a page's handler calls declares `idempotent_by` (PW0338), and
+  kiokun's sources are `transactions none`, so no command could carry it.
+  Ruled **(c)**:
+  - no search box until a route reads its query part;
+  - then a plain `<form method="get" action="/search">` with `name="q"`,
+    which needs no script and is nearer kiokun.com.
+  Not (a), a navigation from a handler that calls no command. A link and a
+  GET form already say that, without script, and ADR-0280 keeps `navigate`
+  for a commit's consequence. Not (b), a placeholder command, which would be
+  a round trip and a write per search. Typed page query parameters are the
+  integrator's next work after the soft navigation's merge; W9's search
+  waits for them the same way.
+- **2026-10-11, the soft navigation and the command order merged** as
+  ADR-0306 and ADR-0305, from `5ed759d` (verify 38157805656 green): a
+  navigation between two pages of one layout keeps it, and a page's
+  commands run in the order it sent them (`pw-after`; the host waits two
+  seconds for the one before, then answers early, 409). **W8, W6 and W9
+  merge `master`.** For W8: a command now carries `pw-after` beside your
+  `pw-document`, and a press's retry carries both; and master's
+  page-speculation test holds a page to its own entry (ADR-0191 amended),
+  which your verify's survivor needs. Master's navigate.spec presses from
+  the keyboard now (its Firefox failure, named known until then).
+- **2026-10-11, W6: kiokun.com's deinflection is GPL-3.0's, so it is out
+  for now.** kiokun.com's `deinflect.ts` is "Adapted from 10ten-ja-reader",
+  which is GPL-3.0: 241 rules, 38 reasons and their labels, and its
+  algorithm. kiokun.com uses it in its search box and in a 307 from an
+  inflected word to its dictionary form. Ruled **(c)**: deinflection is not
+  claimed, and the reading index and the Homophones section go first.
+  Nothing of the table is committed, whole, in part or transcribed.
+  **The owner's question**: may this public Apache-2.0 repository hold that
+  table under GPL-3.0 in a separate file, making its licensing mixed (a), or
+  should our own rules be written from a cited grammar reference, keeping
+  the repository Apache-2.0 alone (b)? The integrator recommends (b):
+  conjugation is grammar, the rules would be structured and labelled as our
+  own, and kiokun.com's behaviour would be an oracle whose disagreements are
+  named. Also ruled: the Homophones section is rendered on the server, its
+  groups in reading order, a Difference from kiokun.com's client-only
+  fetches, whose order is whichever answers first; the oracle compares each
+  reading's set.
+- **2026-10-11, the owner's answers** (relayed by the coordinator):
+  (1) **deinflection is (b)**: our own rules, written from a cited grammar
+  reference whose licence is cleared, in W6's own ADR after the reading
+  index and Homophones; the repository stays permissive (Apache-2.0, and
+  MIT where a source is), with no part of 10ten's table. W6 asks before
+  using a reference whose licence is unclear. (2) **`is_common`**: how
+  production loaded the index is not known to the owner; W6 keeps its plan
+  (integers, as the `.sql` writes them), and its oracle runs both loadings
+  once and records any difference, which the coordinator tells the owner.
+

@@ -1,8 +1,8 @@
 ADR-0222 - a post is shown before the server answers
 
 produced by: just e14-optimistic-posts
-commit: 0efa5cad088d29a44297f6c100228b6726551de1
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37943438178 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 328720e89d73f343c9e671077dfc0fd51e1fed46
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38006542533 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -11,19 +11,19 @@ playwright: Version 1.58.0
 
 test a_target_may_leave_a_key_unnamed ... ok
 test a_key_left_unnamed_is_a_targets_alone ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.71s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.24s
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
 test tests::a_speculating_page_is_sent_its_carts_value ... ok
-test tests::a_post_is_shown_before_the_server_answers_and_the_page_told_when_it_holds_it ... ok
-test tests::a_speculated_value_that_did_not_change_is_not_sent_again ... ok
 test tests::a_page_that_reads_more_holds_what_it_shows ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 331 filtered out; finished in 8.02s
+test tests::a_speculated_value_that_did_not_change_is_not_sent_again ... ok
+test tests::a_post_is_shown_before_the_server_answers_and_the_page_told_when_it_holds_it ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 357 filtered out; finished in 16.11s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  66 passed (1.8m)
+  66 passed (3.0m)
 
 == mutation controls (scripts/optimistic_posts_mutations.py)
 

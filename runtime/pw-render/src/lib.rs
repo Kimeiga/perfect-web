@@ -654,7 +654,7 @@ impl Env {
 /// are two of them. Ten more are left for a host's shell around the page.
 pub const NESTED_ELEMENTS: u32 = 500;
 
-/// **The page's announcer** (ADR-XXXX): where the runtime says what a failed
+/// **The page's announcer** (ADR-0302): where the runtime says what a failed
 /// press is told, a `role="status"` read by ear and seen by no one. Written
 /// into every document that ships the runtime, so it is the same node from
 /// the page's first byte (ADR-0182): a live region added with its words is

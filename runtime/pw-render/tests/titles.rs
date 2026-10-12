@@ -161,7 +161,7 @@ fn rendered(chunks: serde_json::Value, values: serde_json::Value, runtime: bool)
     std::fs::read_to_string(out.join("P.html")).expect("written")
 }
 
-/// **A page the build renders holds the page's announcer** (ADR-XXXX):
+/// **A page the build renders holds the page's announcer** (ADR-0302):
 /// where its runtime says what a failed press is told, once, empty, before
 /// the runtime, from the first byte. A page that ships no runtime has none.
 #[test]

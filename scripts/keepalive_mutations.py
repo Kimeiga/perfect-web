@@ -44,14 +44,14 @@ MUTANTS = [
         "",
     ),
     (
-        # Re-anchored by ADR-XXXX: an answer that came early is read first.
+        # Re-anchored by ADR-0305: an answer that came early is read first.
         "an answered request stays counted",
         RUNTIME,
         "    if (keepalive) keptAlive -= bytes;\n    if (response.status === 409) {\n",
         "    if (response.status === 409) {\n",
     ),
     (
-        # Re-anchored by ADR-XXXX: a request with no answer is thrown as
+        # Re-anchored by ADR-0302: a request with no answer is thrown as
         # unreachable.
         "a failed request stays counted",
         RUNTIME,

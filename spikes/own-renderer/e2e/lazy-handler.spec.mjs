@@ -237,7 +237,7 @@ test("a handler that fails to load is visible and recoverable", async ({ page })
     "data-pw-handler-error",
     "failed",
   );
-  // And told beside it (ADR-XXXX).
+  // And told beside it (ADR-0302).
   await expect(page.locator("#menu .pw-refusal").first()).toHaveText(
     "This did not work. Try again.",
   );

@@ -455,7 +455,7 @@ fn passes_unchanged(
 }
 
 /// A page binding `let b = query R(k..)`: the page's own, or its layout's
-/// (ADR-XXXX), whose key is written in the layout's body.
+/// (ADR-0303), whose key is written in the layout's body.
 struct PageBinding<'b> {
     name: String,
     resource: DefId,
@@ -509,7 +509,7 @@ fn page_bindings<'b>(
     out
 }
 
-/// **The bindings a page's layout gives it** (ADR-XXXX), by the names its
+/// **The bindings a page's layout gives it** (ADR-0303), by the names its
 /// plan reads them by, `cart~StoreLayout`: a layout's count of the cart is
 /// speculated on with the page's, so the two never show two values.
 fn layout_bindings<'b>(
@@ -659,7 +659,7 @@ fn page_module(
                 decl: cid.0,
             };
             // Every binding that shows the entry: the page's, and its
-            // layout's (ADR-XXXX), each told the speculation.
+            // layout's (ADR-0303), each told the speculation.
             let shown: Vec<&PageBinding> = bindings
                 .iter()
                 .filter(|b| {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-XXXX: a page's commands run in the order it sent
+"""Mutation controls for ADR-0305: a page's commands run in the order it sent
 them.
 
 Each mutant undoes one piece:

@@ -124,18 +124,20 @@ MUTANTS = [
         "a second navigation is taken",
         BROWSER,
         RUNTIME,
-        "  if (navigating) {\n"
-        "    log.push(`navigation to ${route} not taken: the page is already leaving`);\n",
+        # Re-anchored by the soft navigation's ADR: one rule for both ways a
+        # page leaves, which the store's pages, shown in a layout, reach softly.
+        "  if (navigating && !(chosen && pending)) {\n"
+        "    log.push(`navigation to ${url} not taken: the page is already leaving`);\n",
         "  if (false) {\n"
-        "    log.push(`navigation to ${route} not taken: the page is already leaving`);\n",
+        "    log.push(`navigation to ${url} not taken: the page is already leaving`);\n",
     ),
     (
         "a navigation goes before the presses made before it",
         BROWSER,
         RUNTIME,
-        "  navigating = true;\n  await Promise.allSettled([...pressing].filter((p) => p !== mine));\n"
-        "  log.push(`navigating to ${url}`);\n",
-        "  navigating = true;\n  log.push(`navigating to ${url}`);\n",
+        # And one wait for the presses before it, for both.
+        "  return Promise.allSettled([...pressing].filter((p) => p !== mine));\n",
+        "  return Promise.allSettled([]);\n",
     ),
     (
         "a press is not counted while it runs",

@@ -1,7 +1,8 @@
 ADR-0072 - an element named with a capital letter is a view
 
 produced by: just e10-view-elements
-commit: e3c3325e43ed32400fd723492ad641b17f0cc74d
+commit: 328720e89d73f343c9e671077dfc0fd51e1fed46
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38006542533 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == view elements (compiler/pw-core/tests/view_elements.rs)
@@ -10,7 +11,7 @@ test a_view_used_in_a_view_composes ... ok
 test a_view_imported_from_another_module_composes ... ok
 test a_capitalised_tag_names_a_view ... ok
 test a_view_is_given_each_of_its_props_once_of_its_type ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
 == mutation controls (scripts/view_element_mutations.py)
 
@@ -22,3 +23,4 @@ a tag's name resolves to nothing: KILLED (4 of 4 tests fail)
 an imported view is not resolved: KILLED (1 of 4 tests fail)
 a view is not told from another declaration: KILLED (1 of 4 tests fail)
 6 of 6 mutants killed
+memory bound: no process was stopped

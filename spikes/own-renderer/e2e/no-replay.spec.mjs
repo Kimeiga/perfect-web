@@ -121,7 +121,7 @@ test.describe("the behavioural half", () => {
             type: r.type,
             where: target?.id || target?.tagName || "?",
             // Inside the cart's section, whose parts read the cart (ADR-0172),
-            // or the layout's count of it (ADR-XXXX).
+            // or the layout's count of it (ADR-0303).
             cart: !!target?.closest("section[aria-labelledby='cart-heading'], #header-cart"),
             added: r.addedNodes.length,
             removed: r.removedNodes.length,

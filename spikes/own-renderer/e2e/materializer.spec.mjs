@@ -29,7 +29,7 @@ test("a regeneration that fails is tried again, and the page hears the change, a
   await expect(page.locator("#cart-count")).toHaveText("1");
   // The server's value reaches the page and reconciles the press.
   // The page's own binding of it, counted alone: its layout's count is
-  // another binding of the cart, reconciled beside it (ADR-XXXX).
+  // another binding of the cart, reconciled beside it (ADR-0303).
   await expect.poll(() => logged(page, "reconciled cart at"), { timeout: 10_000 }).toBe(1);
   // And the next change, as any change does.
   await page.getByRole("button", { name: "Add Cortado" }).click();

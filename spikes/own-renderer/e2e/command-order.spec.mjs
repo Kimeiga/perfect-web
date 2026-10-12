@@ -1,4 +1,4 @@
-// ADR-XXXX: a page's commands run in the order it sent them. Each names the
+// ADR-0305: a page's commands run in the order it sent them. Each names the
 // latest command its page sent and has not been answered (`pw-after`), and
 // the server runs it only once that one has run, whichever request the
 // network brings first. Found by `navigate.spec.mjs` under load: "Clear",

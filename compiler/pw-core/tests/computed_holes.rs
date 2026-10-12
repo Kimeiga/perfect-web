@@ -188,7 +188,7 @@ fn a_value_the_template_computes_is_lifted_and_planned() {
     assert!(chunks.contains("\"#feed.app.PostPage~1\""), "{chunks}");
     assert!(chunks.contains("\"#feed.app.PostPage~2\""), "{chunks}");
     // Control: the home page's host computes one value, whether its
-    // composer is hidden, from its reader (ADR-XXXX). What else it computes
+    // composer is hidden, from its reader (ADR-0302). What else it computes
     // is from its draft, a signal, which the browser computes (ADR-0227).
     let home = plan_of(&b, "feed.app.Home");
     let computed: Vec<_> = home

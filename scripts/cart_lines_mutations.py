@@ -28,10 +28,11 @@ Each mutant undoes one piece:
   attribute or a block not rendered again; a new row not inserted; the
   document's regions not served.
 
-A mutant must fail the suite it is listed with, all of it run: `pw-core`'s
-tests, `pw-conformance`'s, `pw-render`'s, `pw-render-wasm`'s, `pw-host`'s
-with the engine, the development server's, or `e2e/cart.spec.mjs` in
-Chromium.
+A mutant must fail the suite it is listed with: `pw-core`'s four test
+targets that see the core mutants (measured, below), `pw-conformance`'s
+tests, `pw-render`'s, `pw-render-wasm`'s, `pw-host`'s with the engine, the
+development server's, or `e2e/cart.spec.mjs` in Chromium, each of these
+run whole.
 
 Run from the repository root; `just e14-cart-lines` records the output.
 The source is restored after every mutant, whatever happens.
@@ -397,7 +398,17 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core"],
+    # The test targets that see the core mutants' rules (W6's ruling of
+    # 2026-10-09: a mutant that takes long is given the tests that can see
+    # its rule), measured by `scripts/mutant_killers.py --suite core` on
+    # 2026-10-11 against pw-core's 211, each mutant seen by two of them where
+    # two kill it: every core mutant ran all 211, relinked, and the script
+    # took 16,552 s of a verify.
+    "core": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
+        "--test", "graphs_on_the_wire", "--test", "handlers",
+        "--test", "nested_lists", "--test", "top_level_captures",
+    ],
     "conformance": ["cargo", "test", "--quiet", "--locked", "-p", "pw-conformance"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render"],
     "render-wasm": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render-wasm"],

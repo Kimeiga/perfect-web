@@ -409,14 +409,47 @@ MUTANTS = [
         '            .any(|i| i.interface.starts_with("kiokun:"))',
         '            .any(|i| i.interface.starts_with("kiokun-never:"))',
     ),
+    (
+        "a word's own file never moves it",
+        APP,
+        "    let moved = moved_from(first, word)\n",
+        "    let moved = moved_from(None, word)\n",
+    ),
+    (
+        "a word is moved to itself",
+        APP,
+        "            Some(t) => if t != word { Some(t) } else { None },\n",
+        "            Some(t) => Some(t),\n",
+    ),
+    (
+        "a move is temporary",
+        APP,
+        "    redirect_on  KiokunError.Moved permanent\n",
+        "    redirect_on  KiokunError.Moved temporary\n",
+    ),
+    (
+        "the page names no move",
+        APP,
+        "    redirect_on  KiokunError.Moved permanent\n",
+        "",
+    ),
+    (
+        "a character's own form counts among its traditional forms",
+        APP,
+        '    let traditional = List.filter(traditional_of(e), v => v != "" & v != source)\n',
+        '    let traditional = List.filter(traditional_of(e), v => v != "")\n',
+    ),
 ]
 
-# Four test threads, not one per core: each kiokun test compiles the
-# program into its own TempDir (ADR-0158), so at full parallelism the
-# process peaked at 3.49 GB measured alone and crossed ADR-0292's
-# 4 GiB bound in the baseline run. With four threads it peaks at
-# 2.26 GB (measured with /usr/bin/time -l, 2026-10-09), at about
-# twice the time.
+# Four test threads, not one per core. Each distinct program is compiled
+# once per test process and its files written into each test's own TempDir
+# (the integrator's ruling of 2026-10-09; ADR-0158 holds). Measured back to
+# back with /usr/bin/time -l on 12 cores at a load near 16, the tests alone
+# take 76.0 s and 2.71 GB at one thread per core, or 99.0 s and 2.39 GB on
+# four (before the cache: 92.8 s and 3.61 GB, or 138.7 s and 2.09 GB). In
+# a whole run at one thread per core, ADR-0292's 4 GiB bound still stopped
+# the test process in 19 of 69 mutants' runs; on four threads, a whole run
+# before the cache stopped none.
 TESTS = [
     [
         "cargo",

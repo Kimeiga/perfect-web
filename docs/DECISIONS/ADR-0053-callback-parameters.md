@@ -98,3 +98,45 @@ environment is flat, and cannot say which binding a use means.
   it is bound to. A scoped environment would answer for each binding.
 - **A lambda in a branch of an annotated binding's initialiser** is not typed
   by the annotation.
+
+## Amended, 2026-10-11: a parameter known in part is checked by that part
+
+Accepted under the owner's delegation of 2026-10-02.
+
+W8 (track `store-accounts`) ran `just e10-callbacks` on a clean archive of
+master at `7a701c2`, and two of its eight mutants survived. The nightly
+verifications of 2026-10-08, -09 and -10 had found the same. The recorded
+evidence was from `b8f9547`, before either change that let them survive. No
+push ran the recipe again: a push runs a mutation script only where a mutant
+sits near a changed line (ADR-0281), and neither change was near one.
+
+- **"a parameter with a hole in its type is kept"** (`values.rs`).
+  `Typer::lambda` kept a parameter's type only where it was known whole
+  (`is_closed`). When this ADR was written, a type bound in one round was
+  fixed for good, and the guard kept a hole from being fixed. ADR-0063 then
+  made `Typer::bind` complete a type that a later round knows more of. Since
+  then the guard has done only one thing: it left unchecked a parameter whose
+  type is known in part. Take `fn each_list<T>(f: fn(List<T>) -> Int)`, where
+  nothing fixes `T`. In `each_list(xs => xs + 1)`, `xs` is a `List<?>`, and it
+  was not checked at all: `xs + 1` and `xs.score` were accepted.
+  **The guard is removed.** A parameter keeps what is known of its type and is
+  checked by it. An unknown part decides nothing (unification's `Undecided`),
+  so only what the known part refuses is reported. The mutant now puts the
+  guard back: "a parameter known only in part is not typed".
+- **"any type parameter takes the list's element"** (`infer.rs`). Since
+  ADR-0063 the value relations no longer start from `infer.rs`'s bindings.
+  Its lambda typing is read only to resolve a member by its receiver's type,
+  and no test held an accumulator to be anything other than the list's
+  element there. `causal_evidence.rs`'s
+  `a_folds_accumulator_is_not_its_lists_element` does. In
+  `List.fold(items, 0, fn(total, el) total.getBoundingClientRect().width)`,
+  `total` is no `ElementRef`, so the member resolves nothing through it and
+  the effect does not reach the body.
+
+Not claimed: a lambda passed before the argument that fixes its type
+parameter, as in `later(xs => .., w)` with `fn later<T>(f: fn(List<T>) -> Int,
+x: T)`. Such a lambda is typed by what the arguments before it fixed, so `xs`
+is a `List<?>`, not a `List<Word>`. TypeScript types a context-sensitive
+argument after the others. Every callback in `pw-std` is its function's last
+parameter, so no program here meets this (KNOWN_LIMITATIONS).
+

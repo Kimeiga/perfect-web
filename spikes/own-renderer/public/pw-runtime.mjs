@@ -561,7 +561,7 @@ function loadHandler(identity) {
 }
 
 /**
- * **A page's commands run in the order it sent them** (ADR-XXXX). Each names
+ * **A page's commands run in the order it sent them** (ADR-0305). Each names
  * the latest command this page sent and has not been answered (`pw-after`),
  * and the server runs it only once that one has run, whichever request the
  * network brings first. Until 2026-10-10 each went its own way, and under
@@ -582,7 +582,7 @@ async function command(component, args, interaction, retry) {
 }
 
 /** Each command this page has sent and not been answered, by interaction, in
- * the order sent, as a promise of its answer (ADR-XXXX). */
+ * the order sent, as a promise of its answer (ADR-0305). */
 const unanswered = new Map();
 
 /**
@@ -608,7 +608,7 @@ const unanswered = new Map();
  * marked `keepalive` outlives its document (the Fetch standard), within 64 KiB
  * of such bodies in flight; one past what remains is sent as before.
  *
- * **Answered early** (ADR-XXXX): the one before it, `after`, had not reached
+ * **Answered early** (ADR-0305): the one before it, `after`, had not reached
  * the server in time, and this one ran nothing. That is no outcome: it is sent
  * again once each command sent `before` it is answered, naming none, and it
  * is no resend of the `retry` clause's.
@@ -658,7 +658,7 @@ async function send(component, args, interaction, retry, after, before) {
       }
     }
     if (!response.ok) {
-      // **Refused by its `requires`** (ADR-XXXX): the predicate and the words
+      // **Refused by its `requires`** (ADR-0302): the predicate and the words
       // a reader is told, which the host that refused sends.
       if (response.status === 403) {
         const refusal = await response.json().catch(() => null);
@@ -1710,7 +1710,7 @@ const verdicts = new Map();
 
 // --- what a failed press is told -----------------------------------------
 //
-// **A refusal is told where the press was** (ADR-XXXX). Until 2026-10-09 a
+// **A refusal is told where the press was** (ADR-0302). Until 2026-10-09 a
 // press a command's `requires` refused failed silently: the speculation was
 // taken back, `data-pw-handler-error` set, a line logged, and the reader told
 // nothing, the dead button this project exists to remove (the owner's
@@ -1909,18 +1909,39 @@ addEventListener(
  * navigation, made while the page leaves, is not taken: the first decides.
  */
 async function navigate(route, args, mine) {
-  if (navigating) {
-    log.push(`navigation to ${route} not taken: the page is already leaving`);
-    return;
-  }
   const url = pageAddress(route, args);
-  // A page shown in a layout keeps it (the soft navigation's ADR): each press
-  // made before this one answered first, as below.
+  // A page shown in a layout keeps it (the soft navigation's ADR), held to
+  // the same two rules, by the same two functions.
   if (parts.layout) return softNavigate(url, "push", mine);
+  if (!taken(url)) return;
   navigating = true;
-  await Promise.allSettled([...pressing].filter((p) => p !== mine));
+  await pressedBefore(mine);
   log.push(`navigating to ${url}`);
   leaveFor(url);
+}
+
+/**
+ * **Whether a navigation to `url` is taken** (ADR-0280): not while the page
+ * leaves, the first navigation deciding, unless it is a reader's own choice
+ * (a link, back or forward) replacing a soft navigation in flight (the soft
+ * navigation's ADR). One rule for both ways a page leaves, so a test of
+ * either holds it.
+ */
+function taken(url, chosen = false) {
+  if (navigating && !(chosen && pending)) {
+    log.push(`navigation to ${url} not taken: the page is already leaving`);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * **Each press made before `mine`, answered first** (ADR-0280): the page a
+ * navigation goes to is read after every commit this page was answered. One
+ * wait for both ways a page leaves.
+ */
+function pressedBefore(mine) {
+  return Promise.allSettled([...pressing].filter((p) => p !== mine));
 }
 
 /** Load `url` whole, the page leaving for it; `reload`: this address. */
@@ -2096,7 +2117,7 @@ function bindEvent(template, part) {
         return;
       }
       lastActed = el;
-      // What its last press was told, taken back (ADR-XXXX).
+      // What its last press was told, taken back (ADR-0302).
       untell(el);
       const record = eventRecord(event, e);
       // Which instance each signal the handler names is, for this use of
@@ -2198,7 +2219,7 @@ function bindEvent(template, part) {
         // user's only way to find out.
         loaded.delete(part.value);
         attempts.set(part.value, (attempts.get(part.value) ?? 0) + 1);
-        // Told where the press was (ADR-XXXX): a refusal in its predicate's
+        // Told where the press was (ADR-0302): a refusal in its predicate's
         // words, anything else in the platform's.
         if (error instanceof Refused) {
           tell(el, error.says || PLATFORM_SAYS.failed, `refused:${error.predicate}`);
@@ -2232,7 +2253,7 @@ async function attach() {
   // One traversal, before anything else. Every later lookup is a map hit.
   const indexed = buildIndex();
   // The announcer a failed press is said by, there before anything is
-  // (ADR-XXXX): a live region added with its words is not reliably said.
+  // (ADR-0302): a live region added with its words is not reliably said.
   announcerOf();
   log.push(`indexed ${indexed} address(es)`);
   for (const p of parts.parts ?? []) {
@@ -2846,10 +2867,7 @@ let pending = null;
  * its commit never does, and is not taken while another is (ADR-0280).
  */
 async function softNavigate(url, how, mine, chosen = false) {
-  if (navigating && !(chosen && pending)) {
-    log.push(`navigation to ${url} not taken: the page is already leaving`);
-    return;
-  }
+  if (!taken(url, chosen)) return;
   pending?.abort();
   const going = new AbortController();
   pending = going;
@@ -2860,7 +2878,7 @@ async function softNavigate(url, how, mine, chosen = false) {
   document.documentElement.dataset.pwReady = "0";
   // Each press made before this answered first, so the page is read after
   // its commit (ADR-0280).
-  await Promise.allSettled([...pressing].filter((p) => p !== mine));
+  await pressedBefore(mine);
   if (going.signal.aborted) return;
   log.push(`navigating softly to ${url}`);
   let response, text;

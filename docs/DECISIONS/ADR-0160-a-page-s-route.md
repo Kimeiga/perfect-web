@@ -68,3 +68,14 @@ its own subscriber first (the next ruling), then the server (the one after).
   `/StorePage.html`, as the next two rulings set out.
 - **An unknown store answered 404.** Which error means "absent" is the page's
   to declare: a ruling of its own.
+
+## Amended, 2026-10-11: two pages of one name are told apart by their modules
+
+PW0341 named each page by its name alone. Then the store's `CartPage` and the
+accepted corpus's (A-026) were "`CartPage` is served at `/cart`, and so is
+`CartPage`": one page named twice. That came from `e14-case-and-delivery`,
+which checked two programs as one; its recipe now checks each program alone.
+Where the two names are alike, each is now named by its module:
+"`forms.CartPage` is served at `/cart`, and so is `shop.CartPage`"
+(`routes.rs`'s `two_pages_of_one_name_are_told_apart_by_their_modules`, and a
+mutant).

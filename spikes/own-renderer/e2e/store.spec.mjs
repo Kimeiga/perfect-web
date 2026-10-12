@@ -69,7 +69,7 @@ test.describe("the document the server produced", () => {
     // the menu grouped by category (ADR-0181): the coffee category's
     // instance 2, its heading 2, and its items' own loop 2 = 6. And the menu
     // counted, which the host keeps (ADR-0277): its line 2. And the count of
-    // the cart in the layout the page is shown in (ADR-XXXX): 2. 74 in all.
+    // the cart in the layout the page is shown in (ADR-0303): 2. 74 in all.
     expect(shape.anchors).toBe(74);
     // Three Add buttons and one Clear button. The Clear button exists so that
     // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`. And
@@ -111,19 +111,13 @@ test.describe("decide() governs attachment", () => {
     // runtime is not edited and has no test-only branch. Without this, "the
     // handler attached" is consistent with a runtime that attaches whatever it
     // is given.
-    await page.goto("/StorePage.html");
-    await page.evaluate(() => {
-      const el = document.getElementById("pw-parts");
-      const data = JSON.parse(el.textContent);
-      // Hash scheme 1 — superseded, and refused as INCOMPARABLE rather than
-      // as different (E7V).
-      data.resume.scheme = "1";
-      el.textContent = JSON.stringify(data);
-    });
-    await page.reload({ waitUntil: "commit" });
-
-    // Re-serve the mutated manifest by intercepting the document instead: a
-    // reload discards the edit, so the mutation is applied to the response.
+    //
+    // The document is answered with hash scheme 1, superseded, and refused as
+    // INCOMPARABLE rather than as different (E7V). Until 2026-10-11 the page
+    // was first loaded, its manifest edited and the page reloaded only to the
+    // reload's commit: an edit the reload discards, and a navigation still
+    // loading as the next began, whose load WebKit once never reached
+    // (master's verify 38036676661).
     await page.route("**/StorePage.html", async (route) => {
       const response = await route.fetch();
       const body = (await response.text()).replace('"scheme":"2"', '"scheme":"1"');
@@ -163,7 +157,7 @@ test.describe("the update touches only what changed", () => {
     const at = (id) => `${pw.parts.schema}/|${id}`;
     // The cart's parts, each what reads the cart (ADR-0172): its count, its
     // subtotal, its first line, its empty message hidden, its fees shown;
-    // and the count the page's layout shows of it (ADR-XXXX).
+    // and the count the page's layout shows of it (ADR-0303).
     expect([...pw.updated].sort(), "exactly the cart's parts").toEqual(
       [
         at(part("text", "cart~StoreLayout.line_count")),

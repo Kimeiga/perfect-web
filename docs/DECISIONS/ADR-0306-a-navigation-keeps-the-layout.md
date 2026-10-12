@@ -1,12 +1,12 @@
-# ADR-XXXX: a navigation keeps the layout, and shows the next page in it
+# ADR-0306: a navigation keeps the layout, and shows the next page in it
 
-Status: proposed by the integrator, 2026-10-09, under the owner's delegation
-of 2026-10-02. The third of three steps to the parts two pages share kept in
-place (NEXT, the DoorDash customer app's item 1): the build is named (the
-build id's ADR), a page names its layout (the layouts' ADR), and a navigation
-between two pages of one layout and one build keeps it. Builds on ADR-0280
-(a navigation after a commit, read after it), ADR-0219 (a live document is
-told), ADR-0122 (speculation), and the refusal ruling's announcer. Date:
+Status: accepted under the owner's delegation of 2026-10-02 (the
+integrator's). The third of three steps to the parts two pages share kept in
+place (NEXT, the DoorDash customer app's item 1): the build is named
+(ADR-0300), a page names its layout (ADR-0303), and a navigation between two
+pages of one layout and one build keeps it. Builds on ADR-0280 (a navigation
+after a commit, read after it), ADR-0219 (a live document is told), ADR-0122
+(speculation), and ADR-0302's announcer. Date:
 2026-10-09. Milestone: E14.
 
 ## Context
@@ -108,7 +108,7 @@ told), ADR-0122 (speculation), and the refusal ruling's announcer. Date:
    evidence run: the clear's request reached the server before the order's,
    the cart was emptied first, and the order was refused as nothing to
    order. Not this ADR's, nor the test's: two presses' commands committed
-   in the order the network brought them. Ruled by the command order's ADR
+   in the order the network brought them. Ruled by ADR-0305
    (a page's commands run in the order it sent them), merged here before
    this ADR's evidence was recorded again.
 

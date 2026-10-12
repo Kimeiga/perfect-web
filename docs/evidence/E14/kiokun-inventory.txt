@@ -1,7 +1,7 @@
 kiokun.com's parity inventory, held to the SvelteKit app it inventories
 
 produced by: just e14-kiokun-inventory (local: reads a kiokun-data checkout)
-commit: 3debcd387e81316fbe1babd1992e9f56dff689f5
+commit: 6f20c4c7d6c8853cbcbf83f4774f7a580e7b4ac5
 python: Python 3.12.8
 
 == the inventory against the app (scripts/kiokun_inventory.py)
@@ -26,3 +26,4 @@ a route row is counted as a feature: KILLED (1 of 9 tests fail)
 the check passes whatever it finds: KILLED (1 of 9 tests fail)
 the recipe is planned on a runner, which has no checkout: KILLED (1 of 9 tests fail)
 9 of 9 mutants killed
+memory bound: no process was stopped

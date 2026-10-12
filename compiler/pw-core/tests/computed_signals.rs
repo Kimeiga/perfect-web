@@ -141,7 +141,7 @@ fn a_value_computed_from_a_signal_is_the_browsers_and_its_first_the_hosts() {
     );
     // Not the host's to compute again: no part of its plan runs either. (It
     // computes one value of its own, the composer's `hidden`, from its
-    // reader, ADR-XXXX.)
+    // reader, ADR-0302.)
     for p in plan.parts.iter().chain(&plan.derived) {
         assert!(
             !p.steps.iter().any(|s| matches!(

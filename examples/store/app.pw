@@ -318,7 +318,7 @@ command place_order()
     Orders.place(current_session())
 }
 
-// **What every page of the store is shown in** (ADR-XXXX): the way home,
+// **What every page of the store is shown in** (ADR-0303): the way home,
 // and the session's cart, its count told as the cart changes, whichever page
 // is open. Its own markup and bindings, the same on every page that names it;
 // read again with every document, so a page gone to after a change shows it.

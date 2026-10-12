@@ -1,4 +1,4 @@
-# ADR-XXXX: a page is shown in its layout, which the pages that name it share
+# ADR-0303: a page is shown in its layout, which the pages that name it share
 
 Status: proposed by the integrator, 2026-10-09, under the owner's delegation
 of 2026-10-02. The second of three steps to the parts two pages share kept in
@@ -119,7 +119,8 @@ Date: 2026-10-09. Milestone: E14.
    parse**: `<h1>a</h1><p>b</p>` is PW0009, and `<h1>a</h1><hr />` too; inside
    an element they do. The template region ends after its first element at
    the top, and the next `<` is read as a comparison. Found writing this
-   ADR's refusals; a grammar fix of its own, queued on NEXT.
+   ADR's refusals; a grammar fix of its own, ADR-0243's amendment of
+   2026-10-10 (merged after this ADR).
 2. **A page and its layout that bind one query read it twice.** The store's
    page binds `Cart(current_session())`, and so does its layout: the host
    read the cart twice for each document, which the host's count of reads
