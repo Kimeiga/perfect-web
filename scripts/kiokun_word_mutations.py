@@ -9,6 +9,12 @@ mutant undoes one rule of the word page, in the program
 chooses it, and at least one of the server's kiokun tests
 (`server/src/tests/kiokun.rs`) must then fail or not build.
 
+Each mutant runs the tests its suite is given (SEEN_BY): the cover of its
+suite's measured killers, each mutant seen by two tests where two kill it
+(the integrator's ruling of 2026-10-09; `scripts/mutant_killers.py`). Run
+whole, every mutant ran every kiokun test, and the script outran a verify's
+six hours (verify 38038009339).
+
 Run from the repository root; `just e14-kiokun-word` records the output.
 The sources are restored after every mutant, whatever happens.
 """
@@ -931,7 +937,74 @@ GROUPS = {
 # rule): the cover `mutant_killers.py` prints over the measured killers, each
 # mutant seen by two tests where two kill it. A suite not named here runs
 # every kiokun test.
-SEEN_BY = {}
+SEEN_BY = {
+    "files": [
+        K + "a_code_is_shown_by_kiokuns_label_for_it",
+        K + "a_file_answers_only_for_the_word_it_records",
+        K + "a_japanese_word_shows_its_pitch_accent",
+        K + "a_record_listed_twice_is_shown_twice_each_keyed_once",
+        K + "a_stub_of_several_traditional_forms_shows_each_ones_words",
+        K + "a_word_too_long_to_be_a_file_name_is_not_found",
+        K + "an_equivalent_forms_words_are_shown_on_the_canonical_page",
+        K + "the_layer_reads_no_path_but_one_of_kiokuns_files",
+    ],
+    "stubs": [
+        K + "a_stub_of_several_traditional_forms_shows_each_ones_words",
+        K + "a_stubs_card_heads_the_page_it_names",
+        K + "an_equivalent_forms_words_are_shown_on_the_canonical_page",
+        K + "an_equivalent_simplified_form_is_moved_to_its_traditional_page",
+    ],
+    "words": [
+        K + "one_japanese_sense_is_not_numbered_and_many_are",
+        K + "the_character_headers_rules_hold",
+        K + "the_word_page_shows_each_languages_words_as_kiokun_does",
+        K + "what_kiokun_com_leaves_out_is_left_out",
+    ],
+    "labels": [
+        K + "a_code_is_shown_by_kiokuns_label_for_it",
+        K + "an_app_without_its_label_table_is_refused",
+    ],
+    "header": [
+        K + "an_equivalent_forms_words_are_shown_on_the_canonical_page",
+        K + "the_character_header_shows_its_gloss_levels_and_readings",
+        K + "the_character_headers_rules_hold",
+        K + "the_header_shows_each_written_form_with_its_roles",
+    ],
+    "head": [
+        K + "the_description_takes_kiokuns_fragments_and_length",
+        K + "the_page_describes_itself_as_kiokun_com_does",
+        K + "the_page_head_matches_kiokuns_answers_for_the_sample",
+    ],
+    "pitch": [
+        K + "a_japanese_word_shows_its_pitch_accent",
+        K + "a_pitch_shard_is_its_words_hash_over_utf16_units",
+    ],
+    "examples": [
+        K + "a_japanese_senses_examples_are_its_japanese_sentences",
+        K + "a_senses_examples_are_shown_first_and_the_rest_disclosed",
+        K + "the_japanese_examples_match_kiokuns_answers_for_the_sample",
+    ],
+    "moves": [
+        K + "an_equivalent_simplified_form_is_moved_to_its_traditional_page",
+    ],
+    "contains": [
+        K + "an_equivalent_forms_words_are_shown_on_the_canonical_page",
+        K + "appears_in_ranks_each_languages_words_ten_at_a_time",
+        K + "contains_and_appears_in_match_kiokuns_answers_for_the_sample",
+        K + "contains_breaks_the_word_down_and_cards_its_forms",
+    ],
+    "edrdg": [
+        K + "a_page_with_edrdg_data_acknowledges_the_group",
+    ],
+    "search": [
+        K + "search_matches_kiokuns_answers_for_the_sample",
+        K + "search_reads_kana_variants_and_canonical_pages",
+    ],
+    "homophones": [
+        K + "homophones_are_each_readings_words_but_the_pages_own",
+        K + "homophones_match_kiokuns_answers_for_the_sample",
+    ],
+}
 
 
 def command_for(suite):
