@@ -362,7 +362,7 @@ test("the tree a screen reader reads is the page's", async ({ page, request }) =
       - status: That item just sold out.
       - button "Clear"
       - paragraph:
-        - link "Go to your cart":
+        - link "Checkout $3.50":
           - /url: /cart
   `);
 });
@@ -393,8 +393,9 @@ test("every control is reached from the keyboard, in the order it is read, and s
     "Increase quantity of Espresso",
     "Remove Espresso",
     "Clear",
-    // The cart's own page (ADR-0190).
-    "Go to your cart",
+    // The cart's own page (ADR-0190), "Checkout" with its subtotal while
+    // the cart holds a line.
+    "Checkout $3.50",
   ]);
   const reached = [];
   for (let i = 0; i < stops.length; i += 1) {

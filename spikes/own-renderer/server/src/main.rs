@@ -11271,6 +11271,92 @@ public query Store(",
         );
     }
 
+    /// The store, with a block its cart decides that shows the cart's count
+    /// through a member, `{cart.line_count}` (ADR-XXXX). With `add_to_cart`'s
+    /// speculation, which renders the block again in the browser (ADR-0172),
+    /// or without it.
+    fn with_count_in_a_block(app: &str, speculated: bool) -> String {
+        let speculation = "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n";
+        let count = "                <p id=\"cart-count\">{cart.line_count}</p>";
+        assert_eq!(
+            app.matches(speculation).count(),
+            1,
+            "the speculation's anchor"
+        );
+        assert_eq!(app.matches(count).count(), 1, "the count's anchor");
+        let app = if speculated {
+            app.to_string()
+        } else {
+            app.replace(speculation, "")
+        };
+        app.replace(
+            count,
+            &format!(
+                "{count}\n                {{#if cart.lines}}<p id=\"inner\">{{cart.line_count}} in \
+                 the cart</p>{{/if}}"
+            ),
+        )
+    }
+
+    /// **A member read inside a block is computed once a change, and told**
+    /// (ADR-XXXX): the count inside `{#if cart.lines}` is shown with the
+    /// block at the first line, set where it is at the second, as the count
+    /// at the top is, and gone with the block when the cart is cleared.
+    /// Until 2026-10-12 the page did not build: "which a host would call per
+    /// instance".
+    #[test]
+    fn a_member_read_inside_a_block_is_computed_and_told_where_it_is() {
+        let s = lines_server_with(|app| with_count_in_a_block(app, false));
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("cortado", 1), false)
+            .expect("runs");
+        s.command(CLEAR, "a", &[], false).expect("runs");
+        let sets = told(&s, "a");
+        assert_eq!(sets.len(), 3, "{sets:?}");
+        assert!(
+            sets[0]
+                .iter()
+                .any(|p| p.starts_with("range \"1 in the cart\"")),
+            "{sets:?}"
+        );
+        // The block still shown: its count set where it is, beside the top's.
+        assert_eq!(
+            sets[1]
+                .iter()
+                .filter(|p| p.starts_with("text \"2\""))
+                .count(),
+            2,
+            "{sets:?}"
+        );
+        assert!(!sets[1].iter().any(|p| p.starts_with("range")), "{sets:?}");
+        assert!(
+            sets[2].iter().any(|p| p.starts_with("range \"\"")),
+            "{sets:?}"
+        );
+    }
+
+    /// **And in a block a speculation renders** (ADR-0172): rendered again
+    /// whole, its count the host's.
+    #[test]
+    fn a_member_read_inside_a_speculated_block_is_rendered_with_it() {
+        let s = lines_server_with(|app| with_count_in_a_block(app, true));
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("cortado", 1), false)
+            .expect("runs");
+        let sets = told(&s, "a");
+        assert_eq!(sets.len(), 2, "{sets:?}");
+        assert!(
+            sets[1]
+                .iter()
+                .any(|p| p.starts_with("range \"2 in the cart\"")),
+            "{sets:?}"
+        );
+    }
+
     /// The store, with a message its cart's lines decide by an attribute:
     /// `hidden` while the cart holds a line (ADR-0171). Without
     /// `add_to_cart`'s speculation, which would not reach it (ADR-0170).
@@ -17031,7 +17117,9 @@ public query Store(",
             // controls ask nothing, track `store-accounts`.)
             // them; and ADR-0303: the layout's count is part 0, before all.
             // Track `store-accounts`: and where deliveries go, before them.
-            whole.ends_with("</template><!--/pw-38--></body>\n</html>\n"),
+            // ADR-XXXX: and the cart's link, a block and the subtotal it
+            // says while the cart holds a line.
+            whole.ends_with("</template><!--/pw-40--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the

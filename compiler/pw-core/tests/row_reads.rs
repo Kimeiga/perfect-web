@@ -182,41 +182,48 @@ fn a_row_of_a_loop_inside_a_loop_reads_members_of_its_item() {
 }
 
 #[test]
-fn a_member_read_no_host_computes_is_refused_where_it_is() {
-    for (markup, refused) in [
-        // At the top of the page: an attribute, and what a block decides by.
+fn a_query_s_member_read_outside_a_row_is_computed_by_a_host() {
+    // ADR-XXXX: at the top of the page, an attribute and what a block
+    // decides by read a query's member as a text part does: a part a host
+    // computes, into what the page is rendered with, by its path. Until
+    // 2026-10-12 each was refused, "which no host computes there".
+    for (markup, path, read_by) in [
         (
             "<p title={total.display}>total</p>",
-            "part 0 reads `total.display` through a member function in an attribute",
+            "total.display",
+            "t.display",
         ),
         (
             "<p aria-label=\"Total {total.display}\">total</p>",
-            "part 0 reads `total.display` through a member function in an attribute",
+            "total.display",
+            "t.display",
         ),
         (
             "{#if total.is_free}<p>free</p>{/if}",
-            "part 0 reads `total.is_free` through a member function in what a block decides by",
+            "total.is_free",
+            "t.is_free",
         ),
         (
             "{#if menu}<p>a menu</p>{:else if total.is_free}<p>free</p>{/if}",
-            "part 1 reads `total.is_free` through a member function in what a block decides by",
+            "total.is_free",
+            "t.is_free",
         ),
         (
             "{#match total.discount}{:Some(d)}<p>{d.minor_units}</p>{:None}<p>none</p>{/match}",
-            "part 0 reads `total.discount` through a member function in what a block decides by",
+            "total.discount",
+            "t.discount",
         ),
     ] {
-        let why = plan(markup).expect_err(markup);
-        assert!(why.starts_with(refused), "{markup}: {why}");
-        assert!(
-            why.ends_with(
-                "which no host computes there: one computes it from a query's value in text at \
-                 the top of the page (ADR-0125), or from the item of a loop over a query's list, \
-                 or over a list in such an item (ADR-0169, ADR-0181)"
-            ),
-            "{why}"
-        );
+        let plan = plan(markup).unwrap_or_else(|e| panic!("{markup}: {e}"));
+        let computed: Vec<_> = plan.derived.iter().filter(|d| d.path == path).collect();
+        assert_eq!(computed.len(), 1, "{markup}: {:#?}", plan.derived);
+        assert_eq!(computed[0].steps, vec![member(read_by)], "{markup}");
+        assert!(plan.rows.is_empty(), "{markup}: {:#?}", plan.rows);
     }
+    // An attribute at the top is set again when what it reads changes, as
+    // a computed one is (ADR-0171, ADR-0226).
+    let plan = plan("<p title={total.display}>total</p>").expect("planned");
+    assert_eq!(plan.attributes, vec![0]);
 }
 
 #[test]

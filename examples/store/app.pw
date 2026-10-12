@@ -613,8 +613,10 @@ user page StorePage(id: StoreId) {
                 >
                     Clear
                 </button>
-                <!-- The cart as a page of its own (ADR-0190). -->
-                <p><a id="cart-page" href="/cart">Go to your cart</a></p>
+                <!-- The cart as a page of its own (ADR-0190), where an order is
+                     placed: "Checkout" with its subtotal while the cart holds
+                     a line (ADR-XXXX, a member read inside a block). -->
+                <p>{#if cart.lines}<a id="checkout" href="/cart">Checkout {cart.subtotal.display}</a>{:else}<a id="cart-page" href="/cart">Go to your cart</a>{/if}</p>
             </section>
 
             <section aria-label="Recommendations">

@@ -20,8 +20,6 @@
 //!
 //! - a binding whose key is neither a page parameter, an invocation-context
 //!   call (`current_session()`), nor a page signal (ADR-0152);
-//! - a member read inside a block (`{#each}`, `{#match}`, `{#if}`): a host
-//!   would call it per instance, which this plan does not state;
 //! - a path that reads through something that is neither a field nor a
 //!   member of the type it reads.
 
@@ -925,10 +923,54 @@ fn field_type(sigs: &Signatures, mut ty: ResolvedType, fields: &[&str]) -> Optio
 fn unplanned(part: u32, path: &str, what: &str) -> String {
     format!(
         "part {part} reads `{path}` through a member function in {what}, which no host \
-         computes there: one computes it from a query's value in text at the top of the page \
-         (ADR-0125), or from the item of a loop over a query's list, or over a list in such an \
-         item (ADR-0169, ADR-0181)"
+         computes there: one computes it from a query's value outside a loop's list \
+         (ADR-0125, ADR-XXXX), or from the item of a loop over a query's list, or over a list \
+         in such an item (ADR-0169, ADR-0181)"
     )
+}
+
+/// **What `root.reads` reads of a query's value** (ADR-0125), as a part a
+/// host computes: each step a record field, or a member function named by
+/// its component, which `members` gains; and whether one is a member's.
+fn query_part(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+    resource: DefId,
+    part: u32,
+    root: &str,
+    reads: &[&str],
+    members: &mut BTreeSet<DefId>,
+) -> Result<(Part, bool), String> {
+    let ty = value_of(sigs, resource)
+        .ok_or_else(|| format!("`{root}`'s query has no resolved result"))?;
+    let mut through_a_member = false;
+    let mut out = Vec::new();
+    for (step, def) in steps(sigs, ty, reads)? {
+        out.push(match (step, def) {
+            (Step::Member(_), Some(def)) => {
+                through_a_member = true;
+                members.insert(def);
+                Step::Member(
+                    component_id_of(hirs, def)
+                        .ok_or_else(|| "a member function with no identity".to_string())?,
+                )
+            }
+            (step, _) => step,
+        });
+    }
+    let path = std::iter::once(root)
+        .chain(reads.iter().copied())
+        .collect::<Vec<_>>()
+        .join(".");
+    Ok((
+        Part {
+            part,
+            path,
+            binding: root.to_string(),
+            steps: out,
+        },
+        through_a_member,
+    ))
 }
 
 /// **The loop whose items `root` names, around the part `part`**: the
@@ -1630,43 +1672,32 @@ fn plan(
             }
             continue;
         };
-        let ty = value_of(sigs, *resource)
-            .ok_or_else(|| format!("`{root}`'s query has no resolved result"))?;
         let reads: Vec<&str> = reads.iter().map(String::as_str).collect();
-        let planned = steps(sigs, ty, &reads)?;
-        if hole.nested && planned.iter().any(|(s, _)| matches!(s, Step::Member(_))) {
-            return Err(format!(
-                "part {} reads a member of `{root}` inside a block, which a host would call \
-                 per instance",
-                hole.part.0
-            ));
-        }
-        if hole.nested {
+        let (part, through_a_member) = query_part(
+            hirs,
+            sigs,
+            *resource,
+            hole.part.0,
+            &root,
+            &reads,
+            &mut members,
+        )?;
+        // Inside a block, one read by field is the renderer's, from the
+        // binding's value it is rendered with.
+        if hole.nested && !through_a_member {
             continue;
         }
-        let mut out = Vec::new();
-        for (step, def) in planned {
-            out.push(match (step, def) {
-                (Step::Member(_), Some(def)) => {
-                    members.insert(def);
-                    Step::Member(
-                        component_id_of(hirs, def)
-                            .ok_or_else(|| "a member function with no identity".to_string())?,
-                    )
-                }
-                (step, _) => step,
-            });
+        // **A member read inside a block** (ADR-XXXX): a query's value is one
+        // value for the document, wherever a block reads it, so a host
+        // computes the member once a change, into what the block is rendered
+        // with by its path, as a computed hole there is (ADR-0229). Until
+        // 2026-10-12 it was refused, "which a host would call per instance":
+        // `{cart.line_count}` inside `{#if cart.lines}` did not build.
+        if hole.nested {
+            derived_values.push(part);
+        } else {
+            parts.push(part);
         }
-        let path = std::iter::once(root.clone())
-            .chain(reads.iter().map(|r| r.to_string()))
-            .collect::<Vec<_>>()
-            .join(".");
-        parts.push(Part {
-            part: hole.part.0,
-            path,
-            binding: root,
-            steps: out,
-        });
     }
 
     // **Each value read outside a text part** (ADR-0169): an attribute's, a
@@ -1740,6 +1771,31 @@ fn plan(
         {
             continue;
         }
+        // **A member read of a query's value outside a row** (ADR-XXXX): in
+        // an attribute, what a block decides by, the page's title or its
+        // metadata, computed once a change into what the page is rendered
+        // with, by its path, as a text part's is. An attribute at the top of
+        // the page is set again when it changes, as a computed one is
+        // (ADR-0226). A loop's list read so is not: a host keeps a list it
+        // reads by field (ADR-0170).
+        if read.kind != crate::template_ir::ReadKind::List {
+            let mut segments = read.path.split('.');
+            let root = segments.next().unwrap_or_default();
+            if let Some((_, resource, _)) = found.iter().find(|(n, ..)| n == root) {
+                let reads: Vec<&str> = segments.collect();
+                let (part, _) = query_part(
+                    hirs,
+                    sigs,
+                    *resource,
+                    read.part.0,
+                    root,
+                    &reads,
+                    &mut members,
+                )?;
+                derived_values.push(part);
+                continue;
+            }
+        }
         let what = match read.kind {
             crate::template_ir::ReadKind::Attribute => "an attribute",
             crate::template_ir::ReadKind::Subject => "what a block decides by",
@@ -1769,7 +1825,7 @@ fn plan(
     // **An attribute at the top of the page reads a query's value**
     // (ADR-0171): a host sets it again when the value changes. Until
     // 2026-10-03 nothing did, and it kept its first value for the document's
-    // life. A member read in one is refused above (ADR-0169).
+    // life. One read through a member is computed above (ADR-XXXX).
     let mut attributes = Vec::new();
     for read in &others {
         let root = read.path.split('.').next().unwrap_or_default();

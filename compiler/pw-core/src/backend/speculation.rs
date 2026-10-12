@@ -1096,33 +1096,61 @@ fn page_module(
     // 2026-10-06 one was skipped: a count inside a block a query's value
     // decides kept the server's beside one a speculation changed.
     let mut in_regions: Vec<(String, String, usize)> = Vec::new();
-    let reads_computed = lowered
-        .holes
-        .iter()
-        .filter_map(|h| {
-            Some((
-                h.part.0,
-                &h.path,
-                h.nested,
-                h.origin,
-                h.expr,
-                h.inputs.as_deref()?,
+    // And a speculated value read through a member (ADR-XXXX), as the
+    // expression that reads it from the value: `cart.line_count`, computed
+    // from `cart`, as a host computes it once a change.
+    let mut typed_reads = BTreeMap::new();
+    let mut through_a_member = |path: &str, origin: (usize, DeclId), expr: ExprId| {
+        let root = path.split('.').next().unwrap_or_default();
+        (path.contains('.')
+            && speculated.iter().any(|(n, ..)| *n == root)
+            && crate::page_values::calls_a_member(
+                cx.hirs,
+                cx.ws,
+                cx.sigs,
+                &mut typed_reads,
+                origin,
+                crate::template_ir::ReadAt::Expr(expr),
             ))
-        })
-        .chain(lowered.reads.iter().filter_map(|r| {
-            let crate::template_ir::ReadAt::Expr(e) = r.at else {
-                return None;
-            };
-            Some((
-                r.part.0,
-                &r.path,
-                r.nested,
-                r.origin,
-                e,
-                r.inputs.as_deref()?,
-            ))
-        }));
+        .then(|| vec![(root.to_string(), root.to_string())])
+    };
+    let mut reads_computed = Vec::new();
+    for h in &lowered.holes {
+        let inputs = match &h.inputs {
+            Some(inputs) => inputs.clone(),
+            // One outside a region is refused below, as any read there is.
+            None if h.nested && in_a_region(h.part.0) => {
+                match through_a_member(&h.path, h.origin, h.expr) {
+                    Some(inputs) => inputs,
+                    None => continue,
+                }
+            }
+            None => continue,
+        };
+        reads_computed.push((h.part.0, &h.path, h.nested, h.origin, h.expr, inputs));
+    }
+    for r in &lowered.reads {
+        let crate::template_ir::ReadAt::Expr(e) = r.at else {
+            continue;
+        };
+        let inputs = match &r.inputs {
+            Some(inputs) => inputs.clone(),
+            None if matches!(
+                r.kind,
+                crate::template_ir::ReadKind::Attribute | crate::template_ir::ReadKind::Subject
+            ) =>
+            {
+                match through_a_member(&r.path, r.origin, e) {
+                    Some(inputs) => inputs,
+                    None => continue,
+                }
+            }
+            None => continue,
+        };
+        reads_computed.push((r.part.0, &r.path, r.nested, r.origin, e, inputs));
+    }
     for (part, path, nested, (at, decl), expr, inputs) in reads_computed {
+        let inputs = inputs.as_slice();
         let [(name, read)] = inputs else {
             continue;
         };

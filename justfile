@@ -5845,3 +5845,32 @@ e14-block-parts:
        python3 scripts/block_parts_mutations.py; \
      } > docs/evidence/E14/block-parts.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/block-parts.txt
+
+# ADR-XXXX: a member read is computed wherever a page reads it (NEXT 3c). The
+# plan's member reads inside a block, in an attribute, a block's subject, the
+# title and the metadata, and in a speculated block
+# (compiler/pw-core/tests/member_reads_in_blocks.rs); the host's count inside
+# a block, told where it is; the store's checkout link, its subtotal shown
+# before the server answers, in three engines (e2e/cart.spec.mjs); and the
+# mutation controls (scripts/member_reads_mutations.py).
+e14-member-reads:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a member read is computed wherever a page reads it"; echo; \
+       echo "produced by: just e14-member-reads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the plan's member reads (compiler/pw-core/tests/member_reads_in_blocks.rs)"; echo; \
+       cargo test --locked -p pw-core --test member_reads_in_blocks 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host: a count inside a block, told where it is, and in a block a speculation renders"; echo; \
+       cargo test --locked -p pw-dev-server -- a_member_read_inside_a_block_is_computed_and_told_where_it_is a_member_read_inside_a_speculated_block_is_rendered_with_it 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the checkout link's subtotal before the server answers, in three engines (e2e/cart.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/cart.spec.mjs -g "a line shows before the server answers|remove takes the line away" --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/member_reads_mutations.py)"; echo; \
+       python3 scripts/member_reads_mutations.py; \
+     } > docs/evidence/E14/member-reads.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/member-reads.txt

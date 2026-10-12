@@ -302,8 +302,9 @@ fn a_page_s_metadata_may_read_what_a_press_speculates() {
     // Written as the page is served and set again by nothing: what a press
     // speculates (the cart, ADR-0172) is no metadata's, and the page's
     // speculation does not refuse it, as it refuses a title that reads it.
-    // The cart's count is a member function, which a host computes only in
-    // text in the page's body (ADR-0125): that is the one refusal.
+    // The cart's count is a member function, which a host computes wherever
+    // the page reads it (ADR-XXXX). Until 2026-10-12 it computed one only in
+    // text in the page's body (ADR-0125), and this was refused.
     let refused = build(|s| {
         assert_eq!(
             s.matches(DESCRIPTION).count(),
@@ -317,12 +318,7 @@ fn a_page_s_metadata_may_read_what_a_press_speculates() {
     })
     .expect("builds")
     .refusals();
-    assert_eq!(refused.len(), 1, "{refused:#?}");
-    assert!(
-        refused[0]
-            .contains("reads `cart.line_count` through a member function in the page's metadata"),
-        "{refused:#?}"
-    );
+    assert_eq!(refused, Vec::<String>::new());
     // Control: the store's own description reads the store.
     assert_eq!(
         build(|s| s.to_string()).expect("builds").refusals(),
