@@ -278,8 +278,8 @@ MUTANTS = [
         "PW5602: an upload's route may be a page's",
         RUST,
         CHECK,
-        "                let page = pages.iter().find(|(r, _)| route_matches(r, &path));\n",
-        "                let page = pages.iter().find(|(r, _)| r.is_empty() && route_matches(r, &path));\n",
+        "                    .find(|(r, _)| route_matches(crate::routes::route_parts(r).0, &path));\n",
+        "                    .find(|(r, _)| r.is_empty() && route_matches(crate::routes::route_parts(r).0, &path));\n",
     ),
     (
         "PW5601: a limit above what a host reads whole",
