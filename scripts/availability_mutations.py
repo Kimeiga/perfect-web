@@ -19,7 +19,8 @@ Each mutant undoes one piece:
 
 A value-analysis mutant must fail `pw-core`'s tests, all of them run; a
 renderer mutant, `pw-render`'s or the development server's; a data-layer,
-page or server mutant, the development server's; the control's,
+page or server mutant, the development server's that see its rule
+(measured, below); the control's,
 `e2e/availability.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-availability` records the output.
@@ -179,7 +180,19 @@ MUTANTS = [
 CARGO = {
     "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render"],
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The development server's tests that see the server mutants' rules
+    # (W6's ruling of 2026-10-09), measured by `scripts/mutant_killers.py` on
+    # 2026-10-12 against its whole suite: each of the eight failed by two of
+    # these where two fail at all. Its whole suite ran for every mutant, and
+    # the recipe took 12,125 s of a verify.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_document_read_behind_a_change_shows_what_the_open_pages_show",
+        "tests::a_menu_changed_at_its_source_shows_once_its_value_is_read_again",
+        "tests::a_rename_sets_every_part_that_reads_the_name",
+        "tests::a_stock_change_drops_the_menu_and_not_the_recommendations",
+        "tests::a_stock_change_told_renders_its_row_again_where_it_is",
+    ],
 }
 BROWSER = ["e2e/availability.spec.mjs", "--project=chromium"]
 
