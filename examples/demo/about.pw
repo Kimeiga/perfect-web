@@ -1,0 +1,27 @@
+// @corpus: fixture
+// @id: DEMO-about
+// @category: metadata — a page's canonical address, in its head
+// @charter: §8.2
+// @milestone: E14
+//
+// ADR-0311: a page states the address it is at, for a search engine and a
+// link's preview, at the top of its view beside its title: a page and its
+// arguments, checked as a navigation's are. Its host writes it into the
+// head, absolute with the deployment's origin, and Open Graph's address
+// from it.
+
+module demo.about
+
+page AboutPage() {
+    route "/demo/about"
+    cache shared
+
+    view {
+        <title>About</title>
+        <meta property="og:title" content="About the demo" />
+        <link rel="canonical" href={AboutPage()} />
+        <main>
+            <h1>About</h1>
+        </main>
+    }
+}

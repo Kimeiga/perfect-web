@@ -745,12 +745,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
              crate, and with test keys only.
 
           Then the language's, found on the way:
-          - **a template's bindings shadow module members** (W8's finding,
-            2026-10-09): `<ready as={estimate}>` resolved to an imported
-            module's function `estimate` (PW0401) though the page bound the
-            name. Names a template binds (`<ready as>`, `<failed as>`,
-            `{#each … as}`, a match arm's binders) shadow module members and
-            imports, as a `let` does: a test for each form;
+          - ~~**a template's bindings shadow module members**~~ (ADR-0310,
+            merged 2026-10-12): a name means its binding in every analysis,
+            the template's bindings, a call through a local and a loop's
+            name beside a page's binding among them;
           - **a full-text source a program declares** (the integrator's
             ruling for W6, 2026-10-10): its index's columns, tokenizer and
             ranking, designed from two real uses, kiokun's search (whose
@@ -761,6 +759,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
             inventory names; Pleris has pages and uploads, and no form for
             a route whose answer is JSON.
 
+          - ~~**a page's canonical address**~~ (ADR-0311, merged
+            2026-10-12; Q2 of 2026-10-09). Next by the same ruling, **a
+            page's structured data** (Q3): JSON-LD typed as a std `Json`,
+            written by the host at the top of a page's view. It needs a
+            float among the renderer's values (JSON's numbers) and a
+            recursive `Json` from a query across the component boundary
+            (ADR-0205), so it waits for a page that asks for it; kiokun's
+            Difference 13 meanwhile;
           - **one telling path for every page a change reaches** (W9's
             finding, 2026-10-11): a menu change tells the store's pages by
             `broadcast_menu`'s own patches, and every other page by what
@@ -814,6 +820,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
             A target renamed later matches nothing, and a run of no tests is
             a failure, not a survival. A task for a worker with a target of
             its own.
+            Progress, 2026-10-12:
+            - `pw-core`'s whole suite: seven scripts narrowed (`aa174750`
+              and before); `availability`'s core suite and `command_retry`
+              remain, measured next;
+            - the development server's whole suite, by test name
+              (`--exact`), each mutant failed by two of the named tests
+              where two fail: `command_answers` 10,599 → 2,105 s,
+              `availability` 8,012 → 3,206 s and `connection_faults` 9,614
+              → 1,498 s (verify 38206663536, every mutant still killed),
+              about 21,400 s a full verify; `test_controls` measured, and
+              14 more scripts in the queue (`scripts/mutant_killers.py`,
+              in a worktree with a target of its own);
 
           The worker tracks, one at a time beside the integrator (the
           owner's budget rule), each launched under docs/PARALLEL.md when
@@ -884,12 +902,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
               public deploy on the owner's explicit go;
           - ~~**search and filters**~~: stores and dishes, by name and
             cuisine, searched in the store's data layer to one meaning
-            (ADR-0308, W9's, merged 2026-10-12). Its next steps, W9's: the
-            search's route and form once a route reads its query part
-            (`route "/search{?q}"`, the integrator's next merge); the cuisine
-            as the store's own field after W8's merge (ruled 2026-10-12);
-            results filtered to the stores that reach the reader's address,
-            through W8's `Reach`;
+            (ADR-0308, W9's, merged 2026-10-12), at `route "/search{?q}"`
+            with a plain GET form (amended the same day). Its next steps,
+            W9's, after W8's merge: the home page's form, the cuisine as the
+            store's own field (ruled 2026-10-12), `user`, and results
+            filtered to the stores that reach the reader's address, through
+            W8's `Reach`;
           - **W9, ratings and reviews** of orders and stores, after
             accounts.
 

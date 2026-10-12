@@ -243,6 +243,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
             // ADR-0280: a handler navigates once its command commits.
             out.extend(navigations(&workspace, &u.hir, i, &sigs));
+            // ADR-0311: and a page's canonical address is a page's.
+            out.extend(canonical_addresses(&workspace, &hirs, i, &sigs));
             // ADR-0303: a page is shown in its layout.
             out.extend(crate::layouts::check(&hirs, &workspace, i));
             // ADR-0243's amendment: markup is no operand.
@@ -2496,6 +2498,13 @@ fn handlers_run_in_the_browser(
                     let Expr::Call { callee, .. } = body.expr(*e) else {
                         return false;
                     };
+                    // A call through a local is the local's, never a
+                    // command of its spelling's (ADR-0063).
+                    if matches!(body.expr(*callee), Expr::Name(_))
+                        && lexical.binder(*callee).is_some()
+                    {
+                        return false;
+                    }
                     let path = path_of(body, *callee);
                     let resolution = match path.contains('.') {
                         true => workspace.resolve_path(unit, &path),
@@ -4332,6 +4341,12 @@ fn metadata(hir: &Hir) -> Vec<Diagnostic> {
             } else if static_attr(attrs, "name").is_some_and(|v| v.eq_ignore_ascii_case("viewport"))
             {
                 Some("name=\"viewport\"")
+            } else if static_attr(attrs, "property")
+                .is_some_and(|v| v.eq_ignore_ascii_case("og:url"))
+            {
+                // Open Graph's canonical address, which the host writes from
+                // the page's (ADR-0311).
+                Some("property=\"og:url\"")
             } else {
                 None
             };
@@ -4363,11 +4378,18 @@ fn metadata(hir: &Hir) -> Vec<Diagnostic> {
                     decl.name
                 ))
             } else if let Some(host) = host {
-                Some(format!(
-                    "`<meta {host}>` in `{}` is the host's: it writes the document's charset and \
-                     viewport (ADR-0182)",
-                    decl.name
-                ))
+                Some(match host.starts_with("property") {
+                    true => format!(
+                        "`<meta {host}>` in `{}` is the host's: it writes Open Graph's address \
+                         from the page's canonical address (ADR-0311)",
+                        decl.name
+                    ),
+                    false => format!(
+                        "`<meta {host}>` in `{}` is the host's: it writes the document's charset \
+                         and viewport (ADR-0182)",
+                        decl.name
+                    ),
+                })
             } else {
                 match keys.as_slice() {
                     [] => Some(format!(
@@ -4472,6 +4494,12 @@ fn metadata(hir: &Hir) -> Vec<Diagnostic> {
 /// PW5035 refuses a `<link>` with neither `rel` nor `itemprop`, or both; one
 /// whose `rel` is computed in place; and one with a relation that is not
 /// body-ok, compared as HTML compares keywords, ignoring ASCII case.
+///
+/// **But a page's canonical address** (ADR-0311): one `<link
+/// rel="canonical">` at the top of a page's view is the page's, written
+/// into the head by its host. It is its relation and its address alone;
+/// what it addresses is PW5051's. One anywhere else, in a view, inside an
+/// element or a block, or a second, is refused here, saying where it goes.
 fn links(hir: &Hir) -> Vec<Diagnostic> {
     const BODY_OK: [&str; 7] = [
         "dns-prefetch",
@@ -4492,6 +4520,7 @@ fn links(hir: &Hir) -> Vec<Diagnostic> {
                 roots.extend(r.iter().copied());
             }
         }
+        let own = crate::canonical::page_link(decl, body);
         for n in body.walk_markup(&roots) {
             let Node::Element { tag, attrs, .. } = body.node(n) else {
                 continue;
@@ -4500,7 +4529,54 @@ fn links(hir: &Hir) -> Vec<Diagnostic> {
                 continue;
             }
             let attr = |name: &str| attrs.iter().find(|a| a.name == name);
+            let canonical = crate::canonical::is_canonical_link(body, n);
             let message = match (attr("rel"), attr("itemprop")) {
+                // A page's canonical address, where a page states it.
+                (Some(_), None) if canonical && own == Some(n) => {
+                    let written = static_attr(attrs, "rel").unwrap_or_default();
+                    let other = attrs
+                        .iter()
+                        .find(|a| !["rel", "href"].contains(&a.name.as_str()));
+                    if written.split_ascii_whitespace().count() > 1 {
+                        Some(format!(
+                            "`<link rel=\"{written}\">` in `{}` is the page's canonical address \
+                             and more: it names `canonical` alone",
+                            decl.name
+                        ))
+                    } else {
+                        other.map(|a| {
+                            format!(
+                                "`<link rel=\"canonical\">` in `{}` has `{}`, which the host \
+                                 does not write: a canonical link is its relation and its \
+                                 address",
+                                decl.name, a.name
+                            )
+                        })
+                    }
+                }
+                // One that is not the page's: where it is says why.
+                (Some(_), None) if canonical => Some(if decl.kind != DeclKind::Page {
+                    format!(
+                        "`<link rel=\"canonical\">` in the {} `{}` would name one address for \
+                         every page that composes it: a page states its own",
+                        match decl.kind {
+                            DeclKind::View => "view",
+                            DeclKind::Component => "component",
+                            DeclKind::Layout => "layout",
+                            _ => "declaration",
+                        },
+                        decl.name
+                    )
+                } else if !roots.contains(&n) {
+                    format!(
+                        "`<link rel=\"canonical\">` in `{}` is inside an element or a block, \
+                         not at the top of its view, where HTML does not allow it and nothing \
+                         reads it",
+                        decl.name
+                    )
+                } else {
+                    format!("`{}` states its canonical address twice", decl.name)
+                }),
                 (None, None) => Some(format!(
                     "`<link>` in `{}` names no relation and no item's property",
                     decl.name
@@ -4559,17 +4635,195 @@ fn links(hir: &Hir) -> Vec<Diagnostic> {
                      `pingback`; or when it is an item's property. A `canonical`, an `icon`, \
                      a `manifest` or an `alternate` link belongs to the head, and in the body \
                      nothing reads it: no search engine takes the address, and no browser \
-                     shows the icon."
+                     shows the icon. A page's canonical address is the one the host writes \
+                     into the head for it: stated once, at the top of the page's view, as \
+                     its relation and its address."
                         .to_string(),
                 ),
                 repairs: vec![Repair {
-                    description: "state what the page says of itself as its metadata, \
+                    description: match canonical {
+                        true => "state the page's canonical address once at the top of its \
+                                 view, beside its `<title>`: `<link rel=\"canonical\" \
+                                 href={StorePage(id)} />` (ADR-0311)"
+                            .to_string(),
+                        false => "state what the page says of itself as its metadata, \
                                   `<meta name=\"description\" content={...} />` (ADR-0186); \
                                   the document's other links are the host's"
+                            .to_string(),
+                    },
+                    replacement: None,
+                }],
+            });
+        }
+    }
+    out
+}
+
+/// **What a page's canonical link addresses** (ADR-0311): a page, by its
+/// declaration, as `navigate` names one (ADR-0280), `href={StorePage(id)}`.
+/// Its arguments are related to the page's parameters as a call's are
+/// (PW0604, PW0605), which the value relations say.
+///
+/// PW5051 refuses one that states no address; one written as text, which
+/// could name no page or one served elsewhere; one computed in place; one
+/// that names no page, or a page served at no route, or at a route with a
+/// query part; and an argument computed in place, where the host is given a
+/// value the page reads, or text.
+fn canonical_addresses(
+    ws: &crate::resolve::Workspace,
+    hirs: &[&Hir],
+    unit: usize,
+    sigs: &Signatures,
+) -> Vec<Diagnostic> {
+    let hir = hirs[unit];
+    let mut out = Vec::new();
+    for (decl_id, decl) in hir.all_decls() {
+        let Some(body_id) = decl.body else { continue };
+        let body = hir.body(body_id);
+        let Some(link) = crate::canonical::page_link(decl, body) else {
+            continue;
+        };
+        let Node::Element { attrs, .. } = body.node(link) else {
+            continue;
+        };
+        let href = attrs.iter().find(|a| a.name == "href");
+        let mut refuse = |message: String, at: hir::Span| {
+            out.push(Diagnostic {
+                code: crate::codes::CANONICAL_ADDRESS.id,
+                invariant: crate::codes::CANONICAL_ADDRESS.invariant,
+                reason: "canonical_address",
+                detector: Detector::DeclarationRule,
+                severity: Severity::Error,
+                message,
+                primary_span: at,
+                related: vec![Related {
+                    span: hir.decl_span(decl_id),
+                    label: format!("`{}`'s canonical address", decl.name),
+                }],
+                explanation: Some(
+                    "A page's canonical address is the one a search engine takes for it \
+                     and a link's preview names. It is a page's, named by its declaration \
+                     and given its parameters as `navigate` gives them, so the address the \
+                     host writes is one a page is served at, with values of the types its \
+                     route gives. The host writes it absolute, with the deployment's origin."
+                        .to_string(),
+                ),
+                repairs: vec![Repair {
+                    description: "write the page and its arguments: `<link rel=\"canonical\" \
+                                  href={StorePage(id)} />`"
                         .to_string(),
                     replacement: None,
                 }],
             });
+        };
+        let call = match href.map(|a| &a.value) {
+            None | Some(AttrValue::None) => {
+                refuse(
+                    format!(
+                        "`<link rel=\"canonical\">` in `{}` states no address",
+                        decl.name
+                    ),
+                    body.node_span(link),
+                );
+                continue;
+            }
+            Some(AttrValue::Static(_)) => {
+                refuse(
+                    format!(
+                        "`<link rel=\"canonical\">` in `{}` states its address as text: a \
+                         canonical address is a page's, which the compiler checks",
+                        decl.name
+                    ),
+                    body.node_span(link),
+                );
+                continue;
+            }
+            Some(AttrValue::Expr(e)) => match body.expr(*e) {
+                Expr::Address { page, args } => (*e, page.clone(), args),
+                Expr::Interpolated { .. } | Expr::Literal(_) => {
+                    refuse(
+                        format!(
+                            "`<link rel=\"canonical\">` in `{}` states its address as text: a \
+                             canonical address is a page's, which the compiler checks",
+                            decl.name
+                        ),
+                        body.expr_span(*e),
+                    );
+                    continue;
+                }
+                _ => {
+                    refuse(
+                        format!(
+                            "`<link rel=\"canonical\">` in `{}` is an address computed in \
+                             place: a canonical address is a page's",
+                            decl.name
+                        ),
+                        body.expr_span(*e),
+                    );
+                    continue;
+                }
+            },
+        };
+        let (e, name, args) = call;
+        let def = crate::canonical::page_named(ws, unit, &name);
+        let kind = def.and_then(|d| sigs.kind_of(d)).or_else(|| {
+            // What it names otherwise, said by its kind, as `navigate`'s is.
+            match ws.resolve_in(unit, crate::resolve::Namespace::Term, &name) {
+                crate::resolve::Resolution::Local(d)
+                | crate::resolve::Resolution::Imported { def: d, .. } => sigs.kind_of(d),
+                _ => None,
+            }
+        });
+        if kind != Some(DeclKind::Page) {
+            let what = match kind {
+                Some(k) => format!("names {}", described(k)),
+                None => "names nothing this module sees".to_string(),
+            };
+            refuse(
+                format!(
+                    "`<link rel=\"canonical\" href={{{name}(..)}}>` in `{}` {what}: a \
+                     canonical address is a page's",
+                    decl.name
+                ),
+                body.expr_span(e),
+            );
+            continue;
+        }
+        let Some(def) = def else { continue };
+        // Its route, read where the page is declared.
+        let route = crate::resolve::declaration(hirs, def)
+            .and_then(|d| crate::routes::declared_route(hirs[def.unit], d));
+        match route {
+            None => refuse(
+                format!(
+                    "`<link rel=\"canonical\">` in `{}` names `{name}`, which is served at no \
+                     route",
+                    decl.name
+                ),
+                body.expr_span(e),
+            ),
+            Some(r) if r.contains("{?") => refuse(
+                format!(
+                    "`<link rel=\"canonical\">` in `{}` names `{name}`, whose route `{r}` has a \
+                     query part: a canonical address with a query is not claimed",
+                    decl.name
+                ),
+                body.expr_span(e),
+            ),
+            Some(_) => {}
+        }
+        for a in args {
+            let text = matches!(body.expr(a.value), Expr::Literal(hir::Literal::Str(_)));
+            if !text && crate::template_ir::value_path_of(body, a.value).is_none() {
+                refuse(
+                    format!(
+                        "`<link rel=\"canonical\">` in `{}` gives `{name}` a value computed in \
+                         place: each argument is a value the page reads, or text",
+                        decl.name
+                    ),
+                    body.expr_span(a.value),
+                );
+            }
         }
     }
     out
@@ -8136,6 +8390,14 @@ fn reads_label_with_source(
         // `query Cart(session)` parses as a keyword statement; `Cart(session)`
         // as a call. Both name a declaration.
         let called = match body.expr(id) {
+            // A call through a local is the local's, never a declaration
+            // of its spelling's (ADR-0063).
+            Expr::Call { callee, .. }
+                if matches!(body.expr(*callee), Expr::Name(_))
+                    && inference.local(at, body, *callee) =>
+            {
+                continue;
+            }
             Expr::Call { callee, .. } => path_of(body, *callee),
             Expr::Keyword {
                 keyword, modifiers, ..
@@ -8422,6 +8684,14 @@ fn reads_of(
     let mut out = Vec::new();
     for id in body.walk() {
         let read = match body.expr(id) {
+            // A call through a local is the local's, never a declaration
+            // of its spelling's (ADR-0063).
+            Expr::Call { callee, .. }
+                if matches!(body.expr(*callee), Expr::Name(_))
+                    && inference.local(at, body, *callee) =>
+            {
+                continue;
+            }
             Expr::Call { callee, .. } => path_of(body, *callee),
             Expr::Keyword {
                 keyword, modifiers, ..
@@ -8453,6 +8723,14 @@ fn observed_from(
     let body = hir.body(decl.body?);
     for id in body.walk() {
         let called = match body.expr(id) {
+            // A call through a local is the local's, never a declaration
+            // of its spelling's (ADR-0063).
+            Expr::Call { callee, .. }
+                if matches!(body.expr(*callee), Expr::Name(_))
+                    && inference.local(at, body, *callee) =>
+            {
+                continue;
+            }
             Expr::Call { callee, .. } => path_of(body, *callee),
             Expr::Keyword {
                 keyword, modifiers, ..

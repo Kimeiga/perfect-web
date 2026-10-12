@@ -1,28 +1,39 @@
 ADR-0045 - affine values consumed exactly once, on every path
 
 produced by: just e10-affine
-commit: a5189027767e2d02bbed87d060d65164471a139c
+commit: d65f2785ad21bf9bd599e639aec2c156d25c0a51
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38203954490 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == each witness (examples/generality/affine_not_consumed_once)
 
 both-branches-release.pw                 NEIGHBOUR  
+bound-to-underscore.pw                   GENERAL    [PW2005] affine resource `DatabaseTransaction` is bound to `_`, and nothing can release it
 caught-match.pw                          GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
 caught.pw                                GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
+component-release-ends-nothing.pw        GENERAL    [PW2005] affine resource `handle: MapHandle` is not consumed on every path
 derived-value-escapes.pw                 NEIGHBOUR  
+dropped-by-a-statement.pw                GENERAL    [PW2005] affine resource `DatabaseTransaction` is acquired, and its statement drops it
+ended-where-made.pw                      NEIGHBOUR  
 escapes.pw                               GENERAL    [PW2005] affine resource `handle: MapHandle` escapes the scope that acquired it
+given-to-a-helper.pw                     GENERAL    [PW2005] affine resource `DatabaseTransaction` is given to `audit`, which does not release it
+held-behind-try-and-destroyed.pw         NEIGHBOUR  
+held-behind-try.pw                       GENERAL    [PW2005] affine resource `handle: MapHandle` is not consumed on every path
 live-across-try.pw                       GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
 moved-to-the-caller.pw                   NEIGHBOUR  
 never-released.pw                        GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
 parameter-not-released.pw                GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
 parameter-released.pw                    NEIGHBOUR  
+release-ends-nothing.pw                  GENERAL    [PW2005] affine resource `handle: MapHandle` is not consumed on every path
 released-before-return.pw                NEIGHBOUR  
 released-in-a-loop.pw                    GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is released inside a loop or a function value, which may run any number of times
 released-twice.pw                        GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is released twice on one path
+returned-by-a-function-value.pw          GENERAL    [PW2005] affine resource `DatabaseTransaction` is returned by a function value, which nothing follows
+unit-body-drops-its-value.pw             GENERAL    [PW2005] affine resource `tx: DatabaseTransaction` is not consumed on every path
 
 == the generality suite
 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 34.45s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 76.83s
 
 == mutation controls (scripts/affine_mutations.py)
 
@@ -35,6 +46,7 @@ a parameter the declaration promises to release is not followed: KILLED (1 of 13
 the body's value does not move the resource to the caller: KILLED (1 of 13 tests fail)
 a use binding is held to explicit releases: KILLED (1 of 13 tests fail)
 7 of 7 mutants killed
+memory bound: no process was stopped
 
 NOT CLAIMED: a borrow. Passing a value to a function whose row does not
 release it is a use; Pleris has no borrow syntax (gate item 5).

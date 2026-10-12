@@ -11,7 +11,8 @@ Each mutant undoes one piece:
 - the controls: `/bench/drop` arms nothing; `/bench/reconnect` cuts nothing.
 
 A drop or cut mutant, and `/bench/reconnect`'s, must fail the development
-server's tests, all of them run; `/bench/drop`'s, `e2e/connections.spec.mjs`
+server's tests that see its rule (measured, below); `/bench/drop`'s,
+`e2e/connections.spec.mjs`
 in Chromium. A page's held stream ends within two seconds of itself, so a
 reconnect that cut nothing could pass in a browser by chance: the server's
 test arms it through the control while a stream is held, and sees it end.
@@ -127,7 +128,17 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The development server's tests that see the server mutants' rules
+    # (W6's ruling of 2026-10-09), measured by `scripts/mutant_killers.py` on
+    # 2026-10-12 against its whole suite: each of the nine failed by two of
+    # these where two fail at all, seven of them by one test alone. Its whole
+    # suite ran for every mutant, and the recipe took 9,614 s of a verify.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_dropped_command_connection_is_answered_by_nothing",
+        "tests::a_forced_reconnect_ends_a_subscription_and_refuses_new_ones_for_its_window",
+        "tests::a_pages_command_after_one_closed_unrun_waits_for_it_sent_again",
+    ],
 }
 BROWSER = ["e2e/connections.spec.mjs", "--project=chromium"]
 

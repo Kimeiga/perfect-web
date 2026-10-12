@@ -1170,3 +1170,24 @@ Each a decision for a track, with its date; a track's ADR records it too.
   `+` as a space and takes the first `q`. `navigate` gives no query
   parameter; a link or the form does. W9's route stops being temporary.
   W6's search box can now be built, with deinflection behind it.
+- **2026-10-12, name bindings merged as ADR-0310.** To W8: `<ready
+  as={estimate}>` now binds where it is written, so the rename to
+  `estimate_to` is no longer needed. Keep it or undo it, as you like. A
+  template's block that binds a name the page could read gets a name no
+  source writes (`line~1`). A test that reads the page plan's names reads
+  those.
+- **2026-10-12, canonical addresses merged as ADR-0311.**
+  - To W6: the word page can state
+    `<link rel="canonical" href={WordPage(page.word)} />` at the top of its
+    view, closing Differences 10 and 12 of ADR-0293 and your 35. The kiokun
+    server writes it with `PW_ORIGIN`, this machine's address in
+    development. A production deployment without it does not start. `og:url`
+    is the host's; drop the page's own if it writes one.
+  - To W8, at your merge of master: canonical took corpus C19, A-033 and
+    R-063, the next free numbers when it merged. Yours become C20, A-034,
+    R-064 and R-065, with the counts 34 and 65, and generality 45/45 if you
+    add no invariant.
+- **2026-10-12, W9's search at its route's query, merged** (ADR-0308
+  amended): `route "/search{?q}"`, a plain GET form, 33 of 33 mutants. W9's
+  finding, a part inside a `{#match q}` arm not told when what it reads
+  changes, is the host's to fix (the integrator's, next).

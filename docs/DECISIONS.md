@@ -2649,3 +2649,42 @@ W6's and W9's searches).
     with no script.
   - The host's move read a route's query part as part of its path: a move
     to itself became a 308 loop. PW5602 missed a page at a query route.
+
+[ADR-0310](DECISIONS/ADR-0310-a-name-means-its-binding-in-every-analysis.md):
+a name means its binding, in every analysis (the integrator's; the first of
+"the language's, found on the way").
+- `<ready as={x}>` and `<failed as={e}>` bind where they are written.
+- A call through a local is that local's. Effect inference, privacy's
+  reads and a handler's requests charge no declaration of its spelling.
+- Each name a template reads is one binding's. A block binding a name the
+  template could already read, and every binding a layout makes, gets a
+  name no source writes.
+- Found:
+  - W8's `<ready as={estimate}>` was charged a module function's row
+    (PW0401);
+  - a call through a `let` was charged its namesake's row (ADR-0283's
+    limitation);
+  - the page plan read a loop's `line` as the page's binding `line`
+    (ADR-0277's limitation). The store's binding is `line` again.
+
+[ADR-0311](DECISIONS/ADR-0311-a-page-states-its-canonical-address.md): a page
+states its canonical address (the integrator's; W6's inflected word page,
+and the ruling of 2026-10-09, Q2).
+- `<link rel="canonical" href={Page(args)} />`, once at the top of a page's
+  view: a page's address, checked as `navigate`'s is (PW5051, PW0604,
+  PW0605). PW5035 still refuses one anywhere else, and says where it goes.
+- The host writes it into the head, absolute with the deployment's origin
+  (`PW_ORIGIN`), never the request's `Host`, and `og:url` from it. A page's
+  own `og:url` is refused (PW5034). A production deployment whose pages
+  state one is refused at start without an origin, and `PW_ORIGIN` must be
+  an origin.
+- An address is its own HIR node, never a call.
+- Found:
+  - lowered as a call, an address was charged its page's effects (the
+    store's page did not build) and joined its page's privacy label (a
+    shared page naming a session page was refused, PW5001). Exempting
+    analyses one by one missed the label; an address is now no call to
+    any of them;
+  - a soft navigation kept the last page's Open Graph and `theme-color`
+    (ADR-0306, amended).
+- Corpus C19: A-033, R-063, R-053 changed; generality 45 / 45.
