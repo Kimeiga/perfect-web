@@ -121,7 +121,11 @@ ADR-0231 (a page's parameter is the document's for its life) and ADR-0307
   element it was across a menu change and back. With no `q` there is no
   status.
 - `scripts/block_parts_mutations.py`, 14 mutants over the plan, the
-  renderer, the host and the browser.
+  renderer, the host and the browser. Its first run here found one
+  survivor: a block a speculation renders, told part by part. The test
+  page's blocks were all ones a speculation renders, so the host kept no
+  values, and the check that keeps such a block whole was never reached.
+  The page now has a block its menu decides too, and the mutant fails it.
 - Re-anchored and run in full, their code moved:
   - `query_blocks_mutations.py` (one mutant now needs a speculated block
     that renders as it did, which the host's tests hold);
