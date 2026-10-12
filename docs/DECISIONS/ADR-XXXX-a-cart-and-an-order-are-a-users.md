@@ -340,13 +340,21 @@ Recorded by `just e14-store-accounts` in
 
 ## Not claimed
 
-- **A retry after the host forgot the page and its session**: a page's
-  session is forgotten with its last document, after two minutes idle
-  (`IDLE`), and its interactions with it, so a retry that comes later than
-  that is refused as out of date though its press committed. The runtime
-  retries within seconds (twice, from one second), so the window is only a
-  retry held past two minutes. Logged for KNOWN_LIMITATIONS through the
-  packet.
+- **Two windows in which a retry of a press that committed is refused as
+  stale**, side by side (the integrator's review of 2026-10-12; a
+  KNOWN_LIMITATIONS merge note, the integrator's file):
+  - **a retry while its first attempt runs**: `command_outcome` reads only
+    a finished outcome, so a retry that arrives while the press is still
+    running, on a page gone stale, is refused, where `try_command` would
+    have waited and answered with the outcome. It needs a press in flight,
+    its connection dropped, and a sign-in or sign-out in another tab inside
+    that window. No waiting read is added for it (the integrator's ruling).
+  - **a retry after the host forgot the page's session**: a page's session
+    is forgotten with its last document, after two minutes idle (`IDLE`),
+    and its interactions with it, so a retry later than that is refused as
+    out of date though its press committed. The runtime retries within
+    seconds (twice, from one second), so only a retry held past two
+    minutes meets it.
 - **A host restarted** numbers its documents from 1 again, so a tab's page
   from before the restart may name a document now another session's: it is
   refused all the same, told the sign-in words where the out-of-date ones
