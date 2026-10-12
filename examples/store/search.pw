@@ -232,11 +232,9 @@ user page SearchPage(q: Option<String>) {
                  The sentence is told where it is when the search's result
                  changes, its arm being the document's (ADR-0320). -->
             {#match q}
-            {:Some(_)}<p id="search-said" role="status">{search.said}</p>
+            {:Some(_)}<p id="search-said" role="status">{search.said}</p><p id="search-near">{search.near}</p>
             {:None}<p id="search-intro">Search the stores by name or cuisine, and their dishes by name or what they are.</p>
             {/match}
-            <!-- Where the search was for: nothing with no `q`. -->
-            <p id="search-near">{search.near}</p>
             <ul id="search-stores">
                 {#each search.stores as store (store.id)}
                     <li>

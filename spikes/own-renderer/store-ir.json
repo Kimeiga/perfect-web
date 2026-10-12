@@ -1748,7 +1748,7 @@
     "params": [
       "q"
     ],
-    "schema": "29296184b54992f7",
+    "schema": "b3708a0c8fe19fc9",
     "chunks": [
       {
         "chunk": "static",
@@ -1821,6 +1821,19 @@
                 },
                 {
                   "chunk": "static",
+                  "value": "</p><p id=\"search-near\">"
+                },
+                {
+                  "chunk": "dynamic",
+                  "value": {
+                    "part": "text",
+                    "id": 5,
+                    "value": "search.near",
+                    "context": "text"
+                  }
+                },
+                {
+                  "chunk": "static",
                   "value": "</p>\n            "
                 }
               ]
@@ -1839,20 +1852,7 @@
       },
       {
         "chunk": "static",
-        "value": "\n            \n            <p id=\"search-near\">"
-      },
-      {
-        "chunk": "dynamic",
-        "value": {
-          "part": "text",
-          "id": 5,
-          "value": "search.near",
-          "context": "text"
-        }
-      },
-      {
-        "chunk": "static",
-        "value": "</p>\n            <ul id=\"search-stores\">\n                "
+        "value": "\n            <ul id=\"search-stores\">\n                "
       },
       {
         "chunk": "dynamic",

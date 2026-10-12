@@ -100,10 +100,16 @@ fn a_block_a_parameter_decides_that_renders_a_query_is_planned() {
     assert_eq!(matches.len(), 1, "the page's match on `q`: {matches:?}");
     assert!(planned.contains(&matches[0]), "{planned:?}");
 
-    let sentence = "{:Some(_)}<p id=\"search-said\" role=\"status\">{search.said}</p>";
+    // Both of the arm's sentences, what was found and where the search was
+    // for (ADR-0308, amended), each made plain text.
+    let sentence = "{:Some(_)}<p id=\"search-said\" role=\"status\">{search.said}</p>\
+                    <p id=\"search-near\">{search.near}</p>";
     let quiet = |s: &str| {
-        assert_eq!(s.matches(sentence).count(), 1, "the sentence's anchor");
-        s.replace(sentence, "{:Some(_)}<p id=\"search-said\">Searched.</p>")
+        assert_eq!(s.matches(sentence).count(), 1, "the sentences' anchor");
+        s.replace(
+            sentence,
+            "{:Some(_)}<p id=\"search-said\">Searched.</p><p id=\"search-near\">Near.</p>",
+        )
     };
     let (matches, planned) = blocks_on(
         &store(&same, &quiet),
