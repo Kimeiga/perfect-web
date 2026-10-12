@@ -74,7 +74,11 @@ TESTS = ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]
 
 # How long one run may take. Past it, it is killed with everything it
 # started, and counts as failing: a turn served to no one waits for ever.
-BOUND = 1200
+# 1800 s while its server command runs the development server's whole
+# suite, about 950 s on CI at 420 tests (the integrator's ruling of
+# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
+# see its mutants, it needs far less (W6's ruling of 2026-10-09).
+BOUND = 1800
 
 
 def run_tests():

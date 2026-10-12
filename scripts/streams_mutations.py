@@ -241,10 +241,19 @@ CARGO = {
     "rules": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "streams"],
     "plan": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "stream_plan"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render", "--test", "streams"],
-    # Every server test. Filtered by `stream` on 2026-10-03 it ran four, and
-    # missed the three a stream's budget, failure and caching are told by,
-    # whose names do not say "stream": four mutants survived the filter.
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The server tests that fail under its mutants, measured against the
+    # whole suite by `scripts/mutant_killers.py` on 2026-10-12 (W6's ruling
+    # of 2026-10-09), two per mutant where two fail. Filtered by `stream` on
+    # 2026-10-03 it ran four, and missed the three a stream's budget,
+    # failure and caching are told by, whose names do not say "stream":
+    # four mutants survived the filter. Measured, these are among them.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_declared_error_and_a_host_s_failure_are_shown_apart",
+        "tests::a_declared_error_is_given_and_not_kept",
+        "tests::a_region_past_its_budget_is_given_the_host_s_failure_when_its_budget_is_spent",
+        "tests::a_streamed_region_follows_its_document_in_the_same_response",
+    ],
 }
 BROWSER = [
     "pnpm", "exec", "playwright", "test", "e2e/stream.spec.mjs",

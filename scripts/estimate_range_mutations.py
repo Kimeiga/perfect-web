@@ -9,7 +9,8 @@ Each mutant undoes one piece:
 - the domain: a bound that is any `Int`, which the host then does not check.
 
 A data-layer, page or domain mutant must fail the development server's
-tests, all of them run; the control's, `e2e/slots.spec.mjs` in Chromium.
+tests that see its rule (measured, below); the control's,
+`e2e/slots.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-estimate-range` records the output.
 The source is restored after every mutant, whatever happens.
@@ -87,7 +88,16 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The server tests that fail under its mutants, measured against the
+    # whole suite by `scripts/mutant_killers.py` on 2026-10-12 (W6's ruling
+    # of 2026-10-09), two per mutant where two fail.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_delivery_estimate_is_a_range",
+        "tests::a_failed_estimate_fills_its_region_and_the_page_is_served",
+        "tests::a_session_s_estimate_is_its_estimator_s",
+        "tests::the_store_sends_its_slots_after_its_own_content",
+    ],
 }
 BROWSER = ["e2e/slots.spec.mjs", "--project=chromium"]
 
