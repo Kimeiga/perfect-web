@@ -178,11 +178,13 @@ MUTANTS = [
         "                 WHERE owner = $1 OR true ORDER BY position\",\n",
     ),
     (
-        "in the compiler, `private` gives a record no scope",
+        # Re-anchored by ADR-0324: `private` gives no scope since, and
+        # `user` alone is the user's.
+        "in the compiler, `user` gives a record no scope",
         "core",
         BOUNDARY,
-        '                    Some("user") | Some("private") => Restriction::User("UserId".into()),\n',
         '                    Some("user") => Restriction::User("UserId".into()),\n',
+        '                    Some("nothing") => Restriction::User("UserId".into()),\n',
     ),
     (
         "in the compiler, disagreeing producers keep the last one's scope",

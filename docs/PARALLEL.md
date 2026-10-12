@@ -1365,3 +1365,16 @@ Each a decision for a track, with its date; a track's ADR records it too.
     passes silently" survived. The suite runs both (`e2121b7`). A narrowed
     suite misses a test a later change moves, and the survivor is how it is
     seen: the verify is what holds a narrowing.
+- **2026-10-12, `private` is "not importable" alone, merged as ADR-0324**
+  (the integrator's ruling on W8's finding of 2026-10-09, NEXT 3a; track
+  `private-module`, from `d933b21`; Verify TRAIN_RUN green, with the train.). To every worker: a query, page,
+  layout, command, subscription, resource or materialization says whose
+  data it holds with `user`, `session` or `public`; `private` on one is
+  PW0029. Merge master before writing one.
+  - **Found by its verify (38309784254)**: master's signed-in-elsewhere
+    browser test (W8's) failed e14-store-accounts' mutation baseline,
+    `page.goto: net::ERR_ABORTED`, though it passed in three engines minutes
+    before; interactions' verify met it too. It let its held subscription go
+    before navigating, so the old document's next poll was told to read the
+    page again and that reload raced the test's own navigation. It navigates
+    first now, then continues the held polls (`d933b21`).

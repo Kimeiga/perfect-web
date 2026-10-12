@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0324, 2026-10-12: `private` says a declaration is not importable,
+and nothing more** (the integrator's; NEXT 3a, W8's finding; track
+`private-module`, merged from `d933b21`).
+- `private` meant the user's scope and "not importable" at once. A module's
+  own helper that said `private` to stay its own made what read it the
+  user's data: a public page computing its title through one was refused
+  for keeping the user's data in a shared cache.
+- Now `private` is access alone, as in every other language. The user's
+  scope is `user`'s (ADR-0318). A declaration that holds data says whose
+  with `user`, `session` or `public`, and `private` on one is refused by
+  name (PW0029), so no program written when `private` meant the user's is
+  read as everyone's data. PW0023 says "drop `private`".
+- Found on the way: a `user` that opens a declaration after one with no body
+  was read as that declaration's unknown policy (PW0005).
+Verify TRAIN_RUN green, with the train.
+
 **ADR-0323, 2026-10-12: a member read is computed wherever a page reads
 it** (the integrator's; NEXT 3c; track `member-in-block`, merged from
 `e2121b7`).

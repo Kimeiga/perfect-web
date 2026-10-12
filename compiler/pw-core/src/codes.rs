@@ -214,6 +214,10 @@ codes! {
         "a name must resolve to exactly one declaration";
     PRIVATE_ACCESS = "PW0023" / private_access / 1, Resolution,
         "a private declaration is not visible outside its module";
+    // ADR-0324: `private` says a declaration is not importable, and nothing
+    // of whose data it holds; until 2026-10-12 it meant the user's too.
+    PRIVATE_DATA = "PW0029" / private_data / 1, Resolution,
+        "a declaration that holds data says whose with `user`, `session` or `public`, not `private`";
     DUPLICATE_DECLARATION = "PW0024" / duplicate_declaration / 1, Resolution,
         "a module may declare each name once per namespace";
     IMPORT_CYCLE = "PW0025" / import_cycle / 1, Resolution,

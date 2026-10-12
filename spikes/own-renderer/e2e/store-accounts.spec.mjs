@@ -204,8 +204,14 @@ test("a tab whose reader signed in or out in another is refused at its next pres
   // session, would be told to read the page again (a document the session
   // does not hold), and that reload races the press. Held, the tab is one
   // whose subscription has not asked yet, which is the case the rule is for.
-  const hold = () => here.route("**/stream?*", () => {});
-  const release = () => here.unroute("**/stream?*");
+  // Each held poll is kept, so that letting go continues the shown page's.
+  const held = [];
+  const hold = () => here.route("**/stream?*", (route) => held.push(route));
+  const release = async () => {
+    await here.unroute("**/stream?*");
+    // A poll of a document already left was cancelled with it.
+    for (const route of held.splice(0)) await route.continue().catch(() => {});
+  };
   // A guest's page, and the reader signs up in another tab.
   await ready(here, "/stores/47");
   await hold();
@@ -221,9 +227,12 @@ test("a tab whose reader signed in or out in another is refused at its next pres
     "refused:another-reader",
   );
   await expect(here.locator("#cart-count")).toHaveText("0");
-  // Read again, the page is the new reader's, and the press runs.
-  await release();
+  // Read again, the page is the new reader's, and the press runs. Shown
+  // before its subscription is let go: let go first, the old document's
+  // next poll is told to read the page again, and that reload raced this
+  // navigation (`net::ERR_ABORTED`, verify 38309784254).
   await ready(here, "/stores/47");
+  await release();
   expect((await add(here, "Espresso")).status()).toBe(202);
   await expect(here.locator("#cart-count")).toHaveText("1");
   // Signed out in the other tab: refused again, the cart as it was.

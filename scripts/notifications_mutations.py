@@ -163,11 +163,11 @@ MUTANTS = [
         "the count is cached shared, every reader's",
         SERVER,
         APP,
-        "private query Unread(reader: capability.User<UserId>) -> Int\n"
+        "user query Unread(reader: capability.User<UserId>) -> Int\n"
         "    freshness      0.seconds\n"
         "    consistency    read_your_writes\n"
         "    cache          private\n",
-        "private query Unread(reader: capability.User<UserId>) -> Int\n"
+        "user query Unread(reader: capability.User<UserId>) -> Int\n"
         "    freshness      0.seconds\n"
         "    consistency    read_your_writes\n"
         "    cache          shared\n",

@@ -509,7 +509,7 @@ awaited in order. What remains:
   a `conflict` strategy's field.
 - **A `replicated` declaration is parsed, and nothing else** (A-011): no
   syntax reads one, no runtime keeps one, and its `privacy` clause labels
-  nothing. A declaration's label comes from its `session` or `private`
+  nothing. A declaration's label comes from its `session` or `user`
   keyword alone, so `privacy User(consumer)` leaves `OrderDraft` public to
   every analysis. Its values are checked by their domains (ADR-0089).
 - **Which declarations a policy belongs to is checked for the four graph
@@ -648,9 +648,7 @@ awaited in order. What remains:
   - a private entry keyed by a user's id that no binding fills with
     `current_user()` reaches every reader of it;
   - a guest's lines whose join failed are reachable by no one;
-  - a user's order is their latest;
-  - `private` still means the user's and not importable (the integrator's
-    ruling, queued).
+  - a user's order is their latest.
 - **The store's PostgreSQL reads grow with the data** (the integrator's
   finding, 2026-10-12; NEXT 4b): the store's logic reads the layer's rows a
   store's or a menu's at a time, and on PostgreSQL each is a statement.

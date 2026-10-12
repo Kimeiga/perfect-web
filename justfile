@@ -5816,6 +5816,28 @@ e14-compiled-once:
        python3 scripts/compiled_once_mutations.py; \
      } > docs/evidence/E14/compiled-once.txt
     @grep -E "^test result|mutants killed|panicked at|peak resident|within the bound|OVER THE BOUND|^wall" docs/evidence/E14/compiled-once.txt
+# ADR-0324: `private` says a declaration is not importable, and nothing more
+# (NEXT 3a). A module's own helper is not the user's data, a `private`
+# declaration is not imported, and `private` on one that holds data is
+# refused by name (compiler/pw-core/tests/private_is_not_importable.rs,
+# user_visibility.rs); a `user` that opens a declaration after one with no
+# body is its own (pw-syntax); and the mutation controls
+# (scripts/private_module_mutations.py).
+e14-private-module:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0324 - private says a declaration is not importable, and nothing more"; echo; \
+       echo "produced by: just e14-private-module"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the ruling (compiler/pw-core/tests/private_is_not_importable.rs, user_visibility.rs)"; echo; \
+       cargo test --locked -p pw-core --test private_is_not_importable --test user_visibility 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== a user declaration after one with no body (compiler/pw-syntax)"; echo; \
+       cargo test --locked -p pw-syntax --lib a_user_declaration_after_one_with_no_body_is_its_own 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/private_module_mutations.py)"; echo; \
+       python3 scripts/private_module_mutations.py; \
+     } > docs/evidence/E14/private-module.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/private-module.txt
+
 
 # ADR-0321: a related note is shown in its own file. The checker's notes in
 # another file name it (compiler/pw-core/tests/related_files.rs); `pw check`

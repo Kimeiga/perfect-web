@@ -2852,3 +2852,9 @@ a member read is computed wherever a page reads it (the integrator's; NEXT
 - A member read of a query's value outside a loop's list is a part a host
   computes once a change, by its path, at the top and inside a block, and
   the browser computes it where it renders a speculated block again.
+[ADR-0324](DECISIONS/ADR-0324-private-says-a-declaration-is-not-importable-and-nothing-more.md):
+`private` says a declaration is not importable, and nothing more (the
+integrator's; W8's finding, NEXT 3a).
+- The user's scope is `user`'s alone; `private` on a declaration that holds
+  data is refused by name (PW0029); PW0023's repair drops `private`; a
+  `user` opening a declaration ends the clause before it.
