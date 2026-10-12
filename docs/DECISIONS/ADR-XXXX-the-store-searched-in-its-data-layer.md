@@ -351,5 +351,12 @@ ADR-0207 (a source states what it guarantees).
   tier 1 on PostgreSQL, which the table's order did not show: the PostgreSQL
   test now compares every search's records, tiers and all, with memory's,
   and kills it (checked here). The next verify is the record.
-- **Verify**: VERIFY-PLACEHOLDER.
+- **Verify, the record** (the integrator's ruling of 2026-10-12: the head
+  differs from `b32f7dc1` only in `#[cfg(test)]` code and this ADR):
+  every recipe but this track's from verify 38188240871 at `b32f7dc1`;
+  `e14-store-search` from its dispatch at `6a69b62c`, verify 38208290480,
+  green on PostgreSQL 18.6: the search's 14 tests (0 characters lowered
+  apart), the page's 6 in memory and 6 on PostgreSQL, the spec 15 of 15 in
+  three engines, **30 of 30 mutants killed**; ci 38207475089 green at
+  `6a69b62c`.
 - **Not claimed**: as above.
