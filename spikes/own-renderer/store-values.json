@@ -24,6 +24,8 @@
   "places": [],
   "SignedIn~holds": false,
   "search.asked": "coffee",
+  "search.title": "Search for “coffee”",
+  "q": { "$case": "some", "value": "coffee" },
   "search.said": "2 stores match “coffee”.",
   "search.stores": [],
   "search.more": ""

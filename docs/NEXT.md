@@ -902,12 +902,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
               public deploy on the owner's explicit go;
           - ~~**search and filters**~~: stores and dishes, by name and
             cuisine, searched in the store's data layer to one meaning
-            (ADR-0308, W9's, merged 2026-10-12). Its next steps, W9's: the
-            search's route and form once a route reads its query part
-            (`route "/search{?q}"`, the integrator's next merge); the cuisine
-            as the store's own field after W8's merge (ruled 2026-10-12);
-            results filtered to the stores that reach the reader's address,
-            through W8's `Reach`;
+            (ADR-0308, W9's, merged 2026-10-12), at `route "/search{?q}"`
+            with a plain GET form (amended the same day). Its next steps,
+            W9's, after W8's merge: the home page's form, the cuisine as the
+            store's own field (ruled 2026-10-12), `user`, and results
+            filtered to the stores that reach the reader's address, through
+            W8's `Reach`. The integrator's, first: a part inside an arm whose
+            subject did not change is told when the query it reads changes
+            (ADR-0308's Found), and the sentence goes back inside the arm;
           - **W9, ratings and reviews** of orders and stores, after
             accounts.
 

@@ -200,11 +200,11 @@ interface store-page-rename-address-api {
 
 interface store-search-search-api {
     use pw:types/types.{store-search-search-shown};
-    search: func(arg0: string) -> store-search-search-shown;
+    search: func(arg0: option<string>) -> store-search-search-shown;
 }
 
 interface store-search-search-page-api {
-    search-page: func(arg0: string);
+    search-page: func(arg0: option<string>);
 }
 
 world resources-cart {
@@ -626,6 +626,7 @@ package pw:types {
         }
         record store-search-search-shown {
             asked: string,
+            title: string,
             said: string,
             stores: list<store-search-shown-store>,
             more: string,

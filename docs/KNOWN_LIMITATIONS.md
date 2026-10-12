@@ -311,6 +311,11 @@ refused by name:
   renders and is not patched, and neither is a shared list other than the
   menu. A query's error is the server's failure, not a value a page shows.
   kiokun's pages are static.
+  A part inside a block whose subject the page's parameters give, not a
+  query, is not told when a query it reads changes (ADR-0308's Found, W9's
+  `{#match q}`): the plan names a block only when a query's value decides
+  it. The integrator's to fix next; the search's sentence stands outside
+  its match until then.
 - **A clause's words are the clause's** (ADR-0047). Every name resolves in
   lexical scope, but `scope application`'s `application`, or `load`'s
   `on_first_interaction`, is a word of its clause and not a name. A word
@@ -611,8 +616,7 @@ awaited in order. What remains:
   Rust 1.97's are 17.0's. The 28 capitals 17.0 added (U+A7CE, U+A7D2,
   U+A7D4, U+16EA0 to U+16EB8) are matched as written on both layers, never
   lowered, and `on_postgres_every_character_is_lowered_alike` fails when
-  either version moves. Its page is at `route "/search/{q}"` until a route
-  reads its query part.
+  either version moves.
 - **A page asks only a predicate with no parameters of its reader**
   (ADR-0307): a control whose command requires one with parameters
   (`OwnsPost(post)`, `MayMessage(to)`) is not held to where it stands, and
