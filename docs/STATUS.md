@@ -23,6 +23,21 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0323, 2026-10-12: a member read is computed wherever a page reads
+it** (the integrator's; NEXT 3c; track `member-in-block`, merged from
+`e2121b7`).
+- `{cart.line_count}` inside `{#if cart.lines}` was refused at build, "which
+  a host would call per instance", though a host renders a block at the top
+  once.
+- A member read of a query's value, outside a loop's list, is now a part a
+  host computes once a change, by its path, into what the page and its
+  blocks are rendered with; a block the browser renders again from a
+  speculation computes it there. A loop's list read through a member, and a
+  member read in a view that contains itself, are refused by name.
+- The store's page names its cart link "Checkout" with the subtotal while
+  the cart holds a line.
+Verify TRAIN_RUN green, with the train.
+
 **ADR-0322, 2026-10-12: `|` and `&` are parenthesized where they mix** (the
 integrator's; W9's finding; track `and-or`, merged from `22a325c`).
 - The two had one power, left to right, so `a | b & c` was `(a | b) & c`,

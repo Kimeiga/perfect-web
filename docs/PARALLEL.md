@@ -1353,3 +1353,15 @@ Each a decision for a track, with its date; a track's ADR records it too.
     control `b & n == 1 | !b`, which the `ci` run had never reached: it
     stopped at the first failing test binary. `just test-unit` runs with
     `--no-fail-fast` since (`22a325c`), so a red run says every failure.
+- **2026-10-12, a member read computed wherever a page reads it, merged as
+  ADR-0323** (the integrator's, NEXT 3c; track `member-in-block`, from
+  `e2121b7`; Verify TRAIN_RUN green, with the train.). The store's cart link says "Checkout" and the subtotal
+  while the cart holds a line: a spec that reads the link's text by "Go to
+  your cart" reads it only on an empty cart.
+  - **Found by its verify (38296433715)**: row_reads' core suite, narrowed
+    to `--test row_reads` that morning, lost the test of the one refusal
+    this ADR leaves (a loop's list read through a member), which is
+    `member_reads_in_blocks`': "a member read outside text no host computes
+    passes silently" survived. The suite runs both (`e2121b7`). A narrowed
+    suite misses a test a later change moves, and the survivor is how it is
+    seen: the verify is what holds a narrowing.

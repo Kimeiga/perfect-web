@@ -212,7 +212,8 @@
   "blocks": [
     4,
     7,
-    35
+    35,
+    38
   ],
   "streams": [
     {
@@ -238,7 +239,7 @@
       "streamed": true
     },
     {
-      "part": 38,
+      "part": 40,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -302,7 +303,22 @@
   "attributes": [
     23
   ],
-  "title": 41,
+  "derived": [
+    {
+      "part": 39,
+      "path": "cart.subtotal.display",
+      "binding": "cart",
+      "steps": [
+        {
+          "member": "UserCarts.subtotal"
+        },
+        {
+          "member": "domain.display"
+        }
+      ]
+    }
+  ],
+  "title": 43,
   "scope": "user:",
   "layout": {
     "path": "store.page.StoreLayout",

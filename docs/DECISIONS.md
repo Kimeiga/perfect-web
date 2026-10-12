@@ -2846,3 +2846,9 @@ a related note is shown in its own file (the integrator's; W8's finding).
 finding).
 - A chain mixing them without parentheses is refused at parse (PW0031),
   naming both groupings; a chain of one is left to right, as before.
+[ADR-0323](DECISIONS/ADR-0323-a-member-read-is-computed-wherever-a-page-reads-it.md):
+a member read is computed wherever a page reads it (the integrator's; NEXT
+3c).
+- A member read of a query's value outside a loop's list is a part a host
+  computes once a change, by its path, at the top and inside a block, and
+  the browser computes it where it renders a speculated block again.

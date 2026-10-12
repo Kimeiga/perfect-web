@@ -717,13 +717,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              the user's scope or becomes "not importable" alone is the
              integrator's ruling, a change to every program that says it
              (the feed's notifications and messages);
-          3c. **a member read inside a block at the top of the page**
-             (found on the way to ADR-0320, 2026-10-12): `{cart.line_count}`
-             in `{#if cart.lines}` is refused at build ("which a host would
-             call per instance"), though a host renders a block at the top
-             once. A host computes such a member once per change, into what
-             the block is rendered with, as a top-level part's; one in a
-             loop's row stays a row read;
+          3c. ~~**a member read inside a block at the top of the page**~~
+             (ADR-0323, merged 2026-10-12): computed by a host once a
+             change, by its path, into what the block is rendered with;
           3b. ~~**benchmark task T11's patches apply again**~~ (merged
              2026-10-12, track `t11-patches`): each patch made again against
              the store holds' merge changed, and a script that names a

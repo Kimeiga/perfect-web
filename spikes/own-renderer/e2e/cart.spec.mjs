@@ -74,11 +74,15 @@ test("a line shows before the server answers, with every part that reads the car
   await expect(page.locator("#cart-empty")).toBeVisible();
   await expect(lines(page)).toHaveCount(0);
   await expect(page.locator("#cart-fees")).toHaveCount(0);
+  await expect(page.locator("#checkout")).toHaveCount(0);
+  await expect(page.locator("#cart-page")).toHaveText("Go to your cart");
 
   const answer = await holding(page, "add_to_cart");
   await page.getByRole("button", { name: "Add Espresso" }).click();
   // Before the server answers: the line, its name and its price as the menu
-  // showed them; the count, the subtotal, the empty message, the fees.
+  // showed them; the count, the subtotal, the empty message, the fees, and
+  // the checkout link with the subtotal it computes, a member read inside a
+  // block (ADR-0323).
   await expect(lines(page)).toHaveCount(1);
   await expect(lines(page).first()).toContainText("Espresso");
   await expect(lines(page).first()).toContainText("$3.50");
@@ -86,6 +90,8 @@ test("a line shows before the server answers, with every part that reads the car
   await expect(page.locator("#cart-subtotal")).toHaveText("$3.50");
   await expect(page.locator("#cart-empty")).toBeHidden();
   await expect(page.locator("#cart-fees")).toBeVisible();
+  await expect(page.locator("#checkout")).toHaveText("Checkout $3.50");
+  await expect(page.locator("#cart-page")).toHaveCount(0);
 
   await answer();
   // After: one line, the server's, which its next change reaches.
@@ -94,6 +100,7 @@ test("a line shows before the server answers, with every part that reads the car
   await page.getByRole("button", { name: "Increase quantity of Espresso" }).click();
   await expect(lines(page).first()).toContainText("$7.00");
   await expect(page.locator("#cart-subtotal")).toHaveText("$7.00");
+  await expect(page.locator("#checkout")).toHaveText("Checkout $7.00");
   expect(await refused(page)).toBe(0);
   expect(loads.count).toBe(1);
 });
@@ -170,6 +177,8 @@ test("remove takes the line away, and focus goes to the cart's heading", async (
   await answer();
   await expect(page.locator("#cart-count")).toHaveText("0");
   await expect(page.locator("#cart-fees")).toHaveCount(0);
+  await expect(page.locator("#checkout")).toHaveCount(0);
+  await expect(page.locator("#cart-page")).toHaveText("Go to your cart");
   expect(await refused(page)).toBe(0);
 });
 
