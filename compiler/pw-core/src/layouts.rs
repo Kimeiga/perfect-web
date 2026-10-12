@@ -192,10 +192,14 @@ pub fn check(hirs: &[&Hir], ws: &Workspace, unit: usize) -> Vec<Diagnostic> {
         if short {
             let audience = |d: &Decl| d.visibility.clone().unwrap_or_else(|| "public".into());
             out.push(Diagnostic {
-                related: vec![Related {
-                    span: layout.name_span.clone(),
-                    label: format!("`{}` is declared `{}` here", layout.name, audience(layout)),
-                }],
+                // The layout's own file, which may be another module's
+                // (ADR-XXXX): until 2026-10-12 its span was read in the
+                // page's file, and past its end stopped `pw check`.
+                related: vec![Related::in_unit(
+                    def.unit,
+                    layout.name_span.clone(),
+                    format!("`{}` is declared `{}` here", layout.name, audience(layout)),
+                )],
                 ..diagnostic(
                     crate::codes::LAYOUT_AUDIENCE,
                     "layout_audience",

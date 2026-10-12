@@ -185,10 +185,10 @@ pub fn check(hir: &Hir, table: &Table, out: &mut Vec<Diagnostic>) {
                     severity: Severity::Error,
                     message: format!("internal link target `{target}` matches no declared route"),
                     primary_span: a.span.clone(),
-                    related: vec![Related {
-                        span: at.clone(),
-                        label: format!("`{}` renders the link", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        at.clone(),
+                        format!("`{}` renders the link", decl.name),
+                    )],
                     explanation: Some(format!(
                         "Internal links are checked against the route table, and this \
                          program declares {}. A link that matches none of them is \
@@ -257,10 +257,10 @@ fn unknown_query_name(
             ),
         },
         primary_span: span,
-        related: vec![Related {
-            span: at.clone(),
-            label: format!("`{}` gives it", decl.name),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            format!("`{}` gives it", decl.name),
+        )],
         explanation: Some(
             "A route's query part, `{?q}`, names what an address gives its page \
              (ADR-0309). A link's query and a GET form's fields are that address, \
@@ -371,10 +371,10 @@ fn form(
             ),
         },
         primary_span: span,
-        related: vec![Related {
-            span: at,
-            label: format!("`{}` renders the form", decl.name),
-        }],
+        related: vec![Related::new(
+            at,
+            format!("`{}` renders the form", decl.name),
+        )],
         explanation: Some(
             "A form's `action` is a request the browser sends with the form's \
              `method`, `get` where it states none: a page answers a `get`, the \
@@ -637,9 +637,13 @@ pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
             .collect::<Vec<_>>()
             .join("/")
     };
-    // Each route's first page: its unit, its name, and its module's.
-    let mut first: std::collections::BTreeMap<String, (usize, String, Option<String>)> =
-        std::collections::BTreeMap::new();
+    // Each route's first page: its unit, its name, its module's, and where
+    // it is declared.
+    #[allow(clippy::type_complexity)]
+    let mut first: std::collections::BTreeMap<
+        String,
+        (usize, String, Option<String>, crate::hir::Span),
+    > = std::collections::BTreeMap::new();
     let mut out = Vec::new();
     for (u, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
@@ -652,9 +656,12 @@ pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
             let module = hir.module_of(id).map(str::to_string);
             match first.get(&shape(&route)) {
                 None => {
-                    first.insert(shape(&route), (u, decl.name.clone(), module));
+                    first.insert(
+                        shape(&route),
+                        (u, decl.name.clone(), module, hir.decl_span(id)),
+                    );
                 }
-                Some((_, other, theirs)) if u == unit => {
+                Some((at, other, theirs, span)) if u == unit => {
                     // Two pages of one name each by its module, or the
                     // message names one page twice. Until 2026-10-11 the
                     // store's `CartPage` and a corpus file's were "`CartPage`
@@ -676,7 +683,13 @@ pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
                             named(other, theirs)
                         ),
                         primary_span: hir.decl_span(id),
-                        related: Vec::new(),
+                        // The page first served there, in its own file
+                        // (ADR-XXXX).
+                        related: vec![Related::in_unit(
+                            *at,
+                            span.clone(),
+                            format!("`{}` is served at it first", named(other, theirs)),
+                        )],
                         explanation: Some(
                             "A page is served at its route (ADR-0160), and an address must \
                              say which page it is for: two pages at one route, whatever \

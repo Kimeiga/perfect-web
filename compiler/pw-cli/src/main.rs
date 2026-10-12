@@ -17,7 +17,7 @@
 use std::path::Path;
 use std::process::ExitCode;
 
-use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
+use annotate_snippets::{AnnotationKind, Group, Level, Renderer, Snippet};
 use pw_core::diagnostics::{Diagnostic, Severity};
 
 fn render(source: &str, path: &str, errors: &[pw_syntax::SyntaxError], styled: bool) -> String {
@@ -45,7 +45,27 @@ fn render(source: &str, path: &str, errors: &[pw_syntax::SyntaxError], styled: b
     out
 }
 
-fn render_findings(source: &str, path: &str, found: &[Diagnostic], styled: bool) -> String {
+/// **Is `span` a range of `source` a renderer can read?** Within it, at
+/// character boundaries. A span that is not is a checker's defect, rendered
+/// as a note rather than allowed to stop `pw check` (ADR-XXXX): until
+/// 2026-10-12 one past a file's end did, as an internal error.
+fn readable(source: &str, span: &std::ops::Range<usize>) -> bool {
+    span.start <= span.end
+        && span.end <= source.len()
+        && source.is_char_boundary(span.start)
+        && source.is_char_boundary(span.end)
+}
+
+/// `found`, each diagnostic of the file `path`, whose text is `source`.
+/// `files` is every file checked, by the name it is shown by, so a related
+/// note in another file is shown in that file (ADR-XXXX).
+fn render_findings(
+    source: &str,
+    path: &str,
+    found: &[Diagnostic],
+    files: &[(String, String)],
+    styled: bool,
+) -> String {
     let renderer = if styled {
         Renderer::styled()
     } else {
@@ -58,20 +78,65 @@ fn render_findings(source: &str, path: &str, found: &[Diagnostic], styled: bool)
         } else {
             Level::WARNING
         };
-        let mut snippet = Snippet::source(source).path(path).line_start(1).annotation(
-            AnnotationKind::Primary
-                .span(f.primary_span.clone())
-                .label(&f.message),
-        );
-        // Charter §16.3: name where the conflicting property originated, not
-        // only where the rule fired.
-        for r in &f.related {
-            snippet =
-                snippet.annotation(AnnotationKind::Context.span(r.span.clone()).label(&r.label));
+        let mut snippet = Snippet::source(source).path(path).line_start(1);
+        // Whether the file's own snippet marks anything: one that marks
+        // nothing is not shown.
+        let mut marked = false;
+        let mut unread = Vec::new();
+        if readable(source, &f.primary_span) {
+            marked = true;
+            snippet = snippet.annotation(
+                AnnotationKind::Primary
+                    .span(f.primary_span.clone())
+                    .label(&f.message),
+            );
+        } else {
+            unread.push(format!(
+                "{path}, bytes {}..{}: {}",
+                f.primary_span.start, f.primary_span.end, f.message
+            ));
         }
-        let mut group = level
-            .primary_title(format!("[{}] {}", f.code, f.message))
-            .element(snippet);
+        // Charter §16.3: name where the conflicting property originated, not
+        // only where the rule fired. A note in another file is shown in it.
+        let mut elsewhere = Vec::new();
+        for r in &f.related {
+            match &r.file {
+                None if readable(source, &r.span) => {
+                    marked = true;
+                    snippet = snippet
+                        .annotation(AnnotationKind::Context.span(r.span.clone()).label(&r.label));
+                }
+                None => unread.push(format!(
+                    "{path}, bytes {}..{}: {}",
+                    r.span.start, r.span.end, r.label
+                )),
+                Some(other) => match files.iter().find(|(name, _)| name == other) {
+                    Some((name, text)) if readable(text, &r.span) => elsewhere.push(
+                        Snippet::source(text.as_str())
+                            .path(name.as_str())
+                            .line_start(1)
+                            .annotation(
+                                AnnotationKind::Context.span(r.span.clone()).label(&r.label),
+                            ),
+                    ),
+                    _ => unread.push(format!(
+                        "{other}, bytes {}..{}: {}",
+                        r.span.start, r.span.end, r.label
+                    )),
+                },
+            }
+        }
+        let mut group =
+            Group::with_title(level.primary_title(format!("[{}] {}", f.code, f.message)));
+        if marked {
+            group = group.element(snippet);
+        }
+        for other in elsewhere {
+            group = group.element(other);
+        }
+        for note in &unread {
+            group = group.element(Level::NOTE.message(note.as_str()));
+        }
         if let Some(n) = &f.explanation {
             group = group.element(Level::NOTE.message(n.as_str()));
         }
@@ -1789,7 +1854,7 @@ fn run() -> ExitCode {
             let mut found = checked.clone();
             found.sort_by_key(|d| d.primary_span.start);
             if !found.is_empty() {
-                print!("{}", render_findings(src, display, &found, !plain));
+                print!("{}", render_findings(src, display, &found, &clean, !plain));
                 errors += found.iter().filter(|f| f.is_error()).count();
                 warnings += found.iter().filter(|f| !f.is_error()).count();
             }
@@ -1820,6 +1885,83 @@ fn run() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A diagnostic of `code` at `primary` in its file, with `related`.
+    fn finding(
+        primary: std::ops::Range<usize>,
+        related: Vec<pw_core::diagnostics::Related>,
+    ) -> Diagnostic {
+        let mut d = Diagnostic::error(
+            "PW5046",
+            "a page is declared for at least its layout's eyes",
+            pw_core::diagnostics::Detector::DeclarationRule,
+            "the message",
+            primary,
+        );
+        d.related = related;
+        d
+    }
+
+    /// **A span outside its file is shown as a note, never a stop**
+    /// (ADR-XXXX): a checker's defect, told as one. Until 2026-10-12 a span
+    /// past a file's end stopped `pw check` with an internal error.
+    #[test]
+    fn a_span_outside_its_file_is_a_note_and_no_panic() {
+        let src = "module page\n";
+        let past = pw_core::diagnostics::Related::new(3307..3312, "declared here");
+        let text = render_findings(src, "page.pw", &[finding(0..6, vec![past])], &[], false);
+        assert!(text.contains("[PW5046]"), "{text}");
+        assert!(
+            text.contains("page.pw, bytes 3307..3312: declared here"),
+            "{text}"
+        );
+        // A primary span outside the file too: no snippet, the note alone.
+        let text = render_findings(src, "page.pw", &[finding(90..99, vec![])], &[], false);
+        assert!(
+            text.contains("page.pw, bytes 90..99: the message"),
+            "{text}"
+        );
+        // And a note naming a file that was not checked.
+        let mut elsewhere = pw_core::diagnostics::Related::new(0..5, "declared here");
+        elsewhere.file = Some("gone.pw".to_string());
+        let text = render_findings(
+            src,
+            "page.pw",
+            &[finding(0..6, vec![elsewhere])],
+            &[],
+            false,
+        );
+        assert!(
+            text.contains("gone.pw, bytes 0..5: declared here"),
+            "{text}"
+        );
+    }
+
+    /// **A note in another file is shown in it**, by its own line.
+    #[test]
+    fn a_note_in_another_file_is_shown_in_it() {
+        // The page's text runs past the note's span, so a renderer that read
+        // the span in the page's file would mark the page's own text.
+        let page = "module page\n\nlayout Shell\n// the page's own text, past the note's span\n";
+        let shell = "module shell\n\nsession layout Shell {}\n";
+        let at = shell.find("Shell {").expect("the layout's name");
+        let mut note = pw_core::diagnostics::Related::new(at..at + 5, "declared here");
+        note.file = Some("shell.pw".to_string());
+        let files = [
+            ("shell.pw".to_string(), shell.to_string()),
+            ("page.pw".to_string(), page.to_string()),
+        ];
+        let text = render_findings(
+            page,
+            "page.pw",
+            &[finding(13..25, vec![note])],
+            &files,
+            false,
+        );
+        assert!(text.contains("page.pw:3:1"), "{text}");
+        assert!(text.contains("shell.pw:3:16"), "{text}");
+        assert!(text.contains("declared here"), "{text}");
+    }
 
     /// Parse and lower, the one way the compiler does it.
     fn hir_of(src: &str) -> pw_core::hir::Hir {

@@ -114,14 +114,8 @@ fn frame_transaction_order(
                 ),
                 primary_span: span.clone(),
                 related: vec![
-                    Related {
-                        span: write,
-                        label: format!("this writes `{LAYOUT_AFFECTING}`"),
-                    },
-                    Related {
-                        span: at.clone(),
-                        label: format!("`{}` declares this frame", decl.name),
-                    },
+                    Related::new(write, format!("this writes `{LAYOUT_AFFECTING}`")),
+                    Related::new(at.clone(), format!("`{}` declares this frame", decl.name)),
                 ],
                 explanation: Some(
                     "A frame transaction orders every read before every write. Reading \
@@ -201,14 +195,8 @@ fn observation_feedback(
                 .to_string(),
             primary_span: body.expr_span(id),
             related: vec![
-                Related {
-                    span: obs.clone(),
-                    label: format!("`{target}` is observed here"),
-                },
-                Related {
-                    span: at.clone(),
-                    label: format!("`{}` declares both", decl.name),
-                },
+                Related::new(obs.clone(), format!("`{target}` is observed here")),
+                Related::new(at.clone(), format!("`{}` declares both", decl.name)),
             ],
             explanation: Some(format!(
                 "`{property}` writes `{LAYOUT_AFFECTING}` on `{target}`, and `{target}` \
@@ -282,10 +270,10 @@ fn compositor_animation(
                 severity: Severity::Error,
                 message: format!("`{property}` is not a compositor-only property"),
                 primary_span: span,
-                related: vec![Related {
-                    span: at.clone(),
-                    label: format!("`{}` declares this animation", decl.name),
-                }],
+                related: vec![Related::new(
+                    at.clone(),
+                    format!("`{}` declares this animation", decl.name),
+                )],
                 explanation: Some(format!(
                     "`animation.composite` permits only {permitted} — the properties \
                      whose setters declare it, because they do not invalidate layout. \
@@ -420,14 +408,11 @@ fn false_independence(body: &Body, decl: &Decl, at: &Span, out: &mut Vec<Diagnos
                         ),
                         primary_span: body.expr_span(read),
                         related: vec![
-                            Related {
-                                span: claim.clone(),
-                                label: "independence is asserted here".to_string(),
-                            },
-                            Related {
-                                span: at.clone(),
-                                label: format!("`{}` declares both", decl.name),
-                            },
+                            Related::new(
+                                claim.clone(),
+                                "independence is asserted here".to_string(),
+                            ),
+                            Related::new(at.clone(), format!("`{}` declares both", decl.name)),
                         ],
                         explanation: Some(format!(
                             "`{}` binds a layout property to `{property}`, which nothing \

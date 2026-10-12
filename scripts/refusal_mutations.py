@@ -92,8 +92,9 @@ MUTANTS = [
         "a predicate declared twice is accepted",
         "core",
         PREDICATES,
-        "                Some((_, module)) if u == unit => out.push(Diagnostic {\n",
-        "                Some((_, module)) if u == unit && false => out.push(Diagnostic {\n",
+        # Re-anchored by ADR-XXXX, whose note names the first declaration.
+        "                Some((at, module, span)) if u == unit => out.push(Diagnostic {\n",
+        "                Some((at, module, span)) if u == unit && false => out.push(Diagnostic {\n",
     ),
     (
         "`says` is any declaration's",

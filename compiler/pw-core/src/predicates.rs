@@ -56,10 +56,7 @@ pub fn check(hir: &Hir, unit: usize, sigs: &Signatures, ws: &Workspace) -> Vec<D
             severity: Severity::Error,
             message,
             primary_span: span,
-            related: vec![Related {
-                span: hir.decl_span(id),
-                label: format!("`{}`", decl.name),
-            }],
+            related: vec![Related::new(hir.decl_span(id), format!("`{}`", decl.name))],
             explanation: Some(
                 "A command a predicate refuses is told to the reader where the press was, \
                  in the predicate's own words (ADR-0302). The deployment says what a \
@@ -178,7 +175,8 @@ pub fn words_of(hirs: &[&Hir]) -> std::collections::BTreeMap<String, String> {
 /// of unit `unit` that an earlier one, in this unit or another, made.
 pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
     let code = crate::codes::PREDICATE_DECLARED;
-    let mut first: std::collections::BTreeMap<&str, (usize, &str)> = Default::default();
+    let mut first: std::collections::BTreeMap<&str, (usize, &str, crate::hir::Span)> =
+        Default::default();
     let mut out = Vec::new();
     for (u, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
@@ -192,9 +190,9 @@ pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
                         .iter()
                         .next()
                         .map_or("", |(_, m, _)| m.name.as_str());
-                    first.insert(decl.name.as_str(), (u, module));
+                    first.insert(decl.name.as_str(), (u, module, hir.decl_span(id)));
                 }
-                Some((_, module)) if u == unit => out.push(Diagnostic {
+                Some((at, module, span)) if u == unit => out.push(Diagnostic {
                     code: code.id,
                     invariant: code.invariant,
                     reason: "predicate_declared",
@@ -206,10 +204,13 @@ pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
                         decl.name
                     ),
                     primary_span: decl.name_span.clone(),
-                    related: vec![Related {
-                        span: hir.decl_span(id),
-                        label: format!("`{}`", decl.name),
-                    }],
+                    // The first declaration, in its own file (ADR-XXXX):
+                    // until 2026-10-12 the note named this one again.
+                    related: vec![Related::in_unit(
+                        *at,
+                        span.clone(),
+                        format!("`predicate {}` is first declared here", decl.name),
+                    )],
                     explanation: None,
                     repairs: vec![Repair {
                         description: "declare it once, and import it where it is required"
