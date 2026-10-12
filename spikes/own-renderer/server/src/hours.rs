@@ -95,6 +95,23 @@ pub(crate) fn refused(h: &Hours) -> Option<String> {
     None
 }
 
+/// **A set of hours as a layer holds it**: its weekly periods by weekday
+/// and opening, its special dates by date, the last of each that a set
+/// lists twice kept, as PostgreSQL's upsert keeps it (`pg_set_hours`), so a
+/// set reads back as one value on both layers (the integrator's ruling of
+/// 2026-10-12).
+pub(crate) fn held(h: &Hours) -> Hours {
+    let weekly: BTreeMap<(i64, i64), &Period> =
+        h.weekly.iter().map(|p| ((p.weekday, p.opens), p)).collect();
+    let special: BTreeMap<i64, &Special> = h.special.iter().map(|s| (s.date, s)).collect();
+    Hours {
+        zone: h.zone.clone(),
+        last_order_minutes: h.last_order_minutes,
+        weekly: weekly.into_values().cloned().collect(),
+        special: special.into_values().cloned().collect(),
+    }
+}
+
 /// **The hours, as the program's `OpeningHours` is.**
 pub(crate) fn hours_val(h: &Hours) -> Val {
     let int = |v: i64| Val::S64(v);
@@ -302,7 +319,10 @@ pub(crate) fn host_writes(with: With, written: Arc<Mutex<Written>>) -> Ops {
 
 /// **A store's hours on PostgreSQL**, on `c` in whatever transaction it is
 /// in: none where the store is not held.
-pub(crate) fn pg_hours(c: &mut postgres::Client, store: &str) -> Result<Option<Hours>, String> {
+pub(crate) fn pg_hours(
+    c: &mut crate::store_pg::Counted<'_>,
+    store: &str,
+) -> Result<Option<Hours>, String> {
     let pg = crate::feed_pg::pg;
     let Some(row) = c
         .query_opt(
@@ -352,7 +372,11 @@ pub(crate) fn pg_hours(c: &mut postgres::Client, store: &str) -> Result<Option<H
 }
 
 /// **A store's hours replaced on PostgreSQL**, on `c`.
-pub(crate) fn pg_set_hours(c: &mut postgres::Client, store: &str, h: &Hours) -> Result<(), String> {
+pub(crate) fn pg_set_hours(
+    c: &mut crate::store_pg::Counted<'_>,
+    store: &str,
+    h: &Hours,
+) -> Result<(), String> {
     let pg = crate::feed_pg::pg;
     c.execute(
         "UPDATE stores SET time_zone = $2, last_order_minutes = $3 WHERE id = $1",
@@ -369,7 +393,8 @@ pub(crate) fn pg_set_hours(c: &mut postgres::Client, store: &str, h: &Hours) -> 
     for p in &h.weekly {
         c.execute(
             "INSERT INTO store_hours (store, weekday, opens_minute, closes_minute) \
-             VALUES ($1, $2, $3, $4)",
+             VALUES ($1, $2, $3, $4) ON CONFLICT (store, weekday, opens_minute) \
+             DO UPDATE SET closes_minute = EXCLUDED.closes_minute",
             &[&store, &p.weekday, &p.opens, &p.closes],
         )
         .map_err(pg)?;
@@ -382,7 +407,9 @@ pub(crate) fn pg_set_hours(c: &mut postgres::Client, store: &str, h: &Hours) -> 
         };
         c.execute(
             "INSERT INTO store_special_hours (store, day, opens_minute, closes_minute) \
-             VALUES ($1, DATE '1970-01-01' + $2::integer, $3, $4)",
+             VALUES ($1, DATE '1970-01-01' + $2::integer, $3, $4) \
+             ON CONFLICT (store, day) DO UPDATE SET opens_minute = EXCLUDED.opens_minute, \
+                 closes_minute = EXCLUDED.closes_minute",
             &[&store, &(s.date as i32), &opens, &closes],
         )
         .map_err(pg)?;

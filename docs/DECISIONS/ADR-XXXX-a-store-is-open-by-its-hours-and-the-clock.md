@@ -63,11 +63,31 @@ search).
      past 1 to 7, a minute past 0 to 1440, a cut-off a day long or a zone
      the host's database lacks. A test reaches it at `/bench/hours`, with a
      `StoreChanged` event.
+   - **A set is held as PostgreSQL returns it** (the integrator's ruling of
+     2026-10-12): weekly periods by weekday and opening, special dates by
+     date, and the last of a period or a date listed twice kept, as an
+     upsert keeps it (`hours::held` in memory; `ON CONFLICT ... DO UPDATE`
+     on PostgreSQL). The read-back is then one value on both layers.
+   - **The order is the layers' contract**: a store's hours, as read, are
+     one value with its order, said in `OpeningHours`' comment and on
+     `Rows::hours`. PostgreSQL upholds it by its `ORDER BY`, memory by
+     holding a set so. The program relies on it and sorts nothing. A sort
+     in the program would be code no test can observe, an equivalent
+     mutant.
 2. **Whether a store is open is the program's** (`examples/store/hours.pw`):
    - From yesterday to a week ahead, each day's periods (its special
      date's, or its weekday's) become spans by day number and minute.
      Spans that meet are joined, so a store open every day round is one
      span.
+   - **A day's periods are their union; the layers hand them ordered by
+     opening, whatever order a set lists them in** (the integrator's
+     rulings of 2026-10-12). A span that starts at or before the last one's
+     end joins it, keeping the later end, compared as (day, minute). That covers a past-midnight period overlapping the next day's
+     first. Until then, dinner listed before lunch made the next opening
+     dinner's (in memory only, since PostgreSQL read them ordered), and
+     periods that overlapped, not meeting exactly, stayed apart, so an
+     order was refused at the first period's last order while the second
+     kept the store open.
    - Each span becomes instants with `clock.at` in the store's zone. Its
      last order is the cut-off before its end, a day back where the end is
      just past midnight.
@@ -143,7 +163,7 @@ search).
 
 ## Acceptance
 
-- `tests/store_hours.rs`, in memory and on PostgreSQL (9 tests):
+- `tests/store_hours.rs`, in memory and on PostgreSQL (13 tests):
   - the store's page told at its closing instant: held until 19:00,
     nothing due at 18:59:59, "Closed" sent past it;
   - an order refused past the last order (18:41) and while closed (20:00),
@@ -155,12 +175,27 @@ search).
   - a day the clocks go forward (2027-03-14): a closing at 03:00 PDT half
     an hour after 01:30 PST, and an opening at 02:30, a time the day skips,
     read as 03:30 PDT;
-  - the home page and a search showing each store's hours;
+  - the home page and a search showing each store's hours. The clock
+    stands still between the two reads, so only the change's drop rereads
+    the home page's stores. A local run on 2026-10-12 found the mutant
+    "kept past a change to their hours" surviving: the clock moved days
+    between the reads, past the stores' 30 seconds;
   - hours a store cannot have refused;
-  - the hours read back alike on the layer, the seed's and a set's.
+  - the hours read back alike on the layer, the seed's and a set's;
+  - since the integrator's ruling of 2026-10-12, each with its control:
+    - dinner listed and written before lunch: at 09:00 "opens today at
+      11:00 am", and at 15:00 "at 5:00 pm";
+    - 11:00 to 15:00 overlapping 14:00 to 22:00: at 14:30 "Open until
+      10:00 pm" and an order at 14:45 taken; at 22:30 one refused;
+    - Monday 18:00 to 02:00 overlapping Tuesday 01:00 to 10:00: one span,
+      "Open until 10:00 am" at Tuesday 01:30, and closed at 10:30;
+    - a set listed out of order, a period and a date twice, read back
+      ordered with the last of each kept.
 - `e2e/store-search.spec.mjs`, three engines: a store's page told when the
   store closes while it is open, and the home page after.
-- `scripts/store_hours_mutations.py`, 14 mutants.
+- `scripts/store_hours_mutations.py`, 17 mutants. Since the rulings of
+  2026-10-12 they include the overlap merge back to exact-meet, memory's
+  ordering of a set taken away, and PostgreSQL's `ORDER BY` taken away.
 
 ## Not claimed
 
@@ -198,7 +233,12 @@ search).
   lists; the platform contract's hash; `store-values.json`.
 - `store_search_mutations.py`'s "a search is kept past a menu's change" is
   re-anchored on the search's `invalidates_on`, which gains `StoreChanged(_)`.
-- KNOWN_LIMITATIONS: a week's horizon; the shown minute on a skipped day.
+- KNOWN_LIMITATIONS: a week's horizon; the shown minute on a skipped day;
+  and (the integrator's N+1 ruling of 2026-10-12) "the hours' reads run a
+  statement per store on PostgreSQL (hours#for-stores, hours#for-cart)",
+  until the track that bounds every read.
+- `hours.rs`' PostgreSQL reads and writes run through part 1's `Counted`
+  connection, so every statement they run is counted.
 
 ## Report
 

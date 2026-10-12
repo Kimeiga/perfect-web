@@ -257,6 +257,10 @@ pub(crate) trait Rows {
     }
     // TRACK SEAM (store-hours): a store's opening hours (`hours.rs`), none
     // where the layer holds no such store.
+    /// The hours as read are one value with its order (`hours::held`):
+    /// weekly periods by weekday and opening, special dates by date, the
+    /// last of each listed twice kept. Every layer hands them so, and the
+    /// program relies on it, sorting nothing itself.
     fn hours(&mut self, store: &str) -> Result<Option<crate::hours::Hours>, String>;
     fn set_hours(&mut self, store: &str, hours: &crate::hours::Hours) -> Result<(), String>;
 }
@@ -1769,7 +1773,8 @@ impl Rows for MemRows {
         Ok(self.state.hours.get(store).cloned())
     }
     fn set_hours(&mut self, store: &str, hours: &crate::hours::Hours) -> Result<(), String> {
-        self.state().hours.insert(store.to_string(), hours.clone());
+        let held = crate::hours::held(hours);
+        self.state().hours.insert(store.to_string(), held);
         Ok(())
     }
 }

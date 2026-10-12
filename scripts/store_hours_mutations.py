@@ -11,9 +11,12 @@ Each mutant undoes one piece:
   midnight closing; a store open before it opens; "tomorrow" said of the
   day after; a time in the evening said "am"; a store open the day round
   not said so; the home page's stores kept past a change to their hours;
+  overlapping periods joined only where one ends as the next starts;
 - the command (`examples/store/app.pw`): an order placed whatever the hours;
-- the layers: memory's hours not written; a weekday past 7 not refused;
-  PostgreSQL's special date written a day late.
+- the layers: memory's hours not written; memory's hours held in the
+  order a set lists them, not as PostgreSQL returns them; a weekday past 7
+  not refused; PostgreSQL's special date written a day late; PostgreSQL's
+  weekly periods read in no order.
 
 A mutant must fail the development server's hours tests in memory
 (`server`), or on PostgreSQL (`postgres`, which needs PW_STORE_DATABASE_URL),
@@ -113,6 +116,16 @@ MUTANTS = [
         "    invalidates_on StoreChanged(_)\n",
         "",
     ),
+    # The integrator's rulings of 2026-10-12: a day's periods are their
+    # union; the layers hand them ordered by opening (the two layers'
+    # mutants below), whatever order a set lists them in.
+    (
+        "overlapping periods are joined only where one ends as the next starts",
+        "server",
+        HOURS_PW,
+        "        Some(last) => if not_after(next.from_day, next.from, last.to_day, last.to) {\n",
+        "        Some(last) => if (next.from_day == last.to_day) & (next.from == last.to) {\n",
+    ),
     (
         "an order is placed whatever the hours",
         "server",
@@ -124,8 +137,15 @@ MUTANTS = [
         "memory's hours are not written",
         "server",
         STORE_DATA,
-        "        self.state().hours.insert(store.to_string(), hours.clone());\n",
+        "        self.state().hours.insert(store.to_string(), held);\n",
         "",
+    ),
+    (
+        "memory holds a set in the order it lists",
+        "server",
+        STORE_DATA,
+        "        let held = crate::hours::held(hours);\n",
+        "        let held = hours.clone();\n",
     ),
     (
         "a weekday past 7 is not refused",
@@ -138,8 +158,15 @@ MUTANTS = [
         "PostgreSQL's special date is written a day late",
         "postgres",
         HOURS_RS,
-        "             VALUES ($1, DATE '1970-01-01' + $2::integer, $3, $4)\",\n",
-        "             VALUES ($1, DATE '1970-01-01' + $2::integer + 1, $3, $4)\",\n",
+        "             VALUES ($1, DATE '1970-01-01' + $2::integer, $3, $4) \\\n",
+        "             VALUES ($1, DATE '1970-01-01' + $2::integer + 1, $3, $4) \\\n",
+    ),
+    (
+        "PostgreSQL's weekly periods are read in no order",
+        "postgres",
+        HOURS_RS,
+        "             WHERE store = $1 ORDER BY weekday, opens_minute\",\n",
+        "             WHERE store = $1\",\n",
     ),
 ]
 

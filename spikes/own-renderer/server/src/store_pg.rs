@@ -281,10 +281,10 @@ impl Rows for PgRows<'_> {
 
     // TRACK SEAM (store-hours): a store's hours, read and replaced (`hours.rs`).
     fn hours(&mut self, store: &str) -> Result<Option<crate::hours::Hours>, String> {
-        crate::hours::pg_hours(self.0, store)
+        crate::hours::pg_hours(&mut self.0, store)
     }
     fn set_hours(&mut self, store: &str, hours: &crate::hours::Hours) -> Result<(), String> {
-        crate::hours::pg_set_hours(self.0, store, hours)
+        crate::hours::pg_set_hours(&mut self.0, store, hours)
     }
 
     fn stores(&mut self) -> Result<Vec<StoreRow>, String> {

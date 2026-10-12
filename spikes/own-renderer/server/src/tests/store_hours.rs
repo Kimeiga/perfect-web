@@ -234,14 +234,16 @@ fn a_day_the_clocks_go_forward() {
 }
 
 /// **The home page and a search show each store's hours**, and a store open
-/// every day round says so.
+/// every day round says so. The clock stands still between the two reads,
+/// so the home page's stores, kept 30 seconds, are read again only because
+/// the change to the hours dropped them.
 #[test]
 fn the_home_page_and_a_search_show_each_stores_hours() {
     let s = served();
+    clock_to(&s, at(2027, 3, 1, 20, 0));
     let home = page(&s, "a", "/");
     assert_eq!(home.matches("Open 24 hours").count(), 2, "{home}");
     set_hours(&s, "48", &daily(7 * 60, 19 * 60));
-    clock_to(&s, at(2027, 3, 1, 20, 0));
     let home = page(&s, "b", "/");
     assert!(
         home.contains("Harbor Coffee Café, Bakery Closed · opens tomorrow at 7:00 am"),
@@ -362,4 +364,145 @@ fn a_cut_off_across_midnight_and_a_store_that_never_closes() {
         .expect("added");
     let placed = s.command_answered(PLACE, "b", &[], None).expect("answered");
     assert!(placed.committed, "23:55 at a store that never closes");
+}
+
+/// Hours of `periods`, each `(weekday, opens, closes)` in minutes.
+fn weekly(periods: &[(i64, i64, i64)]) -> Hours {
+    Hours {
+        weekly: periods
+            .iter()
+            .map(|&(weekday, opens, closes)| Period {
+                weekday,
+                opens,
+                closes,
+            })
+            .collect(),
+        ..daily(0, 0)
+    }
+}
+
+/// Every day's `periods`, in the order given.
+fn every_day(periods: &[(i64, i64)]) -> Hours {
+    let each: Vec<(i64, i64, i64)> = (1..=7)
+        .flat_map(|d| periods.iter().map(move |&(o, c)| (d, o, c)))
+        .collect();
+    weekly(&each)
+}
+
+/// **A day's periods are taken by opening, whatever order a set lists them
+/// in** (the integrator's rulings of 2026-10-12): dinner, 17:00 to 22:00,
+/// listed and written before lunch, 11:00 to 14:00; at 09:00 the store opens
+/// at 11:00, and, the control, at 15:00 at 17:00. The layer hands them
+/// ordered: memory as it holds a set, PostgreSQL by its `ORDER BY`.
+#[test]
+fn a_days_periods_are_taken_by_opening_whatever_the_order_listed() {
+    let s = served();
+    set_hours(
+        &s,
+        "47",
+        &every_day(&[(17 * 60, 22 * 60), (11 * 60, 14 * 60)]),
+    );
+    clock_to(&s, at(2027, 3, 1, 9, 0));
+    let morning = page(&s, "a", "/stores/47");
+    assert!(
+        morning.contains("Closed · opens today at 11:00 am"),
+        "09:00: {morning}"
+    );
+    clock_to(&s, at(2027, 3, 1, 15, 0));
+    let afternoon = page(&s, "b", "/stores/47");
+    assert!(
+        afternoon.contains("Closed · opens today at 5:00 pm"),
+        "15:00: {afternoon}"
+    );
+}
+
+/// **Overlapping periods are open as their union** (the integrator's ruling
+/// of 2026-10-12): 11:00 to 15:00 and 14:00 to 22:00; at 14:30 the store is
+/// open until 22:00, and an order at 14:45 is taken, not refused at the
+/// first period's last order; the control, at 22:30 it is closed and an
+/// order refused.
+#[test]
+fn overlapping_periods_are_open_as_their_union() {
+    let s = served();
+    set_hours(
+        &s,
+        "47",
+        &every_day(&[(11 * 60, 15 * 60), (14 * 60, 22 * 60)]),
+    );
+    clock_to(&s, at(2027, 3, 1, 14, 30));
+    let open = page(&s, "a", "/stores/47");
+    assert!(open.contains("Open until 10:00 pm"), "14:30: {open}");
+    clock_to(&s, at(2027, 3, 1, 14, 45));
+    s.command(ADD, "a", &add_shown("espresso", 1), false)
+        .expect("added");
+    let placed = s.command_answered(PLACE, "a", &[], None).expect("answered");
+    assert!(placed.committed, "14:45: open until 22:00");
+    clock_to(&s, at(2027, 3, 1, 22, 30));
+    s.command(ADD, "a", &add_shown("espresso", 1), false)
+        .expect("added");
+    let refused = s.command_answered(PLACE, "a", &[], None).expect("answered");
+    assert!(!refused.committed, "22:30: closed");
+}
+
+/// **A period past midnight that overlaps the next day's first is one
+/// span**: Monday 18:00 to 02:00 and Tuesday 01:00 to 10:00; at Tuesday
+/// 01:30 the store is open until 10:00 am, and, the control, at 10:30 it is
+/// closed until Monday's 18:00.
+#[test]
+fn a_period_past_midnight_overlapping_the_next_days_is_one_span() {
+    let s = served();
+    set_hours(&s, "47", &weekly(&[(1, 18 * 60, 2 * 60), (2, 60, 10 * 60)]));
+    clock_to(&s, at(2027, 3, 2, 1, 30));
+    let night = page(&s, "a", "/stores/47");
+    assert!(
+        night.contains("Open until 10:00 am"),
+        "Tuesday 01:30: {night}"
+    );
+    clock_to(&s, at(2027, 3, 2, 10, 30));
+    let morning = page(&s, "b", "/stores/47");
+    assert!(
+        morning.contains("Closed · opens Monday at 6:00 pm"),
+        "Tuesday 10:30: {morning}"
+    );
+}
+
+/// **A set reads back as the layer holds it, on either layer**: its weekly
+/// periods by weekday and opening, its special dates by date, the last of a
+/// period or a date listed twice kept, as PostgreSQL's upsert keeps it (the
+/// integrator's ruling of 2026-10-12).
+#[test]
+fn a_set_reads_back_ordered_the_last_of_each_kept() {
+    let s = served();
+    let special = |date: i64, closed: bool, opens: i64, closes: i64| Special {
+        date,
+        closed,
+        opens,
+        closes,
+    };
+    let (christmas, new_year) = (pw_time::days(2027, 12, 25), pw_time::days(2027, 12, 31));
+    let mut written = weekly(&[
+        (2, 17 * 60, 22 * 60),
+        (1, 17 * 60, 21 * 60),
+        (1, 11 * 60, 14 * 60),
+        (1, 17 * 60, 23 * 60),
+    ]);
+    written.special = vec![
+        special(new_year, false, 8 * 60, 14 * 60),
+        special(christmas, false, 9 * 60, 12 * 60),
+        special(christmas, true, 0, 0),
+    ];
+    set_hours(&s, "48", &written);
+    let mut held = weekly(&[
+        (1, 11 * 60, 14 * 60),
+        (1, 17 * 60, 23 * 60),
+        (2, 17 * 60, 22 * 60),
+    ]);
+    held.special = vec![
+        special(christmas, true, 0, 0),
+        special(new_year, false, 8 * 60, 14 * 60),
+    ];
+    assert_eq!(
+        s.layer_read("a", "store:data/hours#for-store", "48"),
+        Val::Result(Ok(Some(Box::new(crate::hours::hours_val(&held))))),
+    );
 }

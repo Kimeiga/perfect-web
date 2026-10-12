@@ -35,7 +35,10 @@ type WeeklyPeriod = WeeklyPeriod { weekday: Int, opens: Int, closes: Int }
 type SpecialDate = SpecialDate { date: Int, closed: Bool, opens: Int, closes: Int }
 
 // **A store's hours**: its zone, its cut-off in minutes before a closing,
-// its weekly periods and its special dates.
+// its weekly periods and its special dates. As read, one value with its
+// order: the weekly periods by weekday and opening, the special dates by
+// date, whatever order a set listed them in. Every layer hands them so, and
+// this program relies on it (the integrator's ruling of 2026-10-12).
 type OpeningHours = OpeningHours {
     zone: String,
     last_order_minutes: Int,
@@ -94,7 +97,8 @@ fn normal(day: Int, minute: Int) -> DaySpan !{} {
     }
 }
 
-// **The periods of day `n`**: its special date's, or its weekday's.
+// **The periods of day `n`**: its special date's, or its weekday's, by
+// opening, as the hours hold them.
 fn spans_on(h: OpeningHours, n: Int) -> List<DaySpan> !{} {
     let none: List<DaySpan> = []
     let no_periods: List<WeeklyPeriod> = []
@@ -112,12 +116,19 @@ fn span_of(n: Int, p: WeeklyPeriod) -> DaySpan !{} {
     DaySpan { from_day: from.from_day, from: from.from, to_day: to.from_day, to: to.from }
 }
 
-// One span after another, a span that starts where the last ends joined to
-// it.
+// Whether day `a_day`'s minute `a` is not after day `b_day`'s minute `b`.
+fn not_after(a_day: Int, a: Int, b_day: Int, b: Int) -> Bool !{} {
+    (a_day < b_day) | ((a_day == b_day) & (a <= b))
+}
+
+// One span after another, by opening: a span that starts at or before the
+// last one's end joined to it, the later end kept. A store is open whenever
+// any of its periods says so (the integrator's ruling of 2026-10-12).
 fn joined(spans: List<DaySpan>, next: DaySpan) -> List<DaySpan> !{} {
     match List.get(spans, List.length(spans) - 1) {
-        Some(last) => if last.to_day == next.from_day & last.to == next.from {
-            List.concat(List.take(spans, List.length(spans) - 1), [DaySpan { from_day: last.from_day, from: last.from, to_day: next.to_day, to: next.to }])
+        Some(last) => if not_after(next.from_day, next.from, last.to_day, last.to) {
+            let later = if not_after(next.to_day, next.to, last.to_day, last.to) { last } else { next }
+            List.concat(List.take(spans, List.length(spans) - 1), [DaySpan { from_day: last.from_day, from: last.from, to_day: later.to_day, to: later.to }])
         } else {
             List.concat(spans, [next])
         },
