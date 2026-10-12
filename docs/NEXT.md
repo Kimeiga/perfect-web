@@ -724,13 +724,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
              once. A host computes such a member once per change, into what
              the block is rendered with, as a top-level part's; one in a
              loop's row stays a row read;
-          3b. **benchmark task T11's patches apply again** (open, the
-             integrator's; named known by W8's merge, 2026-10-12): holds'
-             merge (ADR-0307) changed `benchmarks/baselines/pleris/store/
-             app.pw` and left T11's reference and unsafe patches unapplied,
-             so `e14-diffs` fails at `git apply`. With it, the planner gap
-             that let it through: a change to a benchmark's baseline planned
-             no recipe that applies patches to it;
+          3b. ~~**benchmark task T11's patches apply again**~~ (merged
+             2026-10-12, track `t11-patches`): each patch made again against
+             the store holds' merge changed, and a script that names a
+             program or benchmark that changed plans its recipe;
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled.
              In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
