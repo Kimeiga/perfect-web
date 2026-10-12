@@ -158,7 +158,23 @@ pub fn check(hir: &Hir, table: &Table, out: &mut Vec<Diagnostic>) {
                 let target = raw.trim_matches('"');
                 // A link is a GET: a page, or a route the platform or an
                 // upload answers so (ADR-0265).
-                if !is_internal(target) || table.answers("GET", target) {
+                if !is_internal(target) {
+                    continue;
+                }
+                if table.answers("GET", target) {
+                    // And its query names only what its page's route gives
+                    // (ADR-XXXX).
+                    let given = target
+                        .split_once('?')
+                        .map(|(_, q)| q.split('#').next().unwrap_or(q))
+                        .into_iter()
+                        .flat_map(|q| q.split('&'))
+                        .filter_map(|kv| kv.split('=').next())
+                        // A name the program computes is not matched.
+                        .filter(|name| !name.is_empty() && !name.contains('{'));
+                    for name in given {
+                        unknown_query_name(name, target, a.span.clone(), decl, &at, table, out);
+                    }
                     continue;
                 }
                 out.push(Diagnostic {
@@ -196,6 +212,69 @@ pub fn check(hir: &Hir, table: &Table, out: &mut Vec<Diagnostic>) {
             }
         }
     }
+}
+
+/// **A name an address gives that its page's route does not** (ADR-XXXX,
+/// PW5050): a link's query name, or a GET form's field, reaching a page
+/// whose route's query part does not name it. The host ignores a name its
+/// route does not declare, as an address may carry one from elsewhere
+/// (`utm_source`), so a program's own would carry its value to nothing.
+fn unknown_query_name(
+    name: &str,
+    target: &str,
+    span: crate::hir::Span,
+    decl: &crate::hir::Decl,
+    at: &crate::hir::Span,
+    table: &Table,
+    out: &mut Vec<Diagnostic>,
+) {
+    let Some(route) = table.pages.iter().find(|r| matches(r, target)) else {
+        return;
+    };
+    let names = route_parts(route).1;
+    if names.contains(&name) {
+        return;
+    }
+    let path = target.split(['?', '#']).next().unwrap_or(target);
+    let code = codes::ADDRESS_NAMES_NO_QUERY_PARAMETER;
+    out.push(Diagnostic {
+        code: code.id,
+        invariant: code.invariant,
+        reason: "address_names_no_query_parameter",
+        detector: Detector::PatternMatrix,
+        severity: Severity::Error,
+        message: match names.is_empty() {
+            true => {
+                format!("`{path}` is given `{name}`, and its route `{route}` has no query part")
+            }
+            false => format!(
+                "`{path}` is given `{name}`, and its route `{route}` gives {}",
+                names
+                    .iter()
+                    .map(|n| format!("`{n}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        },
+        primary_span: span,
+        related: vec![Related {
+            span: at.clone(),
+            label: format!("`{}` gives it", decl.name),
+        }],
+        explanation: Some(
+            "A route's query part, `{?q}`, names what an address gives its page \
+             (ADR-XXXX). A link's query and a GET form's fields are that address, \
+             and the host reads the names its route declares and no other: a \
+             name it does not declare would carry its value to nothing."
+                .to_string(),
+        ),
+        repairs: vec![Repair {
+            description: format!(
+                "give `{path}` only what its route's query names, or name `{name}` in it"
+            ),
+            replacement: None,
+        }],
+    });
 }
 
 /// **A route and its page's parameters agree** (ADR-0160). A route is `/`
@@ -251,6 +330,25 @@ fn form(
     }
     let method = value("method").map_or_else(|| "GET".to_string(), |(m, _)| m.to_ascii_uppercase());
     if table.answers(&method, &target) {
+        // A GET form's fields are its address's query (HTML's "mutate action
+        // URL"): each a name its page's route gives (ADR-XXXX).
+        if method == "GET" {
+            for c in body.walk_markup(children) {
+                let Node::Element { tag, attrs, .. } = body.node(c) else {
+                    continue;
+                };
+                if !matches!(tag.as_str(), "input" | "select" | "textarea" | "button") {
+                    continue;
+                }
+                let Some(a) = attrs.iter().find(|a| a.name == "name") else {
+                    continue;
+                };
+                if let AttrValue::Static(raw) = &a.value {
+                    let name = raw.trim_matches('"');
+                    unknown_query_name(name, &target, a.span.clone(), decl, &at, table, out);
+                }
+            }
+        }
         return;
     }
     let answering: Vec<String> = table
@@ -332,7 +430,9 @@ pub fn parameters_agree(
                 }],
             });
         };
-        let segments: Vec<&str> = match route.as_str() {
+        // Its path, and the names its query part gives (ADR-XXXX).
+        let (path, queried) = route_parts(&route);
+        let segments: Vec<&str> = match path {
             "/" => Vec::new(),
             r => r.strip_prefix('/').unwrap_or(r).split('/').collect(),
         };
@@ -341,8 +441,22 @@ pub fn parameters_agree(
                 && s.chars()
                     .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~'))
         };
+        // A query written as text, `/search?q=x`, or an expansion anywhere but
+        // the route's end, is no route: its query part names what an address
+        // may give, `{?q}` (ADR-XXXX).
+        if path.contains('?') || path.contains("{?") {
+            refuse(
+                &mut out,
+                format!(
+                    "`{route}` writes its query: a route's query part is `{{?name}}` at its \
+                     end, RFC 6570's form-style expansion, naming what an address may give"
+                ),
+                "write the query part as `{?q}`, after the path".to_string(),
+            );
+            continue;
+        }
         let mut named: Vec<&str> = Vec::new();
-        let mut malformed = !route.starts_with('/');
+        let mut malformed = !route.starts_with('/') || queried.iter().any(|q| !word(q));
         for s in &segments {
             match s.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
                 Some(name) if word(name) => named.push(name),
@@ -355,13 +469,16 @@ pub fn parameters_agree(
                 &mut out,
                 format!(
                     "`{route}` is not a route: it is `/` and segments, a word or a \
-                     `{{parameter}}` each"
+                     `{{parameter}}` each, and may end in a query part, `{{?name,..}}`"
                 ),
                 "write the route as `/` and segments, `/stores/{id}`".to_string(),
             );
             continue;
         }
         let params: Vec<&str> = decl.params.iter().map(|p| p.name.as_str()).collect();
+        // The path's names, then the query's: each a parameter, once.
+        let path_names = named.len();
+        named.extend(queried.iter().copied());
         for (i, name) in named.iter().enumerate() {
             if !params.contains(name) {
                 refuse(
@@ -389,7 +506,7 @@ pub fn parameters_agree(
                          would not give it",
                         decl.name
                     ),
-                    format!("add a `{{{p}}}` segment"),
+                    format!("add a `{{{p}}}` segment, or name it in the query, `{{?{p}}}`"),
                 );
             }
         }
@@ -407,6 +524,44 @@ pub fn parameters_agree(
             else {
                 continue;
             };
+            // A query's parameter is an `Option` of text: an address may leave
+            // it out (ADR-XXXX, PW0630).
+            let name = p.name.as_str();
+            if named[path_names..].contains(&name) && !named[..path_names].contains(&name) {
+                if !optional_text(sigs, ty) {
+                    let code = codes::QUERY_PARAMETER_IS_OPTIONAL_TEXT;
+                    out.push(Diagnostic {
+                        code: code.id,
+                        invariant: code.invariant,
+                        reason: "query_parameter_is_optional_text",
+                        detector: Detector::DeclarationRule,
+                        severity: Severity::Error,
+                        message: format!(
+                            "`{}`'s parameter `{}` is of type `{}`, and an address may leave \
+                             its query out: it is given as an `Option` of text",
+                            decl.name,
+                            p.name,
+                            ty.display_name()
+                        ),
+                        primary_span: at.clone(),
+                        related: Vec::new(),
+                        explanation: Some(
+                            "A route's query part, `{?q}`, names what an address may give: a \
+                             link, a form or a reader may leave it out, and a field left empty \
+                             gives it empty. The page is given `None` where it is left out, and \
+                             what the address says, decoded, where it is not."
+                                .to_string(),
+                        ),
+                        repairs: vec![Repair {
+                            description: "declare the parameter an `Option<String>`, or an \
+                                          `Option` of an opaque type over one"
+                                .to_string(),
+                            replacement: None,
+                        }],
+                    });
+                }
+                continue;
+            }
             if !named.contains(&p.name.as_str()) || is_text(sigs, ty) {
                 continue;
             }
@@ -443,6 +598,12 @@ pub fn parameters_agree(
     out
 }
 
+/// **An `Option` of text** (ADR-XXXX): what a query parameter is given.
+fn optional_text(sigs: &crate::signatures::Signatures, ty: &crate::resolved::ResolvedType) -> bool {
+    ty.as_builtin() == Some(crate::resolved::Builtin::Option)
+        && ty.args().first().is_some_and(|a| is_text(sigs, a))
+}
+
 /// A `String`, or an opaque type whose representation is one.
 pub(crate) fn is_text(
     sigs: &crate::signatures::Signatures,
@@ -463,8 +624,11 @@ pub(crate) fn is_text(
 /// its parameters' names aside, leave an address naming two pages. Reported
 /// on each page of `unit` that shares its route with a page before it.
 pub fn declared_twice(hirs: &[&Hir], unit: usize) -> Vec<Diagnostic> {
+    // By the path alone: two routes that differ in their query part name one
+    // page's address (ADR-XXXX).
     let shape = |route: &str| -> String {
-        route
+        route_parts(route)
+            .0
             .split('/')
             .map(|s| match s.starts_with('{') && s.ends_with('}') {
                 true => "{}",
@@ -600,11 +764,32 @@ fn case_named(
     Ok((def, case.to_string()))
 }
 
-/// The `{name}` segments of a route as written, `"/word/{word}"`, in order.
+/// **A route's path, and the names its query part gives** (ADR-XXXX):
+/// `"/search{?q}"` is `("/search", ["q"])`, RFC 6570's form-style query
+/// expansion, at the route's end; a route without one gives none.
+pub(crate) fn route_parts(route: &str) -> (&str, Vec<&str>) {
+    let route = route.trim().trim_matches('"');
+    match route.find("{?") {
+        Some(at)
+            if route.ends_with('}') && !route[at + 2..route.len() - 1].contains(['{', '}']) =>
+        {
+            (
+                &route[..at],
+                route[at + 2..route.len() - 1]
+                    .split(',')
+                    .map(str::trim)
+                    .collect(),
+            )
+        }
+        _ => (route, Vec::new()),
+    }
+}
+
+/// The `{name}` segments of a route's path as written, `"/word/{word}"`, in
+/// order: its query part's names are not segments (ADR-XXXX).
 pub(crate) fn route_holes(route: &str) -> Vec<String> {
-    route
-        .trim()
-        .trim_matches('"')
+    route_parts(route)
+        .0
         .split('/')
         .filter_map(|s| s.strip_prefix('{').and_then(|s| s.strip_suffix('}')))
         .map(str::to_string)
@@ -636,6 +821,10 @@ fn is_internal(target: &str) -> bool {
 /// exactly one segment. It does not match `/stores/7/reviews`: a parameter
 /// stands for one segment, not for the rest of the path.
 fn matches(route: &str, target: &str) -> bool {
+    // By the path: a route's query part, and a target's query and fragment,
+    // say what is given to a page, not which page (ADR-XXXX).
+    let route = route_parts(route).0;
+    let target = target.split(['?', '#']).next().unwrap_or(target);
     let r: Vec<&str> = route.trim_matches('/').split('/').collect();
     let t: Vec<&str> = target.trim_matches('/').split('/').collect();
     r.len() == t.len()

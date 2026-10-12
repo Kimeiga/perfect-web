@@ -3427,9 +3427,8 @@ impl Server {
                                 .lock()
                                 .expect("params")
                                 .get(&(session.to_string(), d))
-                                .and_then(|p| p.get(name).cloned())
+                                .and_then(|p| param_val(plan, name, p))
                         })
-                        .map(Val::String)
                         .ok_or_else(|| format!("the page's `{name}` is given no value here"))
                 }
                 Some("current_session()") => Ok(Val::String(session.into())),
@@ -4805,8 +4804,17 @@ impl Server {
             .find(|t| t.path == path)
             .ok_or_else(|| format!("no template `{path}`"))?;
         let mut env = Env::new();
-        for (name, given) in params {
-            env = env.set(name, Value::Text(given.clone()));
+        // Each as its address gave it: a query's `Some` or `None`
+        // (ADR-XXXX), a path's its text.
+        for name in plan["params"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|n| n.as_str())
+        {
+            if let Some(v) = param_val(plan, name, params) {
+                env = env.set(name, val_to_value(&v));
+            }
         }
         for (part, outcome) in settled {
             env = env.settle(PartId(*part), outcome.clone());
@@ -4895,10 +4903,19 @@ impl Server {
     /// **The page a path names by its route**, and the parameters the path
     /// gives it (ADR-0162): among the pages this build planned with one.
     /// One route is one page's (PW0341), so the first is the only one.
-    fn routed(&self, path: &str) -> Option<(String, Params)> {
+    fn routed(&self, path: &str, query: &str) -> Option<Result<(String, Params), String>> {
         self.plans.iter().find_map(|(page, plan)| {
             let route = plan["route"].as_str()?;
-            route_params(route, path).map(|params| (page.clone(), params))
+            let mut params = route_params(route_path(route), path)?;
+            // And the names its query part gives (ADR-XXXX), as the address
+            // says them.
+            Some(match query_params(route, query) {
+                Some(given) => {
+                    params.extend(given);
+                    Ok((page.clone(), params))
+                }
+                None => Err(format!("`{path}`'s query is no text its route can read")),
+            })
         })
     }
 
@@ -5523,8 +5540,17 @@ impl Server {
         // attribute or a handler's captures that read one built, then every
         // request for the page was answered 503.
         let mut env = Env::new();
-        for (name, given) in params {
-            env = env.set(name, Value::Text(given.clone()));
+        // Each as its address gave it: a query's `Some` or `None`
+        // (ADR-XXXX), a path's its text.
+        for name in plan["params"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|n| n.as_str())
+        {
+            if let Some(v) = param_val(plan, name, params) {
+                env = env.set(name, val_to_value(&v));
+            }
         }
         // Each binding's whole value, so a block a query decides, and what is
         // inside it, reads any field of it (ADR-0146), and each row what it
@@ -5822,12 +5848,9 @@ fn stream_runs(
             .flatten()
             .map(|a| match a.as_str() {
                 Some("current_session()") => Ok(Val::String(session.into())),
-                Some(name) => params
-                    .get(name)
-                    .map(|v| Val::String(v.clone()))
-                    .ok_or_else(|| {
-                        format!("a stream's query is given `{name}`, which is not given")
-                    }),
+                Some(name) => param_val(plan, name, params).ok_or_else(|| {
+                    format!("a stream's query is given `{name}`, which is not given")
+                }),
                 None => Err(format!(
                     "a stream's argument this server cannot compute: {a}"
                 )),
@@ -6940,8 +6963,25 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
     // The page a path names by its route, and the parameters it gives
     // (ADR-0162).
     let routed = match method {
-        "GET" => server.routed(route),
+        "GET" => server.routed(route, query),
         _ => None,
+    };
+    // A query a page's route reads that is no text, as the address says it,
+    // is refused, never replaced (ADR-XXXX).
+    let routed = match routed {
+        Some(Err(why)) => {
+            respond(
+                &mut stream,
+                400,
+                "text/plain; charset=utf-8",
+                &session,
+                fresh,
+                why.as_bytes(),
+            );
+            return;
+        }
+        Some(Ok(matched)) => Some(matched),
+        None => None,
     };
 
     match (method, route) {
@@ -8488,6 +8528,63 @@ fn serve_page(
 /// **The parameters a path gives a route** (ADR-0162), or `None` when it is
 /// not the route's: one segment each, as the compiler's link check matches
 /// a link to a route (`routes::matches`), each decoded as a path is.
+/// **The names a route's query part gives** (ADR-XXXX): `"/search{?q}"`
+/// gives `q`, RFC 6570's form-style expansion at the route's end, as
+/// `pw_core::routes` reads it.
+fn route_query_names(route: &str) -> Vec<&str> {
+    match route.find("{?") {
+        Some(at) if route.ends_with('}') => route[at + 2..route.len() - 1]
+            .split(',')
+            .map(str::trim)
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// A route's path: the route without its query part.
+fn route_path(route: &str) -> &str {
+    route.find("{?").map_or(route, |at| &route[..at])
+}
+
+/// **What a request's query gives a route's query names** (ADR-XXXX), read
+/// as the URL Standard reads application/x-www-form-urlencoded (§5.1): split
+/// on `&`, a `+` a space, then percent-decoded; the first occurrence of a
+/// name taken, and a name the route does not give ignored, as an address
+/// may carry one from elsewhere (`utm_source`). `None` where a value the
+/// route gives is no UTF-8, or has an escape that is not one: refused,
+/// where the URL Standard would replace it.
+fn query_params(route: &str, query: &str) -> Option<Params> {
+    let names = route_query_names(route);
+    let mut out = Params::new();
+    if names.is_empty() {
+        return Some(out);
+    }
+    let decoded = |v: &str| path_decoded(&v.replace('+', " "));
+    for piece in query.split('&').filter(|p| !p.is_empty()) {
+        let (name, value) = piece.split_once('=').unwrap_or((piece, ""));
+        let Some(name) = decoded(name) else { continue };
+        if !names.contains(&name.as_str()) || out.contains_key(&name) {
+            continue;
+        }
+        out.insert(name, decoded(value)?);
+    }
+    Some(out)
+}
+
+/// **A page parameter's value, as its document's address gave it**
+/// (ADR-0162, ADR-XXXX): a path's is its text; a query's is `Some` of what
+/// the address said, or `None` where it said nothing. `None` for a path's
+/// that was not given.
+fn param_val(plan: &serde_json::Value, name: &str, params: &Params) -> Option<Val> {
+    let route = plan["route"].as_str().unwrap_or_default();
+    if route_query_names(route).contains(&name) {
+        return Some(Val::Option(
+            params.get(name).map(|v| Box::new(Val::String(v.clone()))),
+        ));
+    }
+    params.get(name).map(|v| Val::String(v.clone()))
+}
+
 fn route_params(route: &str, path: &str) -> Option<Params> {
     let segments = |s: &str| -> Vec<String> {
         match s.trim_matches('/') {
@@ -14435,16 +14532,62 @@ public query Store(",
         assert_eq!(route_params("/", "/"), Some(Params::new()));
     }
 
+    /// **A route's query part, read as a browser's form writes it**
+    /// (ADR-XXXX): the URL Standard's form-urlencoded parsing, `+` a space and
+    /// `%20` one, the first of a name taken, a name the route does not give
+    /// ignored, and bytes that are no UTF-8 refused.
+    #[test]
+    fn a_query_is_read_as_a_browsers_form_writes_it() {
+        assert_eq!(route_query_names("/search{?q,page}"), ["q", "page"]);
+        assert_eq!(route_query_names("/stores/{id}"), Vec::<&str>::new());
+        assert_eq!(route_path("/search{?q}"), "/search");
+        assert_eq!(route_path("/stores/{id}"), "/stores/{id}");
+        let q = |query: &str| query_params("/search{?q}", query).map(|p| p.get("q").cloned());
+        assert_eq!(q("q=flat+white"), Some(Some("flat white".to_string())));
+        assert_eq!(q("q=flat%20white"), Some(Some("flat white".to_string())));
+        assert_eq!(q("q=a%2Bb"), Some(Some("a+b".to_string())));
+        assert_eq!(q("q=%E3%81%B2"), Some(Some("\u{3072}".to_string())));
+        assert_eq!(q("q="), Some(Some(String::new())));
+        assert_eq!(q("q"), Some(Some(String::new())));
+        assert_eq!(q(""), Some(None));
+        assert_eq!(
+            q("utm_source=x&q=pie&q=cake"),
+            Some(Some("pie".to_string()))
+        );
+        // Not text: refused, where the URL Standard would put U+FFFD.
+        assert_eq!(q("q=%FF"), None);
+        assert_eq!(q("q=%zz"), None);
+        // A name the route does not give is ignored, whatever it holds.
+        assert_eq!(q("x=%FF&q=pie"), Some(Some("pie".to_string())));
+        // What the page is given: a query's `Some` or `None`, a path's text.
+        let plan = serde_json::json!({ "route": "/stores/{id}{?tab}" });
+        let given = Params::from([("id".to_string(), "48".to_string())]);
+        assert_eq!(
+            param_val(&plan, "id", &given),
+            Some(Val::String("48".into()))
+        );
+        assert_eq!(param_val(&plan, "tab", &given), Some(Val::Option(None)));
+        let given = Params::from([("tab".to_string(), "menu".to_string())]);
+        assert_eq!(
+            param_val(&plan, "tab", &given),
+            Some(Val::Option(Some(Box::new(Val::String("menu".into())))))
+        );
+        assert_eq!(param_val(&plan, "id", &given), None);
+    }
+
     /// **The store at its route, and a second store at its own** (ADR-0162,
     /// charter §15.3): `/stores/{id}` names the store page, and `48` is a
     /// store with its own name and menu.
     #[test]
     fn each_store_is_served_at_its_route() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
-        let (page, params) = s.routed("/stores/48").expect("the store's route");
+        let (page, params) = s
+            .routed("/stores/48", "")
+            .expect("the store's route")
+            .expect("its query read");
         assert_eq!(page, "store.page.StorePage");
         assert_eq!(params, store_params("48"));
-        assert_eq!(s.routed("/stores"), None);
+        assert_eq!(s.routed("/stores", ""), None);
         let (harbor, _) = s.serve_store_document("a", "48").expect("served");
         let harbor = visible(&harbor);
         assert!(harbor.contains("Harbor Coffee"), "{harbor}");

@@ -171,8 +171,8 @@ MUTANTS = [
         "an address carries a value as written",
         BROWSER,
         RUNTIME,
-        '      out += unreserved ? String.fromCharCode(b) : "%" + b.toString(16).toUpperCase().padStart(2, "0");\n',
-        "      out += String.fromCharCode(b);\n",
+        '    out += unreserved ? String.fromCharCode(b) : "%" + b.toString(16).toUpperCase().padStart(2, "0");\n',
+        "    out += String.fromCharCode(b);\n",
     ),
     (
         "an address carries what no segment can",
