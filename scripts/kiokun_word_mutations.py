@@ -1001,25 +1001,22 @@ MUTANTS = [
     ),
 ]
 
-# The baseline runs every kiokun test on one thread, and a mutant runs its
-# suite's cover on two. Each distinct program is compiled once per test
-# process and its files written into each test's own TempDir (the
-# integrator's ruling of 2026-10-09; ADR-0158 holds), but every test's server
-# compiles the program's components again, about 1 GiB a server running at
-# once.
+# Four test threads, CI's runner's cores, for the baseline and for each
+# mutant's cover. Each distinct program is compiled once per test process
+# and its files written into each test's own TempDir (the integrator's
+# ruling of 2026-10-09; ADR-0158 holds), and each component once a process
+# (ADR-0317).
 #
 # The test binary's peak footprint as ADR-0292's bound reads it (macOS
-# phys_footprint, measured 2026-10-12 at 98a1f1e1, the bound 3.9 GiB on CI):
-# - every kiokun test: 5.21 GiB on four threads, 4.19 on three, 3.47 on two,
-#   2.11 on one (1,424 s here). Verify 38235212974 stopped the four-thread
-#   baseline.
-# - the largest cover, files' eight tests: 2.98 GiB on two threads, 2.24 on
-#   one; contains' four: 2.59 and 1.85.
-#
-# The lasting fix is NEXT's infrastructure item "the server's components
-# compiled once a process".
+# phys_footprint, measured 2026-10-12; the bound 3.9 GiB on CI):
+# - before ADR-0317, when every test's server compiled the program's
+#   components again: every kiokun test 5.21 GiB on four threads (verify
+#   38235212974 stopped that baseline), 4.19 on three, 3.47 on two, 2.11 on
+#   one; the largest cover, files' eight tests, 2.98 GiB on two threads;
+# - after it: every kiokun test 1.28 GiB on four threads, in 46 s; files'
+#   cover 1.10 GiB on four, in 55 s.
 CARGO = ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]
-TESTS = [CARGO + ["--", "kiokun", "--test-threads=1"]]
+TESTS = [CARGO + ["--", "kiokun", "--test-threads=4"]]
 
 K = "tests::kiokun::"
 
@@ -1200,7 +1197,7 @@ def command_for(suite):
     names = SEEN_BY.get(suite)
     if names is None:
         return TESTS[0]
-    return CARGO + ["--", "--exact", *names, "--test-threads=2"]
+    return CARGO + ["--", "--exact", *names, "--test-threads=4"]
 
 
 def run_tests(cmd):
