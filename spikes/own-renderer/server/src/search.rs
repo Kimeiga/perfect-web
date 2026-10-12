@@ -394,7 +394,7 @@ fn answer(with: &With, text: &str, reader: Option<&str>) -> Result<Vec<Val>, Str
 /// stores that match or hold one. Every term is a bound `LIKE` pattern
 /// ([`pattern`]), never written into the statement.
 pub(crate) fn on_postgres(
-    c: &mut postgres::Client,
+    c: &mut crate::store_pg::Counted<'_>,
     terms: &[String],
 ) -> Result<Vec<Matched>, String> {
     let patterns: Vec<String> = terms.iter().map(|t| pattern(t)).collect();
@@ -1006,7 +1006,10 @@ mod tests {
         let layer = crate::store_pg::StorePg::for_test(&url).expect("the layer");
         let mut c = on_postgres_fixture(&layer);
         for (text, want) in table() {
-            let got = shown(on_postgres(&mut c, &terms_of(text)).expect("searched"));
+            let got = shown(
+                on_postgres(&mut crate::store_pg::Counted(&mut c), &terms_of(text))
+                    .expect("searched"),
+            );
             assert_eq!(got, want, "{text:?}");
         }
         // And each record found, its text and every tier, its dishes' too,
@@ -1016,10 +1019,47 @@ mod tests {
         let texts = table().into_iter().map(|(text, _)| text);
         for text in texts.chain(DISH_TIERS.iter().map(|(text, ..)| *text)) {
             let terms = terms_of(text);
-            let pg = ordered(on_postgres(&mut c, &terms).expect("searched"));
+            let pg = ordered(
+                on_postgres(&mut crate::store_pg::Counted(&mut c), &terms).expect("searched"),
+            );
             let mem = ordered(matched(&terms, fixture()));
             assert_eq!(pg, mem, "{text:?}");
         }
+    }
+
+    /// **A search is two statements on PostgreSQL, whatever the number of
+    /// stores**: through the layer's own operation, every statement it runs
+    /// counted (as Django's `assertNumQueries` does), with the fixture's six
+    /// stores and then six more. Matched in the database, not each store's
+    /// menu read to the host and matched there. The search for a reader
+    /// (`find-for`) is not pinned: its reach is a statement per store found,
+    /// until the track that bounds every read (NEXT).
+    #[test]
+    fn on_postgres_a_search_is_two_statements_whatever_the_stores() {
+        let Some(url) = database() else { return };
+        let layer = crate::store_pg::StorePg::for_test(&url).expect("the layer");
+        let mut c = on_postgres_fixture(&layer);
+        let counted = |text: &str| {
+            let ops = crate::data::DataLayer::reads(&layer, "s", None);
+            let find = ops.get("store:data/search#find").expect("registered");
+            crate::store_pg::STATEMENTS.with(|n| n.set(0));
+            let answer = find(&[Val::String(text.into())]).expect("answered");
+            assert!(
+                matches!(answer.as_slice(), [Val::Result(Ok(_))]),
+                "{answer:?}"
+            );
+            crate::store_pg::STATEMENTS.with(|n| n.get())
+        };
+        assert_eq!(counted("juice"), 2, "six stores");
+        for n in 0..6 {
+            c.execute(
+                "INSERT INTO stores (id, position, name, description, cuisine, opens_minute, \
+                     closes_minute) VALUES ($1, $2, $3, '', 'Juice', 420, 1140)",
+                &[&format!("more-{n}"), &(100 + n), &format!("More Juice {n}")],
+            )
+            .expect("a store");
+        }
+        assert_eq!(counted("juice"), 2, "twelve stores");
     }
 
     /// **The layer's own operation, on PostgreSQL**: the seed searched

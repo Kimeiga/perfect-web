@@ -2326,6 +2326,9 @@ a merge is held to CI's verification run.
   browser spec too; `evidence-fetch` brings the record into docs/evidence
   once the owner approves the download in the integrator's session; what CI
   cannot run stays local and says so.
+- Amended 2026-10-12: a fetch takes no file whose recipe reads what
+  changed between its run's commit and the tree it joins (the planner's
+  rule): the branch merges master and is verified again.
 [ADR-0282](DECISIONS/ADR-0282-what-a-value-holds-is-one-label.md):
 what a value holds is one label (amends ADR-0118, corrects ADR-0128).
 - A secret a declaration answers is held, and one it only uses as a key is

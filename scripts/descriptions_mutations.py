@@ -182,9 +182,21 @@ CARGO = {
     "engine": [
         ["cargo", "test", "--quiet", "--locked", "-p", "pw-host", "--features", "engine",
          "--test", "host_answers"],
-        ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+        # The development server's tests that see the engine mutants the
+        # host's own tests above do not, and the server mutants', measured
+        # by `scripts/mutant_killers.py` on 2026-10-12 (W6's ruling of
+        # 2026-10-09): two per mutant where two fail.
+        [
+            "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+            "tests::a_block_a_query_decides_is_rendered",
+            "tests::a_block_whose_rendering_changed_is_rendered_again",
+        ],
     ],
-    "server": [["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]],
+    "server": [[
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::the_store_and_each_item_say_what_they_are",
+        "tests::the_store_sends_its_slots_after_its_own_content",
+    ]],
 }
 BROWSER = ["e2e/slots.spec.mjs", "--project=webkit"]
 

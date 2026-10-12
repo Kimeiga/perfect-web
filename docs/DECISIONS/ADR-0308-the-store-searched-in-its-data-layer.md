@@ -499,11 +499,19 @@ under the integrator's rulings of 2026-10-12 on this ADR's questions.
 
   Three are re-anchored on the new code. The integrator's fixed-arms track
   drops one ("an address with no q is told it searched for nothing").
-  Verify 38294475263 found one equivalent: "PostgreSQL's layer searches as
-  memory does". The two layers hold one meaning, and the cuisine is now
-  the store's row on both, so nothing observable tells them apart. It is
-  dropped, with why, leaving 38. That the statements run in the database
-  is what the PostgreSQL mutants show, since only the SQL can kill them.
+  Verify 38294475263 found "PostgreSQL's layer searches as memory does"
+  surviving: since the cuisine became the store's row, only an accident
+  had killed it. It is kept (the integrator's ruling of 2026-10-12), and
+  now killed on purpose. **A search is two statements on PostgreSQL,
+  whatever the number of stores** (the layer's statements counted, as
+  Django's `assertNumQueries` does). `store_pg.rs`'s `Counted`, which every
+  statement of `PgRows` and of the search's own runs through, counts them
+  for a test. `on_postgres_a_search_is_two_statements_whatever_the_stores`
+  pins the anonymous search through the layer's operation at 2, with six
+  stores and with twelve. The reader's search (`find-for`) is not pinned:
+  its reach is a statement per store found. That is a KNOWN_LIMITATIONS
+  merge note, "a reader's search reads each matched store's reach on
+  PostgreSQL", until the track that bounds every read (NEXT).
 - **Another track's mutant moved**: `descriptions_mutations.py`'s "the
   store says too little for WebKit to paint it before its slots" survived
   (verify 38294475263). The cuisine's paragraph said enough. Its anchor

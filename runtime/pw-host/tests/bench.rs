@@ -142,15 +142,21 @@ fn the_compiled_command_through_the_host() {
         ])]),
     )])))));
     let add_result = cart.clone();
-    let read: HostFn = Arc::new(|_| Ok(vec![Val::String("session-7".into())]));
+    // The reader's user, and their cart (ADR-0318); the store that reaches
+    // their chosen address (ADR-0319). Until 2026-10-12 the benchmark
+    // answered the session's cart, which the command no longer imports, and
+    // `just e8-host` failed every nightly from W8's merge.
+    let read: HostFn = Arc::new(|_| Ok(vec![Val::String("user-7".into())]));
     let add: HostFn = Arc::new(move |_| Ok(vec![add_result.clone()]));
     let done: HostFn = Arc::new(|_| Ok(Vec::new()));
     let available: HostFn = Arc::new(|_| Ok(vec![Val::Bool(true)]));
+    let reaches: HostFn = Arc::new(|_| Ok(vec![Val::Bool(true)]));
     let ops = BTreeMap::from([
-        ("pw:host/session#read".to_string(), read),
-        ("store:data/carts#add".to_string(), add.clone()),
+        ("pw:host/principal#read".to_string(), read),
+        ("store:data/user-carts#add".to_string(), add.clone()),
         ("store:data/menus#is-available".to_string(), available),
-        ("pw:host/outbox#cart-changed".to_string(), done.clone()),
+        ("store:data/coverage#reaches".to_string(), reaches),
+        ("pw:host/outbox#user-cart-changed".to_string(), done.clone()),
         ("pw:host/invalidations#store-page-cart".to_string(), done),
     ]);
     // Each import the contract declares, answered here: one the benchmark

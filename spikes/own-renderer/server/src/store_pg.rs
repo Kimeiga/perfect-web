@@ -206,7 +206,63 @@ fn migrate(c: &mut Client) -> Result<(), String> {
 }
 
 /// **The store's rows, on a connection**, in whatever transaction it is in.
-struct PgRows<'c>(&'c mut Client);
+struct PgRows<'c>(Counted<'c>);
+
+// TRACK SEAM (store-search): every statement the store's rows run, counted
+// for a test (as Django's `assertNumQueries` does), on the thread a read or a
+// command runs on: what tells a read that grows with the data from one that
+// does not.
+#[cfg(test)]
+thread_local! {
+    pub(crate) static STATEMENTS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// **A connection whose every statement is counted** (`STATEMENTS`): what
+/// `PgRows` and the search's own statements (`search.rs`) run through.
+pub(crate) struct Counted<'c>(pub(crate) &'c mut Client);
+
+impl Counted<'_> {
+    fn counted() {
+        #[cfg(test)]
+        STATEMENTS.with(|n| n.set(n.get() + 1));
+    }
+
+    pub(crate) fn query<T: ?Sized + postgres::ToStatement>(
+        &mut self,
+        query: &T,
+        params: &[&(dyn postgres::types::ToSql + Sync)],
+    ) -> Result<Vec<postgres::Row>, postgres::Error> {
+        Self::counted();
+        self.0.query(query, params)
+    }
+
+    pub(crate) fn query_one<T: ?Sized + postgres::ToStatement>(
+        &mut self,
+        query: &T,
+        params: &[&(dyn postgres::types::ToSql + Sync)],
+    ) -> Result<postgres::Row, postgres::Error> {
+        Self::counted();
+        self.0.query_one(query, params)
+    }
+
+    pub(crate) fn query_opt<T: ?Sized + postgres::ToStatement>(
+        &mut self,
+        query: &T,
+        params: &[&(dyn postgres::types::ToSql + Sync)],
+    ) -> Result<Option<postgres::Row>, postgres::Error> {
+        Self::counted();
+        self.0.query_opt(query, params)
+    }
+
+    pub(crate) fn execute<T: ?Sized + postgres::ToStatement>(
+        &mut self,
+        query: &T,
+        params: &[&(dyn postgres::types::ToSql + Sync)],
+    ) -> Result<u64, postgres::Error> {
+        Self::counted();
+        self.0.execute(query, params)
+    }
+}
 
 fn line_of(r: &postgres::Row) -> Line {
     Line {
@@ -220,7 +276,7 @@ fn line_of(r: &postgres::Row) -> Line {
 impl Rows for PgRows<'_> {
     // TRACK SEAM (store-search): a search, matched by the database (`search.rs`).
     fn search(&mut self, terms: &[String]) -> Result<Vec<crate::search::Matched>, String> {
-        crate::search::on_postgres(self.0, terms)
+        crate::search::on_postgres(&mut self.0, terms)
     }
 
     // TRACK SEAM (store-hours): a store's hours, read and replaced (`hours.rs`).
@@ -796,7 +852,7 @@ impl crate::data::DataLayer for StorePg {
             let c = conn.client();
             c.batch_execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
                 .map_err(pg)?;
-            let out = f(&mut PgRows(c));
+            let out = f(&mut PgRows(Counted(c)));
             if c.batch_execute("COMMIT").is_err() {
                 conn.discard();
             }
@@ -826,7 +882,7 @@ impl crate::data::DataLayer for StorePg {
             let conn = conn.clone();
             Arc::new(
                 move |f| match conn.lock().expect("the command's connection").as_mut() {
-                    Some(c) => f(&mut PgRows(c.client())),
+                    Some(c) => f(&mut PgRows(Counted(c.client()))),
                     None => Err(why.clone()),
                 },
             )
