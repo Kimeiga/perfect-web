@@ -56,8 +56,8 @@ MUTANTS = [
     (
         "a link reaches pages alone",
         ROUTES,
-        '                if !is_internal(target) || table.answers("GET", target) {\n',
-        "                if !is_internal(target) || table.pages.iter().any(|r| matches(r, target)) {\n",
+        '                if table.answers("GET", target) {\n',
+        "                if table.pages.iter().any(|r| matches(r, target)) {\n",
     ),
     (
         "the relying party's routes are not answered",

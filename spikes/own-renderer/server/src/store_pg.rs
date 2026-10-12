@@ -38,6 +38,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0002_seed",
         include_str!("../migrations/store/0002_seed.sql"),
     ),
+    // TRACK SEAM (store-search): each store's cuisine, which a search reads.
+    (
+        "0010_search",
+        include_str!("../migrations/store/0010_search.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -193,6 +198,11 @@ fn line_of(r: &postgres::Row) -> Line {
 }
 
 impl Rows for PgRows<'_> {
+    // TRACK SEAM (store-search): a search, matched by the database (`search.rs`).
+    fn search(&mut self, terms: &[String]) -> Result<Vec<crate::search::Matched>, String> {
+        crate::search::on_postgres(self.0, terms)
+    }
+
     fn stores(&mut self) -> Result<Vec<StoreRow>, String> {
         let rows = self
             .0

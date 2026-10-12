@@ -205,6 +205,20 @@ fn its_paths_are_no_pages() {
           `About`, at `/uploads/post-image`"
         ]
     );
+    // A page whose route has a query part is served at its path (ADR-0309).
+    let page_with_query = PROGRAM
+        .replace("page About() {", "page About(q: Option<String>) {")
+        .replace(
+            "route     \"/about\"",
+            "route     \"/uploads/post-image{?q}\"",
+        );
+    assert_eq!(
+        uploads(&page_with_query),
+        [
+            "PW5602 `PostImage` answers `/uploads/post-image`, its route, and so does the page \
+          `About`, at `/uploads/post-image{?q}`"
+        ]
+    );
     let page_under_serves = PROGRAM.replace("route     \"/about\"", "route     \"/images/{id}\"");
     let found = uploads(&page_under_serves);
     assert_eq!(found.len(), 1, "{found:?}");

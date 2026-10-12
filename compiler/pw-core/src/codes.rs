@@ -109,6 +109,9 @@ pub enum Owner {
     /// ADR-0253: the kiokun track's codes, PW60xx: kiokun.com, the owner's
     /// dictionary, rewritten in Pleris (docs/PARALLEL.md, W6's plan).
     Kiokun,
+    /// ADR-0253: the store-search track's codes, PW63xx: the DoorDash
+    /// store's customer search (docs/PARALLEL.md, W9). None registered yet.
+    StoreSearch,
 }
 
 impl fmt::Display for Code {
@@ -452,6 +455,11 @@ codes! {
     // what its segment says.
     ROUTE_PARAMETER_IS_TEXT = "PW0621" / route_parameter_is_text / 1, Types,
         "a route's parameter is text: a `String`, or an opaque type over one";
+    // ADR-0309: a route's query part is RFC 6570's form-style expansion,
+    // `{?q}`, and an address may leave each of its names out, so each is
+    // given as an `Option` of text.
+    QUERY_PARAMETER_IS_OPTIONAL_TEXT = "PW0630" / query_parameter_is_optional_text / 1, Types,
+        "a query parameter is an `Option` of text: an address may leave it out";
     ANSWER_READ_FOR_A_VALUE = "PW0620" / answer_read_for_a_value / 1, Types,
         "what a command answers carries no value: a handler matches `Ok(_)`, and reads the value from a query";
     // ADR-0179: `opaque type PositiveInt = Int` stated no invariant, so
@@ -648,6 +656,11 @@ codes! {
     // `get` to `/sign-out`, which answers a `post`, or a `post` to a page.
     FORM_ANSWERED_BY_NOTHING = "PW5041" / form_answered_by_nothing / 1, Markup,
         "a form's `action` is a route that answers its `method`: a page's, the relying party's, or an upload's";
+    // ADR-0309: a link's query, and a GET form's fields, name only the query
+    // parameters of the route they reach: another name carries its value to
+    // nothing.
+    ADDRESS_NAMES_NO_QUERY_PARAMETER = "PW5050" / address_names_no_query_parameter / 1, Markup,
+        "a link's query and a GET form's fields name only the query parameters of the route they reach";
     // ADR-0280: a handler goes to a page once its command commits. A link
     // names a route by its text; `navigate` names the page.
     NAVIGATE_NAMES_NO_PAGE = "PW5042" / navigate_names_no_page / 1, Markup,
@@ -905,6 +918,7 @@ impl Owner {
             Owner::Messages => "PW58",
             Owner::StorePg => "PW59",
             Owner::Kiokun => "PW60",
+            Owner::StoreSearch => "PW63",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -968,6 +982,7 @@ mod tests {
                 (Owner::Messages, "PW58"),
                 (Owner::StorePg, "PW59"),
                 (Owner::Kiokun, "PW60"),
+                (Owner::StoreSearch, "PW63"),
             ] {
                 assert!(
                     !c.id.starts_with(block) || c.owner == owner,

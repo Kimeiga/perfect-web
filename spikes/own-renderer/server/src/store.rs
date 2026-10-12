@@ -206,6 +206,10 @@ pub(crate) trait Rows {
     fn curate(&mut self, items: Option<&[(String, String)]>) -> Result<(), String>;
     fn estimate(&mut self, session: &str) -> Result<Option<Estimate>, String>;
     fn set_estimate(&mut self, session: &str, estimate: Estimate) -> Result<(), String>;
+    // TRACK SEAM (store-search): what a search's terms match, each layer's (`search.rs`).
+    fn search(&mut self, terms: &[String]) -> Result<Vec<crate::search::Matched>, String> {
+        crate::search::scan(self, terms)
+    }
 }
 
 /// **Where an operation's rows are**, each layer's: it runs `f` on them, in
@@ -517,6 +521,7 @@ pub(crate) const DEFAULT_ESTIMATE: Estimate = (25, None);
 /// recommender. Any store the layer does not hold is answered `not-found`.
 fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
     let mut ops: Ops = BTreeMap::new();
+    ops.extend(crate::search::ops(with.clone())); // TRACK SEAM (store-search)
     // Charter §15.5's store delay (ADR-0174), and its origin failing once
     // (ADR-0177), as a test set them.
     let store_delay = faults.store_delay_ms.clone();

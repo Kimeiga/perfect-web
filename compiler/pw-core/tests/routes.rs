@@ -88,7 +88,7 @@ fn a_route_is_slash_and_segments() {
             found,
             [format!(
                 "PW0340 `{route}` is not a route: it is `/` and segments, a word or a \
-                 `{{parameter}}` each"
+                 `{{parameter}}` each, and may end in a query part, `{{?name,..}}`"
             )],
             "{route}"
         );
@@ -149,6 +149,114 @@ fn two_pages_of_one_name_are_told_apart_by_their_modules() {
 
 /// **The page's plan carries its route** (ADR-0160), where a host serves
 /// it; a page that declares none carries none.
+/// **A route's query part is RFC 6570's form-style expansion** (ADR-0309):
+/// `{?q}` at its end names a parameter an address may leave out, which the
+/// page is given as an `Option` of text.
+#[test]
+fn a_query_parameter_is_an_option_of_text() {
+    for (params, route) in [
+        ("q: Option<String>", "/search{?q}"),
+        (
+            "q: Option<String>, page: Option<String>",
+            "/search{?q,page}",
+        ),
+        ("id: StoreId, tab: Option<StoreId>", "/stores/{id}{?tab}"),
+    ] {
+        let found = reported(&program(&page("P", params, route)));
+        assert!(found.is_empty(), "{route}: {found:#?}");
+    }
+    assert_eq!(
+        reported(&program(&page("P", "q: String", "/search{?q}"))),
+        [
+            "PW0630 `P`'s parameter `q` is of type `String`, and an address may leave its \
+             query out: it is given as an `Option` of text"
+        ]
+    );
+    assert_eq!(
+        reported(&program(&page("P", "q: Option<Int>", "/search{?q}"))),
+        [
+            "PW0630 `P`'s parameter `q` is of type `Option<Int>`, and an address may leave \
+             its query out: it is given as an `Option` of text"
+        ]
+    );
+}
+
+#[test]
+fn a_query_part_ends_the_route_and_names_each_parameter_once() {
+    assert_eq!(
+        reported(&program(&page("P", "q: Option<String>", "/search?q=x"))),
+        [
+            "PW0340 `/search?q=x` writes its query: a route's query part is `{?name}` at its \
+             end, RFC 6570's form-style expansion, naming what an address may give"
+        ]
+    );
+    assert_eq!(
+        reported(&program(&page("P", "id: StoreId", "/stores/{id}{?id}"))),
+        ["PW0340 `/stores/{id}{?id}` names `id` twice"]
+    );
+    assert_eq!(
+        reported(&program(&page("P", "q: Option<String>", "/search{?term}"))),
+        [
+            "PW0340 `/search{?term}` names `term`, which is not a parameter of `P`",
+            "PW0340 `/search{?term}` does not name `q`, a parameter of `P`: the address \
+             would not give it",
+        ]
+    );
+}
+
+#[test]
+fn two_routes_that_differ_in_their_query_are_one() {
+    let found = reported(&program(&format!(
+        "{}{}",
+        page("Search", "q: Option<String>", "/search{?q}"),
+        page("Find", "", "/search")
+    )));
+    assert_eq!(
+        found,
+        ["PW0341 `Find` is served at `/search`, and so is `Search`"]
+    );
+}
+
+/// **An address gives only what its route names** (ADR-0309, PW5050): a
+/// link's query, and a GET form's fields, are a page's query parameters.
+#[test]
+fn an_address_gives_only_what_its_route_names() {
+    let linking = |markup: &str| {
+        program(&format!(
+            "{}page Home() {{\n    route \"/\"\n    cache private\n\n    \
+             signal caption: String = \"q\"\n\n    view {{\n        \
+             <title>Home</title>\n        <main><h1>Home</h1>{markup}</main>\n    }}\n}}\n\n",
+            page("Search", "q: Option<String>", "/search{?q}")
+        ))
+    };
+    // The controls: what the route names, or nothing.
+    for markup in [
+        r#"<a href="/search?q=pizza">Pizza</a>"#,
+        r#"<a href="/search">Search</a>"#,
+        r#"<a href="/search?{caption}=x">Computed</a>"#,
+        r#"<form method="get" action="/search"><label>Find <input type="search" name="q" /></label><button>Search</button></form>"#,
+        r#"<form action="/search"><label>Find <input type="search" name="q" /></label><button>Search</button></form>"#,
+    ] {
+        let found = reported(&linking(markup));
+        assert!(found.is_empty(), "{markup}: {found:#?}");
+    }
+    assert_eq!(
+        reported(&linking(r#"<a href="/search?term=pizza">Pizza</a>"#)),
+        ["PW5050 `/search` is given `term`, and its route `/search{?q}` gives `q`"]
+    );
+    assert_eq!(
+        reported(&linking(
+            r#"<form action="/search"><label>Find <input type="search" name="term" /></label><button>Search</button></form>"#
+        )),
+        ["PW5050 `/search` is given `term`, and its route `/search{?q}` gives `q`"]
+    );
+    // A page whose route has no query part.
+    assert_eq!(
+        reported(&linking(r#"<a href="/?q=pizza">Home</a>"#)),
+        ["PW5050 `/` is given `q`, and its route `/` has no query part"]
+    );
+}
+
 #[test]
 fn the_plan_carries_the_route() {
     use pw_core::lower::lower_file;

@@ -600,6 +600,20 @@ awaited in order. What remains:
 - **A layout is one, unnested, and given nothing** (ADR-0303): a page names
   one layout; a layout is shown in no other, is given none of the page's
   parameters, has no title template of its own, and holds one slot.
+- **A page's query parameters are text, and given by a link or a form**
+  (ADR-0309): a list (`{?tag*}`) or a typed number is not read, `{&name}`
+  continuation and a literal query part are refused, and `navigate` gives
+  no query parameter. A page whose parameter is a query's is reached by a
+  link or a GET form.
+- **The store's search folds nothing, and matches each record by its own
+  fields** (ADR-0308): no accent or stem is folded, no word is corrected,
+  and a store's dishes do not make its own name match. Its meaning is
+  Unicode 16.0's simple lowercase mapping, PostgreSQL 18.6's tables, where
+  Rust 1.97's are 17.0's. The 28 capitals 17.0 added (U+A7CE, U+A7D2,
+  U+A7D4, U+16EA0 to U+16EB8) are matched as written on both layers, never
+  lowered, and `on_postgres_every_character_is_lowered_alike` fails when
+  either version moves. Its page is at `route "/search/{q}"` until a route
+  reads its query part.
 - **A page asks only a predicate with no parameters of its reader**
   (ADR-0307): a control whose command requires one with parameters
   (`OwnsPost(post)`, `MayMessage(to)`) is not held to where it stands, and

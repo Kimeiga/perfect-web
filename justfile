@@ -19,6 +19,7 @@ import 'just/uploads.just'
 import 'just/notifications.just'
 import 'just/messages.just'
 import 'just/kiokun.just'
+import 'just/store-search.just'
 
 default:
     @just --list
@@ -5664,6 +5665,31 @@ e14-holds:
        python3 scripts/holds_mutations.py; \
      } > docs/evidence/E14/holds.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/holds.txt
+
+# ADR-0309: a page's query parameters are typed, and a GET form makes them.
+# The checker's tests, the host's, the demo's search in three engines with
+# scripts on and off, and the mutation controls.
+e14-query-params:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0309 - a page's query parameters are typed, and a GET form makes them"; echo; \
+       echo "produced by: just e14-query-params"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== a route's query part, and what an address gives (compiler/pw-core/tests/routes.rs, uploads.rs)"; echo; \
+       cargo test --locked -p pw-core --test routes --test uploads 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host reads a query as a browser's form writes it, and moves a page by its path"; echo; \
+       cargo test --locked -p pw-dev-server -- a_query_is_read_as_a_browsers_form_writes_it a_route_with_a_query_part_is_moved_by_its_path 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the demo's search, in three engines (e2e/query.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/query.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/query_params_mutations.py)"; echo; \
+       python3 scripts/query_params_mutations.py; \
+     } > docs/evidence/E14/query-params.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/query-params.txt
 
 # The soft navigation's ADR: a navigation keeps the layout, and shows the next
 # page in it. The browser's tests in three engines, ADR-0280's navigation as

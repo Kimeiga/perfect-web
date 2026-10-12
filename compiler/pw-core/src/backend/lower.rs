@@ -1777,7 +1777,17 @@ impl<'a> Lower<'a> {
             ));
         }
         let mut given = Vec::new();
+        let queried = crate::routes::route_parts(&route).1;
         for ((arg, declared), param) in args.iter().zip(&sig.params).zip(&decl.params) {
+            // A query's parameter is an `Option`, which a navigation does not
+            // give yet: a link or a GET form does (ADR-0309's Not claimed).
+            if queried.contains(&param.name.as_str()) {
+                return blocked(format!(
+                    "`{name}`'s parameter `{}` is its route's query's, which a navigation \
+                     does not give yet: a link or a GET form gives it",
+                    param.name
+                ));
+            }
             let Some(declared) = declared.as_ref() else {
                 return blocked(format!("`{name}`'s parameter `{}` has no type", param.name));
             };

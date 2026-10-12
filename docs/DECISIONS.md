@@ -2609,3 +2609,43 @@ the third step of "a refusal is never silent").
     again;
   - an answer read again at each read hid some controls after a sign-out
     elsewhere and kept the rest.
+
+[ADR-0308](DECISIONS/ADR-0308-the-store-searched-in-its-data-layer.md): the
+store's stores and dishes, searched in its data layer to one meaning (W9's,
+track `store-search`, accepted at the merge).
+- A search's terms are its words, each lowered once by Unicode 16.0's simple
+  lowercase mapping. A record matches where every term is part of one of
+  its fields. A store is listed where it matches or holds a dish that does.
+  A tier says where its terms were found. The order, the cut (20 stores,
+  5 dishes each) and the bound (100 characters) are `search.rs`'s alone.
+- Each layer answers what matched through `Rows::search`: in memory a scan,
+  on PostgreSQL two statements with escaped `LIKE` patterns bound as one
+  parameter. So the two layers cannot rank differently, and a test holds
+  them to answer alike.
+- The program's `public query Search(q)`, dropped by any store's menu or
+  stock change, and its `SearchPage` at `route "/search/{q}"` until the
+  query part lands.
+- Found: the menu route's drop told only the store's own pages, and now
+  tells each open page that reads what it dropped. The verify found a
+  survivor whose dish moved tier on PostgreSQL alone, which the test's table
+  did not show: the test now compares every record whole.
+
+[ADR-0309](DECISIONS/ADR-0309-a-pages-query-parameters-are-typed.md): a page's
+query parameters are typed, and a GET form makes them (the integrator's; for
+W6's and W9's searches).
+- A route's query part is RFC 6570's form-style expansion at its end,
+  `route "/search{?q}"`. Each name is a page parameter, an `Option` of text
+  (PW0630), as an address may leave it out.
+- The host reads a query as the URL Standard reads a form's: `+` and `%20`
+  a space, the first of a name taken, and a foreign name ignored. It refuses
+  bytes that are no UTF-8 (400), where the URL Standard would replace them.
+- A link's query and a GET form's fields give only what the route names
+  (PW5050). Two routes that differ only in their query are one (PW0341). A
+  page is at its route's path: a move (ADR-0295) fills the path and keeps
+  the query, and PW5602 compares an upload's paths with a page's path.
+- Found:
+  - `navigate` cannot carry a form (ADR-0280 keeps it for a commit), so
+    W6's first search ruling could not be written. The forms are GET forms,
+    with no script.
+  - The host's move read a route's query part as part of its path: a move
+    to itself became a 308 loop. PW5602 missed a page at a query route.
