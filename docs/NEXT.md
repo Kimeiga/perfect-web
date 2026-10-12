@@ -836,9 +836,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
               where two fail: `command_answers` 10,599 → 2,105 s,
               `availability` 8,012 → 3,206 s and `connection_faults` 9,614
               → 1,498 s (verify 38206663536, every mutant still killed),
-              about 21,400 s a full verify; `test_controls` measured, and
-              14 more scripts in the queue (`scripts/mutant_killers.py`,
-              in a worktree with a target of its own);
+              about 21,400 s a full verify; eight more by narrowing-2
+              (merged 2026-10-12), 55,286 → 10,486 s; nine more
+              measured, in track `narrowing-3`; and `query_blocks` to
+              measure again since ADR-0320 changed its mutants' killers;
 
           The worker tracks, one at a time beside the integrator (the
           owner's budget rule), each launched under docs/PARALLEL.md when
