@@ -1931,9 +1931,15 @@ fn search_reads_kana_variants_and_canonical_pages() {
     }
 }
 
+/// A homophone as shown: its word, and whether its chip is marked common.
+type ChipShown = (String, bool);
+
+/// A Homophones group as shown: its reading where it is shown, and its words.
+type HomophoneGroupShown = (Option<String>, Vec<ChipShown>);
+
 /// The page's Homophones, as shown: each group's reading where it is shown,
 /// and its words, each with whether its chip is marked common.
-fn homophones_in(html: &str) -> Vec<(Option<String>, Vec<(String, bool)>)> {
+fn homophones_in(html: &str) -> Vec<HomophoneGroupShown> {
     let Some(at) = html.find("<section id=\"homophones\"") else {
         return Vec::new();
     };
