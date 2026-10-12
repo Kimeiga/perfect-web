@@ -701,10 +701,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              2026-10-11, with ADR-0305, a page's commands in the order it
              sent them);
           2. ~~**accounts in the store**~~ and 3. ~~**delivery
-             addresses**~~: **W8's since 2026-10-09** (the owner: DoorDash
-             faster, with a third worker; PARALLEL.md, "the DoorDash track"),
-             launched first in the next free slot after W5's merge, whose
-             tables they change. Accepted by the owner's own Next.js bug:
+             addresses**~~: **W8's**, merged 2026-10-12 (ADR-0318, ADR-0319;
+             the owner: DoorDash faster, with a third worker; PARALLEL.md,
+             "the DoorDash track"). Accepted by the owner's own Next.js bug:
              save an address, go to a store, and its page shows the new
              address's estimate, with no cache-busting parameter, no reload
              and, once item 1 lands, no header mounted again, in three
@@ -718,6 +717,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
              the user's scope or becomes "not importable" alone is the
              integrator's ruling, a change to every program that says it
              (the feed's notifications and messages);
+          3b. **benchmark task T11's patches apply again** (open, the
+             integrator's; named known by W8's merge, 2026-10-12): holds'
+             merge (ADR-0307) changed `benchmarks/baselines/pleris/store/
+             app.pw` and left T11's reference and unsafe patches unapplied,
+             so `e14-diffs` fails at `git apply`. With it, the planner gap
+             that let it through: a change to a benchmark's baseline planned
+             no recipe that applies patches to it;
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled.
              In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);

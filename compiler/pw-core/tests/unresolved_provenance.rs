@@ -378,6 +378,7 @@ fn store_page_after_repair() {
     assert_eq!(
         caps(add),
         BTreeSet::from([
+            "database.read<Addresses>".to_string(),
             "database.read<Menus>".to_string(),
             "database.write<Carts>".to_string(),
             "outbox.write".to_string(),
@@ -385,7 +386,9 @@ fn store_page_after_repair() {
         ]),
         "the write AND the session read — which is what the backend saw as two \
          host calls before the import was applied — and, since ADR-0157, the \
-         menu read that asks whether the item can be ordered"
+         menu read that asks whether the item can be ordered, and since track \
+         `store-accounts` the addresses read that asks whether its store \
+         reaches the reader's"
     );
 
     // The discriminator. `Menu` is on the same page, in the same module, and

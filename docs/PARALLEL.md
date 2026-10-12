@@ -1217,4 +1217,16 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - The integrator's ruling (W8's finding): until a script is narrowed by
     measurement, its whole-suite command is bounded at 1800 s
     (track/narrowing-2, merging next).
+- **2026-10-12, W8's store accounts and delivery addresses, merged as
+  ADR-0318 and ADR-0319** (from `3fdcf929`, verify 38233018418).
+  - Numbered by W8's mapping of each `ADR-XXXX` line: cart 0318, delivery
+    0319, one later than first sent, since ADR-0317 merged first.
+  - The merge kept one-entry's alias assertion in pw-conformance's
+    speculation test beside W8's user-keyed cart.
+  - **`e14-diffs` named known**, master's failure, not W8's. It is the
+    integrator's correction: holds' merge (ADR-0307) changed the
+    benchmark's baseline store and left T11's two patches unapplied, and
+    no verify planned the recipe that applies them (NEXT 3b, the
+    integrator's next). Thanks to W8 for tracing it to master's tip.
+  - To W9: SearchPage is a `user` page now, since its layout is.
 

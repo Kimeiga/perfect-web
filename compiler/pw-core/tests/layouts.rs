@@ -85,10 +85,11 @@ fn plan<'b>(b: &'b pw_core::build::Build, page: &str) -> &'b pw_core::page_value
         .unwrap_or_else(|| panic!("no plan for `{page}`"))
 }
 
-/// The header the store's pages share, in module `t`: the session's cart's
+/// The header the store's pages share, in module `t`: the reader's cart's
+/// (the user's since track `store-accounts`, as the store's pages read it)
 /// count, live.
-const LAYOUT: &str = "session layout Shell {\n    \
-    let cart = query Cart(current_session())\n\n    \
+const LAYOUT: &str = "user layout Shell {\n    \
+    let cart = query Cart(current_user())\n\n    \
     view {\n        <header>\n            <a href=\"/\">Stores</a>\n            \
     <p>Cart: <span id=\"count\">{cart.line_count}</span></p>\n        </header>\n        \
     <main>\n            <slot />\n        </main>\n        \
@@ -99,17 +100,17 @@ const LAYOUT: &str = "session layout Shell {\n    \
 fn program(layout: &str, pages: &str) -> String {
     format!(
         "module t\n\nimport store.page.{{ Store, Cart, Menu }}\nimport domain.{{ StoreId }}\n\
-         import context.{{ current_session }}\n\n{layout}\n{pages}"
+         import context.{{ current_user }}\n\n{layout}\n{pages}"
     )
 }
 
-const PAGES: &str = "session page A(id: StoreId) {\n    route  \"/a/{id}\"\n    \
+const PAGES: &str = "user page A(id: StoreId) {\n    route  \"/a/{id}\"\n    \
     layout Shell\n    cache  private\n\n    let store = query Store(id)\n    \
-    let cart = query Cart(current_session())\n\n    view {\n        \
+    let cart = query Cart(current_user())\n\n    view {\n        \
     <title>{store.name}</title>\n        <h1>{store.name}</h1>\n        \
     <p>{cart.line_count} in your cart</p>\n    }\n}\n\n\
-    session page B() {\n    route  \"/b\"\n    layout Shell\n    cache  private\n\n    \
-    let cart = query Cart(current_session())\n\n    view {\n        \
+    user page B() {\n    route  \"/b\"\n    layout Shell\n    cache  private\n\n    \
+    let cart = query Cart(current_user())\n\n    view {\n        \
     <title>Your cart</title>\n        <h1>Your cart</h1>\n        \
     {#each cart.lines as line (line.item_id)}<p>{line.name}</p>{/each}\n    }\n}\n";
 
@@ -215,7 +216,7 @@ fn its_plan_reads_the_layouts_bindings_under_names_no_source_writes() {
         assert!(names.contains(&"cart"), "{page}: {names:?}");
         let theirs = &plan.bindings[0];
         assert_eq!(theirs.resource, "store.page.Cart");
-        assert_eq!(theirs.args, ["current_session()"]);
+        assert_eq!(theirs.args, ["current_user()"]);
         // Its parts read it by that name.
         let read: Vec<(u32, &str)> = plan
             .parts
@@ -251,8 +252,8 @@ fn its_plan_reads_the_layouts_bindings_under_names_no_source_writes() {
 
 /// A layout with a signal of its own, a handler that sets it, and a block
 /// it decides.
-const MENU: &str = "session layout Shell {\n    \
-    let cart = query Cart(current_session())\n    signal open: Bool = false\n\n    \
+const MENU: &str = "user layout Shell {\n    \
+    let cart = query Cart(current_user())\n    signal open: Bool = false\n\n    \
     view {\n        <header>\n            \
     <button type=\"button\" on:press={() => open = !open}>Menu</button>\n            \
     {#if open}<nav><a href=\"/b\">Your cart</a></nav>{/if}\n            \
@@ -371,7 +372,7 @@ fn a_slot_is_its_layouts_once_at_the_top_and_empty() {
     refused(
         &LAYOUT.replace(
             "<slot />",
-            "<stream query={Cart(current_session())}><placeholder><p>…</p></placeholder>\
+            "<stream query={Cart(current_user())}><placeholder><p>…</p></placeholder>\
              <ready as={c}><slot /></ready><failed><p>-</p></failed></stream>",
         ),
         PAGES,
@@ -425,8 +426,8 @@ fn a_layout_takes_no_page_clause_and_no_other_declaration_names_one() {
         "layout Shell",
     ] {
         let with = LAYOUT.replace(
-            "    let cart = query Cart(current_session())\n",
-            &format!("    {clause}\n\n    let cart = query Cart(current_session())\n"),
+            "    let cart = query Cart(current_user())\n",
+            &format!("    {clause}\n\n    let cart = query Cart(current_user())\n"),
         );
         let said = codes(&with, PAGES);
         assert!(said.contains(&"PW5105".to_string()), "{clause}: {said:?}");
@@ -450,9 +451,9 @@ fn a_layout_takes_no_page_clause_and_no_other_declaration_names_one() {
 
 #[test]
 fn a_page_declares_at_least_its_layouts_audience() {
-    // A page for anyone's eyes shown in a session's layout.
-    let public = PAGES.replace("session page B()", "page B()").replace(
-        "    let cart = query Cart(current_session())\n\n    view {\n        <title>Your cart",
+    // A page for anyone's eyes shown in a user's layout.
+    let public = PAGES.replace("user page B()", "page B()").replace(
+        "    let cart = query Cart(current_user())\n\n    view {\n        <title>Your cart",
         "\n    view {\n        <title>Your cart",
     );
     let public = public.replace(
@@ -465,10 +466,10 @@ fn a_page_declares_at_least_its_layouts_audience() {
     );
     let said = reported(&[("t.pw", &program(LAYOUT, &public))]);
     assert!(said.iter().any(|d| d.starts_with("PW5046")), "{said:?}");
-    // Control: a session's page shown in a layout for anyone.
+    // Control: a user's page shown in a layout for anyone.
     let open_layout = LAYOUT
-        .replace("session layout Shell", "layout Shell")
-        .replace("    let cart = query Cart(current_session())\n\n", "")
+        .replace("user layout Shell", "layout Shell")
+        .replace("    let cart = query Cart(current_user())\n\n", "")
         .replace("{cart.line_count}", "-")
         .replace("{cart.subtotal.display}", "-");
     assert_eq!(codes(&open_layout, PAGES), Vec::<String>::new());
@@ -476,10 +477,10 @@ fn a_page_declares_at_least_its_layouts_audience() {
 
 #[test]
 fn what_a_layout_shows_is_its_pages_for_the_shared_cache() {
-    // An unlabelled layout that reads a session's cart: a page that declares
-    // a shared cache would hold every session's cart in it (PW5001), as a
+    // An unlabelled layout that reads a user's cart: a page that declares
+    // a shared cache would hold every user's cart in it (PW5001), as a
     // read of its own would make it (charter §7.8).
-    let unlabelled = LAYOUT.replace("session layout Shell", "layout Shell");
+    let unlabelled = LAYOUT.replace("user layout Shell", "layout Shell");
     let shared = "page C() {\n    route  \"/c\"\n    layout Shell\n    cache  shared\n\n    \
         view {\n        <title>About</title>\n        <h1>About</h1>\n    }\n}\n";
     let said = reported(&[("t.pw", &program(&unlabelled, shared))]);
@@ -488,9 +489,9 @@ fn what_a_layout_shows_is_its_pages_for_the_shared_cache() {
             .any(|d| d.starts_with("PW5001") && d.contains("`C`")),
         "{said:?}"
     );
-    // Control: the same page, its layout reading nothing a session owns.
+    // Control: the same page, its layout reading nothing a user owns.
     let public = unlabelled
-        .replace("    let cart = query Cart(current_session())\n\n", "")
+        .replace("    let cart = query Cart(current_user())\n\n", "")
         .replace("{cart.line_count}", "-")
         .replace("{cart.subtotal.display}", "-");
     let said = reported(&[("t.pw", &program(&public, shared))]);
@@ -501,7 +502,7 @@ fn what_a_layout_shows_is_its_pages_for_the_shared_cache() {
 fn a_page_reads_what_its_layout_reads_in_the_graph() {
     // The page `C` reads no cart of its own; its layout does, and a change to
     // the cart is the page's to be told of (ADR-0123).
-    let about = "session page C() {\n    route  \"/c\"\n    layout Shell\n    cache  private\n\n    \
+    let about = "user page C() {\n    route  \"/c\"\n    layout Shell\n    cache  private\n\n    \
         view {\n        <title>About</title>\n        <h1>About</h1>\n    }\n}\n";
     let b = built(&[("t.pw", &program(LAYOUT, about))]);
     let reads: Vec<&str> = b
@@ -583,8 +584,8 @@ const UI: &str = "module ui\n\nsignal drawer: Bool\n\n\
 fn a_layout_provides_what_its_views_need_and_its_page_provides_it_nothing() {
     let with = |layout: &str, pages: &str| -> Vec<String> {
         let src = program(layout, pages).replace(
-            "import context.{ current_session }\n",
-            "import context.{ current_session }\nimport ui.{ drawer, Open }\n",
+            "import context.{ current_user }\n",
+            "import context.{ current_user }\nimport ui.{ drawer, Open }\n",
         );
         reported(&[("ui.pw", UI), ("t.pw", &src)])
     };
@@ -612,13 +613,13 @@ fn a_layout_provides_what_its_views_need_and_its_page_provides_it_nothing() {
     );
     // Control: the layout provides it, and its view sets the layout's.
     let provided = open.replace(
-        "    let cart = query Cart(current_session())\n",
-        "    let cart = query Cart(current_session())\n    provide drawer = false\n",
+        "    let cart = query Cart(current_user())\n",
+        "    let cart = query Cart(current_user())\n    provide drawer = false\n",
     );
     assert_eq!(with(&provided, PAGES), Vec::<String>::new());
     let src = program(&provided, PAGES).replace(
-        "import context.{ current_session }\n",
-        "import context.{ current_session }\nimport ui.{ drawer, Open }\n",
+        "import context.{ current_user }\n",
+        "import context.{ current_user }\nimport ui.{ drawer, Open }\n",
     );
     let b = built(&[("ui.pw", UI), ("t.pw", &src)]);
     let (before, ..) = around(template(&b, "t.A"));

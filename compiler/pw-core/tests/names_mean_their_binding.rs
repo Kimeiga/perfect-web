@@ -400,7 +400,8 @@ fn a_loops_name_is_the_loops_beside_a_page_binding_of_its_spelling() {
 /// `app` with `change` made to the store page's declaration alone: the cart
 /// page writes some of the same markup.
 fn in_store_page(app: &str, change: impl Fn(&str) -> String) -> String {
-    let start = app.find("session page StorePage(").expect("the store page");
+    // A `user` page since track `store-accounts`.
+    let start = app.find("user page StorePage(").expect("the store page");
     let end = start + app[start..].find("\n}\n").expect("its end") + 3;
     format!(
         "{}{}{}",
@@ -525,11 +526,11 @@ fn a_loops_name_is_the_loops_beside_a_signal_of_its_spelling() {
 /// Module `t`: a view that lists a cart's lines, `as line`, and a page that
 /// binds `line` and shows the view.
 const VIEWED: &str = "module t\n\nimport store.page.{ Store, Cart }\n\
-    import domain.{ StoreId, CartLine }\nimport context.{ current_session }\n\n\
+    import domain.{ StoreId, CartLine }\nimport context.{ current_user }\n\n\
     view Lines(lines: List<CartLine>) !{} {\n    \
     <ul>{#each lines as line (line.item_id)}<li>{line.quantity.count}</li>{/each}</ul>\n}\n\n\
-    session page P(id: StoreId) {\n    route \"/p/{id}\"\n    cache private\n\n    \
-    let line = query Store(id)\n    let cart = query Cart(current_session())\n\n    \
+    user page P(id: StoreId) {\n    route \"/p/{id}\"\n    cache private\n\n    \
+    let line = query Store(id)\n    let cart = query Cart(current_user())\n\n    \
     view {\n        <title>{line.name}</title>\n        <h1>{line.name}</h1>\n        \
     <Lines lines={cart.lines} />\n    }\n}\n";
 
@@ -545,21 +546,22 @@ fn a_views_loop_is_its_own_beside_a_page_binding_of_its_spelling() {
     );
 }
 
-/// Module `t`: a layout that lists the session's cart's lines, `as line`,
+/// Module `t`: a layout that lists the reader's cart's lines (the user's since track
+/// `store-accounts`, as the store's), `as line`,
 /// itself and through a view, and two pages shown in it, one that binds
 /// `line` and one that does not.
 const LAID_OUT: &str = "module t\n\nimport store.page.{ Store, Cart }\n\
-    import domain.{ StoreId, CartLine }\nimport context.{ current_session }\n\n\
+    import domain.{ StoreId, CartLine }\nimport context.{ current_user }\n\n\
     view Totals(lines: List<CartLine>) !{} {\n    \
     <ol>{#each lines as line (line.item_id)}<li>{line.total.display}</li>{/each}</ol>\n}\n\n\
-    session layout Shell {\n    let cart = query Cart(current_session())\n\n    \
+    user layout Shell {\n    let cart = query Cart(current_user())\n\n    \
     view {\n        <header><ul>{#each cart.lines as line (line.item_id)}\
     <li>{line.quantity.count}</li>{/each}</ul><Totals lines={cart.lines} /></header>\n        \
     <main>\n            <slot />\n        </main>\n    }\n}\n\n\
-    session page A(id: StoreId) {\n    route  \"/a/{id}\"\n    layout Shell\n    \
+    user page A(id: StoreId) {\n    route  \"/a/{id}\"\n    layout Shell\n    \
     cache  private\n\n    let line = query Store(id)\n\n    view {\n        \
     <title>{line.name}</title>\n        <h1>{line.name}</h1>\n    }\n}\n\n\
-    session page B(id: StoreId) {\n    route  \"/b/{id}\"\n    layout Shell\n    \
+    user page B(id: StoreId) {\n    route  \"/b/{id}\"\n    layout Shell\n    \
     cache  private\n\n    let store = query Store(id)\n\n    view {\n        \
     <title>{store.name}</title>\n        <h1>{store.name}</h1>\n    }\n}\n";
 

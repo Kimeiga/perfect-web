@@ -23,6 +23,25 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0318 and ADR-0319, 2026-10-12: a cart and an order are a user's, and a
+delivery goes to the reader's chosen address** (W8's, track `store-accounts`,
+merged from `3fdcf929`). The store's customer side:
+- Carts and orders are a user's (`user query Cart(reader)`). A guest's cart
+  joins its user's at sign-in, and a user's changes are told to that user's
+  sessions alone.
+- A command is answered for the reader its page was shown to. A tab whose
+  reader signed in or out elsewhere is refused before it runs.
+- Addresses and coverage follow one rule, read by the estimate, the page and
+  the commands. Choosing an address shows its estimate with no reload: the
+  owner's own Next.js bug.
+- Found: a correction to the integrator's Q1 ruling, since another user's
+  activity reached every reader as a timing channel. Also, a record's scope
+  depended on the order of the files.
+
+Verify 38233018418: 76 of 77 recipes green. `e14-diffs` failed on master's
+own defect, named known: benchmark task T11's patches no longer apply after
+holds' merge (NEXT 3b).
+
 **ADR-0317, 2026-10-12: a component is compiled once a process** (the
 integrator's; track `compile-once`, merged from `05a67ae`).
 - Found: after kiokun's merge, the development server's suite, run whole

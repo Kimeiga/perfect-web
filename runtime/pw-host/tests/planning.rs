@@ -57,6 +57,9 @@ fn full() -> Topology {
                     // A session's order, read and placed (ADR-0193).
                     "database.read<Orders>".to_string(),
                     "database.write<Orders>".to_string(),
+                    // A reader's addresses (track `store-accounts`).
+                    "database.read<Addresses>".to_string(),
+                    "database.write<Addresses>".to_string(),
                 ]),
             },
         ],
@@ -506,10 +509,12 @@ fn every_edge_in_the_store_program_can_be_bound() {
             Some(true),
             "an obligation is not a refusal"
         );
+        // A session's, or since track `store-accounts` (ADR-0318) a user's:
+        // the cart and the order are the reader's user's.
         assert!(
             e.obligations.iter().any(|o| {
                 let pw_host::Obligation::PreservePrincipal { principal, .. } = o;
-                principal.contains("Session")
+                principal.contains("Session") || principal.contains("User")
             }),
             "and it names the principal a binding must preserve: {e:?}"
         );

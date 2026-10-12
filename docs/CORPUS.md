@@ -891,3 +891,36 @@ Generality at open:        45/45 invariants generality-tested
 | R-053 | changed: its canonical link inside `<main>` (`PW5035`) | its category kept |
 | R-063 | added: a canonical address written as text (`PW5051`) | new category |
 | `canonical_address` | a GENERAL witness, an address that calls a view, and a NEIGHBOUR one, another page's address given by name in another order | new invariant |
+
+## C20: a private query's record the user's, and `user`, 2026-10-09
+
+Opened because the specification changed, twice, by the integrator's
+rulings of 2026-10-09 (track `store-accounts`, ADR-0318):
+
+- a record a `private` query produces is its user's (ADR-0270), as a
+  record a `session query` produces is the session's (R-030), and a record
+  several scoped queries produce holds each of their scopes, joined. Until
+  then `private` gave the record no scope, so a view's parameter of it
+  crossed into the public shell unrefused, and the scope a record carried
+  was its last producer's in the units' order;
+- `user` is a visibility, `session`'s peer: the user's, as `private` is, and
+  importable, as `session` is and `private` is not. It is one only before a
+  declaration's keyword, so a name `user` is still a name.
+
+No invariant is retired, no `@expect-error` line of an earlier fixture
+changed, and no fixture moved. The library gains `Saved`, a `user` query
+and the record only it produces, which A-034 and R-065 import.
+
+```text
+Corpus version:            C20
+Accepted programs:         34
+Rejected programs:         65
+Charter categories:        34/34 accepted, 65/65 rejected
+Generality at open:        45/45 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| R-064 | added: a `private` query's record captured into the public shell from a view's parameter (`PW5007`) | new category |
+| A-034 | added: a `user` query imported from the library and read, and captured, on a `user page` | new category |
+| R-065 | added: the same `user` query's record captured into a public page's manifest (`PW5007`) | new category |
