@@ -87,3 +87,17 @@ Recorded by `just e14-links` in `docs/evidence/E14/links.txt`:
   its body. Browsers apply it, but HTML puts it in the head. Styling is
   charter §8.3's: scoped styles, cascade layers and typed tokens.
 - **What a stylesheet or a preload loads.**
+
+## Amended, 2026-10-12: a page states its canonical address
+
+The first of the Alternatives is taken, for `canonical` alone: a page now
+needs one (kiokun's word page, which answers an inflected word with its
+dictionary form's entry). ADR-XXXX decides it:
+- a page states its canonical address once at the top of its view,
+  `<link rel="canonical" href={Page(args)} />`, a page's address its host
+  writes into the head;
+- PW5035 still refuses a canonical link anywhere else, and its invariant
+  names the exception;
+- R-053's link is now inside `<main>`.
+
+`alternate`, `icon` and `manifest` stay refused.

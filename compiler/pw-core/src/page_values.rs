@@ -337,6 +337,7 @@ fn rendered_again(
             Part::Instance { args, .. } => args.iter().map(|(_, v)| v.clone()).collect(),
             Part::Title { pieces, .. } => title_reads(pieces),
             Part::Meta { content, .. } => title_reads(content),
+            Part::Canonical { args, .. } => canonical_reads(args),
             // A stream's query's arguments, each a value's path or an
             // invocation-context call (ADR-0148).
             Part::Stream { args, .. } => {
@@ -509,8 +510,21 @@ fn own_reads(p: &crate::template_ir::Part) -> Vec<String> {
         Part::Stream { args, .. } => args.iter().filter(|a| !a.ends_with(')')).cloned().collect(),
         Part::Title { pieces, .. } => title_reads(pieces),
         Part::Meta { content, .. } => title_reads(content),
+        Part::Canonical { args, .. } => canonical_reads(args),
         Part::Event { .. } | Part::Blocked { .. } => Vec::new(),
     }
+}
+
+/// **What a page's canonical address reads** (ADR-XXXX): each value among
+/// its route's arguments.
+fn canonical_reads(args: &[(String, crate::template_ir::TitlePiece)]) -> Vec<String> {
+    use crate::template_ir::TitlePiece;
+    args.iter()
+        .filter_map(|(_, p)| match p {
+            TitlePiece::Value(v) => Some(v.clone()),
+            TitlePiece::Text(_) => None,
+        })
+        .collect()
 }
 
 /// **What a page's title reads** (ADR-0183), or its metadata's content

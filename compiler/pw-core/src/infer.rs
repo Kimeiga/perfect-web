@@ -45,7 +45,7 @@
 //! each caller's decision whether to fall back or to stop.
 //! `docs/evidence/P0/readiness.txt` records which ones still fall back.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::hir::{Body, Decl, DeclId, DeclKind, Expr, ExprId, Hir, Node};
 use crate::lexical::{Binder, Lexical};
@@ -71,6 +71,10 @@ pub struct Types<'a> {
     /// nothing, because signatures are stored module-qualified — so a rule
     /// following a helper stopped at the module boundary of its own file.
     module: Option<String>,
+    /// **The callees of a page's address** (ADR-XXXX): `StorePage` in a
+    /// canonical link's `href={StorePage(id)}`, which names a page and runs
+    /// nothing, so no analysis reads it as a call of the page.
+    addresses: BTreeSet<ExprId>,
 }
 
 impl<'a> Types<'a> {
@@ -238,6 +242,13 @@ impl<'a> Types<'a> {
             bindings,
             self_type,
             module: module.map(str::to_string),
+            addresses: crate::canonical::address_calls(body)
+                .into_iter()
+                .filter_map(|e| match body.expr(e) {
+                    Expr::Call { callee, .. } => Some(*callee),
+                    _ => None,
+                })
+                .collect(),
         };
 
         // A REAL type-propagation rule, not adapter knowledge:
@@ -736,6 +747,10 @@ impl<'a> Types<'a> {
     /// The signature a call resolves to, **only** when the receiver's type is
     /// known. Never guesses from a name.
     pub fn callee(&self, body: &Body, callee: ExprId) -> Option<&'a crate::signatures::Signature> {
+        // A page's address calls nothing (ADR-XXXX).
+        if self.addresses.contains(&callee) {
+            return None;
+        }
         if let Some(sig) = self.by_path(&path_of(body, callee)) {
             return Some(sig);
         }

@@ -1,0 +1,25 @@
+// @status: NEIGHBOUR
+// @invariant: canonical_address
+// @dimension: valid neighbour — another page's address, its arguments by name in another order, one of them text
+//
+// A page may name another page's address as its own, and give its
+// arguments by name: the address fills its route in the route's order.
+
+module generality.canonical_named
+
+page Section(store: String, section: String) !{} {
+    route "/stores/{store}/sections/{section}"
+    view {
+        <title>Section</title>
+        <main><h1>{section}</h1></main>
+    }
+}
+
+page Coffee(store: String) !{} {
+    route "/stores/{store}/coffee"
+    view {
+        <title>Coffee</title>
+        <link rel="canonical" href={Section(section: "coffee", store: store)} />
+        <main><h1>Coffee</h1></main>
+    }
+}

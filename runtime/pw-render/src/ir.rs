@@ -224,6 +224,16 @@ pub enum Part {
         key: String,
         content: Vec<TitlePiece>,
     },
+    /// `<link rel="canonical" href={StorePage(id)} />` at the top of a
+    /// page's view (ADR-XXXX): the route of the page it names, and what fills
+    /// each `{name}` of it. Its host writes it into the document's `<head>`,
+    /// absolute with the deployment's origin ([`crate::head_canonical`]), so
+    /// it renders nothing in the body.
+    Canonical {
+        id: PartId,
+        route: String,
+        args: Vec<(String, TitlePiece)>,
+    },
     /// Verbatim bytes.
     ///
     /// Reachable only from a value whose type carries the raw-HTML capability.
@@ -323,7 +333,8 @@ impl Part {
             | Part::Instance { id, .. }
             | Part::RawHtml { id, .. }
             | Part::Title { id, .. }
-            | Part::Meta { id, .. } => *id,
+            | Part::Meta { id, .. }
+            | Part::Canonical { id, .. } => *id,
             Part::Blocked { .. } => return None,
         })
     }
@@ -353,7 +364,7 @@ impl Part {
             | Part::Stream { .. }
             | Part::Instance { .. }
             | Part::RawHtml { .. } => Anchor::Range,
-            Part::Title { .. } | Part::Meta { .. } => Anchor::Document,
+            Part::Title { .. } | Part::Meta { .. } | Part::Canonical { .. } => Anchor::Document,
             Part::Blocked { .. } => return None,
         })
     }
@@ -373,6 +384,7 @@ impl Part {
             Part::RawHtml { .. } => "raw_html",
             Part::Title { .. } => "title",
             Part::Meta { .. } => "meta",
+            Part::Canonical { .. } => "canonical",
             Part::Blocked { .. } => "blocked",
         }
     }
@@ -486,6 +498,15 @@ impl Template {
                         | Part::Meta { content, .. } => content
                             .iter()
                             .filter_map(|p| match p {
+                                TitlePiece::Value(v) => Some(v.as_str()),
+                                TitlePiece::Text(_) => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                        // Every value its address reads, in the route's order.
+                        Part::Canonical { args, .. } => args
+                            .iter()
+                            .filter_map(|(_, p)| match p {
                                 TitlePiece::Value(v) => Some(v.as_str()),
                                 TitlePiece::Text(_) => None,
                             })

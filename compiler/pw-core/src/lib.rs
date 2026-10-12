@@ -28,6 +28,7 @@ pub mod backend;
 pub mod binding;
 pub mod boundary;
 pub mod build;
+pub(crate) mod canonical;
 pub mod capability;
 pub mod check;
 pub mod codes;

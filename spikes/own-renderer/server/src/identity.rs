@@ -70,16 +70,33 @@ impl Deployment {
             }
         };
         let origin = match std::env::var("PW_ORIGIN") {
-            Ok(o) if !o.is_empty() => o.trim_end_matches('/').to_string(),
+            Ok(o) if !o.is_empty() => Deployment::origin_checked(&o)?,
             _ => format!("http://127.0.0.1:{port}"),
         };
-        if !(origin.starts_with("http://") || origin.starts_with("https://")) {
-            return Err(format!("PW_ORIGIN `{origin}` is not an http(s) origin"));
-        }
         Ok(Deployment {
             development,
             origin,
         })
+    }
+
+    /// **`PW_ORIGIN`, read as an origin**: `http` or `https`, a host and a
+    /// port, a trailing `/` dropped. Since ADR-XXXX also nothing after them,
+    /// as the URL Standard's tuple origin has nothing after them: a path, a
+    /// query, a fragment or credentials would be written into every absolute
+    /// address made with it, a page's canonical address among them.
+    pub fn origin_checked(origin: &str) -> Result<String, String> {
+        let origin = origin.trim_end_matches('/').to_string();
+        if !(origin.starts_with("http://") || origin.starts_with("https://")) {
+            return Err(format!("PW_ORIGIN `{origin}` is not an http(s) origin"));
+        }
+        let authority = origin.split_once("://").map_or("", |(_, rest)| rest);
+        if authority.is_empty() || authority.contains(['/', '?', '#', '@']) {
+            return Err(format!(
+                "PW_ORIGIN `{origin}` is not an origin: a scheme, a host and a port, and \
+                 nothing after them"
+            ));
+        }
+        Ok(origin)
     }
 
     /// The origin's host, without its scheme or port.
@@ -1080,6 +1097,36 @@ mod tests {
         assert!(is_verifier(&verifier), "{verifier}");
         assert_eq!(verifier.len(), 43);
         assert_ne!(verifier, token());
+    }
+
+    /// **`PW_ORIGIN` is an origin** (ADR-XXXX): a scheme, a host and a
+    /// port, and nothing after them, which every absolute address the host
+    /// makes is written with.
+    #[test]
+    fn an_origin_is_a_scheme_a_host_and_a_port() {
+        for (given, read) in [
+            ("https://kiokun.com", "https://kiokun.com"),
+            ("https://kiokun.com/", "https://kiokun.com"),
+            ("http://127.0.0.1:3143", "http://127.0.0.1:3143"),
+            ("http://[::1]:3000", "http://[::1]:3000"),
+        ] {
+            assert_eq!(
+                Deployment::origin_checked(given).as_deref(),
+                Ok(read),
+                "{given}"
+            );
+        }
+        for refused in [
+            "kiokun.com",
+            "ftp://kiokun.com",
+            "https://",
+            "https://kiokun.com/app",
+            "https://kiokun.com?a=1",
+            "https://kiokun.com#top",
+            "https://user:pass@kiokun.com",
+        ] {
+            assert!(Deployment::origin_checked(refused).is_err(), "{refused}");
+        }
     }
 
     /// **A session's cookie**: HttpOnly and SameSite=Lax always, Secure

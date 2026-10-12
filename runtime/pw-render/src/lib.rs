@@ -1595,6 +1595,66 @@ pub fn head_metadata(t: &Template, env: &Env) -> Result<String, Blocked> {
     Ok(out)
 }
 
+/// **A page's canonical address, as its head writes it** (ADR-XXXX): the
+/// route of the page it names, each `{name}` filled with its value encoded as
+/// a link's hole is (`url_component`), absolute with `origin`, the
+/// deployment's public origin, never a request's `Host`; and Open Graph's
+/// `og:url` from it. Empty for a template that states none. Refused where a
+/// template states one and its host has no origin, and for a value no segment
+/// can carry (empty, `.` or `..`), as `navigate`'s address refuses one
+/// (ADR-0280).
+pub fn head_canonical(t: &Template, env: &Env, origin: Option<&str>) -> Result<String, Blocked> {
+    let at = || "<link rel=\"canonical\">".to_string();
+    let mut out = String::new();
+    for c in &t.chunks {
+        let Chunk::Dynamic(Part::Canonical { route, args, .. }) = c else {
+            continue;
+        };
+        let Some(origin) = origin else {
+            return Err(Blocked::UnrepresentedConstruct {
+                reason: "a page that states its canonical address is served with the \
+                         deployment's public origin, and this host has none"
+                    .to_string(),
+                at: at(),
+            });
+        };
+        let mut address = route.clone();
+        for (name, piece) in args {
+            let text = match piece {
+                TitlePiece::Text(t) => t.clone(),
+                TitlePiece::Value(path) => {
+                    let v = env
+                        .get(path)
+                        .ok_or(Blocked::MissingValue { path: path.clone() })?;
+                    if let Value::Raw { .. } = v {
+                        return Err(Blocked::UnrepresentedConstruct {
+                            reason: "an address is text, and this value is HTML".to_string(),
+                            at: at(),
+                        });
+                    }
+                    v.as_str()
+                        .ok_or(Blocked::MissingValue { path: path.clone() })?
+                        .to_string()
+                }
+            };
+            if text.is_empty() || text == "." || text == ".." {
+                return Err(Blocked::UnrepresentedConstruct {
+                    reason: format!("`{text}` is no segment of an address"),
+                    at: at(),
+                });
+            }
+            address = address.replace(&format!("{{{name}}}"), &escape::url_component(&text));
+        }
+        let absolute = format!("{}{address}", origin.trim_end_matches('/'));
+        out.push_str(&format!(
+            "<link rel=\"canonical\" href=\"{}\">\n<meta property=\"og:url\" content=\"{}\">\n",
+            escape::attribute(&absolute),
+            escape::attribute(&absolute)
+        ));
+    }
+    Ok(out)
+}
+
 /// **A page's title, as text** (ADR-0183): its text, and each value by its
 /// path, with its whitespace collapsed and trimmed as a browser's
 /// `document.title` reads it. Its host writes it into `<title>`, escaped,
@@ -1768,6 +1828,8 @@ fn emit_part<'o>(
         Part::Title { .. } => Ok(()),
         // And its metadata (`head_metadata`, ADR-0186).
         Part::Meta { .. } => Ok(()),
+        // And its canonical address (`head_canonical`, ADR-XXXX).
+        Part::Canonical { .. } => Ok(()),
 
         Part::Text { id, value, context } => {
             let v = env.get(value).ok_or(Blocked::MissingValue {

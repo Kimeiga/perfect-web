@@ -195,3 +195,12 @@ Recorded by `just e14-metadata` in `docs/evidence/E14/metadata.txt`:
   that an `itemref` names an element.
 - **What a description says.** Its length, and whether it repeats another
   page's, are a person's to judge.
+
+## Amended, 2026-10-12: a canonical address, and `og:url` the host's
+
+The Not claimed's `<link>` in the head is now claimed for a canonical
+address (ADR-XXXX), written after the page's metadata. Open Graph's `og:url`
+is the canonical address by its definition, so the host writes it from the
+page's, and a page's own `<meta property="og:url">` is refused (PW5034), as
+its charset and viewport are. A soft navigation now takes every `<meta>`
+the page states, and not only its description (ADR-0306, amended).
