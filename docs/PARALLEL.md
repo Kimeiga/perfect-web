@@ -1255,3 +1255,24 @@ Each a decision for a track, with its date; a track's ADR records it too.
   kiokun.com's `2391117c`, and the search's evidence recorded again at its
   route. No new ADR: ADR-0314, ADR-0316 and ADR-0293 are amended.
 
+- **2026-10-12, T11's patches merged** (track `t11-patches`, from `f14a107`,
+  verify 38275359848). This closes the integrator's correction in W8's
+  merge entry: `e14-diffs` passes, and `semantic-diffs.txt` is recorded
+  again from a run that passed.
+- **2026-10-12, a merge takes only evidence of what master will hold** (the
+  integrator's ruling, found at narrowing-2's merge).
+  - A head's verify records each recipe over the head's tree. Where master
+    changed that recipe's inputs since the head's merge base,
+    `scripts/ci_plan.py --changed <head> <merge>` plans it. Its file is then
+    evidence of code master will not hold, and is not taken: the track
+    merges master, and its verify records the recipe again.
+  - narrowing-2's run at `853674f` was of such code. Its eight narrowed
+    scripts name server tests, and W8, fixed-arms and W6's packet changed
+    the server and the store after it. It merged master (`bd5c642`), with
+    each of the 33 tests it names still in the suite, and is verified
+    again.
+  - Checked on W6's merge (`0f58f9d`), whose head lacked fixed-arms and W8:
+    its three files hold, since none of their recipes is among the 89 those
+    two changed. The 19 recipes W6's packet changed are recorded again by
+    master's own verify 38282497091, fetched to master once it is green.
+    t11-patches' three files hold the same way.

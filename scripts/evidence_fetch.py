@@ -8,6 +8,9 @@ command produced it (its `produced by:` line, unchanged), at which commit,
 and where it ran, and a reader can open the run and its logs. A recipe run
 here again writes the file without it.
 
+A file a recipe that failed wrote is not copied: its output, never its
+evidence, whether its run's failure is known or not.
+
 Refused, before anything is copied:
 - a run that has not completed, or did not succeed, unless each job that
   failed is one `--known` names: a failure open in NEXT, which a merge names
@@ -106,6 +109,14 @@ def shard_dirs(tmp: pathlib.Path) -> list[pathlib.Path]:
     return sorted(tmp.glob("evidence-*")) or ([tmp] if (tmp / "evidence").is_dir() else [])
 
 
+def failed_files(results: list[dict]) -> set[str]:
+    """Each file a recipe wrote that did not run to its end: its output, never
+    its evidence. Until 2026-10-12 a run fetched with `--known summary` copied
+    it with the rest, and W8's merge took `e14-diffs`' output stopped at a
+    patch that did not apply."""
+    return {w for r in results if r.get("status") != 0 for w in r.get("wrote", [])}
+
+
 def results_of(shards: list[pathlib.Path]) -> list[dict]:
     out = []
     for shard in shards:
@@ -146,12 +157,16 @@ def main() -> int:
         staged: dict[pathlib.Path, bytes] = {}
         refused = []
         shards = shard_dirs(pathlib.Path(tmp))
+        failed = failed_files(results_of(shards))
         for shard in shards:
             runner = (shard / "runner.txt").read_text().strip() if (shard / "runner.txt").exists() else "a GitHub-hosted runner"
             for f in sorted((shard / "evidence").rglob("*")):
                 if not f.is_file():
                     continue
                 rel = f.relative_to(shard / "evidence")
+                if str(rel) in failed:
+                    print(f"  not copied, its recipe failed: {rel}")
+                    continue
                 if rel.suffix != ".txt":
                     staged[ROOT / rel] = f.read_bytes()
                     continue
