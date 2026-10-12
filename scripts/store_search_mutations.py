@@ -14,7 +14,9 @@ Each mutant undoes one piece:
   stores that matched; stores by id before name; dishes left in their
   menu's order; every dish listed; the stores past twenty not counted;
 - the operation: a declared case misnamed; the operation not registered
-  where the layers' catalogue is (the seam in `store.rs`);
+  where the layers' catalogue is (the seam in `store.rs`); a menu change's
+  route telling no session whose open page reads a search (the seam in
+  `main.rs`);
 - the program (`examples/store/search.pw`): a long text told as a blank
   one; a store's dishes not shown; a search kept past a menu's change;
 - PostgreSQL: `%`, `_` or `\\` not escaped in a term's pattern; the layer's
@@ -43,6 +45,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SEARCH = ROOT / "spikes/own-renderer/server/src/search.rs"
 STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 STORE_PG = ROOT / "spikes/own-renderer/server/src/store_pg.rs"
+SERVER_RS = ROOT / "spikes/own-renderer/server/src/main.rs"
 MIGRATION = ROOT / "spikes/own-renderer/server/migrations/store/0010_search.sql"
 PROGRAM = ROOT / "examples/store/search.pw"
 
@@ -170,6 +173,13 @@ MUTANTS = [
         STORE_DATA,
         "    ops.extend(crate::search::ops(with.clone())); // TRACK SEAM (store-search)\n",
         "\n",
+    ),
+    (
+        "a menu change's route tells no page reading a search",
+        "server",
+        SERVER_RS,
+        "                    String::new(),\n                    reached\n",
+        "                    String::new(),\n                    Vec::<String>::new()\n",
     ),
     # --- the program ----------------------------------------------------------------
     (

@@ -152,3 +152,35 @@ fn a_menu_change_reaches_a_kept_search() {
     );
     assert_eq!(html.matches("href=\"/stores/47\"").count(), 2, "{html}");
 }
+
+/// **A search page open when a menu changes is told** (ADR-0219): the
+/// change's route drops the kept search, and each session whose open page
+/// reads it is sent the dish found, where until track `store-search` a
+/// query a menu change reached was told to the store's own pages alone.
+#[test]
+fn an_open_search_page_is_told_of_a_menu_change() {
+    let s = served();
+    let params = Params::from([("q".to_string(), "flat white".to_string())]);
+    let (html, _, _, _) = s
+        .serve_document_settled("a", "store.search.SearchPage", &params, &[])
+        .expect("served");
+    assert!(
+        visible(&html).contains("No stores or dishes match"),
+        "{html}"
+    );
+    let doc = latest(&s.pending.lock().expect("pending"), "a");
+    let before = sets_of(&s, &doc).len();
+    let answer = posted(
+        &s,
+        "/command/menu?op=insert_after&id=flat-white&name=Flat%20White",
+        "b",
+        "menu-1",
+        "",
+    );
+    assert!(answer.starts_with("HTTP/1.1 202"), "{answer}");
+    let sets = sets_of(&s, &doc);
+    assert!(sets.len() > before, "the open page is told");
+    let told = format!("{:?}", &sets[before..]);
+    assert!(told.contains("Flat White"), "{told}");
+    assert!(told.contains("1 store matches"), "{told}");
+}

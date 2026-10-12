@@ -4163,7 +4163,17 @@ impl Server {
             &args,
             std::slice::from_ref(&event),
             |delivered| {
-                self.invalidate_queries("", &[], delivered);
+                let reached = self.invalidate_queries("", &[], delivered);
+                // TRACK SEAM (store-search): what the change dropped that the
+                // store's page does not read (a search), told to each session
+                // reading it (ADR-0219); the store's pages get the patches below.
+                self.telling.lock().expect("telling").push((
+                    String::new(),
+                    reached
+                        .into_iter()
+                        .filter(|r| !self.reads_any(self.store_page(), std::slice::from_ref(r)))
+                        .collect(),
+                ));
             },
         )?;
 
