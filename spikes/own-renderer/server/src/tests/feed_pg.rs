@@ -140,6 +140,42 @@ fn post(s: &Server, session: &str, text: &str, interaction: &str) -> Answered {
     .expect("runs")
 }
 
+/// **An interaction's answer outlives its host, on the feed too**
+/// (ADR-XXXX): a post committed on one host, and sent again to a host
+/// started after it over the same schema, is answered as the first was, and
+/// the feed holds the one post. Until ADR-XXXX the second posted it again.
+#[test]
+fn on_postgres_a_posts_interaction_outlives_its_host() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "outlives");
+    let host = || {
+        let layer = FeedPg::open(&url, Some(&db.name)).expect("the layer");
+        let (dir, out) = built_feed_with(|app| app.to_string());
+        let server =
+            Server::from_build_with(out.clone(), out, Some(Arc::new(layer))).expect("served");
+        Served { server, _dir: dir }
+    };
+    let first = {
+        let s = host();
+        posted(&s, "/command/feed.app.post", "a", "i-1", "[\"Once\"]")
+    };
+    assert!(first.contains("\"committed\":true"), "{first}");
+    let posts = db.count("SELECT count(*) FROM posts");
+    let s = host();
+    let again = posted(&s, "/command/feed.app.post", "a", "i-1", "[\"Once\"]");
+    assert!(again.contains("\"committed\":true"), "{again}");
+    assert_eq!(
+        db.count("SELECT count(*) FROM posts"),
+        posts,
+        "the one post"
+    );
+    assert_eq!(
+        db.count("SELECT count(*) FROM interactions"),
+        1,
+        "its record, committed with it"
+    );
+}
+
 fn thread_of(id: &str) -> Params {
     Params::from([("id".to_string(), id.to_string())])
 }

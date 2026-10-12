@@ -879,6 +879,11 @@ struct Server {
     /// once: a commit there is the race the apply is held against.
     #[cfg(test)]
     keyed_fetched: Mutex<Option<KeyedFetched>>,
+    /// **What a test does before a command commits** (ADR-XXXX), once: a
+    /// commit of the same interaction there, by another host, is the race its
+    /// record is held against.
+    #[cfg(test)]
+    before_commit: Mutex<Option<KeyedFetched>>,
     /// **What a test does while a change is derived outside the table**
     /// (ADR-0296), for each document derived: the table is free there, and
     /// a change that reaches the document there is derived against again.
@@ -959,6 +964,11 @@ struct Server {
 /// an interaction older than this many later ones runs again: the bound's
 /// cost, stated rather than unbounded memory.
 const INTERACTIONS_PER_SESSION: usize = 64;
+
+/// **How long an interaction's committed record answers a retry** (ADR-XXXX):
+/// a day, as Stripe keeps an idempotency key at least 24 hours. A retry
+/// later than that is a new request.
+const INTERACTIONS_KEPT_MS: u64 = 24 * 60 * 60 * 1000;
 
 /// The semantic identity of one session's cart.
 ///
@@ -1610,6 +1620,8 @@ impl Server {
             #[cfg(test)]
             keyed_fetched: Mutex::new(None),
             #[cfg(test)]
+            before_commit: Mutex::new(None),
+            #[cfg(test)]
             deriving_hook: Mutex::new(None),
             #[cfg(test)]
             told_rendered: Mutex::new(None),
@@ -2122,7 +2134,22 @@ impl Server {
         args: &[Val],
         interaction: Option<&str>,
     ) -> Result<Answered, String> {
-        let (answered, dropped) = self.command_held(component_id, session, args, interaction)?;
+        self.command_recorded(component_id, session, args, interaction, None)
+    }
+
+    /// [`Server::command_answered`], an idempotent command's answer committed
+    /// with its writes by its interaction's key and the arguments it was sent
+    /// with (ADR-XXXX).
+    fn command_recorded(
+        &self,
+        component_id: &str,
+        session: &str,
+        args: &[Val],
+        interaction: Option<&str>,
+        record: Option<(&str, &str)>,
+    ) -> Result<Answered, String> {
+        let (answered, dropped) =
+            self.command_held(component_id, session, args, interaction, record)?;
         // Every other session holding what the commit dropped is told after
         // the author is answered (ADR-0219), so a post's answer does not
         // wait on every reader.
@@ -2145,13 +2172,16 @@ impl Server {
     }
 
     /// [`Server::command_answered`] within the session's hold, and what its
-    /// commit dropped that other sessions may hold (ADR-0219).
+    /// commit dropped that other sessions may hold (ADR-0219). `record` is an
+    /// idempotent command's interaction, by its key and the arguments it was
+    /// sent with: its answer is committed with its writes (ADR-XXXX).
     fn command_held(
         &self,
         component_id: &str,
         session: &str,
         args: &[Val],
         interaction: Option<&str>,
+        record: Option<(&str, &str)>,
     ) -> Result<(Answered, Vec<Reached>), String> {
         // The session's one change at a time, through its frames (ADR-0172).
         let session_lock = self.one_at_a_time(session);
@@ -2202,9 +2232,50 @@ impl Server {
                 let staged = staged_events.lock().expect("staged");
                 (staged.events.clone(), staged.invalidated.clone())
             };
-            let Some(((emitted, invalidated), ids)) =
-                self.commit_staged(&mut *staging, &emitted, &invalidated)?
-            else {
+            // **Its answer, committed with its writes** (ADR-XXXX): what a
+            // retry of its interaction is answered, here after a restart or on
+            // another host, kept a day.
+            let answer = Answered {
+                committed: true,
+                result: result.clone(),
+                why: None,
+                refused: None,
+            }
+            .kept();
+            let now = u64::try_from(self.now()).unwrap_or_default();
+            let recorded = record.map(|(key, sent)| data::Recorded {
+                key,
+                sent,
+                answer: &answer,
+                at_ms: now,
+                forget_before_ms: now.saturating_sub(INTERACTIONS_KEPT_MS),
+            });
+            #[cfg(test)]
+            if let Some(hook) = self.before_commit.lock().expect("before commit").take() {
+                hook(self);
+            }
+            let committed = match self.commit_staged(
+                &mut *staging,
+                &emitted,
+                &invalidated,
+                recorded.as_ref(),
+            ) {
+                Ok(committed) => committed,
+                // **Recorded first by another host** (ADR-XXXX): the same
+                // interaction committed there, and its record holds the key.
+                // This commit rolled back, and the interaction is answered
+                // as the first was.
+                Err(why) => match record {
+                    Some((key, sent)) => match self.recalled_interaction(key)? {
+                        Some((first, answer)) if first == sent => {
+                            return Ok((Answered::from_kept(&answer), Vec::new()));
+                        }
+                        _ => return Err(why),
+                    },
+                    None => return Err(why),
+                },
+            };
+            let Some(((emitted, invalidated), ids)) = committed else {
                 // Nothing was written, so there is nothing to commit.
                 let answered = Answered {
                     committed: true,
@@ -2277,6 +2348,7 @@ impl Server {
         staging: &mut dyn data::Staged,
         emitted: &[data::Handed],
         invalidated: &[data::Dropped],
+        interaction: Option<&data::Recorded<'_>>,
     ) -> Result<Option<(data::Outboxed, Vec<i64>)>, String> {
         let Some(rows) = staging.rows() else {
             return Ok(None);
@@ -2285,7 +2357,7 @@ impl Server {
             .iter()
             .map(|(event, values)| outboxed(event, values))
             .collect::<Result<Vec<_>, String>>()?;
-        let (delivered, ids) = match staging.commit(emitted, invalidated)? {
+        let (delivered, ids) = match staging.commit(emitted, invalidated, interaction)? {
             Some(committed) => {
                 let mut ids = Vec::new();
                 if self.data.session_entry() {
@@ -2313,10 +2385,15 @@ impl Server {
             }
             None => {
                 // The state the data layer staged and the outbox's events, in
-                // one transaction (ADR-0019, ADR-0208).
+                // one transaction (ADR-0019, ADR-0208); and the interaction's
+                // answer, where the command has one (ADR-XXXX).
                 let ids = self.materializer.command(|tx| {
                     for (key, value) in &rows {
                         Materializer::set_state(tx, key, value);
+                    }
+                    if let Some(r) = interaction {
+                        Materializer::prune_interactions(tx, r.forget_before_ms);
+                        Materializer::record_interaction(tx, r.key, r.sent, r.answer, r.at_ms)?;
                     }
                     Ok::<_, String>(events)
                 })?;
@@ -2359,7 +2436,8 @@ impl Server {
             }
             other => return Err(format!("{op} answered {other:?}")),
         };
-        let Some(((delivered, _), ids)) = self.commit_staged(&mut *staging, events, &[])? else {
+        let Some(((delivered, _), ids)) = self.commit_staged(&mut *staging, events, &[], None)?
+        else {
             return Ok(answer);
         };
         drop(staging);
@@ -2531,6 +2609,17 @@ impl Server {
         }
         let key = format!("{session}\u{1f}{component_id}\u{1f}{id}");
         let sent = serde_json::Value::Array(json.to_vec()).to_string();
+        // **A committed record answers it** (ADR-XXXX): sent again after the
+        // host restarted, past the session's last 64, or to another host, the
+        // interaction is answered as it was, and nothing runs.
+        if let Some((first, answer)) = self.recalled_interaction(&key)? {
+            if first != sent {
+                return Err(format!(
+                    "interaction `{id}` was first sent with other arguments"
+                ));
+            }
+            return Ok(Answered::from_kept(&answer));
+        }
         {
             let mut held = self.interactions.lock().expect("interactions");
             let queue = held.entry(session.to_string()).or_default();
@@ -2542,7 +2631,7 @@ impl Server {
                 }
                 Some(_) => {}
                 None => {
-                    queue.push_back((key.clone(), sent));
+                    queue.push_back((key.clone(), sent.clone()));
                     while queue.len() > INTERACTIONS_PER_SESSION {
                         if let Some((oldest, _)) = queue.pop_front() {
                             self.commands.forget_command(&oldest);
@@ -2554,10 +2643,32 @@ impl Server {
         let outcome = self
             .commands
             .try_command(&key, || {
-                answered(self.command_answered(component_id, session, &args, Some(id))).kept()
+                answered(self.command_recorded(
+                    component_id,
+                    session,
+                    &args,
+                    Some(id),
+                    Some((&key, &sent)),
+                ))
+                .kept()
             })
             .map_err(|e| format!("interaction `{id}`'s outcome is unknown: {e:?}"))?;
         Ok(Answered::from_kept(&outcome))
+    }
+
+    /// **An interaction's committed record** (ADR-XXXX), kept a day on the
+    /// host's clock: the arguments it was sent with and its answer, from the
+    /// data layer that keeps it beside its writes, or the host's
+    /// materializer. One older is a new request's, pruned or not.
+    fn recalled_interaction(&self, key: &str) -> Result<Option<(String, String)>, String> {
+        let since = u64::try_from(self.now())
+            .unwrap_or_default()
+            .saturating_sub(INTERACTIONS_KEPT_MS);
+        if self.data.keeps_interactions() {
+            self.data.recalled(key, since)
+        } else {
+            Ok(self.materializer.recalled(key, since))
+        }
     }
 
     /// **Whether the session's next command connection is dropped, and
@@ -12909,7 +13020,7 @@ public query Store(",
         }
         assert_eq!(s.cart_value("session-b"), presses as i64);
         assert_eq!(s.commands.commands_held(), INTERACTIONS_PER_SESSION);
-        // The newest is still recognised; the oldest is the bound's cost.
+        // The newest is still recognised in memory.
         s.command_json(
             ADD,
             "session-b",
@@ -12919,6 +13030,51 @@ public query Store(",
         .expect("well-formed")
         .expect("its first outcome");
         assert_eq!(s.cart_value("session-b"), presses as i64);
+        // **And the oldest, by its record committed with its writes**
+        // (ADR-XXXX): the bound is the reservations' alone. Until ADR-XXXX it
+        // was the bound's cost, and the cart took a line more.
+        s.command_json(ADD, "session-b", &espresso, Some("p0"))
+            .expect("well-formed")
+            .expect("its first outcome, from its record");
+        assert_eq!(s.cart_value("session-b"), presses as i64);
+        // Sent with other arguments, it is refused, as in memory (ADR-0121).
+        let other = [shown("cortado"), serde_json::json!(1)];
+        let refused = s
+            .command_json(ADD, "session-b", &other, Some("p0"))
+            .expect_err("another request under the same interaction");
+        assert!(
+            refused.contains("first sent with other arguments"),
+            "{refused}"
+        );
+        assert_eq!(s.cart_value("session-b"), presses as i64);
+    }
+
+    /// **An interaction's record answers it for a day** (ADR-XXXX): past the
+    /// session's 64 in memory, the oldest is answered by its record within
+    /// the day, and is a new request a day and a minute later, as a key
+    /// Stripe has pruned is.
+    #[test]
+    fn an_interactions_record_answers_it_for_a_day() {
+        let s = rendering_server();
+        let espresso = [shown("espresso"), serde_json::json!(1)];
+        let presses = INTERACTIONS_PER_SESSION + 1;
+        for i in 0..presses {
+            s.command_json(ADD, "session-d", &espresso, Some(&format!("d{i}")))
+                .expect("well-formed")
+                .expect("committed");
+        }
+        // Within the day: its record answers, and nothing runs again.
+        posted(&s, "/bench/clock?advance=82800000", "clock", "c-1", "");
+        s.command_json(ADD, "session-d", &espresso, Some("d0"))
+            .expect("well-formed")
+            .expect("its first outcome, from its record");
+        assert_eq!(s.cart_value("session-d"), presses as i64);
+        // A day and a minute after it was recorded: a new request, which runs.
+        posted(&s, "/bench/clock?advance=3660000", "clock", "c-2", "");
+        s.command_json(ADD, "session-d", &espresso, Some("d0"))
+            .expect("well-formed")
+            .expect("committed again");
+        assert_eq!(s.cart_value("session-d"), presses as i64 + 1);
     }
 
     #[test]

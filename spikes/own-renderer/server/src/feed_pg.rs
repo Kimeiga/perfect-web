@@ -51,6 +51,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0007_messages",
         include_str!("../migrations/feed/0007_messages.sql"),
     ),
+    // ADR-XXXX: an interaction's answer, committed with its writes.
+    (
+        "0008_interactions",
+        include_str!("../migrations/feed/0008_interactions.sql"),
+    ),
 ];
 
 /// **How a command's transaction is opened.** The layer sets serializable on
@@ -729,6 +734,7 @@ impl crate::data::Staged for Staging<'_> {
         &mut self,
         events: &[Handed],
         invalidated: &[Dropped],
+        interaction: Option<&crate::data::Recorded<'_>>,
     ) -> Result<Option<Outboxed>, String> {
         let mut conn = self.conn.lock().expect("the command's connection");
         let c = conn
@@ -769,6 +775,10 @@ impl crate::data::Staged for Staging<'_> {
         // before its row commits, so no committed post names bytes the
         // deployment does not have.
         self.claims.lock().expect("claims").keep()?;
+        // **The interaction's answer, with the writes** (ADR-XXXX).
+        if let Some(r) = interaction {
+            record(c, r)?;
+        }
         c.batch_execute("COMMIT").map_err(pg)?;
         self.committed = true;
         // Track `uploads`: each lease the command committed or discarded
@@ -802,6 +812,38 @@ impl crate::data::Staged for Staging<'_> {
 }
 
 /// **Whether a committed post names the blob `key`** (ADR-0261).
+/// **An interaction's record, in its command's transaction** (ADR-XXXX):
+/// those recorded more than a day before forgotten, then this one. A key
+/// recorded already, by another host, refuses it, and the command's
+/// transaction rolls back.
+pub(crate) fn record(c: &mut Client, r: &crate::data::Recorded<'_>) -> Result<(), String> {
+    let before = i64::try_from(r.forget_before_ms).unwrap_or(i64::MAX);
+    let at = i64::try_from(r.at_ms).unwrap_or(i64::MAX);
+    c.execute("DELETE FROM interactions WHERE at_ms < $1", &[&before])
+        .map_err(pg)?;
+    c.execute(
+        "INSERT INTO interactions (key, sent, answer, at_ms) VALUES ($1, $2, $3, $4)",
+        &[&r.key, &r.sent, &r.answer, &at],
+    )
+    .map_err(|e| format!("interaction not recorded: {}", pg(e)))?;
+    Ok(())
+}
+
+/// **An interaction's committed record** (ADR-XXXX), recorded at
+/// `since_ms` or later: the arguments it was sent with, and its answer.
+pub(crate) fn recalled(
+    c: &mut Client,
+    key: &str,
+    since_ms: u64,
+) -> Result<Option<(String, String)>, postgres::Error> {
+    let since = i64::try_from(since_ms).unwrap_or(i64::MAX);
+    Ok(c.query_opt(
+        "SELECT sent, answer FROM interactions WHERE key = $1 AND at_ms >= $2",
+        &[&key, &since],
+    )?
+    .map(|row| (row.get(0), row.get(1))))
+}
+
 fn names_blob(c: &mut Client, key: &str) -> Result<bool, postgres::Error> {
     c.query_one(
         "SELECT EXISTS (SELECT 1 FROM posts WHERE image_key = $1)",
@@ -884,6 +926,14 @@ impl crate::data::DataLayer for FeedPg {
 
     fn names_blob(&self, key: &str) -> Result<bool, String> {
         self.pool.with(|c| names_blob(c, key))
+    }
+
+    fn keeps_interactions(&self) -> bool {
+        true
+    }
+
+    fn recalled(&self, key: &str, since_ms: u64) -> Result<Option<(String, String)>, String> {
+        self.pool.with(|c| recalled(c, key, since_ms))
     }
 
     fn identified_by(&self, principals: Principals) {

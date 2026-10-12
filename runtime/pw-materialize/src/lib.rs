@@ -327,7 +327,14 @@ impl Materializer {
                  id    INTEGER PRIMARY KEY AUTOINCREMENT,
                  event TEXT NOT NULL,
                  args  TEXT NOT NULL
-             );",
+             );
+             CREATE TABLE interactions (
+                 key    TEXT PRIMARY KEY,
+                 sent   TEXT NOT NULL,
+                 answer TEXT NOT NULL,
+                 at_ms  INTEGER NOT NULL
+             );
+             CREATE INDEX interactions_at ON interactions (at_ms);",
         )
         .expect("schema");
         Materializer {
@@ -456,6 +463,49 @@ impl Materializer {
             params![name, value],
         )
         .expect("state write");
+    }
+
+    /// **An interaction's answer, recorded in a command's transaction**
+    /// (ADR-XXXX): its key, the arguments it was sent with, and what it
+    /// answered, at `at_ms` on the host's clock. Committed with the command's
+    /// state and events, or with none of them. A key recorded already is an
+    /// error, and the transaction is the caller's to roll back.
+    pub fn record_interaction(
+        tx: &rusqlite::Transaction<'_>,
+        key: &str,
+        sent: &str,
+        answer: &str,
+        at_ms: u64,
+    ) -> Result<(), String> {
+        tx.execute(
+            "INSERT INTO interactions (key, sent, answer, at_ms) VALUES (?1, ?2, ?3, ?4)",
+            params![key, sent, answer, at_ms as i64],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("interaction `{key}` not recorded: {e}"))
+    }
+
+    /// **The interactions recorded before `before_ms` forgotten**, in a
+    /// command's transaction (ADR-XXXX): a retry of one is a new request.
+    pub fn prune_interactions(tx: &rusqlite::Transaction<'_>, before_ms: u64) {
+        tx.execute(
+            "DELETE FROM interactions WHERE at_ms < ?1",
+            params![before_ms as i64],
+        )
+        .expect("interactions pruned");
+    }
+
+    /// **An interaction's committed record** (ADR-XXXX), recorded at
+    /// `since_ms` or later: the arguments it was sent with, and what it
+    /// answered. One older is forgotten, pruned or not.
+    pub fn recalled(&self, key: &str, since_ms: u64) -> Option<(String, String)> {
+        let db = self.db();
+        db.query_row(
+            "SELECT sent, answer FROM interactions WHERE key = ?1 AND at_ms >= ?2",
+            params![key, since_ms as i64],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+        )
+        .ok()
     }
 
     /// Read a state value, for tests that check the state and the outbox agree.

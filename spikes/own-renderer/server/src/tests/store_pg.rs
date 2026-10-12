@@ -346,6 +346,125 @@ fn on_postgres_a_retried_interaction_runs_its_command_once() {
     );
 }
 
+/// **Hosts over one database, its layer kept between them** (ADR-XXXX):
+/// each built as a host is when it starts, with nothing of the others in its
+/// memory.
+fn hosts(url: &str) -> (Arc<StorePg>, impl Fn() -> Server, tempfile::TempDir) {
+    let layer = Arc::new(StorePg::for_test(url).expect("the layer"));
+    let (dir, out) = built_from_patches_in("examples", |app| app.to_string(), &[]);
+    let kept = layer.clone();
+    let host = move || {
+        Server::from_build_layers(out.clone(), out.clone(), None, Some(kept.clone()))
+            .expect("served on PostgreSQL")
+    };
+    (layer, host, dir)
+}
+
+/// **An interaction's answer outlives its host** (ADR-XXXX): committed on
+/// one host, the same interaction sent to a host started after it over the
+/// same database is answered as the first was, and the cart holds the one
+/// line; sent there with other arguments, it is refused. Until ADR-XXXX the
+/// record was the first host's memory, and the second ran it again: two.
+#[test]
+fn on_postgres_an_interactions_answer_outlives_its_host() {
+    let Some(url) = database() else { return };
+    let (_layer, host, _dir) = hosts(&url);
+    let request = [shown("espresso"), serde_json::json!(1)];
+    let first = {
+        let s = host();
+        s.command_answer(ADD, "a", &request, Some("press-1"))
+            .expect("a well-formed request")
+    };
+    assert!(first.committed, "{first:?}");
+    let s = host();
+    let again = s
+        .command_answer(ADD, "a", &request, Some("press-1"))
+        .expect("a well-formed request");
+    assert_eq!(again, first, "the first host's answer");
+    assert_eq!(s.cart_lines("a"), [("espresso".to_string(), 1)]);
+    let other = [shown("cortado"), serde_json::json!(1)];
+    let refused = s
+        .command_answer(ADD, "a", &other, Some("press-1"))
+        .expect_err("another request under the same interaction");
+    assert!(
+        refused.contains("first sent with other arguments"),
+        "{refused}"
+    );
+    assert_eq!(s.cart_lines("a"), [("espresso".to_string(), 1)]);
+}
+
+/// **A record answers a day** (ADR-XXXX): on a host started after the
+/// first, its clock a day and a minute past the record, the same interaction
+/// is a new request. It runs, and its commit forgets the old record in its
+/// own transaction, so the new one takes its key.
+#[test]
+fn on_postgres_an_interactions_record_answers_a_day() {
+    let Some(url) = database() else { return };
+    let (_layer, host, _dir) = hosts(&url);
+    let request = [shown("espresso"), serde_json::json!(1)];
+    {
+        let s = host();
+        let first = s
+            .command_answer(ADD, "a", &request, Some("press-1"))
+            .expect("a well-formed request");
+        assert!(first.committed, "{first:?}");
+    }
+    let s = host();
+    posted(&s, "/bench/clock?advance=86460000", "clock", "c-1", "");
+    let again = s
+        .command_answer(ADD, "a", &request, Some("press-1"))
+        .expect("a well-formed request");
+    assert!(again.committed, "{again:?}");
+    assert_eq!(s.cart_lines("a"), [("espresso".to_string(), 2)]);
+}
+
+/// **Two hosts, one interaction** (ADR-XXXX): while the second runs it, the
+/// first commits the same interaction, and the second's commit meets the
+/// first's record by its key. It rolls back, writes nothing, and answers as
+/// the first did. The first is played by its record alone, committed from
+/// beside: the first's cart writes would wait on the second's.
+#[test]
+fn on_postgres_a_second_hosts_commit_answers_what_the_first_committed() {
+    let Some(url) = database() else { return };
+    let (layer, host, _dir) = hosts(&url);
+    let s = host();
+    let request = [shown("espresso"), serde_json::json!(1)];
+    let key = format!("a\u{1f}{ADD}\u{1f}press-1");
+    let sent = serde_json::Value::Array(request.to_vec()).to_string();
+    let first = r#"{"committed":true,"why":null,"refused":null,"result":{"first":true}}"#;
+    {
+        let (layer, key, sent) = (layer.clone(), key.clone(), sent.clone());
+        *s.before_commit.lock().expect("hook") = Some(Box::new(move |_: &Server| {
+            layer
+                .sql()
+                .execute(
+                    "INSERT INTO interactions (key, sent, answer, at_ms) VALUES ($1, $2, $3, $4)",
+                    &[&key, &sent, &first, &i64::MAX],
+                )
+                .expect("the first host's record");
+        }));
+    }
+    let answered = s
+        .command_answer(ADD, "a", &request, Some("press-1"))
+        .expect("a well-formed request");
+    assert_eq!(
+        answered,
+        Answered::from_kept(first),
+        "the first host's answer"
+    );
+    assert_eq!(
+        s.cart_lines("a"),
+        Vec::<(String, i64)>::new(),
+        "nothing written"
+    );
+    let held = layer
+        .sql()
+        .query_one("SELECT count(*) FROM interactions WHERE key = $1", &[&key])
+        .expect("counted")
+        .get::<_, i64>(0);
+    assert_eq!(held, 1, "one record, the first's");
+}
+
 /// **An order keeps its lines on PostgreSQL** (ADR-0193), and every event
 /// a commit staged is consumed once delivered: after orders are placed and
 /// moved along, neither the database's outbox nor the materializer's holds

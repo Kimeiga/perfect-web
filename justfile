@@ -3118,6 +3118,34 @@ e14-store-postgres:
      } > docs/evidence/E14/store-postgres.txt; \
      grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/store-postgres.txt
 
+# ADR-XXXX: an interaction's answer commits with its writes (NEXT 5). The
+# host's records in memory, the store's and the feed's on PostgreSQL, a host
+# started after another, and two hosts at once; the materializer's own; and
+# the mutation controls (scripts/interactions_mutations.py). Needs
+# PW_STORE_DATABASE_URL, a throwaway database (each test uses a schema of its
+# own and drops it), or PW_FEED_DATABASE_URL; skips without one.
+e14-interactions:
+    @url="${PW_STORE_DATABASE_URL:-${PW_FEED_DATABASE_URL:-}}"; \
+     if [ -z "$url" ]; then \
+       echo "e14-interactions: skipped, PW_STORE_DATABASE_URL is not set (a throwaway PostgreSQL database, e.g. postgresql://localhost/pw_store_test)"; \
+       exit 0; \
+     fi; \
+     export PW_STORE_DATABASE_URL="$url" PW_FEED_DATABASE_URL="$url"; \
+     mkdir -p docs/evidence/E14; \
+     { echo "ADR-XXXX - an interaction's answer commits with its writes"; echo; \
+       echo "produced by: just e14-interactions"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "postgres: $(psql "$url" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)')"; echo; \
+       echo "== the materializer's record (runtime/pw-materialize)"; echo; \
+       cargo test --locked -p pw-materialize 2>&1 | grep -E '^test result|panicked at'; \
+       echo; echo "== the host's records, in memory, and on PostgreSQL (store_pg.rs, feed_pg.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- interactions_kept_are_bounded_per_session an_interactions_record_answers_it_for_a_day on_postgres_an_interactions_answer_outlives_its_host on_postgres_a_second_hosts_commit_answers_what_the_first_committed on_postgres_an_interactions_record_answers_a_day on_postgres_a_retried_interaction_runs_its_command_once on_postgres_a_posts_interaction_outlives_its_host 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/interactions_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/interactions_mutations.py; \
+     } > docs/evidence/E14/interactions.txt; \
+     grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/interactions.txt
+
 # ADR-0219: what a commit drops reaches every session that reads it
 e14-cross-session:
     @mkdir -p docs/evidence/E14
