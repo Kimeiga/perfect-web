@@ -5764,6 +5764,55 @@ e14-canonical:
      } > docs/evidence/E14/canonical.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at|corpus-check" docs/evidence/E14/canonical.txt
 
+# ADR-0312: a page and its layout show one entry by one value. The
+# speculation module's binding and its alias, run under Node, the host's one
+# entry, the layout's count in three engines, and the mutation controls.
+e14-one-entry:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0312 - a page and its layout show one entry by one value"; echo; \
+       echo "produced by: just e14-one-entry"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the store's page's module: one binding, its layout's name an alias (compiler/pw-core/tests/layouts.rs)"; echo; \
+       cargo test --locked -p pw-core --test layouts 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the module run under Node (compiler/pw-conformance/tests/speculation.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test speculation 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host: one entry for the store's cart"; echo; \
+       cargo test --locked -p pw-dev-server -- a_page_and_its_layout_show_one_entry_by_one_value 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the layout's count, in three engines (e2e/layouts.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/layouts.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/one_entry_mutations.py)"; echo; \
+       python3 scripts/one_entry_mutations.py; \
+     } > docs/evidence/E14/one-entry.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/one-entry.txt
+
+# ADR-0317: a component is compiled once a process. The host's cache
+# (runtime/pw-host/tests/compiled_once.rs, the engine's proposals), the
+# conformance harness that reads a component's imports from it, the
+# development server's suite whole at four tests at once against ADR-0292's
+# bound (scripts/suite_memory.py), and the mutation controls.
+e14-compiled-once:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0317 - a component is compiled once a process"; echo; \
+       echo "produced by: just e14-compiled-once"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== compiled once, its imports read from it (runtime/pw-host/tests/compiled_once.rs, engine_proposals.rs)"; echo; \
+       cargo test --locked -p pw-host --features engine --test compiled_once --test engine_proposals 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the conformance harness (compiler/pw-conformance)"; echo; \
+       cargo test --locked -p pw-conformance 2>&1 | grep -E '^test result|panicked at'; \
+       echo; echo "== the development server's suite, whole, four tests at once (scripts/suite_memory.py)"; echo; \
+       python3 scripts/suite_memory.py --threads 4; \
+       echo; echo "== mutation controls (scripts/compiled_once_mutations.py)"; echo; \
+       python3 scripts/compiled_once_mutations.py; \
+     } > docs/evidence/E14/compiled-once.txt
+    @grep -E "^test result|mutants killed|panicked at|peak resident|within the bound|OVER THE BOUND|^wall" docs/evidence/E14/compiled-once.txt
+
 # ADR-XXXX: a block is told part by part while its arm stays. The plan names
 # each block at the top of a page that renders a query's value, whatever
 # decides it (compiler/pw-core/tests/blocks_that_render_a_query.rs); a host

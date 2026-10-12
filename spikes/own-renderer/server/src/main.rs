@@ -1116,10 +1116,10 @@ fn components() -> BTreeMap<String, Loaded> {
                 path.display()
             )
         });
-        let imports = pw_host::engine::imports_of(&bytes)
-            .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        // Compiled once, its imports read from it (ADR-0317).
         let prepared = pw_host::engine::Prepared::compile(&bytes)
             .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let imports = prepared.imports();
         out.insert(id.to_string(), Loaded { prepared, imports });
     }
     out
@@ -1154,10 +1154,10 @@ fn components_in(dir: &std::path::Path) -> Result<BTreeMap<String, Loaded>, Stri
             continue;
         };
         let bytes = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let imports =
-            pw_host::engine::imports_of(&bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+        // Compiled once, its imports read from it (ADR-0317).
         let prepared = pw_host::engine::Prepared::compile(&bytes)
             .map_err(|e| format!("{}: {e}", path.display()))?;
+        let imports = prepared.imports();
         out.insert(id.to_string(), Loaded { prepared, imports });
     }
     Ok(out)
@@ -15181,6 +15181,34 @@ public query Store(",
             .expect("added");
         let told: String = sets_of(&s, &doc).iter().map(written).collect();
         assert_eq!(told, "2", "the header's count, and nothing else");
+    }
+
+    /// **One entry, one value** (ADR-0312): the store's page and its layout
+    /// both show the session's cart, and its document carries it once, by
+    /// the page's name, the layout's count rendered from it. Until then it
+    /// carried two entries for the one cart, `cart` and `cart~StoreLayout`,
+    /// and a change sent the value twice, each at its own version.
+    #[test]
+    fn a_page_and_its_layout_show_one_entry_by_one_value() {
+        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let html: String = fetched_as(&s, &format!("/stores/{STORE_ID}"), Some("a"))
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        let manifest = manifest_of(&html);
+        let entries: Vec<&String> = manifest["entries"]
+            .as_object()
+            .expect("entries")
+            .keys()
+            .collect();
+        assert_eq!(entries, ["cart"], "{manifest}");
+        // Nothing is sent by the layout's name: the cart's entry is the
+        // materializer's, and no other value is speculated on.
+        assert_eq!(
+            s.speculates_on_cart("store.page.StorePage").as_deref(),
+            Some("cart")
+        );
+        assert!(s.speculated_bindings("store.page.StorePage").is_empty());
     }
 
     /// **What a handler at the top of the page captures is set again when it

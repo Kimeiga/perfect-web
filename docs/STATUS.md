@@ -23,6 +23,49 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0317, 2026-10-12: a component is compiled once a process** (the
+integrator's; track `compile-once`, merged from `05a67ae`).
+- Found: after kiokun's merge, the development server's suite, run whole
+  four tests at once, held more than ADR-0292's memory bound. Ten
+  whole-suite mutation baselines were stopped in a verify, and
+  `e14-kiokun-word` on master.
+- The cause: a server compiled each component twice, once to read its
+  imports and once to run it, and every test's server did so again.
+- Now a component's bytes are compiled once a process, and its imports are
+  read from that compile.
+- On CI the suite runs in 302 s at a 1.56 GiB peak (3.9 GiB bound), from
+  about 950 s and over it. Here it went from 1,034 s at 4.47 GiB to 618 s
+  at 1.40 GiB.
+
+Verify 38256961376 green: 2 of 2 mutants, and the suite's own measure.
+
+**ADR-0313 to ADR-0316, 2026-10-12: kiokun's Contains and Appears in, its
+search, its reading index and Homophones, and its deinflection** (W6's,
+track `kiokun`, merged from `fc77a5a2`). Each is held to kiokun.com's own
+code, run locally and never committed:
+- Contains and Appears in: 5,513 sampled words, the same;
+- search: kiokun.com's two FTS5 statements in the data layer, over its
+  migration 0005;
+- Homophones: rendered with the page, and needing no script;
+- deinflection: our own rules from three cited CC BY-SA revisions, none of
+  10ten's GPL table. 3,873 forms, 0 unnamed differences. An inflected
+  address answers 200 with its dictionary form's entry and a note.
+Verify 38212356198 green: kiokun-word's 132 of 132 mutants, redirects' 15
+and dealt-by-time's 17. A search fails on nothing a reader types.
+`is_common`'s loading is the owner's question (A-027).
+
+**ADR-0312, 2026-10-12: a page and its layout show one entry by one value**
+(the integrator's; track `one-entry`, merged from `0ab1afc`). The store's
+pages and their layout both show the session's cart: read once for the
+document (ADR-0303), but speculated as two bindings, `cart` and
+`cart~StoreLayout`, so each press ran its transition twice and each change
+was sent twice, at two versions of one entry. The layout's name is now an
+alias of the page's binding: no decoder, transition or value of its own,
+its parts rendered from the one value. The module exports `aliases`, the
+host sends the entry once, and the runtime renders an entry by every name.
+Verify 38208918670 green: 5 of 5 mutants, and the layouts spec in three
+engines.
+
 **2026-10-12: three mutation scripts' server mutants run the server tests
 that see them** (W6's ruling of 2026-10-09; track `narrowing`, merged from
 `973df1a`). Each ran the development server's whole suite for every

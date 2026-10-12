@@ -17,9 +17,14 @@ it. Date: 2026-10-08. Milestone: E14, the owner's production target.
   missing, with what it needs of the language or the platform. Then the
   gaps are built in the order the integrator gives.
 - **What was read.** The app's source, in the owner's kiokun-data checkout
-  (`sveltekit-app/`), at `abf71a89` plus the owner's uncommitted changes to
-  11 files (among them `[word]/+page.svelte` and the untracked
-  `src/lib/character-lessons/`). The working tree was read as it stood.
+  (`sveltekit-app/`), at `abf71a89`. The working tree was read as it stood,
+  with the owner's uncommitted changes to 11 files. **Amended 2026-10-10**
+  (the integrator's ruling, logged in ADR-0313, Contains and Appears in):
+  the inventory and the oracles read kiokun-data's committed tree at HEAD,
+  never its working tree, since the evidence names a commit; the
+  uncommitted route `/api/character-lesson/[character]` and feature
+  `CharacterMiniLesson.svelte` were taken out, to come back when the owner
+  commits them.
   The builder's source (`src/main.rs`, `src/search_index_builder.rs`), the
   data's layout (`output_dictionary`) and the app's static data were read
   where a row depends on them. Nothing was written into the checkout, and
@@ -28,9 +33,9 @@ it. Date: 2026-10-08. Milestone: E14, the owner's production target.
 ## Method
 
 1. **The routes are SvelteKit's own.** A route is a directory under
-   `src/routes` holding a `+page` or a `+server.ts`: 102 of them, 49 pages
-   and 53 endpoints. `scripts/kiokun_inventory.py` reads them from the
-   checkout and holds this ADR to them: every route is a row below, and
+   `src/routes` holding a `+page` or a `+server.ts`: 101 of them at
+   `abf71a89`, 49 pages and 52 endpoints. `scripts/kiokun_inventory.py`
+   reads them from the checkout's commit at HEAD and holds this ADR to them: every route is a row below, and
    every row is a route (`just e14-kiokun-inventory`).
 2. **The source was read whole.** Four readers covered the word page and
    its components; search, the home page and the reference pages; accounts
@@ -132,17 +137,16 @@ signed-in user's data.
 
 | route | kind | status | what it is | Pleris today, or what it needs |
 |---|---|---|---|---|
-| `/[word]` | page | partial | The entry: forms, readings, meanings, characters, words, names, examples, mnemonics, components, history, related words; loader redirects and fallbacks. | Pleris today: `Lookup` (one redirect) and `WordPage` over all 1.49 million entries, 404 for none, no script (ADR-0037, ADR-0041). 4 of the 50 features below are built, 10 partial. |
-| `/search` | page | partial | 60 hits in Chinese, Japanese and Korean columns, a reading, up to three definitions, a Common badge; community words. | Pleris today: `SearchPage`, 20 hits over one shard, Chinese and Japanese rows. Needs the whole index, Korean rows, the variant expansion, three columns and the custom words (accounts). |
-| `/api/search` | endpoint | partial | JSON search over the FTS5 index, used by the dropdown (8) and the search page (60). | Pleris today: the ranking is the compiled `Search` query, a port of an older version (ADR-0041's correction), over one shard; no JSON endpoint. Needs the current ranking re-derived from `api/search/+server.ts` and an index over every shard (the deployment's). |
-| `/api/lookup-reading` | endpoint | missing | Kana to written forms: Japanese rows whose reading is the query. Feeds the word page's homophones and the deinflection fallback. | An exact-reading index beside the search index. |
+| `/[word]` | page | partial | The entry: forms, readings, meanings, characters, words, names, examples, mnemonics, components, history, related words; loader redirects and fallbacks. | Pleris today: `Lookup` (one redirect) and `WordPage` over all 1.49 million entries, 404 for none, no script (ADR-0037, ADR-0041). 17 of the 50 features below are built, 9 partial. |
+| `/search` | page | partial | 60 hits in Chinese, Japanese and Korean columns, a reading, up to three definitions, a Common badge; community words. | Pleris today (the search ADR): `SearchPage` over the whole index, Korean rows, the variant expansion, three columns, 60 hits, held to kiokun.com's handler. Needs its address, `/search?q=` (a route reading its query part, the integrator's next), the header's search box, and the custom words (accounts). |
+| `/api/search` | endpoint | partial | JSON search over the FTS5 index, used by the dropdown (8) and the search page (60). | Pleris today (the search ADR): its two statements as written, in the kiokun layer, over the whole index; what it does around them, in the program. Needs a form for a route that answers JSON. |
+| `/api/lookup-reading` | endpoint | partial | Kana to written forms: Japanese rows whose reading is the query. Feeds the word page's homophones and the deinflection fallback. | Pleris today (the reading index ADR): its statement as written, in the kiokun layer, which the word page's Homophones read. Needs a form for a route that answers JSON. |
 | `/api/dictionary` | endpoint | missing | Proxies one entry file from raw GitHub, then jsDelivr, cached at the edge; `optional=1` turns a miss into 204. The client app's only path to an entry. | Not needed while pages render on the server: the host reads entries itself. Needed for a client that reads entries (an offline app). |
 | `/api/dictionary/[word]` | endpoint | missing | The same proxy, by path. | As `/api/dictionary`. |
 | `/api/korean-glosses` | endpoint | missing | Glosses each token of up to eight Korean sentences, by Korean deinflection and entry lookups. | Korean deinflection in Pleris (pure computation) and entry reads. |
 | `/api/stroke-data` | endpoint | missing | Proxies hanzi-writer stroke JSON from jsDelivr. | An outbound fetch, or the data served locally; the animation is client. |
 | `/api/handwriting` | endpoint | missing | Sends drawn strokes to Google Input Tools' unofficial endpoint (always Japanese: the client never sends a language). | An outbound fetch to a third party; a drawing canvas (client). |
 | `/api/character-support` | endpoint | missing | Glosses, a taxonomy and component uses for the asked characters, from three static JSON files. | Static data read by the host; a query over it. |
-| `/api/character-lesson/[character]` | endpoint | missing | A character lesson: 14 curated, else saved in R2, else generated by OpenAI (POST, rate-limited) and saved. | Curated lessons are data. Generating needs an LLM call with a secret and blob storage. |
 | `/api/og` | endpoint | missing | A 1200×630 PNG link-preview card, drawn with resvg and CJK fonts. | Image rendering (a crate, the owner's to approve) or cards made at build. |
 | `/api/frequency` | endpoint | missing | Redirects to `/frequency_list.json`. | A redirect and a static file. |
 | `/api/cors-port` | endpoint | missing | Development only: the local CORS server's port. | Proposed not to port: the host reads the data directly. |
@@ -260,23 +264,23 @@ signed-in user's data.
 | Japanese names | `JapaneseNames.svelte` | built | Written forms, readings, kinds, translations. | Built (and kinds, which kiokun.com shows as tags). |
 | upstream errors | `+page.ts:83-94` | partial | 429 becomes 503, 5xx 502. | The slice reads local files; a remote source would need the mapping. |
 | redirect stub | `+page.ts:438-462` | partial | One hop; the stub's mnemonic stays first. | Built: the hop. Missing: the mnemonic merge. |
-| canonical redirect | `+page.ts:419-425` | missing | 308 to the one traditional form a simplified character equals in meaning. | A redirect from a page's query (`Lookup` answering a target). |
-| variants merged | `+page.ts:464-492` | missing | A stub with several traditional forms shows every form's Chinese words. | More entry reads in `Lookup`; a dedupe by id. |
-| related forms | `+page.ts:153-280` | missing | Up to twelve related forms read and, where equivalent, merged. | Entry reads; Pleris computation. |
-| deinflection | `+page.ts:353-379`, `deinflect.ts`, `korean-deinflect.ts` | missing | A conjugated Japanese or Korean word redirects to its dictionary form, with how it was conjugated. | Japanese and Korean deinflection in Pleris (about 1,470 lines of rules); `/api/lookup-reading`. |
+| canonical redirect | `+page.ts:419-425` | built | 308 to the one traditional form a simplified character equals in meaning. | Built: `redirect_on KiokunError.Moved permanent` (ADR-0295, ADR-0301), held to kiokun.com's code. |
+| variants merged | `+page.ts:464-492` | built | A stub with several traditional forms shows every form's Chinese words. | Built: each form read and its words merged, deduped by id (ADR-0289). |
+| related forms | `+page.ts:153-280` | partial | Up to twelve related forms read and, where equivalent, merged. | Built: an equivalent form's words, Contains and Appears in merged on the canonical page (ADR-0289, the Contains ADR). Missing: the related forms' list itself. |
+| deinflection | `+page.ts:353-379`, `deinflect.ts`, `korean-deinflect.ts` | partial | A conjugated Japanese or Korean word redirects to its dictionary form, with how it was conjugated. | Built: Japanese, by rules of our own from cited grammar, kiokun.com's resolution, the form shown at the address asked (the deinflection ADR). Missing: Korean. |
 | custom-word fallback | `+page.ts:381-405` | missing | A word users added, when the dictionary has none. | Accounts' data. |
-| conjugation note | `+page.svelte:429-461` | missing | "from → word (how)", and other candidates. | The deinflection; URL parameters. |
+| conjugation note | `+page.svelte:429-461` | built | "from → word (how)", and other candidates. | Built: on the inflected address itself, the reasons in the rewrite's words (the deinflection ADR). |
 | search box | `Header.svelte:84-127` | partial | A combobox with suggestions as one types, and handwriting. | Built: a plain search form. Missing: suggestions and handwriting (client). |
 | word hero | `+page.svelte:550-559` | partial | The headword large, with save, practice and share. | Built: the headword. The actions are client and accounts. |
 | built-from strip | `WordCharacterStrip.svelte` | missing | Each character of a word, glossed and linked. | The entry's `contains`; server-renderable. |
 | false friends | `false-friends.ts:43-63` | missing | A warning when Chinese and Japanese meanings diverge. | Pleris computation over the entry. |
 | form specimens | `+page.svelte:582-607` | missing | Each written form (Trad, Simp, HK, JP, KR) with its own meaning. | The entry and related forms. |
 | stroke order | `CharacterLearningSections.svelte:848-1201` | missing | An animated stroke order from hanzi-writer data on jsDelivr. | Client; an outbound fetch or local data. |
-| learner gloss | `+page.svelte:610-614` | missing | The mnemonic keyword, else the meaning, as a heading. | The entry. |
-| HSK and JLPT | `+page.svelte:616-621` | partial | Exam-level badges. | Built: the JLPT level. Missing: HSK (`chinese_char.statistics.hskLevel`). |
+| learner gloss | `+page.svelte:610-614` | built | The mnemonic keyword, else the meaning, as a heading. | Built (ADR-0288). |
+| HSK and JLPT | `+page.svelte:616-621` | built | Exam-level badges. | Built: both levels (ADR-0288). |
 | taxonomy | `+page.svelte:632-644` | missing | A category breadcrumb. | Static data (`char_taxonomy.json`). |
 | sense highlights | `+page.svelte:645-652` | missing | Up to four other meanings, proper names last. | Pleris computation. |
-| readings matrix | `+page.svelte:665-688` | partial | Mandarin by frequency, Cantonese, on'yomi, kun'yomi, Korean. | Built: the Korean reading. Missing: the rest, from the entry. |
+| readings matrix | `+page.svelte:665-688` | built | Mandarin by frequency, Cantonese, on'yomi, kun'yomi, Korean. | Built: each row, Mandarin by the words' readings and frequency (ADR-0288). |
 | mnemonic | `SemanticMnemonicCard.svelte` | missing | The keyword, the equation and the story, with linked characters. | The entry's `semantic_mnemonic`. |
 | mnemonic pictures | `MnemonicVisualGallery.svelte` | missing | A picture for the meaning and for each sound. | Images from the entry or a static manifest. |
 | sound mnemonics | `PronunciationMnemonicLayer.svelte` | missing | Per reading: a strategy, a cue, anchor words. | The entry. |
@@ -286,24 +290,23 @@ signed-in user's data.
 | similar characters | `SimilarCharacters.svelte` | missing | Characters sharing parts. | Static data. |
 | historical forms | `HistoricalEvolution.svelte` | missing | Oracle, bronze and seal images, attributed. | The entry's images (a third-party host). |
 | scholarly comments | `CharacterLearningSections.svelte:1577-1595` | missing | Sourced comments. | The entry. |
-| character lesson | `CharacterMiniLesson.svelte` (uncommitted) | missing | A curated or generated lesson for one character. | Curated data; generation is an LLM call. |
-| Chinese words | `+page.svelte:707-778` | partial | Forms, pinyin, Jyutping, numbered definitions. | Built: forms, pinyin, definitions. Missing: Jyutping, numbering, speech, save. |
+| Chinese words | `+page.svelte:707-778` | partial | Forms, pinyin, Jyutping, numbered definitions. | Built: forms, pinyin, Jyutping, numbered definitions. Missing: speech and save (client, accounts). |
 | Chinese examples | `SenseExampleList.svelte` | missing | A sentence per definition, with ruby. | The entry; expanding is client or a details element. |
 | Chinese corpus | `ChineseSentenceExamples.svelte` | missing | Sentences from a static corpus where the entry has none. | Static data, a hash rule. |
-| Japanese words | `JapaneseWords/WordEntry.svelte` | partial | Written forms with tags and a common mark, readings. | Built: forms and readings. Missing: tags, the common mark, the search-only forms dropped. |
-| pitch accent | `components/PitchAccent.svelte` | missing | High and low morae, and the pattern's name. | Static data (`static/pitch/`), its own hash rule. |
-| Japanese senses | `JapaneseWords/Sense.svelte` | partial | Glosses, part of speech, field, dialect, notes, labelled. | Built: glosses. Missing: the tags and their labels (`japanese-labels.json`). |
-| Japanese examples | `Sense.svelte:66` | missing | Example sentences with readings. | The entry; readings need segmentation. |
+| Japanese words | `JapaneseWords/WordEntry.svelte` | built | Written forms with tags and a common mark, readings. | Built: forms, tags, the common mark, readings, the search-only forms dropped (ADR-0288). |
+| pitch accent | `components/PitchAccent.svelte` | built | High and low morae, and the pattern's name. | Built: the pitch shards by their hash rule (ADR-0299). |
+| Japanese senses | `JapaneseWords/Sense.svelte` | built | Glosses, part of speech, field, dialect, notes, labelled. | Built: each tag by kiokun's label for it (ADR-0288). |
+| Japanese examples | `Sense.svelte:66` | partial | Example sentences with readings. | Built: the sentences and translations, the first shown and the rest disclosed (ADR-0299). Missing: readings, which need segmentation. |
 | conjugation table | `ConjugationTable.svelte`, `conjugate.ts` | missing | A verb's forms. | Pleris computation; showing it on demand is a details element or client. |
-| Korean words | `+page.svelte:805-861` | partial | Hangul, hanja, part of speech, numbered definitions, examples. | Built: hangul, hanja, definitions. Missing: part of speech, numbering, examples, glosses. |
+| Korean words | `+page.svelte:805-861` | partial | Hangul, hanja, part of speech, numbered definitions, examples. | Built: hangul, hanja, part of speech, numbered definitions, examples. Missing: the glosses (`/api/korean-glosses`). |
 | Korean corpus | `KoreanSentenceExamples.svelte` | missing | Sentences from a static corpus, romanized, glossed. | Static data; Korean glosses. |
-| homophones | `+page.svelte:379-420` | missing | Other words read the same, for each kana reading. | `/api/lookup-reading`'s index. |
-| contains | `Contains.svelte`, `contains-order.ts` | missing | The words and characters within, ordered breadth first. | The entry's `contains`; paging instead of infinite scroll. |
-| appears in | `AppearsIn.svelte`, `appears-in-order.ts` | missing | Words containing this one, in three languages, by frequency. | The entry's `contained_in_*`. |
+| homophones | `+page.svelte:379-420` | built | Other words read the same, for each kana reading. | Built: over the reading index, rendered with the page (the reading index ADR). |
+| contains | `Contains.svelte`, `contains-order.ts` | built | The words and characters within, ordered breadth first. | Built: the breakdown, cards and order, the rest disclosed (the Contains ADR). |
+| appears in | `AppearsIn.svelte`, `appears-in-order.ts` | built | Words containing this one, in three languages, by frequency. | Built: three ranked columns, ten at a time, disclosed (the Contains ADR). |
 | notes | `Notes.svelte` | missing | Users' Markdown notes on the entry, with images. | Accounts, uploads, sanitized Markdown. |
 | found in artifacts | `ArtifactMentions.svelte` | missing | Artifact sentences containing the word. | Accounts' data; escaped (Found 6). |
 | reels | `ReelsSection.svelte` | missing | Short videos saying the word. | Static data, FNV-1a; thumbnails on a third-party CDN. |
-| SEO head | `seo.ts:163-198`, `SeoMeta.svelte` | missing | Title, description, canonical, Open Graph, Twitter, JSON-LD. | Server-rendered head; Pleris can render it where kiokun.com cannot (Found 1). |
+| SEO head | `seo.ts:163-198`, `SeoMeta.svelte` | built | Title, description, canonical, Open Graph, Twitter, JSON-LD. | Built: rendered on the server, held to kiokun.com's code (ADR-0293). |
 
 ## The site's features
 
@@ -328,17 +331,18 @@ signed-in user's data.
 `scripts/kiokun_inventory.py` counts the rows above
 (`docs/evidence/E14/kiokun-inventory.txt`):
 
-- **Routes: 102** (49 pages, 53 endpoints). **0 built, 4 partial, 98
-  missing.** The partial four are the slice's: `/`, `/[word]`, `/search`
-  and `/api/search`'s ranking.
-- **Features: 63** (50 of the word page, 13 of the site). **4 built, 11
-  partial, 48 missing.** All four built, and ten of the partial, are the
-  word page's.
+- **Routes: 101** (49 pages, 52 endpoints). **0 built, 5 partial, 96
+  missing.** The partial five: `/`, `/[word]`, `/search`, and
+  `/api/search`'s and `/api/lookup-reading`'s statements, which the pages
+  read but no JSON route answers.
+- **Features: 62** (49 of the word page, 13 of the site). **17 built, 10
+  partial, 35 missing** (2026-10-11, after the word page's steps,
+  search and deinflection). All seventeen built, and nine of the partial, are the word page's.
 - **Proposed not to port: 9 routes**, dead or developer pages: `/demo`,
   `/test`, `/api/cors-port`, `/api/notes`, `/api/uploads`,
   `/api/tutor/chat`, `/api/tutor/exercise`, `/api/learning-resources/words`,
   `/api/study/searches`. And 3 more unless the iPhone app stays:
-  `/api/sync/pull`, `/api/sync/push`, `/api/mobile-auth/complete`. The 98
+  `/api/sync/pull`, `/api/sync/push`, `/api/mobile-auth/complete`. The 96
   missing count them.
 
 ## What the gaps need, by kind

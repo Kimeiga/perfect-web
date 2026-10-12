@@ -1,0 +1,24 @@
+The word page's Homophones, against kiokun.com's own api/lookup-reading
+
+produced by: just e14-kiokun-homophones (local: reads a kiokun-data checkout)
+commit: b0611710e64a5c585b98c744453626c27afeb580
+kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree (src/routes/api/lookup-reading/+server.ts 75a934056574; migrations/0005_search_index_with_jyutping.sql 004a33675a53)
+kiokun.com's source: abf71a89af1111f4039578cd1fde58e06f14c4bf, its committed tree (output_search_index.csv 0d5523b5cc3a)
+node: v22.21.1
+host: Darwin arm64, 12 cores, load averages: 33.15 42.90 37.84
+
+== kiokun.com's answers (spikes/own-renderer/kiokun-oracle/homophones.mjs)
+
+stride 256: read 5938 entries; 1082 with Japanese words; 1318 readings looked up; 0 failed
+
+== the rewrite's, compared
+
+compared: 1082 words with Japanese words (stride 256, 5938 entries read, 1318 readings)
+unnamed differences: 0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 408 filtered out; finished in 21.09s
+after it: load averages: 46.77 44.80 38.88
+
+== the CI fixture: kiokun.com's answers over the repository's word sample and index sample
+
+stride 1: read 28 entries; 21 with Japanese words; 59 readings looked up; 0 failed
+fixture: spikes/own-renderer/kiokun-oracle/homophones-sample.json: 21 answers, named {}

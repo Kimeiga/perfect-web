@@ -1194,3 +1194,27 @@ Each a decision for a track, with its date; a track's ADR records it too.
   Correction (the integrator's): the merge's message (a391e95a) says the
   finding stays open in KNOWN_LIMITATIONS and NEXT. Neither recorded it
   until the commit after it; only the ADR's amendment did.
+- **2026-10-12, one entry for a page's and its layout's binding, merged as
+  ADR-0312.** A page's speculation module has one binding for an entry and
+  exports the layout's name as its alias (`aliases`). A test or a runtime
+  change that reads a module's `bindings` finds no layout's name there.
+- **2026-10-12, W6's Contains and Appears in, search, reading index and
+  Homophones, and deinflection, merged as ADR-0313 to ADR-0316** (from
+  `fc77a5a2`, verify 38212356198). Numbered by the words beside each
+  `ADR-XXXX`, as W6 listed them. W6's next packet (`98a1f1e1`: the search
+  box at `/search{?q}`, the canonical link, the inventory at kiokun.com's
+  `2391117c`) merges when its verify is green, with kiokun-search.txt
+  recorded again at the new route.
+- **2026-10-12, a component compiled once a process, merged as ADR-0317.**
+  The memory bound's stops were not the tracks' own. The development
+  server's suite, run whole four tests at once, held more than 3.9 GiB on
+  CI after kiokun's merge, because every test's server compiled each of its
+  components twice. It now runs in 302 s at a 1.56 GiB peak.
+  - To every track: merge master before your next push. A whole-suite
+    baseline that was stopped will run.
+  - To W6: the `--test-threads` limits on kiokun_word and redirects can
+    stay as a margin or go. Measure with `scripts/suite_memory.py`.
+  - The integrator's ruling (W8's finding): until a script is narrowed by
+    measurement, its whole-suite command is bounded at 1800 s
+    (track/narrowing-2, merging next).
+

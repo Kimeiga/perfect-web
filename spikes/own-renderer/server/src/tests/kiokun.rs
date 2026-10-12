@@ -154,14 +154,38 @@ fn path_of(word: &str) -> String {
     out
 }
 
+/// The response to `GET path` as the server sent it, its bytes read to the
+/// close and decoded once, as UTF-8 or not at all. `fetched_as` decodes
+/// each read on its own, so a character a read boundary splits comes out as
+/// U+FFFD: a reader's error, not the server's, and one that depends on
+/// timing (on a loaded machine the oracle once found "に��める" for
+/// "にしめる").
+fn fetched_whole(s: &Server, path: &str) -> String {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+    let at = listener.local_addr().expect("address");
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            let (stream, _) = listener.accept().expect("accept");
+            handle(s, stream);
+        });
+        let mut client = TcpStream::connect(at).expect("connect");
+        client
+            .write_all(
+                format!("GET {path} HTTP/1.1\r\nHost: t\r\nCookie: pw-session=a\r\n\r\n")
+                    .as_bytes(),
+            )
+            .expect("request");
+        let mut bytes = Vec::new();
+        client.read_to_end(&mut bytes).expect("read");
+        String::from_utf8(bytes).expect("the response is UTF-8")
+    })
+}
+
 /// The response to `GET path`, whole: its status line, headers and body,
 /// without the renderer's part markers (`<!--pw:s0-->`), which a reader
 /// does not see.
 fn fetched(s: &Server, path: &str) -> String {
-    let whole: String = fetched_as(s, path, Some("a"))
-        .into_iter()
-        .map(|(_, c)| c)
-        .collect();
+    let whole = fetched_whole(s, path);
     let mut out = String::with_capacity(whole.len());
     let mut rest = whole.as_str();
     while let Some(at) = rest.find("<!--pw:") {
@@ -184,7 +208,7 @@ fn section<'a>(html: &'a str, id: &str) -> &'a str {
 
 /// **The development server serves kiokun's program from kiokun's files**:
 /// its contracts import `kiokun:data/…`, so the host chooses the kiokun
-/// layer, which supplies `entries#read` and grants reading entries alone.
+/// layer, which supplies `entries#read` and grants reading kiokun's data alone.
 #[test]
 fn kiokun_is_served_by_the_host_its_entries_read_from_kiokuns_files() {
     let s = served_kiokun();
@@ -194,7 +218,10 @@ fn kiokun_is_served_by_the_host_its_entries_read_from_kiokuns_files() {
             "database.read<Entry>",
             "database.read<Label>",
             "database.read<CharGloss>",
-            "database.read<PitchReading>"
+            "database.read<PitchReading>",
+            "database.read<SearchRow>",
+            "database.read<AliasSet>",
+            "database.read<ReadingHit>"
         ]
     );
     assert!(s.data.operations().contains("kiokun:data/entries#read"));
@@ -643,35 +670,25 @@ fn text_of(html: &str, id: &str) -> String {
 
 /// **The character header** (`[word]/+page.svelte:572-690`): the learner
 /// gloss with the HSK and former JLPT levels beside it, and the readings,
-/// each labelled. 人's Mandarin is the frequency list's `rén` alone, since
-/// its words read `rén` and not `ren`.
+/// each labelled.
+///
+/// The repository's sample holds the cleared fields only (the integrator's
+/// ruling of 2026-10-10): KANJIDIC2's readings, Unihan's Cantonese, the
+/// Korean reading. The levels are shown beside a gloss, and the gloss, the
+/// HSK level and the
+/// frequency list are Dong Chinese's and the mnemonics the owner's, so a
+/// hand-made entry holds them: its Mandarin is the frequency list's `rén`
+/// alone, since its words read `rén` and not `ren`; and where the card has
+/// no keyword, its meaning is the gloss.
 #[test]
 fn the_character_header_shows_its_gloss_levels_and_readings() {
     let s = served_kiokun();
-    let person = fetched(&s, &path_of("人"));
-    assert_eq!(text_of(&person, "entry-gloss"), "person");
-    let header = header_of(&person);
-    for shown in [
-        "HSK 1",
-        "N4",
-        "Mandarin",
-        "rén",
-        "Cantonese",
-        "jan4",
-        "Korean",
-        "인",
-    ] {
+    let header = header_of(&fetched(&s, &path_of("人")));
+    for shown in ["Mandarin", "rén", "Cantonese", "jan4", "Korean", "인"] {
         assert!(header.contains(shown), "{shown}: {header}");
     }
-    assert!(!header.contains("rén, ren"), "{header}");
-    let music = fetched(&s, &path_of("樂"));
-    // No keyword: the mnemonic's meaning.
-    assert_eq!(text_of(&music, "entry-gloss"), "music");
-    let header = header_of(&music);
+    let header = header_of(&fetched(&s, &path_of("樂")));
     for shown in [
-        "HSK 10",
-        "N3",
-        "lè, yuè",
         "lok6",
         "ガク、ラク、ゴウ",
         "たの.しい、たの.しむ、この.む",
@@ -679,6 +696,40 @@ fn the_character_header_shows_its_gloss_levels_and_readings() {
     ] {
         assert!(header.contains(shown), "{shown}: {header}");
     }
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "人",
+        r#"{"key":"人","chinese_char":{"char":"人","gloss":"person","statistics":{"hskLevel":1},
+            "pinyinFrequencies":[{"pinyin":"rén"},{"pinyin":"ren"}]},
+            "japanese_char":{"literal":"人","misc":{"jlptLevel":4}},
+            "chinese_words":[{"_id":"1","simp":"人","trad":"人","items":[{"pinyin":"rén","definitions":["person"]}]}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "樂",
+        r#"{"key":"樂","chinese_char":{"char":"樂","gloss":"happy, music","statistics":{"hskLevel":10},
+            "pinyinFrequencies":[{"pinyin":"lè"},{"pinyin":"yuè"},{"pinyin":"yào"}]},
+            "japanese_char":{"literal":"樂","misc":{"jlptLevel":3}},
+            "semantic_mnemonic":{"character":"樂","meaning":"music"},
+            "chinese_words":[{"_id":"1","simp":"乐","trad":"樂","items":[{"pinyin":"lè","definitions":["happy"]},{"pinyin":"yuè","definitions":["music"]}]}]}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    let person = fetched(&s, &path_of("人"));
+    assert_eq!(text_of(&person, "entry-gloss"), "person");
+    let header = header_of(&person);
+    for shown in ["HSK 1", "N4", "rén"] {
+        assert!(header.contains(shown), "{shown}: {header}");
+    }
+    assert!(!header.contains("rén, ren"), "{header}");
+    let music = fetched(&s, &path_of("樂"));
+    // No keyword: the mnemonic's meaning.
+    assert_eq!(text_of(&music, "entry-gloss"), "music");
+    let header = header_of(&music);
+    for shown in ["HSK 10", "N3", "lè, yuè"] {
+        assert!(header.contains(shown), "{shown}: {header}");
+    }
+    assert!(!header.contains("yào"), "{header}");
 }
 
 /// **The header's own rules**, each with its control: no header for an
@@ -805,12 +856,25 @@ fn text_of_class(html: &str, open: &str) -> String {
 /// Japanese form; and the hanja table's form, U+F914, the compatibility
 /// ideograph, a code point of its own and so a form of its own, as
 /// kiokun.com shows it. Each form's meaning is its card's, else kiokun.com's
-/// component gloss, its source marker removed.
+/// component gloss, its source marker removed. The variants are Dong
+/// Chinese's fields, which the repository's sample leaves out, so the entry
+/// is made here with kiokun's own deciding fields for 樂.
 #[test]
 fn the_header_shows_each_written_form_with_its_roles() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "樂",
+        "{\"key\":\"樂\",\"chinese_char\":{\"char\":\"樂\",\"simpVariants\":[\"乐\"]},\
+         \"japanese_char\":{\"literal\":\"楽\"},\"korean_char\":{\"character\":\"樂\",\"hanjaForm\":\"\u{F914}\"},\
+         \"chinese_words\":[{\"_id\":\"1\",\"simp\":\"乐\",\"trad\":\"樂\",\"items\":[{\"pinyin\":\"lè\",\"definitions\":[\"happy\"]}]}]}",
+    );
     let app = app_with("{}", r#"{"乐":"music (simp)","楽":"fun (jp)"}"#);
     let mut s = served_kiokun();
-    s.server.data = Arc::new(crate::kiokun::KiokunData::at(sample(), Some(app.path())));
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        Some(app.path()),
+    ));
     let music = fetched(&s, &path_of("樂"));
     assert_eq!(
         forms_of(&music),
@@ -834,10 +898,25 @@ fn the_header_shows_each_written_form_with_its_roles() {
 
 /// **A stub's page shows its target's forms and its own** (the related
 /// forms, `+page.ts:236-280`): 谚 is 諺's simplified form, read as the
-/// related form it is. 諺 is the hanja table's character too.
+/// related form it is. 諺 is the hanja table's character too. The entries
+/// are made here with kiokun's own deciding fields, the variants being Dong
+/// Chinese's, which the repository's sample leaves out.
 #[test]
 fn a_stubs_page_shows_its_targets_forms_and_its_own() {
-    let s = served_kiokun();
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "谚",
+        r#"{"key":"谚","redirect":"諺","chinese_char":{"char":"谚","tradVariants":["諺"]}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "諺",
+        r#"{"key":"諺","chinese_char":{"char":"諺","simpVariants":["谚"]},"japanese_char":{"literal":"諺"},
+            "korean_char":{"character":"諺"},
+            "chinese_words":[{"_id":"1","simp":"谚","trad":"諺","items":[{"pinyin":"yàn","definitions":["proverb"]}]}]}"#,
+    );
+    let s = served_kiokun_on(dir.path());
     let proverb = fetched(&s, &path_of("谚"));
     assert_eq!(forms_of(&proverb), ["諺 Trad · HK · JP · KR", "谚 Simp"]);
 }
@@ -919,7 +998,9 @@ fn an_equivalent_forms_words_are_shown_on_the_canonical_page() {
         dir.path(),
         "後",
         r#"{"key":"後","chinese_char":{"char":"後","simpVariants":["后","余"]},
-            "chinese_words":[{"_id":"t","simp":"后","trad":"後","items":[{"pinyin":"hòu","definitions":["behind"]}]}]}"#,
+            "chinese_words":[{"_id":"t","simp":"后","trad":"後","items":[{"pinyin":"hòu","definitions":["behind"]}]}],
+            "contains":[{"w":"後","d":"behind"}],
+            "contained_in_chinese":[{"w":"後面","p":"hòu miàn","d":"behind","fr":10},{"w":"然後","p":"rán hòu","d":"then"}]}"#,
     );
     write_entry(
         dir.path(),
@@ -927,7 +1008,9 @@ fn an_equivalent_forms_words_are_shown_on_the_canonical_page() {
         r#"{"key":"后","simplified_form_of":"後","chinese_char":{"char":"后","tradVariants":["後"]},
             "semantic_mnemonic":{"character":"后","meaning":"Back"},
             "semantic_mnemonic_variants":[{"character":"後","meaning":"back "}],
-            "chinese_words":[{"_id":"s","simp":"后","trad":"后","items":[{"pinyin":"hòu","definitions":["queen"]}]}]}"#,
+            "chinese_words":[{"_id":"s","simp":"后","trad":"后","items":[{"pinyin":"hòu","definitions":["queen"]}]}],
+            "contains":[{"w":"后","p":"hòu","d":"queen"},{"w":"後","d":"behind"}],
+            "contained_in_chinese":[{"w":"後面","p":"hòu mian","d":"x"},{"w":"后来","p":"hòu lái","d":"afterwards","fr":20}]}"#,
     );
     write_entry(
         dir.path(),
@@ -935,12 +1018,27 @@ fn an_equivalent_forms_words_are_shown_on_the_canonical_page() {
         r#"{"key":"余","simplified_form_of":"後","chinese_char":{"char":"余","tradVariants":["後"]},
             "semantic_mnemonic":{"character":"余","meaning":"surplus"},
             "semantic_mnemonic_variants":[{"character":"後","meaning":"back"}],
-            "chinese_words":[{"_id":"r","simp":"余","trad":"余","items":[{"pinyin":"yú","definitions":["surplus"]}]}]}"#,
+            "chinese_words":[{"_id":"r","simp":"余","trad":"余","items":[{"pinyin":"yú","definitions":["surplus"]}]}],
+            "contained_in_chinese":[{"w":"多余","p":"duō yú","d":"surplus"}]}"#,
     );
     let s = served_kiokun_on(dir.path());
-    let back = visible(section(&fetched(&s, &path_of("後")), "chinese"));
+    let page = fetched(&s, &path_of("後"));
+    let back = visible(section(&page, "chinese"));
     assert!(back.contains("behind") && back.contains("queen"), "{back}");
     assert!(!back.contains("surplus"), "{back}");
+    // Its lists too (`+page.ts:198-217`): Appears in by form, 後面 once,
+    // ranked; Contains by form and readings, 後 once, and 后/後 one card,
+    // since the page's forms are 后 and 後. 余's are not merged.
+    let html = page.split("<script").next().unwrap_or_default();
+    assert_eq!(
+        appears_in_column(html, "chinese-words"),
+        [
+            "後面 | hòu miàn |  | behind",
+            "后来 | hòu lái |  | afterwards",
+            "然後 | rán hòu |  | then"
+        ]
+    );
+    assert_eq!(contains_in(html), ["后/後 | hòu |  |  |  |  | queen"]);
 }
 
 /// **A simplified form that equals its one traditional form in meaning is
@@ -1025,6 +1123,1320 @@ fn an_equivalent_simplified_form_is_moved_to_its_traditional_page() {
         let page = fetched(&s, &path_of(word));
         assert!(page.starts_with("HTTP/1.1 200 OK\r\n"), "{word}: {page}");
     }
+}
+
+/// The text of the first element whose class is `class` in `html`,
+/// unescaped, or empty where there is none.
+fn class_text(html: &str, class: &str) -> String {
+    match html.find(&format!("class=\"{class}\"")) {
+        Some(at) => unescaped(&text_of_class(&html[at..], &format!("class=\"{class}\""))),
+        None => String::new(),
+    }
+}
+
+/// The pieces of `html` that begin where `open` does, each to the next.
+fn pieces<'a>(html: &'a str, open: &str) -> Vec<&'a str> {
+    let mut out = Vec::new();
+    let mut rest = html;
+    while let Some(at) = rest.find(open) {
+        rest = &rest[at + 1..];
+        let end = rest.find(open).unwrap_or(rest.len());
+        out.push(&rest[..end]);
+    }
+    out
+}
+
+/// **Contains as the page shows it** (`Contains.svelte:146-195`): each card,
+/// shown first or behind the disclosure, as `text | pinyin | Jyutping |
+/// Japanese | on'yomi | Korean | definition`; none where the page has no
+/// section.
+fn contains_in(html: &str) -> Vec<String> {
+    if !html.contains("<section id=\"contains\"") {
+        return Vec::new();
+    }
+    pieces(section(html, "contains"), "class=\"character-card\"")
+        .into_iter()
+        .map(|card| {
+            let jp = match card.find("class=\"japanese-reading kunyomi-reading\"") {
+                Some(at) => class_text(&card[at..], "japanese-reading kunyomi-reading"),
+                None => class_text(card, "japanese-reading"),
+            };
+            format!(
+                "{} | {} | {} | {} | {} | {} | {}",
+                class_text(card, "character"),
+                class_text(card, "chinese-reading"),
+                class_text(card, "cantonese-reading"),
+                jp,
+                class_text(card, "japanese-onyomi-reading"),
+                class_text(card, "korean-reading"),
+                class_text(card, "definition"),
+            )
+        })
+        .collect()
+}
+
+/// **One column of Appears in as the page shows it**
+/// (`AppearsIn.svelte:160-290`): each word, shown first or behind the
+/// disclosure, as `word | reading | Jyutping | definition`, a common
+/// Japanese word's star before it; none where the page has no such column.
+fn appears_in_column(html: &str, id: &str) -> Vec<String> {
+    // The heading's id is a hole, so the renderer marks the element before
+    // it (`data-pw`): it is found by the id alone.
+    let Some(at) = html.find(&format!(" id=\"{id}\"")) else {
+        return Vec::new();
+    };
+    let column = &html[at..];
+    let end = column
+        .find("class=\"column\"")
+        .or_else(|| column.find("</section>"))
+        .unwrap_or(column.len());
+    pieces(&column[..end], "class=\"word-card\"")
+        .into_iter()
+        .map(|card| {
+            let word_at = card.find("class=\"word-text\"").expect("the word");
+            // The word's span ends before its reading, or with its header
+            // where it has none: never past it, into a disclosure's count.
+            let word_end = card[word_at..]
+                .find("class=\"pronunciation\"")
+                .or_else(|| card[word_at..].find("</div>"))
+                .map_or(card.len(), |e| word_at + e);
+            let word = unescaped(&visible(&format!("<{}", &card[word_at..word_end])));
+            format!(
+                "{} | {} | {} | {}",
+                word,
+                class_text(card, "pronunciation"),
+                class_text(card, "cantonese-pronunciation"),
+                class_text(card, "definition"),
+            )
+        })
+        .collect()
+}
+
+/// One list of the oracle's answer: its length where the oracle kept only
+/// part of it (the CI fixture's trim), else none; and the items it kept,
+/// each with its place, in the forms the page readers give.
+type Wanted = (Option<usize>, Vec<(usize, String)>);
+
+/// The oracle's answer for a word: each list, whole or trimmed.
+fn oracle_lists(answer: &serde_json::Value) -> Vec<(String, Wanted)> {
+    let s = |v: &serde_json::Value, k: &str| v[k].as_str().unwrap_or_default().to_string();
+    let card = |c: &serde_json::Value| {
+        format!(
+            "{} | {} | {} | {} | {} | {} | {}",
+            s(c, "text"),
+            s(c, "p"),
+            s(c, "ct"),
+            s(c, "jp"),
+            s(c, "jo"),
+            s(c, "kr"),
+            s(c, "definition")
+        )
+    };
+    let word = |w: &serde_json::Value| {
+        let star = if w["c"].as_bool() == Some(true) {
+            "⭐"
+        } else {
+            ""
+        };
+        format!(
+            "{star}{} | {} | {} | {}",
+            s(w, "w"),
+            s(w, "reading"),
+            s(w, "ct"),
+            s(w, "d")
+        )
+    };
+    let list = |v: &serde_json::Value, shown: &dyn Fn(&serde_json::Value) -> String| -> Wanted {
+        match v.as_array() {
+            Some(items) => (None, items.iter().map(shown).enumerate().collect()),
+            None => (
+                Some(v["length"].as_u64().expect("a trimmed list's length") as usize),
+                v["kept"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|i| (i["at"].as_u64().expect("its place") as usize, shown(i)))
+                    .collect(),
+            ),
+        }
+    };
+    vec![
+        ("contains".to_string(), list(&answer["contains"], &card)),
+        ("chinese-words".to_string(), list(&answer["chinese"], &word)),
+        (
+            "japanese-words".to_string(),
+            list(&answer["japanese"], &word),
+        ),
+        ("korean-words".to_string(), list(&answer["korean"], &word)),
+    ]
+}
+
+/// Does the page's list hold what the oracle kept: the whole list, or a
+/// trimmed list's length and each kept item at its place?
+fn holds(got: &[String], (length, kept): &Wanted) -> bool {
+    got.len() == length.unwrap_or(kept.len()) && kept.iter().all(|(at, w)| got.get(*at) == Some(w))
+}
+
+/// **Contains and Appears in against kiokun.com's answers**: each word's
+/// lists, as the page shows them in order, beside the oracle's. No
+/// difference is named for them; each is listed.
+fn contains_held_to_oracle(s: &Server, oracle: &serde_json::Value) -> Vec<String> {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut differ: Vec<String> = Vec::new();
+    for (word, answer) in answers {
+        let page = fetched(s, &path_of(word));
+        if !page.starts_with("HTTP/1.1 200") {
+            differ.push(format!(
+                "{word}: {}",
+                page.lines().next().unwrap_or_default()
+            ));
+            continue;
+        }
+        let html = page.split("<script").next().unwrap_or_default();
+        for (list, want) in oracle_lists(answer) {
+            let got = if list == "contains" {
+                contains_in(html)
+            } else {
+                appears_in_column(html, &list)
+            };
+            if !holds(&got, &want) {
+                differ.push(format!(
+                    "{word} {list}:\n  kiokun.com: {want:?}\n  rewrite:    {got:?}"
+                ));
+            }
+        }
+    }
+    differ
+}
+
+/// **Contains and Appears in against kiokun.com's own code** (local: `just
+/// e14-kiokun-contains` runs `orderContainsWords`, `rankAppearsIn` and the
+/// page's and `Contains.svelte`'s own functions, copied from `KIOKUN_APP`,
+/// over a stated sample of `KIOKUN_DATA`, and names its answers in
+/// `KIOKUN_CONTAINS_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-contains`"]
+fn contains_and_appears_in_match_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_CONTAINS_ORACLE").expect("KIOKUN_CONTAINS_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let differ = contains_held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} words (stride {}, {} entries read)",
+        oracle["answered"], oracle["stride"], oracle["read"]
+    );
+    println!("named differences: {{}}");
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(30) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
+}
+
+/// **Contains** (`Contains.svelte`, `contains-order.ts`): a multi-character
+/// word's previews, broken down breadth first (学生 + 会, then 学 and 生),
+/// then the rest, the longer and earlier first. Where the word has forms of
+/// one length (学生会/學生會), the one-character previews at one place are
+/// one card written with each form's character (会/會, 学/學). A card's
+/// definition is the first of its characters' component glosses, its marker
+/// taken off ("assemble (TRAD)" is 會's, the card's second form), else the
+/// preview's; an on'yomi the same as the reading is not shown. The expected
+/// cards are kiokun.com's own answers for these entries (`contains.mjs`).
+#[test]
+fn contains_breaks_the_word_down_and_cards_its_forms() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "学生会",
+        r#"{"key":"学生会","chinese_words":[{"_id":"1","simp":"学生会","trad":"學生會","items":[{"pinyin":"xué shēng huì","definitions":["student union"]}]}],
+            "contains":[{"w":"会","p":"huì","ct":"wui5","d":"can"},{"w":"学生","p":"xué shēng","d":"student","fr":120},
+            {"w":"會","p":"huì","d":"meeting","fr":30},{"w":"学","p":"xué","jp":"まなぶ","jo":"ガク","kr":"학","d":"learn"},
+            {"w":"生会","d":""},{"w":"生","p":"shēng","jp":"せい","jo":"せい","d":"life","c":true},
+            {"w":"學","p":"xué","d":"study"},{"w":"x","d":"unrelated"},{"w":"學生","p":"xué shēng","d":"pupil"}]}"#,
+    );
+    let app = app_with(
+        "{}",
+        r#"{"学":"to study (simp)","會":"assemble (TRAD)","生":""}"#,
+    );
+    let mut s = served_kiokun();
+    s.server.data = Arc::new(crate::kiokun::KiokunData::at(
+        dir.path().to_path_buf(),
+        Some(app.path()),
+    ));
+    let page = fetched(&s, &path_of("学生会"));
+    let html = page.split("<script").next().unwrap_or_default();
+    assert_eq!(
+        contains_in(html),
+        [
+            "学生 | xué shēng |  |  |  |  | student",
+            "会/會 | huì | wui5 |  |  |  | assemble",
+            "学/學 | xué |  | まなぶ | ガク | 학 | to study",
+            "生 | shēng |  | せい |  |  | life",
+            "生会 |  |  |  |  |  | ",
+            "學生 | xué shēng |  |  |  |  | pupil",
+            "x |  |  |  |  |  | unrelated",
+        ]
+    );
+    // 学's on'yomi differs from its reading: both shown, the reading as the
+    // kun'yomi. Each card links to its word's page.
+    let study = section(html, "contains");
+    assert!(
+        study.contains("aria-label=\"Japanese kun’yomi: まなぶ\""),
+        "{study}"
+    );
+    assert!(
+        study.contains("href=\"/word/%E5%AD%A6%E7%94%9F\""),
+        "{study}"
+    );
+    // Seven cards: none behind the disclosure.
+    assert!(!study.contains("<details"), "{study}");
+    // Where nothing breaks a form down, the previews tie on where they sit
+    // in the form chosen (the first, 丁乙丙, where neither is), and the
+    // word's own order decides: 甲 is in 甲乙丙, 戊 is not
+    // (`sortContainsWords`), whatever the file's order.
+    write_entry(
+        dir.path(),
+        "甲乙丙",
+        r#"{"key":"甲乙丙","chinese_words":[{"_id":"1","simp":"丁乙丙","trad":"丁乙丙","items":[{"pinyin":"x","definitions":["x"]}]}],
+            "contains":[{"w":"戊","d":"fifth"},{"w":"甲","d":"first"}]}"#,
+    );
+    let tie = fetched(&s, &path_of("甲乙丙"));
+    assert_eq!(
+        contains_in(tie.split("<script").next().unwrap_or_default()),
+        ["丁/甲 |  |  |  |  |  | first", "戊 |  |  |  |  |  | fifth"]
+    );
+    // Control: a word whose file has no previews, 人 in the repository's
+    // sample, has no section.
+    let person = fetched(&served_kiokun(), &path_of("人"));
+    assert!(person.starts_with("HTTP/1.1 200"), "{person}");
+    assert!(!person.contains("<section id=\"contains\""), "{person}");
+}
+
+/// **Appears in** (`AppearsIn.svelte`, `appears-in-order.ts`): each
+/// language's words that contain this one. Chinese words before names
+/// (pinyin that begins with a capital, its zero-width spaces not counted),
+/// each by frequency rank, a rank of 0 counted as none; Japanese common
+/// words first; Korean as the file lists them. A word read and defined as
+/// another is shown once; one without a form, not at all. Ten are shown,
+/// and the rest behind a disclosure that counts them. The expected words
+/// are kiokun.com's own answers for this entry (`contains.mjs`).
+#[test]
+fn appears_in_ranks_each_languages_words_ten_at_a_time() {
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "子",
+        "{\"key\":\"子\",\"contained_in_chinese\":[\
+         {\"w\":\"孩子\",\"p\":\"hái zi\",\"d\":\"child\",\"fr\":900},{\"w\":\"老子\",\"p\":\"Lǎo zǐ\",\"d\":\"Laozi\",\"fr\":5},\
+         {\"w\":\"儿子\",\"p\":\"ér zi\",\"d\":\"son\",\"fr\":300},{\"w\":\"儿子\",\"p\":\"ér\u{200b}zi\",\"d\":\"son \"},\
+         {\"w\":\"子弹\",\"p\":\"zǐ dàn\",\"ct\":\"zi2 daan2\",\"d\":\"bullet\"},{\"w\":\"孙子\",\"p\":\"\u{200b}Sūn\u{200b}zǐ\",\"d\":\"Sunzi\"},\
+         {\"w\":\"桌子\",\"p\":\"zhuō zi\",\"d\":\"table\",\"fr\":0},{\"w\":\"\",\"p\":\"x\",\"d\":\"nothing\"},\
+         {\"w\":\"椅子\",\"p\":\"yǐ zi\",\"d\":\"chair\",\"fr\":1200},{\"w\":\"瓶子\",\"p\":\"píng zi\",\"d\":\"bottle\",\"fr\":2000},\
+         {\"w\":\"房子\",\"p\":\"fáng zi\",\"d\":\"house\",\"fr\":700},{\"w\":\"日子\",\"p\":\"rì zi\",\"d\":\"day\",\"fr\":400},\
+         {\"w\":\"样子\",\"p\":\"yàng zi\",\"d\":\"look\",\"fr\":350},{\"w\":\"妻子\",\"p\":\"qī zi\",\"d\":\"wife\",\"fr\":800}],\
+         \"contained_in_japanese\":[{\"w\":\"子供\",\"jp\":\"こども\",\"d\":\"child\",\"fr\":50},\
+         {\"w\":\"帽子\",\"jp\":\"ぼうし\",\"d\":\"hat\",\"c\":true,\"fr\":900},{\"w\":\"様子\",\"jp\":\"ようす\",\"d\":\"state\",\"c\":true,\"fr\":100},\
+         {\"w\":\"子音\",\"p\":\"zǐ yīn\",\"d\":\"consonant\"}],\
+         \"contained_in_korean\":[{\"w\":\"자손\",\"kr\":\"자손\",\"d\":\"descendant\",\"fr\":9},{\"w\":\"모자\",\"d\":\"hat\",\"fr\":1}]}",
+    );
+    let s = served_kiokun_on(dir.path());
+    let page = fetched(&s, &path_of("子"));
+    let html = page.split("<script").next().unwrap_or_default();
+    assert_eq!(
+        appears_in_column(html, "chinese-words"),
+        [
+            "儿子 | ér zi |  | son",
+            "样子 | yàng zi |  | look",
+            "日子 | rì zi |  | day",
+            "房子 | fáng zi |  | house",
+            "妻子 | qī zi |  | wife",
+            "孩子 | hái zi |  | child",
+            "椅子 | yǐ zi |  | chair",
+            "瓶子 | píng zi |  | bottle",
+            "子弹 | zǐ dàn | zi2 daan2 | bullet",
+            "桌子 | zhuō zi |  | table",
+            "老子 | Lǎo zǐ |  | Laozi",
+            "孙子 | \u{200b}Sūn\u{200b}zǐ |  | Sunzi",
+        ]
+    );
+    assert_eq!(
+        appears_in_column(html, "japanese-words"),
+        [
+            "⭐様子 | ようす |  | state",
+            "⭐帽子 | ぼうし |  | hat",
+            "子供 | こども |  | child",
+            "子音 | zǐ yīn |  | consonant",
+        ]
+    );
+    assert_eq!(
+        appears_in_column(html, "korean-words"),
+        ["자손 | 자손 |  | descendant", "모자 |  |  | hat"]
+    );
+    // Twelve Chinese words: ten shown, two behind the disclosure.
+    let chinese = &html[html.find(" id=\"chinese-words\"").expect("the column")..];
+    let chinese = &chinese[..chinese.find("class=\"column\"").unwrap_or(chinese.len())];
+    let disclosed = &chinese[chinese.find("<details").expect("the disclosure")..];
+    assert_eq!(chinese.matches("class=\"word-card\"").count(), 12);
+    assert_eq!(disclosed.matches("class=\"word-card\"").count(), 2);
+    assert!(disclosed.contains(">2 more items<"), "{disclosed}");
+    // Three columns.
+    assert!(html.contains("word-columns three-columns"), "{html}");
+}
+
+/// **Contains and Appears in against kiokun.com's answers for the
+/// repository's sample** (`kiokun-oracle/contains-sample.json`, written by
+/// `just e14-kiokun-contains`): what CI holds. The sample's words are single
+/// characters, with no Contains; its Appears in lists are kiokun's own, up
+/// to 200 words each. The fixture keeps each list's length and its first 20
+/// and last 5 words, each with its place (the integrator's ruling of
+/// 2026-10-10): the head, where the order shows, and the tail, where the
+/// unranked words and the names go. The whole lists are held locally.
+#[test]
+fn contains_and_appears_in_match_kiokuns_answers_for_the_sample() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../kiokun-oracle/contains-sample.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the fixture")).expect("JSON");
+    assert!(
+        fixture["kiokun_commit"]
+            .as_str()
+            .is_some_and(|c| c.len() == 40),
+        "{fixture}"
+    );
+    let oracle = &fixture["oracle"];
+    assert_eq!(
+        oracle["trimmed"],
+        "each list's length, and its first 20 and last 5 items, each with its place",
+        "{fixture}"
+    );
+    let chinese = &oracle["answers"]["人"]["chinese"];
+    assert!(
+        chinese["length"].as_u64().is_some_and(|n| n > 25),
+        "{fixture}"
+    );
+    assert_eq!(
+        chinese["kept"].as_array().map(Vec::len),
+        Some(25),
+        "{fixture}"
+    );
+    let s = served_kiokun();
+    let differ = contains_held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+}
+
+/// **Word pages with long lists, timed** (local: it reads the owner's
+/// kiokun-data checkout through `KIOKUN_DATA`; run in release by `just
+/// e14-kiokun-contains`). Each word in `KIOKUN_TIME_WORDS` is asked for
+/// `KIOKUN_TIME_REPEAT` times (30 by default), each time of a server just
+/// started from the one build, since the word's page is kept in the shared
+/// cache once read: the time from the request to the response's last byte.
+/// `KIOKUN_SAMPLE_APP` names another `app.pw` to serve, for a baseline.
+#[test]
+#[ignore = "reads a kiokun-data checkout named by KIOKUN_DATA; a measurement, run by `just e14-kiokun-contains`"]
+fn word_pages_with_long_lists_are_timed() {
+    assert!(
+        std::env::var_os("KIOKUN_DATA").is_some(),
+        "KIOKUN_DATA must name a kiokun-data checkout's output_dictionary"
+    );
+    let words = std::env::var("KIOKUN_TIME_WORDS").expect("KIOKUN_TIME_WORDS");
+    let repeat: usize = std::env::var("KIOKUN_TIME_REPEAT")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(30);
+    let (_dir, out) = built_kiokun_with(|app| match std::env::var_os("KIOKUN_SAMPLE_APP") {
+        Some(other) => std::fs::read_to_string(other).expect("KIOKUN_SAMPLE_APP"),
+        None => app.to_string(),
+    });
+    for word in words.split(',') {
+        let mut times: Vec<f64> = Vec::new();
+        let mut page = String::new();
+        for _ in 0..repeat {
+            let s = Server::from_build(out.clone(), out.clone()).expect("served");
+            let at = std::time::Instant::now();
+            page = fetched_as(&s, &path_of(word), Some("timed"))
+                .into_iter()
+                .map(|(_, c)| c)
+                .collect();
+            times.push(at.elapsed().as_secs_f64() * 1e3);
+        }
+        assert!(page.starts_with("HTTP/1.1 200"), "{word}: {page}");
+        times.sort_by(|a, b| a.partial_cmp(b).expect("a time"));
+        let html = page.split("<script").next().unwrap_or_default();
+        println!(
+            "word {word}: {} bytes; Contains {}, Chinese {}, Japanese {}, Korean {}; per request, ms: p50 {:.1}, p90 {:.1}, max {:.1} ({repeat} requests)",
+            page.len(),
+            contains_in(html).len(),
+            appears_in_column(html, "chinese-words").len(),
+            appears_in_column(html, "japanese-words").len(),
+            appears_in_column(html, "korean-words").len(),
+            quantile(&times, 0.5),
+            quantile(&times, 0.9),
+            quantile(&times, 1.0)
+        );
+    }
+}
+
+/// **EDRDG's acknowledgement on each page that shows its data**: the
+/// licence of JMdict, JMnedict and KANJIDIC2 asks a web dictionary to
+/// acknowledge the files "on each screen display"
+/// (https://www.edrdg.org/edrdg/licence.html, checked 2026-10-10). 人's page
+/// shows JMdict's words and KANJIDIC2's character, and says so at its foot,
+/// linking each to its project and the Group to its licence; a page with
+/// Chinese words alone does not. kiokun.com's pages carry none.
+#[test]
+fn a_page_with_edrdg_data_acknowledges_the_group() {
+    let person = fetched(&served_kiokun(), &path_of("人"));
+    let html = person.split("<script").next().unwrap_or_default();
+    let foot = &html[html
+        .find("<footer class=\"data-sources\"")
+        .expect("the acknowledgement")..];
+    let text = visible(foot);
+    assert!(
+        text.contains("These files are the property of the Electronic Dictionary Research and Development Group, and are used in conformance with the Group's licence."),
+        "{text}"
+    );
+    for link in [
+        "https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project",
+        "https://www.edrdg.org/wiki/index.php/KANJIDIC_Project",
+        "https://www.edrdg.org/edrdg/licence.html",
+    ] {
+        assert!(foot.contains(&format!("href=\"{link}\"")), "{foot}");
+    }
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "电脑",
+        r#"{"key":"电脑","chinese_words":[{"_id":"1","simp":"电脑","trad":"電腦","items":[{"pinyin":"diàn nǎo","definitions":["computer"]}]}]}"#,
+    );
+    let computer = fetched(&served_kiokun_on(dir.path()), &path_of("电脑"));
+    assert!(computer.starts_with("HTTP/1.1 200"), "{computer}");
+    assert!(!computer.contains("data-sources"), "{computer}");
+}
+
+/// The search page's path for `q`, its one segment percent-encoded.
+fn search_path(q: &str) -> String {
+    path_of(q).replacen("/word/", "/search/", 1)
+}
+
+/// **One language's column of the search page** (`search/+page.svelte`):
+/// each hit, shown first or behind the disclosure, as `text | [pronunciation]
+/// | Common | 1. a ; 2. b ; 3. c | +N more | target`; none where the page has
+/// no such column.
+fn search_hits_in(html: &str, language: &str) -> Vec<String> {
+    let Some(at) = html.find(&format!(" id=\"{language}-results\"")) else {
+        return Vec::new();
+    };
+    let column = &html[at..];
+    let end = column[1..]
+        .find("class=\"results-column\"")
+        .map_or(column.find("</main>").unwrap_or(column.len()), |e| e + 1);
+    // Each hit from its link's tag, whose `href` comes before its class.
+    pieces(&column[..end], "<a ")
+        .into_iter()
+        .filter(|card| card.contains("class=\"result-card"))
+        .map(|card| {
+            let href = card
+                .find("href=\"/word/")
+                .map(|h| {
+                    let rest = &card[h + 12..];
+                    rest[..rest.find('"').unwrap_or(rest.len())].to_string()
+                })
+                .unwrap_or_default();
+            let definitions: Vec<String> = pieces(card, "class=\"definition\"")
+                .into_iter()
+                .map(|d| unescaped(&text_of_class(&format!("x{d}"), "x")))
+                .collect();
+            format!(
+                "{} | {} | {} | {} | {} | {}",
+                class_text(card, "word"),
+                class_text(card, "pronunciation"),
+                if card.contains("class=\"common-badge\"") {
+                    "Common"
+                } else {
+                    ""
+                },
+                definitions.join(" ; "),
+                class_text(card, "more-definitions"),
+                href
+            )
+        })
+        .collect()
+}
+
+/// kiokun.com's response for a query, in the form the page reader gives,
+/// each language's hits in the response's order.
+fn search_wanted(answer: &serde_json::Value, language: &str) -> Vec<String> {
+    let s = |v: &serde_json::Value| v.as_str().unwrap_or_default().to_string();
+    answer["results"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|r| r["language"] == language)
+        .map(|r| {
+            let forms: Vec<String> = r["forms"].as_array().into_iter().flatten().map(s).collect();
+            let text = if language == "chinese" && !forms.is_empty() {
+                forms
+                    .iter()
+                    .take(3)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" / ")
+            } else {
+                s(&r["word"])
+            };
+            let pronunciation = s(&r["pronunciation"]);
+            let definitions: Vec<String> = r["definitions"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(s)
+                .collect();
+            let extra = definitions.len().saturating_sub(3);
+            let target = match s(&r["targetWord"]) {
+                t if t.is_empty() => s(&r["word"]),
+                t => t,
+            };
+            format!(
+                "{} | {} | {} | {} | {} | {}",
+                text,
+                if pronunciation.is_empty() {
+                    String::new()
+                } else {
+                    format!("[{pronunciation}]")
+                },
+                if r["is_common"].as_bool() == Some(true) {
+                    "Common"
+                } else {
+                    ""
+                },
+                definitions
+                    .iter()
+                    .take(3)
+                    .enumerate()
+                    .map(|(i, d)| format!("{}. {d}", i + 1))
+                    .collect::<Vec<_>>()
+                    .join(" ; "),
+                match extra {
+                    0 => String::new(),
+                    1 => "+1 more definition".to_string(),
+                    n => format!("+{n} more definitions"),
+                },
+                path_of(&target).trim_start_matches("/word/")
+            )
+        })
+        .collect()
+}
+
+/// **The search page against kiokun.com's answers**: each query's hits, in
+/// each language's column, beside the oracle's. A query kiokun.com answers
+/// with an error (FTS5 reading it as syntax) is counted by name where the
+/// page answers it, 200 (Difference 27: a search does not fail on what a
+/// reader types); any other difference is listed, a page that fails on it
+/// among them.
+fn search_held_to_oracle(
+    s: &Server,
+    oracle: &serde_json::Value,
+) -> (BTreeMap<String, usize>, Vec<String>) {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut named: BTreeMap<String, usize> = BTreeMap::new();
+    let mut differ: Vec<String> = Vec::new();
+    for (q, answer) in answers {
+        let page = fetched(s, &search_path(q));
+        if answer.get("error").is_some() {
+            if page.starts_with("HTTP/1.1 200") {
+                *named
+                    .entry("a search kiokun.com fails, answered".to_string())
+                    .or_default() += 1;
+            } else {
+                differ.push(format!(
+                    "{q}: kiokun.com {}, and the page fails too: {}",
+                    answer["error"],
+                    page.lines().next().unwrap_or_default()
+                ));
+            }
+            continue;
+        }
+        if !page.starts_with("HTTP/1.1 200") {
+            differ.push(format!("{q}: {}", page.lines().next().unwrap_or_default()));
+            continue;
+        }
+        let html = page.split("<script").next().unwrap_or_default();
+        for language in ["chinese", "japanese", "korean"] {
+            let want = search_wanted(answer, language);
+            let got = search_hits_in(html, language);
+            if got != want {
+                differ.push(format!(
+                    "{q} {language}:\n  kiokun.com: {want:?}\n  rewrite:    {got:?}"
+                ));
+            }
+        }
+    }
+    (named, differ)
+}
+
+/// **Search against kiokun.com's own code** (local: `just e14-kiokun-search`
+/// runs kiokun.com's `api/search` handler, copied from `KIOKUN_APP`'s HEAD,
+/// over kiokun-data's committed index, and names its answers in
+/// `KIOKUN_SEARCH_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-search`"]
+fn search_matches_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_SEARCH_ORACLE").expect("KIOKUN_SEARCH_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let (named, differ) = search_held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} queries (stride {}, {} rows)",
+        oracle["queries"], oracle["stride"], oracle["rows"]
+    );
+    println!("named differences: {named:?}");
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(30) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
+}
+
+/// **Search against kiokun.com's answers for the repository's sample**
+/// (`kiokun-oracle/search-sample.json`, written by `just e14-kiokun-search`
+/// over `examples/kiokun/data/search-sample.csv` and its hand-made aliases):
+/// what CI holds.
+#[test]
+fn search_matches_kiokuns_answers_for_the_sample() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../kiokun-oracle/search-sample.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the fixture")).expect("JSON");
+    assert!(
+        fixture["kiokun_commit"]
+            .as_str()
+            .is_some_and(|c| c.len() == 40),
+        "{fixture}"
+    );
+    let oracle = &fixture["oracle"];
+    assert!(
+        oracle["queries"].as_u64().is_some_and(|n| n > 20),
+        "{fixture}"
+    );
+    let s = served_kiokun();
+    let (_, differ) = search_held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+}
+
+/// **Search's edges** (`api/search/+server.ts`, `search-aliases-core.ts`),
+/// over the repository's sample index and its hand-made aliases; each answer
+/// is kiokun.com's own for the same query (`search.mjs`):
+/// - a katakana query also searches its hiragana reading: ヒト finds 人, read
+///   ひと;
+/// - a CJK query searches each character's variants: 学 finds 學;
+/// - a Japanese form groups under its canonical page: 学生 is one hit,
+///   written 学生, linking 學生, read in Japanese and Chinese;
+/// - a query nothing matches says so;
+/// - what kiokun.com answers 500, FTS5 reading it as syntax, is answered as
+///   words (Difference 27; the integrator's ruling of 2026-10-11): the four
+///   inputs its oracle found fail there, a romanization's `-` and a comma
+///   among them, and `"`, `*` and `AND`. Those answers are the rewrite's
+///   own, not kiokun.com's.
+#[test]
+fn search_reads_kana_variants_and_canonical_pages() {
+    let s = served_kiokun();
+    let html = |q: &str| {
+        let page = fetched(&s, &search_path(q));
+        assert!(page.starts_with("HTTP/1.1 200"), "{q}: {page}");
+        page.split("<script").next().unwrap_or_default().to_string()
+    };
+    let kana = html("ヒト");
+    let first = search_hits_in(&kana, "japanese");
+    assert!(
+        first[0].starts_with("人 | [ひと] | Common | 1. person"),
+        "{first:?}"
+    );
+    let study = html("学");
+    // Eight hits a column, and the rest behind a disclosure.
+    let japanese = &study[study.find(" id=\"japanese-results\"").expect("the column")..];
+    let shown = &japanese[..japanese.find("<details").expect("the disclosure")];
+    assert_eq!(shown.matches("class=\"result-card").count(), 8, "{study}");
+    assert!(japanese.contains(">Show more Japanese results<"), "{study}");
+    assert!(
+        search_hits_in(&study, "chinese")
+            .iter()
+            .any(|h| h.starts_with("學 | [xué]")),
+        "{study}"
+    );
+    let student = html("学生");
+    assert_eq!(search_hits_in(&student, "chinese"), Vec::<String>::new());
+    let hits = search_hits_in(&student, "japanese");
+    assert_eq!(hits.len(), 1, "{hits:?}");
+    assert!(
+        hits[0].starts_with("学生 | [がくせい · xué\u{200b}sheng] | Common"),
+        "{hits:?}"
+    );
+    assert!(hits[0].ends_with("| %E5%AD%B8%E7%94%9F"), "{hits:?}");
+    assert!(student.contains("Found 1 result<"), "{student}");
+    let none = html("zzzzqq");
+    assert!(none.contains("No results for “zzzzqq”"), "{none}");
+    // Nothing in the sample holds these words: each is answered, and found
+    // nothing.
+    for nothing in [
+        "\"",
+        "*",
+        "bingmaweidong, liangcaoxianxing",
+        "ime-ji",
+        "monsuta-",
+        "maikuroa-ruenue-",
+    ] {
+        let page = html(nothing);
+        assert!(page.contains("No results for “"), "{nothing}: {page}");
+        for language in ["chinese", "japanese", "korean"] {
+            assert_eq!(
+                search_hits_in(&page, language),
+                Vec::<String>::new(),
+                "{nothing}"
+            );
+        }
+    }
+    // A word that is FTS5's operator is the word.
+    let and = html("and");
+    for language in ["chinese", "japanese", "korean"] {
+        assert_eq!(
+            search_hits_in(&html("AND"), language),
+            search_hits_in(&and, language),
+            "AND, {language}"
+        );
+    }
+    assert!(!search_hits_in(&and, "chinese").is_empty(), "{and}");
+    // A romanization's long-vowel `-`: 人和, read レンホー, romanized renho-.
+    let renho = search_hits_in(&html("renho-"), "japanese");
+    assert!(
+        renho
+            .first()
+            .is_some_and(|h| h.starts_with("人和 | [レンホー]")),
+        "{renho:?}"
+    );
+    // A comma between words: both words, in any order.
+    let people = search_hits_in(&html("person, people"), "chinese");
+    let targets: Vec<&str> = people
+        .iter()
+        .map(|h| h.rsplit(" | ").next().unwrap_or_default())
+        .collect();
+    let want: Vec<String> = ["漢人", "華人", "港人"]
+        .iter()
+        .map(|w| path_of(w).trim_start_matches("/word/").to_string())
+        .collect();
+    assert_eq!(targets.len(), 3, "{people:?}");
+    for w in &want {
+        assert!(targets.contains(&w.as_str()), "{w} in {people:?}");
+    }
+}
+
+/// A homophone as shown: its word, and whether its chip is marked common.
+type ChipShown = (String, bool);
+
+/// A Homophones group as shown: its reading where it is shown, and its words.
+type HomophoneGroupShown = (Option<String>, Vec<ChipShown>);
+
+/// The page's Homophones, as shown: each group's reading where it is shown,
+/// and its words, each with whether its chip is marked common.
+fn homophones_in(html: &str) -> Vec<HomophoneGroupShown> {
+    let Some(at) = html.find("<section id=\"homophones\"") else {
+        return Vec::new();
+    };
+    let end = at + html[at..].find("</section>").expect("its end");
+    html[at..end]
+        .split("class=\"homophone-group\"")
+        .skip(1)
+        .map(|group| {
+            let reading = group
+                .split_once("class=\"homophone-reading\"")
+                .map(|(_, r)| {
+                    let r = &r[r.find('>').expect("its text") + 1..];
+                    r[..r.find('<').expect("its end")].to_string()
+                });
+            let words = group
+                .split("<a ")
+                .skip(1)
+                .map(|chip| {
+                    let class = chip
+                        .split_once("class=\"")
+                        .map(|(_, c)| &c[..c.find('"').expect("its end")])
+                        .unwrap_or_default();
+                    let text = &chip[chip.find('>').expect("its text") + 1..];
+                    (
+                        text[..text.find("</a>").expect("its end")].to_string(),
+                        class.split(' ').any(|c| c == "common"),
+                    )
+                })
+                .collect();
+            (reading, words)
+        })
+        .collect()
+}
+
+/// **Homophones** (`[word]/+page.svelte`, `api/lookup-reading/+server.ts`),
+/// over the repository's sample index, which holds the Japanese rows read as
+/// the word sample's readings; each answer is kiokun.com's own rules':
+/// - each of the page's readings is a group, in the readings' order, its
+///   reading shown where there are several;
+/// - a group's words are those read as it, common first, then shorter, each
+///   chip marked common where its dictionary says so, linked to its page;
+/// - the page's own forms are left out: 人's ひと has no 人;
+/// - a word read as a reading by two entries, one common and one not, is
+///   shown twice, as the endpoint's DISTINCT answers it: 色's 食;
+/// - one group shows no reading: 夢's ゆめ;
+/// - a reading with none left has no group, and a page with none has no
+///   section: 諺.
+#[test]
+fn homophones_are_each_readings_words_but_the_pages_own() {
+    let s = served_kiokun();
+    let page = |w: &str| {
+        let page = fetched(&s, &path_of(w));
+        assert!(page.starts_with("HTTP/1.1 200"), "{w}: {page}");
+        homophones_in(page.split("<script").next().unwrap_or_default())
+    };
+    let person = page("人");
+    let readings: Vec<Option<String>> = person.iter().map(|(r, _)| r.clone()).collect();
+    assert_eq!(
+        readings,
+        ["と", "ひと", "にん", "じん"]
+            .map(|r| Some(r.to_string()))
+            .to_vec()
+    );
+    let hito = &person[1].1;
+    assert_eq!(hito[0], ("一".to_string(), true), "{hito:?}");
+    assert!(hito.iter().all(|(w, _)| w != "人"), "{hito:?}");
+    let jin = &person[3].1;
+    assert_eq!(jin[0], ("仁".to_string(), true), "{jin:?}");
+    assert!(jin[1..].iter().all(|(_, common)| !common), "{jin:?}");
+    let colour = page("色");
+    let shoku = &colour[0].1;
+    assert!(shoku.contains(&("食".to_string(), true)), "{shoku:?}");
+    assert!(shoku.contains(&("食".to_string(), false)), "{shoku:?}");
+    assert_eq!(page("夢"), vec![(None, vec![("努".to_string(), false)])]);
+    assert_eq!(page("諺"), Vec::new());
+    let html = fetched(&s, &path_of("夢"));
+    assert!(
+        html.contains("<h2 id=\"homophones-heading\">Homophones</h2>"),
+        "{html}"
+    );
+    assert!(
+        html.contains(&format!("href=\"{}\"", path_of("努"))),
+        "{html}"
+    );
+    // A reading two of the page's words share is one group: an entry made
+    // for it, its two words read かみ.
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    write_entry(
+        dir.path(),
+        "上",
+        r#"{"key":"上","japanese_words":[
+            {"id":"1","kanji":[{"text":"上","tags":[],"common":true}],"kana":[{"text":"かみ","tags":[],"common":true}],"sense":[]},
+            {"id":"2","kanji":[{"text":"上","tags":[],"common":true}],"kana":[{"text":"かみ","tags":[],"common":false},{"text":"うえ","tags":[],"common":true}],"sense":[]}]}"#,
+    );
+    let shared = served_kiokun_on(dir.path());
+    let page = fetched(&shared, &path_of("上"));
+    let groups = homophones_in(page.split("<script").next().unwrap_or_default());
+    let readings: Vec<Option<String>> = groups.iter().map(|(r, _)| r.clone()).collect();
+    assert_eq!(
+        readings,
+        vec![Some("かみ".to_string()), Some("うえ".to_string())],
+        "{page}"
+    );
+}
+
+/// A Japanese word's entry as kiokun's build writes one, with one sense of
+/// parts of speech `pos`.
+fn japanese_entry(word: &str, kana: &str, pos: &[&str]) -> String {
+    let pos: Vec<String> = pos.iter().map(|p| format!("\"{p}\"")).collect();
+    format!(
+        r#"{{"key":"{word}","japanese_words":[{{"id":"{word}","kanji":[{{"text":"{word}","tags":[],"common":true}}],
+            "kana":[{{"text":"{kana}","tags":[],"common":true}}],
+            "sense":[{{"gloss":[{{"text":"a gloss"}}],"info":[],"partOfSpeech":[{}],"field":[],"misc":[],"dialect":[]}}]}}]}}"#,
+        pos.join(",")
+    )
+}
+
+/// The page's note on an inflected address: the word asked, the form shown,
+/// how, and the other forms linked.
+fn inflection_in(html: &str) -> Option<(String, String, String, Vec<String>)> {
+    let at = html.find("class=\"conjugation-info\"")?;
+    let note = &html[at..at + html[at..].find("</aside>")?];
+    let text = |class: &str| {
+        let from = note.find(&format!("class=\"{class}\""))?;
+        let rest = &note[from..];
+        let rest = &rest[rest.find('>')? + 1..];
+        Some(rest[..rest.find('<')?].to_string())
+    };
+    let others = note
+        .split("class=\"alternative-chip\"")
+        .skip(1)
+        .filter_map(|chip| {
+            let rest = &chip[chip.find('>')? + 1..];
+            Some(rest[..rest.find('<')?].to_string())
+        })
+        .collect();
+    Some((
+        text("conjugated-from")?,
+        text("dictionary-form")?,
+        text("conjugation-detail")?,
+        others,
+    ))
+}
+
+/// **An inflected word shows the dictionary form it is** (the deinflection
+/// ADR, the integrator's ruling of 2026-10-11): a word with no file of its own
+/// is read back, by the rules of the grammar the ADR cites, to the forms it
+/// can be; the first whose entry's part of speech fits is shown, 200, at the
+/// address asked, with the note "asked → form (how)" and the others linked.
+/// Over entries made for it:
+/// - endings and auxiliaries read back in turn: 食べなかった, 食べさせられた;
+/// - each verb class's own forms: a godan's euphony (書いて), 行く's (行った), the
+///   godan potential (書ける), する after a noun (勉強しました), 来る;
+/// - an adjective's (高くなかった), and いい's on よ (よかった);
+/// - a hiragana form whose own word has no entry is looked up by reading, as
+///   kiokun.com does: はいた is はく, which the index sample reads as 掃く, 履く
+///   and 吐く, of which 履く and 吐く have entries here;
+/// - a form nothing reads back is not found.
+#[test]
+fn an_inflected_word_shows_the_dictionary_form_it_is() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    for (word, kana, pos) in [
+        ("食べる", "たべる", &["v1", "vt"][..]),
+        ("書く", "かく", &["v5k", "vt"][..]),
+        ("行く", "いく", &["v5k-s", "vi"][..]),
+        ("勉強", "べんきょう", &["n", "vs"][..]),
+        ("来る", "くる", &["vk", "vi"][..]),
+        ("高い", "たかい", &["adj-i"][..]),
+        ("いい", "いい", &["adj-ix"][..]),
+        ("履く", "はく", &["v5k", "vt"][..]),
+        ("吐く", "はく", &["v5k", "vt"][..]),
+        // はいた is also はいる's past, but this はいる is a noun: its entry
+        // does not fit the verb.
+        ("はいる", "はいる", &["n"][..]),
+    ] {
+        write_entry(dir.path(), word, &japanese_entry(word, kana, pos));
+    }
+    // A candidate's file that is a stub is followed to the entry it names:
+    // たべた is たべる's past, and たべる's file names 食べる.
+    write_entry(
+        dir.path(),
+        "たべる",
+        r#"{"key":"たべる","redirect":"食べる"}"#,
+    );
+    let s = served_kiokun_on(dir.path());
+    let note = |asked: &str| {
+        let page = fetched(&s, &path_of(asked));
+        assert!(page.starts_with("HTTP/1.1 200"), "{asked}: {page}");
+        let html = page.split("<script").next().unwrap_or_default().to_string();
+        let (from, shown, how, others) =
+            inflection_in(&html).unwrap_or_else(|| panic!("{asked}: no note: {html}"));
+        assert_eq!(from, asked);
+        assert!(
+            html.contains(&format!("<h1 id=\"headword\">{shown}</h1>")),
+            "{asked}: {html}"
+        );
+        (shown, how, others)
+    };
+    let shown = |asked: &str, form: &str, how: &str| {
+        let (s, h, _) = note(asked);
+        assert_eq!((s.as_str(), h.as_str()), (form, how), "{asked}");
+    };
+    shown("食べた", "食べる", "(past)");
+    shown("食べなかった", "食べる", "(negative, past)");
+    shown(
+        "食べさせられた",
+        "食べる",
+        "(causative, passive or potential, past)",
+    );
+    shown("書いて", "書く", "(te form)");
+    shown("書ける", "書く", "(potential)");
+    shown("書かれる", "書く", "(passive)");
+    shown("行った", "行く", "(past)");
+    shown("勉強しました", "勉強", "(polite, past)");
+    shown("来なかった", "来る", "(negative, past)");
+    shown("高くなかった", "高い", "(negative, past)");
+    shown("よかった", "いい", "(past)");
+    let (form, how, others) = note("はいた");
+    assert_eq!(how, "(past)");
+    let mut all = vec![form];
+    all.extend(others);
+    all.sort();
+    assert_eq!(all, vec!["吐く".to_string(), "履く".to_string()]);
+    // The stub's word is the form shown, as kiokun.com adds the candidate.
+    shown("たべた", "たべる", "(past)");
+    let none = fetched(&s, &path_of("ほげほげ"));
+    assert!(none.starts_with("HTTP/1.1 404"), "{none}");
+    // A word with its own file is its own page, with no note.
+    let own = fetched(&s, &path_of("書く"));
+    assert!(!own.contains("conjugation-info"), "{own}");
+}
+
+/// **Deinflection against kiokun.com's answers**: for each inflected form the
+/// oracle asked, the page's answer beside kiokun.com's resolution. Where
+/// kiokun.com finds a form, the page shows it, 200, with the same first form
+/// and the same forms in all (in any order: each side orders the others by its
+/// own candidates); where kiokun.com finds none, the page is not found. Each
+/// difference is listed, by kind.
+fn deinflection_held_to_oracle(
+    s: &Server,
+    oracle: &serde_json::Value,
+) -> (BTreeMap<String, usize>, Vec<String>) {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut named: BTreeMap<String, usize> = BTreeMap::new();
+    let mut differ = Vec::new();
+    for (form, answer) in answers {
+        let page = fetched(s, &path_of(form));
+        let html = page.split("<script").next().unwrap_or_default();
+        let at = format!(
+            "{form} ({} {}, {})",
+            answer["from"], answer["pos"], answer["how"]
+        );
+        let Some(primary) = answer["primary"].as_str() else {
+            if !page.starts_with("HTTP/1.1 404") {
+                match inflection_in(html) {
+                    // いい's forms on よ, which kiokun.com reads as よい's alone.
+                    Some((_, s, _, others))
+                        if s.ends_with("いい") && others.iter().all(|o| o.ends_with("いい")) =>
+                    {
+                        *named.entry("いい beside よい".to_string()).or_default() += 1;
+                    }
+                    shown => {
+                        let shown = shown.map(|(_, s, h, _)| format!("{s} {h}"));
+                        differ.push(format!(
+                            "{at}: kiokun.com finds none; the rewrite {shown:?}"
+                        ));
+                    }
+                }
+            }
+            continue;
+        };
+        let Some((_, shown, how, others)) = inflection_in(html) else {
+            differ.push(format!(
+                "{at}: kiokun.com {primary}; the rewrite {}",
+                page.lines().next().unwrap_or_default()
+            ));
+            continue;
+        };
+        let mut want: Vec<String> = answer["alternatives"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|a| a.as_str().map(str::to_string))
+            .collect();
+        want.push(primary.to_string());
+        want.sort();
+        let mut in_order = vec![shown.clone()];
+        in_order.extend(others.iter().cloned());
+        let mut got = in_order.clone();
+        got.sort();
+        if shown == primary && got == want {
+            continue;
+        }
+        // The rewrite's own answers (the deinflection ADR's Differences): a
+        // 〜する verb JMdict marks vs-s, read as a する verb; and いい beside
+        // よい. With those forms taken out, the rest is kiokun.com's.
+        let extra = |w: &str| {
+            !want.iter().any(|k| k == w)
+                && (w.ends_with("する")
+                    || (w.ends_with("いい")
+                        && want.contains(&format!("{}よい", &w[..w.len() - "いい".len()]))))
+        };
+        let kept: Vec<&String> = in_order.iter().filter(|w| !extra(w)).collect();
+        let mut kept_sorted: Vec<String> = kept.iter().map(|w| w.to_string()).collect();
+        kept_sorted.sort();
+        if kept.first().map(|w| w.as_str()) == Some(primary) && kept_sorted == want {
+            let kind = if in_order.iter().any(|w| extra(w) && w.ends_with("する")) {
+                "a vs-s verb read as a する verb"
+            } else {
+                "いい beside よい"
+            };
+            *named.entry(kind.to_string()).or_default() += 1;
+            continue;
+        }
+        differ.push(format!(
+            "{at}: kiokun.com {primary} of {want:?}; the rewrite {shown} {how} of {got:?}"
+        ));
+    }
+    (named, differ)
+}
+
+/// **Deinflection against kiokun.com's answers for the repository's sample**
+/// (`kiokun-oracle/deinflection-sample.json`, written by `just
+/// e14-kiokun-deinflection` over the deinflection sample and the index
+/// sample): what CI holds.
+#[test]
+fn deinflection_matches_kiokuns_answers_for_the_sample() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let fixture: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(
+            root.join("spikes/own-renderer/kiokun-oracle/deinflection-sample.json"),
+        )
+        .expect("the fixture"),
+    )
+    .expect("JSON");
+    let oracle = &fixture["oracle"];
+    assert!(
+        oracle["asked"].as_u64().is_some_and(|n| n > 100),
+        "{fixture}"
+    );
+    let s = served_kiokun_on(&root.join("examples/kiokun/data/deinflection"));
+    let (named, differ) = deinflection_held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+    // The sample holds each of the rewrite's own answers.
+    assert!(
+        named
+            .get("a vs-s verb read as a する verb")
+            .is_some_and(|n| *n > 0),
+        "{named:?}"
+    );
+    assert!(
+        named.get("いい beside よい").is_some_and(|n| *n > 0),
+        "{named:?}"
+    );
+}
+
+/// **Deinflection against kiokun.com's own code** (local: `just
+/// e14-kiokun-deinflection` runs its `findWordsWithDeinflection`, copied from
+/// `KIOKUN_APP`'s HEAD, over kiokun-data's entries and committed index, and
+/// names its answers in `KIOKUN_DEINFLECTION_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-deinflection`"]
+fn deinflection_matches_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_DEINFLECTION_ORACLE").expect("KIOKUN_DEINFLECTION_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let (named, differ) = deinflection_held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} forms of {} words (stride {}, {} entries read)",
+        oracle["asked"], oracle["words"], oracle["stride"], oracle["read"]
+    );
+    println!("named differences: {named:?}");
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(400) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
+}
+
+/// **The Homophones against kiokun.com's**: for each word the oracle
+/// answers, each reading's words, as a multiset of (word, common), beside
+/// kiokun.com's; and the rewrite's groups in the readings' order and each
+/// group's words common first, then shorter, as kiokun.com's statement
+/// orders them. kiokun.com shows each group when its request answers, so its
+/// groups' order is not compared (the reading index ADR's Difference), nor
+/// the order of words its statement does not order.
+fn homophones_held_to_oracle(s: &Server, oracle: &serde_json::Value) -> Vec<String> {
+    let answers = oracle["answers"].as_object().expect("the oracle's answers");
+    let mut differ = Vec::new();
+    for (word, groups) in answers {
+        let page = fetched(s, &path_of(word));
+        if !page.starts_with("HTTP/1.1 200") {
+            differ.push(format!(
+                "{word}: {}",
+                page.lines().next().unwrap_or_default()
+            ));
+            continue;
+        }
+        let got = homophones_in(page.split("<script").next().unwrap_or_default());
+        let want: Vec<(String, Vec<(String, bool)>)> = groups
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|g| {
+                let words = g["words"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|w| {
+                        (
+                            w["word"].as_str().unwrap_or_default().to_string(),
+                            w["is_common"].as_i64().unwrap_or(0) != 0
+                                || w["is_common"].as_bool() == Some(true),
+                        )
+                    })
+                    .collect();
+                (g["reading"].as_str().unwrap_or_default().to_string(), words)
+            })
+            .collect();
+        if got.len() != want.len() {
+            differ.push(format!(
+                "{word}: {} groups, kiokun.com {}",
+                got.len(),
+                want.len()
+            ));
+            continue;
+        }
+        for ((reading, words), (want_reading, want_words)) in got.iter().zip(&want) {
+            if want.len() > 1 && reading.as_deref() != Some(want_reading.as_str()) {
+                differ.push(format!(
+                    "{word}: a group read {reading:?}, kiokun.com's {want_reading}"
+                ));
+            }
+            let (mut a, mut b) = (words.clone(), want_words.clone());
+            a.sort();
+            b.sort();
+            if a != b {
+                differ.push(format!(
+                    "{word} {want_reading}:\n  kiokun.com: {want_words:?}\n  rewrite:    {words:?}"
+                ));
+            }
+            let ordered = words.windows(2).all(|p| {
+                let key = |(w, c): &(String, bool)| (!c, w.chars().count());
+                key(&p[0]) <= key(&p[1])
+            });
+            if !ordered {
+                differ.push(format!(
+                    "{word} {want_reading}: not common first, then shorter: {words:?}"
+                ));
+            }
+        }
+    }
+    differ
+}
+
+/// **Homophones against kiokun.com's answers for the repository's sample**
+/// (`kiokun-oracle/homophones-sample.json`, written by `just
+/// e14-kiokun-homophones` over the word sample and the index sample): what CI
+/// holds.
+#[test]
+fn homophones_match_kiokuns_answers_for_the_sample() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../kiokun-oracle/homophones-sample.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the fixture")).expect("JSON");
+    let oracle = &fixture["oracle"];
+    assert!(
+        oracle["answered"].as_u64().is_some_and(|n| n > 10),
+        "{fixture}"
+    );
+    let s = served_kiokun();
+    let differ = homophones_held_to_oracle(&s, oracle);
+    assert!(differ.is_empty(), "{differ:#?}");
+}
+
+/// **Homophones against kiokun.com's own code** (local: `just
+/// e14-kiokun-homophones` runs its `api/lookup-reading` handler, copied from
+/// `KIOKUN_APP`'s HEAD, over kiokun-data's committed index and a sample of
+/// its entries, and names its answers in `KIOKUN_HOMOPHONES_ORACLE`).
+#[test]
+#[ignore = "reads kiokun.com's own answers, made locally by `just e14-kiokun-homophones`"]
+fn homophones_match_kiokuns_own_on_a_sample() {
+    let path = std::env::var_os("KIOKUN_HOMOPHONES_ORACLE").expect("KIOKUN_HOMOPHONES_ORACLE");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("the answers")).expect("JSON");
+    let s = served_kiokun();
+    let differ = homophones_held_to_oracle(&s, &oracle);
+    println!(
+        "compared: {} words with Japanese words (stride {}, {} entries read, {} readings)",
+        oracle["answered"], oracle["stride"], oracle["read"], oracle["lookups"]
+    );
+    println!("unnamed differences: {}", differ.len());
+    for d in differ.iter().take(30) {
+        println!("difference: {d}");
+    }
+    assert!(differ.is_empty(), "{} unnamed difference(s)", differ.len());
 }
 
 /// The value at fraction `q` of sorted `values` (nearest rank).
@@ -1169,10 +2581,30 @@ fn title(html: &str) -> String {
 
 /// **The page's description of itself** (`buildDictionarySeo`): 人's title
 /// is the word and its first three meanings, the learner gloss first, and
-/// its description says so; Open Graph and Twitter repeat them.
+/// its description says so; Open Graph and Twitter repeat them. The gloss
+/// and the variants are Dong Chinese's, which the repository's sample leaves
+/// out, so the entries are made here.
 #[test]
 fn the_page_describes_itself_as_kiokun_com_does() {
-    let s = served_kiokun();
+    let dir = tempfile::TempDir::with_prefix("pw-kiokun-data-").expect("a directory");
+    write_entry(
+        dir.path(),
+        "人",
+        r#"{"key":"人","chinese_char":{"char":"人","gloss":"person"},
+            "chinese_words":[{"_id":"1","simp":"人","trad":"人","items":[{"pinyin":"rén","definitions":["man","person","people"]}]}]}"#,
+    );
+    write_entry(
+        dir.path(),
+        "谚",
+        r#"{"key":"谚","redirect":"諺","chinese_char":{"char":"谚","tradVariants":["諺"]}}"#,
+    );
+    write_entry(
+        dir.path(),
+        "諺",
+        r#"{"key":"諺","chinese_char":{"char":"諺","simpVariants":["谚"]},
+            "chinese_words":[{"_id":"1","simp":"谚","trad":"諺","items":[{"pinyin":"yàn","definitions":["proverb"]}]}]}"#,
+    );
+    let s = served_kiokun_on(dir.path());
     let page = fetched(&s, &path_of("人"));
     assert_eq!(title(&page), "人 — person, man, people | Kiokun");
     let described = "人 means person, man, people. Character readings, definitions, examples, \
@@ -1519,6 +2951,12 @@ fn the_japanese_examples_match_kiokuns_answers_for_the_sample() {
         oracle["answered"].as_u64().unwrap_or_default() > 0,
         "{fixture}"
     );
+    // Each example committed carries its Tatoeba sentence id, which
+    // attributes it to its author (CC BY 2.0 FR; kiokun-oracle/NOTICE.md).
+    for (word, examples) in oracle["answers"].as_object().expect("the answers") {
+        let ids = oracle["tatoeba"][word].as_array().map(Vec::len);
+        assert_eq!(ids, examples.as_array().map(Vec::len), "{word}: {fixture}");
+    }
     let s = served_kiokun_on(&sample());
     let differ = examples_held_to_oracle(&s, oracle);
     assert!(differ.is_empty(), "{differ:#?}");

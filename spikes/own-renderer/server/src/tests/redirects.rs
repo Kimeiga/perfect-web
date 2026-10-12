@@ -59,7 +59,7 @@ fn served_with(change: fn(&str) -> String) -> Served {
 
 /// The line of the word query that decides where the word moves, as
 /// written in `app.pw` (kiokun.com's `equivalentTraditionalTarget`).
-const DECIDED: &str = "    let moved = moved_from(first, word)\n";
+const DECIDED: &str = "    let moved = moved_from(first, shown_word)\n";
 
 /// The query answering `Moved` for the words the tests choose besides
 /// kiokun's own: `old` is 魚's, `same` its own, and `dots` an address no
@@ -70,7 +70,7 @@ fn moving(app: &str) -> String {
         DECIDED,
         "    let moved = if word == \"old\" { Some(\"魚\") } else { \
          if word == \"same\" { Some(\"same\") } else { \
-         if word == \"dots\" { Some(\"..\") } else { moved_from(first, word) } } }\n",
+         if word == \"dots\" { Some(\"..\") } else { moved_from(first, shown_word) } } }\n",
     )
 }
 

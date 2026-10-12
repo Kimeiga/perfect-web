@@ -632,7 +632,8 @@ fn a_layout_provides_what_its_views_need_and_its_page_provides_it_nothing() {
 fn a_layouts_count_is_speculated_with_the_pages() {
     // The store's page speculates on its cart when an item is added
     // (ADR-0122): its own count, and its layout's, so the page never shows
-    // two counts while the command is out.
+    // two counts while the command is out. Its layout's is the same entry,
+    // speculated once (ADR-0312).
     let b = built(&[]);
     let store = b
         .speculations
@@ -642,23 +643,40 @@ fn a_layouts_count_is_speculated_with_the_pages() {
     let pw_core::backend::wasm::Encoding::Encoded(module) = &store.module else {
         panic!("{:?}", store.module);
     };
-    let bindings: Vec<&str> = module.bindings.iter().map(|b| b.binding.as_str()).collect();
-    assert!(bindings.contains(&"cart"), "{bindings:?}");
-    assert!(bindings.contains(&"cart~StoreLayout"), "{bindings:?}");
-    // Both transitioned for each command that speculates on the cart.
+    // One entry, one binding (ADR-0312): the page's, with the layout's name
+    // for the same entry as its alias, which has no value of its own.
+    let bindings: Vec<(&str, &[String])> = module
+        .bindings
+        .iter()
+        .map(|b| (b.binding.as_str(), b.aliases.as_slice()))
+        .collect();
+    assert_eq!(
+        bindings,
+        [("cart", &["cart~StoreLayout".to_string()][..])],
+        "{bindings:?}"
+    );
     assert!(
         module
             .source
-            .contains("binding: \"cart~StoreLayout\", transition"),
+            .contains("export const aliases = {\n  \"cart~StoreLayout\": \"cart\",\n};"),
         "{}",
         module.source
     );
+    // Transitioned once for each command that speculates on the cart.
     assert!(
         module.source.contains("binding: \"cart\", transition"),
         "{}",
         module.source
     );
-    // And the layout's count is a part it renders again.
+    assert!(
+        !module
+            .source
+            .contains("binding: \"cart~StoreLayout\", transition"),
+        "{}",
+        module.source
+    );
+    // And the layout's count is a part it renders again, from the cart's
+    // value.
     assert!(
         module.source.contains("\"cart~StoreLayout\": ["),
         "{}",

@@ -216,6 +216,22 @@ type Card = Card {
 }
 
 // An entry. A stub carries only `key` and `redirect`, the entry it names.
+// A word kiokun's builder previews in another's entry (`WordPreview`,
+// kiokun-data `src/word_preview_types.rs`): its written form, pinyin,
+// Jyutping, Japanese reading and on'yomi, Korean reading, first definition,
+// whether JMdict calls it common, and its frequency rank.
+type Preview = Preview {
+    w: String,
+    p: String,
+    ct: String,
+    jp: String,
+    jo: String,
+    kr: String,
+    d: String,
+    c: Bool,
+    fr: Option<Int>,
+}
+
 type Entry = Entry {
     key: String,
     redirect: Option<String>,
@@ -229,6 +245,10 @@ type Entry = Entry {
     mnemonic: Option<Card>,
     variants: List<Card>,
     simplified_form_of: String,
+    contains: List<Preview>,
+    in_chinese: List<Preview>,
+    in_japanese: List<Preview>,
+    in_korean: List<Preview>,
 }
 
 // One of kiokun.com's labels for JMdict's codes
@@ -1047,6 +1067,10 @@ fn with_card(e: Entry, card: Option<Card>, variants: List<Card>) -> Entry {
         mnemonic: card,
         variants: variants,
         simplified_form_of: e.simplified_form_of,
+        contains: e.contains,
+        in_chinese: e.in_chinese,
+        in_japanese: e.in_japanese,
+        in_korean: e.in_korean,
     }
 }
 
@@ -1082,6 +1106,18 @@ fn more_names(into: List<JapaneseName>, more: List<JapaneseName>) -> List<Japane
     List.fold(more, into, (out, w) => if List.any(out, s => s.id == w.id) { out } else { List.concat(out, [w]) })
 }
 
+// Contains' previews not yet in `into` by form and readings, appended
+// (`mergeUniqueBy`, `+page.ts:198-202`).
+fn more_contains(into: List<Preview>, more: List<Preview>) -> List<Preview> {
+    List.fold(more, into, (out, p) => if List.any(out, s => s.w == p.w & s.p == p.p & s.jp == p.jp & s.kr == p.kr) { out } else { List.concat(out, [p]) })
+}
+
+// Appears in's previews not yet in `into` by form, appended; none without a
+// form (`+page.ts:203-217`).
+fn more_previews(into: List<Preview>, more: List<Preview>) -> List<Preview> {
+    List.fold(more, into, (out, p) => if p.w == "" | List.any(out, s => s.w == p.w) { out } else { List.concat(out, [p]) })
+}
+
 fn with_chinese(e: Entry, chinese: List<ChineseWord>) -> Entry {
     Entry {
         key: e.key,
@@ -1096,6 +1132,10 @@ fn with_chinese(e: Entry, chinese: List<ChineseWord>) -> Entry {
         mnemonic: e.mnemonic,
         variants: e.variants,
         simplified_form_of: e.simplified_form_of,
+        contains: e.contains,
+        in_chinese: e.in_chinese,
+        in_japanese: e.in_japanese,
+        in_korean: e.in_korean,
     }
 }
 
@@ -1119,6 +1159,10 @@ fn merged_form(into: Entry, related: Entry) -> Entry {
         mnemonic: into.mnemonic,
         variants: other_cards(related_cards, into.mnemonic),
         simplified_form_of: into.simplified_form_of,
+        contains: more_contains(into.contains, related.contains),
+        in_chinese: more_previews(into.in_chinese, related.in_chinese),
+        in_japanese: more_previews(into.in_japanese, related.in_japanese),
+        in_korean: more_previews(into.in_korean, related.in_korean),
     }
 }
 
@@ -1820,8 +1864,564 @@ fn words_for(data: Option<Entry>, stub: Option<Entry>) -> List<String> {
 fn characters_for(word: String, page: Option<Loaded>) -> List<String> {
     let none: List<String> = []
     match page {
-        Some(l) => support_characters(word, l.data, l.stub, header_cards(l.data, l.stub)),
+        Some(l) => distinct(List.concat(support_characters(word, l.data, l.stub, header_cards(l.data, l.stub)), List.map(l.data.contains, p => p.w))),
         None => none,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Contains and Appears in (`src/lib/Contains.svelte`, `src/lib/AppearsIn.svelte`,
+// `src/lib/contains-order.ts`, `src/lib/appears-in-order.ts`).
+
+// The characters `[...text]` gives: one string a code point.
+fn characters(text: String) -> List<String> {
+    List.map(String.codepoints(text), c => String.from_codepoints([c]))
+}
+
+// Where `part` first begins in `text`, or -1 (`String.indexOf`). Counted in
+// code points, not UTF-16 units: each use compares two places in one text,
+// and their order is the same either way.
+fn index_of(text: String, part: String) -> Int {
+    match found_at(text, part, 0) {
+        Some(at) => at,
+        None => -1,
+    }
+}
+
+// `sortContainsWords` (`[word]/+page.svelte:140-150`): previews found in the
+// word first, by where; the rest after, as they were. The sort is stable.
+fn by_place(word: String, a: Preview, b: Preview) -> Int {
+    let at_a = index_of(word, a.w)
+    let at_b = index_of(word, b.w)
+    if at_a == -1 & at_b == -1 { 0 } else { if at_a == -1 { 1 } else { if at_b == -1 { -1 } else { at_a - at_b } } }
+}
+
+// `buildContainsWordForms` (`[word]/+page.svelte:152-178`): the Chinese
+// words' forms, the Japanese words' written forms, the Korean words' hanja,
+// the word and the entry's key, each once. kiokun.com also adds a Korean
+// word's `hanjaForm`, which its builder never writes.
+fn contains_forms(e: Entry, word: String) -> List<String> {
+    let none: List<String> = []
+    let chinese = List.fold(e.chinese, none, (out, w) => List.concat(out, [w.simp, w.trad]))
+    let japanese = List.fold(e.japanese, none, (out, w) => List.concat(out, List.map(w.kanji, k => k.text)))
+    let korean = List.map(e.korean, w => w.hanja)
+    distinct(List.concat(List.concat(chinese, japanese), List.concat(korean, [word, e.key])))
+}
+
+// One preview as `orderContainsWords` places it: its place among the
+// previews, and its characters.
+type Candidate = Candidate {
+    item: Preview,
+    index: Int,
+    chars: List<String>,
+}
+
+// A candidate placed in a form, from `start` to `end`.
+type Placed = Placed {
+    candidate: Candidate,
+    start: Int,
+    end: Int,
+}
+
+// Does `chars` begin at `at` in `form`?
+fn matches_at(form: List<String>, chars: List<String>, at: Int) -> Bool {
+    match List.get(chars, 0) {
+        Some(c) => match List.get(form, at) {
+            Some(f) => if f == c { matches_at(form, List.drop(chars, 1), at + 1) } else { false },
+            None => false,
+        },
+        None => true,
+    }
+}
+
+// `lexicalQuality`: a definition 4, common 2, a frequency rank 1.
+fn quality(p: Preview) -> Int {
+    let defined = if p.d != "" { 4 } else { 0 }
+    let common = if p.c { 2 } else { 0 }
+    let ranked = match p.fr {
+        Some(_) => 1,
+        None => 0,
+    }
+    defined + common + ranked
+}
+
+fn quality_of(placed: List<Placed>) -> Int {
+    List.fold(placed, 0, (total, p) => total + quality(p.candidate.item))
+}
+
+// `lengthImbalance`: the longest piece's length less the shortest's.
+fn imbalance(placed: List<Placed>) -> Int {
+    let lengths = List.map(placed, p => p.end - p.start)
+    let longest = List.fold(lengths, 0, (m, n) => if n > m { n } else { m })
+    let shortest = List.fold(lengths, 1000000000, (m, n) => if n < m { n } else { m })
+    longest - shortest
+}
+
+// The first place the two breakdowns' previews differ: -1 where `a`'s comes
+// first, 1 where `b`'s does, 0 where none differs.
+fn first_difference(a: List<Placed>, b: List<Placed>) -> Int {
+    match List.get(a, 0) {
+        Some(x) => match List.get(b, 0) {
+            Some(y) => if x.candidate.index != y.candidate.index {
+                if x.candidate.index < y.candidate.index { -1 } else { 1 }
+            } else {
+                first_difference(List.drop(a, 1), List.drop(b, 1))
+            },
+            None => 0,
+        },
+        None => 0,
+    }
+}
+
+// `isBetterBreakdown`: fewer pieces; then better words; then pieces nearer
+// one length; then the earlier previews.
+fn better_breakdown(candidate: List<Placed>, current: Option<List<Placed>>) -> Bool {
+    match current {
+        Some(now) => if List.length(candidate) != List.length(now) {
+            List.length(candidate) < List.length(now)
+        } else {
+            if quality_of(candidate) != quality_of(now) {
+                quality_of(candidate) > quality_of(now)
+            } else {
+                if imbalance(candidate) != imbalance(now) { imbalance(candidate) < imbalance(now) } else { first_difference(candidate, now) < 0 }
+            }
+        },
+        None => true,
+    }
+}
+
+// The best breakdown from `stop` to the range's end, as `table` holds it:
+// `table[i]` is the best from `end - i`.
+fn best_at(table: List<Option<List<Placed>>>, end: Int, stop: Int) -> Option<List<Placed>> {
+    match List.get(table, end - stop) {
+        Some(best) => best,
+        None => None,
+    }
+}
+
+// One candidate tried at `cursor`: where it fits, with the best breakdown
+// after it, kept where it beats `best`.
+fn tried(form: List<String>, start: Int, end: Int, cursor: Int, table: List<Option<List<Placed>>>, best: Option<List<Placed>>, c: Candidate) -> Option<List<Placed>> {
+    let stop = cursor + List.length(c.chars)
+    if stop > end | (cursor == start & stop == end) | !matches_at(form, c.chars, cursor) {
+        best
+    } else {
+        match best_at(table, end, stop) {
+            Some(tail) => if better_breakdown(List.concat([Placed { candidate: c, start: cursor, end: stop }], tail), best) {
+                Some(List.concat([Placed { candidate: c, start: cursor, end: stop }], tail))
+            } else {
+                best
+            },
+            None => best,
+        }
+    }
+}
+
+// Each cursor's best breakdown, from the range's end back to `cursor`.
+fn table_from(form: List<String>, candidates: List<Candidate>, start: Int, end: Int, cursor: Int, table: List<Option<List<Placed>>>) -> List<Option<List<Placed>>> {
+    let none: Option<List<Placed>> = None
+    if cursor < start {
+        table
+    } else {
+        table_from(form, candidates, start, end, cursor - 1, List.concat(table, [List.fold(candidates, none, (best, c) => tried(form, start, end, cursor, table, best, c))]))
+    }
+}
+
+// `bestBreakdown`: the best way to write `form` from `start` to `end` in
+// previews, never the whole range in one. kiokun.com finds each cursor's
+// best once (its `memo`); so does this, from the end back.
+fn breakdown(form: List<String>, candidates: List<Candidate>, start: Int, end: Int) -> Option<List<Placed>> {
+    let done: List<Placed> = []
+    best_at(table_from(form, candidates, start, end, end - 1, [Some(done)]), end, start)
+}
+
+// A range of a form, from `start` to `end`.
+type Range = Range {
+    start: Int,
+    end: Int,
+}
+
+// `buildHierarchy`'s result: the pieces placed, breadth first, each once,
+// and how many the whole form broke into.
+type Hierarchy = Hierarchy {
+    ordered: List<Placed>,
+    top: Int,
+}
+
+// One level of `buildHierarchy`: each range's breakdown, its pieces kept
+// once each, and the pieces longer than one character the next level's
+// ranges.
+type Level = Level {
+    ordered: List<Placed>,
+    next: List<Range>,
+    top: Int,
+}
+
+fn placed_once(ordered: List<Placed>, pieces: List<Placed>) -> List<Placed> {
+    List.fold(pieces, ordered, (out, p) => if List.any(out, q => q.candidate.index == p.candidate.index) { out } else { List.concat(out, [p]) })
+}
+
+fn level_of(form: List<String>, candidates: List<Candidate>, ranges: List<Range>, ordered: List<Placed>, top: Int, first: Bool) -> Level {
+    let none: List<Range> = []
+    List.fold(ranges, Level { ordered: ordered, next: none, top: top }, (l, r) => match breakdown(form, candidates, r.start, r.end) {
+        Some(pieces) => Level {
+            ordered: placed_once(l.ordered, pieces),
+            next: List.concat(l.next, List.map(List.filter(pieces, p => p.end - p.start > 1), p => Range { start: p.start, end: p.end })),
+            top: if first { List.length(pieces) } else { l.top },
+        },
+        None => l,
+    })
+}
+
+fn levels(form: List<String>, candidates: List<Candidate>, ranges: List<Range>, ordered: List<Placed>, top: Int, first: Bool) -> Hierarchy {
+    if List.length(ranges) == 0 {
+        Hierarchy { ordered: ordered, top: top }
+    } else {
+        let l = level_of(form, candidates, ranges, ordered, top, first)
+        levels(form, candidates, l.next, l.ordered, l.top, false)
+    }
+}
+
+// `buildHierarchy`: the form broken into previews, breadth first. A count
+// of 1000000000 stands for kiokun.com's `Infinity`: no form has as many
+// characters.
+fn hierarchy(form: List<String>, candidates: List<Candidate>) -> Hierarchy {
+    let none: List<Placed> = []
+    if List.length(form) < 2 { Hierarchy { ordered: none, top: 1000000000 } } else { levels(form, candidates, [Range { start: 0, end: List.length(form) }], none, 1000000000, true) }
+}
+
+// `isBetterHierarchy`: fewer pieces at the top; then more pieces placed.
+fn better_hierarchy(candidate: Hierarchy, current: Hierarchy) -> Bool {
+    if candidate.top != current.top { candidate.top < current.top } else { List.length(candidate.ordered) > List.length(current.ordered) }
+}
+
+// The form whose hierarchy is best so far.
+type Chosen = Chosen {
+    form: String,
+    hierarchy: Hierarchy,
+}
+
+fn chosen_of(candidates: List<Candidate>, best: Chosen, form: String) -> Chosen {
+    let h = hierarchy(characters(form), candidates)
+    if better_hierarchy(h, best.hierarchy) { Chosen { form: form, hierarchy: h } } else { best }
+}
+
+// `compareRemaining`: the longer preview first; then the earlier in the
+// form; then the earlier preview.
+fn by_remaining(form: String, a: Candidate, b: Candidate) -> Int {
+    let at_a = if index_of(form, a.item.w) == -1 { 1000000000 } else { index_of(form, a.item.w) }
+    let at_b = if index_of(form, b.item.w) == -1 { 1000000000 } else { index_of(form, b.item.w) }
+    if List.length(a.chars) != List.length(b.chars) {
+        List.length(b.chars) - List.length(a.chars)
+    } else {
+        if at_a != at_b { at_a - at_b } else { a.index - b.index }
+    }
+}
+
+// `orderContainsWords` (`contains-order.ts:29-57`): the previews that break
+// the word down, breadth first, in reading order; then the rest.
+fn ordered_contains(words: List<Preview>, forms: List<String>) -> List<Candidate> {
+    let none: List<Candidate> = []
+    let candidates = List.filter(List.fold(words, none, (out, p) => List.concat(out, [Candidate { item: p, index: List.length(out), chars: characters(p.w) }])), c => List.length(c.chars) > 0)
+    let unique = distinct(forms)
+    let first = match List.get(unique, 0) {
+        Some(f) => f,
+        None => "",
+    }
+    let nothing: List<Placed> = []
+    let chosen = List.fold(unique, Chosen { form: first, hierarchy: Hierarchy { ordered: nothing, top: 1000000000 } }, (best, f) => chosen_of(candidates, best, f))
+    let placed = List.map(chosen.hierarchy.ordered, p => p.candidate)
+    let rest = List.filter(candidates, c => !List.any(placed, p => p.index == c.index))
+    List.concat(placed, List.sort_by(rest, (a, b) => by_remaining(chosen.form, a, b)))
+}
+
+// A card of Contains: a preview, and the written forms it stands for where
+// the word's forms differ at its place (`buildContainsCards`).
+type ContainsCard = ContainsCard {
+    candidate: Candidate,
+    forms: List<String>,
+}
+
+// The forms' characters at `position`, each once.
+fn at_position(forms: List<List<String>>, position: Int) -> List<String> {
+    distinct(List.map(forms, chars => match List.get(chars, position) {
+        Some(c) => c,
+        None => "",
+    }))
+}
+
+// Is `w` the character at `at`?
+fn has_at(chars: List<String>, at: Int, w: String) -> Bool {
+    match List.get(chars, at) {
+        Some(c) => c == w,
+        None => false,
+    }
+}
+
+// The first place where one of the forms has the character `w`.
+fn position_of(forms: List<List<String>>, w: String, at: Int, length: Int) -> Int {
+    if at >= length { -1 } else { if List.any(forms, chars => has_at(chars, at, w)) { at } else { position_of(forms, w, at + 1, length) } }
+}
+
+type Carded = Carded {
+    cards: List<ContainsCard>,
+    used: List<Int>,
+}
+
+fn carded(previews: List<Candidate>, forms: List<List<String>>, length: Int, state: Carded, c: Candidate) -> Carded {
+    let position = if List.length(c.chars) == 1 { position_of(forms, c.item.w, 0, length) } else { -1 }
+    if List.any(state.used, u => u == c.index) {
+        state
+    } else {
+        if position == -1 {
+            Carded { cards: List.concat(state.cards, [ContainsCard { candidate: c, forms: [] }]), used: List.concat(state.used, [c.index]) }
+        } else {
+            let variants = at_position(forms, position)
+            let matched = List.filter(previews, p => List.length(p.chars) == 1 & List.any(variants, v => v == p.item.w))
+            match List.get(matched, 0) {
+                Some(m) => Carded {
+                    cards: List.concat(state.cards, [ContainsCard { candidate: m, forms: variants }]),
+                    used: List.concat(state.used, List.map(matched, p => p.index)),
+                },
+                None => state,
+            }
+        }
+    }
+}
+
+// `buildContainsCards` (`Contains.svelte:47-85`): where the word has
+// several forms of one length, the one-character previews at one place are
+// one card, written with each form's character there (学/學).
+fn contains_cards(previews: List<Candidate>, word_forms: List<String>) -> List<ContainsCard> {
+    let plain = List.map(previews, c => ContainsCard { candidate: c, forms: [] })
+    let forms = List.map(distinct(word_forms), characters)
+    let length = match List.get(forms, 0) {
+        Some(f) => List.length(f),
+        None => 0,
+    }
+    let none: List<ContainsCard> = []
+    let nobody: List<Int> = []
+    if List.length(forms) < 2 | length == 0 | List.any(forms, f => List.length(f) != length) {
+        plain
+    } else {
+        let cards = List.fold(previews, Carded { cards: none, used: nobody }, (state, c) => carded(previews, forms, length, state, c)).cards
+        if List.length(cards) > 0 { cards } else { plain }
+    }
+}
+
+// `cleanGloss` (`Contains.svelte:104-108`): one source marker taken off the
+// end, matched ignoring ASCII case.
+fn clean_gloss(gloss: String) -> String {
+    let t = String.trim(gloss)
+    let lower = String.to_lower_ascii(t)
+    let marker = match List.find(["(simp)", "(trad/jp)", "(trad)", "(jp)"], m => String.ends_with(lower, m)) {
+        Some(m) => m,
+        None => "",
+    }
+    if marker == "" { t } else { String.trim(String.slice(t, 0, String.length(t) - String.length(marker))) }
+}
+
+// One card of Contains as the page shows it (`Contains.svelte:140-200`):
+// its written forms, each reading kiokun.com shows, and its definition.
+type ShownContains = ShownContains {
+    id: String,
+    w: String,
+    text: String,
+    p: String,
+    ct: String,
+    jp: String,
+    jo: String,
+    kr: String,
+    readings: Bool,
+    japanese: Bool,
+    on_and_kun: Bool,
+    jp_class: String,
+    kun_label: String,
+    definition: String,
+}
+
+// `displayDefinition`: the first of the card's characters with a component
+// gloss, cleaned; else the preview's definition.
+fn contains_definition(card: ContainsCard, glosses: List<CharGloss>) -> String {
+    let p = card.candidate.item
+    match List.find(distinct(List.concat([p.w], card.forms)), c => List.any(glosses, g => g.character == c & g.gloss != "")) {
+        Some(c) => match List.find(glosses, g => g.character == c & g.gloss != "") {
+            Some(g) => clean_gloss(g.gloss),
+            None => p.d,
+        },
+        None => p.d,
+    }
+}
+
+fn contains_shown(card: ContainsCard, glosses: List<CharGloss>, n: Int) -> ShownContains {
+    let p = card.candidate.item
+    let jo = if p.jo != p.jp { p.jo } else { "" }
+    ShownContains {
+        id: "contains:{n}",
+        w: p.w,
+        text: if List.length(card.forms) > 0 { String.join(card.forms, "/") } else { p.w },
+        p: p.p,
+        ct: p.ct,
+        jp: p.jp,
+        jo: jo,
+        kr: p.kr,
+        readings: p.p != "" | p.ct != "" | p.jp != "" | jo != "" | p.kr != "",
+        japanese: p.jp != "" | jo != "",
+        on_and_kun: p.jp != "" & jo != "",
+        jp_class: if jo != "" { "japanese-reading kunyomi-reading" } else { "japanese-reading" },
+        kun_label: if jo != "" { "Japanese kun’yomi: {p.jp}" } else { "Japanese reading: {p.jp}" },
+        definition: contains_definition(card, glosses),
+    }
+}
+
+// A list shown ten at a time (`displayCount`, `pageSize` 10): the first
+// ten, and the rest behind a disclosure, which needs no script.
+type ContainsList = ContainsList {
+    first: List<ShownContains>,
+    rest: List<ShownContains>,
+    more: String,
+}
+
+// Contains (`[word]/+page.svelte:916-925`, `Contains.svelte`): the word's
+// previews ordered by where they sit, broken down, carded, and shown.
+fn contains_of(e: Entry, word: String, glosses: List<CharGloss>) -> ContainsList {
+    let sorted = List.sort_by(e.contains, (a, b) => by_place(word, a, b))
+    let forms = contains_forms(e, word)
+    let cards = contains_cards(ordered_contains(sorted, forms), forms)
+    let none: List<ShownContains> = []
+    let shown = List.fold(cards, none, (out, c) => List.concat(out, [contains_shown(c, glosses, List.length(out))]))
+    ContainsList {
+        first: List.take(shown, 10),
+        rest: List.drop(shown, 10),
+        more: "{List.length(shown) - 10} more",
+    }
+}
+
+// INVISIBLE (`appears-in-order.ts:14`): zero-width characters and white
+// space taken out.
+fn visible_text(text: String) -> String {
+    String.from_codepoints(List.filter(String.codepoints(text), c => c != 8203 & c != 8204 & c != 8205 & c != 8288 & c != 65279 & String.trim(String.from_codepoints([c])) != ""))
+}
+
+// `readingOf`: the pinyin, else the Japanese reading, else the Korean, seen
+// and lower-cased.
+fn reading_of(p: Preview) -> String {
+    String.to_lower(visible_text(if p.p != "" { p.p } else { if p.jp != "" { p.jp } else { p.kr } }))
+}
+
+// `isChineseProperNoun`: pinyin that begins with an upper-case letter
+// (`/^\p{Lu}/u`): one that upper-cases to itself and lower-cases to
+// another.
+fn proper_noun(p: Preview) -> Bool {
+    let first = String.slice(visible_text(p.p), 0, 1)
+    first != "" & String.to_upper(first) == first & String.to_lower(first) != first
+}
+
+// `dedupeAppearsIn`: the first preview of each written form, reading and
+// definition; none without a form.
+fn deduped(words: List<Preview>) -> List<Preview> {
+    let none: List<Preview> = []
+    List.fold(words, none, (out, p) => if p.w == "" | List.any(out, q => q.w == p.w & reading_of(q) == reading_of(p) & String.trim(q.d) == String.trim(p.d)) { out } else { List.concat(out, [p]) })
+}
+
+// `rankOf`: a rank above zero, else last.
+fn rank_of(p: Preview) -> Int {
+    match p.fr {
+        Some(n) => if n > 0 { n } else { 1000000000 },
+        None => 1000000000,
+    }
+}
+
+type Ranked = Ranked {
+    item: Preview,
+    index: Int,
+}
+
+fn by_appearance(chinese: Bool, a: Ranked, b: Ranked) -> Int {
+    let proper = (if proper_noun(a.item) { 1 } else { 0 }) - (if proper_noun(b.item) { 1 } else { 0 })
+    let common = (if b.item.c { 1 } else { 0 }) - (if a.item.c { 1 } else { 0 })
+    let first = if chinese { proper } else { common }
+    if first != 0 {
+        first
+    } else {
+        if rank_of(a.item) != rank_of(b.item) { if rank_of(a.item) < rank_of(b.item) { -1 } else { 1 } } else { a.index - b.index }
+    }
+}
+
+// `rankAppearsIn` (`appears-in-order.ts:59-82`): Chinese words before names,
+// Japanese common words first, each by frequency rank; Korean as the file
+// lists them.
+fn ranked(words: List<Preview>, language: String) -> List<Preview> {
+    let unique = deduped(words)
+    let none: List<Ranked> = []
+    if language == "korean" {
+        unique
+    } else {
+        List.map(List.sort_by(List.fold(unique, none, (out, p) => List.concat(out, [Ranked { item: p, index: List.length(out) }])), (a, b) => by_appearance(language == "chinese", a, b)), r => r.item)
+    }
+}
+
+// One word of Appears in as the page shows it (`AppearsIn.svelte:160-290`):
+// its reading the column's own, else the pinyin.
+type ShownAppears = ShownAppears {
+    id: String,
+    w: String,
+    reading: String,
+    ct: String,
+    d: String,
+    c: Bool,
+}
+
+type AppearsList = AppearsList {
+    id: String,
+    heading: String,
+    lang: String,
+    first: List<ShownAppears>,
+    rest: List<ShownAppears>,
+    more: String,
+}
+
+fn appears_of(words: List<Preview>, language: String, heading: String, lang: String) -> AppearsList {
+    let none: List<ShownAppears> = []
+    let shown = List.fold(ranked(words, language), none, (out, p) => List.concat(out, [ShownAppears {
+        id: "{language}-words:{List.length(out)}",
+        w: p.w,
+        reading: if language == "japanese" & p.jp != "" { p.jp } else { if language == "korean" & p.kr != "" { p.kr } else { p.p } },
+        ct: if language == "chinese" { p.ct } else { "" },
+        d: p.d,
+        c: language == "japanese" & p.c,
+    }]))
+    AppearsList {
+        id: "{language}-words",
+        heading: heading,
+        lang: lang,
+        first: List.take(shown, 10),
+        rest: List.drop(shown, 10),
+        more: "{List.length(shown) - 10} more items",
+    }
+}
+
+// Appears in (`[word]/+page.svelte:927-936`): each language's words that
+// contain this one.
+type Appears = Appears {
+    chinese: AppearsList,
+    japanese: AppearsList,
+    korean: AppearsList,
+    shown: Bool,
+    columns: String,
+}
+
+fn appears_in(e: Entry) -> Appears {
+    let chinese = appears_of(e.in_chinese, "chinese", "Chinese Words", "zh")
+    let japanese = appears_of(e.in_japanese, "japanese", "Japanese Words", "ja")
+    let korean = appears_of(e.in_korean, "korean", "Korean Words", "ko")
+    let count = List.length(List.filter([List.length(chinese.first), List.length(japanese.first), List.length(korean.first)], n => n > 0))
+    Appears {
+        chinese: chinese,
+        japanese: japanese,
+        korean: korean,
+        shown: count > 0,
+        columns: if count == 3 { "word-columns three-columns" } else { if count == 2 { "word-columns two-columns" } else { "word-columns" } },
     }
 }
 
@@ -1835,6 +2435,11 @@ type WordShown = WordShown {
     japanese: List<ShownJapanese>,
     korean: List<ShownKorean>,
     names: List<ShownName>,
+    homophones: List<HomophoneGroup>,
+    inflection: List<Inflection>,
+    contains: ContainsList,
+    appears: Appears,
+    edrdg: Bool,
 }
 
 // Each Japanese word's pitch readings, by its place among the words.
@@ -1851,7 +2456,7 @@ fn japanese_all(words: List<JapaneseWord>, labels: List<Label>, pitches: List<Wo
     List.fold(words, none, (out, w) => List.concat(out, [japanese_shown(w, labels, pitch_at(pitches, List.length(out)))]))
 }
 
-fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>, pitches: List<WordPitch>) -> WordShown {
+fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>, pitches: List<WordPitch>, found: List<ReadingFound>, inflection: List<Inflection>) -> WordShown {
     let none: List<ShownChinese> = []
     let e = l.data
     WordShown {
@@ -1862,7 +2467,636 @@ fn shown(word: String, l: Loaded, labels: List<Label>, glosses: List<CharGloss>,
         japanese: japanese_all(e.japanese, labels, pitches),
         korean: List.map(e.korean, korean_shown),
         names: List.map(e.names, name_shown),
+        homophones: homophones_of(word, e, found),
+        inflection: inflection,
+        contains: contains_of(e, word, glosses),
+        appears: appears_in(e),
+        edrdg: edrdg_shown(e),
     }
+}
+
+// Does the page show the Electronic Dictionary Research and Development
+// Group's data: JMdict's words, JMnedict's names, KANJIDIC2's character, or
+// a preview read from them (a Japanese word's reading, gloss or common
+// flag; a character's on'yomi)? EDRDG's licence asks a web dictionary to
+// acknowledge the files "on each screen display"
+// (https://www.edrdg.org/edrdg/licence.html, checked 2026-10-10).
+fn edrdg_shown(e: Entry) -> Bool {
+    let previewed = List.any(e.contains, p => p.jp != "" | p.jo != "") | List.length(e.in_japanese) > 0
+    List.length(e.japanese) > 0 | List.length(e.names) > 0 | previewed | match e.japanese_char {
+        Some(_) => true,
+        None => false,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Deinflection (the deinflection ADR): an inflected Japanese word read back to
+// the dictionary forms it can be. The facts are Japanese grammar's, as
+// English Wikipedia's "Japanese conjugation" (revision 1379736007) and
+// Wiktionary's appendices on Japanese verbs (revision 92311215) and
+// adjectives (revision 91406689) state them. The structure is the rewrite's
+// own:
+// - a word class has bases, each a text that takes the place of the
+//   dictionary form's ending;
+// - an ending closes a word on one of its bases (書い + た);
+// - an auxiliary follows a base and makes a word of its own class (書か +
+//   ない, an adjective), which is read back in turn.
+// So 書かなかった is read back as 書かない, an adjective, past; then as 書く,
+// negative, past.
+
+// One base of a word class: its name, and the text that takes the place of
+// the dictionary form's ending.
+type Base = Base {
+    name: String,
+    text: String,
+}
+
+// A word class: its code (JMdict's part of speech), the group an entry's
+// part of speech is checked against, the dictionary form's ending, and its
+// bases.
+type WordClass = WordClass {
+    code: String,
+    group: String,
+    ending: String,
+    bases: List<Base>,
+}
+
+// A form that closes a word: the groups whose words it closes, the base it
+// follows, its text, and what it says.
+type Closing = Closing {
+    groups: List<String>,
+    base: String,
+    text: String,
+    reasons: List<String>,
+}
+
+// An auxiliary: the groups it follows, the base it follows, its dictionary
+// form, the class of the word it makes, and what it says.
+type Auxiliary = Auxiliary {
+    groups: List<String>,
+    base: String,
+    text: String,
+    makes: String,
+    reason: String,
+}
+
+// A word read back: a dictionary form, its class, and what was done to it,
+// innermost first.
+type Deinflected = Deinflected {
+    word: String,
+    class: String,
+    reasons: List<String>,
+}
+
+// A five-row (godan) verb's class, by its ending's row: the a-row for the
+// irrealis base and the voices, the i-row for the continuative, the e-row
+// for the hypothetical, the imperative and the potential, the o-row and う
+// for the volitional, and its euphonic te and ta forms.
+fn godan(code: String, ending: String, a: String, i: String, e: String, o: String, te: String, ta: String) -> WordClass {
+    WordClass {
+        code: code,
+        group: "godan",
+        ending: ending,
+        bases: [
+            Base { name: "irrealis", text: a },
+            Base { name: "voice", text: a },
+            Base { name: "continuative", text: i },
+            Base { name: "hypothetical", text: e },
+            Base { name: "imperative", text: e },
+            Base { name: "volitional", text: "{o}う" },
+            Base { name: "te", text: te },
+            Base { name: "ta", text: ta },
+            Base { name: "cha", text: cha_of(te) },
+        ],
+    }
+}
+
+// The te form's contraction before しまう: て as ちゃ, で as じゃ.
+fn cha_of(te: String) -> String {
+    let n = String.length(te)
+    let last = String.slice(te, n - 1, n)
+    if last == "て" { "{String.slice(te, 0, n - 1)}ちゃ" } else if last == "で" { "{String.slice(te, 0, n - 1)}じゃ" } else { te }
+}
+
+// A one-row verb's bases, after a stem `stem` that takes the place of
+// `ending`: for 食べる, `ending` る and `stem` empty; for 来る, `ending` 来る
+// and `stem` 来.
+fn ichidan_bases(stem: String) -> List<Base> {
+    [
+        Base { name: "irrealis", text: stem },
+        Base { name: "voice", text: stem },
+        Base { name: "continuative", text: stem },
+        Base { name: "hypothetical", text: "{stem}れ" },
+        Base { name: "imperative", text: "{stem}ろ" },
+        Base { name: "imperative", text: "{stem}よ" },
+        Base { name: "volitional", text: "{stem}よう" },
+        Base { name: "te", text: "{stem}て" },
+        Base { name: "ta", text: "{stem}た" },
+        Base { name: "cha", text: "{stem}ちゃ" },
+    ]
+}
+
+// する's bases, after `stem`.
+fn suru_bases() -> List<Base> {
+    [
+        Base { name: "irrealis", text: "し" },
+        Base { name: "irrealis", text: "せ" },
+        Base { name: "voice", text: "さ" },
+        Base { name: "continuative", text: "し" },
+        Base { name: "hypothetical", text: "すれ" },
+        Base { name: "imperative", text: "しろ" },
+        Base { name: "imperative", text: "せよ" },
+        Base { name: "volitional", text: "しよう" },
+        Base { name: "te", text: "して" },
+        Base { name: "ta", text: "した" },
+        Base { name: "cha", text: "しちゃ" },
+    ]
+}
+
+// An i-adjective's bases, after `stem`, which takes the place of い (よ for
+// いい).
+fn adjective_bases(stem: String) -> List<Base> {
+    [
+        Base { name: "stem", text: stem },
+        Base { name: "continuative", text: "{stem}く" },
+        Base { name: "hypothetical", text: "{stem}けれ" },
+        Base { name: "te", text: "{stem}くて" },
+        Base { name: "ta", text: "{stem}かった" },
+    ]
+}
+
+// Every class the rules read back to, and the classes auxiliaries make.
+fn word_classes() -> List<WordClass> {
+    [
+        WordClass { code: "v1", group: "ichidan", ending: "る", bases: ichidan_bases("") },
+        godan("v5u", "う", "わ", "い", "え", "お", "って", "った"),
+        godan("v5u-s", "う", "わ", "い", "え", "お", "うて", "うた"),
+        godan("v5k", "く", "か", "き", "け", "こ", "いて", "いた"),
+        godan("v5k-s", "く", "か", "き", "け", "こ", "って", "った"),
+        godan("v5g", "ぐ", "が", "ぎ", "げ", "ご", "いで", "いだ"),
+        godan("v5s", "す", "さ", "し", "せ", "そ", "して", "した"),
+        godan("v5t", "つ", "た", "ち", "て", "と", "って", "った"),
+        godan("v5n", "ぬ", "な", "に", "ね", "の", "んで", "んだ"),
+        godan("v5b", "ぶ", "ば", "び", "べ", "ぼ", "んで", "んだ"),
+        godan("v5m", "む", "ま", "み", "め", "も", "んで", "んだ"),
+        godan("v5r", "る", "ら", "り", "れ", "ろ", "って", "った"),
+        WordClass { code: "vs-i", group: "suru", ending: "する", bases: suru_bases() },
+        // する after one kanji (愛する): する's bases and the godan-like
+        // sa-row ones beside them (愛さない, 愛そう, 愛せ, 愛せば).
+        WordClass {
+            code: "vs-s",
+            group: "suru",
+            ending: "する",
+            bases: List.concat(suru_bases(), [
+                Base { name: "irrealis", text: "さ" },
+                Base { name: "volitional", text: "そう" },
+                Base { name: "imperative", text: "せ" },
+                Base { name: "hypothetical", text: "せ" },
+            ]),
+        },
+        WordClass { code: "vs", group: "noun-vs", ending: "", bases: suru_bases() },
+        WordClass {
+            code: "vk",
+            group: "kuru",
+            ending: "くる",
+            bases: [
+                Base { name: "irrealis", text: "こ" },
+                Base { name: "voice", text: "こ" },
+                Base { name: "continuative", text: "き" },
+                Base { name: "hypothetical", text: "くれ" },
+                Base { name: "imperative", text: "こい" },
+                Base { name: "volitional", text: "こよう" },
+                Base { name: "te", text: "きて" },
+                Base { name: "ta", text: "きた" },
+                Base { name: "cha", text: "きちゃ" },
+            ],
+        },
+        WordClass {
+            code: "vk",
+            group: "kuru",
+            ending: "来る",
+            bases: [
+                Base { name: "irrealis", text: "来" },
+                Base { name: "voice", text: "来" },
+                Base { name: "continuative", text: "来" },
+                Base { name: "hypothetical", text: "来れ" },
+                Base { name: "imperative", text: "来い" },
+                Base { name: "volitional", text: "来よう" },
+                Base { name: "te", text: "来て" },
+                Base { name: "ta", text: "来た" },
+                Base { name: "cha", text: "来ちゃ" },
+            ],
+        },
+        WordClass { code: "adj-i", group: "adj-i", ending: "い", bases: adjective_bases("") },
+        WordClass { code: "adj-ix", group: "adj-i", ending: "いい", bases: adjective_bases("よ") },
+        WordClass { code: "masu", group: "masu", ending: "ます", bases: [Base { name: "stem", text: "" }] },
+    ]
+}
+
+// The groups whose words are verbs.
+fn verbs() -> List<String> {
+    ["ichidan", "godan", "suru", "noun-vs", "kuru"]
+}
+
+// The forms that close a word.
+fn closings() -> List<Closing> {
+    [
+        // A one-row verb's bare stem first, before the forms it can also be
+        // (口を滑らせ is 口を滑らせる's stem before it is 口を滑らす's imperative).
+        Closing { groups: ["ichidan"], base: "continuative", text: "", reasons: ["continuative stem"] },
+        Closing { groups: verbs(), base: "ta", text: "", reasons: ["past"] },
+        Closing { groups: verbs(), base: "te", text: "", reasons: ["te form"] },
+        Closing { groups: verbs(), base: "ta", text: "ら", reasons: ["conditional (たら)"] },
+        Closing { groups: verbs(), base: "ta", text: "り", reasons: ["listing (たり)"] },
+        Closing { groups: verbs(), base: "hypothetical", text: "ば", reasons: ["conditional (ば)"] },
+        Closing { groups: verbs(), base: "volitional", text: "", reasons: ["volitional"] },
+        Closing { groups: verbs(), base: "imperative", text: "", reasons: ["imperative"] },
+        Closing { groups: verbs(), base: "irrealis", text: "ず", reasons: ["negative (ず)"] },
+        Closing { groups: verbs(), base: "continuative", text: "そう", reasons: ["appearance (そう)"] },
+        Closing { groups: ["adj-i"], base: "stem", text: "そう", reasons: ["appearance (そう)"] },
+        Closing { groups: ["adj-i"], base: "ta", text: "", reasons: ["past"] },
+        Closing { groups: ["adj-i"], base: "te", text: "", reasons: ["te form"] },
+        Closing { groups: ["adj-i"], base: "ta", text: "ら", reasons: ["conditional (たら)"] },
+        Closing { groups: ["adj-i"], base: "hypothetical", text: "ば", reasons: ["conditional (ば)"] },
+        Closing { groups: ["adj-i"], base: "continuative", text: "", reasons: ["adverb"] },
+        Closing { groups: ["adj-i"], base: "stem", text: "さ", reasons: ["noun (さ)"] },
+        Closing { groups: ["masu"], base: "stem", text: "ました", reasons: ["past"] },
+        Closing { groups: ["masu"], base: "stem", text: "ません", reasons: ["negative"] },
+        Closing { groups: ["masu"], base: "stem", text: "ませんでした", reasons: ["negative", "past"] },
+        Closing { groups: ["masu"], base: "stem", text: "ましょう", reasons: ["volitional"] },
+        Closing { groups: ["masu"], base: "stem", text: "まして", reasons: ["te form"] },
+        Closing { groups: ["masu"], base: "stem", text: "ましたら", reasons: ["conditional (たら)"] },
+    ]
+}
+
+// The auxiliaries, each a word of its own class once attached.
+fn auxiliaries() -> List<Auxiliary> {
+    [
+        Auxiliary { groups: verbs(), base: "irrealis", text: "ない", makes: "adj-i", reason: "negative" },
+        Auxiliary { groups: ["adj-i"], base: "continuative", text: "ない", makes: "adj-i", reason: "negative" },
+        Auxiliary { groups: verbs(), base: "continuative", text: "ます", makes: "masu", reason: "polite" },
+        Auxiliary { groups: verbs(), base: "continuative", text: "たい", makes: "adj-i", reason: "desire (たい)" },
+        // Where two readings take as many steps, the potential is tried
+        // first, then the one-row and 来る voices, then the godan and する
+        // voices.
+        Auxiliary { groups: ["godan"], base: "hypothetical", text: "る", makes: "v1", reason: "potential" },
+        Auxiliary { groups: ["ichidan", "kuru"], base: "voice", text: "られる", makes: "v1", reason: "passive or potential" },
+        Auxiliary { groups: ["ichidan", "kuru"], base: "voice", text: "させる", makes: "v1", reason: "causative" },
+        Auxiliary { groups: ["godan"], base: "voice", text: "される", makes: "v1", reason: "causative-passive (される)" },
+        Auxiliary { groups: ["godan", "suru", "noun-vs"], base: "voice", text: "れる", makes: "v1", reason: "passive" },
+        Auxiliary { groups: ["godan", "suru", "noun-vs"], base: "voice", text: "せる", makes: "v1", reason: "causative" },
+        Auxiliary { groups: verbs(), base: "te", text: "いる", makes: "v1", reason: "progressive (ている)" },
+        Auxiliary { groups: verbs(), base: "te", text: "る", makes: "v1", reason: "progressive (てる)" },
+        Auxiliary { groups: verbs(), base: "te", text: "しまう", makes: "v5u", reason: "completion (てしまう)" },
+        Auxiliary { groups: verbs(), base: "cha", text: "う", makes: "v5u", reason: "completion (ちゃう)" },
+        Auxiliary { groups: verbs(), base: "continuative", text: "すぎる", makes: "v1", reason: "excess (すぎる)" },
+        Auxiliary { groups: ["adj-i"], base: "stem", text: "すぎる", makes: "v1", reason: "excess (すぎる)" },
+    ]
+}
+
+fn none_auxiliaries() -> List<Auxiliary> {
+    let none: List<Auxiliary> = []
+    none
+}
+
+// The classes an auxiliary makes, whose dictionary forms are read back in
+// turn.
+fn made_classes() -> List<String> {
+    ["adj-i", "v1", "v5u", "masu"]
+}
+
+// What precedes `tail` in `word`, where `word` ends with it.
+fn stem_before(word: String, tail: String) -> Option<String> {
+    if String.ends_with(word, tail) {
+        Some(String.slice(word, 0, String.length(word) - String.length(tail)))
+    } else {
+        None
+    }
+}
+
+// The texts of a class's bases named `name`.
+fn bases_named(c: WordClass, name: String) -> List<String> {
+    List.map(List.filter(c.bases, b => b.name == name), b => b.text)
+}
+
+// `out` with `d` added, where its word is not empty and it is not there yet
+// by word and class.
+fn add_read_back(out: List<Deinflected>, d: Deinflected) -> List<Deinflected> {
+    if d.word == "" | List.any(out, o => o.word == d.word & o.class == d.class) { out } else { List.concat(out, [d]) }
+}
+
+// Each way `word` is a dictionary form, of a class an auxiliary makes, or a
+// closed form of a class's word.
+fn closed_forms(word: String) -> List<Deinflected> {
+    let none: List<Deinflected> = []
+    let as_is = List.fold(List.filter(word_classes(), c => List.any(made_classes(), m => m == c.code)), none, (out, c) => match stem_before(word, c.ending) {
+        Some(_) => add_read_back(out, Deinflected { word: word, class: c.code, reasons: [] }),
+        None => out,
+    })
+    List.fold(closings(), as_is, (out, k) => List.fold(List.filter(word_classes(), c => List.any(k.groups, g => g == c.group)), out, (o, c) => List.fold(bases_named(c, k.base), o, (o2, b) => match stem_before(word, "{b}{k.text}") {
+        Some(stem) => add_read_back(o2, Deinflected { word: "{stem}{c.ending}", class: c.code, reasons: k.reasons }),
+        None => o2,
+    })))
+}
+
+// Each word `d` is with an auxiliary taken off: `d` is the dictionary form of
+// the word an auxiliary made. A bare stem's word is read back no further.
+fn unattached(d: Deinflected) -> List<Deinflected> {
+    let none: List<Deinflected> = []
+    let auxiliaries_off = if List.any(d.reasons, r => r == "continuative stem") { none_auxiliaries() } else { List.filter(auxiliaries(), a => a.makes == d.class) }
+    List.fold(auxiliaries_off, none, (out, a) => List.fold(List.filter(word_classes(), c => List.any(a.groups, g => g == c.group)), out, (o, c) => List.fold(bases_named(c, a.base), o, (o2, b) => match stem_before(d.word, "{b}{a.text}") {
+        Some(stem) => add_read_back(o2, Deinflected { word: "{stem}{c.ending}", class: c.code, reasons: List.concat([a.reason], d.reasons) }),
+        None => o2,
+    })))
+}
+
+// The words read back so far, and those found in the last round, read back
+// further for `rounds` more rounds; a word already found is not found again.
+fn read_back(found: List<Deinflected>, last: List<Deinflected>, rounds: Int) -> List<Deinflected> {
+    let none: List<Deinflected> = []
+    let next = List.fold(last, none, (out, d) => List.fold(unattached(d), out, (o, u) => if List.any(found, f => f.word == u.word & f.class == u.class) { o } else { add_read_back(o, u) }))
+    if rounds == 0 | List.length(next) == 0 { found } else { read_back(List.concat(found, next), next, rounds - 1) }
+}
+
+// How many auxiliaries the rules read back through, at most.
+fn deinflect_rounds() -> Int {
+    6
+}
+
+// **The dictionary forms an inflected word can be**: each a word of a
+// dictionary class, something done to it, fewest reasons first.
+fn deinflected(word: String) -> List<Deinflected> {
+    let asked = String.trim(word)
+    // A word written in katakana is read in hiragana too, first, as
+    // kiokun.com does (ガサ入れした is がさ入れ's as well as ガサ入れ's).
+    let spellings = each_once([hiragana(asked), asked])
+    let none: List<Deinflected> = []
+    let first = List.fold(spellings, none, (out, w) => List.fold(closed_forms(w), out, (o, d) => add_read_back(o, d)))
+    let all = read_back(first, first, deinflect_rounds())
+    let kept = List.filter(all, d => d.class != "masu" & List.length(d.reasons) > 0)
+    List.sort_by(kept, (a, b) => List.length(a.reasons) - List.length(b.reasons))
+}
+
+// A word's entry, as kiokun.com's resolution reads it: the word's file, its
+// redirect followed one hop (`fetchDictionaryEntry`).
+type Filed = Filed {
+    word: String,
+    entry: Option<Entry>,
+}
+
+// A dictionary form an inflected word resolves to, and how it was inflected.
+type Resolved = Resolved {
+    word: String,
+    how: String,
+}
+
+// One other form an inflected word can be, as the page links it.
+type OtherForm = OtherForm {
+    id: String,
+    word: String,
+    how: String,
+}
+
+// What the page says of an inflected address (`+page.svelte:427-460`): the
+// word asked, the dictionary form shown, how it was inflected, and the other
+// forms it can be.
+type Inflection = Inflection {
+    asked: String,
+    shown: String,
+    how: String,
+    others: List<OtherForm>,
+}
+
+// The group a JMdict part of speech is checked as, or none (`posToWordType`'s
+// groups: verbs by kind, the する verbs, nouns taking する, i-adjectives).
+fn pos_group(pos: String) -> String {
+    if String.starts_with(pos, "v1") {
+        "ichidan"
+    } else if String.starts_with(pos, "v5") {
+        "godan"
+    } else if pos == "vk" {
+        "kuru"
+    } else if pos == "vs-i" | pos == "vs-s" | pos == "vs-c" {
+        "suru"
+    } else if pos == "vs" {
+        "noun-vs"
+    } else if pos == "adj-i" | pos == "adj-ix" {
+        "adj-i"
+    } else {
+        ""
+    }
+}
+
+// The group of a class's words.
+fn group_of(class: String) -> String {
+    match List.find(word_classes(), c => c.code == class) {
+        Some(c) => c.group,
+        None => "",
+    }
+}
+
+// Does `e`'s Japanese words' parts of speech include `d`'s group
+// (`validatePosMatch`)? An entry with none of the groups fits nothing.
+fn fits(d: Deinflected, e: Option<Entry>) -> Bool {
+    let group = group_of(d.class)
+    match e {
+        Some(x) => List.any(x.japanese, w => List.any(w.senses, s => List.any(s.pos, p => pos_group(p) == group))),
+        None => false,
+    }
+}
+
+// Only hiragana (U+3040 to U+309F), and not empty (`isHiraganaOnly`).
+fn hiragana_only(word: String) -> Bool {
+    let points = String.codepoints(word)
+    List.length(points) > 0 & List.all(points, c => c >= 12352 & c <= 12447)
+}
+
+// The words `items` names, each once, in order.
+fn each_once(items: List<String>) -> List<String> {
+    let none: List<String> = []
+    List.fold(items, none, (out, w) => if List.any(out, o => o == w) { out } else { List.concat(out, [w]) })
+}
+
+// The targets of the files' redirects.
+fn redirects_of(files: List<Option<Entry>>) -> List<String> {
+    let none: List<String> = []
+    List.fold(files, none, (out, f) => match f {
+        Some(e) => match e.redirect {
+            Some(t) => List.concat(out, [t]),
+            None => out,
+        },
+        None => out,
+    })
+}
+
+// The entry `entries` holds for `word`.
+fn entry_of(entries: List<Filed>, word: String) -> Option<Entry> {
+    match List.find(entries, f => f.word == word) {
+        Some(f) => f.entry,
+        None => None,
+    }
+}
+
+// Each word with its file, a redirect followed to the file read for its
+// target among `hops`.
+fn filed(words: List<String>, files: List<Option<Entry>>, targets: List<String>, hops: List<Option<Entry>>) -> List<Filed> {
+    let none: List<Filed> = []
+    let hopped = List.fold(targets, none, (out, t) => List.concat(out, [Filed { word: t, entry: file_at(hops, List.length(out)) }]))
+    List.fold(words, none, (out, w) => List.concat(out, [Filed { word: w, entry: followed_file(file_at(files, List.length(out)), hopped) }]))
+}
+
+// The file at place `i` of `files`, or none.
+fn file_at(files: List<Option<Entry>>, i: Int) -> Option<Entry> {
+    match List.get(files, i) {
+        Some(f) => f,
+        None => None,
+    }
+}
+
+// A file, its redirect followed to the entry `hopped` holds for its target.
+fn followed_file(file: Option<Entry>, hopped: List<Filed>) -> Option<Entry> {
+    match file {
+        Some(e) => match e.redirect {
+            Some(t) => entry_of(hopped, t),
+            None => Some(e),
+        },
+        None => None,
+    }
+}
+
+// What a reading lookup found as a reading's written forms
+// (`findKanjiFormsFromReading`): each word but the reading itself, as the
+// endpoint answers.
+fn written_forms(readings: List<ReadingFound>, reading: String) -> List<String> {
+    let none: List<String> = []
+    match List.find(readings, f => f.reading == reading) {
+        Some(f) => List.map(List.filter(f.rows, r => r.word != reading), r => r.word),
+        None => none,
+    }
+}
+
+// The hiragana words read back whose own entries do not fit, which the
+// resolution looks up by reading.
+fn unfit_kana(candidates: List<Deinflected>, entries: List<Filed>) -> List<String> {
+    each_once(List.map(List.filter(candidates, d => hiragana_only(d.word) & !fits(d, entry_of(entries, d.word))), d => d.word))
+}
+
+// How a word was inflected, as the page says it.
+fn how_of(reasons: List<String>) -> String {
+    String.join(reasons, ", ")
+}
+
+// The most forms an inflected word resolves to (`maxResults`).
+fn resolved_limit() -> Int {
+    5
+}
+
+fn add_resolved(out: List<Resolved>, word: String, how: String) -> List<Resolved> {
+    if List.length(out) >= resolved_limit() | List.any(out, r => r.word == word) { out } else { List.concat(out, [Resolved { word: word, how: how }]) }
+}
+
+// **The forms an inflected word resolves to** (`findWordsWithDeinflection`):
+// each candidate, fewest reasons first, whose entry fits it; else, for a
+// hiragana candidate, each written form its reading finds whose entry fits
+// it.
+fn resolved(candidates: List<Deinflected>, entries: List<Filed>, readings: List<ReadingFound>) -> List<Resolved> {
+    let none: List<Resolved> = []
+    List.fold(candidates, none, (out, d) => if fits(d, entry_of(entries, d.word)) {
+        add_resolved(out, d.word, how_of(d.reasons))
+    } else if hiragana_only(d.word) {
+        List.fold(written_forms(readings, d.word), out, (o, k) => if fits(d, entry_of(entries, k)) { add_resolved(o, k, how_of(d.reasons)) } else { o })
+    } else {
+        out
+    })
+}
+
+// The page's note, where its address was an inflected word.
+fn inflection_of(asked: String, found: List<Resolved>) -> List<Inflection> {
+    let none: List<Inflection> = []
+    let others: List<OtherForm> = []
+    match List.get(found, 0) {
+        Some(first) => [Inflection {
+            asked: asked,
+            shown: first.word,
+            how: first.how,
+            others: List.fold(List.drop(found, 1), others, (out, r) => List.concat(out, [OtherForm { id: r.word, word: r.word, how: r.how }])),
+        }],
+        None => none,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Homophones (`[word]/+page.svelte`, `api/lookup-reading/+server.ts`): the
+// words read as each of the page's Japanese readings, from the search index.
+// kiokun.com fetches them in the browser, one request a reading, and shows
+// each group when its request answers; the rewrite reads them with the page
+// and shows them in the readings' order (the reading index ADR).
+
+// What the reading index answered for one of the page's readings.
+type ReadingFound = ReadingFound {
+    reading: String,
+    rows: List<ReadingHit>,
+}
+
+// One homophone: a word, linked, marked where its dictionary calls it common.
+type HomophoneWord = HomophoneWord {
+    id: String,
+    word: String,
+    chip: String,
+}
+
+// One reading's homophones; its reading is shown where there are several.
+type HomophoneGroup = HomophoneGroup {
+    id: String,
+    reading: String,
+    labelled: Bool,
+    words: List<HomophoneWord>,
+}
+
+// The readings kiokun.com's page asks for: each Japanese word's kana, each
+// once, in the words' order.
+fn readings_of(e: Entry) -> List<String> {
+    let none: List<String> = []
+    List.fold(e.japanese, none, (out, w) => List.fold(w.kana, out, (o, k) => if k.text == "" | List.any(o, r => r == k.text) { o } else { List.concat(o, [k.text]) }))
+}
+
+// The page's own forms: its word, and each Japanese word's kanji and kana.
+fn own_forms(word: String, e: Entry) -> List<String> {
+    let none: List<String> = []
+    List.concat([word], List.fold(e.japanese, none, (out, w) => List.concat(out, List.concat(List.map(w.kanji, k => k.text), List.map(w.kana, k => k.text)))))
+}
+
+// The limit the page asks the reading index for (`?limit=20`), which is the
+// endpoint's most.
+fn homophone_limit() -> Int {
+    20
+}
+
+// One reading's words: none of the page's own forms. kiokun.com also drops
+// the reading itself, twice: the endpoint the word equal to the trimmed
+// query, the page the word equal to the reading. Both are implied here: the
+// reading is one of the page's kana, so among its forms, and trimming
+// changes none of kiokun's readings (none of the committed index's 427,860
+// Japanese pronunciations; the reading index ADR).
+fn homophone_words(f: ReadingFound, forms: List<String>) -> List<HomophoneWord> {
+    let kept = List.filter(f.rows, r => !List.any(forms, x => x == r.word))
+    let none: List<HomophoneWord> = []
+    List.fold(kept, none, (out, r) => List.concat(out, [HomophoneWord {
+        id: "{f.reading}:{List.length(out)}",
+        word: r.word,
+        chip: if r.is_common != 0 { "homophone-chip common" } else { "homophone-chip" },
+    }]))
+}
+
+// Each reading with words left, as a group.
+fn homophones_of(word: String, e: Entry, found: List<ReadingFound>) -> List<HomophoneGroup> {
+    let forms = own_forms(word, e)
+    let none: List<HomophoneGroup> = []
+    let groups = List.fold(found, none, (out, f) => match List.length(homophone_words(f, forms)) {
+        0 => out,
+        _ => List.concat(out, [HomophoneGroup { id: f.reading, reading: f.reading, labelled: false, words: homophone_words(f, forms) }]),
+    })
+    List.map(groups, g => HomophoneGroup { id: g.id, reading: g.reading, labelled: List.length(groups) > 1, words: g.words })
 }
 
 // **A word's page** (`[word]/+page.ts`): kiokun's entry for `word`, its
@@ -1881,7 +3115,40 @@ public query Word(word: String) -> Result<WordShown, KiokunError>
     // among the component's imports (the compiler's `host_calls` reads the
     // declaration's body alone).
     let labels = read_labels()
-    let first = recorded(read_entry(shards.subdirectory(word), file_name(word)), word)
+    let own = recorded(read_entry(shards.subdirectory(word), file_name(word)), word)
+    // A word with no file of its own is read back to the dictionary forms
+    // it can be (`+page.ts:350-379`, `findWordsWithDeinflection`): each
+    // candidate's file, its redirect followed one hop; for a hiragana
+    // candidate whose own entry does not fit, the written forms its reading
+    // finds (`?limit=10`), and theirs.
+    let unread: List<Deinflected> = []
+    let candidates = match own {
+        Some(_) => unread,
+        None => deinflected(word),
+    }
+    let asked_words = each_once(List.map(candidates, d => d.word))
+    let asked_files = read_entries(List.map(asked_words, place_of))
+    let asked_hops = read_entries(List.map(redirects_of(asked_files), place_of))
+    let asked_entries = filed(asked_words, asked_files, redirects_of(asked_files), asked_hops)
+    let lookups = List.map(unfit_kana(candidates, asked_entries), r => ReadingFound { reading: r, rows: search_reading(r, 10) })
+    let no_words: List<String> = []
+    let written = each_once(List.fold(lookups, no_words, (out, f) => List.concat(out, written_forms(lookups, f.reading))))
+    let written_files = read_entries(List.map(written, place_of))
+    let written_hops = read_entries(List.map(redirects_of(written_files), place_of))
+    let entries = List.concat(asked_entries, filed(written, written_files, redirects_of(written_files), written_hops))
+    let resolutions = resolved(candidates, entries, lookups)
+    let inflection = inflection_of(word, resolutions)
+    // The page shown: the word's own, else the first dictionary form it
+    // resolves to, at the word's address (the deinflection ADR: kiokun.com
+    // answers 307 to it).
+    let shown_word = match List.get(resolutions, 0) {
+        Some(r) => r.word,
+        None => word,
+    }
+    let first = match List.get(resolutions, 0) {
+        Some(r) => recorded(read_entry(shards.subdirectory(r.word), file_name(r.word)), r.word),
+        None => own,
+    }
     let target = target_of(first)
     let followed = match target {
         Some(t) => recorded(read_entry(shards.subdirectory(t), file_name(t)), t),
@@ -1895,21 +3162,28 @@ public query Word(word: String) -> Result<WordShown, KiokunError>
         Some(d) => Some(loaded(d, stub, words, read)),
         None => None,
     }
-    let glosses = read_glosses(characters_for(word, page))
+    let glosses = read_glosses(characters_for(shown_word, page))
     let none: List<WordPitch> = []
     let pitches = match page {
         Some(l) => List.map(l.data.japanese, w => WordPitch { readings: read_pitch(pitch_shard(speak_of(w)), speak_of(w)) }),
         None => none,
     }
+    // Each reading's homophones, asked as the page asks (`?limit=20`); an
+    // empty reading, which the endpoint refuses, is asked nothing.
+    let unread: List<ReadingFound> = []
+    let found = match page {
+        Some(l) => List.map(List.filter(readings_of(l.data), r => String.trim(r) != ""), r => ReadingFound { reading: r, rows: search_reading(String.trim(r), homophone_limit()) }),
+        None => unread,
+    }
     // A simplified form that equals its one traditional form in meaning is
     // moved to that form's page, for good (`[word]/+page.ts:415-425`,
     // ADR-0295): the word's own file decides, before a stub is followed or
     // forms merged.
-    let moved = moved_from(first, word)
+    let moved = moved_from(first, shown_word)
     match moved {
         Some(t) => Err(Moved(t)),
         None => match page {
-            Some(l) => Ok(shown(word, l, labels, glosses, pitches)),
+            Some(l) => Ok(shown(shown_word, l, labels, glosses, pitches, found, inflection)),
             None => Err(NotFound),
         },
     }
@@ -1946,6 +3220,98 @@ view SenseExamples(examples: ShownExamples) {
     {/if}
 }
 
+// One card of Contains (`Contains.svelte:146-195`): a link to the word's
+// page, its forms, each reading, and its definition.
+view ContainsCardView(card: ShownContains) {
+    <a href="/word/{card.w}" class="character-card">
+        <div class="character">{card.text}</div>
+        {#if card.readings}
+            <div class="pronunciations">
+                {#if card.p}<span class="chinese-reading">{card.p}</span>{/if}
+                {#if card.ct}<span class="cantonese-reading">{card.ct}</span>{/if}
+                {#if card.japanese}
+                    <span class="japanese-readings" lang="ja">
+                        {#if card.jp}<span class={card.jp_class} aria-label={card.kun_label}>{card.jp}</span>{/if}
+                        {#if card.on_and_kun}<span class="japanese-reading-separator" aria-hidden="true">·</span>{/if}
+                        {#if card.jo}<span class="japanese-onyomi-reading" aria-label="Japanese on’yomi: {card.jo}">{card.jo}</span>{/if}
+                    </span>
+                {/if}
+                {#if card.kr}<span class="korean-reading">{card.kr}</span>{/if}
+            </div>
+        {/if}
+        {#if card.definition}<div class="definition">{card.definition}</div>{/if}
+    </a>
+}
+
+// Contains (`Contains.svelte:140-205`): the first ten cards, and the rest
+// behind a disclosure saying how many there are.
+view ContainsSection(list: ContainsList) {
+    {#if list.first}
+        <section id="contains" aria-labelledby="contains-heading">
+            <h2 id="contains-heading">Contains</h2>
+            <div class="characters-row">
+                {#each list.first as c (c.id)}<ContainsCardView card={c} />{/each}
+            </div>
+            {#if list.rest}
+                <details class="remaining">
+                    <summary class="remaining-count">{list.more}</summary>
+                    <div class="characters-row">
+                        {#each list.rest as c (c.id)}<ContainsCardView card={c} />{/each}
+                    </div>
+                </details>
+            {/if}
+        </section>
+    {/if}
+}
+
+// One word of Appears in (`AppearsIn.svelte:160-290`): a link to its page,
+// JMdict's star for a common Japanese word, its reading, and its definition.
+view AppearsCard(item: ShownAppears) {
+    <a href="/word/{item.w}" class="word-card">
+        <div class="word-header">
+            <span class="word-text">{#if item.c}<span class="common-star" title="Common word">⭐</span>{/if}{item.w}</span>
+            {#if item.reading}<span class="pronunciation" title={item.reading}>{item.reading}</span>{/if}
+            {#if item.ct}<span class="cantonese-pronunciation" title="Cantonese (Jyutping)">{item.ct}</span>{/if}
+        </div>
+        {#if item.d}
+            <div class="definition-row"><div class="definition" title={item.d}>{item.d}</div></div>
+        {/if}
+    </a>
+}
+
+// One column of Appears in: its heading, its first ten words, and the rest
+// behind a disclosure saying how many there are.
+view AppearsColumn(list: AppearsList) {
+    {#if list.first}
+        <div class="column" lang={list.lang}>
+            <h2 id={list.id}>{list.heading}</h2>
+            <div class="word-list">
+                {#each list.first as w (w.id)}<AppearsCard item={w} />{/each}
+            </div>
+            {#if list.rest}
+                <details class="remaining">
+                    <summary class="remaining-count">{list.more}</summary>
+                    <div class="word-list">
+                        {#each list.rest as w (w.id)}<AppearsCard item={w} />{/each}
+                    </div>
+                </details>
+            {/if}
+        </div>
+    {/if}
+}
+
+// Appears in (`AppearsIn.svelte:150-300`): a column for each language's
+// words that contain this one.
+view AppearsSection(appears: Appears) {
+    {#if appears.shown}
+        <section id="appears-in" class={appears.columns}>
+            <AppearsColumn list={appears.chinese} />
+            <AppearsColumn list={appears.japanese} />
+            <AppearsColumn list={appears.korean} />
+        </section>
+    {/if}
+}
+
 // The word's page. Its route is `/word/{word}` until the host's own paths
 // move under `/_pw/` (the integrator's ruling of 2026-10-08), then
 // kiokun.com's `/{word}`.
@@ -1970,6 +3336,14 @@ page WordPage(word: String) {
         <meta name="twitter:title" content="{page.seo.title}" />
         <meta name="twitter:description" content="{page.seo.description}" />
         <main>
+            {#each page.inflection as i (i.asked)}
+                <aside class="conjugation-info">
+                    <p><span class="conjugated-from">{i.asked}</span> → <span class="dictionary-form">{i.shown}</span> <span class="conjugation-detail">({i.how})</span></p>
+                    {#if i.others}
+                        <p class="conjugation-alternatives">Could also be: {#each i.others as o (o.id)}<a href="/word/{o.word}" class="alternative-chip">{o.word}</a> {/each}</p>
+                    {/if}
+                </aside>
+            {/each}
             <h1 id="headword">{page.word}</h1>
             {#if page.header.shown}
                 <div id="character-header" class="character-identity-grid">
@@ -2138,6 +3512,21 @@ page WordPage(word: String) {
                     {/each}
                 </section>
             {/if}
+            {#if page.homophones}
+                <section id="homophones" aria-labelledby="homophones-heading">
+                    <h2 id="homophones-heading">Homophones</h2>
+                    <div class="homophones-section">
+                        {#each page.homophones as g (g.id)}
+                            <div class="homophone-group">
+                                {#if g.labelled}<div class="homophone-reading">{g.reading}</div>{/if}
+                                <div class="homophone-list">
+                                    {#each g.words as h (h.id)}<a href="/word/{h.word}" class={h.chip}>{h.word}</a>{/each}
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                </section>
+            {/if}
             {#if page.names}
                 <section id="names" aria-labelledby="names-heading">
                     <h2 id="names-heading">Japanese Names</h2>
@@ -2160,6 +3549,419 @@ page WordPage(word: String) {
                         {/each}
                     </div>
                 </section>
+            {/if}
+            <ContainsSection list={page.contains} />
+            <AppearsSection appears={page.appears} />
+            {#if page.edrdg}
+                <footer class="data-sources">
+                    <p>This page uses the <a href="https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project">JMdict</a>, JMnedict and <a href="https://www.edrdg.org/wiki/index.php/KANJIDIC_Project">KANJIDIC2</a> dictionary files. These files are the property of the <a href="https://www.edrdg.org/">Electronic Dictionary Research and Development Group</a>, and are used in conformance with the Group's <a href="https://www.edrdg.org/edrdg/licence.html">licence</a>.</p>
+                </footer>
+            {/if}
+        </main>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Search (`src/routes/api/search/+server.ts`, `src/lib/search-aliases-core.ts`,
+// `src/routes/search/+page.svelte`): the whole dictionary's index, as
+// kiokun.com's D1 holds it, searched with kiokun.com's two statements; what
+// to search for, how hits group and how the page shows them, the program's.
+
+// A row of kiokun.com's search index (migration 0005's `dictionary_search`):
+// a word, its language, one definition, its pronunciation and romanization,
+// and whether its dictionary calls it common.
+type SearchRow = SearchRow {
+    word: String,
+    language: String,
+    definition: String,
+    pronunciation: String,
+    reading_search: String,
+    is_common: Int,
+}
+
+// A word the reading statement answers (`api/lookup-reading`): a Japanese
+// row's word, its pronunciation and its common flag, each once.
+type ReadingHit = ReadingHit {
+    word: String,
+    pronunciation: String,
+    is_common: Int,
+}
+
+// One key and what kiokun.com's aliases give for it (`search-aliases.json`).
+type AliasSet = AliasSet {
+    term: String,
+    values: List<String>,
+}
+
+// kiokun.com's search index and aliases: read, never written; every read
+// sees the one index the deployment opened.
+source KiokunSearch
+    holds        SearchRow, AliasSet, ReadingHit
+    transactions none
+    reads        strong
+    changes      none
+
+// The CJK statement (`buildCjkSearchSql`): each term a word prefix, ranked
+// exact, then a Japanese reading, then a prefix.
+fn search_cjk(terms: List<String>, reading: String, limit: Int) -> List<SearchRow> !{ database.read<SearchRow> }
+    host "kiokun:data/search#cjk"
+
+// The Latin statement: the query over every column.
+fn search_latin(asked: String, limit: Int) -> List<SearchRow> !{ database.read<SearchRow> }
+    host "kiokun:data/search#latin"
+
+// The reading statement (`api/lookup-reading`): the Japanese words read as
+// `reading`, common first, then shorter.
+fn search_reading(reading: String, limit: Int) -> List<ReadingHit> !{ database.read<ReadingHit> }
+    host "kiokun:data/search#reading"
+
+// Each term's whole-word aliases (`aliases`).
+fn search_aliases(terms: List<String>) -> List<AliasSet> !{ database.read<AliasSet> }
+    host "kiokun:data/search#aliases"
+
+// Each character's script variants (`characterVariants`).
+fn search_variants(characters: List<String>) -> List<AliasSet> !{ database.read<AliasSet> }
+    host "kiokun:data/search#variants"
+
+// Each Japanese form's canonical page (`japaneseToCanonical`).
+fn search_canonical(words: List<String>) -> List<AliasSet> !{ database.read<AliasSet> }
+    host "kiokun:data/search#canonical"
+
+fn values_of(sets: List<AliasSet>, key: String) -> List<String> {
+    let none: List<String> = []
+    match List.find(sets, s => s.term == key) {
+        Some(s) => s.values,
+        None => none,
+    }
+}
+
+// `isCJK` (`/[　-鿿가-힯豈-﫿]/`, without the `u`
+// flag): a UTF-16 unit in those ranges, so a character past U+FFFF, two
+// surrogates, is none.
+fn is_cjk(asked: String) -> Bool {
+    List.any(String.codepoints(asked), c => (c >= 12288 & c <= 40959) | (c >= 44032 & c <= 55215) | (c >= 63744 & c <= 64255))
+}
+
+// `isJapaneseKanaQuery` (`/^[぀-ヿ]+$/u`, trimmed).
+fn is_kana(asked: String) -> Bool {
+    let points = String.codepoints(String.trim(asked))
+    List.length(points) > 0 & List.all(points, c => c >= 12352 & c <= 12543)
+}
+
+// `normalizeJapaneseReading`: katakana (U+30A1 to U+30F6) as hiragana.
+fn hiragana(asked: String) -> String {
+    String.from_codepoints(List.map(String.codepoints(String.trim(asked)), c => if c >= 12449 & c <= 12534 { c - 96 } else { c }))
+}
+
+// `addTerm`: a term trimmed, added where it is not empty, not there yet,
+// and the terms are fewer than 24.
+fn add_term(terms: List<String>, term: String) -> List<String> {
+    let t = String.trim(term)
+    if t == "" | List.any(terms, s => s == t) | List.length(terms) >= 24 { terms } else { List.concat(terms, [t]) }
+}
+
+fn add_terms(terms: List<String>, more: List<String>) -> List<String> {
+    List.fold(more, terms, (out, t) => add_term(out, t))
+}
+
+// One character's step of `expandCharacterVariants`: each prefix with each
+// of the character's forms, no more than 24 in all.
+fn combined(prefixes: List<String>, options: List<String>) -> List<String> {
+    let none: List<String> = []
+    List.fold(prefixes, none, (out, p) => List.fold(options, out, (o, x) => if List.length(o) >= 24 { o } else { List.concat(o, ["{p}{x}"]) }))
+}
+
+// `expandCharacterVariants`: every way to write the query, each character as
+// itself or a variant, in order, no more than 24.
+fn spellings(asked: String, variants: List<AliasSet>) -> List<String> {
+    List.fold(characters(asked), [""], (prefixes, c) => combined(prefixes, distinct_keep(List.concat([c], values_of(variants, c)))))
+}
+
+// Each value once, in order, the empty one kept (`[...new Set(options)]`).
+fn distinct_keep(values: List<String>) -> List<String> {
+    let none: List<String> = []
+    List.fold(values, none, (out, v) => if List.any(out, s => s == v) { out } else { List.concat(out, [v]) })
+}
+
+// `getCjkSearchTermsFromData`: the query, its aliases, its spellings, and
+// each term's aliases, no more than 24.
+fn cjk_terms(before: List<String>, later_aliases: List<AliasSet>) -> List<String> {
+    List.fold(before, before, (out, t) => add_terms(out, values_of(later_aliases, t)))
+}
+
+fn first_terms(asked: String, aliases: List<AliasSet>, variants: List<AliasSet>) -> List<String> {
+    let none: List<String> = []
+    let trimmed = String.trim(asked)
+    if trimmed == "" { none } else { add_terms(add_terms(add_term(none, trimmed), values_of(aliases, trimmed)), spellings(trimmed, variants)) }
+}
+
+// `getSearchTarget`: a Japanese form's canonical page, else the word.
+fn page_of_row(row: SearchRow, canonical: List<AliasSet>) -> String {
+    if row.language == "japanese" {
+        match List.get(values_of(canonical, row.word), 0) {
+            Some(t) => t,
+            None => row.word,
+        }
+    } else {
+        row.word
+    }
+}
+
+// `displayScore`: which row of a group names it.
+fn display_score(row: SearchRow, target: String, asked: String, terms: List<String>) -> Int {
+    let is_term = List.any(terms, t => t == row.word)
+    if row.word == asked { 1000 } else { if row.word == target & target == asked { 950 } else { if row.word == target & is_term { 900 } else { if is_term { 850 } else { if row.word == target { 700 } else { if row.language == "japanese" & target != row.word { 650 } else { 500 } } } } } }
+}
+
+// A group of rows naming one page, as the endpoint builds it.
+type Group = Group {
+    target: String,
+    word: String,
+    forms: List<String>,
+    language: String,
+    definitions: List<String>,
+    japanese: String,
+    chinese: String,
+    korean: String,
+    common: Bool,
+    score: Int,
+}
+
+fn first_pronunciation(now: String, row: SearchRow, language: String) -> String {
+    if now == "" & row.language == language & row.pronunciation != "" { row.pronunciation } else { now }
+}
+
+fn grouped(group: Group, row: SearchRow, score: Int) -> Group {
+    let better = score > group.score
+    Group {
+        target: group.target,
+        word: if better { row.word } else { group.word },
+        forms: if List.any(group.forms, f => f == row.word) { group.forms } else { List.concat(group.forms, [row.word]) },
+        language: if better { row.language } else { group.language },
+        definitions: if List.any(group.definitions, d => d == row.definition) { group.definitions } else { List.concat(group.definitions, [row.definition]) },
+        japanese: first_pronunciation(group.japanese, row, "japanese"),
+        chinese: first_pronunciation(group.chinese, row, "chinese"),
+        korean: first_pronunciation(group.korean, row, "korean"),
+        common: group.common | row.is_common != 0,
+        score: if better { score } else { group.score },
+    }
+}
+
+fn started(row: SearchRow, target: String, score: Int) -> Group {
+    let none: List<String> = []
+    Group {
+        target: target,
+        word: row.word,
+        forms: distinct(if row.word == target { [row.word] } else { [row.word, target] }),
+        language: row.language,
+        definitions: none,
+        japanese: "",
+        chinese: "",
+        korean: "",
+        common: false,
+        score: score,
+    }
+}
+
+// One row into the groups: a new group where its page has none, else the
+// group's, each in the order its page was first met.
+fn group_row(groups: List<Group>, row: SearchRow, canonical: List<AliasSet>, asked: String, terms: List<String>) -> List<Group> {
+    let target = page_of_row(row, canonical)
+    let score = display_score(row, target, asked, terms)
+    if List.any(groups, g => g.target == target) {
+        List.map(groups, g => if g.target == target { grouped(g, row, score) } else { g })
+    } else {
+        List.concat(groups, [grouped(started(row, target, score), row, score)])
+    }
+}
+
+// A hit as the search page shows it (`search/+page.svelte`).
+type ShownHit = ShownHit {
+    id: String,
+    target: String,
+    text: String,
+    pronunciation: String,
+    common: Bool,
+    definitions: List<ShownLine>,
+    more: String,
+}
+
+// One numbered definition of a hit.
+type ShownLine = ShownLine {
+    id: String,
+    text: String,
+}
+
+fn hit_shown(g: Group, n: Int) -> ShownHit {
+    let parts = List.filter([g.japanese, g.chinese, g.korean], p => p != "")
+    let none: List<ShownLine> = []
+    let lines = List.fold(List.take(g.definitions, 3), none, (out, d) => List.concat(out, [ShownLine { id: "{n}:{List.length(out)}", text: "{List.length(out) + 1}. {d}" }]))
+    let extra = List.length(g.definitions) - 3
+    ShownHit {
+        id: "hit:{n}",
+        target: g.target,
+        text: if g.language == "chinese" { String.join(List.take(g.forms, 3), " / ") } else { g.word },
+        pronunciation: String.join(parts, " · "),
+        common: g.common,
+        definitions: lines,
+        more: if extra <= 0 { "" } else { if extra == 1 { "+1 more definition" } else { "+{extra} more definitions" } },
+    }
+}
+
+// One language's column: its first eight hits, and the rest behind a
+// disclosure (`visibleChinese`, eight, and "Show more").
+type HitColumn = HitColumn {
+    id: String,
+    heading: String,
+    first: List<ShownHit>,
+    rest: List<ShownHit>,
+    more: String,
+}
+
+fn column_of(hits: List<ShownHit>, groups: List<Group>, language: String, heading: String) -> HitColumn {
+    let mine = List.filter(hits, h => List.any(groups, g => g.target == h.target & g.language == language))
+    HitColumn {
+        id: "{language}-results",
+        heading: heading,
+        first: List.take(mine, 8),
+        rest: List.drop(mine, 8),
+        more: "Show more {heading} results",
+    }
+}
+
+// The search page's content.
+type SearchShown = SearchShown {
+    asked: String,
+    found: String,
+    any: Bool,
+    chinese: HitColumn,
+    japanese: HitColumn,
+    korean: HitColumn,
+}
+
+fn search_shown(asked: String, groups: List<Group>) -> SearchShown {
+    let none: List<ShownHit> = []
+    let hits = List.fold(groups, none, (out, g) => List.concat(out, [hit_shown(g, List.length(out))]))
+    let total = List.length(groups)
+    SearchShown {
+        asked: asked,
+        found: if total == 1 { "Found 1 result" } else { "Found {total} results" },
+        any: total > 0,
+        chinese: column_of(hits, groups, "chinese", "Chinese"),
+        japanese: column_of(hits, groups, "japanese", "Japanese"),
+        korean: column_of(hits, groups, "korean", "Korean"),
+    }
+}
+
+// The page asks for 60 (`limit=60`).
+fn search_limit() -> Int {
+    60
+}
+
+// **A search** (`GET /api/search?q=…&limit=60`, as the search page asks
+// it): a CJK query's terms, the query and its variants and aliases; a Latin
+// one as typed; the rows kiokun.com's statements return, grouped by the page
+// each names, the first 60.
+public query Search(q: String) -> SearchShown
+    freshness   1.hours
+    consistency snapshot
+    cache       shared
+    key         q
+{
+    let none: List<String> = []
+    let cjk = is_cjk(q)
+    let trimmed = String.trim(q)
+    let first_aliases = if cjk { search_aliases([trimmed]) } else { search_aliases(none) }
+    let variants = if cjk { search_variants(characters(trimmed)) } else { search_variants(none) }
+    let early = if cjk { first_terms(q, first_aliases, variants) } else { none }
+    let later = search_aliases(early)
+    let terms = if cjk { cjk_terms(early, later) } else { [q] }
+    let kana = cjk & is_kana(q)
+    let rows = if cjk {
+        search_cjk(terms, if kana { hiragana(q) } else { "" }, if 1000 < search_limit() * max_of(4, min_of(List.length(terms), 12)) { 1000 } else { search_limit() * max_of(4, min_of(List.length(terms), 12)) })
+    } else {
+        search_latin(q, search_limit() * 3)
+    }
+    let canonical = search_canonical(List.map(List.filter(rows, r => r.language == "japanese"), r => r.word))
+    let empty: List<Group> = []
+    let groups = List.fold(rows, empty, (gs, r) => group_row(gs, r, canonical, q, terms))
+    search_shown(q, List.take(groups, search_limit()))
+}
+
+fn max_of(a: Int, b: Int) -> Int {
+    if a > b { a } else { b }
+}
+
+fn min_of(a: Int, b: Int) -> Int {
+    if a < b { a } else { b }
+}
+
+// One hit of the search page (`search/+page.svelte`): a link to its word's
+// page, its written forms, its pronunciation, a Common badge, three
+// definitions numbered, and how many more.
+view HitCard(hit: ShownHit) {
+    <a href="/word/{hit.target}" class="result-card divider-cell">
+        <div class="result-header">
+            <span class="word">{hit.text}</span>
+            {#if hit.pronunciation}<span class="pronunciation">[{hit.pronunciation}]</span>{/if}
+            {#if hit.common}<span class="common-badge">Common</span>{/if}
+        </div>
+        <div class="definitions">
+            {#each hit.definitions as d (d.id)}<div class="definition">{d.text}</div>{/each}
+            {#if hit.more}<div class="more-definitions">{hit.more}</div>{/if}
+        </div>
+    </a>
+}
+
+// One language's column: eight hits, and the rest behind a disclosure.
+view HitColumnView(column: HitColumn) {
+    {#if column.first}
+        <div class="results-column" id={column.id}>
+            <h2 class="column-title section-bar-label">{column.heading}</h2>
+            <div class="results-list divider-grid">
+                {#each column.first as h (h.id)}<HitCard hit={h} />{/each}
+            </div>
+            {#if column.rest}
+                <details class="show-more">
+                    <summary>{column.more}</summary>
+                    <div class="results-list divider-grid">
+                        {#each column.rest as h (h.id)}<HitCard hit={h} />{/each}
+                    </div>
+                </details>
+            {/if}
+        </div>
+    {/if}
+}
+
+// The search page. Its route is `/search/{q}` until a page can read a
+// query string (kiokun.com's `/search?q=`), which is the integrator's.
+page SearchPage(q: String) {
+    route     "/search/{q}"
+    placement origin
+    cache     shared
+
+    let found = query Search(q)
+
+    view {
+        <title>Search Results | Kiokun</title>
+        <meta name="robots" content="noindex, follow" />
+        <main id="main-content" class="search-page">
+            <div class="search-header">
+                <h1>Search Results</h1>
+                <p class="search-asked">Results across Chinese, Japanese, and Korean for <strong>{found.asked}</strong></p>
+            </div>
+            {#if found.any}
+                <div class="results-header"><p>{found.found}</p></div>
+                <div class="results-container">
+                    <HitColumnView column={found.chinese} />
+                    <HitColumnView column={found.japanese} />
+                    <HitColumnView column={found.korean} />
+                </div>
+            {:else}
+                <div class="no-results">
+                    <h2>No results for “{found.asked}”</h2>
+                    <p class="hint">Try a shorter spelling, a dictionary form, or an English meaning.</p>
+                </div>
             {/if}
         </main>
     }

@@ -1,0 +1,10228 @@
+{
+ "kiokun_commit": "abf71a89af1111f4039578cd1fde58e06f14c4bf",
+ "node": "v22.21.1",
+ "oracle": {
+  "answered": 23,
+  "answers": {
+   "上": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "晚上"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上帝"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "马上"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上海"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "以上"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "早上"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上面"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "身上"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "事实上"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "实际上"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上市"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "看上去"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上午"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上班"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "路上"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "加上"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上涨"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上升"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上去"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "地上"
+      },
+      {
+       "at": 144,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上星期"
+      },
+      {
+       "at": 145,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上映"
+      },
+      {
+       "at": 146,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上月"
+      },
+      {
+       "at": 147,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上有天堂，下有苏杭"
+      },
+      {
+       "at": 148,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上有政策，下有对策"
+      }
+     ],
+     "length": 149
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "not less than ...",
+       "reading": "いじょう",
+       "w": "以上"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "to raise",
+       "reading": "あげる",
+       "w": "上げる"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "to rise",
+       "reading": "あがる",
+       "w": "上がる"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "to stand up",
+       "reading": "たちあがる",
+       "w": "立ち上がる"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "to look up at",
+       "reading": "みあげる",
+       "w": "見上げる"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "older brother",
+       "reading": "あに",
+       "w": "兄"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "above ground",
+       "reading": "ちじょう",
+       "w": "地上"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "in addition",
+       "reading": "そのうえ",
+       "w": "その上"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "to elevate",
+       "reading": "もちあげる",
+       "w": "持ち上げる"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "to swell",
+       "reading": "もりあがる",
+       "w": "盛り上がる"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "to ascend",
+       "reading": "のぼる",
+       "w": "上る"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "skillful",
+       "reading": "じょうず",
+       "w": "上手"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "to say",
+       "reading": "もうしあげる",
+       "w": "申し上げる"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "older",
+       "reading": "としうえ",
+       "w": "年上"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "to pick up",
+       "reading": "とりあげる",
+       "w": "取り上げる"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "to pull up",
+       "reading": "ひきあげる",
+       "w": "引き上げる"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "skillful",
+       "reading": "うまい",
+       "w": "上手い"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "overhead",
+       "reading": "ずじょう",
+       "w": "頭上"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "rooftop",
+       "reading": "おくじょう",
+       "w": "屋上"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "to rise",
+       "reading": "おきあがる",
+       "w": "起き上がる"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "to check through",
+       "reading": "しらべあげる",
+       "w": "調べ上げる"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "intentionally",
+       "reading": "しょうちのうえで",
+       "w": "承知の上で"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "to give one's name",
+       "reading": "なのりをあげる",
+       "w": "名乗りを上げる"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "convalescence",
+       "reading": "やみあがり",
+       "w": "病み上がり"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "to fabricate",
+       "reading": "でっちあげる",
+       "w": "でっち上げる"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "oh my goodness; oh my gosh",
+       "reading": "",
+       "w": "세상에"
+      },
+      {
+       "at": 1,
+       "d": "or more; and over",
+       "reading": "",
+       "w": "이상"
+      },
+      {
+       "at": 2,
+       "d": "superior; boss",
+       "reading": "",
+       "w": "상관"
+      },
+      {
+       "at": 3,
+       "d": "world",
+       "reading": "",
+       "w": "세상"
+      },
+      {
+       "at": 4,
+       "d": "being in history; existing historically",
+       "reading": "",
+       "w": "역사상"
+      },
+      {
+       "at": 5,
+       "d": "master sergeant; first sergeant",
+       "reading": "",
+       "w": "상사"
+      },
+      {
+       "at": 6,
+       "d": "being actual; being as a matter of fact; being virtual",
+       "reading": "",
+       "w": "사실상"
+      },
+      {
+       "at": 7,
+       "d": "portable water; service water",
+       "reading": "",
+       "w": "상수"
+      },
+      {
+       "at": 8,
+       "d": "raise; increase",
+       "reading": "",
+       "w": "인상하다"
+      },
+      {
+       "at": 9,
+       "d": "top",
+       "reading": "",
+       "w": "상의"
+      },
+      {
+       "at": 10,
+       "d": "ground",
+       "reading": "",
+       "w": "지상"
+      },
+      {
+       "at": 11,
+       "d": "being in history",
+       "reading": "",
+       "w": "사상"
+      },
+      {
+       "at": 12,
+       "d": "rooftop",
+       "reading": "",
+       "w": "옥상"
+      },
+      {
+       "at": 13,
+       "d": "corporal",
+       "reading": "",
+       "w": "상병"
+      },
+      {
+       "at": 14,
+       "d": "improvement; enhancement; progress",
+       "reading": "",
+       "w": "향상"
+      },
+      {
+       "at": 15,
+       "d": "high rank",
+       "reading": "",
+       "w": "상위"
+      },
+      {
+       "at": 16,
+       "d": "rise; increase; ascent",
+       "reading": "",
+       "w": "상승"
+      },
+      {
+       "at": 17,
+       "d": "water way; being on the water",
+       "reading": "",
+       "w": "수상"
+      },
+      {
+       "at": 18,
+       "d": "elite; high society; upper class",
+       "reading": "",
+       "w": "상류층"
+      },
+      {
+       "at": 19,
+       "d": "Shanghai",
+       "reading": "",
+       "w": "상해"
+      },
+      {
+       "at": 156,
+       "d": "one's lifetime; one's whole life",
+       "reading": "",
+       "w": "한世上"
+      },
+      {
+       "at": 157,
+       "d": "one's lifetime; one's whole life",
+       "reading": "",
+       "w": "한세상"
+      },
+      {
+       "at": 158,
+       "d": "being on the sea",
+       "reading": "",
+       "w": "해상"
+      },
+      {
+       "at": 159,
+       "d": "improve; enhance; make progress",
+       "reading": "",
+       "w": "향상되다"
+      },
+      {
+       "at": 160,
+       "d": "improve; enhance; make progress",
+       "reading": "",
+       "w": "향상하다"
+      }
+     ],
+     "length": 161
+    }
+   },
+   "人": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "女人"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "别人"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "男人"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "有人"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人员"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人们"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人民"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "个人"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人生"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "一个人"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人类"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人士"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "病人"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "夫人"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人物"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人才"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "家人"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "负责人"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人家"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "敌人"
+      },
+      {
+       "at": 138,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人不知鬼不觉"
+      },
+      {
+       "at": 139,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人世"
+      },
+      {
+       "at": 140,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人世间"
+      },
+      {
+       "at": 141,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人丛"
+      },
+      {
+       "at": 142,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人中"
+      }
+     ],
+     "length": 143
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "human being",
+       "reading": "にんげん",
+       "w": "人間"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "two persons",
+       "reading": "ふたり",
+       "w": "二人"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "one person",
+       "reading": "ひとり",
+       "w": "一人"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "(one's) life",
+       "reading": "じんせい",
+       "w": "人生"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "alone",
+       "reading": "ひとりで",
+       "w": "一人で"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "people",
+       "reading": "ひとびと",
+       "w": "人々"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "the person in question",
+       "reading": "ほんにん",
+       "w": "本人"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "he",
+       "reading": "あのひと",
+       "w": "あの人"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "person",
+       "reading": "じんぶつ",
+       "w": "人物"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "another person",
+       "reading": "たにん",
+       "w": "他人"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "people",
+       "reading": "ひとたち",
+       "w": "人たち"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "adult",
+       "reading": "おとな",
+       "w": "大人"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "guest",
+       "reading": "きゃく",
+       "w": "客"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "friend",
+       "reading": "ゆうじん",
+       "w": "友人"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "popularity",
+       "reading": "にんき",
+       "w": "人気"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "three people",
+       "reading": "さんにん",
+       "w": "三人"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "lover",
+       "reading": "こいびと",
+       "w": "恋人"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "offender",
+       "reading": "はんにん",
+       "w": "犯人"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "doll",
+       "reading": "にんぎょう",
+       "w": "人形"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "both (people)",
+       "reading": "ふたりとも",
+       "w": "二人とも"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "standing on formality",
+       "reading": "たにんぎょうぎ",
+       "w": "他人行儀"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "per-capita division",
+       "reading": "にんずうぶん",
+       "w": "人数分"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "human realm",
+       "reading": "にんげんかい",
+       "w": "人間界"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "hereditary disposition",
+       "reading": "ひととなり",
+       "w": "人となり"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "puppet",
+       "reading": "あやつりにんぎょう",
+       "w": "操り人形"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "wife",
+       "reading": "",
+       "w": "부인"
+      },
+      {
+       "at": 1,
+       "d": "murder; killing",
+       "reading": "",
+       "w": "살인"
+      },
+      {
+       "at": 2,
+       "d": "human; human being",
+       "reading": "",
+       "w": "인간"
+      },
+      {
+       "at": 3,
+       "d": "life",
+       "reading": "",
+       "w": "인생"
+      },
+      {
+       "at": 4,
+       "d": "each person; individual",
+       "reading": "",
+       "w": "개인"
+      },
+      {
+       "at": 5,
+       "d": "figure; distinguished person",
+       "reading": "",
+       "w": "인사"
+      },
+      {
+       "at": 6,
+       "d": "sea of people; waves of people",
+       "reading": "",
+       "w": "인해"
+      },
+      {
+       "at": 7,
+       "d": "Caucasian",
+       "reading": "",
+       "w": "백인"
+      },
+      {
+       "at": 8,
+       "d": "murder; kill",
+       "reading": "",
+       "w": "살인하다"
+      },
+      {
+       "at": 9,
+       "d": "jung-in",
+       "reading": "",
+       "w": "중인"
+      },
+      {
+       "at": 10,
+       "d": "lover; one's beloved",
+       "reading": "",
+       "w": "애인"
+      },
+      {
+       "at": 11,
+       "d": "being artificial",
+       "reading": "",
+       "w": "인공"
+      },
+      {
+       "at": 12,
+       "d": "owner",
+       "reading": "",
+       "w": "주인"
+      },
+      {
+       "at": 13,
+       "d": "soldier",
+       "reading": "",
+       "w": "군인"
+      },
+      {
+       "at": 14,
+       "d": "human duty; human obligation",
+       "reading": "",
+       "w": "인도"
+      },
+      {
+       "at": 15,
+       "d": "doll; figure",
+       "reading": "",
+       "w": "인형"
+      },
+      {
+       "at": 16,
+       "d": "alien",
+       "reading": "",
+       "w": "외계인"
+      },
+      {
+       "at": 17,
+       "d": "Negroid",
+       "reading": "",
+       "w": "흑인"
+      },
+      {
+       "at": 18,
+       "d": "gynecology; department of gynecology",
+       "reading": "",
+       "w": "부인과"
+      },
+      {
+       "at": 19,
+       "d": "one person; one man",
+       "reading": "",
+       "w": "일인"
+      },
+      {
+       "at": 195,
+       "d": "tenant farmer",
+       "reading": "",
+       "w": "소작인"
+      },
+      {
+       "at": 196,
+       "d": "holder; possessor",
+       "reading": "",
+       "w": "소지인"
+      },
+      {
+       "at": 197,
+       "d": "recipient",
+       "reading": "",
+       "w": "수령인"
+      },
+      {
+       "at": 198,
+       "d": "addressee",
+       "reading": "",
+       "w": "수신인"
+      },
+      {
+       "at": 199,
+       "d": "addressee; consignee",
+       "reading": "",
+       "w": "수취인"
+      }
+     ],
+     "length": 200
+    }
+   },
+   "半": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "一半"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半年"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半夜"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半场"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半个"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上半年"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半天"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半决赛"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "大半"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多半"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半辈子"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半数"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半点"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半岛"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半径"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半死"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半路"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半月"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半生"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半导体"
+      },
+      {
+       "at": 134,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半桥"
+      },
+      {
+       "at": 135,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半桶水"
+      },
+      {
+       "at": 136,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半殖民地"
+      },
+      {
+       "at": 137,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半流体"
+      },
+      {
+       "at": 138,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "半熟练"
+      }
+     ],
+     "length": 139
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "half",
+       "reading": "はんぶん",
+       "w": "半分"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "middle",
+       "reading": "なかば",
+       "w": "半ば"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "half a year",
+       "reading": "はんとし",
+       "w": "半年"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "second half",
+       "reading": "こうはん",
+       "w": "後半"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "majority",
+       "reading": "たいはん",
+       "w": "大半"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "halfway",
+       "reading": "ちゅうとはんぱ",
+       "w": "中途半端"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "upper half of the body",
+       "reading": "じょうはんしん",
+       "w": "上半身"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "lower half of the body",
+       "reading": "かはんしん",
+       "w": "下半身"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "half day",
+       "reading": "はんにち",
+       "w": "半日"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "first half",
+       "reading": "ぜんはん",
+       "w": "前半"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "remnant",
+       "reading": "はんぱ",
+       "w": "半端"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "half the number",
+       "reading": "はんすう",
+       "w": "半数"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "half the body",
+       "reading": "はんしん",
+       "w": "半身"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "half-moon",
+       "reading": "はんげつ",
+       "w": "半月"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "radius",
+       "reading": "はんけい",
+       "w": "半径"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "reduction by half",
+       "reading": "はんげん",
+       "w": "半減"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "half and half",
+       "reading": "はんはん",
+       "w": "半々"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "half the amount (of money)",
+       "reading": "はんがく",
+       "w": "半額"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "short sleeves",
+       "reading": "はんそで",
+       "w": "半袖"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "during",
+       "reading": "あいだじゅう",
+       "w": "間中"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "goat-god",
+       "reading": "はんじゅうしん",
+       "w": "半獣神"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "eastern hemisphere",
+       "reading": "ひがしはんきゅう",
+       "w": "東半球"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "insufficiency",
+       "reading": "はんか",
+       "w": "半可"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "syllable with a \"p\" sound (in Japanese)",
+       "reading": "はんだくおん",
+       "w": "半濁音"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "comedian who plays a lover's part",
+       "reading": "にまいめはん",
+       "w": "二枚目半"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "ring",
+       "reading": "",
+       "w": "반지"
+      },
+      {
+       "at": 1,
+       "d": "half",
+       "reading": "",
+       "w": "절반"
+      },
+      {
+       "at": 2,
+       "d": "second half; latter part",
+       "reading": "",
+       "w": "후반"
+      },
+      {
+       "at": 3,
+       "d": "peninsula",
+       "reading": "",
+       "w": "반도"
+      },
+      {
+       "at": 4,
+       "d": "half year; six months",
+       "reading": "",
+       "w": "반년"
+      },
+      {
+       "at": 5,
+       "d": "half",
+       "reading": "",
+       "w": "반쪽"
+      },
+      {
+       "at": 6,
+       "d": "informal speech",
+       "reading": "",
+       "w": "반말"
+      },
+      {
+       "at": 7,
+       "d": "wedding ring",
+       "reading": "",
+       "w": "결혼반지"
+      },
+      {
+       "at": 8,
+       "d": "majority",
+       "reading": "",
+       "w": "과반"
+      },
+      {
+       "at": 9,
+       "d": "majority",
+       "reading": "",
+       "w": "과반수"
+      },
+      {
+       "at": 10,
+       "d": "gold ring",
+       "reading": "",
+       "w": "금반지"
+      },
+      {
+       "at": 11,
+       "d": "southern hemisphere",
+       "reading": "",
+       "w": "남반구"
+      },
+      {
+       "at": 12,
+       "d": "southern half",
+       "reading": "",
+       "w": "남반부"
+      },
+      {
+       "at": 13,
+       "d": "be cut by half; be halved",
+       "reading": "",
+       "w": "반감되다"
+      },
+      {
+       "at": 14,
+       "d": "cut by half; halve",
+       "reading": "",
+       "w": "반감하다"
+      },
+      {
+       "at": 15,
+       "d": "half price",
+       "reading": "",
+       "w": "반값"
+      },
+      {
+       "at": 16,
+       "d": "hemisphere",
+       "reading": "",
+       "w": "반구"
+      },
+      {
+       "at": 17,
+       "d": "being hemispherical",
+       "reading": "",
+       "w": "반구형"
+      },
+      {
+       "at": 18,
+       "d": "more than half",
+       "reading": "",
+       "w": "반나마"
+      },
+      {
+       "at": 19,
+       "d": "half joking; half in jest",
+       "reading": "",
+       "w": "반농담조"
+      },
+      {
+       "at": 77,
+       "d": "lower body",
+       "reading": "",
+       "w": "하반신"
+      },
+      {
+       "at": 78,
+       "d": "hanbando",
+       "reading": "",
+       "w": "한반도"
+      },
+      {
+       "at": 79,
+       "d": "second half; latter part",
+       "reading": "",
+       "w": "후반기"
+      },
+      {
+       "at": 80,
+       "d": "second half; latter part",
+       "reading": "",
+       "w": "후반부"
+      },
+      {
+       "at": 81,
+       "d": "second half",
+       "reading": "",
+       "w": "후반전"
+      }
+     ],
+     "length": 82
+    }
+   },
+   "博": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博士"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博物馆"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "赌博"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博文"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博客"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博览会"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博得"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博弈"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博爱"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博士学位"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博尔顿"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博学"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博士后"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博大"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "渊博"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博览"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "淄博"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博取"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博彩"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "博大精深"
+      },
+      {
+       "at": 125,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "彭博社"
+      },
+      {
+       "at": 126,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "彭博通讯社"
+      },
+      {
+       "at": 127,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "微博"
+      },
+      {
+       "at": 128,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "微博客"
+      },
+      {
+       "at": 129,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "托拉博拉"
+      }
+     ],
+     "length": 130
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "museum",
+       "reading": "はくぶつかん",
+       "w": "博物館"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "charity",
+       "reading": "はくあい",
+       "w": "博愛"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "exhibition",
+       "reading": "はくらんかい",
+       "w": "博覧会"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "erudition",
+       "reading": "はくがく",
+       "w": "博学"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "natural history",
+       "reading": "はくぶつ",
+       "w": "博物"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "national museum",
+       "reading": "こくりつはくぶつかん",
+       "w": "国立博物館"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "doctor",
+       "reading": "はくし",
+       "w": "博士"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "Hakata (old but still commonly used name for Fukuoka)",
+       "reading": "はかた",
+       "w": "博多"
+      },
+      {
+       "at": 8,
+       "c": false,
+       "d": "gambling",
+       "reading": "とばく",
+       "w": "賭博"
+      },
+      {
+       "at": 9,
+       "c": false,
+       "d": "gambling",
+       "reading": "ばくち",
+       "w": "博打"
+      },
+      {
+       "at": 10,
+       "c": false,
+       "d": "extensive knowledge",
+       "reading": "はくしき",
+       "w": "博識"
+      },
+      {
+       "at": 11,
+       "c": false,
+       "d": "to win",
+       "reading": "はくする",
+       "w": "博する"
+      },
+      {
+       "at": 12,
+       "c": false,
+       "d": "doctor's degree",
+       "reading": "はくしごう",
+       "w": "博士号"
+      },
+      {
+       "at": 13,
+       "c": false,
+       "d": "gambling house",
+       "reading": "とばくじょう",
+       "w": "賭博場"
+      },
+      {
+       "at": 14,
+       "c": false,
+       "d": "gambling",
+       "reading": "ばくえき",
+       "w": "博奕"
+      },
+      {
+       "at": 15,
+       "c": false,
+       "d": "gambler",
+       "reading": "ばくと",
+       "w": "博徒"
+      },
+      {
+       "at": 16,
+       "c": false,
+       "d": "world fair",
+       "reading": "ばんぱく",
+       "w": "万博"
+      },
+      {
+       "at": 17,
+       "c": false,
+       "d": "doctor of medicine",
+       "reading": "いがくはかせ",
+       "w": "医学博士"
+      },
+      {
+       "at": 18,
+       "c": false,
+       "d": "risky speculation",
+       "reading": "おおばくち",
+       "w": "大博打"
+      },
+      {
+       "at": 19,
+       "c": false,
+       "d": "natural history",
+       "reading": "はくぶつがく",
+       "w": "博物学"
+      },
+      {
+       "at": 116,
+       "c": false,
+       "d": "doctoral degree (e.g. PhD) by thesis only",
+       "reading": "ろんぶんはかせ",
+       "w": "論文博士"
+      },
+      {
+       "at": 117,
+       "c": false,
+       "d": "gambling table",
+       "reading": "とばくだい",
+       "w": "賭博台"
+      },
+      {
+       "at": 118,
+       "c": false,
+       "d": "doctor of agriculture",
+       "reading": "のうはく",
+       "w": "農博"
+      },
+      {
+       "at": 119,
+       "c": false,
+       "d": "outdoor gambling",
+       "reading": "のばくち",
+       "w": "野博打"
+      },
+      {
+       "at": 120,
+       "c": false,
+       "d": "professor specializing in the readings of kanji in classic Confucianist texts",
+       "reading": "おんはかせ",
+       "w": "音博士"
+      }
+     ],
+     "length": 121
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "doctoral degree; Ph.D.",
+       "reading": "",
+       "w": "박사"
+      },
+      {
+       "at": 1,
+       "d": "museum",
+       "reading": "",
+       "w": "박물관"
+      },
+      {
+       "at": 2,
+       "d": "gamble",
+       "reading": "",
+       "w": "도박하다"
+      },
+      {
+       "at": 3,
+       "d": "gambling",
+       "reading": "",
+       "w": "도박"
+      },
+      {
+       "at": 4,
+       "d": "National Museum",
+       "reading": "",
+       "w": "국립 박물관"
+      },
+      {
+       "at": 5,
+       "d": "habitual gambler",
+       "reading": "",
+       "w": "도박꾼"
+      },
+      {
+       "at": 6,
+       "d": "gambler",
+       "reading": "",
+       "w": "도박사"
+      },
+      {
+       "at": 7,
+       "d": "gambling house",
+       "reading": "",
+       "w": "도박장"
+      },
+      {
+       "at": 8,
+       "d": "gambling place",
+       "reading": "",
+       "w": "도박판"
+      },
+      {
+       "at": 9,
+       "d": "walking encyclopedia; walking dictionary",
+       "reading": "",
+       "w": "만물박사"
+      },
+      {
+       "at": 10,
+       "d": "honorary doctorate",
+       "reading": "",
+       "w": "명예박사"
+      },
+      {
+       "at": 11,
+       "d": "folk museum",
+       "reading": "",
+       "w": "민속 박물관"
+      },
+      {
+       "at": 12,
+       "d": "exposition; exhibition",
+       "reading": "",
+       "w": "박람회"
+      },
+      {
+       "at": 13,
+       "d": "knowledgeable; erudite",
+       "reading": "",
+       "w": "박식하다"
+      },
+      {
+       "at": 14,
+       "d": "love of mankind; philanthropy",
+       "reading": "",
+       "w": "박애"
+      },
+      {
+       "at": 15,
+       "d": "great learning; profound knowledge",
+       "reading": "",
+       "w": "박학"
+      },
+      {
+       "at": 16,
+       "d": "being erudite; being knowledgeable",
+       "reading": "",
+       "w": "박학다식"
+      },
+      {
+       "at": 17,
+       "d": "erudite; knowledgeable",
+       "reading": "",
+       "w": "박학하다"
+      },
+      {
+       "at": 18,
+       "d": "walking encyclopedia; walking dictionary",
+       "reading": "",
+       "w": "척척博士"
+      },
+      {
+       "at": 19,
+       "d": "walking encyclopedia; walking dictionary",
+       "reading": "",
+       "w": "척척박사"
+      },
+      {
+       "at": 20,
+       "d": "knowledgeable; erudite; learned",
+       "reading": "",
+       "w": "해박하다"
+      }
+     ],
+     "length": 21
+    }
+   },
+   "園": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "公园"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "花园"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "校园"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "幼儿园"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "家园"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐园"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "动物园"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "园区"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "园林"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "庄园"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "园丁"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "园艺"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "果园"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "田园"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "游乐园"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "伊甸园"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "圆明园"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "葡萄园"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "工业园区"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "植物园"
+      },
+      {
+       "at": 99,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "香港湿地公园"
+      },
+      {
+       "at": 100,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "凤梨园"
+      },
+      {
+       "at": 101,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "麓湖公园"
+      },
+      {
+       "at": 102,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "麦迪逊广场花园"
+      },
+      {
+       "at": 103,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "麦迪逊花园广场"
+      }
+     ],
+     "length": 104
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "(public) park",
+       "reading": "こうえん",
+       "w": "公園"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "educational institution",
+       "reading": "がくえん",
+       "w": "学園"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "garden",
+       "reading": "ていえん",
+       "w": "庭園"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "garden",
+       "reading": "その",
+       "w": "園"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "amusement park",
+       "reading": "ゆうえんち",
+       "w": "遊園地"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "paradise",
+       "reading": "らくえん",
+       "w": "楽園"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "kindergarten (in Japan, non-compulsory education from age 3 until primary school)",
+       "reading": "ようちえん",
+       "w": "幼稚園"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "zoo",
+       "reading": "どうぶつえん",
+       "w": "動物園"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "flower garden",
+       "reading": "はなぞの",
+       "w": "花園"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "nursery school",
+       "reading": "ほいくえん",
+       "w": "保育園"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "Koshien Stadium (baseball park in Nishinomiya, Hyōgo Prefecture)",
+       "reading": "こうしえん",
+       "w": "甲子園"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "inside the kindergarten",
+       "reading": "えんない",
+       "w": "園内"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "farm",
+       "reading": "のうえん",
+       "w": "農園"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "horticulture",
+       "reading": "えんげい",
+       "w": "園芸"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "kindergarten pupil",
+       "reading": "えんじ",
+       "w": "園児"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "head of a garden",
+       "reading": "えんちょう",
+       "w": "園長"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "the country",
+       "reading": "でんえん",
+       "w": "田園"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "vegetable garden",
+       "reading": "さいえん",
+       "w": "菜園"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "botanical garden",
+       "reading": "しょくぶつえん",
+       "w": "植物園"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "nature park",
+       "reading": "しぜんこうえん",
+       "w": "自然公園"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "Instituto Educacional Centro Nippo Brasileiro (school)",
+       "reading": "にっぱくがくえん",
+       "w": "日伯学園"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "Seibi Gakuen College",
+       "reading": "せいびがくえんたんきだいがく",
+       "w": "星美学園短期大学"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "child not enrolled in kindergarten",
+       "reading": "みしゅうえんじ",
+       "w": "未就園児"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "this kindergarten",
+       "reading": "ほんえん",
+       "w": "本園"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "Tohoku Bunka Gakuen University",
+       "reading": "とうほくぶんかがくえんだいがく",
+       "w": "東北文化学園大学"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "country",
+       "reading": "",
+       "w": "전원"
+      },
+      {
+       "at": 1,
+       "d": "zoo",
+       "reading": "",
+       "w": "동물원"
+      },
+      {
+       "at": 2,
+       "d": "kindergarten",
+       "reading": "",
+       "w": "유치원"
+      },
+      {
+       "at": 3,
+       "d": "gardener",
+       "reading": "",
+       "w": "정원사"
+      },
+      {
+       "at": 4,
+       "d": "park cemetery",
+       "reading": "",
+       "w": "공원묘지"
+      },
+      {
+       "at": 5,
+       "d": "orchard",
+       "reading": "",
+       "w": "과수원"
+      },
+      {
+       "at": 6,
+       "d": "national park",
+       "reading": "",
+       "w": "국립 공원"
+      },
+      {
+       "at": 7,
+       "d": "paradise; heaven",
+       "reading": "",
+       "w": "낙원"
+      },
+      {
+       "at": 8,
+       "d": "amusement park",
+       "reading": "",
+       "w": "놀이公園"
+      },
+      {
+       "at": 9,
+       "d": "amusement park",
+       "reading": "",
+       "w": "놀이공원"
+      },
+      {
+       "at": 10,
+       "d": "farm; plantation",
+       "reading": "",
+       "w": "농원"
+      },
+      {
+       "at": 11,
+       "d": "large public park",
+       "reading": "",
+       "w": "대공원"
+      },
+      {
+       "at": 12,
+       "d": "minipark; pocket park",
+       "reading": "",
+       "w": "소공원"
+      },
+      {
+       "at": 13,
+       "d": "arboretum",
+       "reading": "",
+       "w": "수목원"
+      },
+      {
+       "at": 14,
+       "d": "botanical garden",
+       "reading": "",
+       "w": "식물원"
+      },
+      {
+       "at": 15,
+       "d": "lookout hut on stilts",
+       "reading": "",
+       "w": "원두막"
+      },
+      {
+       "at": 16,
+       "d": "gardening; horticulture; floriculture",
+       "reading": "",
+       "w": "원예"
+      },
+      {
+       "at": 17,
+       "d": "horticulture farming",
+       "reading": "",
+       "w": "원예 농업"
+      },
+      {
+       "at": 18,
+       "d": "gardener; horticulturist",
+       "reading": "",
+       "w": "원예사"
+      },
+      {
+       "at": 19,
+       "d": "horticulture services",
+       "reading": "",
+       "w": "원예업"
+      },
+      {
+       "at": 22,
+       "d": "kindergartener",
+       "reading": "",
+       "w": "유치원생"
+      },
+      {
+       "at": 23,
+       "d": "country-like town",
+       "reading": "",
+       "w": "전원도시"
+      },
+      {
+       "at": 24,
+       "d": "country house; country home",
+       "reading": "",
+       "w": "전원주택"
+      },
+      {
+       "at": 25,
+       "d": "garden tree",
+       "reading": "",
+       "w": "정원수"
+      },
+      {
+       "at": 26,
+       "d": "flower garden",
+       "reading": "",
+       "w": "화원"
+      }
+     ],
+     "length": 27
+    }
+   },
+   "多": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多少"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "许多"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "好多"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多久"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "差不多"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多么"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "大多数"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多次"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "众多"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多种"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "最多"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多谢"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多数"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "大多"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多个"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "增多"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "过多"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "诸多"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "绝大多数"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多云"
+      },
+      {
+       "at": 136,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多吃多占"
+      },
+      {
+       "at": 137,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多咱"
+      },
+      {
+       "at": 138,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多哈"
+      },
+      {
+       "at": 139,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多哈回合"
+      },
+      {
+       "at": 140,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "多哥"
+      }
+     ],
+     "length": 141
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "many",
+       "reading": "おおい",
+       "w": "多い"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "many",
+       "reading": "おおく",
+       "w": "多く"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "probably",
+       "reading": "たぶん",
+       "w": "多分"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "a little",
+       "reading": "たしょう",
+       "w": "多少"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "very",
+       "reading": "おおいに",
+       "w": "大いに"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "large number (of)",
+       "reading": "たすう",
+       "w": "多数"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "rarely",
+       "reading": "めったに",
+       "w": "滅多に"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "in great numbers",
+       "reading": "かずおおく",
+       "w": "数多く"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "great (quantity, amount, etc.)",
+       "reading": "ただい",
+       "w": "多大"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "somewhat larger (amount)",
+       "reading": "おおめ",
+       "w": "多め"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "being very busy",
+       "reading": "たぼう",
+       "w": "多忙"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "large (amount of money)",
+       "reading": "たがく",
+       "w": "多額"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "great majority",
+       "reading": "だいたすう",
+       "w": "大多数"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "thoughtless",
+       "reading": "めった",
+       "w": "滅多"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "diverse",
+       "reading": "たよう",
+       "w": "多様"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "large quantity",
+       "reading": "たりょう",
+       "w": "多量"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "colourful",
+       "reading": "たさい",
+       "w": "多彩"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "repeated occurrence",
+       "reading": "たはつ",
+       "w": "多発"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "multiple",
+       "reading": "たじゅう",
+       "w": "多重"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "majority decision",
+       "reading": "たすうけつ",
+       "w": "多数決"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "various meanings",
+       "reading": "たぎ",
+       "w": "多義"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "owning multiple animals (esp. pets of the same kind)",
+       "reading": "たとうがい",
+       "w": "多頭飼い"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "complex and wide-ranging",
+       "reading": "ふくざつたき",
+       "w": "複雑多岐"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "it is justifiable to kill one person to save the lives of many",
+       "reading": "いっさつたしょう",
+       "w": "一殺多生"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "versatile",
+       "reading": "たげいたさい",
+       "w": "多芸多才"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "the most; the largest; maximum",
+       "reading": "",
+       "w": "최다"
+      },
+      {
+       "at": 1,
+       "d": "luckily; with luck",
+       "reading": "",
+       "w": "다행히"
+      },
+      {
+       "at": 2,
+       "d": "more or less",
+       "reading": "",
+       "w": "다소"
+      },
+      {
+       "at": 3,
+       "d": "extreme",
+       "reading": "",
+       "w": "과다"
+      },
+      {
+       "at": 4,
+       "d": "multilayer",
+       "reading": "",
+       "w": "다중"
+      },
+      {
+       "at": 5,
+       "d": "many sides",
+       "reading": "",
+       "w": "다면"
+      },
+      {
+       "at": 6,
+       "d": "being simultaneous",
+       "reading": "",
+       "w": "다발성"
+      },
+      {
+       "at": 7,
+       "d": "osteoporosis",
+       "reading": "",
+       "w": "골다공증"
+      },
+      {
+       "at": 8,
+       "d": "excessive",
+       "reading": "",
+       "w": "과다하다"
+      },
+      {
+       "at": 9,
+       "d": "multi-household house",
+       "reading": "",
+       "w": "다가구 주택"
+      },
+      {
+       "at": 10,
+       "d": "multiangle",
+       "reading": "",
+       "w": "다각도"
+      },
+      {
+       "at": 11,
+       "d": "many-sided; multilateral; diversified",
+       "reading": "",
+       "w": "다각적"
+      },
+      {
+       "at": 12,
+       "d": "polygon",
+       "reading": "",
+       "w": "다각형"
+      },
+      {
+       "at": 13,
+       "d": "diversification",
+       "reading": "",
+       "w": "다각화"
+      },
+      {
+       "at": 14,
+       "d": "emotional; sentimental",
+       "reading": "",
+       "w": "다감하다"
+      },
+      {
+       "at": 15,
+       "d": "many or few; quantity; amount",
+       "reading": "",
+       "w": "다과"
+      },
+      {
+       "at": 16,
+       "d": "many languages",
+       "reading": "",
+       "w": "다국어"
+      },
+      {
+       "at": 17,
+       "d": "multinational",
+       "reading": "",
+       "w": "다국적"
+      },
+      {
+       "at": 18,
+       "d": "multinational enterprise",
+       "reading": "",
+       "w": "다국적 기업"
+      },
+      {
+       "at": 19,
+       "d": "multipolarization",
+       "reading": "",
+       "w": "다극화"
+      },
+      {
+       "at": 106,
+       "d": "fortune",
+       "reading": "",
+       "w": "천만다행"
+      },
+      {
+       "at": 107,
+       "d": "widespread; known widely",
+       "reading": "",
+       "w": "파다하다"
+      },
+      {
+       "at": 108,
+       "d": "countless; plenty; numerous",
+       "reading": "",
+       "w": "허다하다"
+      },
+      {
+       "at": 109,
+       "d": "countlessly; so many; plentifully",
+       "reading": "",
+       "w": "허다히"
+      },
+      {
+       "at": 110,
+       "d": "with the good comes the bad",
+       "reading": "",
+       "w": "호사다마"
+      }
+     ],
+     "length": 111
+    }
+   },
+   "夢": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "梦想"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "做梦"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "噩梦"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "梦幻"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "梦见"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "恶梦"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "梦境"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "红楼梦"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "梦寐以求"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "梦游"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "白日梦"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "梦魇"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "梦乡"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "圆梦"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "春梦"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "醉生梦死"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "云梦"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "梦话"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "白日做梦"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "人生如梦"
+      },
+      {
+       "at": 64,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "魂牵梦萦"
+      },
+      {
+       "at": 65,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "魂牵梦绕"
+      },
+      {
+       "at": 66,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "黄粱一梦"
+      },
+      {
+       "at": 67,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "黄粱梦"
+      },
+      {
+       "at": 68,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "黄粱美梦"
+      }
+     ],
+     "length": 69
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "absorbed in",
+       "reading": "むちゅう",
+       "w": "夢中"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "nightmare",
+       "reading": "あくむ",
+       "w": "悪夢"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "dream",
+       "reading": "むそう",
+       "w": "夢想"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "(not) in the slightest",
+       "reading": "ゆめにも",
+       "w": "夢にも"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "dreams",
+       "reading": "むげん",
+       "w": "夢幻"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "first dream of the New year (believed to foretell one's luck)",
+       "reading": "はつゆめ",
+       "w": "初夢"
+      },
+      {
+       "at": 6,
+       "c": false,
+       "d": "to dream (i.e. while asleep)",
+       "reading": "ゆめをみる",
+       "w": "夢を見る"
+      },
+      {
+       "at": 7,
+       "c": false,
+       "d": "to dream (of)",
+       "reading": "ゆめみる",
+       "w": "夢見る"
+      },
+      {
+       "at": 8,
+       "c": false,
+       "d": "to have in one's dreams",
+       "reading": "ゆめにもおもう",
+       "w": "夢にも思う"
+      },
+      {
+       "at": 9,
+       "c": false,
+       "d": "losing oneself (in)",
+       "reading": "むがむちゅう",
+       "w": "無我夢中"
+      },
+      {
+       "at": 10,
+       "c": false,
+       "d": "account of a dream",
+       "reading": "ゆめものがたり",
+       "w": "夢物語"
+      },
+      {
+       "at": 11,
+       "c": false,
+       "d": "having a dream",
+       "reading": "ゆめみ",
+       "w": "夢見"
+      },
+      {
+       "at": 12,
+       "c": false,
+       "d": "dream for the future",
+       "reading": "しょうらいのゆめ",
+       "w": "将来の夢"
+      },
+      {
+       "at": 13,
+       "c": false,
+       "d": "to go after one's dreams",
+       "reading": "ゆめをおう",
+       "w": "夢を追う"
+      },
+      {
+       "at": 14,
+       "c": false,
+       "d": "daydream",
+       "reading": "はくちゅうむ",
+       "w": "白昼夢"
+      },
+      {
+       "at": 15,
+       "c": false,
+       "d": "dreamy state of mind",
+       "reading": "ゆめみごこち",
+       "w": "夢見心地"
+      },
+      {
+       "at": 16,
+       "c": false,
+       "d": "dream within a dream",
+       "reading": "ゆめのまたゆめ",
+       "w": "夢のまた夢"
+      },
+      {
+       "at": 17,
+       "c": false,
+       "d": "half asleep and half awake",
+       "reading": "ゆめうつつ",
+       "w": "夢うつつ"
+      },
+      {
+       "at": 18,
+       "c": false,
+       "d": "to talk of one's dreams (esp. unrealistic, far-fetched ones)",
+       "reading": "ゆめをかたる",
+       "w": "夢を語る"
+      },
+      {
+       "at": 19,
+       "c": false,
+       "d": "dreamy state of mind",
+       "reading": "ゆめごこち",
+       "w": "夢心地"
+      },
+      {
+       "at": 96,
+       "c": false,
+       "d": "Dream of the Red Chamber (18th century novel by Cao Xueqin)",
+       "reading": "こうろうむ",
+       "w": "紅楼夢"
+      },
+      {
+       "at": 97,
+       "c": false,
+       "d": "ancient dream",
+       "reading": "きゅうむ",
+       "w": "旧夢"
+      },
+      {
+       "at": 98,
+       "c": false,
+       "d": "unfulfilled dream",
+       "reading": "みはてぬゆめ",
+       "w": "見果てぬ夢"
+      },
+      {
+       "at": 99,
+       "c": false,
+       "d": "homesickness",
+       "reading": "きょうむ",
+       "w": "郷夢"
+      },
+      {
+       "at": 100,
+       "c": false,
+       "d": "Battle Angel Alita (manga and anime)",
+       "reading": "がんむ",
+       "w": "銃夢"
+      }
+     ],
+     "length": 101
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "nightmare; bad dream",
+       "reading": "",
+       "w": "악몽"
+      },
+      {
+       "at": 1,
+       "d": "lucky dream",
+       "reading": "",
+       "w": "길몽"
+      },
+      {
+       "at": 2,
+       "d": "same situation, different thoughts",
+       "reading": "",
+       "w": "동상이몽"
+      },
+      {
+       "at": 3,
+       "d": "dreaming while asleep",
+       "reading": "",
+       "w": "몽매"
+      },
+      {
+       "at": 4,
+       "d": "fantasy",
+       "reading": "",
+       "w": "몽상"
+      },
+      {
+       "at": 5,
+       "d": "dreamer",
+       "reading": "",
+       "w": "몽상가"
+      },
+      {
+       "at": 6,
+       "d": "dream; fancy; daydream",
+       "reading": "",
+       "w": "몽상하다"
+      },
+      {
+       "at": 7,
+       "d": "sleepwalking; somnambulism",
+       "reading": "",
+       "w": "몽유병"
+      },
+      {
+       "at": 8,
+       "d": "wet dream",
+       "reading": "",
+       "w": "몽정"
+      },
+      {
+       "at": 9,
+       "d": "dreams and fantasies",
+       "reading": "",
+       "w": "몽환"
+      },
+      {
+       "at": 10,
+       "d": "being dreamlike; being dreamy",
+       "reading": "",
+       "w": "몽환적"
+      },
+      {
+       "at": 11,
+       "d": "illusion; delusion",
+       "reading": "",
+       "w": "미몽"
+      },
+      {
+       "at": 12,
+       "d": "daydream; reverie",
+       "reading": "",
+       "w": "백일몽"
+      },
+      {
+       "at": 13,
+       "d": "being half-asleep; being half-awake; being half-dreaming and half-awake",
+       "reading": "",
+       "w": "비몽사몽"
+      },
+      {
+       "at": 14,
+       "d": "Yi Mongryong",
+       "reading": "",
+       "w": "이몽룡"
+      },
+      {
+       "at": 15,
+       "d": "empty dream; spring dream",
+       "reading": "",
+       "w": "일장춘몽"
+      },
+      {
+       "at": 16,
+       "d": "dream of forthcoming conception",
+       "reading": "",
+       "w": "태몽"
+      },
+      {
+       "at": 17,
+       "d": "dream reading; dream interpretation",
+       "reading": "",
+       "w": "해몽"
+      },
+      {
+       "at": 18,
+       "d": "read a dream; interpret a dream",
+       "reading": "",
+       "w": "해몽하다"
+      },
+      {
+       "at": 19,
+       "d": "appearing in one's dream",
+       "reading": "",
+       "w": "현몽"
+      },
+      {
+       "at": 20,
+       "d": "bad dream; nightmare",
+       "reading": "",
+       "w": "흉몽"
+      }
+     ],
+     "length": 21
+    }
+   },
+   "市": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "城市"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市场"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市长"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市民"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上市"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "超市"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市中心"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "全市"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市区"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "股市"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "都市"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市政府"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市场经济"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "北京市"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市里"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市政厅"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市政"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "黑市"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "市委"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "集市"
+      },
+      {
+       "at": 152,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "副市长"
+      },
+      {
+       "at": 153,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "副省级城市"
+      },
+      {
+       "at": 154,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "劳务市场"
+      },
+      {
+       "at": 155,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "包头市"
+      },
+      {
+       "at": 156,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "化州市"
+      }
+     ],
+     "length": 157
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "town",
+       "reading": "とし",
+       "w": "都市"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "citizen (of a country)",
+       "reading": "しみん",
+       "w": "市民"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "in the city",
+       "reading": "しない",
+       "w": "市内"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "mayor",
+       "reading": "しちょう",
+       "w": "市長"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "urban areas",
+       "reading": "しがい",
+       "w": "市街"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "town area",
+       "reading": "しがいち",
+       "w": "市街地"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "putting on the market",
+       "reading": "しはん",
+       "w": "市販"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "metropolis",
+       "reading": "だいとし",
+       "w": "大都市"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "in the city",
+       "reading": "しちゅう",
+       "w": "市中"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "municipal office",
+       "reading": "しやくしょ",
+       "w": "市役所"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "urban area",
+       "reading": "としぶ",
+       "w": "都市部"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "outside the city",
+       "reading": "しがい",
+       "w": "市外"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "citizenship",
+       "reading": "しみんけん",
+       "w": "市民権"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "municipal",
+       "reading": "しりつ",
+       "w": "市立"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "(town) market",
+       "reading": "いちば",
+       "w": "市場"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "cities, towns and villages",
+       "reading": "しちょうそん",
+       "w": "市町村"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "stock market",
+       "reading": "かぶしきしじょう",
+       "w": "株式市場"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "city planning",
+       "reading": "としけいかく",
+       "w": "都市計画"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "municipal government",
+       "reading": "しせい",
+       "w": "市政"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "trade fair",
+       "reading": "みほんいち",
+       "w": "見本市"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "secondhand book fair",
+       "reading": "こしょいち",
+       "w": "古書市"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "citizens' rally",
+       "reading": "しみんたいかい",
+       "w": "市民大会"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "city name",
+       "reading": "しめい",
+       "w": "市名"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "neighboring towns",
+       "reading": "きんこうとし",
+       "w": "近郊都市"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "city god",
+       "reading": "いちがみ",
+       "w": "市神"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "city",
+       "reading": "",
+       "w": "도시"
+      },
+      {
+       "at": 1,
+       "d": "mayor",
+       "reading": "",
+       "w": "시장"
+      },
+      {
+       "at": 2,
+       "d": "urbanite; city dweller",
+       "reading": "",
+       "w": "시민"
+      },
+      {
+       "at": 3,
+       "d": "creating a new market",
+       "reading": "",
+       "w": "개시"
+      },
+      {
+       "at": 4,
+       "d": "street of city",
+       "reading": "",
+       "w": "시가"
+      },
+      {
+       "at": 5,
+       "d": "city hall",
+       "reading": "",
+       "w": "시청"
+      },
+      {
+       "at": 6,
+       "d": "launch; start",
+       "reading": "",
+       "w": "개시하다"
+      },
+      {
+       "at": 7,
+       "d": "industrial city",
+       "reading": "",
+       "w": "공업 도시"
+      },
+      {
+       "at": 8,
+       "d": "tourist city",
+       "reading": "",
+       "w": "관광 도시"
+      },
+      {
+       "at": 9,
+       "d": "metropolitan city",
+       "reading": "",
+       "w": "광역시"
+      },
+      {
+       "at": 10,
+       "d": "domestic market",
+       "reading": "",
+       "w": "국내 시장"
+      },
+      {
+       "at": 11,
+       "d": "international market",
+       "reading": "",
+       "w": "국제 시장"
+      },
+      {
+       "at": 12,
+       "d": "international city",
+       "reading": "",
+       "w": "국제도시"
+      },
+      {
+       "at": 13,
+       "d": "financial market",
+       "reading": "",
+       "w": "금융 시장"
+      },
+      {
+       "at": 14,
+       "d": "Namdaemun Market",
+       "reading": "",
+       "w": "남대문 시장"
+      },
+      {
+       "at": 15,
+       "d": "big city; metropolis",
+       "reading": "",
+       "w": "대도시"
+      },
+      {
+       "at": 16,
+       "d": "busy and disorderly market; zoo",
+       "reading": "",
+       "w": "도깨비市場"
+      },
+      {
+       "at": 17,
+       "d": "busy and disorderly market; zoo",
+       "reading": "",
+       "w": "도깨비시장"
+      },
+      {
+       "at": 18,
+       "d": "crowded and disorderly market",
+       "reading": "",
+       "w": "도떼기市場"
+      },
+      {
+       "at": 19,
+       "d": "crowded and disorderly market",
+       "reading": "",
+       "w": "도떼기시장"
+      },
+      {
+       "at": 76,
+       "d": "release; launch",
+       "reading": "",
+       "w": "출시하다"
+      },
+      {
+       "at": 77,
+       "d": "teukbyeol-si",
+       "reading": "",
+       "w": "특별시"
+      },
+      {
+       "at": 78,
+       "d": "niche market",
+       "reading": "",
+       "w": "틈새市場"
+      },
+      {
+       "at": 79,
+       "d": "niche market",
+       "reading": "",
+       "w": "틈새시장"
+      },
+      {
+       "at": 80,
+       "d": "port city",
+       "reading": "",
+       "w": "항구 도시"
+      }
+     ],
+     "length": 81
+    }
+   },
+   "形": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形成"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形象"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形式"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形势"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形容"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "情形"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形状"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "变形"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "隐形"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形态"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "整形"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "外形"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "畸形"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "无形"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "圆形"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "地形"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "身形"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "图形"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "体形"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "三角形"
+      },
+      {
+       "at": 127,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形势严峻"
+      },
+      {
+       "at": 128,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形胜"
+      },
+      {
+       "at": 129,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形单影只"
+      },
+      {
+       "at": 130,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形变"
+      },
+      {
+       "at": 131,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "形同"
+      }
+     ],
+     "length": 132
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "form",
+       "reading": "かたち",
+       "w": "形"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "doll",
+       "reading": "にんぎょう",
+       "w": "人形"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "large",
+       "reading": "おおがた",
+       "w": "大型"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "small-sized",
+       "reading": "こがた",
+       "w": "小型"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "formation",
+       "reading": "けいせい",
+       "w": "形成"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "form (as opposed to substance)",
+       "reading": "けいしき",
+       "w": "形式"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "hair style",
+       "reading": "かみがた",
+       "w": "髪型"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "shape",
+       "reading": "けいじょう",
+       "w": "形状"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "form",
+       "reading": "けいたい",
+       "w": "形態"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "traces",
+       "reading": "けいせき",
+       "w": "形跡"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "dress",
+       "reading": "みなり",
+       "w": "身なり"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "figure",
+       "reading": "たいけい",
+       "w": "体型"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "transformation",
+       "reading": "へんけい",
+       "w": "変形"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "terrain",
+       "reading": "ちけい",
+       "w": "地形"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "creation",
+       "reading": "せいせい",
+       "w": "生成"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "disposition",
+       "reading": "きしつ",
+       "w": "気質"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "description",
+       "reading": "けいよう",
+       "w": "形容"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "round shape",
+       "reading": "えんけい",
+       "w": "円形"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "new type",
+       "reading": "しんがた",
+       "w": "新型"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "memento (esp. of a deceased person)",
+       "reading": "かたみ",
+       "w": "形見"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "doll clothed in chrysanthemum flowers and branches",
+       "reading": "きくにんぎょう",
+       "w": "菊人形"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "Japanese puppet theatre in which recited narrative and dialog is accompanied by a shamisen (forerunner of bunraku)",
+       "reading": "にんぎょうじょうるり",
+       "w": "人形浄瑠璃"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "formal logic",
+       "reading": "けいしきろんりがく",
+       "w": "形式論理学"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "leading actor",
+       "reading": "はながたやくしゃ",
+       "w": "花形役者"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "linear",
+       "reading": "せんけい",
+       "w": "線形"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "doll; figure",
+       "reading": "",
+       "w": "인형"
+      },
+      {
+       "at": 1,
+       "d": "poor; low; bad",
+       "reading": "",
+       "w": "형편없다"
+      },
+      {
+       "at": 2,
+       "d": "plastic surgery; department of plastic surgery",
+       "reading": "",
+       "w": "성형외과"
+      },
+      {
+       "at": 3,
+       "d": "situation; state",
+       "reading": "",
+       "w": "형편"
+      },
+      {
+       "at": 4,
+       "d": "orthopedics; department of orthopedics",
+       "reading": "",
+       "w": "정형외과"
+      },
+      {
+       "at": 5,
+       "d": "shaping",
+       "reading": "",
+       "w": "성형"
+      },
+      {
+       "at": 6,
+       "d": "formation; building; development",
+       "reading": "",
+       "w": "형성"
+      },
+      {
+       "at": 7,
+       "d": "form; build; develop",
+       "reading": "",
+       "w": "형성하다"
+      },
+      {
+       "at": 8,
+       "d": "model; example",
+       "reading": "",
+       "w": "모형"
+      },
+      {
+       "at": 9,
+       "d": "badly; terribly; awfully",
+       "reading": "",
+       "w": "형편없이"
+      },
+      {
+       "at": 10,
+       "d": "exclamatory form",
+       "reading": "",
+       "w": "감탄형"
+      },
+      {
+       "at": 11,
+       "d": "egg shape",
+       "reading": "",
+       "w": "계란형"
+      },
+      {
+       "at": 12,
+       "d": "solid",
+       "reading": "",
+       "w": "고형"
+      },
+      {
+       "at": 13,
+       "d": "past tense",
+       "reading": "",
+       "w": "과거형"
+      },
+      {
+       "at": 14,
+       "d": "adnominal",
+       "reading": "",
+       "w": "관형격"
+      },
+      {
+       "at": 15,
+       "d": "adnominal case marker",
+       "reading": "",
+       "w": "관형격 조사"
+      },
+      {
+       "at": 16,
+       "d": "determiner",
+       "reading": "",
+       "w": "관형사"
+      },
+      {
+       "at": 17,
+       "d": "adnominal suffix",
+       "reading": "",
+       "w": "관형사형 어미"
+      },
+      {
+       "at": 18,
+       "d": "adnominal phrase",
+       "reading": "",
+       "w": "관형어"
+      },
+      {
+       "at": 19,
+       "d": "adnominal clause",
+       "reading": "",
+       "w": "관형절"
+      },
+      {
+       "at": 116,
+       "d": "form; shape",
+       "reading": "",
+       "w": "형체"
+      },
+      {
+       "at": 117,
+       "d": "form; shape",
+       "reading": "",
+       "w": "형태"
+      },
+      {
+       "at": 118,
+       "d": "morpheme",
+       "reading": "",
+       "w": "형태소"
+      },
+      {
+       "at": 119,
+       "d": "being physical; being morphological",
+       "reading": "",
+       "w": "형태적"
+      },
+      {
+       "at": 120,
+       "d": "variety; diversity; many different colors",
+       "reading": "",
+       "w": "형형색색"
+      }
+     ],
+     "length": 121
+    }
+   },
+   "攢": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "积攒"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "攒簇"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "攒集"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "拼攒"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "攒聚"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "众星攒月"
+      }
+     ],
+     "length": 6
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [],
+     "length": 0
+    },
+    "korean": {
+     "kept": [],
+     "length": 0
+    }
+   },
+   "時": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时候"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时间"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "小时"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "同时"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "当时"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时代"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "那时"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "有时"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时尚"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "有时候"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时刻"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "及时"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时期"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "随时"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "暂时"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时光"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "此时"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "这时"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "平时"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "临时"
+      },
+      {
+       "at": 195,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时不再来"
+      },
+      {
+       "at": 196,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时不我待"
+      },
+      {
+       "at": 197,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时不时"
+      },
+      {
+       "at": 198,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时乖命蹇"
+      },
+      {
+       "at": 199,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时事"
+      }
+     ],
+     "length": 200
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "time",
+       "reading": "じかん",
+       "w": "時間"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "at the same time",
+       "reading": "どうじに",
+       "w": "同時に"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "period",
+       "reading": "じだい",
+       "w": "時代"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "at that time",
+       "reading": "とうじ",
+       "w": "当時"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "at times",
+       "reading": "ときには",
+       "w": "時には"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "time",
+       "reading": "じき",
+       "w": "時期"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "before one knows",
+       "reading": "いつのまにか",
+       "w": "いつの間にか"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "point in time",
+       "reading": "じてん",
+       "w": "時点"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "sometimes",
+       "reading": "ときどき",
+       "w": "時々"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "clock",
+       "reading": "とけい",
+       "w": "時計"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "one o'clock",
+       "reading": "いちじ",
+       "w": "一時"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "autumn",
+       "reading": "あき",
+       "w": "秋"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "temporary",
+       "reading": "いちじてき",
+       "w": "一時的"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "time",
+       "reading": "じこく",
+       "w": "時刻"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "one hour",
+       "reading": "いちじかん",
+       "w": "一時間"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "as always",
+       "reading": "いつもどおり",
+       "w": "いつも通り"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "sometimes",
+       "reading": "ときおり",
+       "w": "時折"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "same time",
+       "reading": "どうじ",
+       "w": "同時"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "instant",
+       "reading": "しゅんじ",
+       "w": "瞬時"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "a few hours",
+       "reading": "すうじかん",
+       "w": "数時間"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "time one returns home",
+       "reading": "きたくじかん",
+       "w": "帰宅時間"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "temporary truce",
+       "reading": "いちじきゅうせん",
+       "w": "一時休戦"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "casual income",
+       "reading": "りんじしゅうにゅう",
+       "w": "臨時収入"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "time to pay the piper",
+       "reading": "ねんぐのおさめどき",
+       "w": "年貢の納め時"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "working hours",
+       "reading": "ろうどうじかん",
+       "w": "労働時間"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "time",
+       "reading": "",
+       "w": "시간"
+      },
+      {
+       "at": 1,
+       "d": "moment; short while",
+       "reading": "",
+       "w": "잠시"
+      },
+      {
+       "at": 2,
+       "d": "immediately",
+       "reading": "",
+       "w": "즉시"
+      },
+      {
+       "at": 3,
+       "d": "then; at that time",
+       "reading": "",
+       "w": "당시"
+      },
+      {
+       "at": 4,
+       "d": "clock",
+       "reading": "",
+       "w": "시계"
+      },
+      {
+       "at": 5,
+       "d": "speed per hour",
+       "reading": "",
+       "w": "시속"
+      },
+      {
+       "at": 6,
+       "d": "being provisional; being tentative; being interim",
+       "reading": "",
+       "w": "임시"
+      },
+      {
+       "at": 7,
+       "d": "days; the time",
+       "reading": "",
+       "w": "시절"
+      },
+      {
+       "at": 8,
+       "d": "now",
+       "reading": "",
+       "w": "시방"
+      },
+      {
+       "at": 9,
+       "d": "time; hour",
+       "reading": "",
+       "w": "시각"
+      },
+      {
+       "at": 10,
+       "d": "being momentary; being temporary",
+       "reading": "",
+       "w": "일시적"
+      },
+      {
+       "at": 11,
+       "d": "deadline; time limit",
+       "reading": "",
+       "w": "시한"
+      },
+      {
+       "at": 12,
+       "d": "moment; brief time period",
+       "reading": "",
+       "w": "일시"
+      },
+      {
+       "at": 13,
+       "d": "every hour",
+       "reading": "",
+       "w": "매시간"
+      },
+      {
+       "at": 14,
+       "d": "long hours",
+       "reading": "",
+       "w": "장시간"
+      },
+      {
+       "at": 15,
+       "d": "frequently",
+       "reading": "",
+       "w": "수시로"
+      },
+      {
+       "at": 16,
+       "d": "period",
+       "reading": "",
+       "w": "시대"
+      },
+      {
+       "at": 17,
+       "d": "emergency; being in a state of emergency",
+       "reading": "",
+       "w": "비상시"
+      },
+      {
+       "at": 18,
+       "d": "real time",
+       "reading": "",
+       "w": "실시간"
+      },
+      {
+       "at": 19,
+       "d": "gosijo; old traditional Korean poem",
+       "reading": "",
+       "w": "고시조"
+      },
+      {
+       "at": 136,
+       "d": "present era; contemporary world",
+       "reading": "",
+       "w": "현시대"
+      },
+      {
+       "at": 137,
+       "d": "present tense",
+       "reading": "",
+       "w": "현재 시제"
+      },
+      {
+       "at": 138,
+       "d": "good times; heyday; prime",
+       "reading": "",
+       "w": "호시절"
+      },
+      {
+       "at": 139,
+       "d": "golden age",
+       "reading": "",
+       "w": "황금시대"
+      },
+      {
+       "at": 140,
+       "d": "pocket watch",
+       "reading": "",
+       "w": "회중시계"
+      }
+     ],
+     "length": 141
+    }
+   },
+   "樂": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "快乐"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "音乐"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "俱乐部"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "娱乐"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐队"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐意"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "欢乐"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐观"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "生日快乐"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐趣"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "新年快乐"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "音乐会"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "可乐"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐园"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐器"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐团"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "摇滚乐"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "音乐家"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐于"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "享乐"
+      },
+      {
+       "at": 195,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐蒂"
+      },
+      {
+       "at": 196,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐蜀"
+      },
+      {
+       "at": 197,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐见其成"
+      },
+      {
+       "at": 198,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐观主义"
+      },
+      {
+       "at": 199,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "乐观其成"
+      }
+     ],
+     "length": 200
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "enjoyable",
+       "reading": "たのしい",
+       "w": "楽しい"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "to enjoy",
+       "reading": "たのしむ",
+       "w": "楽しむ"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "comfort",
+       "reading": "らく",
+       "w": "楽"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "enjoyment",
+       "reading": "たのしみ",
+       "w": "楽しみ"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "music",
+       "reading": "おんがく",
+       "w": "音楽"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "carefree",
+       "reading": "きらく",
+       "w": "気楽"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "pleasure",
+       "reading": "かいらく",
+       "w": "快楽"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "musical instrument",
+       "reading": "がっき",
+       "w": "楽器"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "amusement",
+       "reading": "ごらく",
+       "w": "娯楽"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "paradise",
+       "reading": "らくえん",
+       "w": "楽園"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "scrawl",
+       "reading": "らくがき",
+       "w": "落書き"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "optimistic",
+       "reading": "らっかんてき",
+       "w": "楽観的"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "Sukhavati (Amitabha's Pure Land)",
+       "reading": "ごくらく",
+       "w": "極楽"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "dressing room",
+       "reading": "がくや",
+       "w": "楽屋"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "kagura",
+       "reading": "かぐら",
+       "w": "神楽"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "score",
+       "reading": "がくふ",
+       "w": "楽譜"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "musician",
+       "reading": "おんがくか",
+       "w": "音楽家"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "optimism",
+       "reading": "らっかん",
+       "w": "楽観"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "orchestra",
+       "reading": "がくだん",
+       "w": "楽団"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "entertainment district",
+       "reading": "かんらくがい",
+       "w": "歓楽街"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "womanizing",
+       "reading": "おんなどうらく",
+       "w": "女道楽"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "amusement program",
+       "reading": "ごらくばんぐみ",
+       "w": "娯楽番組"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "kagura song",
+       "reading": "かぐらうた",
+       "w": "神楽歌"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "grand kagura performance at Ise",
+       "reading": "だいかぐら",
+       "w": "太神楽"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "compositional rules",
+       "reading": "がくてん",
+       "w": "楽典"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "music",
+       "reading": "",
+       "w": "음악"
+      },
+      {
+       "at": 1,
+       "d": "instrumental music",
+       "reading": "",
+       "w": "기악"
+      },
+      {
+       "at": 2,
+       "d": "musical instrument",
+       "reading": "",
+       "w": "악기"
+      },
+      {
+       "at": 3,
+       "d": "music concert",
+       "reading": "",
+       "w": "음악회"
+      },
+      {
+       "at": 4,
+       "d": "keyboard instrument",
+       "reading": "",
+       "w": "건반 악기"
+      },
+      {
+       "at": 5,
+       "d": "light music",
+       "reading": "",
+       "w": "경음악"
+      },
+      {
+       "at": 6,
+       "d": "sorrows and joys",
+       "reading": "",
+       "w": "고락"
+      },
+      {
+       "at": 7,
+       "d": "classical music",
+       "reading": "",
+       "w": "고전 음악"
+      },
+      {
+       "at": 8,
+       "d": "wind music; pipe music",
+       "reading": "",
+       "w": "관악"
+      },
+      {
+       "at": 9,
+       "d": "wind instrument",
+       "reading": "",
+       "w": "관악기"
+      },
+      {
+       "at": 10,
+       "d": "orchestra; symphony",
+       "reading": "",
+       "w": "관현악"
+      },
+      {
+       "at": 11,
+       "d": "orchestra; symphony; symphony orchestra",
+       "reading": "",
+       "w": "관현악단"
+      },
+      {
+       "at": 12,
+       "d": "symphony",
+       "reading": "",
+       "w": "교향악"
+      },
+      {
+       "at": 13,
+       "d": "symphony orchestra",
+       "reading": "",
+       "w": "교향악단"
+      },
+      {
+       "at": 14,
+       "d": "church music",
+       "reading": "",
+       "w": "교회 음악"
+      },
+      {
+       "at": 15,
+       "d": "gugak",
+       "reading": "",
+       "w": "국악"
+      },
+      {
+       "at": 16,
+       "d": "gugakgi",
+       "reading": "",
+       "w": "국악기"
+      },
+      {
+       "at": 17,
+       "d": "military music",
+       "reading": "",
+       "w": "군악"
+      },
+      {
+       "at": 18,
+       "d": "military band",
+       "reading": "",
+       "w": "군악대"
+      },
+      {
+       "at": 19,
+       "d": "paradise; heaven",
+       "reading": "",
+       "w": "극락"
+      },
+      {
+       "at": 87,
+       "d": "joys and sorrows; all kinds of emotions",
+       "reading": "",
+       "w": "희로애락"
+      },
+      {
+       "at": 88,
+       "d": "rejoicing; jubilation",
+       "reading": "",
+       "w": "희희낙락"
+      },
+      {
+       "at": 89,
+       "d": "rejoice; jubilate",
+       "reading": "",
+       "w": "희희낙락거리다"
+      },
+      {
+       "at": 90,
+       "d": "rejoice; jubilate",
+       "reading": "",
+       "w": "희희낙락대다"
+      },
+      {
+       "at": 91,
+       "d": "rejoice; jubilate",
+       "reading": "",
+       "w": "희희낙락하다"
+      }
+     ],
+     "length": 92
+    }
+   },
+   "空": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "空间"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "空气"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "航空"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "天空"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "太空"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "空中"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "有空"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "空调"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "空军"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "时空"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "空白"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "上空"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "空虚"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "空手"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "航空公司"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "空前"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "星空"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "空地"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "高空"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "真空"
+      },
+      {
+       "at": 130,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "平空"
+      },
+      {
+       "at": 131,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "平行时空"
+      },
+      {
+       "at": 132,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "弯曲空间"
+      },
+      {
+       "at": 133,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "当空"
+      },
+      {
+       "at": 134,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "得空"
+      }
+     ],
+     "length": 135
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "to open",
+       "reading": "ひらく",
+       "w": "開く"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "to open (a door, etc.)",
+       "reading": "あける",
+       "w": "開ける"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "air",
+       "reading": "くうき",
+       "w": "空気"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "sky",
+       "reading": "くうちゅう",
+       "w": "空中"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "sky",
+       "reading": "じょうくう",
+       "w": "上空"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "night sky",
+       "reading": "よぞら",
+       "w": "夜空"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "to confide",
+       "reading": "うちあける",
+       "w": "打ち明ける"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "empty",
+       "reading": "からっぽ",
+       "w": "空っぽ"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "blue sky",
+       "reading": "あおぞら",
+       "w": "青空"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "empty stomach",
+       "reading": "くうふく",
+       "w": "空腹"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "daydream",
+       "reading": "くうそう",
+       "w": "空想"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "empty space",
+       "reading": "こくう",
+       "w": "虚空"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "empty",
+       "reading": "むなしい",
+       "w": "虚しい"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "starry sky",
+       "reading": "ほしぞら",
+       "w": "星空"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "to become less crowded",
+       "reading": "すく",
+       "w": "空く"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "blank space (in a document)",
+       "reading": "くうはく",
+       "w": "空白"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "airport",
+       "reading": "くうこう",
+       "w": "空港"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "cavity",
+       "reading": "くうどう",
+       "w": "空洞"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "emptiness",
+       "reading": "くうきょ",
+       "w": "空虚"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "fictitious",
+       "reading": "かくう",
+       "w": "架空"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "vacuum pack",
+       "reading": "しんくうパック",
+       "w": "真空パック"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "Japan Air Lines",
+       "reading": "にっぽんこうくう",
+       "w": "日本航空"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "karate practitioner",
+       "reading": "からてか",
+       "w": "空手家"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "absentminded response",
+       "reading": "そらへんじ",
+       "w": "空返事"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "air mobile",
+       "reading": "くうちゅうきどう",
+       "w": "空中機動"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "gaining for free",
+       "reading": "",
+       "w": "공하다"
+      },
+      {
+       "at": 1,
+       "d": "something gained free of charge",
+       "reading": "",
+       "w": "공짜"
+      },
+      {
+       "at": 2,
+       "d": "airport",
+       "reading": "",
+       "w": "공항"
+      },
+      {
+       "at": 3,
+       "d": "space",
+       "reading": "",
+       "w": "공간"
+      },
+      {
+       "at": 4,
+       "d": "being antiaircraft",
+       "reading": "",
+       "w": "대공"
+      },
+      {
+       "at": 5,
+       "d": "fantasy",
+       "reading": "",
+       "w": "공상"
+      },
+      {
+       "at": 6,
+       "d": "vainly; in vain; to no avail",
+       "reading": "",
+       "w": "공연히"
+      },
+      {
+       "at": 7,
+       "d": "aviation; air",
+       "reading": "",
+       "w": "항공"
+      },
+      {
+       "at": 8,
+       "d": "airplane; aircraft; plane",
+       "reading": "",
+       "w": "항공기"
+      },
+      {
+       "at": 9,
+       "d": "vacuum",
+       "reading": "",
+       "w": "진공"
+      },
+      {
+       "at": 10,
+       "d": "fictional character",
+       "reading": "",
+       "w": "가공인물"
+      },
+      {
+       "at": 11,
+       "d": "being fictitious; being fictive",
+       "reading": "",
+       "w": "가공적"
+      },
+      {
+       "at": 12,
+       "d": "high altitude",
+       "reading": "",
+       "w": "고공"
+      },
+      {
+       "at": 13,
+       "d": "spatiality",
+       "reading": "",
+       "w": "공간성"
+      },
+      {
+       "at": 14,
+       "d": "being spatial",
+       "reading": "",
+       "w": "공간적"
+      },
+      {
+       "at": 15,
+       "d": "something gained free of charge; freebies",
+       "reading": "",
+       "w": "공것"
+      },
+      {
+       "at": 16,
+       "d": "briefcase",
+       "reading": "",
+       "w": "공공칠가방"
+      },
+      {
+       "at": 17,
+       "d": "air force",
+       "reading": "",
+       "w": "공군"
+      },
+      {
+       "at": 18,
+       "d": "Air Force Academy",
+       "reading": "",
+       "w": "공군 사관 학교"
+      },
+      {
+       "at": 19,
+       "d": "air cleaner",
+       "reading": "",
+       "w": "공기 정화기"
+      },
+      {
+       "at": 73,
+       "d": "air route; airway",
+       "reading": "",
+       "w": "항공로"
+      },
+      {
+       "at": 74,
+       "d": "airfare; flight fare",
+       "reading": "",
+       "w": "항공료"
+      },
+      {
+       "at": 75,
+       "d": "airline",
+       "reading": "",
+       "w": "항공사"
+      },
+      {
+       "at": 76,
+       "d": "air transportation; flight",
+       "reading": "",
+       "w": "항공편"
+      },
+      {
+       "at": 77,
+       "d": "air; sky",
+       "reading": "",
+       "w": "허공"
+      }
+     ],
+     "length": 78
+    }
+   },
+   "終": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终于"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "最终"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "始终"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终点"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终身"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终结"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终止"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终极"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终究"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终端"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终生"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "年终"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "临终"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "告终"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "自始至终"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终日"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终点站"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "年终奖"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终场"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "终审"
+      },
+      {
+       "at": 83,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "遐终"
+      },
+      {
+       "at": 84,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "靡不有初，鲜克有终"
+      },
+      {
+       "at": 85,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "饱食终日"
+      },
+      {
+       "at": 86,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "饱食终日，无所用心"
+      },
+      {
+       "at": 87,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "养老送终"
+      }
+     ],
+     "length": 88
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "to end",
+       "reading": "おわる",
+       "w": "終わる"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "end",
+       "reading": "おわり",
+       "w": "終わり"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "to finish",
+       "reading": "おえる",
+       "w": "終える"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "end",
+       "reading": "しゅうりょう",
+       "w": "終了"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "final",
+       "reading": "さいしゅうてき",
+       "w": "最終的"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "last",
+       "reading": "さいしゅう",
+       "w": "最終"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "beginning and end",
+       "reading": "しゅうし",
+       "w": "終始"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "finally",
+       "reading": "ついに",
+       "w": "遂に"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "to finish",
+       "reading": "しまう",
+       "w": "仕舞う"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "end (of life)",
+       "reading": "しゅうえん",
+       "w": "終焉"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "end",
+       "reading": "しゅうけつ",
+       "w": "終結"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "endgame",
+       "reading": "しゅうばん",
+       "w": "終盤"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "continuously",
+       "reading": "しじゅう",
+       "w": "始終"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "the end",
+       "reading": "おしまい",
+       "w": "お仕舞い"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "terminus",
+       "reading": "しゅうてん",
+       "w": "終点"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "after the end (of something)",
+       "reading": "しゅうりょうご",
+       "w": "終了後"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "end",
+       "reading": "しゅうまつ",
+       "w": "終末"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "last train (of the day)",
+       "reading": "しゅうでん",
+       "w": "終電"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "end of war",
+       "reading": "しゅうせん",
+       "w": "終戦"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "all day",
+       "reading": "しゅうじつ",
+       "w": "終日"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "most recent business year",
+       "reading": "さいしゅうじぎょうねんど",
+       "w": "最終事業年度"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "final value",
+       "reading": "さいしゅうち",
+       "w": "最終値"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "last train",
+       "reading": "さいしゅうれっしゃ",
+       "w": "最終列車"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "Olympic Cauldron lighter",
+       "reading": "さいしゅうてんかしゃ",
+       "w": "最終点火者"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "final version",
+       "reading": "さいしゅうばん",
+       "w": "最終版"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "the entire day",
+       "reading": "",
+       "w": "종일"
+      },
+      {
+       "at": 1,
+       "d": "the last; the final",
+       "reading": "",
+       "w": "최종"
+      },
+      {
+       "at": 2,
+       "d": "all day",
+       "reading": "",
+       "w": "온종일"
+      },
+      {
+       "at": 3,
+       "d": "end",
+       "reading": "",
+       "w": "종료"
+      },
+      {
+       "at": 4,
+       "d": "last stop",
+       "reading": "",
+       "w": "종착역"
+      },
+      {
+       "at": 5,
+       "d": "one's deathbed; one's end",
+       "reading": "",
+       "w": "임종"
+      },
+      {
+       "at": 6,
+       "d": "be on one's deathbed; be dying",
+       "reading": "",
+       "w": "임종하다"
+      },
+      {
+       "at": 7,
+       "d": "time of death",
+       "reading": "",
+       "w": "망종"
+      },
+      {
+       "at": 8,
+       "d": "beginning and end",
+       "reading": "",
+       "w": "시종"
+      },
+      {
+       "at": 9,
+       "d": "being consistent from the start to finish",
+       "reading": "",
+       "w": "시종일관"
+      },
+      {
+       "at": 10,
+       "d": "all day",
+       "reading": "",
+       "w": "온終日"
+      },
+      {
+       "at": 11,
+       "d": "end",
+       "reading": "",
+       "w": "유종"
+      },
+      {
+       "at": 12,
+       "d": "all the details; whole story; full account of",
+       "reading": "",
+       "w": "자초지종"
+      },
+      {
+       "at": 13,
+       "d": "end of semester; last class",
+       "reading": "",
+       "w": "종강"
+      },
+      {
+       "at": 14,
+       "d": "end",
+       "reading": "",
+       "w": "종강하다"
+      },
+      {
+       "at": 15,
+       "d": "end; conclusion",
+       "reading": "",
+       "w": "종결"
+      },
+      {
+       "at": 16,
+       "d": "sentence-closing ending",
+       "reading": "",
+       "w": "종결 어미"
+      },
+      {
+       "at": 17,
+       "d": "be ended; be finished",
+       "reading": "",
+       "w": "종결되다"
+      },
+      {
+       "at": 18,
+       "d": "end; finish",
+       "reading": "",
+       "w": "종결짓다"
+      },
+      {
+       "at": 19,
+       "d": "end; finish",
+       "reading": "",
+       "w": "종결하다"
+      },
+      {
+       "at": 48,
+       "d": "last stop; final destination",
+       "reading": "",
+       "w": "종착지"
+      },
+      {
+       "at": 49,
+       "d": "all day",
+       "reading": "",
+       "w": "진종일"
+      },
+      {
+       "at": 50,
+       "d": "the last instance",
+       "reading": "",
+       "w": "최종심"
+      },
+      {
+       "at": 51,
+       "d": "the last day",
+       "reading": "",
+       "w": "최종일"
+      },
+      {
+       "at": 52,
+       "d": "being the last; being final",
+       "reading": "",
+       "w": "최종적"
+      }
+     ],
+     "length": 53
+    }
+   },
+   "縊": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "自缢"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "缢死"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "投缳自缢"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "绞缢"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "缢杀"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "缢颈"
+      }
+     ],
+     "length": 6
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": false,
+       "d": "to underrate",
+       "reading": "みくびる",
+       "w": "見くびる"
+      },
+      {
+       "at": 1,
+       "c": false,
+       "d": "to hang oneself",
+       "reading": "くびをくくる",
+       "w": "首をくくる"
+      },
+      {
+       "at": 2,
+       "c": false,
+       "d": "to strangle to death",
+       "reading": "くびりころす",
+       "w": "くびり殺す"
+      },
+      {
+       "at": 3,
+       "c": false,
+       "d": "to strangle to death",
+       "reading": "くびる",
+       "w": "縊る"
+      },
+      {
+       "at": 4,
+       "c": false,
+       "d": "suicide by hanging",
+       "reading": "いし",
+       "w": "縊死"
+      },
+      {
+       "at": 5,
+       "c": false,
+       "d": "hanging oneself",
+       "reading": "くびくくり",
+       "w": "首縊り"
+      },
+      {
+       "at": 6,
+       "c": false,
+       "d": "suicide by hanging",
+       "reading": "いしゅ",
+       "w": "縊首"
+      },
+      {
+       "at": 7,
+       "c": false,
+       "d": "to hang oneself",
+       "reading": "わなく",
+       "w": "縊く"
+      }
+     ],
+     "length": 8
+    },
+    "korean": {
+     "kept": [],
+     "length": 0
+    }
+   },
+   "聲": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "声音"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "声明"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "大声"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "声称"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "掌声"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "歌声"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "名声"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "小声"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "铃声"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "笑声"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "心声"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "枪声"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "超声"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "低声"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "声誉"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "叫声"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "风声"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "无声"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "呼声"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "噪声"
+      },
+      {
+       "at": 195,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "声情并茂"
+      },
+      {
+       "at": 196,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "声押"
+      },
+      {
+       "at": 197,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "声援"
+      },
+      {
+       "at": 198,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "声旁"
+      },
+      {
+       "at": 199,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "声旁字"
+      }
+     ],
+     "length": 200
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "declaration",
+       "reading": "せいめい",
+       "w": "声明"
+      },
+      {
+       "at": 1,
+       "c": false,
+       "d": "wailing voice",
+       "reading": "こくせい",
+       "w": "哭声"
+      }
+     ],
+     "length": 2
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "voice",
+       "reading": "",
+       "w": "음성"
+      },
+      {
+       "at": 1,
+       "d": "fame; eminence",
+       "reading": "",
+       "w": "명성"
+      },
+      {
+       "at": 2,
+       "d": "dubbing artist; voice actor/actress",
+       "reading": "",
+       "w": "성우"
+      },
+      {
+       "at": 3,
+       "d": "fake voice",
+       "reading": "",
+       "w": "가성"
+      },
+      {
+       "at": 4,
+       "d": "loud singing",
+       "reading": "",
+       "w": "고성방가"
+      },
+      {
+       "at": 5,
+       "d": "gokseong; wail",
+       "reading": "",
+       "w": "곡성"
+      },
+      {
+       "at": 6,
+       "d": "odd sound",
+       "reading": "",
+       "w": "괴성"
+      },
+      {
+       "at": 7,
+       "d": "coquettish voice",
+       "reading": "",
+       "w": "교성"
+      },
+      {
+       "at": 8,
+       "d": "ghost's wail",
+       "reading": "",
+       "w": "귀곡성"
+      },
+      {
+       "at": 9,
+       "d": "metallic sound",
+       "reading": "",
+       "w": "금속성"
+      },
+      {
+       "at": 10,
+       "d": "peal of thunder",
+       "reading": "",
+       "w": "뇌성"
+      },
+      {
+       "at": 11,
+       "d": "wailing loudly; mourning bitterly",
+       "reading": "",
+       "w": "대성통곡"
+      },
+      {
+       "at": 12,
+       "d": "wail loudly; mourn bitterly; howl",
+       "reading": "",
+       "w": "대성통곡하다"
+      },
+      {
+       "at": 13,
+       "d": "being silent",
+       "reading": "",
+       "w": "무성"
+      },
+      {
+       "at": 14,
+       "d": "silent movie",
+       "reading": "",
+       "w": "무성 영화"
+      },
+      {
+       "at": 15,
+       "d": "sweet voice",
+       "reading": "",
+       "w": "미성"
+      },
+      {
+       "at": 16,
+       "d": "vocalization",
+       "reading": "",
+       "w": "발성"
+      },
+      {
+       "at": 17,
+       "d": "vocal organ",
+       "reading": "",
+       "w": "발성 기관"
+      },
+      {
+       "at": 18,
+       "d": "be vocalized",
+       "reading": "",
+       "w": "발성되다"
+      },
+      {
+       "at": 19,
+       "d": "vocalize",
+       "reading": "",
+       "w": "발성하다"
+      },
+      {
+       "at": 48,
+       "d": "sound of cannon firing",
+       "reading": "",
+       "w": "포성"
+      },
+      {
+       "at": 49,
+       "d": "cry; shout; roar; yell",
+       "reading": "",
+       "w": "함성"
+      },
+      {
+       "at": 50,
+       "d": "speaker",
+       "reading": "",
+       "w": "확성기"
+      },
+      {
+       "at": 51,
+       "d": "cheer; shout; cry",
+       "reading": "",
+       "w": "환성"
+      },
+      {
+       "at": 52,
+       "d": "cheer; shout of joy",
+       "reading": "",
+       "w": "환호성"
+      }
+     ],
+     "length": 53
+    }
+   },
+   "色": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "出色"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "角色"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "颜色"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "红色"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "黑色"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "绿色"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "特色"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "蓝色"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "白色"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "以色列"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "色彩"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "黄色"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "脸色"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "色情"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "金色"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "灰色"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "紫色"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "彩色"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "棕色"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "肤色"
+      },
+      {
+       "at": 137,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "染色"
+      },
+      {
+       "at": 138,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "染色体"
+      },
+      {
+       "at": 139,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "染色体三倍体症"
+      },
+      {
+       "at": 140,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "染色体倍性"
+      },
+      {
+       "at": 141,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "染色质"
+      }
+     ],
+     "length": 142
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "various",
+       "reading": "いろいろ",
+       "w": "色々"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "scenery",
+       "reading": "けしき",
+       "w": "景色"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "complexion",
+       "reading": "かおいろ",
+       "w": "顔色"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "grey",
+       "reading": "はいいろ",
+       "w": "灰色"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "gold (colour, color)",
+       "reading": "きんいろ",
+       "w": "金色"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "silver (color, colour)",
+       "reading": "ぎんいろ",
+       "w": "銀色"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "various",
+       "reading": "いろんな",
+       "w": "色んな"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "yellow",
+       "reading": "きいろい",
+       "w": "黄色い"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "green",
+       "reading": "みどりいろ",
+       "w": "緑色"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "yellow",
+       "reading": "きいろ",
+       "w": "黄色"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "purple",
+       "reading": "むらさきいろ",
+       "w": "紫色"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "colouring",
+       "reading": "いろけ",
+       "w": "色気"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "brown",
+       "reading": "ちゃいろ",
+       "w": "茶色"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "to colour",
+       "reading": "いろどる",
+       "w": "彩る"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "colour",
+       "reading": "しきさい",
+       "w": "色彩"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "light blue",
+       "reading": "みずいろ",
+       "w": "水色"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "colouring",
+       "reading": "いろあい",
+       "w": "色合い"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "tone of voice",
+       "reading": "こわいろ",
+       "w": "声色"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "pink (colour, color)",
+       "reading": "ももいろ",
+       "w": "桃色"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "tone color",
+       "reading": "ねいろ",
+       "w": "音色"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "bronze color",
+       "reading": "どうしょく",
+       "w": "銅色"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "grayish white",
+       "reading": "かいはくしょく",
+       "w": "灰白色"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "red-light district",
+       "reading": "いろまち",
+       "w": "色町"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "dark green",
+       "reading": "あんりょくしょく",
+       "w": "暗緑色"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "red light (esp. on emergency vehicles)",
+       "reading": "せきしょくとう",
+       "w": "赤色灯"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "green",
+       "reading": "",
+       "w": "녹색"
+      },
+      {
+       "at": 1,
+       "d": "brown",
+       "reading": "",
+       "w": "갈색"
+      },
+      {
+       "at": 2,
+       "d": "white",
+       "reading": "",
+       "w": "흰색"
+      },
+      {
+       "at": 3,
+       "d": "blue",
+       "reading": "",
+       "w": "파란색"
+      },
+      {
+       "at": 4,
+       "d": "green",
+       "reading": "",
+       "w": "초록색"
+      },
+      {
+       "at": 5,
+       "d": "yellow",
+       "reading": "",
+       "w": "노란색"
+      },
+      {
+       "at": 6,
+       "d": "red; dark red",
+       "reading": "",
+       "w": "적색"
+      },
+      {
+       "at": 7,
+       "d": "violet; purple",
+       "reading": "",
+       "w": "보라색"
+      },
+      {
+       "at": 8,
+       "d": "silver",
+       "reading": "",
+       "w": "은색"
+      },
+      {
+       "at": 9,
+       "d": "red color",
+       "reading": "",
+       "w": "빨간색"
+      },
+      {
+       "at": 10,
+       "d": "golden color",
+       "reading": "",
+       "w": "금색"
+      },
+      {
+       "at": 11,
+       "d": "black",
+       "reading": "",
+       "w": "검은색"
+      },
+      {
+       "at": 12,
+       "d": "color; hue; tint",
+       "reading": "",
+       "w": "색깔"
+      },
+      {
+       "at": 13,
+       "d": "gray",
+       "reading": "",
+       "w": "회색"
+      },
+      {
+       "at": 14,
+       "d": "black",
+       "reading": "",
+       "w": "검정색"
+      },
+      {
+       "at": 15,
+       "d": "orange color",
+       "reading": "",
+       "w": "주황색"
+      },
+      {
+       "at": 16,
+       "d": "diverse colors",
+       "reading": "",
+       "w": "각색"
+      },
+      {
+       "at": 17,
+       "d": "sky blue",
+       "reading": "",
+       "w": "하늘색"
+      },
+      {
+       "at": 18,
+       "d": "dyeing",
+       "reading": "",
+       "w": "염색"
+      },
+      {
+       "at": 19,
+       "d": "white",
+       "reading": "",
+       "w": "하얀색"
+      },
+      {
+       "at": 195,
+       "d": "gunmetal gray",
+       "reading": "",
+       "w": "청회색"
+      },
+      {
+       "at": 196,
+       "d": "all natural color",
+       "reading": "",
+       "w": "총천연색"
+      },
+      {
+       "at": 197,
+       "d": "khaki",
+       "reading": "",
+       "w": "카키색"
+      },
+      {
+       "at": 198,
+       "d": "bleach; decoloration",
+       "reading": "",
+       "w": "탈색"
+      },
+      {
+       "at": 199,
+       "d": "be bleached; be decolored",
+       "reading": "",
+       "w": "탈색되다"
+      }
+     ],
+     "length": 200
+    }
+   },
+   "諺": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "谚语"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "民谚"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "农谚"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "古谚"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "俗谚"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "俗谚口碑"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "俚谚"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "谚文"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "里谚"
+      }
+     ],
+     "length": 9
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": false,
+       "d": "proverb",
+       "reading": "ぞくげん",
+       "w": "俗諺"
+      },
+      {
+       "at": 1,
+       "c": false,
+       "d": "proverb",
+       "reading": "りげん",
+       "w": "俚諺"
+      },
+      {
+       "at": 2,
+       "c": false,
+       "d": "old saying",
+       "reading": "こげん",
+       "w": "古言"
+      },
+      {
+       "at": 3,
+       "c": false,
+       "d": "hangul (Korean script)",
+       "reading": "オンモン",
+       "w": "諺文"
+      },
+      {
+       "at": 4,
+       "c": false,
+       "d": "legal maxim",
+       "reading": "ほうげん",
+       "w": "法諺"
+      },
+      {
+       "at": 5,
+       "c": false,
+       "d": "proverb",
+       "reading": "せいげん",
+       "w": "世諺"
+      },
+      {
+       "at": 6,
+       "c": false,
+       "d": "vulgar proverb",
+       "reading": "ひげん",
+       "w": "鄙諺"
+      },
+      {
+       "at": 7,
+       "c": false,
+       "d": "Western saying",
+       "reading": "せいげん",
+       "w": "西諺"
+      },
+      {
+       "at": 8,
+       "c": false,
+       "d": "colloquial interpretation (of a text)",
+       "reading": "げんかい",
+       "w": "諺解"
+      },
+      {
+       "at": 9,
+       "c": false,
+       "d": "colloquialism",
+       "reading": "げんご",
+       "w": "諺語"
+      }
+     ],
+     "length": 10
+    },
+    "korean": {
+     "kept": [],
+     "length": 0
+    }
+   },
+   "貪": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪婪"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪污"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪心"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪官"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪图"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪吃"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪得无厌"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪欲"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪玩"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪财"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪恋"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪生怕死"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪官污吏"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪赃枉法"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "起早贪黑"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪杯"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪求"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪嘴"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪色"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪心不足"
+      },
+      {
+       "at": 39,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪猥无厌"
+      },
+      {
+       "at": 40,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪腐"
+      },
+      {
+       "at": 41,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪贿无艺"
+      },
+      {
+       "at": 42,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪食"
+      },
+      {
+       "at": 43,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "贪馋"
+      }
+     ],
+     "length": 44
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "to covet",
+       "reading": "むさぼる",
+       "w": "貪る"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "greedy",
+       "reading": "どんよく",
+       "w": "貪欲"
+      },
+      {
+       "at": 2,
+       "c": false,
+       "d": "to sleep all day",
+       "reading": "だみんをむさぼる",
+       "w": "惰眠をむさぼる"
+      },
+      {
+       "at": 3,
+       "c": false,
+       "d": "to eat greedily",
+       "reading": "むさぼりくう",
+       "w": "貪り食う"
+      },
+      {
+       "at": 4,
+       "c": false,
+       "d": "to consume greedily",
+       "reading": "むさぼりつくす",
+       "w": "貪り尽くす"
+      },
+      {
+       "at": 5,
+       "c": false,
+       "d": "avarice",
+       "reading": "どんらん",
+       "w": "貪婪"
+      },
+      {
+       "at": 6,
+       "c": false,
+       "d": "voracity",
+       "reading": "どんしょく",
+       "w": "貪食"
+      },
+      {
+       "at": 7,
+       "c": false,
+       "d": "blunt",
+       "reading": "つっけんどん",
+       "w": "突慳貪"
+      },
+      {
+       "at": 8,
+       "c": false,
+       "d": "to devour greedily",
+       "reading": "むさぼりくらう",
+       "w": "貪り食らう"
+      },
+      {
+       "at": 9,
+       "c": false,
+       "d": "to read avidly",
+       "reading": "むさぼりよむ",
+       "w": "むさぼり読む"
+      },
+      {
+       "at": 10,
+       "c": false,
+       "d": "the three kilesas that poison the heart of man (greed, hatred and delusion)",
+       "reading": "とんじんち",
+       "w": "貪瞋痴"
+      },
+      {
+       "at": 11,
+       "c": false,
+       "d": "corrupt government official",
+       "reading": "たんかんおり",
+       "w": "貪官汚吏"
+      },
+      {
+       "at": 12,
+       "c": false,
+       "d": "attachment",
+       "reading": "とんあい",
+       "w": "貪愛"
+      },
+      {
+       "at": 13,
+       "c": false,
+       "d": "non-craving",
+       "reading": "むとん",
+       "w": "無貪"
+      },
+      {
+       "at": 14,
+       "c": false,
+       "d": "greed",
+       "reading": "たんお",
+       "w": "貪汚"
+      },
+      {
+       "at": 15,
+       "c": false,
+       "d": "to enjoy oneself to the full",
+       "reading": "かいをむさぼる",
+       "w": "快を貪る"
+      },
+      {
+       "at": 16,
+       "c": false,
+       "d": "avariciousness and inhumanity",
+       "reading": "たんれい",
+       "w": "貪戻"
+      },
+      {
+       "at": 17,
+       "c": false,
+       "d": "greedy algorithm",
+       "reading": "どんよくほう",
+       "w": "貪欲法"
+      },
+      {
+       "at": 18,
+       "c": false,
+       "d": "phagocyte",
+       "reading": "どんしょくさいぼう",
+       "w": "貪食細胞"
+      }
+     ],
+     "length": 19
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "desire; covet",
+       "reading": "",
+       "w": "탐하다"
+      },
+      {
+       "at": 1,
+       "d": "desire; covet",
+       "reading": "",
+       "w": "탐내다"
+      },
+      {
+       "at": 2,
+       "d": "gluttony",
+       "reading": "",
+       "w": "식탐"
+      },
+      {
+       "at": 3,
+       "d": "corrupt official; greedy official",
+       "reading": "",
+       "w": "탐관"
+      },
+      {
+       "at": 4,
+       "d": "corrupt official; greedy official",
+       "reading": "",
+       "w": "탐관오리"
+      },
+      {
+       "at": 5,
+       "d": "be desirable; be tempting",
+       "reading": "",
+       "w": "탐나다"
+      },
+      {
+       "at": 6,
+       "d": "desirable; appetizing",
+       "reading": "",
+       "w": "탐스럽다"
+      },
+      {
+       "at": 7,
+       "d": "voracity; edacity; gluttony",
+       "reading": "",
+       "w": "탐식"
+      },
+      {
+       "at": 8,
+       "d": "eat voraciously; devour",
+       "reading": "",
+       "w": "탐식하다"
+      },
+      {
+       "at": 9,
+       "d": "greed; covetousness",
+       "reading": "",
+       "w": "탐욕"
+      },
+      {
+       "at": 10,
+       "d": "greedy; covetous",
+       "reading": "",
+       "w": "탐욕스럽다"
+      },
+      {
+       "at": 11,
+       "d": "being greedy; being covetous",
+       "reading": "",
+       "w": "탐욕적"
+      }
+     ],
+     "length": 12
+    }
+   },
+   "酒": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酒店"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酒吧"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "啤酒"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "喝酒"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酒精"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "葡萄酒"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酗酒"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "白酒"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鸡尾酒"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酒鬼"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "饮酒"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酒楼"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酒杯"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "戒酒"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酒馆"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酒会"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酒后"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "美酒"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "酿酒"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "下酒"
+      },
+      {
+       "at": 139,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "行酒令"
+      },
+      {
+       "at": 140,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "解酒"
+      },
+      {
+       "at": 141,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "调酒"
+      },
+      {
+       "at": 142,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "调酒器"
+      },
+      {
+       "at": 143,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "调酒师"
+      }
+     ],
+     "length": 144
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "bar",
+       "reading": "さかば",
+       "w": "酒場"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "sake cup",
+       "reading": "さかずき",
+       "w": "杯"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "izakaya",
+       "reading": "いざかや",
+       "w": "居酒屋"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "sake (rice wine)",
+       "reading": "にほんしゅ",
+       "w": "日本酒"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "liquor store",
+       "reading": "さかや",
+       "w": "酒屋"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "drinking alcohol",
+       "reading": "いんしゅ",
+       "w": "飲酒"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "abstinence from alcohol",
+       "reading": "きんしゅ",
+       "w": "禁酒"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "alcoholic drinks",
+       "reading": "しゅるい",
+       "w": "酒類"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "brewing (sake)",
+       "reading": "しゅぞう",
+       "w": "酒造"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "Western wine and spirits",
+       "reading": "ようしゅ",
+       "w": "洋酒"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "ume liqueur",
+       "reading": "うめしゅ",
+       "w": "梅酒"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "drunk driving",
+       "reading": "いんしゅうんてん",
+       "w": "飲酒運転"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "refined sake",
+       "reading": "せいしゅ",
+       "w": "清酒"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "liquor store",
+       "reading": "さかだな",
+       "w": "酒店"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "liquor tax",
+       "reading": "しゅぜい",
+       "w": "酒税"
+      },
+      {
+       "at": 15,
+       "c": false,
+       "d": "alcohol",
+       "reading": "おさけ",
+       "w": "お酒"
+      },
+      {
+       "at": 16,
+       "c": false,
+       "d": "sake bottle",
+       "reading": "さかびん",
+       "w": "酒瓶"
+      },
+      {
+       "at": 17,
+       "c": false,
+       "d": "(grape) wine",
+       "reading": "ぶどうしゅ",
+       "w": "ぶどう酒"
+      },
+      {
+       "at": 18,
+       "c": false,
+       "d": "appetizer or snack served with drinks",
+       "reading": "さかな",
+       "w": "肴"
+      },
+      {
+       "at": 19,
+       "c": false,
+       "d": "reeking of liquor",
+       "reading": "さけくさい",
+       "w": "酒臭い"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "sake used for seasoning (oft. containing a small amount of salt)",
+       "reading": "さかしお",
+       "w": "酒塩"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "cream of tartar",
+       "reading": "しゅせきえい",
+       "w": "酒石英"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "potassium bitartrate",
+       "reading": "しゅせきさんすいそカリウム",
+       "w": "酒石酸水素カリウム"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "Buddhist precept prohibiting the consumption of alcohol",
+       "reading": "ふおんじゅかい",
+       "w": "不飲酒戒"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "high-grade sake",
+       "reading": "うまさけ",
+       "w": "旨酒"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "beer",
+       "reading": "",
+       "w": "맥주"
+      },
+      {
+       "at": 1,
+       "d": "wine",
+       "reading": "",
+       "w": "포도주"
+      },
+      {
+       "at": 2,
+       "d": "soju",
+       "reading": "",
+       "w": "소주"
+      },
+      {
+       "at": 3,
+       "d": "drinking",
+       "reading": "",
+       "w": "음주"
+      },
+      {
+       "at": 4,
+       "d": "drunkard",
+       "reading": "",
+       "w": "주정뱅이"
+      },
+      {
+       "at": 5,
+       "d": "medicinal wine",
+       "reading": "",
+       "w": "약주"
+      },
+      {
+       "at": 6,
+       "d": "heavy drinkers",
+       "reading": "",
+       "w": "주당"
+      },
+      {
+       "at": 7,
+       "d": "bootleg; moonshining",
+       "reading": "",
+       "w": "밀주"
+      },
+      {
+       "at": 8,
+       "d": "bottled beer",
+       "reading": "",
+       "w": "병맥주"
+      },
+      {
+       "at": 9,
+       "d": "gamju",
+       "reading": "",
+       "w": "감주"
+      },
+      {
+       "at": 10,
+       "d": "gangsoju; straight soju",
+       "reading": "",
+       "w": "강燒酒"
+      },
+      {
+       "at": 11,
+       "d": "gangsoju; straight soju",
+       "reading": "",
+       "w": "강소주"
+      },
+      {
+       "at": 12,
+       "d": "gaesoju",
+       "reading": "",
+       "w": "개燒酒"
+      },
+      {
+       "at": 13,
+       "d": "gaesoju",
+       "reading": "",
+       "w": "개소주"
+      },
+      {
+       "at": 14,
+       "d": "kaoliang spirits; kaoliang liquor",
+       "reading": "",
+       "w": "고량주"
+      },
+      {
+       "at": 15,
+       "d": "grain whiskey",
+       "reading": "",
+       "w": "곡주"
+      },
+      {
+       "at": 16,
+       "d": "fruit wine",
+       "reading": "",
+       "w": "과실주"
+      },
+      {
+       "at": 17,
+       "d": "fruit wine",
+       "reading": "",
+       "w": "과일酒"
+      },
+      {
+       "at": 18,
+       "d": "fruit wine",
+       "reading": "",
+       "w": "과일주"
+      },
+      {
+       "at": 19,
+       "d": "ban drinking",
+       "reading": "",
+       "w": "금주하다"
+      },
+      {
+       "at": 56,
+       "d": "be in a drunken frenzy",
+       "reading": "",
+       "w": "주정하다"
+      },
+      {
+       "at": 57,
+       "d": "cheongju",
+       "reading": "",
+       "w": "청주"
+      },
+      {
+       "at": 58,
+       "d": "takju",
+       "reading": "",
+       "w": "탁주"
+      },
+      {
+       "at": 59,
+       "d": "mixed liquor; bomb-shot",
+       "reading": "",
+       "w": "폭탄주"
+      },
+      {
+       "at": 60,
+       "d": "hapwanju",
+       "reading": "",
+       "w": "합환주"
+      }
+     ],
+     "length": 61
+    }
+   },
+   "錢": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "赚钱"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "金钱"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "钱包"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "有钱"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "花钱"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "价钱"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "挣钱"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "值钱"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "钱财"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "零钱"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "省钱"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "借钱"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "有钱人"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "出钱"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "洗钱"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "工钱"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "本钱"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "压岁钱"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "用钱"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "大钱"
+      },
+      {
+       "at": 140,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "零用钱"
+      },
+      {
+       "at": 141,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "余钱"
+      },
+      {
+       "at": 142,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "香火钱"
+      },
+      {
+       "at": 143,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "体己钱"
+      },
+      {
+       "at": 144,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "黑钱"
+      }
+     ],
+     "length": 145
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "money",
+       "reading": "きんせん",
+       "w": "金銭"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "small change",
+       "reading": "こぜに",
+       "w": "小銭"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "public bath",
+       "reading": "せんとう",
+       "w": "銭湯"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "change (for a purchase)",
+       "reading": "つりせん",
+       "w": "釣り銭"
+      },
+      {
+       "at": 4,
+       "c": false,
+       "d": "round coin with a (square) hole in the center",
+       "reading": "ぜに",
+       "w": "銭"
+      },
+      {
+       "at": 5,
+       "c": false,
+       "d": "monetary",
+       "reading": "きんせんてき",
+       "w": "金銭的"
+      },
+      {
+       "at": 6,
+       "c": false,
+       "d": "farewell gift",
+       "reading": "せんべつ",
+       "w": "餞別"
+      },
+      {
+       "at": 7,
+       "c": false,
+       "d": "one sen",
+       "reading": "いっせん",
+       "w": "一銭"
+      },
+      {
+       "at": 8,
+       "c": false,
+       "d": "monetary offering",
+       "reading": "さいせん",
+       "w": "賽銭"
+      },
+      {
+       "at": 9,
+       "c": false,
+       "d": "sense for (how to use) money",
+       "reading": "きんせんかんかく",
+       "w": "金銭感覚"
+      },
+      {
+       "at": 10,
+       "c": false,
+       "d": "miser",
+       "reading": "しゅせんど",
+       "w": "守銭奴"
+      },
+      {
+       "at": 11,
+       "c": false,
+       "d": "offertory box",
+       "reading": "さいせんばこ",
+       "w": "賽銭箱"
+      },
+      {
+       "at": 12,
+       "c": false,
+       "d": "daily income in cash",
+       "reading": "ひぜに",
+       "w": "日銭"
+      },
+      {
+       "at": 13,
+       "c": false,
+       "d": "dine and dash",
+       "reading": "むせんいんしょく",
+       "w": "無銭飲食"
+      },
+      {
+       "at": 14,
+       "c": false,
+       "d": "change purse",
+       "reading": "こぜにいれ",
+       "w": "小銭入れ"
+      },
+      {
+       "at": 15,
+       "c": false,
+       "d": "copper coin",
+       "reading": "どうせん",
+       "w": "銅銭"
+      },
+      {
+       "at": 16,
+       "c": false,
+       "d": "to use one's own money",
+       "reading": "みぜにをきる",
+       "w": "身銭を切る"
+      },
+      {
+       "at": 17,
+       "c": false,
+       "d": "large bathhouse with many different services",
+       "reading": "スーパーせんとう",
+       "w": "スーパー銭湯"
+      },
+      {
+       "at": 18,
+       "c": false,
+       "d": "easy money",
+       "reading": "あぶくぜに",
+       "w": "あぶく銭"
+      },
+      {
+       "at": 19,
+       "c": false,
+       "d": "tossing a coin (to a street performer or beggar)",
+       "reading": "なげせん",
+       "w": "投げ銭"
+      },
+      {
+       "at": 111,
+       "c": false,
+       "d": "Acheilognathus typus (species of bitterling-like cyprinid)",
+       "reading": "ぜにたなご",
+       "w": "銭鱮"
+      },
+      {
+       "at": 112,
+       "c": false,
+       "d": "Zenitaka Corporation",
+       "reading": "ぜにたかぐみ",
+       "w": "錢高組"
+      },
+      {
+       "at": 113,
+       "c": false,
+       "d": "handling fee",
+       "reading": "あいせん",
+       "w": "間銭"
+      },
+      {
+       "at": 114,
+       "c": false,
+       "d": "toll",
+       "reading": "せきせん",
+       "w": "関銭"
+      },
+      {
+       "at": 115,
+       "c": false,
+       "d": "round coin with a (square) hole in the center",
+       "reading": "ががんせん",
+       "w": "鵝眼銭"
+      }
+     ],
+     "length": 116
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "penny; red cent",
+       "reading": "",
+       "w": "땡전"
+      },
+      {
+       "at": 1,
+       "d": "gold coin",
+       "reading": "",
+       "w": "금전"
+      },
+      {
+       "at": 2,
+       "d": "cashbook; account book",
+       "reading": "",
+       "w": "금전 출납부"
+      },
+      {
+       "at": 3,
+       "d": "materialism; the almighty dollar",
+       "reading": "",
+       "w": "금전만능"
+      },
+      {
+       "at": 4,
+       "d": "emergency money",
+       "reading": "",
+       "w": "급전"
+      },
+      {
+       "at": 5,
+       "d": "penny; red cent",
+       "reading": "",
+       "w": "땡錢"
+      },
+      {
+       "at": 6,
+       "d": "penniless journey; travel without money",
+       "reading": "",
+       "w": "무전여행"
+      },
+      {
+       "at": 7,
+       "d": "principal",
+       "reading": "",
+       "w": "본전"
+      },
+      {
+       "at": 8,
+       "d": "breaking even",
+       "reading": "",
+       "w": "본전치기"
+      },
+      {
+       "at": 9,
+       "d": "miser",
+       "reading": "",
+       "w": "수전노"
+      },
+      {
+       "at": 10,
+       "d": "money and crops",
+       "reading": "",
+       "w": "전곡"
+      },
+      {
+       "at": 11,
+       "d": "foreign exchange; money exchange",
+       "reading": "",
+       "w": "환전"
+      },
+      {
+       "at": 12,
+       "d": "currency exchange counter",
+       "reading": "",
+       "w": "환전소"
+      },
+      {
+       "at": 13,
+       "d": "change; exchange",
+       "reading": "",
+       "w": "환전하다"
+      }
+     ],
+     "length": 14
+    }
+   },
+   "青": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青年"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青少年"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青春"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青蛙"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青岛"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青春期"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青睐"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "年青"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "沥青"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青山"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青海"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青霉素"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青菜"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青藏"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青年人"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青铜"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青梅竹马"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青光眼"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "共青团"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青草"
+      },
+      {
+       "at": 136,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青山湖区"
+      },
+      {
+       "at": 137,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青山绿水"
+      },
+      {
+       "at": 138,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青岛啤酒"
+      },
+      {
+       "at": 139,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青川"
+      },
+      {
+       "at": 140,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "青川县"
+      }
+     ],
+     "length": 141
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "blue",
+       "reading": "あおい",
+       "w": "青い"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "blue",
+       "reading": "あお",
+       "w": "青"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "youth",
+       "reading": "せいねん",
+       "w": "青年"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "to become pale",
+       "reading": "あおざめる",
+       "w": "青ざめる"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "pale",
+       "reading": "あおじろい",
+       "w": "青白い"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "youth",
+       "reading": "せいしゅん",
+       "w": "青春"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "blue sky",
+       "reading": "あおぞら",
+       "w": "青空"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "deep blue",
+       "reading": "まっさお",
+       "w": "真っ青"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "blue",
+       "reading": "あおいろ",
+       "w": "青色"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "minority (i.e. being under age)",
+       "reading": "みせいねん",
+       "w": "未成年"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "lush mountain",
+       "reading": "せいざん",
+       "w": "青山"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "Japanese laurel (Aucuba japonica)",
+       "reading": "あおき",
+       "w": "青木"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "fresh leaves",
+       "reading": "あおば",
+       "w": "青葉"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "young people",
+       "reading": "せいしょうねん",
+       "w": "青少年"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "bronze",
+       "reading": "せいどう",
+       "w": "青銅"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "green willow (i.e. one that has budded)",
+       "reading": "あおやぎ",
+       "w": "青柳"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "verdigris",
+       "reading": "ろくしょう",
+       "w": "緑青"
+      },
+      {
+       "at": 17,
+       "c": true,
+       "d": "young persons' association",
+       "reading": "せいねんだん",
+       "w": "青年団"
+      },
+      {
+       "at": 18,
+       "c": true,
+       "d": "unripe plum",
+       "reading": "あおうめ",
+       "w": "青梅"
+      },
+      {
+       "at": 19,
+       "c": true,
+       "d": "hydrocyanic acid",
+       "reading": "せいさん",
+       "w": "青酸"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "Blue Sky, White Sun, and a Wholly Red Earth (flag of the Republic of China)",
+       "reading": "せいてんはくじつまんちこうき",
+       "w": "青天白日満地紅旗"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "Shorenin school of calligraphy",
+       "reading": "しょうれんいんりゅう",
+       "w": "青蓮院流"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "Seishun 18 ticket",
+       "reading": "せいしゅんじゅうはちきっぷ",
+       "w": "青春１８きっぷ"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "Blue Book (government-issued report)",
+       "reading": "せいしょ",
+       "w": "青書"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "green flesh (melon, etc.)",
+       "reading": "あおにく",
+       "w": "青肉"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [],
+     "length": 0
+    }
+   },
+   "魚": {
+    "chinese": {
+     "kept": [
+      {
+       "at": 0,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "双鱼座"
+      },
+      {
+       "at": 1,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鲨鱼"
+      },
+      {
+       "at": 2,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "钓鱼"
+      },
+      {
+       "at": 3,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鳄鱼"
+      },
+      {
+       "at": 4,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鱿鱼"
+      },
+      {
+       "at": 5,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鲸鱼"
+      },
+      {
+       "at": 6,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "金枪鱼"
+      },
+      {
+       "at": 7,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "捕鱼"
+      },
+      {
+       "at": 8,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "美人鱼"
+      },
+      {
+       "at": 9,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鱼类"
+      },
+      {
+       "at": 10,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "章鱼"
+      },
+      {
+       "at": 11,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "金鱼"
+      },
+      {
+       "at": 12,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "炒鱿鱼"
+      },
+      {
+       "at": 13,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鱼雷"
+      },
+      {
+       "at": 14,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鲑鱼"
+      },
+      {
+       "at": 15,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鱼缸"
+      },
+      {
+       "at": 16,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鱼子酱"
+      },
+      {
+       "at": 17,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鲤鱼"
+      },
+      {
+       "at": 18,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鲍鱼"
+      },
+      {
+       "at": 19,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鳗鱼"
+      },
+      {
+       "at": 195,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鱼死网破"
+      },
+      {
+       "at": 196,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鱼水"
+      },
+      {
+       "at": 197,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鱼水之欢"
+      },
+      {
+       "at": 198,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鱼水情"
+      },
+      {
+       "at": 199,
+       "ct": "",
+       "d": "",
+       "reading": "",
+       "w": "鱼汛"
+      }
+     ],
+     "length": 200
+    },
+    "contains": {
+     "kept": [],
+     "length": 0
+    },
+    "japanese": {
+     "kept": [
+      {
+       "at": 0,
+       "c": true,
+       "d": "hit",
+       "reading": "あたり",
+       "w": "当たり"
+      },
+      {
+       "at": 1,
+       "c": true,
+       "d": "goldfish (Carassius auratus)",
+       "reading": "きんぎょ",
+       "w": "金魚"
+      },
+      {
+       "at": 2,
+       "c": true,
+       "d": "chopping board",
+       "reading": "まないた",
+       "w": "まな板"
+      },
+      {
+       "at": 3,
+       "c": true,
+       "d": "fish market",
+       "reading": "さかなや",
+       "w": "魚屋"
+      },
+      {
+       "at": 4,
+       "c": true,
+       "d": "torpedo",
+       "reading": "ぎょらい",
+       "w": "魚雷"
+      },
+      {
+       "at": 5,
+       "c": true,
+       "d": "octopus",
+       "reading": "たこ",
+       "w": "蛸"
+      },
+      {
+       "at": 6,
+       "c": true,
+       "d": "ayu (Plecoglossus altivelis)",
+       "reading": "あゆ",
+       "w": "鮎"
+      },
+      {
+       "at": 7,
+       "c": true,
+       "d": "marine products",
+       "reading": "ぎょかいるい",
+       "w": "魚介類"
+      },
+      {
+       "at": 8,
+       "c": true,
+       "d": "fish",
+       "reading": "ぎょるい",
+       "w": "魚類"
+      },
+      {
+       "at": 9,
+       "c": true,
+       "d": "marine products",
+       "reading": "ぎょかい",
+       "w": "魚介"
+      },
+      {
+       "at": 10,
+       "c": true,
+       "d": "tropical fish",
+       "reading": "ねったいぎょ",
+       "w": "熱帯魚"
+      },
+      {
+       "at": 11,
+       "c": true,
+       "d": "cuttlefish",
+       "reading": "イカ",
+       "w": "烏賊"
+      },
+      {
+       "at": 12,
+       "c": true,
+       "d": "fresh fish",
+       "reading": "せんぎょ",
+       "w": "鮮魚"
+      },
+      {
+       "at": 13,
+       "c": true,
+       "d": "fish meat",
+       "reading": "ぎょにく",
+       "w": "魚肉"
+      },
+      {
+       "at": 14,
+       "c": true,
+       "d": "school of fish",
+       "reading": "ぎょぐん",
+       "w": "魚群"
+      },
+      {
+       "at": 15,
+       "c": true,
+       "d": "fry",
+       "reading": "ちぎょ",
+       "w": "稚魚"
+      },
+      {
+       "at": 16,
+       "c": true,
+       "d": "fish market",
+       "reading": "うおいちば",
+       "w": "魚市場"
+      },
+      {
+       "at": 17,
+       "c": false,
+       "d": "small fish",
+       "reading": "ざこ",
+       "w": "雑魚"
+      },
+      {
+       "at": 18,
+       "c": false,
+       "d": "mermaid",
+       "reading": "にんぎょ",
+       "w": "人魚"
+      },
+      {
+       "at": 19,
+       "c": false,
+       "d": "kingfisher (esp. the common kingfisher, Alcedo atthis)",
+       "reading": "かわせみ",
+       "w": "川蝉"
+      },
+      {
+       "at": 195,
+       "c": false,
+       "d": "Matsubara's red rockfish (Sebastes matsubarae)",
+       "reading": "あこうだい",
+       "w": "赤魚鯛"
+      },
+      {
+       "at": 196,
+       "c": false,
+       "d": "giant Pacific octopus (Enteroctopus dofleini)",
+       "reading": "みずだこ",
+       "w": "水蛸"
+      },
+      {
+       "at": 197,
+       "c": false,
+       "d": "silver-stripe round herring (Spratelloides gracilis)",
+       "reading": "きびなご",
+       "w": "黍魚子"
+      },
+      {
+       "at": 198,
+       "c": false,
+       "d": "substitute fish",
+       "reading": "だいようぎょ",
+       "w": "代用魚"
+      },
+      {
+       "at": 199,
+       "c": false,
+       "d": "saltwater fish",
+       "reading": "かんすいぎょ",
+       "w": "鹹水魚"
+      }
+     ],
+     "length": 200
+    },
+    "korean": {
+     "kept": [
+      {
+       "at": 0,
+       "d": "crocodile; alligator",
+       "reading": "",
+       "w": "악어"
+      },
+      {
+       "at": 1,
+       "d": "trout",
+       "reading": "",
+       "w": "송어"
+      },
+      {
+       "at": 2,
+       "d": "dry seafood",
+       "reading": "",
+       "w": "건어물"
+      },
+      {
+       "at": 3,
+       "d": "sea eel",
+       "reading": "",
+       "w": "곰長魚"
+      },
+      {
+       "at": 4,
+       "d": "sea eel",
+       "reading": "",
+       "w": "곰장어"
+      },
+      {
+       "at": 5,
+       "d": "pet fish",
+       "reading": "",
+       "w": "관상어"
+      },
+      {
+       "at": 6,
+       "d": "flatfish",
+       "reading": "",
+       "w": "광어"
+      },
+      {
+       "at": 7,
+       "d": "big fish",
+       "reading": "",
+       "w": "대어"
+      },
+      {
+       "at": 8,
+       "d": "octopus",
+       "reading": "",
+       "w": "문어"
+      },
+      {
+       "at": 9,
+       "d": "legs of octopus; tentacles",
+       "reading": "",
+       "w": "문어발"
+      },
+      {
+       "at": 10,
+       "d": "eel",
+       "reading": "",
+       "w": "뱀長魚"
+      },
+      {
+       "at": 11,
+       "d": "eel",
+       "reading": "",
+       "w": "뱀장어"
+      },
+      {
+       "at": 12,
+       "d": "puffer fish; swellfish",
+       "reading": "",
+       "w": "복魚"
+      },
+      {
+       "at": 13,
+       "d": "puffer fish; swellfish",
+       "reading": "",
+       "w": "복어"
+      },
+      {
+       "at": 14,
+       "d": "dried pollack",
+       "reading": "",
+       "w": "북어"
+      },
+      {
+       "at": 15,
+       "d": "bugeopo",
+       "reading": "",
+       "w": "북어포"
+      },
+      {
+       "at": 16,
+       "d": "bugeotguk; dried pollack soup",
+       "reading": "",
+       "w": "북엇국"
+      },
+      {
+       "at": 17,
+       "d": "torpedo",
+       "reading": "",
+       "w": "어뢰"
+      },
+      {
+       "at": 18,
+       "d": "fish",
+       "reading": "",
+       "w": "어류"
+      },
+      {
+       "at": 19,
+       "d": "fish cake",
+       "reading": "",
+       "w": "어묵"
+      },
+      {
+       "at": 28,
+       "d": "eel",
+       "reading": "",
+       "w": "장어"
+      },
+      {
+       "at": 29,
+       "d": "chueotang; loach soup",
+       "reading": "",
+       "w": "추어탕"
+      },
+      {
+       "at": 30,
+       "d": "fry; fingerling",
+       "reading": "",
+       "w": "치어"
+      },
+      {
+       "at": 31,
+       "d": "thornback",
+       "reading": "",
+       "w": "홍어"
+      },
+      {
+       "at": 32,
+       "d": "live fish",
+       "reading": "",
+       "w": "활어"
+      }
+     ],
+     "length": 33
+    }
+   }
+  },
+  "named": {},
+  "provenance": {
+   "chinese": "w: CC-CEDICT (MDBG, CC BY-SA 4.0), through Dong Chinese's export (kiokun-data data/chinese_dictionary_word_2025-06-25.jsonl); reading, Jyutping and definition held locally",
+   "contains": "none in the sample; held locally",
+   "japanese": "w, reading, c, d: JMdict (EDRDG, CC BY-SA 4.0), through jmdict-simplified 3.6.1 (kiokun-data data/jmdict-examples-eng-3.6.1.json)",
+   "korean": "w, d: KRDICT (National Institute of Korean Language, CC BY-SA 2.0 KR), through Lyroxide's Yomitan export (kiokun-data data/krdict-en); reading held locally",
+   "the sample": "read from the repository's sample (examples/kiokun/data/han-1char-3, its MANIFEST), which holds cleared fields alone; see NOTICE.md"
+  },
+  "read": 28,
+  "stride": 1,
+  "trimmed": "each list's length, and its first 20 and last 5 items, each with its place"
+ },
+ "pleris_commit": "56e67766c64ae9e80ad87c7809d6cab24bc22dec",
+ "produced_by": "just e14-kiokun-contains"
+}
