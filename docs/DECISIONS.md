@@ -2841,3 +2841,8 @@ a related note is shown in its own file (the integrator's; W8's finding).
   that file's lines. A span outside its file is told as a note, never an
   internal error. PW5046, PW0338, PW5106, PW0351 and PW0341 note what they
   found in another file; five explanations read as written.
+[ADR-0322](DECISIONS/ADR-0322-or-and-and-are-parenthesized-where-they-mix.md):
+`|` and `&` are parenthesized where they mix (the integrator's; W9's
+finding).
+- A chain mixing them without parentheses is refused at parse (PW0031),
+  naming both groupings; a chain of one is left to right, as before.

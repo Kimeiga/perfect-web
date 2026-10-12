@@ -195,6 +195,10 @@ codes! {
     // dropped, and checked. PW002x is name resolution's.
     STATEMENTS_SEPARATED = "PW0030" / statements_separated / 1, Syntax,
         "a block's statements are separated by `;` or a line";
+    // ADR-0322: `a | b & c` was `(a | b) & c`, one power left to right, where
+    // most languages read `a | (b & c)` (W9's finding, track store-hours).
+    LOGICAL_MIXED = "PW0031" / logical_mixed / 1, Syntax,
+        "`|` and `&` mixed in one chain are parenthesized: neither binds tighter";
     NO_PROGRESS = "PW0099" / no_progress / 1, Syntax, "the parser made no progress";
 
     // --- name resolution (PW002x) -----------------------------------------

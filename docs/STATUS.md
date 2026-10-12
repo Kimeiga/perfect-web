@@ -23,6 +23,20 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0322, 2026-10-12: `|` and `&` are parenthesized where they mix** (the
+integrator's; W9's finding; track `and-or`, merged from `22a325c`).
+- The two had one power, left to right, so `a | b & c` was `(a | b) & c`,
+  where C, Rust, Java, Python and SQL read `a | (b & c)`. W9's "open until"
+  read one way and ran the other.
+- A chain that mixes them without parentheses is refused at parse, once,
+  where the mix begins: PW0031, with "write `(a | b) & c` or `a | (b & c)`,
+  whichever is meant", as Carbon leaves `and` and `or` unranked. A chain of
+  one stays left to right; a comparison inside binds tighter.
+- Every shipped program already parenthesized its mixes; two tests'
+  programs did not, found by CI and the local run (PARALLEL.md). `just
+  test-unit` runs every test binary since, so one failure hides no other.
+Verify TRAIN_RUN green, with the train.
+
 **2026-10-12: nine more scripts' mutants run the tests that see them**
 (W6's ruling of 2026-10-09; track `narrowing-3`, merged from `25bfad5`).
 - Measured by `scripts/mutant_killers.py`, two killers kept per mutant where

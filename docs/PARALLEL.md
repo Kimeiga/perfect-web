@@ -1340,3 +1340,16 @@ Each a decision for a track, with its date; a track's ADR records it too.
 - **2026-10-12, narrowing batch 3 merged on the train** (track
   `narrowing-3`, from `25bfad5`, verify 38315832945): nine scripts, 39,463 s
   to 13,041 s. Batch 4 (13 scripts) is being measured.
+- **2026-10-12, `|` and `&` parenthesized where they mix, merged as
+  ADR-0322** (the integrator's ruling on W9's finding; track `and-or`, from
+  `22a325c`; Verify TRAIN_RUN green, with the train.). To every worker: a mix without parentheses is PW0031
+  once you merge master.
+  - **Correction (the integrator's)**: `c67562a` was pushed after
+    pw-syntax's and pw-core's tests alone, not `just ci`; the track's `ci`
+    run (38298832576) found `pw-conformance`'s JavaScript program mixing
+    them (`a & b | c`, three tests), and its verify (38298832695) the two
+    recipes that run that crate. Parenthesized as it parsed, `417355c`.
+    The next local `just ci` found a second, `pw-core`'s `value_relations`
+    control `b & n == 1 | !b`, which the `ci` run had never reached: it
+    stopped at the first failing test binary. `just test-unit` runs with
+    `--no-fail-fast` since (`22a325c`), so a red run says every failure.
