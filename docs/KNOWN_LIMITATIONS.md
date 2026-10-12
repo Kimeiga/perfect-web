@@ -314,11 +314,14 @@ refused by name:
   renders and is not patched, and neither is a shared list other than the
   menu. A query's error is the server's failure, not a value a page shows.
   kiokun's pages are static.
-  A part inside a block whose subject the page's parameters give, not a
-  query, is not told when a query it reads changes (ADR-0308's Found, W9's
-  `{#match q}`): the plan names a block only when a query's value decides
-  it. The integrator's to fix next; the search's sentence stands outside
-  its match until then.
+  A block that renders a query's value is told part by part while it shows
+  the arm it showed (ADR-0320), and rendered again whole where it shows
+  another, where something inside it that is not set in place changed (a
+  view's instance, a raw value, an unkeyed list), or where a speculation
+  renders it. A host keeps a copy of a document's values where it has such
+  a block. A member of a query read inside any block is refused at build
+  (`{cart.line_count}` in `{#if cart.lines}`), though a host renders a block
+  at the top of the page once: found on the way (NEXT).
 - **A clause's words are the clause's** (ADR-0047). Every name resolves in
   lexical scope, but `scope application`'s `application`, or `load`'s
   `on_first_interaction`, is a word of its clause and not a name. A word

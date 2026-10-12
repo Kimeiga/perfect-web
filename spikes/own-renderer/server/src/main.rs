@@ -551,6 +551,11 @@ struct Shown {
     captures: BTreeMap<u32, Option<String>>,
     /// The page's title, by its part, as its text (ADR-0183).
     title: Option<(u32, String)>,
+    /// **The values its blocks were rendered from** (ADR-0320), on a page
+    /// with a block it tells part by part: what a block showed is read from
+    /// them where the block changed, beside what it shows now. Only there:
+    /// none else is read again.
+    bindings: Option<Arc<BTreeMap<String, Val>>>,
     /// **Each value the page speculates on, but the store's cart**
     /// (ADR-0222), by its binding, as the page's module decodes it: what the
     /// browser holds, sent when it changes, from the read the page's patches
@@ -6018,7 +6023,9 @@ impl Server {
             };
             shown.lists.insert(list.clone(), std::mem::take(items));
         }
-        // Each block a query decides, as it renders now (ADR-0146).
+        // Each block that renders a query's value, as it renders now
+        // (ADR-0146), and what it was rendered from, where one is told part
+        // by part (ADR-0320).
         let env = self.document_env(page, session, params, bindings);
         let template = self.template_of(page);
         for block in plan["blocks"].as_array().into_iter().flatten() {
@@ -6026,6 +6033,13 @@ impl Server {
             let html = pw_render::render_part(template, PartId(id), &env, &self.templates)
                 .map_err(|b| format!("block {id}: {b:?}"))?;
             shown.blocks.insert(id, html);
+        }
+        if shown
+            .blocks
+            .keys()
+            .any(|id| !self.speculation_renders(page, *id))
+        {
+            shown.bindings = Some(Arc::new(bindings.clone()));
         }
         // Each attribute at the top of the page that reads a query's value,
         // written by the function the page's render writes it with
@@ -6159,17 +6173,52 @@ impl Server {
                 operation,
             });
         }
-        // Each block a query decides whose rendering changed, rendered again
-        // where it is (ADR-0146).
+        // Each block whose rendering changed (ADR-0146): told part by part
+        // where it shows the arm it showed, as a row is (ADR-0320), so a
+        // field in it keeps its focus and a live region in it is told its
+        // new text; rendered again where it is otherwise. Until 2026-10-12
+        // every one was rendered again, whole.
+        let before = was
+            .bindings
+            .as_ref()
+            .map(|b| self.document_env(page, session, params, b));
         for (id, html) in &now.blocks {
-            if was.blocks.get(id) != Some(html) {
-                out.push(Targeted {
+            if was.blocks.get(id) == Some(html) {
+                continue;
+            }
+            let in_place = match &before {
+                // **Not one a speculation renders** (ADR-0172): the browser
+                // may show it as it speculated, and only the whole block finds
+                // it as it was derived.
+                Some(before)
+                    if was.blocks.contains_key(id) && !self.speculation_renders(page, *id) =>
+                {
+                    pw_render::block_changes(template, PartId(*id), before, &env, &self.templates)
+                        .map_err(|b| format!("block {id}: {b:?}"))?
+                }
+                _ => None,
+            };
+            match in_place {
+                Some(changes) => out.extend(instance_patches(&schema, &[], changes)),
+                None => out.push(Targeted {
                     target: PartAddress::new(&schema, LocalPartId(*id)),
                     operation: PatchOp::ReplaceRange { html: html.clone() },
-                });
+                }),
             }
         }
         Ok(out)
+    }
+
+    /// **Does a speculation on `page` render the part `id` again?**
+    /// (ADR-0172): the browser renders it from the value it speculates on,
+    /// whole, so a host tells it whole too.
+    fn speculation_renders(&self, page: &str, id: u32) -> bool {
+        self.speculations
+            .get(page)
+            .and_then(|m| m["regions"].as_array())
+            .into_iter()
+            .flatten()
+            .any(|r| r.as_u64() == Some(u64::from(id)))
     }
 }
 
@@ -11122,6 +11171,106 @@ public query Store(",
         assert!(sets[2][1].starts_with("range \"\""), "{sets:?}");
     }
 
+    /// The store, with two blocks its cart decides, one that lists the
+    /// cart's lines and one that shows text, and one its menu decides. With
+    /// `add_to_cart`'s speculation, which renders the cart's again in the
+    /// browser (ADR-0172), or without it. The menu's no speculation renders,
+    /// so the host keeps what the page's blocks were rendered from either
+    /// way.
+    fn with_listed_blocks(app: &str, speculated: bool) -> String {
+        let speculation = "    optimistic    Cart(current_session()) as cart => Carts.with_line(cart, item, quantity)\n";
+        assert_eq!(
+            app.matches(speculation).count(),
+            1,
+            "the speculation's anchor"
+        );
+        let app = if speculated {
+            app.to_string()
+        } else {
+            app.replace(speculation, "")
+        };
+        let out = app.replacen(
+            "                <p id=\"cart-count\">{cart.line_count}</p>",
+            "                <p id=\"cart-count\">{cart.line_count}</p>\n                \
+             {#if cart.lines}<ul id=\"ready\">{#each cart.lines as l (l.item_id)}<li>{l.item_id}</li>{/each}</ul>{/if}\n                \
+             {#if cart.lines}<p id=\"fees\">Fees at checkout.</p>{/if}\n                \
+             {#if menu}<p id=\"menu-shown\">The menu.</p>{/if}",
+            1,
+        );
+        assert!(out.contains("{#if cart.lines}"));
+        out
+    }
+
+    /// The patches each change sent document `doc`, as `said` writes them.
+    fn told(s: &Server, doc: &str) -> Vec<Vec<String>> {
+        patch_sets(s, doc)
+            .iter()
+            .map(|p| p.patches.iter().map(said).collect())
+            .collect()
+    }
+
+    /// **A block that shows the arm it showed is told part by part**
+    /// (ADR-0320): the line a change adds is inserted into its list where it
+    /// is, and the block is not rendered again. Until 2026-10-12 it was,
+    /// whole, at every change inside it (ADR-0146).
+    #[test]
+    fn a_block_that_shows_the_arm_it_showed_is_told_part_by_part() {
+        let s = lines_server_with(|app| with_listed_blocks(app, false));
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("cortado", 1), false)
+            .expect("runs");
+        let sets = told(&s, "a");
+        assert_eq!(sets.len(), 2, "{sets:?}");
+        // Shown, with the first line: each block, whole.
+        assert!(
+            sets[0].iter().any(|p| p.starts_with("range \"espresso\"")),
+            "{sets:?}"
+        );
+        assert!(
+            sets[0]
+                .iter()
+                .any(|p| p.starts_with("range \"Fees at checkout.\"")),
+            "{sets:?}"
+        );
+        // Still shown: the line inserted where it is. The other block renders
+        // as it did, and is not sent.
+        assert!(
+            sets[1]
+                .iter()
+                .any(|p| p.starts_with("insert after true cortado")),
+            "{sets:?}"
+        );
+        assert!(!sets[1].iter().any(|p| p.starts_with("range")), "{sets:?}");
+    }
+
+    /// **A block a speculation renders is rendered again whole** (ADR-0320,
+    /// ADR-0172): the browser may show it as it speculated, and only the
+    /// whole block finds it as it was derived.
+    #[test]
+    fn a_block_a_speculation_renders_is_rendered_again_whole() {
+        let s = lines_server_with(|app| with_listed_blocks(app, true));
+        s.serve_document("a");
+        s.command(ADD, "a", &add("espresso", 1), false)
+            .expect("runs");
+        s.command(ADD, "a", &add("cortado", 1), false)
+            .expect("runs");
+        let sets = told(&s, "a");
+        assert_eq!(sets.len(), 2, "{sets:?}");
+        assert!(
+            sets[1]
+                .iter()
+                .any(|p| p.starts_with("range \"espressocortado\"")),
+            "{sets:?}"
+        );
+        // One that renders as it did is not sent (ADR-0146).
+        assert!(
+            !sets[1].iter().any(|p| p.contains("Fees at checkout.")),
+            "{sets:?}"
+        );
+    }
+
     /// The store, with a message its cart's lines decide by an attribute:
     /// `hidden` while the cart holds a line (ADR-0171). Without
     /// `add_to_cart`'s speculation, which would not reach it (ADR-0170).
@@ -15302,6 +15451,32 @@ public query Store(",
             .iter()
             .filter_map(|(_, f)| match f {
                 StreamFrame::PatchSet(set) => Some(set.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// **What each change set the text part of `page` that reads `value`
+    /// to**, where it is (ADR-0320): a block told part by part sets its
+    /// parts as text, and does not write the block again.
+    fn texts_told(s: &Server, doc: &Doc, page: &str, value: &str) -> Vec<String> {
+        let parts: Vec<u32> = s
+            .template_of(page)
+            .manifest()
+            .into_iter()
+            .filter(|p| p.kind == "text" && p.value == value)
+            .map(|p| p.id.0)
+            .collect();
+        assert!(
+            !parts.is_empty(),
+            "`{page}` has no text part that reads `{value}`"
+        );
+        sets_of(s, doc)
+            .iter()
+            .flat_map(|set| set.patches.iter())
+            .filter(|p| p.target.instances.is_empty() && parts.contains(&p.target.part.0))
+            .filter_map(|p| match &p.operation {
+                PatchOp::ReplaceText { text } => Some(text.clone()),
                 _ => None,
             })
             .collect()

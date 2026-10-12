@@ -1748,7 +1748,7 @@
     "params": [
       "q"
     ],
-    "schema": "3d5b5d610275ae25",
+    "schema": "29296184b54992f7",
     "chunks": [
       {
         "chunk": "static",
@@ -1778,13 +1778,28 @@
       },
       {
         "chunk": "static",
-        "value": "</h1>\n            \n            "
+        "value": "</h1>\n            <form id=\"search-form\" method=\"get\" action=\"/search\" role=\"search\">\n                <label>Stores and dishes <input data-pw=\"0\" id=\"search-q\" type=\"search\" name=\"q\" "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "attribute",
+          "id": 2,
+          "owner": 0,
+          "name": "value",
+          "value": "search.asked",
+          "context": "attribute"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "></label>\n                <button>Search</button>\n            </form>\n            \n            "
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "match",
-          "id": 2,
+          "id": 3,
           "value": "q",
           "arms": [
             {
@@ -1793,7 +1808,20 @@
               "body": [
                 {
                   "chunk": "static",
-                  "value": "\n            "
+                  "value": "<p id=\"search-said\" role=\"status\">"
+                },
+                {
+                  "chunk": "dynamic",
+                  "value": {
+                    "part": "text",
+                    "id": 4,
+                    "value": "search.said",
+                    "context": "text"
+                  }
+                },
+                {
+                  "chunk": "static",
+                  "value": "</p>\n            "
                 }
               ]
             },
@@ -1811,35 +1839,7 @@
       },
       {
         "chunk": "static",
-        "value": "\n            <form id=\"search-form\" method=\"get\" action=\"/search\" role=\"search\">\n                <label>Stores and dishes <input data-pw=\"0\" id=\"search-q\" type=\"search\" name=\"q\" "
-      },
-      {
-        "chunk": "dynamic",
-        "value": {
-          "part": "attribute",
-          "id": 3,
-          "owner": 0,
-          "name": "value",
-          "value": "search.asked",
-          "context": "attribute"
-        }
-      },
-      {
-        "chunk": "static",
-        "value": "></label>\n                <button>Search</button>\n            </form>\n            <p id=\"search-said\" role=\"status\">"
-      },
-      {
-        "chunk": "dynamic",
-        "value": {
-          "part": "text",
-          "id": 4,
-          "value": "search.said",
-          "context": "text"
-        }
-      },
-      {
-        "chunk": "static",
-        "value": "</p>\n            <p id=\"search-near\">"
+        "value": "\n            \n            <p id=\"search-near\">"
       },
       {
         "chunk": "dynamic",

@@ -110,14 +110,16 @@ MUTANTS = [
     (
         "a match renders its first arm whatever the case",
         RENDER,
-        "            let arm = arms.iter().find(|a| a.case == *case).ok_or_else(|| {",
-        "            let arm = arms.first().ok_or_else(|| {",
+        # Re-anchored by ADR-0320, whose `arm_shown` both a render and a
+        # block's change read.
+        "    let arm =\n        arms.iter()\n            .find(|a| a.case == *case)\n",
+        "    let arm =\n        arms.first()\n",
     ),
     (
         "an arm's payload is not bound",
         RENDER,
-        "                (Some(name), Some(p)) => env.with(name, (**p).clone()),",
-        "                (Some(_), Some(_)) => env.clone(),",
+        "        (Some(name), Some(p)) => env.with(name, (**p).clone()),",
+        "        (Some(_), Some(_)) => env.clone(),",
     ),
     (
         "a value in a URL is attribute-escaped, not one component",

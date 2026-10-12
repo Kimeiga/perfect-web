@@ -1234,4 +1234,20 @@ Each a decision for a track, with its date; a track's ADR records it too.
     range's end less 172. W8's 7769 reached 7941, W9's PORT; W8's range,
     7741 to 7940, is free with its merge, and W9 at 7941 reaches 8113,
     inside its own.
+  - **Correction (the integrator's)**: the merge took W8's run's
+    `semantic-diffs.txt` with its other evidence, a failed recipe's output,
+    stopped at T11's patch. Such a file is never evidence: the run's
+    failure was named known, not its output. The file was restored to
+    master's own, from before the merge, until T11's fix records it again.
+- **2026-10-12, a block told part by part while its arm stays, merged as
+  ADR-0320** (track `fixed-arms`, from `124b62b`, verify 38263374811). To
+  W9:
+  - your finding is fixed, and the search's sentence is back inside the
+    `Some` arm, after the form, with the intro in the `None` arm;
+  - with no `q` the page shows no sentence, so `given` did nothing a page
+    shows, and its mutant survived the first verify. Both are gone, and
+    `store_search_mutations.py` holds 32. Your part 1 merges master and
+    resolves `shown` against this;
+  - a test that matched a block's whole HTML in what a change sent reads
+    the part's text now (`texts_told`), as the feed's count tests do.
 

@@ -39,25 +39,24 @@ MUTANTS = [
         "a block a query decides is not planned",
         "plan",
         PLAN,
-        # Re-anchored by ADR-0229, whose computed subject decides one too.
-        "                || derived_values.iter().any(|d| d.path == entry.value))\n"
-        "            && template.chunks.iter().any(\n"
-        "                |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),\n"
-        "            )\n        {\n            blocks.push(entry.id.0);\n",
-        "                || derived_values.iter().any(|d| d.path == entry.value))\n"
-        "            && template.chunks.iter().any(\n"
-        "                |c| matches!(c, crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id)),\n"
-        "            )\n        {\n            let _ = entry.id.0;\n",
+        # Re-anchored by ADR-0229, whose computed subject decides one too,
+        # and by ADR-0320, whose block renders one inside it.
+        "                || part.nested().into_iter().any(|r| renders(r, &queried)))\n"
+        "        {\n            blocks.push(entry.id.0);\n",
+        "                || part.nested().into_iter().any(|r| renders(r, &queried)))\n"
+        "        {\n            let _ = entry.id.0;\n",
     ),
     (
         "a block inside one is planned as if at the top",
         "plan",
         PLAN,
-        # Re-anchored by ADR-0229, as above.
-        "                || derived_values.iter().any(|d| d.path == entry.value))\n"
-        "            && template.chunks.iter().any(\n",
-        "                || derived_values.iter().any(|d| d.path == entry.value))\n"
-        "            && template.chunks.iter().any(|_| true) | template.chunks.iter().any(\n",
+        # Re-anchored by ADR-0229, as above, and by ADR-0320, which finds the
+        # block at the top of the page.
+        "            && let Some(part) = template.chunks.iter().find_map(|c| match c {\n"
+        "                crate::template_ir::Chunk::Dynamic(p) if p.id() == Some(entry.id) => Some(p),\n"
+        "                _ => None,\n"
+        "            })\n",
+        "            && let Some(part) = find_part(&template.chunks, entry.id.0)\n",
     ),
     (
         "a row reads another query",
@@ -91,8 +90,9 @@ MUTANTS = [
         "a block's rendering is not compared",
         "server",
         SERVER,
-        "            if was.blocks.get(id) != Some(html) {\n",
-        "            if was.blocks.get(id) != Some(html) || true {\n",
+        # Re-anchored by ADR-0320, whose block is told part by part.
+        "            if was.blocks.get(id) == Some(html) {\n                continue;\n",
+        "            if was.blocks.get(id) == Some(html) && false {\n                continue;\n",
     ),
     (
         "a block is not rendered again",
