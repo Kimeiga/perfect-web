@@ -1,0 +1,28 @@
+// @corpus: platform
+// @id: STD-json
+// @category: standard library — JSON as a value
+// @charter: §7.3
+// @milestone: E14
+//
+// ADR-XXXX: JSON as a typed value, for what a page states of itself as
+// structured data (`<script type="application/ld+json">{data}</script>`). Its
+// shape is RFC 8259's, and only JSON's: the value a program builds is the one
+// the host writes, keys in the order the program gives them. What it means,
+// schema.org's types or any other vocabulary, is the program's to say.
+//
+// The cases are named as RFC 8259 names JSON's values: an object's entries
+// are its members, each a name and a value. `Boolean` and `Array`, not `Bool`
+// and `List`, so a case is never read as the type of the same name.
+
+module json
+
+type Json =
+    | Null
+    | Boolean(Bool)
+    | Number(Float)
+    | Text(String)
+    | Array(List<Json>)
+    | Object(List<Member>)
+
+// One member of an object: a name and its value (RFC 8259 §4).
+type Member = Member { name: String, value: Json }
