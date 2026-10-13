@@ -1429,3 +1429,11 @@ Each a decision for a track, with its date; a track's ADR records it too.
   `a0c794c`), committed_events', the last that ran the server's whole suite
   per mutant. Every script now names the server tests it runs: W6's ruling
   of 2026-10-09 is carried out.
+- **2026-10-13, W9's store hours merged as ADR-0328** on train-2 (track
+  `store-hours`, from `4f2ffa8`). The integrator's rulings, logged: the
+  order's refusal is structured data the view words; the clock's
+  `day_number`, `numbered_day`, `midnight` and `minute_of_day`; a day's
+  periods are their union (sorted by the layers, overlaps joined by the
+  program), the order the layers' contract. W9's findings: PostgreSQL
+  refused a duplicate date memory accepted (both keep the last); the home
+  page's hours mutant had survived on freshness alone. W9 takes 6b next.

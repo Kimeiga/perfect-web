@@ -717,6 +717,8 @@ mod clock;
 mod order;
 // TRACK SEAM (store-search): the store's search, in its data layer (W9).
 mod search;
+// TRACK SEAM (store-hours): a store's opening hours (W9).
+mod hours;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -1162,6 +1164,11 @@ fn components() -> BTreeMap<String, Loaded> {
         // (ADR-0277).
         "store.page.MenuSize",
         "store.page.MenuLine",
+        // TRACK SEAM (store-hours): whether a store is open, every store's,
+        // and what the cart says of its stores' hours.
+        "store.hours.StoreStatus",
+        "store.hours.StoresOpen",
+        "store.hours.CartHours",
     ] {
         let path = dir.join(format!("{id}.wasm"));
         let bytes = std::fs::read(&path).unwrap_or_else(|e| {
@@ -7925,6 +7932,11 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // The store's staff post a notice (E14, T09): at the source, and
         // nothing is told. What a page shows of it is the `Notice` query's
         // to keep, for as long as its freshness says.
+        // TRACK SEAM (store-hours): a store's hours, every day alike (a test's).
+        ("POST", "/bench/hours") => match crate::hours::bench(server, query) {
+            Ok(()) => respond_json(&mut stream, 200, &session, fresh, "{}"),
+            Err(why) => refused_json(&mut stream, &session, fresh, why),
+        },
         ("POST", "/bench/notice") => {
             let text = query
                 .split('&')
@@ -12145,8 +12157,10 @@ public query Store(",
         served_from_patches_in(
             "examples",
             |app| {
-                // The reader's cart is the user's since track `store-accounts`.
-                let page = "    let stores = query StoreList()\n    let cart = query Cart(current_user())\n";
+                // The reader's cart is the user's since track `store-accounts`;
+                // the stores, each with whether it is open, since track
+                // `store-hours`.
+                let page = "    let stores = query StoresOpen()\n    let cart = query Cart(current_user())\n";
                 let shown = "            <h1>Stores</h1>\n";
                 assert!(app.contains(page) && app.contains(shown), "the home page");
                 app.replacen("import List\n", "import List\nimport clock\n", 1)
@@ -12195,12 +12209,14 @@ public query Store(",
     }
 
     /// **A page that compares no clock is held by nothing** (ADR-0304): the
-    /// store's own home page is read again only when something changes.
+    /// store's order page is read again only when something changes. (The
+    /// home page compared none until track `store-hours`, whose stores say
+    /// whether they are open.)
     #[test]
     fn a_page_that_compares_no_clock_holds_nothing() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let _ = s
-            .serve_document_settled("a", "store.page.HomePage", &Params::new(), &[])
+            .serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         assert_eq!(s.timers.at(&doc), None);
@@ -13298,6 +13314,9 @@ public query Store(",
 
     // TRACK SEAM (store-search): the store's search page, served (W9).
     mod store_search;
+
+    // TRACK SEAM (store-hours): a store's opening hours, served (W9).
+    mod store_hours;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
@@ -15042,10 +15061,16 @@ public query Store(",
         let s = served_from_patches_in(
             "examples",
             |app| {
-                // `add_to_cart`'s, the first command's.
+                // `add_to_cart`'s, the first command's. And what a cart's
+                // change would drop that it then says nothing of: the cart's
+                // hours (track `store-hours`), which read the cart too.
                 let emits = "    emits         UserCartChanged(current_user())\n";
                 assert!(app.contains(emits), "the store's add_to_cart emits");
-                app.replacen(emits, "", 1)
+                app.replacen(emits, "", 1).replacen(
+                    "    invalidates   Cart(current_user())\n",
+                    "    invalidates   Cart(current_user()), CartHours(current_user())\n",
+                    1,
+                )
             },
             &[],
         );
@@ -17281,8 +17306,8 @@ public query Store(",
             // Track `store-accounts`: and where deliveries go, before them.
             // ADR-0323: and the cart's link, a block and the subtotal it
             // says while the cart holds a line. ADR-0308, amended: and the
-            // store's cuisine.
-            whole.ends_with("</template><!--/pw-41--></body>\n</html>\n"),
+            // store's cuisine; track `store-hours`: and whether it is open.
+            whole.ends_with("</template><!--/pw-42--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the

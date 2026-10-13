@@ -2887,3 +2887,9 @@ money is rounded only where a program names how (the integrator's; NEXT
   only by `at_rate` with a `Rate` in millionths and a named `Rounding`; a
   phantom generic opaque type crosses as its representation (the
   2026-08-20 ruling amended for that case).
+[ADR-0328](DECISIONS/ADR-0328-a-store-is-open-by-its-hours-and-the-clock.md):
+a store is open by its hours, read by the clock (W9's; NEXT 4, step 2).
+- Hours as data on both layers (zone, cut-off, weekly periods as their
+  union, special dates); open or closed computed by the program against the
+  clock and told when it changes; an order refused while closed or past the
+  last order, as data the page words.

@@ -326,7 +326,15 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "transferable"
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "String"
+              }
+            ]
           }
         },
         "component": {
@@ -372,6 +380,573 @@
               "at_least": 1
             }
           ]
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.hours.CartHours",
+    "capability_mapping": 1,
+    "abi_schema": "ad95ef681a4ee1cc",
+    "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "compare"
+      },
+      {
+        "family": "clock",
+        "operation": "zone"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Carts"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/clock",
+        "name": "at",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.LocalDate"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.LocalTime"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.Instant"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "passed",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "today",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/hours",
+        "name": "for-cart",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.hours.OpeningHoursOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "CartHours",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "String"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-hours-cart-hours-api@0.1.0",
+          "function": "cart-hours"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.hours.StoreStatus",
+    "capability_mapping": 1,
+    "abi_schema": "8745b39c6f40cb6a",
+    "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "compare"
+      },
+      {
+        "family": "clock",
+        "operation": "zone"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/clock",
+        "name": "at",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.LocalDate"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.LocalTime"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.Instant"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "passed",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "today",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/hours",
+        "name": "for-store",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.hours.OpeningHours"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.StoreError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "StoreStatus",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-hours-store-status-api@0.1.0",
+          "function": "store-status"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.hours.StoresOpen",
+    "capability_mapping": 1,
+    "abi_schema": "83705ac29176622a",
+    "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "compare"
+      },
+      {
+        "family": "clock",
+        "operation": "zone"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/clock",
+        "name": "at",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.LocalDate"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.LocalTime"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.Instant"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "passed",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "today",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/hours",
+        "name": "for-stores",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "builtin": {
+                "ctor": "List",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "domain.StoreId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.hours.OpeningHoursOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/stores",
+        "name": "list",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.Store"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "StoresOpen",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-hours-stores-open-api@0.1.0",
+          "function": "stores-open"
         }
       }
     ]
@@ -594,6 +1169,12 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:app/store.hours.CartHours",
+        "name": "CartHours",
+        "owner": "external",
+        "kind": "component"
+      },
       {
         "interface": "pw:app/store.page.Cart",
         "name": "Cart",
@@ -828,14 +1409,14 @@
     ],
     "imports": [
       {
-        "interface": "pw:app/store.page.Cart",
-        "name": "Cart",
+        "interface": "pw:app/store.hours.StoresOpen",
+        "name": "StoresOpen",
         "owner": "external",
         "kind": "component"
       },
       {
-        "interface": "pw:app/store.page.StoreList",
-        "name": "StoreList",
+        "interface": "pw:app/store.page.Cart",
+        "name": "Cart",
         "owner": "external",
         "kind": "component"
       },
@@ -1012,7 +1593,15 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "transferable"
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "String"
+              }
+            ]
           }
         },
         "component": {
@@ -1788,6 +2377,12 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:app/store.hours.StoreStatus",
+        "name": "StoreStatus",
+        "owner": "external",
+        "kind": "component"
+      },
       {
         "interface": "pw:app/store.page.Cart",
         "name": "Cart",
@@ -3288,8 +3883,26 @@
   {
     "component_id": "store.page.place_order",
     "capability_mapping": 1,
-    "abi_schema": "fb6bec6c5ebf1383",
+    "abi_schema": "b0018e0965e11e9b",
     "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "compare"
+      },
+      {
+        "family": "clock",
+        "operation": "zone"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Carts"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      },
       {
         "family": "database",
         "operation": "write",
@@ -3313,6 +3926,95 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:host/clock",
+        "name": "at",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.LocalDate"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.LocalTime"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.Instant"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "passed",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "today",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
       {
         "interface": "pw:host/invalidations",
         "name": "store-page-cart",
@@ -3474,6 +4176,53 @@
         "kind": "host_capability"
       },
       {
+        "interface": "store:data/hours",
+        "name": "for-cart",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.hours.OpeningHoursOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
         "interface": "store:data/user-orders",
         "name": "place",
         "capability": "database.write<Orders>",
@@ -3523,7 +4272,35 @@
           }
         },
         "owner": "external",
-        "kind": "host_capability"
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "err",
+              "closed",
+              "closed-now",
+              "some",
+              "at"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          },
+          {
+            "argument": 0,
+            "path": [
+              "err",
+              "closed",
+              "past-last-order"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          }
+        ]
       }
     ],
     "exports": [
@@ -4183,8 +4960,16 @@
   {
     "component_id": "store.search.Search",
     "capability_mapping": 1,
-    "abi_schema": "d26c16946c40ccae",
+    "abi_schema": "9c8a7f1e53e7f531",
     "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "compare"
+      },
+      {
+        "family": "clock",
+        "operation": "zone"
+      },
       {
         "family": "database",
         "operation": "read",
@@ -4205,6 +4990,137 @@
       "origin"
     ],
     "imports": [
+      {
+        "interface": "pw:host/clock",
+        "name": "at",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.LocalDate"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.LocalTime"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.Instant"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "passed",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "today",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/hours",
+        "name": "for-stores",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "builtin": {
+                "ctor": "List",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "domain.StoreId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.hours.OpeningHoursOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
       {
         "interface": "store:data/search",
         "name": "find-for",
@@ -4275,6 +5191,12 @@
           "remote": {
             "kind": "conditional",
             "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "Option<String>"
+              },
               {
                 "kind": "preserve_principal",
                 "principal": "User<UserId>",
@@ -4353,7 +5275,15 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "transferable"
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "Option<String>"
+              }
+            ]
           }
         },
         "component": {

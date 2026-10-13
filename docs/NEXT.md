@@ -724,8 +724,7 @@ E14 comes before E11-E13. Its plan, controls and task list are
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled.
              In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
-             the store's hours (**W9's** `track/store-hours`, after W8's
-             merge, on the integrator's design: PARALLEL.md, 2026-10-11);
+             ~~the store's hours~~ (ADR-0328, merged 2026-10-13, W9's);
              orders scheduled;
           4a. ~~**typed page query parameters**~~ (ADR-0309, merged
              2026-10-12): a route's query part, `route "/search{?q}"`,

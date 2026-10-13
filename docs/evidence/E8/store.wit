@@ -62,6 +62,21 @@ interface domain-total-api {
     total: func(arg0: domain-cart-line) -> domain-money;
 }
 
+interface store-hours-cart-hours-api {
+    use pw:types/types.{capability-user-id};
+    cart-hours: func(arg0: capability-user-id) -> string;
+}
+
+interface store-hours-store-status-api {
+    use pw:types/types.{domain-store-id, store-hours-status-shown};
+    store-status: func(arg0: domain-store-id) -> store-hours-status-shown;
+}
+
+interface store-hours-stores-open-api {
+    use pw:types/types.{store-hours-listed-store};
+    stores-open: func() -> list<store-hours-listed-store>;
+}
+
 interface store-page-address-page-api {
     use pw:types/types.{domain-store-id};
     address-page: func(arg0: domain-store-id);
@@ -247,6 +262,25 @@ world domain-total {
     export domain-total-api;
 }
 
+world store-hours-cart-hours {
+    import pw:host/clock;
+    import store:data/hours;
+    export store-hours-cart-hours-api;
+}
+
+world store-hours-store-status {
+    import pw:host/clock;
+    import store:data/hours;
+    export store-hours-store-status-api;
+}
+
+world store-hours-stores-open {
+    import pw:host/clock;
+    import store:data/hours;
+    import store:data/stores;
+    export store-hours-stores-open-api;
+}
+
 world store-page-address-page {
     import pw:host/principal;
     import store-page-add-address-api;
@@ -265,6 +299,7 @@ world store-page-cart {
 
 world store-page-cart-page {
     import pw:host/principal;
+    import store-hours-cart-hours-api;
     import store-page-cart-api;
     import store-page-clear-cart-api;
     import store-page-decrease-in-cart-api;
@@ -282,8 +317,8 @@ world store-page-estimate {
 
 world store-page-home-page {
     import pw:host/principal;
+    import store-hours-stores-open-api;
     import store-page-cart-api;
-    import store-page-store-list-api;
     export store-page-home-page-api;
 }
 
@@ -353,6 +388,7 @@ world store-page-store-list {
 
 world store-page-store-page {
     import pw:host/principal;
+    import store-hours-store-status-api;
     import store-page-add-to-cart-api;
     import store-page-cart-api;
     import store-page-clear-cart-api;
@@ -420,9 +456,11 @@ world store-page-increase-in-cart {
 }
 
 world store-page-place-order {
+    import pw:host/clock;
     import pw:host/invalidations;
     import pw:host/outbox;
     import pw:host/principal;
+    import store:data/hours;
     import store:data/user-orders;
     export store-page-place-order-api;
 }
@@ -452,6 +490,8 @@ world store-page-rename-address {
 }
 
 world store-search-search {
+    import pw:host/clock;
+    import store:data/hours;
     import store:data/search;
     export store-search-search-api;
 }
@@ -467,6 +507,18 @@ package pw:types {
         type capability-session-id = string;
         type capability-user-id = string;
         type clock-instant = s64;
+        type clock-time-zone = string;
+        type clock-local-date = s64;
+        type clock-local-time = s64;
+        variant clock-weekday {
+            monday,
+            tuesday,
+            wednesday,
+            thursday,
+            friday,
+            saturday,
+            sunday,
+        }
         type domain-store-id = string;
         type domain-menu-item-id = string;
         type domain-order-id = string;
@@ -530,6 +582,20 @@ package pw:types {
         variant domain-order-error {
             nothing-to-order,
             no-coverage,
+            closed(domain-closing),
+        }
+        variant domain-closing {
+            closed-now(option<domain-opening>),
+            past-last-order(clock-local-time),
+        }
+        record domain-opening {
+            day: domain-opening-day,
+            at: clock-local-time,
+        }
+        variant domain-opening-day {
+            today,
+            tomorrow,
+            on(clock-weekday),
         }
         record domain-order-progress {
             stage-label: string,
@@ -593,6 +659,49 @@ package pw:types {
             sections: s64,
             items: s64,
         }
+        record store-hours-weekly-period {
+            weekday: s64,
+            opens: s64,
+            closes: s64,
+        }
+        record store-hours-special-date {
+            date: s64,
+            closed: bool,
+            opens: s64,
+            closes: s64,
+        }
+        record store-hours-opening-hours {
+            zone: string,
+            last-order-minutes: s64,
+            weekly: list<store-hours-weekly-period>,
+            special: list<store-hours-special-date>,
+        }
+        record store-hours-opening-hours-of {
+            store: domain-store-id,
+            name: string,
+            hours: store-hours-opening-hours,
+        }
+        record store-hours-open-until {
+            until: clock-instant,
+            last-order: clock-instant,
+        }
+        variant store-hours-open-state {
+            open(store-hours-open-until),
+            closed(option<clock-instant>),
+        }
+        record store-hours-status-shown {
+            status: store-hours-open-state,
+            open: bool,
+            said: string,
+        }
+        record store-hours-listed-store {
+            id: domain-store-id,
+            name: string,
+            description: string,
+            cuisine: string,
+            open: bool,
+            said: string,
+        }
         record store-search-dish-hit {
             id: domain-menu-item-id,
             name: string,
@@ -624,6 +733,7 @@ package pw:types {
             name: string,
             description: string,
             cuisine: string,
+            open: string,
             dishes: list<store-search-dish-hit>,
             more: string,
         }
@@ -639,6 +749,12 @@ package pw:types {
 }
 
 package pw:host {
+    interface clock {
+        use pw:types/types.{clock-instant, clock-local-date, clock-local-time, clock-time-zone};
+        at: func(arg0: clock-local-date, arg1: clock-local-time, arg2: clock-time-zone) -> clock-instant;
+        passed: func(arg0: clock-instant) -> bool;
+        today: func(arg0: clock-time-zone) -> clock-local-date;
+    }
     interface invalidations {
         use pw:types/types.{capability-user-id};
         store-page-cart: func(arg0: capability-user-id);
@@ -675,6 +791,12 @@ package store:data {
         use pw:types/types.{addresses-coverage, capability-user-id, domain-store-id};
         for-store: func(arg0: domain-store-id, arg1: capability-user-id) -> addresses-coverage;
         reaches: func(arg0: domain-store-id, arg1: capability-user-id) -> bool;
+    }
+    interface hours {
+        use pw:types/types.{capability-user-id, domain-store-error, domain-store-id, store-hours-opening-hours, store-hours-opening-hours-of};
+        for-cart: func(arg0: capability-user-id) -> list<store-hours-opening-hours-of>;
+        for-store: func(arg0: domain-store-id) -> result<store-hours-opening-hours, domain-store-error>;
+        for-stores: func(arg0: list<domain-store-id>) -> list<store-hours-opening-hours-of>;
     }
     interface menus {
         use pw:types/types.{domain-menu-item-id, domain-menu-section, domain-store-error, domain-store-id};

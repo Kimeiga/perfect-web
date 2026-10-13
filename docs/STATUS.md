@@ -23,6 +23,24 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0328, 2026-10-13: a store is open by its hours, read by the clock**
+(W9's; NEXT 4, step 2; track `store-hours`, merged from `4f2ffa8`).
+- A store's hours are its data on both layers: its zone, a cut-off before
+  each closing (20 minutes, DoorDash's), weekly periods and special dates.
+  A day's periods are their union; the layers hand them ordered.
+- Whether it is open is the program's, by comparing the clock with each
+  opening and closing (ADR-0304): a page that shows it is told at the
+  instant it changes. "Open until 7:00 pm", "Closed · opens tomorrow at
+  7:00 am", on the store's page, the home page, search results and the
+  cart.
+- An order is refused while closed and past the last order, as data the
+  page words (`OrderError.Closed(Closing)`), across midnight and on a day
+  the clocks go forward.
+- Found on the way: PostgreSQL refused a set listing a date twice while
+  memory took it (both keep the last now); a mutant had survived on the
+  home page's freshness alone (the clock is held between the reads now).
+Verify TRAIN_RUN green, with train-2.
+
 **2026-10-13: thirteen more scripts' server mutants run the tests that see
 them** (W6's ruling of 2026-10-09; track `narrowing-4`, merged from
 `d838954`).
