@@ -23,6 +23,27 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0329, 2026-10-13: an order is priced by the program from the
+store's data** (W9's; NEXT 6b; track `order-total`, merged from `1a64318`,
+with the integrator's rulings of 2026-10-13).
+- Each store's fee schedule is data on both layers (migration 0013): a
+  delivery fee, a service rate within a least and a most, a small-order
+  fee, a tax rate and what is taxed; read for a cart's stores in one
+  statement. San Francisco's seed: $2.99, 15% within $3 and $12, $2.50 under
+  $10, 8.625%, delivery and service untaxed (the platform a DNC that has not
+  elected, the store the retailer: Reg. 1684.5(a)(2), CDTFA's guide).
+- A cart is priced store by store and added, every part of an amount at a
+  named rounding (ADR-0327); the tip and the fees on the subtotal before a
+  promo; a promo one store's, store-funded lowering its taxable base;
+  each refusal by name; one use per reader, held by its key.
+- `place_order` takes the total the page showed and refuses
+  `TotalChanged(now)`; the order keeps each store's part with the rate
+  applied.
+- Found on the way: ADR-0327 named `is_less`, which nothing declared (W9);
+  the promo field sat inside the disclosure's target size (now its own
+  paragraph).
+Verify TRAIN_RUN green, with train-4.
+
 **ADR-0281 amended (4), 2026-10-13: a push to master plans from what a
 run passed at** (the integrator's; track `verified-base`, merged from
 `284d93f`).

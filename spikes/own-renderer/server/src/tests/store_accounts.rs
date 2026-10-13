@@ -364,7 +364,7 @@ fn an_order_is_no_other_users_to_read() {
     let ben = signed_in(&s, &provider, "came-ben", "ben");
     s.command(ADD, &ada, &add_shown("espresso", 1), false)
         .expect("ada adds");
-    s.command(PLACE, &ada, &[], false)
+    s.command(PLACE, &ada, &[s.shown_total(&ada)], false)
         .expect("ada places her order");
     assert_eq!(
         s.order_of(&ada),

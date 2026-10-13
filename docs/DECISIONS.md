@@ -2898,3 +2898,9 @@ a store is open by its hours, read by the clock (W9's; NEXT 4, step 2).
 - ADR-0281 amended (4), 2026-10-13: a push to master plans from the newest
   commit on its first-parent line a push's or the nightly's verify run passed
   at; a train's evidence then plans nothing.
+[ADR-0329](DECISIONS/ADR-0329-an-order-is-priced-by-the-program-from-the-stores-data.md):
+an order is priced by the program from the store's data (W9's; NEXT 6b).
+- Fees, tax, a tip and promo codes from each store's schedule, priced per
+  store in named roundings; the shown total held at `place_order`; each
+  store's part kept with its rate.
+- ADR-0327 corrected: `is_less` was named and not declared (found by W9).

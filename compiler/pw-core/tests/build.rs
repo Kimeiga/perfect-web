@@ -81,6 +81,8 @@ fn the_store_builds_every_artifact_from_source() {
             "store.hours.StoreStatus",
             "store.hours.StoresOpen",
             "store.page.Cart",
+            // The cart priced (track `order-total`).
+            "store.page.Checkout",
             // The store's slots, since ADR-0165: each stream's query.
             "store.page.Estimate",
             "store.page.Menu",
@@ -91,6 +93,8 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.MenuSize",
             // A session's order (ADR-0193).
             "store.page.Order",
+            // What the order was charged (track `order-total`).
+            "store.page.OrderTotal",
             // The places an address may name, and whether the store reaches
             // the reader's (track `store-accounts`).
             "store.page.Places",
@@ -103,7 +107,12 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.StoreList",
             "store.page.add_address",
             "store.page.add_to_cart",
+            // The cart's code applied (track `order-total`).
+            "store.page.apply_promo",
             "store.page.choose_address",
+            // Its tip, by percent and by amount (track `order-total`).
+            "store.page.choose_tip",
+            "store.page.choose_tip_amount",
             "store.page.clear_cart",
             // A line's controls (ADR-0172).
             "store.page.decrease_in_cart",
@@ -112,6 +121,8 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.place_order",
             "store.page.remove_address",
             "store.page.remove_from_cart",
+            // The cart's code taken off (track `order-total`).
+            "store.page.remove_promo",
             "store.page.rename_address",
             // The search (track `store-search`).
             "store.search.Search",
@@ -159,9 +170,11 @@ fn the_store_builds_every_artifact_from_source() {
     );
     assert_eq!(
         b.handlers.len(),
-        15,
+        24,
         "add_to_cart, clear_cart, and a line's three (ADR-0172); the cart \
-         page's clear and a line's three (ADR-0190), and its place_order \
+         page's clear and a line's three (ADR-0190), its place_order, and \
+         its checkout's seven: a code applied and taken off, four tips by \
+         percent and one by amount (track `order-total`) \
          (ADR-0193); the address page's label and its four (track \
          `store-accounts`)"
     );

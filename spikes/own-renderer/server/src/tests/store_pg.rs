@@ -171,7 +171,7 @@ fn on_postgres_a_routes_change_commits_with_its_event_in_one_transaction() {
     let s = served(&url);
     assert!(add(&s, "a", "espresso", 1, "i-1").committed);
     let placed = s
-        .command_answered(PLACE, "a", &[], Some("i-2"))
+        .command_answered(PLACE, "a", &[s.shown_total("a")], Some("i-2"))
         .expect("runs");
     assert!(placed.committed, "{:?}", placed.result);
     audit_the_outbox(&s);
@@ -477,7 +477,12 @@ fn on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_nothing() {
         assert!(add(&s, session, "espresso", 2, &format!("i-{i}-1")).committed);
         assert!(add(&s, session, "cortado", 1, &format!("i-{i}-2")).committed);
         let placed = s
-            .command_answered(PLACE, session, &[], Some(&format!("i-{i}-3")))
+            .command_answered(
+                PLACE,
+                session,
+                &[s.shown_total(session)],
+                Some(&format!("i-{i}-3")),
+            )
             .expect("runs");
         assert!(placed.committed, "{:?}", placed.result);
         let answer = posted(&s, "/bench/order?status=delivered", session, "", "");
@@ -633,7 +638,7 @@ fn on_postgres_the_two_layers_answer_alike() {
         );
         server.untold("", "store:host/kitchen#set-prep", &[s("47"), Val::S64(20)]);
         let placed = server
-            .command_answered(PLACE, "a", &[], Some("i-3"))
+            .command_answered(PLACE, "a", &[server.shown_total("a")], Some("i-3"))
             .expect("runs");
         assert!(placed.committed, "{:?}", placed.result);
         server.order_set_untold("a", "preparing");

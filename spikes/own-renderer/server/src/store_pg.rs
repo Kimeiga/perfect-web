@@ -68,6 +68,12 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0012_store_hours",
         include_str!("../migrations/store/0012_store_hours.sql"),
     ),
+    // TRACK SEAM (order-total): the fees, the codes, the choices, and the
+    // orders as charged.
+    (
+        "0013_order_total",
+        include_str!("../migrations/store/0013_order_total.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -290,6 +296,39 @@ impl Rows for PgRows<'_> {
     }
     fn set_hours(&mut self, store: &str, hours: &crate::hours::Hours) -> Result<(), String> {
         crate::hours::pg_set_hours(&mut self.0, store, hours)
+    }
+
+    // TRACK SEAM (order-total): the checkout's rows (`checkout.rs`).
+    fn fees(&mut self, stores: &[String]) -> Result<Vec<(String, crate::checkout::Fees)>, String> {
+        crate::checkout::pg_fees(&mut self.0, stores)
+    }
+    fn set_fees(&mut self, store: &str, fees: &crate::checkout::Fees) -> Result<(), String> {
+        crate::checkout::pg_set_fees(&mut self.0, store, fees)
+    }
+    fn promo(
+        &mut self,
+        owner: &str,
+        code: &str,
+    ) -> Result<Option<(crate::checkout::Promo, bool)>, String> {
+        crate::checkout::pg_promo(&mut self.0, owner, code)
+    }
+    fn set_promo(&mut self, promo: &crate::checkout::Promo) -> Result<(), String> {
+        crate::checkout::pg_set_promo(&mut self.0, promo)
+    }
+    fn use_promo(&mut self, owner: &str, code: &str) -> Result<bool, String> {
+        crate::checkout::pg_use_promo(&mut self.0, owner, code)
+    }
+    fn chosen(&mut self, owner: &str) -> Result<crate::checkout::Chosen, String> {
+        crate::checkout::pg_chosen(&mut self.0, owner)
+    }
+    fn set_chosen(&mut self, owner: &str, chosen: &crate::checkout::Chosen) -> Result<(), String> {
+        crate::checkout::pg_set_chosen(&mut self.0, owner, chosen)
+    }
+    fn charge(&mut self, owner: &str, charged: &crate::checkout::Charged) -> Result<(), String> {
+        crate::checkout::pg_charge(&mut self.0, owner, charged)
+    }
+    fn charged(&mut self, owner: &str) -> Result<Option<crate::checkout::Charged>, String> {
+        crate::checkout::pg_charged(&mut self.0, owner)
     }
 
     fn stores(&mut self) -> Result<Vec<StoreRow>, String> {

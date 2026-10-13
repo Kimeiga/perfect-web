@@ -1107,3 +1107,10 @@ ADR-0027 supersedes the inference that an undefined frame-level
 read from script-attribution records by the repaired instrumentation. Missing
 observations and observed zero must remain distinct. Old raw measurements are
 preserved, not replaced with invented results.
+- **A platform's own fees' taxability** (ADR-0329): no CDTFA text addresses a
+  delivery platform's own fees directly, so the deployment's tax adviser
+  sets each store's flags; CDTFA proposed in 2026 to end the DNC opt-out
+  (unconfirmed): if it does, the platform is the retailer and the flags
+  change.
+- **A cart's lines are mapped to their stores by a read per store**
+  (`checkout#parts`, as `hours#for-cart`), until NEXT 4b bounds every read.

@@ -122,6 +122,7 @@ NEEDS_DATABASE = {
     "e14-store-accounts",
     "e14-store-search",
     "e14-store-hours",
+    "e14-order-total",
     "e14-interactions",
 }
 

@@ -334,7 +334,7 @@
     "path": "store.page.CartPage",
     "name": "CartPage",
     "params": [],
-    "schema": "a5a7ff2e72271b3c",
+    "schema": "134d304637a66d2b",
     "chunks": [
       {
         "chunk": "static",
@@ -564,18 +564,122 @@
       },
       {
         "chunk": "static",
-        "value": "</span></p>\n            "
+        "value": "</span></p>\n            \n            "
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "conditional",
           "id": 14,
-          "value": "cart.lines",
+          "value": "checkout.any",
           "then": [
             {
               "chunk": "static",
-              "value": "<p id=\"cart-fees\">Delivery fee and taxes are added at checkout.</p>"
+              "value": "<details id=\"cart-fees\">\n                <summary>Total <span id=\"checkout-total\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 15,
+                "value": "checkout.charges.total.display",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</span></summary>\n                <dl id=\"checkout-charges\">\n                    <dt>Subtotal</dt><dd id=\"charge-subtotal\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 16,
+                "value": "checkout.charges.subtotal.display",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</dd>\n                    <dt>Promo</dt><dd id=\"charge-discount\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 17,
+                "value": "checkout.discount_said",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</dd>\n                    <dt>Delivery fee</dt><dd id=\"charge-delivery\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 18,
+                "value": "checkout.charges.delivery.display",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</dd>\n                    <dt>Service fee</dt><dd id=\"charge-service\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 19,
+                "value": "checkout.charges.service.display",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</dd>\n                    <dt>Small order fee</dt><dd id=\"charge-small\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 20,
+                "value": "checkout.charges.small_order.display",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</dd>\n                    <dt>Estimated tax</dt><dd id=\"charge-tax\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 21,
+                "value": "checkout.charges.tax.display",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</dd>\n                    <dt>Tip</dt><dd id=\"charge-tip\">"
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 22,
+                "value": "checkout.charges.tip.display",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</dd>\n                </dl>\n            </details>"
             }
           ],
           "otherwise": []
@@ -583,13 +687,216 @@
       },
       {
         "chunk": "static",
-        "value": "\n            <p id=\"cart-hours\">"
+        "value": "\n            <p id=\"promo\">\n                <label>Promo code <input data-pw=\"4\" id=\"promo-code\" type=\"text\" "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "attribute",
+          "id": 23,
+          "owner": 4,
+          "name": "value",
+          "value": "code",
+          "context": "attribute"
+        }
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "event",
+          "id": 24,
+          "owner": 4,
+          "event": "input",
+          "handler": "029fa6a984724f1c",
+          "name": ""
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "></label>\n                <button data-pw=\"5\" id=\"apply-promo\" type=\"button\""
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "event",
+          "id": 25,
+          "owner": 5,
+          "event": "press",
+          "handler": "a1b9d04f6c3d6962",
+          "name": "apply_promo"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": ">\n                    Apply\n                </button>\n            </p>\n            <p id=\"promo-said\">"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 15,
+          "id": 26,
+          "value": "checkout.said",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</p>\n            "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "match",
+          "id": 27,
+          "value": "checkout.promo",
+          "arms": [
+            {
+              "case": "some",
+              "binding": "_",
+              "body": [
+                {
+                  "chunk": "static",
+                  "value": "<button data-pw=\"6\" id=\"remove-promo\" type=\"button\""
+                },
+                {
+                  "chunk": "dynamic",
+                  "value": {
+                    "part": "event",
+                    "id": 28,
+                    "owner": 6,
+                    "event": "press",
+                    "handler": "481e071528717f3b",
+                    "name": "remove_promo"
+                  }
+                },
+                {
+                  "chunk": "static",
+                  "value": ">\n                Remove code\n            </button>\n            "
+                }
+              ]
+            },
+            {
+              "case": "none",
+              "body": [
+                {
+                  "chunk": "static",
+                  "value": "\n            "
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n            <fieldset id=\"tips\">\n                <legend>Tip your courier</legend>\n                <button data-pw=\"7\" type=\"button\" id=\"tip-none\""
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "event",
+          "id": 29,
+          "owner": 7,
+          "event": "press",
+          "handler": "72ee2f24e9bc94ec",
+          "name": "choose_tip"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": ">No tip</button>\n                <button data-pw=\"8\" type=\"button\" id=\"tip-15\""
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "event",
+          "id": 30,
+          "owner": 8,
+          "event": "press",
+          "handler": "3a34798f164933d6",
+          "name": "choose_tip"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": ">15%</button>\n                <button data-pw=\"9\" type=\"button\" id=\"tip-18\""
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "event",
+          "id": 31,
+          "owner": 9,
+          "event": "press",
+          "handler": "ce8d600da2e9c480",
+          "name": "choose_tip"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": ">18%</button>\n                <button data-pw=\"10\" type=\"button\" id=\"tip-20\""
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "event",
+          "id": 32,
+          "owner": 10,
+          "event": "press",
+          "handler": "f5ef1bbd058606bd",
+          "name": "choose_tip"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": ">20%</button>\n                <label>Other amount <input data-pw=\"11\" id=\"tip-amount\" type=\"text\" inputmode=\"decimal\" "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "attribute",
+          "id": 33,
+          "owner": 11,
+          "name": "value",
+          "value": "tip_typed",
+          "context": "attribute"
+        }
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "event",
+          "id": 34,
+          "owner": 11,
+          "event": "input",
+          "handler": "55314a08032a0a1d",
+          "name": ""
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "></label>\n                <button data-pw=\"12\" type=\"button\" id=\"tip-other\""
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "event",
+          "id": 35,
+          "owner": 12,
+          "event": "press",
+          "handler": "ad47a7258ff192dc",
+          "name": "dollars_typed"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": ">Add tip</button>\n            </fieldset>\n            <p id=\"cart-hours\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 36,
           "value": "hours",
           "context": "text"
         }
@@ -602,21 +909,21 @@
         "chunk": "dynamic",
         "value": {
           "part": "text",
-          "id": 16,
+          "id": 37,
           "value": "notice",
           "context": "text"
         }
       },
       {
         "chunk": "static",
-        "value": "</p>\n            <button data-pw=\"4\" id=\"clear-cart\" type=\"button\""
+        "value": "</p>\n            <button data-pw=\"13\" id=\"clear-cart\" type=\"button\""
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "event",
-          "id": 17,
-          "owner": 4,
+          "id": 38,
+          "owner": 13,
           "event": "press",
           "handler": "b5c3e56ff370a6a8",
           "name": "clear_cart"
@@ -630,22 +937,25 @@
         "chunk": "dynamic",
         "value": {
           "part": "conditional",
-          "id": 18,
+          "id": 39,
           "value": "SignedIn~holds",
           "then": [
             {
               "chunk": "static",
-              "value": "<button data-pw=\"5\" id=\"place-order\" type=\"button\""
+              "value": "<button data-pw=\"14\" id=\"place-order\" type=\"button\""
             },
             {
               "chunk": "dynamic",
               "value": {
                 "part": "event",
-                "id": 19,
-                "owner": 5,
+                "id": 40,
+                "owner": 14,
                 "event": "press",
-                "handler": "c51c59a7bf923bd1",
-                "name": "place_order"
+                "handler": "b7567b82874d05d7",
+                "name": "place_order",
+                "captures": [
+                  "checkout.charges.total"
+                ]
               }
             },
             {
@@ -664,7 +974,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "match",
-          "id": 20,
+          "id": 41,
           "value": "order",
           "arms": [
             {
@@ -697,7 +1007,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 21,
+          "id": 42,
           "pieces": [
             {
               "piece": "text",
@@ -874,7 +1184,7 @@
     "path": "store.page.OrderPage",
     "name": "OrderPage",
     "params": [],
-    "schema": "4861a03f1c971894",
+    "schema": "a2e8359fe0a92607",
     "chunks": [
       {
         "chunk": "static",
@@ -956,7 +1266,20 @@
                 },
                 {
                   "chunk": "static",
-                  "value": "\n                "
+                  "value": "\n                    <p id=\"order-total\">Total charged: "
+                },
+                {
+                  "chunk": "dynamic",
+                  "value": {
+                    "part": "text",
+                    "id": 3,
+                    "value": "charged.display",
+                    "context": "text"
+                  }
+                },
+                {
+                  "chunk": "static",
+                  "value": "</p>\n                "
                 }
               ]
             },
@@ -980,7 +1303,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 3,
+          "id": 4,
           "pieces": [
             {
               "piece": "text",
