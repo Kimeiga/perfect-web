@@ -1447,3 +1447,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
     changes, cancelled; money went on with no run of its own, its local `just
     ci` and 11 of 11 mutants green.
   - To W9: 6b may start from master now.
+- **2026-10-13, train-3 landed** (`track/train-3`, verify 38436632504): ADR-0026
+  amended (a failed artifact audit prints why) and ADR-0281 amended (4) (a
+  push to master plans from what a run passed at). Master's verify after a
+  train now plans from the train's head, nothing for its evidence: the
+  integrator no longer cancels it by hand (the rulings of train-2's entry
+  stand otherwise).

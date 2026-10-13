@@ -34,7 +34,7 @@ run passed at** (the integrator's; track `verified-base`, merged from
   error: more, never less. Both trains' evidence commits plan nothing.
 - Seven tests; eight mutants in `dealt_by_time_mutations.py`, 30 of 30
   killed.
-Verify TRAIN_RUN green, with train-3.
+Verify 38436632504 green, with train-3.
 
 **ADR-0026 amended, 2026-10-13: a failed artifact audit prints why**
 (the integrator's; found reading the nightly of 2026-10-12; track
@@ -46,7 +46,9 @@ Verify TRAIN_RUN green, with train-3.
 - The audit now prints the tests' output whatever they answer, then exits
   with their status and writes no evidence; the gate tests run the real
   recipe with a failing producer (2 outputs of 3 before).
-Verify TRAIN_RUN green, with train-3.
+Verify 38436632504 green, with train-3; `e8-host` by dispatch 38438359393:
+the planner planned none for its script's change (the integrator's finding,
+fixed on track `plan-shell`).
 
 **ADR-0328, 2026-10-13: a store is open by its hours, read by the clock**
 (W9's; NEXT 4, step 2; track `store-hours`, merged from `4f2ffa8`).
