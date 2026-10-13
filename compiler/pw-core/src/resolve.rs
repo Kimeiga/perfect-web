@@ -529,16 +529,27 @@ impl Workspace {
         if let Some(def) = m.defines.get(&(ns, name.to_string())) {
             return Resolution::Local(*def);
         }
+        // **A name the file imports by name, before a whole module's**
+        // (ADR-XXXX). `import domain.{ sum }` beside `import List` means
+        // `domain`'s `sum`: the file chose it by name, as an explicit `use`
+        // shadows a glob in Rust. Two whole modules that both declare a name
+        // the file uses leave it ambiguous, and the use is refused (PW0022).
         let mut hits: Vec<(String, DefId)> = Vec::new();
-        for imp in &m.imports {
-            let Some(&t) = self.by_name.get(&imp.module) else {
-                continue;
-            };
-            if !(imp.names.is_empty() || imp.names.iter().any(|n| n == name)) {
-                continue;
+        for by_name in [true, false] {
+            for imp in &m.imports {
+                let Some(&t) = self.by_name.get(&imp.module) else {
+                    continue;
+                };
+                let named = imp.names.iter().any(|n| n == name);
+                if by_name != named || (!by_name && !imp.names.is_empty()) {
+                    continue;
+                }
+                if let Some(def) = self.modules[t].defines.get(&(ns, name.to_string())) {
+                    hits.push((imp.module.clone(), *def));
+                }
             }
-            if let Some(def) = self.modules[t].defines.get(&(ns, name.to_string())) {
-                hits.push((imp.module.clone(), *def));
+            if !hits.is_empty() {
+                break;
             }
         }
         // The PRELUDE, last, and only for the namespace a package exported.
