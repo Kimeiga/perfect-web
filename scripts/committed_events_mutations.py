@@ -65,7 +65,14 @@ MUTANTS = [
 ]
 
 TESTS = [
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The tests that fail under its mutants, measured against the whole suite
+    # by `scripts/mutant_killers.py` on 2026-10-13 (W6's ruling of
+    # 2026-10-09), two per mutant where two fail.
+    [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_change_reaches_each_page_that_reads_it_by_its_own_plan",
+        "tests::a_command_commits_the_events_it_computes",
+    ],
 ]
 
 
