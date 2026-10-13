@@ -20,6 +20,13 @@ evidence and the documents, which no recipe reads.
   never less.
 
     python3 scripts/verified_base.py BEFORE HEAD   # prints the base
+    python3 scripts/verified_base.py --browsers BASE HEAD   # prints true or false
+
+**And the browser suites** (amended the same day, its first use): master's
+verify after train-3 planned no recipe from the train's head, and its three
+browser jobs ran the suites the train's run had, on the same code. Where the
+base is a run's commit, not the push's before, and what changed since it is
+documents and the seconds kept alone, they are not run again.
 
 `gh` reads the runs, with `GH_TOKEN` and `GITHUB_REPOSITORY` as a workflow
 gives them.
@@ -89,9 +96,35 @@ def base(
     return before
 
 
+# What changes nothing a browser suite reads: the documents, the evidence
+# among them, and the seconds each recipe last took.
+RECORDS = ("docs/", "scripts/ci_seconds.json")
+
+
+def browsers(verified: str, head: str, root: pathlib.Path = ROOT) -> bool:
+    """Whether the browser suites run for `head`, where `verified` is the
+    commit a run passed at: not where what changed since is records alone.
+    Any error runs them."""
+    try:
+        names = subprocess.run(
+            ["git", "diff", "--name-only", f"{verified}..{head}"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()
+    except Exception as error:  # noqa: BLE001 - any failure runs more, never less
+        print(f"verified_base: {error}; the browser suites run", file=sys.stderr)
+        return True
+    return not all(n.startswith(RECORDS) for n in names)
+
+
 def main() -> int:
+    if len(sys.argv) == 4 and sys.argv[1] == "--browsers":
+        print("true" if browsers(sys.argv[2], sys.argv[3]) else "false")
+        return 0
     if len(sys.argv) != 3:
-        print("usage: verified_base.py BEFORE HEAD", file=sys.stderr)
+        print("usage: verified_base.py BEFORE HEAD | --browsers BASE HEAD", file=sys.stderr)
         return 2
     print(base(sys.argv[1], sys.argv[2]))
     return 0

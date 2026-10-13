@@ -113,12 +113,26 @@ hold.
      merge made on master is not its track's head and is planned as before;
      a dispatch's run, which runs only the recipes it names, does not
      count; any error plans from the commit before the push, more and
-     never less. A track branched from a train not yet landed is verified
+     never less. Its first use, master's push after train-3, planned from
+     the train's head and planned nothing (verify 38440251297, "planned
+     from 051e8eb"); its three browser jobs still ran the train's suites on
+     the same code. **So the browser suites too** (the same day): where the
+     base is a run's commit and what changed since is records alone (the
+     documents and `scripts/ci_seconds.json`), they are not run again; any
+     error runs them (`verified_base.py --browsers`; a test, two mutants). A track branched from a train not yet landed is verified
      with the next train, not pushed alone: its push plans from master's
      merge base, which re-runs the unlanded train. And a track whose own
      run would plan most of what the train's will (a program most recipes
      read changed) goes on with its local `just ci` and its mutation
      controls green.
+   - **A shell script a recipe runs plans it** (the integrator's finding,
+     2026-10-13). The planner read only the `scripts/*.py` a recipe's lines
+     name: train-3's run, and the audit track's own, planned no `e8-host`
+     for a change to `spikes/wasmtime-component/audit.sh`, the script the
+     recipe is, which a dispatch then ran. A path to a `.sh` in a recipe's
+     lines that the range changed plans the recipe, as a changed browser
+     spec does (`ci_plan.py`'s `reads_what_changed`; a test in
+     `test_ci_scripts.py`, a mutant in `dealt_by_time_mutations.py`).
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does

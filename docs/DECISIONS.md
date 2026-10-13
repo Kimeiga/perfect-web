@@ -2913,3 +2913,6 @@ integrator's; W9's finding in NEXT 6b).
 a case crosses from a browser (the integrator's; W9's finding in NEXT 6b).
 - `Option`, `Result` and declared cases as command arguments, sent as the
   browser holds them and read by the parameter's type.
+- ADR-0281 amended (5), 2026-10-13: a shell script a recipe runs plans it;
+  master's verify skips the browser suites where only records changed since
+  the run that passed.

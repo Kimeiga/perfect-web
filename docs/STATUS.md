@@ -23,6 +23,18 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0281 amended (5), 2026-10-13: a shell script a recipe runs plans
+it, and master's verify runs no browser suite again on the same code**
+(the integrator's; track `plan-shell`, merged from `f289fc9`).
+- The planner followed only a recipe's `scripts/*.py`: train-3's run, and
+  the audit's own, planned no `e8-host` for its `audit.sh`. A `.sh` path a
+  recipe names plans it when it changes.
+- Master's push after train-3 planned nothing from the train's head
+  (verify 38440251297), and still ran its three browser suites on the same
+  code: where only records changed since the run that passed, they are
+  skipped. 33 of 33 planner mutants killed.
+Verify TRAIN_RUN green, with train-4.
+
 **2026-10-13: a flight test that fails says the query runtime's trace**
 (the integrator's finding; NEXT 3d; track `flight-wait`, merged from
 `46f7c93`).

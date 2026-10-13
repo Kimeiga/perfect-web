@@ -37,6 +37,13 @@ VBASE = ROOT / "scripts/verified_base.py"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
+    # ADR-0281, amended 2026-10-13: a shell script a recipe runs plans it.
+    (
+        "a shell script a recipe runs is not read",
+        PLAN,
+        "        if rel in changed:\n            return True\n    for name in re.findall(",
+        "        if False:\n            return True\n    for name in re.findall(",
+    ),
     # ADR-0281, amended 2026-10-13: what a run passed at is not run again.
     (
         "a dispatch's run counts as covering what it pushed",
@@ -79,6 +86,18 @@ MUTANTS = [
         VBASE,
         "    except Exception as error:  # noqa: BLE001 - any failure plans more, never less\n",
         "    except ZeroDivisionError as error:\n",
+    ),
+    (
+        "the browser suites run again where only records changed",
+        VBASE,
+        "    return not all(n.startswith(RECORDS) for n in names)\n",
+        "    return True\n",
+    ),
+    (
+        "the browser suites are skipped whatever changed",
+        VBASE,
+        "    return not all(n.startswith(RECORDS) for n in names)\n",
+        "    return False\n",
     ),
     (
         "the runs are read by no commit",
