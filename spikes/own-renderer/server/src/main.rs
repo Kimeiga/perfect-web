@@ -717,6 +717,10 @@ mod clock;
 mod order;
 // TRACK SEAM (store-search): the store's search, in its data layer (W9).
 mod search;
+// NEXT 6c: a deployment's payments, a provider's webhooks held to their
+// signature.
+#[allow(dead_code)]
+mod payments;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
