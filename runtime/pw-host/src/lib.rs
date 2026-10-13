@@ -372,6 +372,11 @@ pub struct ComponentExport {
     /// that runs it.
     #[serde(default)]
     pub idempotent_by: Option<String>,
+    /// Who invokes it where no reader does (NEXT 6c): `Payments`. A host
+    /// answers a reader's invocation of such an export as one that is not
+    /// there. Mirrored by field name, ADR-0018.
+    #[serde(default)]
+    pub invoked_by: Option<String>,
     /// Where an argument must hold an invariant (ADR-0179). Mirrored by field
     /// name, ADR-0018.
     #[serde(default)]

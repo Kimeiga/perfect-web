@@ -22,6 +22,7 @@
 //! PW57xx   the notifications track's (ADR-0253): the typed principal, notifications
 //! PW58xx   the messages track's (ADR-0253): direct messages
 //! PW60xx   the kiokun track's (ADR-0253): kiokun.com in Pleris
+//! PW64xx   the payments track's (NEXT 6c): a command the platform invokes
 //! ```
 //!
 //! A parallel track registers its codes in its own block, with its own
@@ -116,6 +117,10 @@ pub enum Owner {
     /// ADR-0253: the store-search track's codes, PW63xx: the DoorDash
     /// store's customer search (docs/PARALLEL.md, W9). None registered yet.
     StoreSearch,
+    /// The payments track's codes, PW64xx (NEXT 6c, the integrator's): a
+    /// command the platform invokes on its provider's word, and no reader
+    /// presses.
+    Payments,
 }
 
 impl fmt::Display for Code {
@@ -848,6 +853,20 @@ codes! {
         "an upload's paths are its own: no page's, and no other upload's";
     FILE_FORM_POSTS_TO_NO_UPLOAD = "PW5603" / file_form_posts_to_no_upload / 1, Uploads,
         "a form that sends a file posts it, as multipart/form-data, to an upload the program declares";
+
+    // --- the payments track (PW64xx; NEXT 6c, the integrator's) ------------
+    //
+    // `invoked_by Payments`: the command a payment's outcome invokes, which
+    // the host calls on its provider's word and no reader presses (Convex's
+    // internal functions; a WASI handler export).
+    INVOKED_COMMAND_REQUIRES = "PW6401" / invoked_command_requires / 1, Payments,
+        "a command the platform invokes holds no reader to a predicate: it declares no `requires`";
+    INVOKED_COMMAND_PARAMETERS = "PW6402" / invoked_command_parameters / 1, Payments,
+        "a command `invoked_by Payments` is given one `payments.Settled`, and nothing else";
+    INVOKED_TWICE = "PW6403" / invoked_twice / 1, Payments,
+        "one command answers a payment's outcome: a second would leave the host two answers";
+    INVOKED_COMMAND_PRESSED = "PW6404" / invoked_command_pressed / 1, Payments,
+        "no page presses a command the platform invokes";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must
@@ -937,6 +956,7 @@ impl Owner {
             Owner::Kiokun => "PW60",
             Owner::StoreAccounts => "PW62",
             Owner::StoreSearch => "PW63",
+            Owner::Payments => "PW64",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -1002,6 +1022,7 @@ mod tests {
                 (Owner::Kiokun, "PW60"),
                 (Owner::StoreAccounts, "PW62"),
                 (Owner::StoreSearch, "PW63"),
+                (Owner::Payments, "PW64"),
             ] {
                 assert!(
                     !c.id.starts_with(block) || c.owner == owner,

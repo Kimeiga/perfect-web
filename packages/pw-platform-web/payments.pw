@@ -1,0 +1,48 @@
+// @corpus: platform
+// @id: PLATFORM-payments
+// @category: platform — payments
+// @charter: §7.8, §15.2
+// @milestone: E14
+//
+// NEXT 6c: a payment at the deployment's provider. A command begins one with
+// the deployment's secret key, which only the origin holds; the reader pays
+// on the provider's own page, which the host never sees; and the provider's
+// word, held to its signature and read again from the provider, settles it.
+// What settles it is a command the program declares `invoked_by Payments`:
+// the host invokes it, and no reader presses it.
+
+module payments
+
+import capability.{ Secret, Payments }
+
+// **A payment at the provider** (Stripe's PaymentIntent): its id, the
+// secret the provider's page is opened with, and where it stands. One per
+// order, begun again by a retried press and never a second.
+type Payment = Payment { id: String, client_secret: String, status: PaymentStatus }
+
+// **Where a payment stands**, as the provider says it (Stripe's statuses):
+// waiting for a card (again, after a decline), for the reader to
+// authenticate, for the bank, paid, or given up.
+type PaymentStatus =
+    | RequiresPaymentMethod
+    | RequiresAction
+    | Processing
+    | Succeeded
+    | Canceled
+
+// **Why a payment was not begun**: the provider could not be reached.
+type BeginError =
+    | TransportFailed
+
+// **What a settled payment tells its program**: which payment, the order it
+// was begun for, and where it now stands. The host gives it to the command
+// the program declares `invoked_by Payments`, after it has the provider's
+// word for it; the amount is the host's to hold to what was begun.
+type Settled = Settled { payment: String, order: String, status: PaymentStatus }
+
+// **A payment begun for `order`**, of `amount` in its currency's minor
+// units, at the deployment's provider: keyed by the order and the press, so
+// a retried press reaches the payment the first began. Only a module that
+// reads an amount's units can say one (ADR-0327: `domain`).
+fn begin(key: Secret<Payments>, order: String, amount: Int) -> Result<Payment, BeginError> !{ payments.begin }
+    host "pw:host/payments#begin"

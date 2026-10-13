@@ -167,6 +167,15 @@ effect outbox.write {
     capability outbox.write
 }
 
+// --- payments ---------------------------------------------------------------
+
+// **A payment begun at the deployment's provider** (NEXT 6c): with its
+// secret key, so at the origin alone, as the key is.
+effect payments.begin {
+    placement  origin
+    capability payments.begin
+}
+
 // --- network ----------------------------------------------------------------
 
 effect network.fetch {

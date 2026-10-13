@@ -335,7 +335,9 @@ fn section_of(policy: &str) -> &'static str {
         "cache" | "freshness" | "consistency" | "key" | "timeout" | "retry" | "delivery"
         | "fallback" | "concurrency" | "on_key_change" | "stampede" | "regenerate"
         | "dedupe_by" | "transport" | "reconnect" | "scope" | "on_scope_exit" => "cache",
-        "requires" | "idempotent_by" | "optimistic" | "rollback" | "transaction" => "obligations",
+        "requires" | "invoked_by" | "idempotent_by" | "optimistic" | "rollback" | "transaction" => {
+            "obligations"
+        }
         "placement" => "placement",
         "partition" | "privacy" => "privacy",
         // The graph's clauses: reported as its edges, once.

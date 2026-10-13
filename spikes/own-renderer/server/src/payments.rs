@@ -1707,6 +1707,64 @@ pub(crate) fn operations(
     vec![("pw:host/payments#begin".to_string(), begin)]
 }
 
+/// **Whether the platform invokes `component_id`, and no reader** (NEXT
+/// 6c): its export is `invoked_by` a platform invoker (`Payments`). The
+/// press route answers a press naming it as a command that is not there.
+pub(crate) fn invoked_by_platform(
+    contracts: &[pw_host::ComponentContract],
+    component_id: &str,
+) -> bool {
+    contracts
+        .iter()
+        .find(|c| c.component_id == component_id)
+        .and_then(|c| c.exports.first()?.component.as_ref())
+        .is_some_and(|e| e.invoked_by.is_some())
+}
+
+#[cfg(test)]
+mod invoked_tests {
+    use super::*;
+    use pw_host::{BindingSupport, CAPABILITY_MAPPING, ComponentContract, ComponentExport, Export};
+
+    fn contract(id: &str, invoked_by: Option<&str>) -> ComponentContract {
+        ComponentContract {
+            component_id: id.into(),
+            capability_mapping: CAPABILITY_MAPPING,
+            abi_schema: "abi".into(),
+            required_capabilities: Vec::new(),
+            allowed_placements: vec!["origin".into()],
+            imports: Vec::new(),
+            exports: vec![Export {
+                name: "settle".into(),
+                kind: "command".into(),
+                binding: BindingSupport::default(),
+                component: Some(ComponentExport {
+                    interface: "pw:app/store-page-settle-api@0.1.0".into(),
+                    function: "settle".into(),
+                    authorization: Vec::new(),
+                    idempotent_by: None,
+                    invoked_by: invoked_by.map(str::to_string),
+                    bounded: Vec::new(),
+                }),
+            }],
+        }
+    }
+
+    /// **A command the platform invokes is no reader's to press**, by its
+    /// contract; a reader's command, and a component this host does not
+    /// have, are not one.
+    #[test]
+    fn a_command_the_platform_invokes_is_told_by_its_contract() {
+        let contracts = [
+            contract("store.page.settle", Some("Payments")),
+            contract("store.page.place_order", None),
+        ];
+        assert!(invoked_by_platform(&contracts, "store.page.settle"));
+        assert!(!invoked_by_platform(&contracts, "store.page.place_order"));
+        assert!(!invoked_by_platform(&contracts, "store.page.nothing"));
+    }
+}
+
 #[cfg(test)]
 mod operation_tests {
     use super::*;

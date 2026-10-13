@@ -1671,6 +1671,14 @@ impl Server {
         }
     }
 
+    /// **Whether the platform invokes `component_id`, and no reader** (NEXT
+    /// 6c): a command `invoked_by Payments`. A press naming it is answered
+    /// as a command that is not there; the host invokes it on its provider's
+    /// word alone.
+    fn invoked_by_platform(&self, component_id: &str) -> bool {
+        payments::invoked_by_platform(&self.contracts, component_id)
+    }
+
     /// **May this component run here, and with what?**
     ///
     /// One `admit` call, and no other source of truth. The command path calls
@@ -7591,11 +7599,14 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // `dist/handlers/<identity>.mjs`). The body is the arguments, as a JSON
         // array, typed here by the component's own parameters; the guard admits
         // only components this server hosts, so an unknown id falls through to
-        // the 404 below rather than to a default.
+        // the 404 below rather than to a default. A command the platform
+        // invokes (NEXT 6c, `invoked_by Payments`) is not a reader's to press,
+        // and falls through with them, as a Convex client's call of an
+        // internal function finds no public one.
         ("POST", route)
-            if route
-                .strip_prefix("/command/")
-                .is_some_and(|id| server.components.contains_key(id)) =>
+            if route.strip_prefix("/command/").is_some_and(|id| {
+                server.components.contains_key(id) && !server.invoked_by_platform(id)
+            }) =>
         {
             let id = &route["/command/".len()..];
             let args = match serde_json::from_slice::<Vec<serde_json::Value>>(&body) {

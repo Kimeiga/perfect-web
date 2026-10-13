@@ -314,6 +314,9 @@ pub fn domain_of(head: &str) -> Option<Domain> {
 
         // --- authority and placement
         "requires" => Domain::PredicateRef,
+        // NEXT 6c: who invokes a command that no reader presses, a word of
+        // the platform's: `Payments`, the host on its provider's word.
+        "invoked_by" => Domain::Word(&["Payments"]),
         "placement" => Domain::Worlds,
         "privacy" => Domain::LabelCtor,
         "capability" => Domain::EffectRef,
@@ -567,7 +570,9 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
             (&[K::Materialize], "a materialization")
         }
         // A command's.
-        "idempotent_by" | "transaction" | "optimistic" => (&[K::Command], "a command"),
+        "idempotent_by" | "transaction" | "optimistic" | "invoked_by" => {
+            (&[K::Command], "a command")
+        }
         // A subscription's connection.
         "transport" | "reconnect" | "on_scope_exit" => (&[K::Subscription], "a subscription"),
         "scope" => (
@@ -1079,6 +1084,7 @@ mod tests {
         "invalidates_on",
         "emits",
         "requires",
+        "invoked_by",
         "placement",
         "route",
         "layout",

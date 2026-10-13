@@ -37,10 +37,31 @@ A-010 (an origin-only secret operation, `capture_payment`) and the charter's
    numbers (4242 succeeds; 3220 and 3184 ask to authenticate; 0002 is
    declined; 9995 has insufficient funds; any other is declined); every
    change an event signed for the host.
-3. To come: the provider on its own origin (the hosted fields' page and its
-   API); the `Payments` capability's host operations; the order awaiting
-   payment, placed only from a verified, de-duplicated webhook, the intent
-   read again, in one transaction; the page told.
+3. **The program says which command a payment's outcome invokes**
+   (`invoked_by Payments`), and no reader presses it. The host calls it once
+   it has its provider's word for the outcome: a signed event, or the
+   reader's return, each read again from the provider (Stripe's "Fulfill
+   orders": the fulfilment "might be called multiple times, possibly
+   concurrently"; retrieve, check the status, record the fulfilment). Its
+   export says so (`ComponentExport.invoked_by`, part of its interface's
+   hash), and a press naming it is answered as a command that is not there,
+   as a Convex client finds no public function for an internal one ("can
+   only be called by other functions and cannot be called directly from a
+   Convex client"). The checks, PW64xx, the payments track's:
+   - PW6401: it declares no `requires`: no reader acts;
+   - PW6402: it is given one `payments.Settled` (the payment, the order it
+     was begun for, where it now stands), what the host has to give;
+   - PW6403: one command answers a payment's outcome in a program;
+   - PW6404: no page's handler sends it.
+4. **The platform's payments** (`packages/pw-platform-web/payments.pw`):
+   `Payment`, `PaymentStatus` (Stripe's statuses), `Settled`, and
+   `begin(key, order, amount)`, effect `payments.begin`, at the origin alone
+   as the key is. The amount is in minor units: only `domain` reads an
+   amount's units (ADR-XXXX, money), so only it begins a payment.
+5. To come: the order awaiting payment, placed only from a settled payment
+   in one transaction, the amount held by the host to what was begun; the
+   provider's page in the checkout, framed from its origin alone; the page
+   told.
 
 ## Not claimed (so far)
 
