@@ -1810,15 +1810,12 @@ impl Server {
         };
         lines
             .iter()
-            .map(|l| {
-                match (
-                    val_at(l, &["name"]),
-                    val_at(l, &["unit-price", "minor-units"]),
-                ) {
+            .map(
+                |l| match (val_at(l, &["name"]), val_at(l, &["unit-price"])) {
                     (Some(Val::String(name)), Some(Val::S64(price))) => (name.clone(), *price),
                     other => panic!("no line: {other:?}"),
-                }
-            })
+                },
+            )
             .collect()
     }
 
@@ -6627,10 +6624,7 @@ fn cart_value(lines: &[Line]) -> Val {
                         // The item's price when the line was made (ADR-0169,
                         // ADR-0172). Until 2026-10-03 every line was priced
                         // 450, whatever its item.
-                        (
-                            "unit-price".into(),
-                            Val::Record(vec![("minor-units".into(), Val::S64(line.price))]),
-                        ),
+                        ("unit-price".into(), Val::S64(line.price)),
                     ])
                 })
                 .collect(),
@@ -11051,7 +11045,7 @@ public query Store(",
             "id": id,
             "store_id": store,
             "name": name,
-            "price": { "minor_units": item_price(id) },
+            "price": item_price(id),
             "available": true,
             "category": { "id": category, "name": category_name },
         })
@@ -11738,10 +11732,7 @@ public query Store(",
                 ("store-id".into(), text(&shown["store_id"])),
                 ("name".into(), text(&shown["name"])),
                 ("description".into(), text(&shown["description"])),
-                (
-                    "price".into(),
-                    Val::Record(vec![("minor-units".into(), Val::S64(item_price(item)))]),
-                ),
+                ("price".into(), Val::S64(item_price(item))),
                 // As the page showed it: one it could order (ADR-0178).
                 ("available".into(), Val::Bool(true)),
                 // Its category (ADR-0181).
@@ -12583,10 +12574,7 @@ public query Store(",
                 ("store-id".into(), Val::String(STORE_ID.into())),
                 ("name".into(), Val::String("Free coffee".into())),
                 ("description".into(), Val::String(String::new())),
-                (
-                    "price".into(),
-                    Val::Record(vec![("minor-units".into(), Val::S64(1))]),
-                ),
+                ("price".into(), Val::S64(1)),
                 ("available".into(), Val::Bool(true)),
                 (
                     "category".into(),
@@ -12708,7 +12696,7 @@ public query Store(",
             .expect("a record")
             .remove("name");
         let mut priced_as_text = cortado.clone();
-        priced_as_text["price"]["minor_units"] = serde_json::json!("425");
+        priced_as_text["price"] = serde_json::json!("425");
         for (args, why) in [
             (vec![cortado.clone()], "takes 2 argument(s); 1 were sent"),
             (
@@ -12721,7 +12709,7 @@ public query Store(",
             ),
             (
                 vec![priced_as_text, serde_json::json!(2)],
-                "argument 1 (`arg0`).price.minor_units: expected an integer",
+                "argument 1 (`arg0`).price: expected an integer",
             ),
             (
                 vec![cortado.clone(), serde_json::json!(1.5)],
@@ -12820,7 +12808,7 @@ public query Store(",
         assert_eq!(
             *value,
             serde_json::json!({ "lines": [
-                { "item_id": "cortado", "name": "Cortado", "quantity": 2, "unit_price": { "minor_units": 425 } }
+                { "item_id": "cortado", "name": "Cortado", "quantity": 2, "unit_price": 425 }
             ] })
         );
         // The presses the value includes (ADR-0172): the page drops their

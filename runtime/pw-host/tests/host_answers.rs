@@ -201,10 +201,7 @@ fn a_list_s_rows_and_a_declared_error_are_read_through_their_types() {
                 Val::String(format!("{id}, described")),
             ),
             // A record in the row: read through its own type (ADR-0169).
-            (
-                "price".to_string(),
-                Val::Record(vec![("minor-units".into(), Val::S64(450))]),
-            ),
+            ("price".to_string(), Val::S64(450)),
             // Whether it can be ordered (ADR-0178).
             ("available".to_string(), Val::Bool(true)),
             ("category".to_string(), coffee()),

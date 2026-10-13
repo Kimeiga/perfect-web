@@ -72,7 +72,8 @@ test("each Add button carries exactly what its handler reads", async ({ page }) 
     expect(c.item.available).toBe(true);
     expect(c.item.category).toEqual({ id: "coffee", name: "Coffee" });
     expect(c.item.store_id).toBe("47");
-    expect(Object.keys(c.item.price)).toEqual(["minor_units"]);
+    // An amount is its cents (ADR-0327), a whole number on the wire.
+    expect(Number.isInteger(c.item.price), JSON.stringify(c.item.price)).toBe(true);
   }
   expect(new Set(parsed.map((c) => c.item.id)).size, "one item per button").toBe(parsed.length);
 });

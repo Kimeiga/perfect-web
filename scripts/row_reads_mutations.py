@@ -224,8 +224,9 @@ MUTANTS = [
         "a line is priced 450 whatever its item",
         "server",
         SERVER,
-        "Val::Record(vec![(\"minor-units\".into(), Val::S64(line.price))]),\n",
-        "Val::Record(vec![(\"minor-units\".into(), Val::S64(450))]),\n",
+        # Re-anchored by ADR-0327: an amount crosses as its cents.
+        "(\"unit-price\".into(), Val::S64(line.price)),\n",
+        "(\"unit-price\".into(), Val::S64(450)),\n",
     ),
     (
         "a path is read one field deep",

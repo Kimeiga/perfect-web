@@ -453,7 +453,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // `store-accounts`, milestone 2).
     // 2026-10-12: `examples/domain.pw`'s `Store` gains `cuisine`, what the
     // store serves in its own words (ADR-0308, amended).
-    const EXPECTED: u64 = 0x60cee521efeee55a;
+    // 2026-10-13: `examples/domain.pw`'s `Money<C>` is opaque, an amount's
+    // minor units read in `domain` alone, with `cents`, `plus`, `minus`,
+    // `times` and `sum`, and a part of an amount only at a `Rate` and a named
+    // `Rounding` (`at_rate`; ADR-0327, NEXT 6a).
+    const EXPECTED: u64 = 0x0f2d_2c71_007e_9448;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

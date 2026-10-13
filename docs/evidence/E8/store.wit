@@ -489,9 +489,7 @@ package pw:types {
             items: list<domain-menu-item>,
         }
         type domain-positive-int = s64;
-        record domain-money {
-            minor-units: s64,
-        }
+        type domain-money = s64;
         record domain-store-hours {
             opens-minute: s64,
             closes-minute: s64,

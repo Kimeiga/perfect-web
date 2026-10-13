@@ -426,23 +426,31 @@ fn a_privacy_qualifier_is_transparent_to_the_type_it_qualifies() {
 /// > Do **not** establish `opaque type X = String → ABI(X) = string` for every
 /// > opaque type. Opacity and ABI transparency are different facts.
 ///
-/// So the rule above is about **privacy qualifiers** and nothing else. A
-/// generic opaque type that is not one still has no WIT form, and refusing it
-/// is the honest answer — the alternative is the plausible guess that
-/// `docs/RISK_QUEUE.md` records as the shape this project keeps deleting.
+/// So the rule above is about **privacy qualifiers** and nothing else: a
+/// generic opaque type is never its *argument's* representation, as a
+/// qualifier is. Since ADR-0327 (money, `opaque type Money<C> = Int`), one
+/// whose representation never mentions its parameters crosses as that
+/// representation, as every opaque type that is not generic does and as a
+/// phantom generic record does; one whose representation mentions them has
+/// one layout per argument, and still no WIT form.
 ///
 /// Without this control, the arm in `wit_type` could be widened to "any generic
 /// nominal is its argument's representation" and every test above would still
 /// pass.
 #[test]
-fn a_generic_opaque_type_that_is_not_a_qualifier_still_has_no_wit_form() {
+fn a_generic_opaque_type_is_never_its_arguments_representation() {
     let src = "\
 module shop.opaque
 
 opaque type Boxed<T> = String
 
+opaque type Wrapped<T> = List<T>
+
 fn fetch(id: Boxed<StoreId>) -> Boxed<StoreId>
     host \"store:data/boxes#get\"
+
+fn wrapped(id: Wrapped<StoreId>) -> Wrapped<StoreId>
+    host \"store:data/boxes#wrapped\"
 
 type StoreId = StoreId { v: Int }
 ";
@@ -453,10 +461,19 @@ type StoreId = StoreId { v: Int }
     let rendered = wit::host_signatures(&refs, &ws);
     let got = rendered
         .get("store:data/boxes#get")
+        .expect("the operation is declared")
+        .as_ref()
+        .unwrap_or_else(|e| panic!("`Boxed<T> = String` crosses as its representation: {e}"));
+    assert!(
+        got.contains("shop-opaque-boxed") && !got.contains("store-id"),
+        "`Boxed<StoreId>` is its own representation, a string, never `StoreId`'s: {got}"
+    );
+    let got = rendered
+        .get("store:data/boxes#wrapped")
         .expect("the operation is declared");
     assert!(
         matches!(got, Err(pw_core::wit::WitError::Unmappable { .. })),
-        "`Boxed<StoreId>` is opaque, not privacy-qualified, so it has no ABI \
-         until something says what it is: {got:?}"
+        "`Wrapped<T> = List<T>` has a layout per argument, so no ABI until something \
+         says what it is: {got:?}"
     );
 }

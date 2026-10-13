@@ -1179,3 +1179,128 @@ fn the_modules_entry_check_is_the_components() {
     let (queries, calls, traps) = agree_on(&us, &[("j.Toggled".to_string(), toggled)], 0x58);
     assert_eq!((queries, calls, traps), (1, 2, 0));
 }
+
+/// **Money is rounded only where a program names how** (ADR-0327):
+/// `domain`'s `at_rate` in each rounding.
+const MONEY: &str = r#"module money
+
+import domain.{ Money, USD, Rounding, at_rate, cents, millionths, percent, plus, minus, sum, times }
+
+fn rated(c: Int, m: Int, r: Rounding) -> Option<Money<USD>> !{} {
+    match millionths(m) {
+        Some(rate) => Some(at_rate(cents(c), rate, r)),
+        None => None,
+    }
+}
+
+public query RoundedHalfUp(c: Int, m: Int) -> Option<Money<USD>> { rated(c, m, Rounding.HalfUp) }
+
+public query RoundedHalfEven(c: Int, m: Int) -> Option<Money<USD>> { rated(c, m, Rounding.HalfEven) }
+
+public query RoundedTowardZero(c: Int, m: Int) -> Option<Money<USD>> { rated(c, m, Rounding.TowardZero) }
+
+public query RoundedAwayFromZero(c: Int, m: Int) -> Option<Money<USD>> { rated(c, m, Rounding.AwayFromZero) }
+
+public query Summed(a: Int, b: Int, n: Int) -> Money<USD> { sum([cents(a), times(cents(b), n)]) }
+
+public query Combined(a: Int, b: Int, c: Int) -> Money<USD> { minus(plus(cents(a), cents(b)), cents(c)) }
+
+public query Percent(c: Int, p: Int) -> Option<Money<USD>> {
+    match percent(p) {
+        Some(rate) => Some(at_rate(cents(c), rate, Rounding.HalfUp)),
+        None => None,
+    }
+}
+"#;
+
+/// **Each rounding at halves of a cent either side of zero, at a third, at
+/// New York City's 8.875% and at Texas's half cent** (ADR-0327), compiled
+/// both ways and agreeing, and each the amount its rounding says. Texas's
+/// Comptroller writes a tax of $20.625 as $20.63: half up, where half even
+/// would collect $20.62. A negative rate is no rate.
+#[test]
+fn money_is_rounded_as_the_program_names_it() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let domain = std::fs::read_to_string(root.join("examples/domain.pw")).expect("domain.pw");
+    let us = units(&[("examples/domain.pw", domain.as_str()), ("money.pw", MONEY)]);
+    // (cents, millionths) -> half up, half even, toward zero, away from zero.
+    let table = [
+        ((1, 500_000), Some([1, 0, 0, 1])),
+        ((3, 500_000), Some([2, 2, 1, 2])),
+        ((5, 500_000), Some([3, 2, 2, 3])),
+        ((-1, 500_000), Some([-1, 0, 0, -1])),
+        ((-3, 500_000), Some([-2, -2, -1, -2])),
+        ((-5, 500_000), Some([-3, -2, -2, -3])),
+        ((100, 333_333), Some([33, 33, 33, 34])),
+        ((-100, 333_333), Some([-33, -33, -33, -34])),
+        ((2000, 88_750), Some([178, 178, 177, 178])),
+        ((33_000, 62_500), Some([2063, 2062, 2062, 2063])),
+        ((1000, 150_000), Some([150, 150, 150, 150])),
+        ((0, 150_000), Some([0, 0, 0, 0])),
+        ((1000, -1), None),
+    ];
+    let modes = [
+        "money.RoundedHalfUp",
+        "money.RoundedHalfEven",
+        "money.RoundedTowardZero",
+        "money.RoundedAwayFromZero",
+    ];
+    let ops: BTreeMap<String, HostFn> = BTreeMap::new();
+    for (i, id) in modes.iter().enumerate() {
+        let r = Runnable::new(compile(&us, id));
+        for ((c, m), want) in &table {
+            let got = r
+                .call(&ops, &[Val::S64(*c), Val::S64(*m)])
+                .unwrap_or_else(|e| panic!("{id}({c}, {m}): {e}"));
+            let want = Val::Option(want.map(|w| Box::new(Val::S64(w[i]))));
+            assert_eq!(got, vec![want], "{id}({c}, {m})");
+        }
+    }
+    let calls = table
+        .iter()
+        .map(|((c, m), _)| vec![Val::S64(*c), Val::S64(*m)])
+        .collect::<Vec<_>>();
+    let cases: Vec<(String, Vec<Vec<Val>>)> = modes
+        .iter()
+        .map(|id| (id.to_string(), calls.clone()))
+        .chain(std::iter::once((
+            "money.Summed".to_string(),
+            vec![
+                vec![Val::S64(450), Val::S64(375), Val::S64(2)],
+                vec![Val::S64(-450), Val::S64(0), Val::S64(9)],
+                // Past an `Int`: both trap, as every `Int` operation does.
+                vec![Val::S64(1), Val::S64(i64::MAX), Val::S64(2)],
+            ],
+        )))
+        .collect();
+    // The exact operations, and a rate in whole percent.
+    for (id, args, want) in [
+        ("money.Summed", vec![450, 375, 2], Val::S64(1200)),
+        ("money.Combined", vec![450, 375, 1], Val::S64(824)),
+        (
+            "money.Percent",
+            vec![1000, 15],
+            Val::Option(Some(Box::new(Val::S64(150)))),
+        ),
+        (
+            "money.Percent",
+            vec![999, 15],
+            Val::Option(Some(Box::new(Val::S64(150)))),
+        ),
+        (
+            "money.Percent",
+            vec![2000, 7],
+            Val::Option(Some(Box::new(Val::S64(140)))),
+        ),
+        ("money.Percent", vec![2000, -1], Val::Option(None)),
+    ] {
+        let r = Runnable::new(compile(&us, id));
+        let args: Vec<Val> = args.into_iter().map(Val::S64).collect();
+        let got = r
+            .call(&ops, &args)
+            .unwrap_or_else(|e| panic!("{id}{args:?}: {e}"));
+        assert_eq!(got, vec![want], "{id}{args:?}");
+    }
+    let (queries, calls, traps) = agree_on(&us, &cases, 0x6d);
+    assert_eq!((queries, calls, traps), (5, 55, 1));
+}

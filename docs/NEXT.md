@@ -748,7 +748,11 @@ E14 comes before E11-E13. Its plan, controls and task list are
           5. ~~**idempotency committed with the writes**~~ (ADR-0325,
              merged 2026-10-12): an interaction's answer commits in its
              command's transaction, on both layers, and answers a day;
-          6. **checkout**: fees, taxes, a tip and promo codes, in money that
+          6. **checkout**, in steps: ~~6a, money rounded only where named~~
+             (ADR-0327, merged 2026-10-13); 6b the order's total (W9's, after
+             store-hours); 6c payment (the integrator's); 6d a Stripe adapter
+             (the owner's approval of each crate). Fees, taxes, a tip and
+             promo codes, in money that
              cannot round silently (`Money` is USD's alone, so no other
              currency, conversion or locale's format, said where it
              limits); payment through a deployment's payment capability

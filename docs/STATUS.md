@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0327, 2026-10-13: money is rounded only where a program names how**
+(the integrator's; NEXT 6a; track `money`, merged from `f12656a`).
+- `Money<C>` is opaque, an amount's cents read in `domain` alone; other
+  modules add, multiply by a count and sum exactly, and take a part only by
+  `at_rate(amount, rate, rounding)`: a `Rate` in millionths and a named
+  `Rounding`, half up as California's, New York's and Texas's taxes round.
+- Each rounding compiled to a component and to JavaScript agrees at halves
+  either side of zero, a third, 8.875% and Texas's $20.625 ($20.63 half up;
+  $20.62 half even); 11 mutants, each killed.
+- A generic opaque type whose representation never mentions its
+  parameters crosses as that representation (`Money<USD>` an `s64`): the
+  ruling of 2026-08-20 amended for that case alone, its controls rewritten.
+- Found on the way: A-001 called a `Money.add` nothing declared and piped
+  into an uncalled `sum`, and checked clean.
+Verify TRAIN_RUN green, with train-2.
+
 **ADR-0326, 2026-10-13: a name imported by name is the file's, before a
 whole module's** (the integrator's; found on the way to NEXT 6a; track
 `explicit-imports`, merged from `267f22d`).

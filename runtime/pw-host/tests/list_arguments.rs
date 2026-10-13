@@ -44,7 +44,7 @@ fn line(item: &str, quantity: serde_json::Value, cents: i64) -> serde_json::Valu
         "item_id": item,
         "name": "Cortado",
         "quantity": quantity,
-        "unit_price": { "minor_units": cents },
+        "unit_price": cents,
     })
 }
 
@@ -54,10 +54,7 @@ fn val(item: &str, quantity: i64, cents: i64) -> Val {
         ("item-id".into(), Val::String(item.into())),
         ("name".into(), Val::String("Cortado".into())),
         ("quantity".into(), Val::S64(quantity)),
-        (
-            "unit-price".into(),
-            Val::Record(vec![("minor-units".into(), Val::S64(cents))]),
-        ),
+        ("unit-price".into(), Val::S64(cents)),
     ])
 }
 
@@ -109,10 +106,7 @@ fn a_list_of_records_is_read_element_by_element_and_runs() {
         &args,
     )
     .expect("runs");
-    assert_eq!(
-        out,
-        vec![Val::Record(vec![("minor-units".into(), Val::S64(1200))])]
-    );
+    assert_eq!(out, vec![Val::S64(1200)]);
 
     // An empty list is a list.
     assert_eq!(

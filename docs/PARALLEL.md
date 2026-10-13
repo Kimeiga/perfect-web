@@ -1418,3 +1418,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
   `explicit-imports`, from `267f22d`). To every worker: `import List` beside
   `import m.{ name }` means `m`'s `name` now; two whole modules that both
   declare a name you call bare are refused at check (PW0022).
+- **2026-10-13, money rounded only where a program names how, merged as
+  ADR-0327** on train-2 (the integrator's, NEXT 6a; track `money`, from
+  `f12656a`). To every worker: an amount's cents are `domain`'s alone; use
+  `cents`, `plus`, `minus`, `times`, `sum` and `at_rate`; a host passes an
+  amount as an `s64` and a browser writes it as a whole number. The
+  benchmark's store takes the same money, as one server serves both.

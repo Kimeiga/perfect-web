@@ -159,8 +159,9 @@ MUTANTS = [
         "a line's total is its price once",
         "conformance",
         DOMAIN,
-        "Money { minor_units: line.unit_price.minor_units * line.quantity.value }",
-        "Money { minor_units: line.unit_price.minor_units }",
+        # Re-anchored by ADR-0327: an amount is multiplied by `times`.
+        "    times(line.unit_price, line.quantity.value)\n",
+        "    line.unit_price\n",
     ),
     (
         "the cart's subtotal is its last line's",
@@ -168,8 +169,9 @@ MUTANTS = [
         USER_CARTS,
         # Re-anchored by track store-accounts: the store's cart is a user's,
         # its transitions UserCarts'.
-        "fn(n, line) n + total(line).minor_units",
-        "fn(n, line) total(line).minor_units",
+        # And by ADR-0327: amounts are added by `sum`.
+        "    sum(List.map(cart.lines, total))\n",
+        "    sum(List.drop(List.map(cart.lines, total), List.length(cart.lines) - 1))\n",
     ),
     (
         "one fewer keeps a line at one",

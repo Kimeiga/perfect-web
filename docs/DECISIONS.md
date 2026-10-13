@@ -2880,3 +2880,10 @@ integrator's).
 - An explicit import shadows a whole module's import of the same name; a
   bare call two whole modules declare is refused at check (PW0022), where
   only the build had refused it.
+[ADR-0327](DECISIONS/ADR-0327-money-is-rounded-only-where-a-program-names-how.md):
+money is rounded only where a program names how (the integrator's; NEXT
+6a).
+- `Money<C>` opaque; exact `cents`, `plus`, `minus`, `times`, `sum`; a part
+  only by `at_rate` with a `Rate` in millionths and a named `Rounding`; a
+  phantom generic opaque type crosses as its representation (the
+  2026-08-20 ruling amended for that case).
