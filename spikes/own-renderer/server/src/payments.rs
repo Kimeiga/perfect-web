@@ -1165,3 +1165,219 @@ mod origin_tests {
         );
     }
 }
+
+// --- the host, hearing the provider ---------------------------------------
+
+/// **A GET of `url`** (`http://host:port/path`): its status and body.
+pub(crate) fn get(url: &str) -> Result<(u16, String), String> {
+    let rest = url.strip_prefix("http://").ok_or("not an http URL")?;
+    let (authority, path) = rest
+        .split_once('/')
+        .map_or((rest, "/".to_string()), |(a, p)| (a, format!("/{p}")));
+    let mut stream = TcpStream::connect(authority).map_err(|e| e.to_string())?;
+    let head = format!("GET {path} HTTP/1.1\r\nhost: {authority}\r\nconnection: close\r\n\r\n");
+    stream
+        .write_all(head.as_bytes())
+        .map_err(|e| e.to_string())?;
+    let mut all = String::new();
+    stream.read_to_string(&mut all).map_err(|e| e.to_string())?;
+    let (head, body) = all.split_once("\r\n\r\n").ok_or("no head")?;
+    let code = head
+        .split_whitespace()
+        .nth(1)
+        .and_then(|c| c.parse().ok())
+        .ok_or("no status")?;
+    Ok((code, body.to_string()))
+}
+
+/// **An intent as the provider says it now**, read again.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Settled {
+    pub(crate) intent: String,
+    pub(crate) order: String,
+    pub(crate) amount: i64,
+    pub(crate) status: String,
+}
+
+/// **Why the host did not act on a webhook.**
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum NotActed {
+    /// Not the provider's word (`verify`).
+    Refused(Refused),
+    /// The provider's word, heard before: answered, and nothing done again.
+    HeardBefore,
+    /// Signed, but no event the host reads, or one naming no intent the
+    /// provider has.
+    Unreadable(String),
+}
+
+/// **What the host hears from its provider** (NEXT 6c). An event is acted
+/// on only as the provider signed it, and then not as the event says but as
+/// the provider says the intent is when asked again: an event may arrive
+/// twice, or after a later one, and the intent's state now is what holds.
+/// An event heard before is answered and ignored. What the host then does
+/// is a transition that holds once (an order awaiting payment placed), so
+/// an event heard twice across a restart changes nothing the second time;
+/// the ids kept here spare the provider a second read.
+pub(crate) struct Hearing {
+    secret: Vec<u8>,
+    /// The provider's API, where an intent is read again.
+    api: String,
+    heard: Mutex<std::collections::BTreeSet<String>>,
+}
+
+impl Hearing {
+    pub(crate) fn new(secret: &[u8], api: &str) -> Hearing {
+        Hearing {
+            secret: secret.to_vec(),
+            api: api.trim_end_matches('/').to_string(),
+            heard: Mutex::new(std::collections::BTreeSet::new()),
+        }
+    }
+
+    /// **A webhook, heard at `now`**: the intent it names, as the provider
+    /// says it now, where the host should act on it.
+    pub(crate) fn webhook(
+        &self,
+        header: Option<&str>,
+        body: &[u8],
+        now: i64,
+    ) -> Result<Settled, NotActed> {
+        verify(header, body, &self.secret, now).map_err(NotActed::Refused)?;
+        let event: serde_json::Value =
+            serde_json::from_slice(body).map_err(|e| NotActed::Unreadable(e.to_string()))?;
+        let (Some(id), Some(intent)) =
+            (event["id"].as_str(), event["data"]["object"]["id"].as_str())
+        else {
+            return Err(NotActed::Unreadable("no event id or intent".into()));
+        };
+        if !self.heard.lock().expect("heard").insert(id.to_string()) {
+            return Err(NotActed::HeardBefore);
+        }
+        let (code, read) = get(&format!("{}/v1/payment_intents/{intent}", self.api))
+            .map_err(NotActed::Unreadable)?;
+        if code != 200 {
+            return Err(NotActed::Unreadable(format!(
+                "the provider answered {code} for {intent}"
+            )));
+        }
+        let read: serde_json::Value =
+            serde_json::from_str(&read).map_err(|e| NotActed::Unreadable(e.to_string()))?;
+        Ok(Settled {
+            intent: intent.to_string(),
+            order: read["metadata"]["order"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
+            amount: read["amount"].as_i64().unwrap_or_default(),
+            status: read["status"].as_str().unwrap_or_default().to_string(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod hearing_tests {
+    use super::*;
+
+    fn provider() -> (String, Arc<Origin>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let base = format!("http://{}", listener.local_addr().expect("addr"));
+        // Its webhooks go nowhere here: each test hands the host the events
+        // as the provider would send them.
+        let origin = Arc::new(Origin::new(
+            b"whsec_t",
+            "http://127.0.0.1:9/x",
+            "http://127.0.0.1:3301",
+            || 5_000,
+        ));
+        let served = origin.clone();
+        std::thread::spawn(move || serve(listener, served));
+        (base, origin)
+    }
+
+    /// **The host acts on the intent as the provider says it now**: a
+    /// signed event is read again; heard twice, ignored the second time;
+    /// forged or stale, refused; a failure that arrives after the success
+    /// reads as succeeded, which is what the intent is.
+    #[test]
+    fn the_host_acts_on_the_intent_as_the_provider_says_it_now() {
+        let (base, origin) = provider();
+        let hearing = Hearing::new(b"whsec_t", &base);
+        let id = {
+            let mut p = origin.provider.lock().expect("provider");
+            let i = p.create("k", "order-7", 1250, 5_000).expect("made");
+            p.pay(&i.client_secret, "4000000000000002")
+                .expect("declined");
+            p.pay(&i.client_secret, "4242424242424242").expect("paid");
+            i.id
+        };
+        let events = std::mem::take(&mut origin.provider.lock().expect("provider").outbox);
+        let (failed, succeeded) = (&events[0], &events[1]);
+
+        let (body, header) = DevProvider::sent(succeeded, b"whsec_t", 5_000);
+        let settled = hearing
+            .webhook(Some(&header), body.as_bytes(), 5_000)
+            .expect("acted on");
+        assert_eq!(
+            settled,
+            Settled {
+                intent: id.clone(),
+                order: "order-7".into(),
+                amount: 1250,
+                status: "succeeded".into()
+            }
+        );
+        assert_eq!(
+            hearing.webhook(Some(&header), body.as_bytes(), 5_010),
+            Err(NotActed::HeardBefore)
+        );
+
+        // The failure, delivered late: read again, the intent succeeded.
+        let (body, header) = DevProvider::sent(failed, b"whsec_t", 5_000);
+        let late = hearing
+            .webhook(Some(&header), body.as_bytes(), 5_020)
+            .expect("acted on");
+        assert_eq!(late.status, "succeeded");
+
+        // Not the provider's word.
+        let forged = DevProvider::sent(
+            &Event {
+                id: "evt_x".into(),
+                kind: "payment_intent.succeeded",
+                intent: id.clone(),
+            },
+            b"whsec_other",
+            5_000,
+        );
+        assert!(matches!(
+            hearing.webhook(Some(&forged.1), forged.0.as_bytes(), 5_000),
+            Err(NotActed::Refused(Refused::Forged))
+        ));
+        let stale = DevProvider::sent(
+            &Event {
+                id: "evt_y".into(),
+                kind: "payment_intent.succeeded",
+                intent: id,
+            },
+            b"whsec_t",
+            4_000,
+        );
+        assert!(matches!(
+            hearing.webhook(Some(&stale.1), stale.0.as_bytes(), 5_000),
+            Err(NotActed::Refused(Refused::Stale { .. }))
+        ));
+        let unknown = DevProvider::sent(
+            &Event {
+                id: "evt_z".into(),
+                kind: "payment_intent.succeeded",
+                intent: "pi_none".into(),
+            },
+            b"whsec_t",
+            5_000,
+        );
+        assert!(matches!(
+            hearing.webhook(Some(&unknown.1), unknown.0.as_bytes(), 5_000),
+            Err(NotActed::Unreadable(_))
+        ));
+    }
+}
