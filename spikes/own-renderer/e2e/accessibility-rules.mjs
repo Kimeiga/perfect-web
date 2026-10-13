@@ -322,6 +322,12 @@ export function violations() {
       say("nested-interactive", el);
     }
   }
+  // A frame is named (axe-core's `frame-title`, WCAG 4.1.2): its name is
+  // what a screen reader says as it enters another page (NEXT 6c: the
+  // provider's page an order's payment is made on).
+  for (const f of all.filter((el) => /^i?frame$/.test(el.localName) && shown(el))) {
+    if (!accessibleName(f)) say("frame-title", f);
+  }
   for (const el of controls.filter(shown)) {
     const name = accessibleName(el);
     if (!name) {

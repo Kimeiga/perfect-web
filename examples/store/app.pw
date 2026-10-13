@@ -47,7 +47,9 @@ import context.{ current_session, current_user }
 import domain.{ StoreId, Store, StoreError, CartError, MenuItem, MenuSection, InteractionId,
     MenuItemId, PositiveInt, Recommendation, RecommendationError, DeliveryEstimate,
     EstimateError, OrderStatus, OrderError, TrackingError, Tip, TipError, PromoError,
-    Money, USD, is_less }
+    Money, USD, is_less, begin_payment, PaymentPage }
+// NEXT 6c: a payment begun, and settled on the provider's word.
+import payments.{ Settled, PaymentStatus, BeginError }
 import capability.{ Session, SessionId, User, UserId }
 import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged, AddressesChanged, StoreChanged }
 // TRACK SEAM (store-hours): each store's hours, and whether it is open.
@@ -441,10 +443,34 @@ command place_order(shown: Money<USD>)
             Ok(p) => if is_less(p.charged.total, shown) | is_less(shown, p.charged.total) {
                 Err(OrderError.TotalChanged(p.charged.total))
             } else {
-                UserOrders.place(current_user(), p.charged, p.promo)
+                // NEXT 6c: awaiting its payment, placed once it is paid, where
+                // the deployment takes payments; at once where it takes none.
+                match UserOrders.await_payment(current_user(), p.charged, p.promo) {
+                    Err(e) => Err(e),
+                    Ok(order) => match begin_payment(order, p.charged.total) {
+                        Ok(payment) => UserOrders.paying(current_user(), order, payment),
+                        Err(BeginError.NotTaken) => UserOrders.settle(current_user(), order, PaymentStatus.Succeeded),
+                        Err(BeginError.TransportFailed) => Err(OrderError.PaymentUnavailable),
+                    },
+                }
             },
         },
     }
+}
+
+// **A payment settled, as the provider says it** (NEXT 6c): invoked by the
+// platform once it has its provider's word, on behalf of the reader who
+// began the payment, never pressed. Placed where it succeeded, its cart's
+// other pages told; awaiting still where it has not yet.
+command settle_payment(settled: Settled)
+    -> Result<OrderStatus, OrderError>
+    invoked_by    Payments
+    idempotent_by InteractionId
+    transaction   serializable
+    invalidates   Cart(current_user()), Order(current_user()), Checkout(current_user()), OrderTotal(current_user())
+    emits         UserCartChanged(current_user()), UserOrderChanged(current_user())
+{
+    UserOrders.settle(current_user(), settled.order, settled.status)
 }
 
 // **The tip the reader chooses** (track `order-total`): none, or 15, 18 or
@@ -922,6 +948,9 @@ user page CartPage() {
                     Err(OrderError.Closed(closing)) => notice = "A store in your cart {closing_said(closing)}.",
                     Err(OrderError.Promo(e)) => notice = promo_said(e),
                     Err(OrderError.TotalChanged(now)) => notice = "Your total is now {now.display}. Check it, and place your order again.",
+                    // NEXT 6c: an order of theirs awaits its payment, on its page.
+                    Err(OrderError.AwaitingPayment) => notice = "An order of yours awaits its payment: pay it on your order's page.",
+                    Err(OrderError.PaymentUnavailable) => notice = "Payment is unavailable just now. Try again in a moment.",
                 }}
             >
                 Place order
@@ -971,6 +1000,18 @@ user page HomePage() {
         </main>
     }
 }
+// **The provider's page an order awaits its payment on**, where it awaits
+// one (NEXT 6c): what the order page frames.
+fn awaited_page(order: Option<OrderStatus>) -> Option<PaymentPage> {
+    match order {
+        Some(status) => match status {
+            OrderStatus.AwaitingPayment(pay) => Some(pay),
+            _ => None,
+        },
+        None => None,
+    }
+}
+
 // **The session's order, as the store moves it along** (ADR-0193): placed,
 // being prepared, on its way, delivered. What the store says next reaches the
 // page while it is open, and a screen reader says it.
@@ -996,11 +1037,23 @@ user page OrderPage() {
                     {:Preparing}<p id="order-status">Preparing: the store is making it.</p>
                     {:OnTheWay}<p id="order-status">On its way to you.</p>
                     {:Delivered}<p id="order-status">Delivered.</p>
+                    {:AwaitingPayment(_)}<p id="order-status">Awaiting your payment: pay below, on the provider's page.</p>
                     {/match}
-                    <p id="order-total">Total charged: {charged.display}</p>
+                    <!-- NEXT 6c: to pay, while it awaits its payment, which
+                         nothing has charged yet; charged, once it is placed. -->
+                    {#match awaited_page(order)}
+                    {:Some(_)}<p id="order-total">Total to pay: {charged.display}</p>
+                    {:None}<p id="order-total">Total charged: {charged.display}</p>
+                    {/match}
                 {:None}<p id="order-status">You have no order yet.</p>
                 {/match}
             </section>
+            <!-- NEXT 6c: the provider's page, framed outside the status's
+                 live region, which a change has read again whole. -->
+            {#match awaited_page(order)}
+            {:Some(pay)}<section aria-label="Payment"><iframe id="payment" src={pay.url} title="Pay for your order"></iframe></section>
+            {:None}
+            {/match}
             <p><a href="/">Order from a store</a></p>
         </main>
     }

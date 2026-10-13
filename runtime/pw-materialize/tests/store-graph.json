@@ -523,6 +523,14 @@
       ]
     },
     {
+      "path": "store.page.settle_payment",
+      "name": "settle_payment",
+      "node": "command",
+      "params": [
+        "settled"
+      ]
+    },
+    {
       "path": "store.search.Search",
       "name": "Search",
       "node": "resource",
@@ -1158,6 +1166,54 @@
     {
       "from": "store.page.rename_address",
       "to": "store.page.SavedAddresses",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "Events.UserCartChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "Events.UserOrderChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "store.page.Checkout",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "store.page.Order",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "store.page.OrderTotal",
       "kind": "invalidates",
       "key": [
         "current_user()"

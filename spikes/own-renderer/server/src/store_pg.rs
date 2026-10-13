@@ -74,6 +74,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0013_order_total",
         include_str!("../migrations/store/0013_order_total.sql"),
     ),
+    // NEXT 6c: the payment an order awaits.
+    (
+        "0014_order_payments",
+        include_str!("../migrations/store/0014_order_payments.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -534,6 +539,10 @@ impl Rows for PgRows<'_> {
 
     fn set_status(&mut self, owner: &str, status: Option<&str>) -> Result<(), String> {
         let Some(status) = status else {
+            // NEXT 6c: and the payment it awaited, as the in-memory layer.
+            self.0
+                .execute("DELETE FROM order_payments WHERE owner = $1", &[&owner])
+                .map_err(pg)?;
             return self
                 .0
                 .execute("DELETE FROM orders WHERE owner = $1", &[&owner])
@@ -557,6 +566,39 @@ impl Rows for PgRows<'_> {
                 .map_err(pg)?;
         }
         Ok(())
+    }
+    fn awaiting(&mut self, owner: &str) -> Result<Option<crate::payments::Awaiting>, String> {
+        let row = self
+            .0
+            .query_opt(
+                "SELECT reference, payment, page FROM order_payments WHERE owner = $1",
+                &[&owner],
+            )
+            .map_err(pg)?;
+        Ok(row.map(|r| crate::payments::Awaiting {
+            reference: r.get(0),
+            payment: r.get(1),
+            page: r.get(2),
+        }))
+    }
+    fn set_awaiting(
+        &mut self,
+        owner: &str,
+        awaiting: Option<&crate::payments::Awaiting>,
+    ) -> Result<(), String> {
+        match awaiting {
+            Some(a) => self.0.execute(
+                "INSERT INTO order_payments (owner, reference, payment, page) \
+                 VALUES ($1, $2, $3, $4) \
+                 ON CONFLICT (owner) DO UPDATE SET reference = $2, payment = $3, page = $4",
+                &[&owner, &a.reference, &a.payment, &a.page],
+            ),
+            None => self
+                .0
+                .execute("DELETE FROM order_payments WHERE owner = $1", &[&owner]),
+        }
+        .map(|_| ())
+        .map_err(pg)
     }
 
     fn addresses(&mut self, owner: &str) -> Result<Vec<AddressRow>, String> {

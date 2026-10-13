@@ -64,6 +64,9 @@ fn full() -> Topology {
                     // zone (track `store-hours`, ADR-0304).
                     "clock.compare".to_string(),
                     "clock.zone".to_string(),
+                    // A payment begun at the deployment's provider (NEXT 6c),
+                    // at the origin alone, as the deployment's key is.
+                    "payments.begin".to_string(),
                 ]),
             },
         ],

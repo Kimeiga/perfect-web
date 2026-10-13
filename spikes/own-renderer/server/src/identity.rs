@@ -287,6 +287,20 @@ pub(crate) struct OnBehalf {
     session: String,
 }
 
+/// **What the name of every session the platform opens on a reader's behalf
+/// begins with** (NEXT 6c, step seven). Its name is no secret (a payment's
+/// settling session is named by the payment, so that its interaction's
+/// record keys it, ADR-0325), so no browser's session may carry it: a cookie
+/// naming one is a new session of its own (`main.rs`'s `session_of`).
+pub(crate) const ON_BEHALF: &str = "on-behalf:";
+
+impl OnBehalf {
+    /// The session's name: [`ON_BEHALF`], then what it was opened for.
+    pub(crate) fn session(&self) -> &str {
+        &self.session
+    }
+}
+
 impl Drop for OnBehalf {
     fn drop(&mut self) {
         self.principals.close(&self.session);
@@ -332,12 +346,14 @@ impl Principals {
     }
 
     /// **A session the platform opens on a reader's behalf** (NEXT 6c, step
-    /// seven): a payment settled as the reader who began it, its
-    /// `current_user()` theirs. Never a browser's: its id is the host's own,
-    /// and it is closed when the guard goes, whatever the command answered.
-    pub(crate) fn on_behalf(&self, session: &str, user: &str) -> OnBehalf {
+    /// seven), named [`ON_BEHALF`] and then `name`: a payment settled as the
+    /// reader who began it, its `current_user()` theirs. Never a browser's:
+    /// no cookie is let name it, and it is closed when the guard goes,
+    /// whatever the command answered.
+    pub(crate) fn on_behalf(&self, name: &str, user: &str) -> OnBehalf {
+        let session = format!("{ON_BEHALF}{name}");
         self.open(
-            session,
+            &session,
             Principal {
                 user: user.to_string(),
                 handle: String::new(),
@@ -347,7 +363,7 @@ impl Principals {
         );
         OnBehalf {
             principals: self.clone(),
-            session: session.to_string(),
+            session,
         }
     }
 

@@ -168,6 +168,14 @@ mod tests {
                 now: 1_000_301
             })
         );
+        // And a time ahead of the host's past it, as far.
+        assert_eq!(
+            verify(Some(&header), body, secret, 999_699),
+            Err(Refused::Stale {
+                seconds: 1_000_000,
+                now: 999_699
+            })
+        );
         assert_eq!(
             verify(Some(&header), body, b"whsec_other", 1_000_000),
             Err(Refused::Forged)
@@ -1217,6 +1225,16 @@ pub(crate) fn get(url: &str) -> Result<(u16, String), String> {
     Ok((code, body.to_string()))
 }
 
+/// **The payment an owner's order awaits** (step seven): the order's
+/// reference, which the payment carries, the provider's payment once begun,
+/// and the provider's page for it, which the order page frames.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub(crate) struct Awaiting {
+    pub(crate) reference: String,
+    pub(crate) payment: String,
+    pub(crate) page: String,
+}
+
 /// **An intent as the provider says it now**, read again.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Settled {
@@ -1346,10 +1364,6 @@ mod hearing_tests {
         (base, origin)
     }
 
-    /// **The host acts on the intent as the provider says it now**: a
-    /// signed event is read again; heard twice, ignored the second time;
-    /// forged or stale, refused; a failure that arrives after the success
-    /// reads as succeeded, which is what the intent is.
     /// **An intent whose amount is not the one begun settles nothing**, said
     /// (step seven): the host holds a payment to the amount it began.
     #[test]
@@ -1389,6 +1403,50 @@ mod hearing_tests {
         );
     }
 
+    /// **An outcome the host could not settle is settled when it comes
+    /// again** (step seven): answered 500 and not remembered, so the
+    /// provider's resend is acted on; once acted on, it is remembered, and
+    /// heard again it is answered and not acted on twice.
+    #[test]
+    fn an_outcome_the_host_could_not_settle_is_settled_when_sent_again() {
+        let (base, origin) = provider();
+        let payments = Payments {
+            provider: base.clone(),
+            hearing: Hearing::new(b"whsec_t", &base),
+            settled: Mutex::new(Vec::new()),
+        };
+        {
+            let mut p = origin.provider.lock().expect("provider");
+            let i = p
+                .create("k", "order-6", "reader-a", 1250, 5_000)
+                .expect("made");
+            p.pay(&i.client_secret, "4242424242424242").expect("paid");
+        }
+        let events = std::mem::take(&mut origin.provider.lock().expect("provider").outbox);
+        let (body, header) = DevProvider::sent(&events[0], b"whsec_t", wall_seconds());
+        let failing = |_: &Settled| Err("the store's layer is down".to_string());
+        assert_eq!(
+            payments.heard(Some(&header), body.as_bytes(), &failing).0,
+            500
+        );
+        assert!(payments.settled.lock().expect("settled").is_empty());
+        let settling = |s: &Settled| Ok(format!("{} settled", s.intent));
+        assert_eq!(
+            payments.heard(Some(&header), body.as_bytes(), &settling).0,
+            200
+        );
+        assert_eq!(payments.settled.lock().expect("settled").len(), 1);
+        let never = |_: &Settled| -> Result<String, String> { panic!("settled twice") };
+        assert_eq!(
+            payments.heard(Some(&header), body.as_bytes(), &never),
+            (200, "heard before".to_string())
+        );
+    }
+
+    /// **The host acts on the intent as the provider says it now**: a
+    /// signed event is read again; heard twice, ignored the second time;
+    /// forged or stale, refused; a failure that arrives after the success
+    /// reads as succeeded, which is what the intent is.
     #[test]
     fn the_host_acts_on_the_intent_as_the_provider_says_it_now() {
         let (base, origin) = provider();
@@ -1539,6 +1597,16 @@ impl Payments {
             ),
         }
     }
+}
+
+/// A test's: the deployment's payments at a provider that is not there.
+#[cfg(test)]
+pub(crate) fn unreachable() -> Arc<Payments> {
+    Arc::new(Payments {
+        provider: "http://127.0.0.1:9".into(),
+        hearing: Hearing::new(b"x", "http://127.0.0.1:9"),
+        settled: Mutex::new(Vec::new()),
+    })
 }
 
 /// **The deployment's payments, as its configuration states them.**
@@ -1753,7 +1821,7 @@ fn post_json(url: &str, key: &str, body: &serde_json::Value) -> Result<(u16, Str
 }
 
 /// A payment as the program's `Payment` is: `{ id, client_secret, status }`.
-fn payment_val(intent: &serde_json::Value) -> Result<Val, String> {
+fn payment_val(provider: &str, intent: &serde_json::Value) -> Result<Val, String> {
     let text = |k: &str| {
         intent[k]
             .as_str()
@@ -1768,15 +1836,35 @@ fn payment_val(intent: &serde_json::Value) -> Result<Val, String> {
         Some("canceled") => "canceled",
         other => return Err(format!("the provider's intent is {other:?}")),
     };
+    let page = format!(
+        "{}/pay/{}",
+        provider.trim_end_matches('/'),
+        intent["client_secret"].as_str().unwrap_or_default()
+    );
     Ok(Val::Record(vec![
         ("id".into(), text("id")?),
         ("client-secret".into(), text("client_secret")?),
         ("status".into(), Val::Variant(status.into(), None)),
+        // The provider's page for it, which the reader's page frames.
+        ("page".into(), Val::String(page)),
     ]))
 }
 
+/// **The payments' operations where the deployment takes none**: `begin`
+/// answers `NotTaken`, and the program places an order as it did before
+/// payments (step seven).
+pub(crate) fn not_taken() -> Vec<(String, HostFn)> {
+    let begin: HostFn = Arc::new(|_args: &[Val]| {
+        Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
+            "not-taken".into(),
+            None,
+        )))))])
+    });
+    vec![("pw:host/payments#begin".to_string(), begin)]
+}
+
 /// **The payments' operations, for one command** (NEXT 6c):
-/// `pw:host/payments#begin(key, order, amount)`, an intent for the order's
+/// `pw:host/payments#begin(order, amount)`, an intent for the order's
 /// amount at the provider, keyed by the order and the command's interaction,
 /// so a retried press reaches the intent the first made and never a second.
 /// A provider that cannot be reached is the program's `TransportFailed`.
@@ -1786,10 +1874,8 @@ pub(crate) fn operations(
     owner: String,
 ) -> Vec<(String, HostFn)> {
     let begin: HostFn = Arc::new(move |args: &[Val]| {
-        let [_key, Val::String(order), Val::S64(amount)] = args else {
-            return Err(format!(
-                "payments#begin(key, order, amount) received {args:?}"
-            ));
+        let [Val::String(order), Val::S64(amount)] = args else {
+            return Err(format!("payments#begin(order, amount) received {args:?}"));
         };
         let Some(interaction) = interaction.as_deref() else {
             return Err(
@@ -1813,7 +1899,10 @@ pub(crate) fn operations(
             Ok((200, body)) => {
                 let intent: serde_json::Value =
                     serde_json::from_str(&body).map_err(|e| e.to_string())?;
-                Ok(vec![Val::Result(Ok(Some(Box::new(payment_val(&intent)?))))])
+                Ok(vec![Val::Result(Ok(Some(Box::new(payment_val(
+                    &payments.provider,
+                    &intent,
+                )?))))])
             }
             // The key sent with other arguments: the program's own error,
             // as a command's interaction is (ADR-0121).
@@ -1919,11 +2008,7 @@ mod operation_tests {
                 interaction.map(str::to_string),
                 "reader-a".into(),
             );
-            ops[0].1(&[
-                Val::String("sk_dev".into()),
-                Val::String("order-1".into()),
-                Val::S64(amount),
-            ])
+            ops[0].1(&[Val::String("order-1".into()), Val::S64(amount)])
         };
         let id = |out: Vec<Val>| match out.as_slice() {
             [Val::Result(Ok(Some(p)))] => match p.as_ref() {
@@ -1952,13 +2037,7 @@ mod operation_tests {
                 .contains("another amount")
         );
         // A provider that is not there.
-        let gone = Arc::new(Payments {
-            provider: "http://127.0.0.1:9".into(),
-            hearing: Hearing::new(b"x", "http://127.0.0.1:9"),
-            settled: Mutex::new(Vec::new()),
-        });
-        let out = operations(gone, Some("press-a".into()), "reader-a".into())[0].1(&[
-            Val::String("sk_dev".into()),
+        let out = operations(unreachable(), Some("press-a".into()), "reader-a".into())[0].1(&[
             Val::String("order-1".into()),
             Val::S64(1250),
         ])

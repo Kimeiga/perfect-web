@@ -135,6 +135,14 @@ export const STORE_ACCOUNTS_PORTS = Object.fromEntries(
 // W9), the store's build, one per engine, because a test adds a dish to
 // store 47's menu, which is one per server.
 export const STORE_SEARCH_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 170 + i]));
+// TRACK SEAM (payments): the store's build taking payments from the
+// development provider (`PW_PAYMENTS=dev`, NEXT 6c), one per engine, because
+// an order awaiting its payment is its reader's on a host. Each host's
+// provider is on an origin of its own, ten ports above it, which the order
+// page frames.
+export const STORE_PAYMENTS_PORTS = Object.fromEntries(
+  ENGINES.map((e, i) => [e, PORT + 180 + i]),
+);
 // A build serves the runtime it was built with. One built before the runtime
 // changed runs the old runtime against the new server, and fails for a reason
 // that is no test's: `dist-keyed` did, once each page's subscription named
@@ -324,6 +332,21 @@ export default defineConfig({
       : Object.values(STORE_SEARCH_PORTS).map((port) => ({
           command: `../../target/debug/pw-dev-server dist`,
           env: { PORT: String(port), ...IN_MEMORY },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))),
+    // TRACK SEAM (payments): the store's hosts that take payments.
+    ...(process.env.PW_PERFORMANCE
+      ? []
+      : Object.values(STORE_PAYMENTS_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist`,
+          env: {
+            PORT: String(port),
+            PW_PAYMENTS: "dev",
+            PW_PAYMENTS_PORT: String(port + 10),
+            ...IN_MEMORY,
+          },
           port,
           reuseExistingServer: !!process.env.PW_REUSE,
           timeout: 60_000,

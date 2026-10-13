@@ -1284,6 +1284,10 @@ fn topology_for(layer: &[&'static str]) -> Topology {
                 "clock.compare",
                 // And its tz database (ADR-0304), read from the host's own.
                 "clock.zone",
+                // NEXT 6c: a payment begun, at the origin alone (step seven):
+                // the deployment's key is this host's, never the program's.
+                // Where the deployment takes none, `begin` answers `NotTaken`.
+                "payments.begin",
             ]
             .iter()
             .chain(layer)
@@ -1701,11 +1705,11 @@ impl Server {
             })
             .map(|c| c.component_id.clone())
             .ok_or("the program declares no command invoked by Payments")?;
-        let session = format!("payment-{}", settled.intent);
-        let _behalf = self
+        let behalf = self
             .identity
             .principals()
-            .on_behalf(&session, &settled.owner);
+            .on_behalf(&format!("payment-{}", settled.intent), &settled.owner);
+        let session = behalf.session().to_string();
         let status = settled.status.replace('_', "-");
         let sent = serde_json::json!({
             "payment": settled.intent,
@@ -2301,13 +2305,18 @@ impl Server {
             // NEXT 6c: the deployment's payments, keyed by this interaction,
             // each begun by this session's reader, on whose behalf it is
             // settled (step seven).
-            if let Some(p) = self.payments.get() {
-                let reader = self.identity.principals().user_of(session);
-                host.extend(payments::operations(
-                    p.clone(),
-                    interaction.map(str::to_string),
-                    reader,
-                ));
+            match self.payments.get() {
+                Some(p) => {
+                    let reader = self.identity.principals().user_of(session);
+                    host.extend(payments::operations(
+                        p.clone(),
+                        interaction.map(str::to_string),
+                        reader,
+                    ));
+                }
+                // None taken: `begin` says so, and the order is placed as
+                // before (step seven).
+                None => host.extend(payments::not_taken()),
             }
 
             // What the command emits (ADR-0208): it computes each event's
@@ -7661,8 +7670,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         }
         headers.push_str(&line);
     }
-    let session = session_of(&headers);
-    let fresh = !headers.contains("pw-session=");
+    let (session, fresh) = session_of(&headers);
 
     // TRACK SEAM (uploads, ADR-0253): an upload reads its own body, within
     // its own limits, before the bound a command's body is held to.
@@ -9983,14 +9991,21 @@ fn speculation_manifests(dist: &std::path::Path) -> BTreeMap<String, serde_json:
         .collect()
 }
 
-fn session_of(headers: &str) -> String {
-    headers
+/// **The request's session, and whether it is new**: its cookie's, or a
+/// new one where it carries none. A cookie naming a session the platform
+/// opens on a reader's behalf (NEXT 6c, `identity::ON_BEHALF`) is a new
+/// session too: those are never a browser's to present, though their names
+/// are no secret.
+fn session_of(headers: &str) -> (String, bool) {
+    match headers
         .split("pw-session=")
         .nth(1)
         .and_then(|rest| rest.split([';', '\r', '\n']).next())
-        .map(str::to_string)
+    {
+        Some(id) if !id.starts_with(identity::ON_BEHALF) => (id.to_string(), false),
         // TRACK SEAM (identity): a fresh session's id, 128 random bits.
-        .unwrap_or_else(identity::new_session_id)
+        _ => (identity::new_session_id(), true),
+    }
 }
 
 /// **A change to the store's data refused** (track `store-pg`): 409, and
@@ -13583,6 +13598,8 @@ public query Store(",
     mod store_hours;
     // TRACK SEAM (order-total): an order's total.
     mod order_total;
+    // TRACK SEAM (payments): an order awaiting its payment, and settled.
+    mod store_payments;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent

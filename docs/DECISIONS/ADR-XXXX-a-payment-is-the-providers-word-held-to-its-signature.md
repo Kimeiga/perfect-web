@@ -2,7 +2,7 @@
 
 Status: draft (the integrator's; NEXT item 6, step 6c). Date: 2026-10-13.
 Milestone: E14. Builds on ADR-0325 (an interaction's answer commits with
-its writes), ADR-XXXX (money is rounded only where a program names how),
+its writes), ADR-0327 (money is rounded only where a program names how),
 A-010 (an origin-only secret operation, `capture_payment`) and the charter's
 `Secret<Payments>` (§7.8, §15.2).
 
@@ -54,35 +54,77 @@ A-010 (an origin-only secret operation, `capture_payment`) and the charter's
    - PW6403: one command answers a payment's outcome in a program;
    - PW6404: no page's handler sends it.
 4. **The platform's payments** (`packages/pw-platform-web/payments.pw`):
-   `Payment`, `PaymentStatus` (Stripe's statuses), `Settled`, and
-   `begin(key, order, amount)`, effect `payments.begin`, at the origin alone
-   as the key is. The amount is in minor units: only `domain` reads an
-   amount's units (ADR-XXXX, money), so only it begins a payment.
-5. To come (step seven, designed 2026-10-13):
-   - **On the reader's behalf.** `begin` is called in the reader's command;
-     the host keeps who began each payment, with its order and amount, in
-     the intent's own record (Stripe's `metadata`), and invokes the command
-     `invoked_by Payments` as that reader: its `current_user()` is the
-     order's owner, so it reads and writes the reader's order and emits
-     `UserOrderChanged(current_user())` as `place_order` does. Still no
-     `requires`: no reader acts; the provider's word does.
+   `Payment` (with the provider's `page` for it), `PaymentStatus` (Stripe's
+   statuses), `Settled`, `BeginError` (`TransportFailed`; `NotTaken` where
+   the deployment takes no payments), and `begin(order, amount)`, effect
+   `payments.begin`, granted at the origin alone. The amount is in minor
+   units: only `domain` reads an amount's units (ADR-0327), so only
+   it begins a payment.
+5. **The key is the host's, never the program's** (2026-10-13). The charter
+   maps `secret<Payments>` to a payments-secret handle (§10.2) and gives the
+   origin world the payment secret (§7.3): a capability the host exercises,
+   not a value a component holds. Until step seven `begin` also took
+   `key: Secret<Payments>`, and what a program could give it,
+   `secrets.payments()`, is `Secret("")`: no key, which the host ignored. A
+   parameter that said a key crossed and carried none is gone; the effect,
+   granted at the origin alone, is the authority. A program that never
+   holds the key leaks it down no path, whatever a label misses.
+6. **An order awaits its payment** (step seven):
+   - **On the reader's behalf.** `begin` is called in the reader's command,
+     `place_order`. The host keeps who began each payment, with its order
+     and amount, in the intent's own record at the provider (Stripe's
+     `metadata`), so a host started after another still knows them, and
+     invokes the command `invoked_by Payments` as that reader: in a session
+     the host opens for it, bound to the reader and closed when the command
+     answers. Its `current_user()` is the order's owner, so it reads and
+     writes the reader's order and emits `UserOrderChanged(current_user())`
+     as `place_order` does. Keyed by the payment and its status (ADR-0325),
+     an outcome heard twice commits once (PW6405: such a command declares
+     `idempotent_by`).
+   - **That session is never a browser's.** Its name is the payment's, no
+     secret, so that its interaction's record keys it; every session the
+     platform opens on a reader's behalf is named `on-behalf:`, and a cookie
+     naming one is a new session. Found in review (2026-10-13): a cookie was
+     taken as it came, so a request naming the session while a payment was
+     settled was the reader's, and the development provider's payments are
+     numbered in order.
+   - **An outcome is remembered once it is acted on.** One the host could
+     not settle (a trap, a refusal) is answered 500, and acted on when the
+     provider sends it again; until step seven it was remembered first, and
+     a resend would have been ignored.
    - **The amount is the host's to hold**: an intent whose amount is not the
-     one begun settles nothing, said.
-   - **The order awaits its payment**: where the deployment takes payments,
-     `place_order` writes the order `AwaitingPayment` with its charges and
-     its lines, reserves its promo code, and begins the payment; the order
-     page frames the provider's page (`Payment.page`, the host's) for the
-     reader to pay on. The settled command places it on `Succeeded`
-     (clearing the cart, the code used), leaves it awaiting on a decline (the
-     same intent takes another card), and cancels it on `Canceled` (the code
-     released). A deployment that takes no payments places as before.
-   - Not claimed (so far): the reader's return as a second trigger (Stripe
-     recommends it beside the webhook), and a Content-Security-Policy on the
-     store's pages (`frame-src` the provider alone; SAQ A's 2025 criterion
-     for the page that frames the hosted fields).
+     one begun settles nothing, said (`AmountChanged`).
+   - **The order awaits its payment.** Where the deployment takes payments,
+     `place_order` places the reader's cart as their order, charged, its
+     code used and the cart emptied, as before, but `AwaitingPayment`, with
+     a reference of its own (`o-` and 16 random characters) that the payment
+     is begun for; the order page frames the provider's page for it
+     (`Payment.page`). The settling command places it on `Succeeded`; a
+     decline leaves it awaiting, the same payment taking another card; an
+     outcome for another reference changes nothing. A reader whose order
+     awaits its payment places no other (`OrderError.AwaitingPayment`), and
+     the cart page says so.
+   - **A deployment that takes no payments places as before**: `begin`
+     answers `NotTaken`, and `place_order` settles its order as paid in the
+     same transaction.
+   - **A provider that cannot be reached** is `TransportFailed`:
+     `place_order` answers `PaymentUnavailable`, and nothing it wrote is
+     committed: no order, and the cart as it was.
 
 ## Not claimed (so far)
 
+- **Taking an awaiting order back** (step eight, next): nothing in this
+  deployment cancels a payment, so a reader whose order awaits a payment
+  they will not make can place no other. And a provider cancels one of its
+  own accord: Stripe's intents "might also automatically transition to
+  `canceled` if they're confirmed too many times" ("How Payment Intents and
+  Setup Intents work", read 2026-10-13), and a merchant cancels from its
+  dashboard. A `Canceled` outcome still leaves the order awaiting a payment
+  that can no longer be made.
+- The reader's return as a second trigger (Stripe recommends it beside the
+  webhook), and a Content-Security-Policy on the store's pages (`frame-src`
+  the provider alone; SAQ A's 2025 criterion for the page that frames the
+  hosted fields).
 - A real provider: a Stripe adapter in test mode waits for the owner's
   approval of each crate it needs (NEXT 6d).
 - Refunds, captures held for later (`requires_capture`), disputes.

@@ -129,6 +129,16 @@ interface store-page-order-page-api {
     order-page: func();
 }
 
+interface store-page-order-page-derived-3-api {
+    use pw:types/types.{domain-order-status, domain-payment-page};
+    derived3: func(arg0: option<domain-order-status>) -> option<domain-payment-page>;
+}
+
+interface store-page-order-page-derived-6-api {
+    use pw:types/types.{domain-order-status, domain-payment-page};
+    derived6: func(arg0: option<domain-order-status>) -> option<domain-payment-page>;
+}
+
 interface store-page-order-total-api {
     use pw:types/types.{capability-user-id, domain-money};
     order-total: func(arg0: capability-user-id) -> domain-money;
@@ -241,6 +251,11 @@ interface store-page-remove-promo-api {
 interface store-page-rename-address-api {
     use pw:types/types.{addresses-address, addresses-address-error, addresses-address-id, addresses-address-label};
     rename-address: func(arg0: addresses-address-id, arg1: addresses-address-label) -> result<list<addresses-address>, addresses-address-error>;
+}
+
+interface store-page-settle-payment-api {
+    use pw:types/types.{domain-order-error, domain-order-status, payments-settled};
+    settle-payment: func(arg0: payments-settled) -> result<domain-order-status, domain-order-error>;
 }
 
 interface store-search-search-api {
@@ -394,6 +409,14 @@ world store-page-order-page {
     export store-page-order-page-api;
 }
 
+world store-page-order-page-derived-3 {
+    export store-page-order-page-derived-3-api;
+}
+
+world store-page-order-page-derived-6 {
+    export store-page-order-page-derived-6-api;
+}
+
 world store-page-order-total {
     import store:data/user-orders;
     export store-page-order-total-api;
@@ -534,6 +557,7 @@ world store-page-place-order {
     import pw:host/clock;
     import pw:host/invalidations;
     import pw:host/outbox;
+    import pw:host/payments;
     import pw:host/principal;
     import store:data/checkout;
     import store:data/fees;
@@ -575,6 +599,14 @@ world store-page-rename-address {
     export store-page-rename-address-api;
 }
 
+world store-page-settle-payment {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/user-orders;
+    export store-page-settle-payment-api;
+}
+
 world store-search-search {
     import pw:host/clock;
     import store:data/hours;
@@ -604,6 +636,28 @@ package pw:types {
             friday,
             saturday,
             sunday,
+        }
+        record payments-payment {
+            id: string,
+            client-secret: string,
+            status: payments-payment-status,
+            page: string,
+        }
+        variant payments-payment-status {
+            requires-payment-method,
+            requires-action,
+            processing,
+            succeeded,
+            canceled,
+        }
+        variant payments-begin-error {
+            transport-failed,
+            not-taken,
+        }
+        record payments-settled {
+            payment: string,
+            order: string,
+            status: payments-payment-status,
         }
         type domain-store-id = string;
         type domain-menu-item-id = string;
@@ -665,6 +719,10 @@ package pw:types {
             preparing,
             on-the-way,
             delivered,
+            awaiting-payment(domain-payment-page),
+        }
+        record domain-payment-page {
+            url: string,
         }
         variant domain-order-error {
             nothing-to-order,
@@ -672,6 +730,8 @@ package pw:types {
             closed(domain-closing),
             promo(domain-promo-error),
             total-changed(domain-money),
+            awaiting-payment,
+            payment-unavailable,
         }
         variant domain-tip {
             no-tip,
@@ -955,6 +1015,10 @@ package pw:host {
         user-cart-changed: func(arg0: capability-user-id);
         user-order-changed: func(arg0: capability-user-id);
     }
+    interface payments {
+        use pw:types/types.{payments-begin-error, payments-payment};
+        begin: func(arg0: string, arg1: s64) -> result<payments-payment, payments-begin-error>;
+    }
     interface principal {
         use pw:types/types.{capability-user-id};
         read: func() -> capability-user-id;
@@ -1036,10 +1100,12 @@ package store:data {
         for-store: func(arg0: domain-store-id, arg1: capability-user-id) -> result<domain-delivery-estimate, domain-estimate-error>;
     }
     interface user-orders {
-        use pw:types/types.{capability-user-id, domain-order-charged, domain-order-error, domain-order-status, domain-tracking-error};
+        use pw:types/types.{capability-user-id, domain-order-charged, domain-order-error, domain-order-status, domain-tracking-error, payments-payment, payments-payment-status};
+        await-payment: func(arg0: capability-user-id, arg1: domain-order-charged, arg2: option<string>) -> result<string, domain-order-error>;
         charged: func(arg0: capability-user-id) -> option<domain-order-charged>;
         current: func(arg0: capability-user-id) -> result<option<domain-order-status>, domain-tracking-error>;
-        place: func(arg0: capability-user-id, arg1: domain-order-charged, arg2: option<string>) -> result<domain-order-status, domain-order-error>;
+        paying: func(arg0: capability-user-id, arg1: string, arg2: payments-payment) -> result<domain-order-status, domain-order-error>;
+        settle: func(arg0: capability-user-id, arg1: string, arg2: payments-payment-status) -> result<domain-order-status, domain-order-error>;
     }
 }
 

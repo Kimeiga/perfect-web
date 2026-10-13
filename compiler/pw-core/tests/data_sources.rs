@@ -383,6 +383,8 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "add_to_cart",
             "increase_in_cart",
             "place_order",
+            // A payment's outcome, settled (NEXT 6c).
+            "settle_payment",
             // The checkout's choices (track `order-total`).
             "choose_tip",
             "choose_tip_amount",
@@ -400,6 +402,8 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
         "remove_from_cart",
         "clear_cart",
         "place_order",
+        // A payment's outcome, settled (NEXT 6c).
+        "settle_payment",
         // The checkout's choices (track `order-total`).
         "choose_tip",
         "choose_tip_amount",
@@ -414,6 +418,6 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     assert_eq!(named("PW0347"), commands);
     assert_eq!(named("PW0348"), commands);
     // Track `order-total`: the checkout's four, three times, and its
-    // query's four reads.
-    assert_eq!(found.len(), 57, "{found:#?}");
+    // query's four reads. NEXT 6c: the settling command, three times.
+    assert_eq!(found.len(), 60, "{found:#?}");
 }

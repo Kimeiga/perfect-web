@@ -125,6 +125,8 @@ NEEDS_DATABASE = {
     "e14-store-hours",
     "e14-order-total",
     "e14-interactions",
+    # NEXT 6c: the store's orders awaiting their payments, on PostgreSQL too.
+    "e14-payments",
 }
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")

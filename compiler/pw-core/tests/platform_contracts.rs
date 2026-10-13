@@ -471,7 +471,12 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-13: `payments` joins the platform (NEXT 6c, step six): a
     // `Payment`, its `PaymentStatus`, a `Settled` outcome and `begin`,
     // effect `payments.begin`, at the origin alone as the deployment's key.
-    const EXPECTED: u64 = 0x75e1_eccf_7204_0b16;
+    // 2026-10-13: `payments.begin` takes no key, which is the host's (step
+    // seven); a `Payment` carries the provider's `page` for it, and
+    // `BeginError` gains `NotTaken`. `domain.pw`'s `OrderStatus` gains
+    // `AwaitingPayment(PaymentPage)`, its `OrderError` `AwaitingPayment` and
+    // `PaymentUnavailable`, and it begins a payment (`begin_payment`).
+    const EXPECTED: u64 = 0x2bc2_0d27_6da1_ded6;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()
