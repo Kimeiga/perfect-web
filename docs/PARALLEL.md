@@ -1342,7 +1342,7 @@ Each a decision for a track, with its date; a track's ADR records it too.
   to 13,041 s. Batch 4 (13 scripts) is being measured.
 - **2026-10-12, `|` and `&` parenthesized where they mix, merged as
   ADR-0322** (the integrator's ruling on W9's finding; track `and-or`, from
-  `22a325c`; Verify TRAIN_RUN green, with the train.). To every worker: a mix without parentheses is PW0031
+  `22a325c`; Verify 38326782630 green, with the train.). To every worker: a mix without parentheses is PW0031
   once you merge master.
   - **Correction (the integrator's)**: `c67562a` was pushed after
     pw-syntax's and pw-core's tests alone, not `just ci`; the track's `ci`
@@ -1355,7 +1355,7 @@ Each a decision for a track, with its date; a track's ADR records it too.
     `--no-fail-fast` since (`22a325c`), so a red run says every failure.
 - **2026-10-12, a member read computed wherever a page reads it, merged as
   ADR-0323** (the integrator's, NEXT 3c; track `member-in-block`, from
-  `e2121b7`; Verify TRAIN_RUN green, with the train.). The store's cart link says "Checkout" and the subtotal
+  `e2121b7`; Verify 38326782630 green, with the train.). The store's cart link says "Checkout" and the subtotal
   while the cart holds a line: a spec that reads the link's text by "Go to
   your cart" reads it only on an empty cart.
   - **Found by its verify (38296433715)**: row_reads' core suite, narrowed
@@ -1367,7 +1367,7 @@ Each a decision for a track, with its date; a track's ADR records it too.
     seen: the verify is what holds a narrowing.
 - **2026-10-12, `private` is "not importable" alone, merged as ADR-0324**
   (the integrator's ruling on W8's finding of 2026-10-09, NEXT 3a; track
-  `private-module`, from `d933b21`; Verify TRAIN_RUN green, with the train.). To every worker: a query, page,
+  `private-module`, from `d933b21`; Verify 38326782630 green, with the train.). To every worker: a query, page,
   layout, command, subscription, resource or materialization says whose
   data it holds with `user`, `session` or `public`; `private` on one is
   PW0029. Merge master before writing one.
@@ -1380,7 +1380,7 @@ Each a decision for a track, with its date; a track's ADR records it too.
     first now, then continues the held polls (`d933b21`).
 - **2026-10-12, an interaction's answer commits with its writes, merged as
   ADR-0325** (the integrator's, NEXT 5; track `interactions-committed`, from
-  `51998bc`; Verify TRAIN_RUN green, with the train.). Item 6 (checkout) may depend on it: a charge is
+  `51998bc`; Verify 38326782630 green, with the train.). Item 6 (checkout) may depend on it: a charge is
   idempotent by the order's interaction.
   - **Found by its verify (38301897351)**: "an interaction reused with
     other arguments shares the first outcome" survived. A committed record
@@ -1392,7 +1392,7 @@ Each a decision for a track, with its date; a track's ADR records it too.
     below `0010_search`; a database that ran 0010 first runs it after, as
     the runner applies each migration it has not recorded.
 - **2026-10-12, W9's store search, part 1, merged as ADR-0308's second
-  amendment** (from `9bc4ff0`; Verify TRAIN_RUN green, with the train.). The integrator's rulings, logged:
+  amendment** (from `9bc4ff0`; Verify 38326782630 green, with the train.). The integrator's rulings, logged:
   - (a) the reach filter is on by default, with the count of the rest
     ("N more match but don't"): accepted, as DoorDash's search is
     location-aware;
@@ -1402,3 +1402,14 @@ Each a decision for a track, with its date; a track's ADR records it too.
     two queries");
   - the reach sentence inside `{#match q}`'s `Some` arm, the block test's
     control quieting both sentences (ADR-0320's reading).
+- **2026-10-13, train-1 landed** (`track/train-1`, verify 38326782630, 81
+  recipes, 0 failed): narrowing-3, ADR-0322 (`|` and `&`), ADR-0323 (a
+  member read computed wherever a page reads it), ADR-0324 (`private`),
+  ADR-0325 (an interaction's answer committed with its writes) and W9's
+  part 1 (ADR-0308's second amendment), each its own merge commit; the
+  store-accounts test's race, fixed on the train, held in e14-store-accounts.
+- **2026-10-13, the order of the next work, under usage pacing** (the
+  integrator's; the coordinator: one worker beside the integrator, the
+  week's allowance 46% used at 14 h): W9 takes store-hours on train-2, then
+  6b (the order's total, its fee reads by set from the start), then 4b; the
+  integrator takes 6a (money, train-2) and 6c (payment); W6 is held.

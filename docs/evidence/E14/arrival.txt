@@ -1,8 +1,8 @@
 ADR-0259 - a map or set from outside is sorted on arrival
 
 produced by: just e14-arrival
-commit: 29cae71e8ffe8b9c02bef73a0e024087f5dbf486
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37933879838 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 25b01345e1a5406a8b977c6c269475aa5b872e60
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38326782630 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 
@@ -15,12 +15,12 @@ test a_map_or_set_out_of_order_is_sorted_on_arrival ... ok
 test a_map_keyed_by_a_bool_or_an_opaque_type_answers_as_a_btreemap_does ... ok
 test a_map_answers_as_a_btreemap_does ... ok
 test a_set_answers_as_a_btreeset_does ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.26s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.02s
 
 == the browser's module against the component (compiler/pw-conformance/tests/javascript.rs)
 
 test the_modules_entry_check_is_the_components ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 1.41s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.78s
 
 == mutation controls (scripts/arrival_mutations.py)
 

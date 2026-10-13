@@ -38,7 +38,7 @@ search box, and a reader's search by their address** (W9's, track
   the layer counts its statements, as Django's `assertNumQueries` counts
   queries, and the mutant that searched as memory does is killed by it
   (the integrator's ruling: it was no equivalent mutant).
-Verify TRAIN_RUN green, with the train.
+Verify 38326782630 green, with the train.
 
 **ADR-0325, 2026-10-12: an interaction's answer commits with its writes**
 (the integrator's; NEXT 5; track `interactions-committed`, merged from
@@ -53,7 +53,7 @@ Verify TRAIN_RUN green, with the train.
   it before running; a second host's commit that meets it rolls back and
   answers what the first recorded; a record answers a day, as Stripe's
   keys do.
-Verify TRAIN_RUN green, with the train.
+Verify 38326782630 green, with the train.
 
 **ADR-0324, 2026-10-12: `private` says a declaration is not importable,
 and nothing more** (the integrator's; NEXT 3a, W8's finding; track
@@ -69,7 +69,7 @@ and nothing more** (the integrator's; NEXT 3a, W8's finding; track
   read as everyone's data. PW0023 says "drop `private`".
 - Found on the way: a `user` that opens a declaration after one with no body
   was read as that declaration's unknown policy (PW0005).
-Verify TRAIN_RUN green, with the train.
+Verify 38326782630 green, with the train.
 
 **ADR-0323, 2026-10-12: a member read is computed wherever a page reads
 it** (the integrator's; NEXT 3c; track `member-in-block`, merged from
@@ -84,7 +84,7 @@ it** (the integrator's; NEXT 3c; track `member-in-block`, merged from
   member read in a view that contains itself, are refused by name.
 - The store's page names its cart link "Checkout" with the subtotal while
   the cart holds a line.
-Verify TRAIN_RUN green, with the train.
+Verify 38326782630 green, with the train.
 
 **ADR-0322, 2026-10-12: `|` and `&` are parenthesized where they mix** (the
 integrator's; W9's finding; track `and-or`, merged from `22a325c`).
@@ -98,7 +98,7 @@ integrator's; W9's finding; track `and-or`, merged from `22a325c`).
 - Every shipped program already parenthesized its mixes; two tests'
   programs did not, found by CI and the local run (PARALLEL.md). `just
   test-unit` runs every test binary since, so one failure hides no other.
-Verify TRAIN_RUN green, with the train.
+Verify 38326782630 green, with the train.
 
 **2026-10-12: nine more scripts' mutants run the tests that see them**
 (W6's ruling of 2026-10-09; track `narrowing-3`, merged from `25bfad5`).
@@ -109,7 +109,7 @@ Verify TRAIN_RUN green, with the train.
 - The nine recipes: 39,463 s of master's latest runs to 13,041 s (verify
   38315832945, 14 of 14 green, at `25bfad5`), every mutant still killed. A
   bound raised to 1800 while the whole suite ran goes back to 900 or 1200.
-Verified again with the train (TRAIN_RUN).
+Verified again with the train (38326782630).
 
 **ADR-0321, 2026-10-12: a related note is shown in its own file** (the
 integrator's; W8's finding; track `related-files`, merged from `87010c1`).

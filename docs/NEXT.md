@@ -744,7 +744,7 @@ E14 comes before E11-E13. Its plan, controls and task list are
              `assert_queries_count` count them) at the seed and with fifty
              stores more, pinned and equal at both; rows read by set
              (`= ANY($1)`), a scan in memory; mutants restore each loop.
-             W9's, after store-hours, on the counter W9's search brings;
+             W9's, after 6b, on the counter W9's search brings;
           5. ~~**idempotency committed with the writes**~~ (ADR-0325,
              merged 2026-10-12): an interaction's answer commits in its
              command's transaction, on both layers, and answers a day;
