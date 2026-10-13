@@ -5886,6 +5886,23 @@ e14-related-files:
      } > docs/evidence/E14/related-files.txt
     @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/related-files.txt
 
+# ADR-XXXX: money is rounded only where a program names how (NEXT 6a). Each
+# rounding, compiled to a component and to JavaScript, agreeing, at the
+# amounts each rounding says (compiler/pw-conformance/tests/javascript.rs),
+# and the mutation controls (scripts/money_mutations.py).
+e14-money:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - money is rounded only where a program names how"; echo; \
+       echo "produced by: just e14-money"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
+       echo "== each rounding, both ways (compiler/pw-conformance/tests/javascript.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test javascript money_is_rounded_as_the_program_names_it 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/money_mutations.py)"; echo; \
+       python3 scripts/money_mutations.py; \
+     } > docs/evidence/E14/money.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/money.txt
+
 # ADR-XXXX: a name imported by name is the file's, before a whole module's.
 # The resolution's order and the refusal of a call two whole modules declare
 # (compiler/pw-core/tests/explicit_imports.rs), every program checking as

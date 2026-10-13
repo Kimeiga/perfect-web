@@ -93,9 +93,90 @@ fn fewer(n: PositiveInt) -> Option<PositiveInt> !{} {
     }
 }
 
+// --- money ----------------------------------------------------------------
+//
+// **Money is rounded only where a program names how** (ADR-XXXX). An amount
+// is its minor units, cents for US dollars, read in this module alone
+// (ADR-0048). Another module adds amounts, multiplies one by a count, sums
+// and compares them, all exactly, and takes a part of one only at a `Rate`,
+// naming its `Rounding`: `/` on an amount's units, which floors (ADR-0039),
+// is this module's alone to write.
+
 type USD = USD { code: String }
 
-type Money<C> = Money { minor_units: Int }
+opaque type Money<C> = Int
+
+// **`n` cents.**
+fn cents(n: Int) -> Money<USD> !{} {
+    Money(n)
+}
+
+fn plus<C>(a: Money<C>, b: Money<C>) -> Money<C> !{} {
+    Money(a.value + b.value)
+}
+
+fn minus<C>(a: Money<C>, b: Money<C>) -> Money<C> !{} {
+    Money(a.value - b.value)
+}
+
+// **`amount`, `count` times.**
+fn times<C>(amount: Money<C>, count: Int) -> Money<C> !{} {
+    Money(amount.value * count)
+}
+
+// **Amounts added together**: none is nothing.
+fn sum<C>(amounts: List<Money<C>>) -> Money<C> !{} {
+    Money(List.fold(amounts, 0, (n, amount) => n + amount.value))
+}
+
+// **A rate, in millionths**: 1,000,000 is the whole, 150,000 is 15%, and
+// 88,750 is 8.875%, New York City's sales tax. A rate is never negative.
+opaque type Rate = Int where value >= 0
+
+// **`p` percent.**
+fn percent(p: Int) -> Option<Rate> !{} {
+    millionths(p * 10000)
+}
+
+// **`n` millionths**, where `n` is not negative.
+fn millionths(n: Int) -> Option<Rate> !{} {
+    if n >= 0 { Some(Rate(n)) } else { None }
+}
+
+// **How a part of a minor unit is rounded** (ADR-XXXX):
+// - `HalfUp`: to the nearer unit, a half away from zero. A half cent or more
+//   is a cent, as California's, New York's and Texas's sales taxes ask.
+// - `HalfEven`: to the nearer unit, a half to the even one (banker's).
+// - `TowardZero`: the part is dropped.
+// - `AwayFromZero`: any part is a whole unit more.
+type Rounding =
+    | HalfUp
+    | HalfEven
+    | TowardZero
+    | AwayFromZero
+
+// **`amount` at `rate`, rounded as `rounding` says**: a fee, a tax, a tip or
+// a discount, never a fraction of a cent.
+fn at_rate<C>(amount: Money<C>, rate: Rate, rounding: Rounding) -> Money<C> !{} {
+    Money(rounded(amount.value * rate.value, 1000000, rounding))
+}
+
+// `n / d`, for `d` above 0, rounded as `rounding` says. `/` and `%` are
+// Euclidean (ADR-0039): `q` is the floor of `n / d` and `r` is in `[0, d)`.
+fn rounded(n: Int, d: Int, rounding: Rounding) -> Int !{} {
+    let q = n / d
+    let r = n % d
+    if r == 0 {
+        q
+    } else {
+        match rounding {
+            TowardZero => if n >= 0 { q } else { q + 1 },
+            AwayFromZero => if n >= 0 { q + 1 } else { q },
+            HalfUp => if r * 2 > d { q + 1 } else if r * 2 < d { q } else if n >= 0 { q + 1 } else { q },
+            HalfEven => if r * 2 > d { q + 1 } else if r * 2 < d { q } else if q % 2 == 0 { q } else { q + 1 },
+        }
+    }
+}
 
 // **A price as a person reads it** (ADR-0169): US dollars as en-US writes
 // them, `$3.50`, `$1,234.50`, and `-$3.50` for an amount owed back. A member
@@ -105,7 +186,7 @@ fn display(price: Money<USD>) -> String !{} {
     // `n == 100 * (n / 100) + n % 100`, whatever `n`'s sign. An amount owed
     // back is written from those parts, since `-n` does not fit for the
     // least `Int`.
-    let n = price.minor_units
+    let n = price.value
     let q = n / 100
     let r = n % 100
     let dollars = if n >= 0 { q } else if r == 0 { 0 - q } else { 0 - q - 1 }
@@ -189,12 +270,12 @@ fn line_count(cart: Cart) -> Int !{} {
 
 // **What a line costs** (ADR-0172): its price, as many times as it holds.
 fn total(line: CartLine) -> Money<USD> !{} {
-    Money { minor_units: line.unit_price.minor_units * line.quantity.value }
+    times(line.unit_price, line.quantity.value)
 }
 
 // **What a cart's lines cost together** (ADR-0172), before any fee.
 fn subtotal(cart: Cart) -> Money<USD> !{} {
-    Money { minor_units: List.fold(cart.lines, 0, fn(n, line) n + total(line).minor_units) }
+    sum(List.map(cart.lines, total))
 }
 
 type CartError =

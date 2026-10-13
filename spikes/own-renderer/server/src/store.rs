@@ -344,10 +344,7 @@ fn item_val(store: &str, item: &Item) -> Val {
         ("name".into(), Val::String(item.name.clone())),
         ("description".into(), Val::String(item.description.clone())),
         // Its price, in cents (ADR-0169).
-        (
-            "price".into(),
-            Val::Record(vec![("minor-units".into(), Val::S64(item.price))]),
-        ),
+        ("price".into(), Val::S64(item.price)),
         // Whether it can be ordered now (ADR-0178): what
         // `menus#is-available` answers.
         ("available".into(), Val::Bool(item.available)),

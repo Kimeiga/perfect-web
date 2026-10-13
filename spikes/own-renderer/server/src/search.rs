@@ -315,10 +315,7 @@ pub(crate) fn found(matched: Vec<Matched>, near: &Near) -> Val {
                         ("name".into(), Val::String(d.name)),
                         ("description".into(), Val::String(d.description)),
                         ("category".into(), Val::String(d.category)),
-                        (
-                            "price".into(),
-                            Val::Record(vec![("minor-units".into(), Val::S64(d.price))]),
-                        ),
+                        ("price".into(), Val::S64(d.price)),
                     ])
                 })
                 .collect();

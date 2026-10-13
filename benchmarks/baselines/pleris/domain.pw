@@ -60,7 +60,9 @@ fn added(a: PositiveInt, b: PositiveInt) -> PositiveInt !{} { PositiveInt(a.valu
 
 type USD = USD { code: String }
 
-type Money<C> = Money { minor_units: Int }
+// An amount, its minor units, read here alone (ADR-XXXX): the store's money,
+// as the host that serves both stores passes it.
+opaque type Money<C> = Int
 
 // A geographic point. A-007, A-019 and A-024 wrote `center: LatLng` for two
 // years of corpus history while no module declared it — an annotation naming
@@ -221,4 +223,4 @@ fn same_item(a: MenuItemId, b: MenuItemId) -> Bool !{} { a.value == b.value }
 // optimistic transition adds a line for an item the cart did not hold, and
 // the price is the server's to say: `add_to_cart` takes none. Zero until the
 // command's result replaces the speculation. No page renders it.
-fn unpriced() -> Money<USD> !{} { Money { minor_units: 0 } }
+fn unpriced() -> Money<USD> !{} { Money(0) }

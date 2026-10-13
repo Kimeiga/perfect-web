@@ -14,10 +14,10 @@ function exact(v) {
 export const name = "add_to_cart";
 export const handler = "ce4501910ab2a49a";
 export async function run(context) {
-  const v0 = ((o) => ({ "id": o["id"], "store_id": o["store_id"], "name": o["name"], "description": o["description"], "price": ((o) => ({ "minor_units": BigInt(o["minor_units"]) }))(o["price"]), "available": o["available"], "category": ((o) => ({ "id": o["id"], "name": o["name"] }))(o["category"]) }))(context.captures["item"]);
+  const v0 = ((o) => ({ "id": o["id"], "store_id": o["store_id"], "name": o["name"], "description": o["description"], "price": BigInt(o["price"]), "available": o["available"], "category": ((o) => ({ "id": o["id"], "name": o["name"] }))(o["category"]) }))(context.captures["item"]);
   const v1 = 1n;
   const v2 = v1;
-  const v3_answer = await context.command("store.page.add_to_cart", [((o) => ({ "id": o["id"], "store_id": o["store_id"], "name": o["name"], "description": o["description"], "price": ((o) => ({ "minor_units": exact(o["minor_units"]) }))(o["price"]), "available": o["available"], "category": ((o) => ({ "id": o["id"], "name": o["name"] }))(o["category"]) }))(v0), exact(v2)], { retry: { max: 2, jitter: true } });
+  const v3_answer = await context.command("store.page.add_to_cart", [((o) => ({ "id": o["id"], "store_id": o["store_id"], "name": o["name"], "description": o["description"], "price": exact(o["price"]), "available": o["available"], "category": ((o) => ({ "id": o["id"], "name": o["name"] }))(o["category"]) }))(v0), exact(v2)], { retry: { max: 2, jitter: true } });
   const v3 = ((c) => { switch (c.$case) { case "ok": return { $case: "ok", value: undefined }; case "err": return { $case: "err", value: ((c) => { switch (c.$case) { case "item-unavailable": return { $case: "item-unavailable", value: c.value }; case "quantity-too-large": return { $case: "quantity-too-large" }; case "cart-expired": return { $case: "cart-expired" }; case "out-of-range": return { $case: "out-of-range", value: c.value }; default: throw new Error("trap: no such case " + c.$case); } })(c.value) }; default: throw new Error("trap: no such case " + c.$case); } })(v3_answer);
   let v17;
   switch (v3.$case) {

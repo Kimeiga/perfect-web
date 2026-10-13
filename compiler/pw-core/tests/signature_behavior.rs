@@ -102,10 +102,18 @@ fn same_spelled_user_type_does_not_impersonate_the_privacy_constructor() {
         "a spelling is not a platform privacy declaration"
     );
     let refs: Vec<_> = hirs.iter().collect();
+    // Its own representation, a string, since ADR-XXXX: never the platform
+    // qualifier's erasure to its argument, which would make it an `s64`.
+    let rendered = pw_core::wit::host_signatures(&refs, &ws);
     let cs = pw_core::contract::contracts(&refs, &sigs, &ws);
+    let (wit, _) = pw_core::wit::package(&refs, &ws, &cs).expect("a phantom opaque type crosses");
     assert!(
-        pw_core::wit::package(&refs, &ws, &cs).is_err(),
-        "unsupported user generic must not borrow the platform qualifier's ABI erasure"
+        wit.contains("type app-secret = string;"),
+        "a user's `Secret<T> = String` is its own representation: {wit}\n{rendered:?}"
+    );
+    assert!(
+        !wit.contains("func(arg0: s64) -> s64"),
+        "a user generic must not borrow the platform qualifier's ABI erasure: {wit}"
     );
 }
 

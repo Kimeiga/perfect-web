@@ -123,8 +123,8 @@ fn the_stores_transitions_run_and_its_parts_read_the_result() {
         &dir,
         r#"
 import * as m from "./m.mjs";
-const line = (item_id, name, quantity, minor_units) =>
-  ({ item_id, name, quantity, unit_price: { minor_units } });
+const line = (item_id, name, quantity, unit_price) =>
+  ({ item_id, name, quantity, unit_price });
 const held = m.decode.cart({ lines: [line("espresso", "Espresso", 2, 450)] });
 const run = (command, value, args) => m.commands[command][0].transition(value, args);
 // The cart's text at the top of the page: its count, then its subtotal.
@@ -150,8 +150,8 @@ const rows = (v) =>
 // As the page shows an item: its store, whether it can be ordered, and its
 // category too (ADR-0178, ADR-0181).
 const coffee = { id: "coffee", name: "Coffee" };
-const espresso = { id: "espresso", store_id: "47", name: "Espresso", description: "", price: { minor_units: 450 }, available: true, category: coffee };
-const cortado = { id: "cortado", store_id: "47", name: "Cortado", description: "Short.", price: { minor_units: 375 }, available: true, category: coffee };
+const espresso = { id: "espresso", store_id: "47", name: "Espresso", description: "", price: 450, available: true, category: coffee };
+const cortado = { id: "cortado", store_id: "47", name: "Cortado", description: "Short.", price: 375, available: true, category: coffee };
 const steps = [held];
 const step = (command, args) => steps.push(run(command, steps.at(-1), args));
 step("store.page.add_to_cart", [espresso, 1]);
@@ -189,12 +189,12 @@ console.log(show(last), String(count(last)), String(subtotal(last)));
     );
     assert_eq!(
         lines[3],
-        r#"{"lines":[{"item_id":"espresso","name":"Espresso","quantity":2,"unit_price":{"minor_units":450}}]}"#,
+        r#"{"lines":[{"item_id":"espresso","name":"Espresso","quantity":2,"unit_price":450}]}"#,
         "the held value is not changed by a transition over it: restoring it is exact"
     );
     assert_eq!(
         lines[4],
-        r#"{"lines":[{"item_id":"espresso","name":"Espresso","quantity":3,"unit_price":{"minor_units":450}},{"item_id":"cortado","name":"Cortado","quantity":3,"unit_price":{"minor_units":375}}]}"#,
+        r#"{"lines":[{"item_id":"espresso","name":"Espresso","quantity":3,"unit_price":450},{"item_id":"cortado","name":"Cortado","quantity":3,"unit_price":375}]}"#,
         "a held item's line grows; a new item's line has its name and price"
     );
     assert_eq!(

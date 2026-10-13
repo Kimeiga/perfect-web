@@ -27,7 +27,7 @@ module UserCarts
 
 import List
 import Carts
-import domain.{ CartLine, CartError, MenuItem, MenuItemId, Money, USD, PositiveInt, same_item, total }
+import domain.{ CartLine, CartError, MenuItem, MenuItemId, Money, USD, PositiveInt, same_item, total, sum }
 import capability.{ User, UserId }
 
 // **A user's cart**: its lines, as a session's `Cart` holds them.
@@ -44,7 +44,7 @@ fn line_count(cart: UserCart) -> Int !{} {
 // **What a cart's lines cost together**, before any fee, as `Cart`'s
 // `subtotal` is (ADR-0172).
 fn subtotal(cart: UserCart) -> Money<USD> !{} {
-    Money { minor_units: List.fold(cart.lines, 0, fn(n, line) n + total(line).minor_units) }
+    sum(List.map(cart.lines, total))
 }
 
 // The user's cart.

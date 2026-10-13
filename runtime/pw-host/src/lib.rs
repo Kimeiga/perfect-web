@@ -2273,8 +2273,8 @@ pub mod engine {
             Type::String => Val::String(v.as_str().ok_or_else(|| expected("a string"))?.into()),
             // **A record, field by field** (ADR-0172): the item a page showed,
             // which `add_to_cart` makes its new line from. A browser writes a
-            // field by its Pleris name, `minor_units`, and the component
-            // declares it by its WIT name, `minor-units`. A field the type
+            // field by its Pleris name, `store_id`, and the component
+            // declares it by its WIT name, `store-id`. A field the type
             // does not declare is not passed in; one it declares and the
             // value lacks is refused.
             Type::Record(record) => {

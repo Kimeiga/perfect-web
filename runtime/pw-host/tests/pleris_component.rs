@@ -89,10 +89,7 @@ fn cart(item: &str, quantity: i64) -> Val {
             ("item-id".into(), Val::String(item.into())),
             ("name".into(), Val::String("Cortado".into())),
             ("quantity".into(), Val::S64(quantity)),
-            (
-                "unit-price".into(),
-                Val::Record(vec![("minor-units".into(), Val::S64(450))]),
-            ),
+            ("unit-price".into(), Val::S64(450)),
         ])]),
     )])
 }
@@ -105,10 +102,7 @@ fn item(id: &str) -> Val {
         ("store-id".into(), Val::String("47".into())),
         ("name".into(), Val::String("Cortado".into())),
         ("description".into(), Val::String("Short.".into())),
-        (
-            "price".into(),
-            Val::Record(vec![("minor-units".into(), Val::S64(375))]),
-        ),
+        ("price".into(), Val::S64(375)),
         ("available".into(), Val::Bool(true)),
         (
             "category".into(),
@@ -624,7 +618,7 @@ fn json_arguments_are_typed_by_the_export_they_are_for() {
             "category": { "id": "coffee", "name": "Coffee" },
         })
     };
-    let cortado = sent(serde_json::json!({ "minor_units": 375 }));
+    let cortado = sent(serde_json::json!(375));
 
     let args = prepared
         .arguments(&at, &[cortado.clone(), serde_json::json!(2)])
@@ -657,15 +651,16 @@ fn json_arguments_are_typed_by_the_export_they_are_for() {
             "the record has no field `name`",
         ),
         (
-            vec![
-                sent(serde_json::json!({ "minor_units": 1.5 })),
-                serde_json::json!(1),
-            ],
-            "arg0`).price.minor_units: expected an integer",
+            vec![sent(serde_json::json!(1.5)), serde_json::json!(1)],
+            "arg0`).price: expected an integer",
         ),
         (
-            vec![sent(serde_json::json!(375)), serde_json::json!(1)],
-            "expected an object",
+            // An amount is its cents (ADR-XXXX), not a record of them.
+            vec![
+                sent(serde_json::json!({ "minor_units": 375 })),
+                serde_json::json!(1),
+            ],
+            "arg0`).price: expected an integer",
         ),
         (
             vec![cortado.clone(), serde_json::json!(1.5)],
@@ -711,7 +706,7 @@ fn a_quantity_that_is_no_positive_int_is_refused_as_the_arguments_are_decoded() 
         "store_id": "47",
         "name": "Cortado",
         "description": "Short.",
-        "price": { "minor_units": 375 },
+        "price": 375,
         "available": true,
         "category": { "id": "coffee", "name": "Coffee" },
     });

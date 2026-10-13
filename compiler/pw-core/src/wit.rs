@@ -245,7 +245,7 @@ pub struct Types {
     by_def: BTreeMap<crate::resolve::DefId, String>,
     qualifiers: BTreeSet<DefId>,
     /// Generic declarations whose representation never mentions their type
-    /// parameters — `type Money<C> = Money { minor_units: Int }`. Every
+    /// parameters — `opaque type Money<C> = Int`. Every
     /// specialization has the one layout, so `Money<USD>` is `domain-money` on
     /// the wire. The argument is kept by the semantic contract and dropped by
     /// the boundary, the same one-directional loss an opaque alias and a
@@ -319,10 +319,15 @@ impl Types {
                     }
                     _ => out.push_type(&path, unit, d, ws, def),
                 }
-                // Records and variants only. An opaque type's opacity is not ABI
-                // transparency (ruling, 2026-08-20): a generic opaque type that
-                // is not a privacy qualifier has no WIT form at all.
-                if d.kind == DeclKind::Type
+                // A generic declaration whose representation never mentions
+                // its parameters has one layout: a record's, a variant's, and
+                // since ADR-XXXX an opaque type's, `Money<C> = Int`, which
+                // crosses as its representation as every opaque type does.
+                // One whose representation mentions them still has no WIT
+                // form: its layout would be its argument's, a privacy
+                // qualifier's transparency, and opacity is not ABI
+                // transparency (the ruling of 2026-08-20).
+                if matches!(d.kind, DeclKind::Type | DeclKind::Opaque)
                     && !d.type_params.is_empty()
                     && out.defs.last().is_some_and(|t| {
                         t.referenced().iter().all(|r| {

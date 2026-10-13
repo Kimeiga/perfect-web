@@ -21,7 +21,7 @@ fn root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// `display(Money { minor_units: cents })`, run by the engine as a host runs
+/// `display(cents)`, an amount's minor units, run by the engine as a host runs
 /// it for a page.
 fn display(cents: i64) -> Result<Vec<Val>, String> {
     let id = "domain.display";
@@ -59,7 +59,7 @@ fn display(cents: i64) -> Result<Vec<Val>, String> {
         },
         &BTreeMap::new(),
         &[&e.interface, &e.function],
-        &[Val::Record(vec![("minor-units".into(), Val::S64(cents))])],
+        &[Val::S64(cents)],
     )
 }
 

@@ -232,9 +232,8 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
              export const handler = \"{id}\";\n\
              export async function run(context) {{\n\
              \x20 const v0 = ((o) => ({{ \"id\": o[\"id\"], \"store_id\": o[\"store_id\"], \
-             \"name\": o[\"name\"], \"description\": o[\"description\"], \"price\": ((o) => \
-             ({{ \"minor_units\": BigInt(o[\"minor_units\"]) }}))(o[\"price\"]), \"available\": \
-             o[\"available\"], \"category\": ((o) => ({{ \"id\": o[\"id\"], \"name\": o[\"name\"] \
+             \"name\": o[\"name\"], \"description\": o[\"description\"], \"price\": \
+             BigInt(o[\"price\"]), \"available\": o[\"available\"], \"category\": ((o) => ({{ \"id\": o[\"id\"], \"name\": o[\"name\"] \
              }}))(o[\"category\"]) }}))(context.captures[\"item\"]);\n",
             id = add.identity
         )),
@@ -242,7 +241,7 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
          (ADR-0172), with whether it is available (ADR-0178), its store and its \
          category (ADR-0181)"
     );
-    let item = r#"{"item":{"id":"espresso","store_id":"47","name":"Espresso","description":"Short.","price":{"minor_units":350},"available":true,"category":{"id":"coffee","name":"Coffee"}}}"#;
+    let item = r#"{"item":{"id":"espresso","store_id":"47","name":"Espresso","description":"Short.","price":350,"available":true,"category":{"id":"coffee","name":"Coffee"}}}"#;
     // Answered `Ok`, without the cart (ADR-0157): the notice is cleared. The
     // item is sent as the page showed it, and `PositiveInt(1)` as its
     // representation.
@@ -257,7 +256,7 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
                     "store_id": "47",
                     "name": "Espresso",
                     "description": "Short.",
-                    "price": { "minor_units": 350 },
+                    "price": 350,
                     "available": true,
                     "category": { "id": "coffee", "name": "Coffee" }
                 },

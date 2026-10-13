@@ -10,7 +10,7 @@
 
 module store.pricing
 
-import domain.{ MenuItemId, Money, USD, PositiveInt }
+import domain.{ MenuItemId, Money, USD, PositiveInt, times, sum }
 
 import List
 
@@ -26,13 +26,13 @@ type Cart = Cart {
 
 // !{} — no effects. Enforced, not merely intended.
 fn line_total(line: CartLine) -> Money<USD> !{} {
-    // `PositiveInt` is opaque here: `.value` is `domain`'s alone, and
-    // `count` is what `domain` gives other modules (ADR-0048).
-    Money(line.unit_price.minor_units * line.quantity.count)
+    // `PositiveInt` and `Money` are opaque here: `.value` is `domain`'s
+    // alone, and `count`, `times` and `sum` are what `domain` gives other
+    // modules (ADR-0048, ADR-XXXX). An amount is multiplied and added
+    // exactly; it is never divided here.
+    times(line.unit_price, line.quantity.count)
 }
 
 fn subtotal(cart: Cart) -> Money<USD> !{} {
-    cart.lines
-        |> List.map(line_total)
-        |> List.fold(Money(0), Money.add)
+    sum(cart.lines |> List.map(line_total))
 }

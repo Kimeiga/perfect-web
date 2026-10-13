@@ -72,10 +72,7 @@ fn menu_item(i: usize) -> Val {
         ("store-id".into(), text("store_47")),
         ("name".into(), text("Cortado")),
         ("description".into(), text("")),
-        (
-            "price".into(),
-            Val::Record(vec![("minor-units".into(), Val::S64(450))]),
-        ),
+        ("price".into(), Val::S64(450)),
         ("available".into(), Val::Bool(true)),
         (
             "category".into(),
@@ -135,10 +132,7 @@ fn the_compiled_command_through_the_host() {
             ("item-id".into(), Val::String("cortado".into())),
             ("name".into(), Val::String("Cortado".into())),
             ("quantity".into(), Val::S64(2)),
-            (
-                "unit-price".into(),
-                Val::Record(vec![("minor-units".into(), Val::S64(450))]),
-            ),
+            ("unit-price".into(), Val::S64(450)),
         ])]),
     )])))));
     let add_result = cart.clone();
