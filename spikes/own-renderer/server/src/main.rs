@@ -10850,13 +10850,17 @@ public query Store(",
                 .expect("the command commits");
         });
         // Read to its end, for `b`: nothing was stopped, and `b`'s page was
-        // not told to read itself again.
+        // not told to read itself again. A failure says what the query
+        // runtime traced: train-3's `just ci` of 2026-10-13 saw it stopped
+        // once, at a load of 20, and no run since has (NEXT, flaky tests).
         assert_eq!(
             s.store
                 .faults()
                 .category_stopped
                 .load(std::sync::atomic::Ordering::SeqCst),
-            0
+            0,
+            "the flight was stopped; the runtime traced {:#?}",
+            s.queries.trace()
         );
         let queue = s.pending.lock().expect("pending");
         assert!(
