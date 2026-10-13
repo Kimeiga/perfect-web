@@ -1381,3 +1381,221 @@ mod hearing_tests {
         ));
     }
 }
+
+// --- the deployment's payments, configured ---------------------------------
+
+/// **A header's value** among a request's raw headers, its name in any case.
+pub(crate) fn header_value<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
+    headers.lines().find_map(|l| {
+        let (k, v) = l.split_once(':')?;
+        k.trim().eq_ignore_ascii_case(name).then(|| v.trim())
+    })
+}
+
+/// **The deployment's payments** (NEXT 6c): its provider's origin, and what
+/// the host has heard from it.
+pub(crate) struct Payments {
+    /// The provider's origin, which a page embeds the hosted fields from.
+    pub(crate) provider: String,
+    hearing: Hearing,
+    /// Each payment the provider's signed word settled, as read again, in
+    /// the order heard: what an order's transition reads (to come, with the
+    /// order's total, NEXT 6b).
+    pub(crate) settled: Mutex<Vec<Settled>>,
+}
+
+impl Payments {
+    pub(crate) fn describe(&self) -> String {
+        format!("the development provider, at {}", self.provider)
+    }
+
+    /// **A webhook, answered**: 200 where it is acted on or was heard
+    /// before, as a provider stops sending an event it was answered for; 400
+    /// where it is not the provider's word.
+    pub(crate) fn heard(&self, signature: Option<&str>, body: &[u8]) -> (u16, String) {
+        match self.hearing.webhook(signature, body, wall_seconds()) {
+            Ok(settled) => {
+                let said = format!("{} is {}", settled.intent, settled.status);
+                self.settled.lock().expect("settled").push(settled);
+                (200, said)
+            }
+            Err(NotActed::HeardBefore) => (200, "heard before".to_string()),
+            Err(NotActed::Refused(why)) => (400, format!("not the provider's word: {why:?}")),
+            Err(NotActed::Unreadable(why)) => (400, format!("unreadable: {why}")),
+        }
+    }
+}
+
+/// **The deployment's payments, as its configuration states them.**
+/// `PW_PAYMENTS` unset (or empty) names none; `dev` names the development
+/// provider, on an origin of its own at this server's port and 100
+/// (`PW_PAYMENTS_PORT` otherwise), with a webhook secret made at start. The
+/// development provider charges nothing, and runs only in a development
+/// deployment on this machine (`local`).
+pub(crate) fn configure(
+    local: bool,
+    host_origin: &str,
+    port: u16,
+    choice: Option<&str>,
+    provider_port: Option<&str>,
+) -> Result<Option<Arc<Payments>>, String> {
+    match choice.unwrap_or("") {
+        "" => Ok(None),
+        "dev" => {
+            if !local {
+                return Err(format!(
+                    "the development payment provider charges nothing, and runs only in a \
+                     development deployment on this machine, not at `{host_origin}`"
+                ));
+            }
+            let provider_port = match provider_port {
+                Some(p) => p
+                    .parse::<u16>()
+                    .map_err(|_| format!("PW_PAYMENTS_PORT is `{p}`, not a port"))?,
+                None => port
+                    .checked_add(100)
+                    .ok_or("no port 100 above this server's")?,
+            };
+            let mut secret = [0u8; 32];
+            getrandom::fill(&mut secret).map_err(|e| format!("a webhook secret: {e}"))?;
+            let listener = TcpListener::bind(("127.0.0.1", provider_port)).map_err(|e| {
+                format!("the development payment provider's port {provider_port}: {e}")
+            })?;
+            let provider = format!("http://127.0.0.1:{provider_port}");
+            let origin = Arc::new(Origin::new(
+                &secret,
+                &format!("http://127.0.0.1:{port}/payments/webhook"),
+                host_origin,
+                wall_seconds,
+            ));
+            std::thread::spawn(move || serve(listener, origin));
+            Ok(Some(Arc::new(Payments {
+                hearing: Hearing::new(&secret, &provider),
+                provider,
+                settled: Mutex::new(Vec::new()),
+            })))
+        }
+        other => Err(format!(
+            "PW_PAYMENTS is `{other}`: this server knows `dev`, or none"
+        )),
+    }
+}
+
+#[cfg(test)]
+mod configured_tests {
+    use super::*;
+
+    /// **The development provider runs only on this machine, in
+    /// development**, and a choice this server does not know is refused.
+    #[test]
+    fn the_development_provider_runs_only_in_development_here() {
+        assert!(
+            configure(true, "http://127.0.0.1:3301", 3301, None, None)
+                .expect("none")
+                .is_none()
+        );
+        let refused = configure(false, "https://store.example", 3301, Some("dev"), None)
+            .err()
+            .expect("refused");
+        assert!(
+            refused.contains("runs only in a development deployment"),
+            "{refused}"
+        );
+        let unknown = configure(true, "http://127.0.0.1:3301", 3301, Some("stripe"), None)
+            .err()
+            .expect("refused");
+        assert!(unknown.contains("PW_PAYMENTS is `stripe`"), "{unknown}");
+    }
+
+    /// **A payment through the configured provider reaches the host's
+    /// webhook, and the host acts on it**: the provider and the host share
+    /// the secret made at start, and nothing else does.
+    #[test]
+    fn the_configured_provider_and_host_agree_on_their_secret() {
+        // A host listening, to hear the provider's webhook as `main` would.
+        let host = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = host.local_addr().expect("addr").port();
+        // The provider on a port of its own, free now.
+        let free = TcpListener::bind("127.0.0.1:0")
+            .expect("bind")
+            .local_addr()
+            .expect("addr")
+            .port()
+            .to_string();
+        let payments = configure(
+            true,
+            &format!("http://127.0.0.1:{port}"),
+            port,
+            Some("dev"),
+            Some(&free),
+        )
+        .expect("configured")
+        .expect("payments");
+        let heard = payments.clone();
+        std::thread::spawn(move || {
+            for stream in host.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                if let Some(req) = read_request(&stream) {
+                    let (code, said) = heard.heard(req.header("stripe-signature"), &req.body);
+                    write(&mut stream, code, "text/plain", "", said.as_bytes());
+                }
+            }
+        });
+        let made = {
+            let (code, body) = {
+                let url = format!("{}/v1/payment_intents", payments.provider);
+                let rest = url.strip_prefix("http://").expect("http");
+                let (authority, path) = rest.split_once('/').expect("path");
+                let mut stream = TcpStream::connect(authority).expect("connect");
+                let body = r#"{"order":"order-1","amount":1250}"#;
+                let head = format!(
+                    "POST /{path} HTTP/1.1\r\nhost: {authority}\r\nidempotency-key: k\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+                    body.len()
+                );
+                stream.write_all(head.as_bytes()).expect("write");
+                stream.write_all(body.as_bytes()).expect("write");
+                let mut all = String::new();
+                stream.read_to_string(&mut all).expect("read");
+                let (head, body) = all.split_once("\r\n\r\n").expect("head");
+                (
+                    head.split_whitespace().nth(1).unwrap_or("").to_string(),
+                    body.to_string(),
+                )
+            };
+            assert_eq!(code, "200", "{body}");
+            serde_json::from_str::<serde_json::Value>(&body).expect("json")
+        };
+        let secret = made["client_secret"].as_str().expect("secret");
+        let url = format!("{}/pay/{secret}", payments.provider);
+        let rest = url.strip_prefix("http://").expect("http");
+        let (authority, path) = rest.split_once('/').expect("path");
+        let mut stream = TcpStream::connect(authority).expect("connect");
+        let body = "card=4242424242424242";
+        let head = format!(
+            "POST /{path} HTTP/1.1\r\nhost: {authority}\r\ncontent-type: application/x-www-form-urlencoded\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+            body.len()
+        );
+        stream.write_all(head.as_bytes()).expect("write");
+        stream.write_all(body.as_bytes()).expect("write");
+        let mut page = String::new();
+        stream.read_to_string(&mut page).expect("read");
+        assert!(page.contains("Paid."), "{page}");
+        // The webhook is sent after the page is answered: wait for the host
+        // to have heard it.
+        let mut tries = 0;
+        while payments.settled.lock().expect("settled").is_empty() && tries < 100 {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            tries += 1;
+        }
+        let settled = payments.settled.lock().expect("settled").clone();
+        assert_eq!(settled.len(), 1, "{settled:?}");
+        assert_eq!(
+            (
+                settled[0].order.as_str(),
+                settled[0].status.as_str(),
+                settled[0].amount
+            ),
+            ("order-1", "succeeded", 1250)
+        );
+    }
+}

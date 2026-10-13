@@ -962,6 +962,10 @@ struct Server {
     /// Set once, as the server starts; a page that states its canonical
     /// address cannot be served without it.
     origin: std::sync::OnceLock<String>,
+    /// NEXT 6c: **the deployment's payments**, as its configuration states
+    /// them (`PW_PAYMENTS`), set once as the server starts; none where it
+    /// names none.
+    payments: std::sync::OnceLock<Arc<payments::Payments>>,
 }
 
 /// How many interactions' outcomes one session keeps (ADR-0121). A retry of
@@ -1611,6 +1615,7 @@ impl Server {
             slow: Mutex::new(std::collections::VecDeque::new()),
             tellings: Mutex::new(std::collections::VecDeque::new()),
             origin: std::sync::OnceLock::new(),
+            payments: std::sync::OnceLock::new(),
             shown: Mutex::new(BTreeMap::new()),
             documents: std::sync::atomic::AtomicU64::new(1),
             params: Mutex::new(BTreeMap::new()),
@@ -7373,6 +7378,25 @@ fn main() {
             eprintln!("pw dev server: {e}");
             std::process::exit(1);
         });
+    // NEXT 6c: the deployment's payments, as its configuration states them,
+    // refused at start where they may not run.
+    match payments::configure(
+        deployment.development && deployment.loopback(),
+        &deployment.origin,
+        port,
+        std::env::var("PW_PAYMENTS").ok().as_deref(),
+        std::env::var("PW_PAYMENTS_PORT").ok().as_deref(),
+    ) {
+        Ok(Some(p)) => {
+            println!("pw dev server payments: {}", p.describe());
+            let _ = server.payments.set(p);
+        }
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("pw dev server: {e}");
+            std::process::exit(1);
+        }
+    }
     // A page's canonical address is written with the public origin
     // (ADR-0311), or the server does not start.
     let stated = std::env::var("PW_ORIGIN").is_ok_and(|o| !o.is_empty());
@@ -7484,6 +7508,22 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
     }
     let mut body = vec![0; length];
     if reader.read_exact(&mut body).is_err() {
+        return;
+    }
+
+    // NEXT 6c: the provider's webhook, held to its signature. It comes from
+    // the provider, not this origin, and carries no session.
+    if method == "POST" && route == "/payments/webhook" {
+        let (code, said) = match server.payments.get() {
+            Some(p) => p.heard(payments::header_value(&headers, "stripe-signature"), &body),
+            None => (404, "this deployment takes no payments".to_string()),
+        };
+        respond_build(
+            &mut stream,
+            code,
+            "text/plain; charset=utf-8",
+            said.as_bytes(),
+        );
         return;
     }
 
