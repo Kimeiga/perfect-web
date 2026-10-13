@@ -2904,3 +2904,8 @@ an order is priced by the program from the store's data (W9's; NEXT 6b).
   store in named roundings; the shown total held at `place_order`; each
   store's part kept with its rate.
 - ADR-0327 corrected: `is_less` was named and not declared (found by W9).
+[ADR-0330](DECISIONS/ADR-0330-an-arms-binding-is-read-through-a-member.md):
+an arm's binding is read through a member, as a block's value is (the
+integrator's; W9's finding in NEXT 6b).
+- A case's payload is a step of a planned path; a value of another case
+  sets nothing; two arms that would set one path refused.

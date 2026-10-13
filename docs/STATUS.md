@@ -23,6 +23,18 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0330, 2026-10-13: an arm's binding is read through a member, as a
+block's value is** (the integrator's; W9's finding in NEXT 6b; track
+`arm-members`, merged from `c0c3b71`).
+- `{#match order_total}{:Some(total)}{total.display}{/match}` did not build;
+  the order page worded its total in its query instead. The plan's path
+  gains a case's payload; a host computes the read from the query's value
+  the match decides by, and sets nothing for another case's value.
+- Refused by name: two arms reading one path from different values, an arm
+  of a match on a loop's item, and one in a region the browser renders
+  again from a speculation.
+Verify TRAIN_RUN green, with train-4.
+
 **ADR-0329, 2026-10-13: an order is priced by the program from the
 store's data** (W9's; NEXT 6b; track `order-total`, merged from `1a64318`,
 with the integrator's rulings of 2026-10-13).

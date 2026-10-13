@@ -162,6 +162,12 @@ pub enum Step {
     /// **A computed hole's function** (ADR-0226), called with the value it
     /// reads: its component id.
     Derived(String),
+    /// **A case's payload** (the integrator's, 2026-10-13; W9's finding in
+    /// NEXT 6b): what a `{#match}` arm binds, `Some(total)`'s `total`, by
+    /// the case's WIT name, as the template names it (`some`, `ok`, `err`,
+    /// `circle`); of a case of several fields, the one at `field`. A value of another case has none, and nothing is set: its
+    /// arm is not shown.
+    Payload { case: String, field: Option<usize> },
 }
 
 /// **A computed part a host computes** (ADR-0226, ruling 0073-a): the pure
@@ -893,6 +899,219 @@ fn row_read(
     }))
 }
 
+/// **An arm's read of its binding through a member** (the integrator's,
+/// 2026-10-13): `{total.display}` inside `{#match order_total}{:Some(total)}`.
+/// A host computes it from the query's value the match decides by, through
+/// the case's payload, into what the block is rendered with by its path, as
+/// a member read inside a block is (ADR-0323); a value of another case sets
+/// nothing, its arm not shown. `None` where `path`'s root is no arm's name
+/// around `part`.
+///
+/// Refused, by name: an arm whose match decides by no query's value (a
+/// loop's item, another arm's binding).
+fn arm_read(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+    chunks: &[crate::template_ir::Chunk],
+    found: &[(String, DefId, Vec<ExprId>)],
+    part: u32,
+    path: &str,
+    members: &mut BTreeSet<DefId>,
+) -> Result<Option<Part>, String> {
+    let mut segments = path.split('.');
+    let root = segments.next().unwrap_or_default();
+    let reads: Vec<&str> = segments.collect();
+    let Some(arm) = enclosing_arm(chunks, part, root, &mut Vec::new()).flatten() else {
+        return Ok(None);
+    };
+    let mut through = arm.subject.split('.');
+    let query = through.next().unwrap_or_default();
+    let fields: Vec<&str> = through.collect();
+    let Some((_, resource, _)) = found.iter().find(|(n, ..)| *n == query) else {
+        return Err(format!(
+            "part {part} reads `{path}` through a member function of `{root}`, the payload \
+             `{{#match {}}}` binds, which decides by no query's value: a host computes a \
+             member of an arm's binding where its match decides by a query's value, or a \
+             field of one",
+            arm.subject
+        ));
+    };
+    // The subject, read from the query's value by field and through a member
+    // as any value is (ADR-0229): `total.discount`.
+    let value = value_of(sigs, *resource)
+        .ok_or_else(|| format!("`{query}`'s query has no resolved result"))?;
+    let (through, subject) = steps_to(sigs, value, &fields)?;
+    let payload = payload_type(sigs, &subject, &arm.case, arm.field).ok_or_else(|| {
+        format!(
+            "part {part}: `{}`'s case `{}` carries no payload `{root}`",
+            arm.subject, arm.case
+        )
+    })?;
+    let mut planned = through;
+    planned.push((
+        Step::Payload {
+            case: arm.case.clone(),
+            field: arm.field,
+        },
+        None,
+    ));
+    planned.extend(steps(sigs, payload, &reads)?);
+    let mut out = Vec::new();
+    for (step, def) in planned {
+        out.push(match (step, def) {
+            (Step::Member(_), Some(def)) => {
+                members.insert(def);
+                Step::Member(
+                    component_id_of(hirs, def)
+                        .ok_or_else(|| "a member function with no identity".to_string())?,
+                )
+            }
+            (step, _) => step,
+        });
+    }
+    Ok(Some(Part {
+        part,
+        path: path.to_string(),
+        binding: query.to_string(),
+        steps: out,
+    }))
+}
+
+/// **An arm's read, planned once for its path**: the renderer reads a block's
+/// values by their path whole, so two arms that bind one name and read one
+/// path through it from different values would set one value for both.
+/// Refused, naming both; the same read twice is planned once.
+fn arm_part(planned: &mut Vec<Part>, read: Part) -> Result<(), String> {
+    match planned.iter().find(|p| p.path == read.path) {
+        None => {
+            planned.push(read);
+            Ok(())
+        }
+        Some(p) if p.binding == read.binding && p.steps == read.steps => Ok(()),
+        Some(p) => Err(format!(
+            "parts {} and {} each read `{}`, through the payloads of two arms that bind \
+             one name from different values: a host sets a block's value by its path, \
+             so the arms' names are named apart",
+            p.part, read.part, read.path
+        )),
+    }
+}
+
+/// **The type of a case's payload**, by the case's WIT name, as the
+/// template names every case: `Option<T>`'s `some` and `Result<T, E>`'s `ok`
+/// a `T`, its `err` an `E`; a declared case's field, the one at `field` of a
+/// case of several.
+fn payload_type(
+    sigs: &Signatures,
+    ty: &ResolvedType,
+    case: &str,
+    field: Option<usize>,
+) -> Option<ResolvedType> {
+    use crate::resolved::Builtin;
+    match (ty.as_builtin(), case, field) {
+        (Some(Builtin::Option), "some", None) | (Some(Builtin::Result), "ok", None) => {
+            return ty.args().first().cloned();
+        }
+        (Some(Builtin::Result), "err", None) => return ty.args().get(1).cloned(),
+        (Some(_), ..) => return None,
+        _ => {}
+    }
+    let fields = sigs
+        .type_decl(ty.def_id()?)?
+        .variants
+        .as_ref()?
+        .iter()
+        .find(|(c, _)| crate::wit::ident(c) == case)?
+        .1
+        .clone();
+    match (field, fields.as_slice()) {
+        (None, [one]) => one.resolved().cloned(),
+        (Some(i), _) if fields.len() > 1 => fields.get(i)?.resolved().cloned(),
+        _ => None,
+    }
+}
+
+/// What an arm's name is around a part: the payload of the match's subject,
+/// as the template reads it, of the case, and of the field of a case of
+/// several.
+#[derive(Debug, Clone)]
+struct ArmBinding {
+    subject: String,
+    case: String,
+    field: Option<usize>,
+}
+
+/// **The arm whose payload `root` names, around the part `part`**: the
+/// innermost name `root` enclosing it, an arm's, or a loop's, which is the
+/// row's to read (ADR-0169) and hides an arm's of the same name.
+fn enclosing_arm(
+    chunks: &[crate::template_ir::Chunk],
+    part: u32,
+    root: &str,
+    around: &mut Vec<(String, Option<ArmBinding>)>,
+) -> Option<Option<ArmBinding>> {
+    use crate::template_ir::{Chunk, Part};
+    for c in chunks {
+        let Chunk::Dynamic(p) = c else { continue };
+        if p.id().is_some_and(|id| id.0 == part) {
+            return Some(
+                around
+                    .iter()
+                    .rev()
+                    .find(|(name, _)| name == root)
+                    .and_then(|(_, arm)| arm.clone()),
+            );
+        }
+        match p {
+            Part::Match { value, arms, .. } => {
+                for arm in arms {
+                    let bound: Vec<(String, Option<ArmBinding>)> = arm
+                        .binding
+                        .iter()
+                        .map(|name| (name, None))
+                        .chain(arm.fields.iter().enumerate().map(|(i, f)| (f, Some(i))))
+                        .map(|(name, field)| {
+                            (
+                                name.clone(),
+                                Some(ArmBinding {
+                                    subject: value.clone(),
+                                    case: arm.case.clone(),
+                                    field,
+                                }),
+                            )
+                        })
+                        .collect();
+                    let n = bound.len();
+                    around.extend(bound);
+                    let found = enclosing_arm(&arm.body, part, root, around);
+                    around.truncate(around.len() - n);
+                    if found.is_some() {
+                        return found;
+                    }
+                }
+            }
+            _ => {
+                // A loop's item hides an arm's name of the same name.
+                let looped = match p {
+                    Part::Each { binding, .. } => Some((binding.clone(), None)),
+                    _ => None,
+                };
+                let pushed = looped.is_some();
+                around.extend(looped);
+                for region in p.nested() {
+                    if let Some(found) = enclosing_arm(region, part, root, around) {
+                        return Some(found);
+                    }
+                }
+                if pushed {
+                    around.pop();
+                }
+            }
+        }
+    }
+    None
+}
+
 /// The type at `fields` in a value of type `ty`, through record fields
 /// alone: `None` where one is not a field.
 fn field_type(sigs: &Signatures, mut ty: ResolvedType, fields: &[&str]) -> Option<ResolvedType> {
@@ -1291,11 +1510,19 @@ fn component_id_of(hirs: &[&Hir], def: DefId) -> Option<String> {
 
 /// The steps a path's reads take from a value of type `ty`, and the member
 /// functions it names.
-fn steps(
+fn steps(sigs: &Signatures, ty: ResolvedType, reads: &[&str]) -> Result<Steps, String> {
+    Ok(steps_to(sigs, ty, reads)?.0)
+}
+
+/// Each step a path takes, with the member function it names.
+type Steps = Vec<(Step, Option<DefId>)>;
+
+/// [`steps`], and the type they reach.
+fn steps_to(
     sigs: &Signatures,
     mut ty: ResolvedType,
     reads: &[&str],
-) -> Result<Vec<(Step, Option<DefId>)>, String> {
+) -> Result<(Steps, ResolvedType), String> {
     let mut out = Vec::new();
     for read in reads {
         let def = ty
@@ -1321,7 +1548,7 @@ fn steps(
         out.push((Step::Member(String::new()), Some(member.definition)));
         ty = next;
     }
-    Ok(out)
+    Ok((out, ty))
 }
 
 fn plan(
@@ -1653,7 +1880,29 @@ fn plan(
                 hole.origin,
                 crate::template_ir::ReadAt::Expr(hole.expr),
             ) {
-                let read = row_read(
+                if let Some(read) = row_read(
+                    hirs,
+                    sigs,
+                    &template.chunks,
+                    &found,
+                    hole.part.0,
+                    &hole.path,
+                    &mut members,
+                )? {
+                    if !rows
+                        .iter()
+                        .any(|r| r.collection == read.collection && r.path == read.path)
+                    {
+                        rows.push(read);
+                    }
+                    continue;
+                }
+                // **An arm's binding read through a member** (the integrator's,
+                // 2026-10-13; W9's finding): computed from the query's value
+                // its match decides by, through the case's payload, into what
+                // the block is rendered with, as ADR-0323's are. Until then it
+                // was refused here, and a page worded its total for it.
+                let read = arm_read(
                     hirs,
                     sigs,
                     &template.chunks,
@@ -1663,12 +1912,7 @@ fn plan(
                     &mut members,
                 )?
                 .ok_or_else(|| unplanned(hole.part.0, &hole.path, "a text part"))?;
-                if !rows
-                    .iter()
-                    .any(|r| r.collection == read.collection && r.path == read.path)
-                {
-                    rows.push(read);
-                }
+                arm_part(&mut derived_values, read)?;
             }
             continue;
         };
@@ -1804,7 +2048,7 @@ fn plan(
             crate::template_ir::ReadKind::Meta => "the page's metadata",
             crate::template_ir::ReadKind::Captures => "what a handler captures",
         };
-        let row = row_read(
+        if let Some(row) = row_read(
             hirs,
             sigs,
             &template.chunks,
@@ -1812,14 +2056,34 @@ fn plan(
             read.part.0,
             &read.path,
             &mut members,
-        )?
-        .ok_or_else(|| unplanned(read.part.0, &read.path, what))?;
-        if !rows
-            .iter()
-            .any(|r| r.collection == row.collection && r.path == row.path)
-        {
-            rows.push(row);
+        )? {
+            if !rows
+                .iter()
+                .any(|r| r.collection == row.collection && r.path == row.path)
+            {
+                rows.push(row);
+            }
+            continue;
         }
+        // An arm's binding read through a member (the integrator's,
+        // 2026-10-13), in an attribute or what a block in the arm decides
+        // by, as in its text. A loop's list read so stays refused.
+        let arm = match read.kind {
+            crate::template_ir::ReadKind::List => None,
+            _ => arm_read(
+                hirs,
+                sigs,
+                &template.chunks,
+                &found,
+                read.part.0,
+                &read.path,
+                &mut members,
+            )?,
+        };
+        arm_part(
+            &mut derived_values,
+            arm.ok_or_else(|| unplanned(read.part.0, &read.path, what))?,
+        )?;
     }
 
     // **An attribute at the top of the page reads a query's value**

@@ -3926,12 +3926,13 @@ impl Server {
     }
 
     /// **A part's value**, by the steps the compiler planned: a record field,
-    /// or a member function run as its own component.
+    /// or a member function run as its own component. `None` where a case's
+    /// payload is read from a value of another case: its arm is not shown.
     fn read_part(
         &self,
         bindings: &BTreeMap<String, Val>,
         part: &serde_json::Value,
-    ) -> Result<Val, String> {
+    ) -> Result<Option<Val>, String> {
         let binding = part["binding"].as_str().unwrap_or_default();
         let value = bindings
             .get(binding)
@@ -3940,9 +3941,21 @@ impl Server {
         self.follow(value, &part["steps"])
     }
 
+    /// A part outside any arm: it always has a value.
+    fn read_shown_part(
+        &self,
+        bindings: &BTreeMap<String, Val>,
+        part: &serde_json::Value,
+    ) -> Result<Val, String> {
+        self.read_part(bindings, part)?
+            .ok_or_else(|| format!("part {} reads an arm's payload", part["part"]))
+    }
+
     /// **The value a part's steps lead to from `value`**: each a record field,
-    /// or a member function run as its own component (ADR-0125).
-    fn follow(&self, mut value: Val, steps: &serde_json::Value) -> Result<Val, String> {
+    /// a member function run as its own component (ADR-0125), or a case's
+    /// payload (the integrator's, 2026-10-13), which a value of another case
+    /// has none of.
+    fn follow(&self, mut value: Val, steps: &serde_json::Value) -> Result<Option<Val>, String> {
         for step in steps.as_array().into_iter().flatten() {
             value = if let Some(field) = step["field"].as_str() {
                 let wit = field.replace('_', "-");
@@ -3966,11 +3979,18 @@ impl Server {
                 out.into_iter()
                     .next()
                     .ok_or_else(|| format!("{derived} returned nothing"))?
+            } else if let Some(payload) = step.get("payload") {
+                let case = payload["case"].as_str().unwrap_or_default();
+                let field = payload["field"].as_u64().map(|i| i as usize);
+                let Some(carried) = payload_of(&value, case, field)? else {
+                    return Ok(None);
+                };
+                carried
             } else {
                 return Err(format!("a step this server does not know: {step}"));
             };
         }
-        Ok(value)
+        Ok(Some(value))
     }
 
     /// **A binding's value as the renderer reads it** (ADR-0169): each row
@@ -4036,7 +4056,9 @@ impl Server {
                 return Err(format!("a row of `{collection}` is no record"));
             };
             for read in reads {
-                let read_value = self.follow(item.clone(), &read["steps"])?;
+                let read_value = self.follow(item.clone(), &read["steps"])?.ok_or_else(|| {
+                    format!("a row's read {} reads an arm's payload", read["path"])
+                })?;
                 // Set whole, by its path from the item's name:
                 // `item.price.display` is `price.display` in the row, which
                 // the renderer reads as one (ADR-0170). Until 2026-10-03 it
@@ -4063,12 +4085,14 @@ impl Server {
         // was read here, so a command asked each of the page's queries for
         // the cart's count, and a slow one held up every command.
         let bindings = self.binding(session, part["binding"].as_str().unwrap_or_default())?;
-        Ok(match &val_to_value(&self.read_part(&bindings, &part)?) {
-            Value::Text(t) => t.clone(),
-            Value::Int(n) => n.to_string(),
-            Value::Bool(b) => b.to_string(),
-            other => return Err(format!("`{path}` has no text form: {other:?}")),
-        })
+        Ok(
+            match &val_to_value(&self.read_shown_part(&bindings, &part)?) {
+                Value::Text(t) => t.clone(),
+                Value::Int(n) => n.to_string(),
+                Value::Bool(b) => b.to_string(),
+                other => return Err(format!("`{path}` has no text form: {other:?}")),
+            },
+        )
     }
 
     /// The lock a session's one change at a time holds (ADR-0172).
@@ -6083,10 +6107,14 @@ impl Server {
             .chain(plan["derived"].as_array().into_iter().flatten())
         {
             let path = part["path"].as_str().unwrap_or_default();
-            let value = self
+            // An arm's payload, of a value of another case, is set nowhere:
+            // its arm is not shown (the integrator's, 2026-10-13).
+            if let Some(value) = self
                 .read_part(bindings, part)
-                .unwrap_or_else(|e| panic!("part `{path}`: {e}"));
-            env = env.set(path, val_to_value(&value));
+                .unwrap_or_else(|e| panic!("part `{path}`: {e}"))
+            {
+                env = env.set(path, val_to_value(&value));
+            }
         }
         // What it computes from its signals, at their first values (ADR-0227).
         let env = self
@@ -6140,7 +6168,7 @@ impl Server {
         let mut shown = Shown::default();
         for part in plan["parts"].as_array().into_iter().flatten() {
             let id = part["part"].as_u64().unwrap_or_default() as u32;
-            let value = val_to_value(&self.read_part(bindings, part)?);
+            let value = val_to_value(&self.read_shown_part(bindings, part)?);
             let text = text_of(&value).ok_or_else(|| format!("part {id} has no text form"))?;
             shown.texts.insert(id, text);
         }
@@ -6952,6 +6980,83 @@ fn value_at_mut<'a>(value: &'a mut Value, fields: &[&str]) -> Option<&'a mut Val
 
 /// A component value as the renderer reads it: a record by its Pleris field
 /// names (the WIT's kebab case undone), an `Int` as an `Int`.
+/// **What a `{#match}` arm binds of `value`, for the case `case`** (the
+/// integrator's, 2026-10-13), by its WIT name as the plan names every case:
+/// `some`'s, `ok`'s and `err`'s payload, or a declared case's, and of a case
+/// of several fields the one at `field`; `None` for a value of another case,
+/// whose arm is not shown. A value that is no case is the plan's fault.
+fn payload_of(value: &Val, case: &str, field: Option<usize>) -> Result<Option<Val>, String> {
+    let carried = match (value, case) {
+        (Val::Option(Some(v)), "some") => Some((**v).clone()),
+        (Val::Option(_), _) => None,
+        (Val::Result(Ok(v)), "ok") | (Val::Result(Err(v)), "err") => v.as_deref().cloned(),
+        (Val::Result(_), _) => None,
+        (Val::Variant(name, v), _) if name == case => v.as_deref().cloned(),
+        (Val::Variant(..), _) => None,
+        (other, _) => return Err(format!("the case `{case}` read from {other:?}")),
+    };
+    Ok(match (field, carried) {
+        (_, None) => None,
+        (None, carried) => carried,
+        (Some(i), Some(Val::Tuple(fields))) => Some(
+            fields
+                .get(i)
+                .cloned()
+                .ok_or_else(|| format!("`{case}` has no field {i}"))?,
+        ),
+        (Some(i), Some(other)) => {
+            return Err(format!("field {i} of `{case}` read from {other:?}"));
+        }
+    })
+}
+
+#[cfg(test)]
+mod payload_tests {
+    use super::*;
+
+    /// **An arm's payload is its case's**, and a value of another case has
+    /// none: the arm is not shown, and nothing is set for it.
+    #[test]
+    fn an_arm_reads_its_cases_payload_and_another_cases_value_has_none() {
+        let some = Val::Option(Some(Box::new(Val::S64(1234))));
+        assert_eq!(payload_of(&some, "some", None), Ok(Some(Val::S64(1234))));
+        assert_eq!(payload_of(&some, "none", None), Ok(None));
+        assert_eq!(payload_of(&Val::Option(None), "some", None), Ok(None));
+        let ok = Val::Result(Ok(Some(Box::new(Val::String("paid".into())))));
+        assert_eq!(
+            payload_of(&ok, "ok", None),
+            Ok(Some(Val::String("paid".into())))
+        );
+        assert_eq!(payload_of(&ok, "err", None), Ok(None));
+        let err = Val::Result(Err(Some(Box::new(Val::S64(7)))));
+        assert_eq!(payload_of(&err, "err", None), Ok(Some(Val::S64(7))));
+        assert_eq!(payload_of(&err, "ok", None), Ok(None));
+        let circle = Val::Variant("circle".into(), Some(Box::new(Val::Float64(2.0))));
+        assert_eq!(
+            payload_of(&circle, "circle", None),
+            Ok(Some(Val::Float64(2.0)))
+        );
+        assert_eq!(payload_of(&circle, "square", None), Ok(None));
+        // A case of several fields: the one at its place.
+        let between = Val::Variant(
+            "between".into(),
+            Some(Box::new(Val::Tuple(vec![Val::S64(100), Val::S64(900)]))),
+        );
+        assert_eq!(
+            payload_of(&between, "between", Some(1)),
+            Ok(Some(Val::S64(900)))
+        );
+        assert_eq!(
+            payload_of(&between, "between", Some(0)),
+            Ok(Some(Val::S64(100)))
+        );
+        assert_eq!(payload_of(&between, "fixed", Some(1)), Ok(None));
+        assert!(payload_of(&between, "between", Some(2)).is_err());
+        // A value that is no case is the plan's fault, said.
+        assert!(payload_of(&Val::S64(1), "some", None).is_err());
+    }
+}
+
 fn val_to_value(v: &Val) -> Value {
     match v {
         Val::String(s) => Value::Text(s.clone()),

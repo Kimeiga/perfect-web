@@ -5924,6 +5924,26 @@ e14-explicit-imports:
      } > docs/evidence/E14/explicit-imports.txt
     @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/explicit-imports.txt
 
+# ADR-0330: an arm's binding is read through a member, as a block's value is
+# (the integrator's; W9's finding in NEXT 6b). The plan's tests
+# (compiler/pw-core/tests/arm_member_reads.rs), the host's payload
+# (payload_tests), and the mutation controls
+# (scripts/arm_member_reads_mutations.py).
+e14-arm-member-reads:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0330 - an arm's binding is read through a member, as a block's value is"; echo; \
+       echo "produced by: just e14-arm-member-reads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the plan (compiler/pw-core/tests/arm_member_reads.rs)"; echo; \
+       cargo test --locked -p pw-core --test arm_member_reads 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host's payload (spikes/own-renderer/server/src/main.rs, payload_tests)"; echo; \
+       cargo test --locked -p pw-dev-server -- payload_tests 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/arm_member_reads_mutations.py)"; echo; \
+       python3 scripts/arm_member_reads_mutations.py; \
+     } > docs/evidence/E14/arm-member-reads.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/arm-member-reads.txt
+
 # ADR-0322: `|` and `&` are parenthesized where they mix (W9's finding). The
 # parser's rule (compiler/pw-syntax/src/grammar.rs), every shipped program and
 # the corpus parsing as before, and the mutation controls

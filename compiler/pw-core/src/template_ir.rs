@@ -402,8 +402,8 @@ pub enum Part {
 /// to, and what it renders.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Arm {
-    /// `Some`, `None`, `Ok` or `Err`; a declared case by its WIT name,
-    /// `circle` (ADR-0061).
+    /// The case by its WIT name, as every case is named here: `some`,
+    /// `none`, `ok`, `err`, or a declared case's, `circle` (ADR-0061).
     pub case: String,
     /// The payload of a case of one field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
