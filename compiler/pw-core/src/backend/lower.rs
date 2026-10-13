@@ -928,6 +928,13 @@ fn sendable_within(cx: &Context<'_>, t: &Type, on_the_way: &mut BTreeSet<DefId>)
         Type::Int | Type::Float | Type::Bool | Type::Str => true,
         // A list of what a browser can send (ADR-0172).
         Type::List(t) => sendable_within(cx, t, on_the_way),
+        // **A case of what a browser can send** (the integrator's,
+        // 2026-10-13; W9's finding in NEXT 6b): `Option`'s and `Result`'s, a
+        // case as its name and payload, `{ $case, value }`.
+        Type::Option(t) => sendable_within(cx, t, on_the_way),
+        Type::Result(t, e) => {
+            sendable_within(cx, t, on_the_way) && sendable_within(cx, e, on_the_way)
+        }
         Type::Nominal(def, _) => {
             let Some(d) = cx.sigs.type_decl(*def) else {
                 return false;
@@ -937,6 +944,24 @@ fn sendable_within(cx: &Context<'_>, t: &Type, on_the_way: &mut BTreeSet<DefId>)
                     ty_resolution(cx.sigs, r, &Span::default()),
                     Lowering::Lowered(Type::Int | Type::Float | Type::Bool | Type::Str)
                 );
+            }
+            // And a declared case's, each field of each case sent. A type
+            // that contains itself through a case is not: a host reads no
+            // such case from a browser.
+            if let Some(cases) = d.variants.as_ref() {
+                if !on_the_way.insert(*def) {
+                    return false;
+                }
+                let all = cases.iter().all(|(_, fields)| {
+                    fields.iter().all(|f| {
+                        matches!(
+                            ty_resolution(cx.sigs, f, &Span::default()),
+                            Lowering::Lowered(field) if sendable_within(cx, &field, on_the_way)
+                        )
+                    })
+                });
+                on_the_way.remove(def);
+                return all;
             }
             // **A record of what a browser can send** (ADR-0172): the item a
             // page showed, which `add_to_cart` makes its new line from.
@@ -5797,8 +5822,8 @@ impl<'a> Lower<'a> {
                         span,
                         reason: format!(
                             "argument {} of `{path}` is `{named}`; a handler sends primitives, \
-                             opaque types over them, and lists and records of what it sends, \
-                             each field named in snake case",
+                             opaque types over them, and lists, records and cases of what it \
+                             sends, each field named in snake case",
                             i + 1
                         ),
                     };

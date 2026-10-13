@@ -63,6 +63,13 @@ subtotal) and the ruling of 2026-08-20 (opacity is not ABI transparency).
 7. **USD alone.** No other currency, no conversion, no locale's format:
    `Money<C>`'s parameter is a marker the program has one of.
 
+## Correction, 2026-10-13 (found by W9 in NEXT 6b)
+
+Decision 2 named `is_less` among the exact operations, and `domain` declared
+none: no test called it, and the ADR said what the code did not. ADR-0329
+declares it, held by a mutant (`<` to `<=`) its small-order boundary test
+kills.
+
 ## Alternatives
 
 - **Keep the record and add the functions.** Any module could still divide

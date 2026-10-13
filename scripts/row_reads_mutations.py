@@ -107,35 +107,20 @@ MUTANTS = [
         "a row's member read in text is not planned",
         "core",
         PLAN,
-        "            ) {\n                let read = row_read(\n",
-        "            ) && false {\n                let read = row_read(\n",
+        "            ) {\n                if let Some(read) = row_read(\n",
+        "            ) && false {\n                if let Some(read) = row_read(\n",
     ),
     (
         "a member read in text no host computes passes silently",
         "core",
         PLAN,
-        "                let read = row_read(\n"
-        "                    hirs,\n"
-        "                    sigs,\n"
-        "                    &template.chunks,\n"
-        "                    &found,\n"
-        "                    hole.part.0,\n"
-        "                    &hole.path,\n"
-        "                    &mut members,\n"
-        "                )?\n"
-        "                .ok_or_else(|| unplanned(hole.part.0, &hole.path, \"a text part\"))?;\n",
-        "                let Some(read) = row_read(\n"
-        "                    hirs,\n"
-        "                    sigs,\n"
-        "                    &template.chunks,\n"
-        "                    &found,\n"
-        "                    hole.part.0,\n"
-        "                    &hole.path,\n"
-        "                    &mut members,\n"
-        "                )?\n"
-        "                else {\n"
+        "                .ok_or_else(|| unplanned(hole.part.0, &hole.path, \"a text part\"))?;\n"
+        "                arm_part(&mut derived_values, read)?;\n",
+        "                ;\n"
+        "                let Some(read) = read else {\n"
         "                    continue;\n"
-        "                };\n",
+        "                };\n"
+        "                arm_part(&mut derived_values, read)?;\n",
     ),
     (
         "a read outside a text part is not checked",
@@ -148,49 +133,34 @@ MUTANTS = [
         "a member read outside text no host computes passes silently",
         "core",
         PLAN,
-        "        let row = row_read(\n"
-        "            hirs,\n"
-        "            sigs,\n"
-        "            &template.chunks,\n"
-        "            &found,\n"
-        "            read.part.0,\n"
-        "            &read.path,\n"
-        "            &mut members,\n"
-        "        )?\n"
-        "        .ok_or_else(|| unplanned(read.part.0, &read.path, what))?;\n",
+        "        arm_part(\n"
+        "            &mut derived_values,\n"
+        "            arm.ok_or_else(|| unplanned(read.part.0, &read.path, what))?,\n"
+        "        )?;\n",
         "        let _ = what;\n"
-        "        let Some(row) = row_read(\n"
-        "            hirs,\n"
-        "            sigs,\n"
-        "            &template.chunks,\n"
-        "            &found,\n"
-        "            read.part.0,\n"
-        "            &read.path,\n"
-        "            &mut members,\n"
-        "        )?\n"
-        "        else {\n"
-        "            continue;\n"
-        "        };\n",
+        "        if let Some(arm) = arm {\n"
+        "            arm_part(&mut derived_values, arm)?;\n"
+        "        }\n",
     ),
     (
         "a row read in text is planned twice",
         "core",
         PLAN,
-        "                if !rows\n"
-        "                    .iter()\n"
-        "                    .any(|r| r.collection == read.collection && r.path == read.path)\n"
-        "                {\n",
-        "                if true {\n",
+        "                    if !rows\n"
+        "                        .iter()\n"
+        "                        .any(|r| r.collection == read.collection && r.path == read.path)\n"
+        "                    {\n",
+        "                    if true {\n",
     ),
     (
         "a row read outside text is planned twice",
         "core",
         PLAN,
-        "        if !rows\n"
-        "            .iter()\n"
-        "            .any(|r| r.collection == row.collection && r.path == row.path)\n"
-        "        {\n",
-        "        if true {\n",
+        "            if !rows\n"
+        "                .iter()\n"
+        "                .any(|r| r.collection == row.collection && r.path == row.path)\n"
+        "            {\n",
+        "            if true {\n",
     ),
     (
         "a signal's member is not refused",

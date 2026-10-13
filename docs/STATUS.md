@@ -23,6 +23,97 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0281 amended (5), 2026-10-13: a shell script a recipe runs plans
+it, and master's verify runs no browser suite again on the same code**
+(the integrator's; track `plan-shell`, merged from `f289fc9`).
+- The planner followed only a recipe's `scripts/*.py`: train-3's run, and
+  the audit's own, planned no `e8-host` for its `audit.sh`. A `.sh` path a
+  recipe names plans it when it changes.
+- Master's push after train-3 planned nothing from the train's head
+  (verify 38440251297), and still ran its three browser suites on the same
+  code: where only records changed since the run that passed, they are
+  skipped. 33 of 33 planner mutants killed.
+Verify TRAIN_RUN green, with train-4.
+
+**2026-10-13: a flight test that fails says the query runtime's trace**
+(the integrator's finding; NEXT 3d; track `flight-wait`, merged from
+`46f7c93`).
+- `a_flight_another_reader_waits_for_is_not_stopped` failed once in
+  train-3's first `just ci`, at a load of 20, and not since (20 of 20 alone,
+  40 of 40 eight at once); neither cause tried explains it. Held open as a
+  race until shown otherwise; its assertion prints the runtime's trace.
+Verify TRAIN_RUN green, with train-4.
+
+**ADR-0331, 2026-10-13: a case crosses from a browser** (the integrator's;
+W9's finding in NEXT 6b; track `variant-args`, merged from `6054be9`).
+- A handler sends an `Option`, a `Result` or a declared case of what it
+  sends, `{ $case, value }`, and a host reads it by the parameter's own
+  type, refusing what is not a case of it, naming the argument. A case of
+  a type that contains itself is refused where the handler is compiled.
+- Found on the way: the host's enum arm was unreachable (a Pleris sum type
+  is always a WIT variant), and is gone.
+Verify TRAIN_RUN green, with train-4.
+
+**ADR-0330, 2026-10-13: an arm's binding is read through a member, as a
+block's value is** (the integrator's; W9's finding in NEXT 6b; track
+`arm-members`, merged from `c0c3b71`).
+- `{#match order_total}{:Some(total)}{total.display}{/match}` did not build;
+  the order page worded its total in its query instead. The plan's path
+  gains a case's payload; a host computes the read from the query's value
+  the match decides by, and sets nothing for another case's value.
+- Refused by name: two arms reading one path from different values, an arm
+  of a match on a loop's item, and one in a region the browser renders
+  again from a speculation.
+Verify TRAIN_RUN green, with train-4.
+
+**ADR-0329, 2026-10-13: an order is priced by the program from the
+store's data** (W9's; NEXT 6b; track `order-total`, merged from `1a64318`,
+with the integrator's rulings of 2026-10-13).
+- Each store's fee schedule is data on both layers (migration 0013): a
+  delivery fee, a service rate within a least and a most, a small-order
+  fee, a tax rate and what is taxed; read for a cart's stores in one
+  statement. San Francisco's seed: $2.99, 15% within $3 and $12, $2.50 under
+  $10, 8.625%, delivery and service untaxed (the platform a DNC that has not
+  elected, the store the retailer: Reg. 1684.5(a)(2), CDTFA's guide).
+- A cart is priced store by store and added, every part of an amount at a
+  named rounding (ADR-0327); the tip and the fees on the subtotal before a
+  promo; a promo one store's, store-funded lowering its taxable base;
+  each refusal by name; one use per reader, held by its key.
+- `place_order` takes the total the page showed and refuses
+  `TotalChanged(now)`; the order keeps each store's part with the rate
+  applied.
+- Found on the way: ADR-0327 named `is_less`, which nothing declared (W9);
+  the promo field sat inside the disclosure's target size (now its own
+  paragraph).
+Verify TRAIN_RUN green, with train-4.
+
+**ADR-0281 amended (4), 2026-10-13: a push to master plans from what a
+run passed at** (the integrator's; track `verified-base`, merged from
+`284d93f`).
+- Master's verify re-ran every recipe a train's run had passed, its code
+  the train's, until it was cancelled by hand. Now a push to `master` plans
+  from the newest commit on its first-parent line that a push's or the
+  nightly's verify run passed at (`scripts/verified_base.py`, read through
+  `gh`), and from the commit before the push where none did or on any
+  error: more, never less. Both trains' evidence commits plan nothing.
+- Seven tests; eight mutants in `dealt_by_time_mutations.py`, 30 of 30
+  killed.
+Verify 38436632504 green, with train-3.
+
+**ADR-0026 amended, 2026-10-13: a failed artifact audit prints why**
+(the integrator's; found reading the nightly of 2026-10-12; track
+`e8-audit-output`, merged from `cc72bd5`).
+- The nightly's `e8-host` failed with exit code 101 and a log of one line:
+  the audit captured its tests' output and printed it afterwards, and a
+  failing `cargo test` ended the script at the capture (`set -e`). The
+  failure itself was the benchmark's rot fixed that evening (`4813aea0`).
+- The audit now prints the tests' output whatever they answer, then exits
+  with their status and writes no evidence; the gate tests run the real
+  recipe with a failing producer (2 outputs of 3 before).
+Verify 38436632504 green, with train-3; `e8-host` by dispatch 38438359393:
+the planner planned none for its script's change (the integrator's finding,
+fixed on track `plan-shell`).
+
 **ADR-0328, 2026-10-13: a store is open by its hours, read by the clock**
 (W9's; NEXT 4, step 2; track `store-hours`, merged from `4f2ffa8`).
 - A store's hours are its data on both layers: its zone, a cut-off before

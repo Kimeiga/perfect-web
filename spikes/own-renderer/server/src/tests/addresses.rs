@@ -327,7 +327,7 @@ fn a_store_out_of_reach_says_so_and_refuses_the_add_and_the_order() {
         "nothing added"
     );
     // The cart, from before, holds store 48's drip: the order is refused.
-    let refused = run(&s, PLACE_ORDER, &ada, &[]);
+    let refused = run(&s, PLACE_ORDER, &ada, &[s.shown_total(&ada)]);
     assert!(refused.unwrap_err().contains("no-coverage"));
     assert_eq!(s.order_of(&ada), None, "no order placed");
     assert_eq!(s.cart_lines(&ada).len(), 1, "the cart is as it was");
@@ -336,7 +336,7 @@ fn a_store_out_of_reach_says_so_and_refuses_the_add_and_the_order() {
     run(&s, "store.page.remove_from_cart", &ada, &[text("drip")]).expect("removed");
     s.command(ADD, &ada, &add_shown("espresso", 1), false)
         .expect("store 47 reaches Dolores Park");
-    run(&s, PLACE_ORDER, &ada, &[]).expect("placed");
+    run(&s, PLACE_ORDER, &ada, &[s.shown_total(&ada)]).expect("placed");
 }
 
 /// **A reader's addresses are told to each of their sessions, and no one

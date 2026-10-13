@@ -125,13 +125,14 @@ fn a_block_a_parameter_decides_that_renders_a_query_is_planned() {
 /// handler there may set.
 fn cart_page(markup: &str) -> impl Fn(&str) -> String + '_ {
     move |src: &str| {
-        let page = "    signal notice: String = \"\"\n\n    view {\n        <title>Your cart</title>\n        <main>\n";
+        // Track `order-total`: after the code's and the typed tip's.
+        let page = "    signal tip_typed: String = \"\"\n\n    view {\n        <title>Your cart</title>\n        <main>\n";
         assert_eq!(src.matches(page).count(), 1, "the cart's page");
         src.replacen("import domain.{ ", "import domain.{ CartLine, ", 1)
             .replacen(
                 page,
                 &format!(
-                    "    signal notice: String = \"\"\n    signal kept: List<CartLine> = []\n\n    \
+                    "    signal tip_typed: String = \"\"\n    signal kept: List<CartLine> = []\n\n    \
                      view {{\n        <title>Your cart</title>\n        <main>\n            \
                      {markup}\n"
                 ),
@@ -196,9 +197,12 @@ fn a_block_inside_one_is_rendered_with_it() {
     assert!(!blocks.contains(&ifs[1]), "the inner one: {blocks:?}");
 }
 
-/// The cart's page as the store ships it: its `{#if SignedIn}` buttons
-/// capture nothing a query moves, and none is planned. What is planned is
-/// what a query decides, as before.
+/// The cart's page as the store ships it: what a query decides, the order's
+/// link and, since track `order-total`, the checkout's disclosure and its
+/// code's Remove; and its `{#if SignedIn}` Place order, which captures the
+/// checkout, the total it passes (ADR-0307: planned where a handler there
+/// captures a query's value). The cart's own fees line, decided by its
+/// lines, is the checkout's now.
 #[test]
 fn the_cart_page_as_it_is_plans_what_it_did() {
     let units = store(&same, &same);
@@ -221,5 +225,10 @@ fn the_cart_page_as_it_is_plans_what_it_did() {
         .map(|e| e.value)
         .collect();
     subjects.sort();
-    assert_eq!(subjects, ["cart.lines", "order"], "{:?}", plan.blocks);
+    assert_eq!(
+        subjects,
+        ["SignedIn~holds", "checkout.any", "checkout.promo", "order"],
+        "{:?}",
+        plan.blocks
+    );
 }

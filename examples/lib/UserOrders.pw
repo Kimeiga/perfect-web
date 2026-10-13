@@ -10,7 +10,7 @@
 // copy of the store.
 module UserOrders
 
-import domain.{ OrderStatus, OrderError, TrackingError }
+import domain.{ OrderStatus, OrderError, TrackingError, OrderCharged }
 import capability.{ User, UserId }
 // The resources these read and write, which their modules name.
 import Carts
@@ -21,6 +21,14 @@ fn current(reader: User<UserId>) -> Result<Option<OrderStatus>, TrackingError> !
     host "store:data/user-orders#current"
 
 // The user's cart, placed as their order: the order is the cart's lines,
-// and the cart is empty after. An empty cart places nothing.
-fn place(reader: User<UserId>) -> Result<OrderStatus, OrderError> !{ database.write<Orders>, database.write<Carts> }
+// and the cart is empty after. An empty cart places nothing. And (track
+// `order-total`) as charged, each store's part, the tip and the total, with
+// the code it used, once per user: a code used since is refused
+// `Promo(AlreadyUsed)`, by the data's own uniqueness.
+fn place(reader: User<UserId>, charged: OrderCharged, promo: Option<String>) -> Result<OrderStatus, OrderError> !{ database.write<Orders>, database.write<Carts> }
     host "store:data/user-orders#place"
+
+// **The user's order, as charged** (track `order-total`): none before one is
+// placed, or where it was placed with no charges recorded.
+fn charged(reader: User<UserId>) -> Option<OrderCharged> !{ database.read<Orders> }
+    host "store:data/user-orders#charged"

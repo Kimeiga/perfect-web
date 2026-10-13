@@ -199,14 +199,24 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
             "",
             "add_to_cart",
             "address_label",
+            // The cart's code applied (track `order-total`).
+            "apply_promo",
             "choose_address",
+            // Its tip: none, 15, 18 or 20 percent, four modules of one name;
+            // and an amount, typed, which the handler reads as dollars first
+            // (`dollars_typed`) (track `order-total`).
+            "choose_tip",
             "clear_cart",
             "decrease_in_cart",
+            "dollars_typed",
             "increase_in_cart",
-            // The cart's own page places it as an order (ADR-0193).
+            // The cart's own page places it as an order (ADR-0193), passing
+            // the total it shows (track `order-total`).
             "place_order",
             "remove_address",
-            "remove_from_cart"
+            "remove_from_cart",
+            // The cart's code taken off (track `order-total`).
+            "remove_promo"
         ]
     );
 
@@ -383,7 +393,10 @@ fn a_module_and_its_event_part_name_one_handler() {
     // The store's page's five, and its cart's page's five (ADR-0190,
     // ADR-0193), and the address page's five (track `store-accounts`): its
     // label's binding, an address chosen, renamed and removed, and one saved.
-    assert_eq!(parts.len(), 15, "{parts:?}");
+    // And the cart page's checkout (track `order-total`): the code's and the
+    // typed tip's bindings, the code applied and taken off, four tips by
+    // percent and one by amount.
+    assert_eq!(parts.len(), 24, "{parts:?}");
     // By identity: two of the address page's handlers have one name (both
     // test the label first, `address_label`), and each is its own module.
     let _ = &modules;
@@ -474,6 +487,7 @@ type Pack = Pack { n: Int }
 type Size = Small | Large
 type Crate = Crate { size: Size }
 type Hours = Hours { opensMinute: Int }
+type Tree = Leaf | Branch(Int, List<Tree>)
 
 command Buy(id: Sku, qty: Qty) -> Int { 0 }
 command Rename(id: Sku, name: String) -> Int { 0 }
@@ -489,6 +503,7 @@ command Resent(id: Sku) -> Int
 command Choose(s: Size) -> Int { 0 }
 command Stack(c: Crate) -> Int { 0 }
 command Open(h: Hours) -> Int { 0 }
+command Plant(t: Tree) -> Int { 0 }
 query Look(id: Sku) -> Int { 0 }
 fn helper(x: Int) -> Int { x }
 
@@ -764,17 +779,12 @@ fn a_record_or_a_list_is_sent_as_json_carries_it() {
 
 #[test]
 fn a_command_parameter_a_browser_cannot_send_is_refused() {
-    // A variant: a host reads none from what a browser writes.
+    // A case of a type that contains itself (ADR-0331): a host reads none
+    // from what a browser writes.
     refused(
-        "Choose(Size.Small)",
+        "Plant(Tree.Leaf)",
         "a command parameter a browser cannot send",
-        "`Size`",
-    );
-    // A record that holds one.
-    refused(
-        "Stack(Crate { size: Size.Small })",
-        "a command parameter a browser cannot send",
-        "`Crate`",
+        "`Tree`",
     );
     // A record whose field's name would not come back from its WIT name:
     // `opens-minute` is found as `opens_minute`.
@@ -782,6 +792,22 @@ fn a_command_parameter_a_browser_cannot_send_is_refused() {
         "Open(Hours { opensMinute: 1 })",
         "a command parameter a browser cannot send",
         "`Hours`",
+    );
+}
+
+/// **A case, and a record that holds one, are sent as the browser holds
+/// them** (ADR-0331): `{ $case, value }`, the case by its WIT name. Until
+/// 2026-10-13 each was refused here, "a host reads none from what a browser
+/// writes".
+#[test]
+fn a_case_and_a_record_holding_one_are_sent_as_the_browser_holds_them() {
+    assert_eq!(
+        sent(&sends("Choose(Size.Small)")),
+        &serde_json::json!([["shop.ui.Choose", [{ "$case": "small" }]]])
+    );
+    assert_eq!(
+        sent(&sends("Stack(Crate { size: Size.Large })")),
+        &serde_json::json!([["shop.ui.Stack", [{ "size": { "$case": "large" } }]]])
     );
 }
 

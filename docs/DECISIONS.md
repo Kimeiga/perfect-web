@@ -2893,3 +2893,26 @@ a store is open by its hours, read by the clock (W9's; NEXT 4, step 2).
   union, special dates); open or closed computed by the program against the
   clock and told when it changes; an order refused while closed or past the
   last order, as data the page words.
+- ADR-0026 amended, 2026-10-13: a failed artifact audit prints its tests'
+  output, then exits with their status and writes no evidence.
+- ADR-0281 amended (4), 2026-10-13: a push to master plans from the newest
+  commit on its first-parent line a push's or the nightly's verify run passed
+  at; a train's evidence then plans nothing.
+[ADR-0329](DECISIONS/ADR-0329-an-order-is-priced-by-the-program-from-the-stores-data.md):
+an order is priced by the program from the store's data (W9's; NEXT 6b).
+- Fees, tax, a tip and promo codes from each store's schedule, priced per
+  store in named roundings; the shown total held at `place_order`; each
+  store's part kept with its rate.
+- ADR-0327 corrected: `is_less` was named and not declared (found by W9).
+[ADR-0330](DECISIONS/ADR-0330-an-arms-binding-is-read-through-a-member.md):
+an arm's binding is read through a member, as a block's value is (the
+integrator's; W9's finding in NEXT 6b).
+- A case's payload is a step of a planned path; a value of another case
+  sets nothing; two arms that would set one path refused.
+[ADR-0331](DECISIONS/ADR-0331-a-case-crosses-from-a-browser.md):
+a case crosses from a browser (the integrator's; W9's finding in NEXT 6b).
+- `Option`, `Result` and declared cases as command arguments, sent as the
+  browser holds them and read by the parameter's type.
+- ADR-0281 amended (5), 2026-10-13: a shell script a recipe runs plans it;
+  master's verify skips the browser suites where only records changed since
+  the run that passed.

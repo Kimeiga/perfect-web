@@ -46,11 +46,15 @@ import Addresses.{ Address, AddressError, AddressId, AddressLabel, Coverage, Pla
 import context.{ current_session, current_user }
 import domain.{ StoreId, Store, StoreError, CartError, MenuItem, MenuSection, InteractionId,
     MenuItemId, PositiveInt, Recommendation, RecommendationError, DeliveryEstimate,
-    EstimateError, OrderStatus, OrderError, TrackingError }
+    EstimateError, OrderStatus, OrderError, TrackingError, Tip, TipError, PromoError,
+    Money, USD, is_less }
 import capability.{ Session, SessionId, User, UserId }
-import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged, AddressesChanged }
+import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged, AddressesChanged, StoreChanged }
 // TRACK SEAM (store-hours): each store's hours, and whether it is open.
 import store.hours.{ StoreStatus, StoresOpen, CartHours, hours_of_cart, closed_in, closing_said }
+// TRACK SEAM (order-total): the order's total, priced from the store's data.
+import store.checkout.{ Priced, Chosen, priced_for, shown_for, promo_for, promo_named, parts_of_cart,
+    promo_said, set_tip, set_promo, negative_tip, dollars_typed, tip_of_percent, total_charged }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -273,6 +277,39 @@ user query Order(reader: User<UserId>) -> Result<Option<OrderStatus>, TrackingEr
     UserOrders.current(reader)
 }
 
+// **The reader's checkout** (track `order-total`): the cart priced from the
+// store's data, each store's fees and tax, the code applied and the tip
+// chosen, and what the page says of the code. Read again when the cart, a
+// choice or a store's data changes, or the clock passes a code's expiry.
+user query Checkout(reader: User<UserId>) -> Priced
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader
+    invalidates_on UserCartChanged(reader), UserOrderChanged(reader), StoreChanged(_)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    shown_for(reader)
+}
+
+// **What the reader's order was charged** (track `order-total`): its total,
+// or nothing where none is placed, which the order page shows only in the
+// order's arm (the integrator's ruling of 2026-10-13).
+user query OrderTotal(reader: User<UserId>) -> Money<USD>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader
+    invalidates_on UserOrderChanged(reader)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    total_charged(UserOrders.charged(reader))
+}
+
 // **Who may place an order** (ADR-0307; track `store-accounts`): a reader
 // signed in, as `place_order` requires, declared here so the cart's page
 // asks it of its reader and shows Place order where it holds. A cart is
@@ -382,21 +419,94 @@ command clear_cart()
 // places nothing, and says so. A guest signs in to order (track
 // `store-accounts`): an order is a user's, followed from any of their
 // sessions, and the guest's cart follows them in.
-command place_order()
+command place_order(shown: Money<USD>)
     -> Result<OrderStatus, OrderError>
     requires      SignedIn
     idempotent_by InteractionId
     retry         transport_only(max = 2, jitter = true)
     transaction   serializable
-    invalidates   Cart(current_user()), Order(current_user())
+    invalidates   Cart(current_user()), Order(current_user()), Checkout(current_user()), OrderTotal(current_user())
     emits         UserCartChanged(current_user()), UserOrderChanged(current_user())
 {
     // TRACK SEAM (store-hours): refused while a store of the cart is closed
     // or past its last order, read in this transaction.
     match closed_in(hours_of_cart(current_user())) {
         Some(closing) => Err(OrderError.Closed(closing)),
-        None => UserOrders.place(current_user()),
+        // TRACK SEAM (order-total): priced again from the data, in this
+        // transaction, never from the page's numbers; refused where the code
+        // no longer applies, or the total is not the one the reader was
+        // shown (the integrator's ruling of 2026-10-13).
+        None => match priced_for(current_user()) {
+            Err(e) => Err(OrderError.Promo(e)),
+            Ok(p) => if is_less(p.charged.total, shown) | is_less(shown, p.charged.total) {
+                Err(OrderError.TotalChanged(p.charged.total))
+            } else {
+                UserOrders.place(current_user(), p.charged, p.promo)
+            },
+        },
     }
+}
+
+// **The tip the reader chooses** (track `order-total`): none, or 15, 18 or
+// 20 percent of the subtotal, each a percent a browser sends. None until
+// they choose.
+command choose_tip(percent: Int)
+    -> Result<Tip, TipError>
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    transaction   serializable
+    invalidates   Checkout(current_user())
+    emits         UserCartChanged(current_user())
+{
+    match tip_of_percent(percent) {
+        Some(tip) => Ok(set_tip(current_user(), tip).tip),
+        None => Err(TipError.NotOffered),
+    }
+}
+
+// **A tip of an amount** (track `order-total`), never below nothing: Money
+// carries no invariant, so a request's negative amount is refused here.
+command choose_tip_amount(amount: Money<USD>)
+    -> Result<Tip, TipError>
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    transaction   serializable
+    invalidates   Checkout(current_user())
+    emits         UserCartChanged(current_user())
+{
+    if negative_tip(Tip.TipAmount(amount)) {
+        return Err(TipError.NegativeTip)
+    }
+    Ok(set_tip(current_user(), Tip.TipAmount(amount)).tip)
+}
+
+// **A promo code applied to the cart** (track `order-total`), or why not,
+// by name: unknown, expired, used, its store not in the cart, or under its
+// least subtotal.
+command apply_promo(code: String)
+    -> Result<Chosen, PromoError>
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    transaction   serializable
+    invalidates   Checkout(current_user())
+    emits         UserCartChanged(current_user())
+{
+    match promo_for(promo_named(current_user(), code), parts_of_cart(current_user())) {
+        Ok(_) => Ok(set_promo(current_user(), Some(code))),
+        Err(e) => Err(e),
+    }
+}
+
+// **The cart's promo code taken off** (track `order-total`).
+command remove_promo()
+    -> Result<Chosen, PromoError>
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    transaction   serializable
+    invalidates   Checkout(current_user())
+    emits         UserCartChanged(current_user())
+{
+    Ok(set_promo(current_user(), None))
 }
 
 // **An address saved, and chosen as it is saved** (track `store-accounts`,
@@ -665,8 +775,13 @@ user page CartPage() {
     let order = query Order(current_user())
     // TRACK SEAM (store-hours): its stores' hours, where one is closed.
     let hours = query CartHours(current_user())
+    // TRACK SEAM (order-total): its total, each charge.
+    let checkout = query Checkout(current_user())
     // What the cart last had to say: a line that could not be changed.
     signal notice: String = ""
+    // A promo code, and a tip in dollars, as the reader types them.
+    signal code: String = ""
+    signal tip_typed: String = ""
 
     view {
         <title>Your cart</title>
@@ -715,7 +830,75 @@ user page CartPage() {
                 {/each}
             </ul>
             <p>Subtotal: <span id="cart-subtotal">{cart.subtotal.display}</span></p>
-            {#if cart.lines}<p id="cart-fees">Delivery fee and taxes are added at checkout.</p>{/if}
+            <!-- TRACK SEAM (order-total): the total, each charge under a
+                 disclosure; a promo code; a tip, none until the reader
+                 chooses one, and no choice shown as chosen before. -->
+            {#if checkout.any}<details id="cart-fees">
+                <summary>Total <span id="checkout-total">{checkout.charges.total.display}</span></summary>
+                <dl id="checkout-charges">
+                    <dt>Subtotal</dt><dd id="charge-subtotal">{checkout.charges.subtotal.display}</dd>
+                    <dt>Promo</dt><dd id="charge-discount">{checkout.discount_said}</dd>
+                    <dt>Delivery fee</dt><dd id="charge-delivery">{checkout.charges.delivery.display}</dd>
+                    <dt>Service fee</dt><dd id="charge-service">{checkout.charges.service.display}</dd>
+                    <dt>Small order fee</dt><dd id="charge-small">{checkout.charges.small_order.display}</dd>
+                    <dt>Estimated tax</dt><dd id="charge-tax">{checkout.charges.tax.display}</dd>
+                    <dt>Tip</dt><dd id="charge-tip">{checkout.charges.tip.display}</dd>
+                </dl>
+            </details>{/if}
+            <p id="promo">
+                <label>Promo code <input id="promo-code" type="text" bind:value={code} /></label>
+                <button
+                    id="apply-promo"
+                    type="button"
+                    on:press={resumable() => match apply_promo(code) {
+                        Ok(_) => notice = "",
+                        Err(e) => notice = promo_said(e),
+                    }}
+                >
+                    Apply
+                </button>
+            </p>
+            <p id="promo-said">{checkout.said}</p>
+            {#match checkout.promo}
+            {:Some(_)}<button
+                id="remove-promo"
+                type="button"
+                on:press={resumable() => match remove_promo() {
+                    Ok(_) => notice = "",
+                    Err(e) => notice = promo_said(e),
+                }}
+            >
+                Remove code
+            </button>
+            {:None}
+            {/match}
+            <fieldset id="tips">
+                <legend>Tip your courier</legend>
+                <button type="button" id="tip-none" on:press={resumable() => match choose_tip(0) {
+                    Ok(_) => notice = "",
+                    Err(_) => notice = "That tip could not be chosen.",
+                }}>No tip</button>
+                <button type="button" id="tip-15" on:press={resumable() => match choose_tip(15) {
+                    Ok(_) => notice = "",
+                    Err(_) => notice = "That tip could not be chosen.",
+                }}>15%</button>
+                <button type="button" id="tip-18" on:press={resumable() => match choose_tip(18) {
+                    Ok(_) => notice = "",
+                    Err(_) => notice = "That tip could not be chosen.",
+                }}>18%</button>
+                <button type="button" id="tip-20" on:press={resumable() => match choose_tip(20) {
+                    Ok(_) => notice = "",
+                    Err(_) => notice = "That tip could not be chosen.",
+                }}>20%</button>
+                <label>Other amount <input id="tip-amount" type="text" inputmode="decimal" bind:value={tip_typed} /></label>
+                <button type="button" id="tip-other" on:press={resumable() => match dollars_typed(tip_typed) {
+                    Some(amount) => match choose_tip_amount(amount) {
+                        Ok(_) => notice = "",
+                        Err(_) => notice = "That tip could not be chosen.",
+                    },
+                    None => notice = "Enter a tip in dollars and cents, like 4.50.",
+                }}>Add tip</button>
+            </fieldset>
             <p id="cart-hours">{hours}</p>
             <p id="cart-notice" role="status">{notice}</p>
             <button
@@ -732,11 +915,13 @@ user page CartPage() {
             {#if SignedIn}<button
                 id="place-order"
                 type="button"
-                on:press={resumable() => match place_order() {
+                on:press={resumable(captures = { checkout }) => match place_order(checkout.charges.total) {
                     Ok(_) => navigate OrderPage(),
                     Err(OrderError.NothingToOrder) => notice = "Your cart is empty: there is nothing to order.",
                     Err(OrderError.NoCoverage) => notice = "A store in your cart doesn't deliver to your address.",
                     Err(OrderError.Closed(closing)) => notice = "A store in your cart {closing_said(closing)}.",
+                    Err(OrderError.Promo(e)) => notice = promo_said(e),
+                    Err(OrderError.TotalChanged(now)) => notice = "Your total is now {now.display}. Check it, and place your order again.",
                 }}
             >
                 Place order
@@ -796,6 +981,8 @@ user page OrderPage() {
     cache     private
 
     let order = query Order(current_user())
+    // TRACK SEAM (order-total): what it was charged.
+    let charged = query OrderTotal(current_user())
 
     view {
         <title>Your order</title>
@@ -810,6 +997,7 @@ user page OrderPage() {
                     {:OnTheWay}<p id="order-status">On its way to you.</p>
                     {:Delivered}<p id="order-status">Delivered.</p>
                     {/match}
+                    <p id="order-total">Total charged: {charged.display}</p>
                 {:None}<p id="order-status">You have no order yet.</p>
                 {/match}
             </section>

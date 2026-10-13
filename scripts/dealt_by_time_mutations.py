@@ -14,8 +14,11 @@ its own would end a shard past the ceiling, a recipe longer than it alone
 let be, and the ceiling under a shard's limit; and (ADR-0281's amendment
 of 2026-10-12) the fetch refusing a file whose recipe reads what changed
 since its run, against the tree here, staged or not, and one no recipe
-wrote, and copying none of a recipe it skips. At least one test of
-`scripts/tests/test_ci_scripts.py` must then fail.
+wrote, and copying none of a recipe it skips; and (its amendment of
+2026-10-13) a push to `master` planned from the newest commit on its
+first-parent line that a push's or the nightly's run passed at, read by its
+commit, and from the commit before the push on any error. At least one test
+of `scripts/tests/test_ci_scripts.py` must then fail.
 
 Run from the repository root; `just e14-dealt-by-time` records the output.
 The sources are restored after every mutant, whatever happens.
@@ -30,9 +33,78 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PLAN = ROOT / "scripts/ci_plan.py"
 FETCH = ROOT / "scripts/evidence_fetch.py"
+VBASE = ROOT / "scripts/verified_base.py"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
+    # ADR-0281, amended 2026-10-13: a shell script a recipe runs plans it.
+    (
+        "a shell script a recipe runs is not read",
+        PLAN,
+        "        if rel in changed:\n            return True\n    for name in re.findall(",
+        "        if False:\n            return True\n    for name in re.findall(",
+    ),
+    # ADR-0281, amended 2026-10-13: what a run passed at is not run again.
+    (
+        "a dispatch's run counts as covering what it pushed",
+        VBASE,
+        'COVERING = ("push", "schedule")\n',
+        'COVERING = ("push", "schedule", "workflow_dispatch")\n',
+    ),
+    (
+        "the nightly's run does not count",
+        VBASE,
+        'COVERING = ("push", "schedule")\n',
+        'COVERING = ("push",)\n',
+    ),
+    (
+        "a merge's second parent counts",
+        VBASE,
+        '["git", "rev-list", "--first-parent", f"{before}..{head}"]',
+        '["git", "rev-list", f"{before}..{head}"]',
+    ),
+    (
+        "a run that did not pass counts",
+        VBASE,
+        'r.get("conclusion") == "success" and ',
+        "",
+    ),
+    (
+        "the oldest commit a run passed at is the base",
+        VBASE,
+        "        for sha in first_parents(before, head, root):\n",
+        "        for sha in reversed(first_parents(before, head, root)):\n",
+    ),
+    (
+        "the base is always the commit before the push",
+        VBASE,
+        "            if passed(runs(sha)):\n                return sha\n",
+        "            if passed(runs(sha)):\n                return before\n",
+    ),
+    (
+        "an error ends the plan",
+        VBASE,
+        "    except Exception as error:  # noqa: BLE001 - any failure plans more, never less\n",
+        "    except ZeroDivisionError as error:\n",
+    ),
+    (
+        "the browser suites run again where only records changed",
+        VBASE,
+        "    return not all(n.startswith(RECORDS) for n in names)\n",
+        "    return True\n",
+    ),
+    (
+        "the browser suites are skipped whatever changed",
+        VBASE,
+        "    return not all(n.startswith(RECORDS) for n in names)\n",
+        "    return False\n",
+    ),
+    (
+        "the runs are read by no commit",
+        VBASE,
+        'f"?head_sha={sha}&status=success&per_page=100",',
+        'f"?status=success&per_page=100",',
+    ),
     (
         "a file whose recipe reads what changed since its run is copied",
         FETCH,

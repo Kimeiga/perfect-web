@@ -721,6 +721,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
              2026-10-12, track `t11-patches`): each patch made again against
              the store holds' merge changed, and a script that names a
              program or benchmark that changed plans its recipe;
+          3d. **a flight another reader waits for was stopped once, under
+             load** (the integrator's finding, 2026-10-13): train-3's first
+             `just ci` saw `a_flight_another_reader_waits_for_is_not_stopped`
+             end with the hot read stopped (1, not 0), at a load average of
+             20. It has passed 20 of 20 alone and 40 of 40 eight at once
+             since. Both of the host's read paths subscribe before they
+             fetch, and T07's timeout is 5 s against the read's 1 s, so
+             neither a late holder nor an expiry explains it. "It fails
+             occasionally under parallelism" is a description of a race
+             (RISK_QUEUE.md, "The recurring bug"): the test says the query
+             runtime's trace when it fails, and the next failure is read
+             from it;
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled.
              In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
@@ -748,8 +760,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
              merged 2026-10-12): an interaction's answer commits in its
              command's transaction, on both layers, and answers a day;
           6. **checkout**, in steps: ~~6a, money rounded only where named~~
-             (ADR-0327, merged 2026-10-13); 6b the order's total (W9's, after
-             store-hours); 6c payment (the integrator's); 6d a Stripe adapter
+             (ADR-0327, merged 2026-10-13); ~~6b the order's total~~ (ADR-0329,
+             merged 2026-10-13, W9's); 6c payment (the integrator's); 6d a Stripe adapter
              (the owner's approval of each crate). Fees, taxes, a tip and
              promo codes, in money that
              cannot round silently (`Money` is USD's alone, so no other

@@ -22,6 +22,7 @@ import 'just/kiokun.just'
 import 'just/store-accounts.just'
 import 'just/store-search.just'
 import 'just/store-hours.just'
+import 'just/order-total.just'
 import 'just/payments.just'
 
 default:
@@ -4534,9 +4535,10 @@ e10-browser engines="chromium firefox webkit" out="docs/evidence/E10/browser-sui
 
 # E8. The artifact audit, against real Wasm components.
 #
-# Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is
-# not part of `just ci` — the DECISIONS it exercises are, in
-# `runtime/pw-host/tests/admission.rs`, and those need no engine.
+# Builds the guests (wasm32-wasip2) and the wasmtime engine, so it is not part
+# of `just ci` — the DECISIONS it exercises are, in
+# `runtime/pw-host/tests/admission.rs`, and those need no engine. Its tests'
+# output is printed when they fail (scripts/tests/test_evidence_gates.py).
 e8-host:
     @bash spikes/wasmtime-component/audit.sh
 
@@ -5922,6 +5924,43 @@ e14-explicit-imports:
        python3 scripts/explicit_imports_mutations.py; \
      } > docs/evidence/E14/explicit-imports.txt
     @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/explicit-imports.txt
+
+# ADR-0330: an arm's binding is read through a member, as a block's value is
+# (the integrator's; W9's finding in NEXT 6b). The plan's tests
+# (compiler/pw-core/tests/arm_member_reads.rs), the host's payload
+# (payload_tests), and the mutation controls
+# (scripts/arm_member_reads_mutations.py).
+e14-arm-member-reads:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0330 - an arm's binding is read through a member, as a block's value is"; echo; \
+       echo "produced by: just e14-arm-member-reads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the plan (compiler/pw-core/tests/arm_member_reads.rs)"; echo; \
+       cargo test --locked -p pw-core --test arm_member_reads 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host's payload (spikes/own-renderer/server/src/main.rs, payload_tests)"; echo; \
+       cargo test --locked -p pw-dev-server -- payload_tests 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/arm_member_reads_mutations.py)"; echo; \
+       python3 scripts/arm_member_reads_mutations.py; \
+     } > docs/evidence/E14/arm-member-reads.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/arm-member-reads.txt
+
+# ADR-0331: a case crosses from a browser (the integrator's; W9's finding in
+# NEXT 6b). The handler sending a case and the host reading it
+# (compiler/pw-conformance/tests/case_arguments.rs), and the mutation
+# controls (scripts/case_arguments_mutations.py).
+e14-case-arguments:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0331 - a case crosses from a browser"; echo; \
+       echo "produced by: just e14-case-arguments"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== a case sent and read (compiler/pw-conformance/tests/case_arguments.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test case_arguments 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/case_arguments_mutations.py)"; echo; \
+       python3 scripts/case_arguments_mutations.py; \
+     } > docs/evidence/E14/case-arguments.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/case-arguments.txt
 
 # ADR-0322: `|` and `&` are parenthesized where they mix (W9's finding). The
 # parser's rule (compiler/pw-syntax/src/grammar.rs), every shipped program and

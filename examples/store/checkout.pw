@@ -1,0 +1,406 @@
+// @corpus: fixture
+// @id: E14-order-total
+// @category: an order's total: each store's fees and tax, a promo code and
+//            a tip, computed by the program from the store's data
+// @charter: §15.1, §15.4
+// @milestone: E14
+//
+// Track `order-total` (NEXT, the DoorDash customer app's item 6, step 6b).
+// Each store's fee schedule is its data: a delivery fee, a service rate
+// clamped to a least and a most, a small-order fee under a threshold, a tax
+// rate, and whether delivery and service are taxed. A promo code is data
+// too, one store's. The total is computed here, the one place, by the
+// money ADR-0327 gives: every part of an amount at a rate and a named
+// rounding, never `/` on cents. The cart page shows it, and `place_order`
+// computes it again from the data in its own transaction.
+
+module store.checkout
+
+import List
+import String
+import clock
+import Stores
+import Carts
+import Orders
+import domain.{ StoreId, same_store, CartLine, Money, USD, Rate, Rounding, cents, plus, minus, sum, is_less, at_rate, percent, total, display, Tip, PromoError, Charges, FundedBy, PartCharged, OrderCharged }
+import capability.{ User, UserId }
+import clock.{ Instant }
+
+// **A store's fee schedule** (DoorDash's delivery, service and small-order
+// fees; the store's sales tax).
+type FeeSchedule = FeeSchedule {
+    delivery_fee: Money<USD>,
+    service_rate: Rate,
+    service_min: Money<USD>,
+    service_max: Money<USD>,
+    small_order_under: Money<USD>,
+    small_order_fee: Money<USD>,
+    tax_rate: Rate,
+    tax_delivery: Bool,
+    tax_service: Bool,
+}
+
+type FeesOf = FeesOf { store: StoreId, fees: FeeSchedule }
+
+// **What a promo code takes off**: a percent of its store's subtotal,
+// rounded toward zero, or an amount.
+type PromoOff =
+    | PercentOff(Rate)
+    | AmountOff(Money<USD>)
+
+// **A promo code**: one store's, at least a subtotal, until an instant, once
+// per user.
+type Promo = Promo {
+    code: String,
+    store: StoreId,
+    off: PromoOff,
+    min_subtotal: Money<USD>,
+    expires: Instant,
+    funded_by: FundedBy,
+}
+
+// A code, and whether the reader has used it.
+type PromoFound = PromoFound { promo: Promo, used: Bool }
+
+// **A store's lines in a cart.**
+type CartPart = CartPart { store: StoreId, lines: List<CartLine> }
+
+// **What the reader chose at checkout**: a tip, and the code applied.
+type Chosen = Chosen { tip: Tip, promo: Option<String> }
+
+fn fees_of_stores(stores: List<StoreId>) -> List<FeesOf> !{ database.read<Stores> }
+    host "store:data/fees#for-stores"
+
+// The reader's cart, each store's lines, in the order the cart lists them.
+fn parts_of_cart(reader: User<UserId>) -> List<CartPart> !{ database.read<Carts>, database.read<Stores> }
+    host "store:data/checkout#parts"
+
+fn chosen_by(reader: User<UserId>) -> Chosen !{ database.read<Carts> }
+    host "store:data/checkout#chosen"
+
+fn promo_named(reader: User<UserId>, code: String) -> Option<PromoFound> !{ database.read<Stores>, database.read<Orders> }
+    host "store:data/promos#find"
+
+fn set_tip(reader: User<UserId>, tip: Tip) -> Chosen !{ database.write<Carts> }
+    host "store:data/checkout#set-tip"
+
+fn set_promo(reader: User<UserId>, code: Option<String>) -> Chosen !{ database.write<Carts> }
+    host "store:data/checkout#set-promo"
+
+// --- the total ----------------------------------------------------------
+
+fn nothing() -> Money<USD> !{} {
+    cents(0)
+}
+
+// `amount`, no less than `least` and no more than `most`.
+fn clamped(amount: Money<USD>, least: Money<USD>, most: Money<USD>) -> Money<USD> !{} {
+    if is_less(amount, least) { least } else if is_less(most, amount) { most } else { amount }
+}
+
+// **A rate of `p` percent**, as a whole percent is never negative.
+fn rate_of(p: Int) -> Rate !{} {
+    match percent(p) {
+        Some(r) => r,
+        None => match percent(0) {
+            Some(r) => r,
+            None => rate_of(0),
+        },
+    }
+}
+
+fn subtotal_of(lines: List<CartLine>) -> Money<USD> !{} {
+    sum(List.map(lines, total))
+}
+
+// **What a promo takes off its store's food**: a percent rounded half up
+// (the integrator's ruling of 2026-10-13: toward zero would make every
+// percent off worth up to a cent less than it says), or an amount; never
+// below nothing, and never more than the subtotal.
+fn discount_of(promo: Promo, subtotal: Money<USD>) -> Money<USD> !{} {
+    let off = match promo.off {
+        PercentOff(rate) => at_rate(subtotal, rate, Rounding.HalfUp),
+        AmountOff(amount) => amount,
+    }
+    clamped(off, nothing(), subtotal)
+}
+
+// **The tip**, of the order's subtotal before any promo: a percent half up,
+// or the amount.
+fn tip_of(tip: Tip, subtotal: Money<USD>) -> Money<USD> !{} {
+    match tip {
+        NoTip => nothing(),
+        Fifteen => at_rate(subtotal, rate_of(15), Rounding.HalfUp),
+        Eighteen => at_rate(subtotal, rate_of(18), Rounding.HalfUp),
+        Twenty => at_rate(subtotal, rate_of(20), Rounding.HalfUp),
+        TipAmount(amount) => amount,
+    }
+}
+
+// **One store's part, priced**, its promo given. Every fee is of the
+// subtotal before the promo, which discounts the store's food alone: the
+// service fee half up and clamped; the small-order fee under its threshold.
+// The tax half up, once, on the subtotal, less a discount the store funds,
+// and the charges its schedule taxes, the small-order fee with the service
+// fee (Texas's 34 TAC §3.286: the tax is the sale's, not each line's). No
+// tip: the order's is added once, and never taxed.
+fn part_charged(store: StoreId, subtotal: Money<USD>, fees: FeeSchedule, promo: Option<Promo>) -> PartCharged !{} {
+    let discount = match promo {
+        Some(p) => discount_of(p, subtotal),
+        None => nothing(),
+    }
+    let funded_by = match promo {
+        Some(p) => Some(p.funded_by),
+        None => None,
+    }
+    let funded = match funded_by {
+        Some(ByStore) => discount,
+        Some(ByPlatform) => nothing(),
+        None => nothing(),
+    }
+    let service = clamped(at_rate(subtotal, fees.service_rate, Rounding.HalfUp), fees.service_min, fees.service_max)
+    let small = if is_less(subtotal, fees.small_order_under) { fees.small_order_fee } else { nothing() }
+    let delivery_taxed = if fees.tax_delivery { fees.delivery_fee } else { nothing() }
+    let service_taxed = if fees.tax_service { plus(service, small) } else { nothing() }
+    let taxable = plus(plus(minus(subtotal, funded), delivery_taxed), service_taxed)
+    PartCharged {
+        store: store,
+        subtotal: subtotal,
+        discount: discount,
+        funded_by: funded_by,
+        delivery: fees.delivery_fee,
+        service: service,
+        small_order: small,
+        taxable: taxable,
+        tax_rate: fees.tax_rate,
+        tax: at_rate(taxable, fees.tax_rate, Rounding.HalfUp),
+    }
+}
+
+// What a part charges: its food less its discount, its fees and its tax.
+fn part_total(p: PartCharged) -> Money<USD> !{} {
+    sum([minus(p.subtotal, p.discount), p.delivery, p.service, p.small_order, p.tax])
+}
+
+// A store with no schedule charges nothing beyond its food.
+fn no_fees() -> FeeSchedule !{} {
+    FeeSchedule {
+        delivery_fee: nothing(),
+        service_rate: rate_of(0),
+        service_min: nothing(),
+        service_max: nothing(),
+        small_order_under: nothing(),
+        small_order_fee: nothing(),
+        tax_rate: rate_of(0),
+        tax_delivery: false,
+        tax_service: false,
+    }
+}
+
+fn fees_for(store: StoreId, fees: List<FeesOf>) -> FeeSchedule !{} {
+    match List.find(fees, f => same_store(f.store, store)) {
+        Some(f) => f.fees,
+        None => no_fees(),
+    }
+}
+
+// A promo, where it is this store's.
+fn promo_of(promo: Option<Promo>, store: StoreId) -> Option<Promo> !{} {
+    match promo {
+        Some(p) => if same_store(p.store, store) { Some(p) } else { None },
+        None => None,
+    }
+}
+
+// **An order as charged**: each store's part priced, a promo on its own
+// store's part alone; then the tip, once, of the whole subtotal.
+fn charged_of(parts: List<CartPart>, fees: List<FeesOf>, promo: Option<Promo>, tip: Tip) -> OrderCharged !{} {
+    let charged = List.map(parts, part => part_charged(part.store, subtotal_of(part.lines), fees_for(part.store, fees), promo_of(promo, part.store)))
+    let tip_charged = tip_of(tip, sum(List.map(charged, p => p.subtotal)))
+    OrderCharged {
+        parts: charged,
+        tip: tip_charged,
+        total: plus(sum(List.map(charged, part_total)), tip_charged),
+    }
+}
+
+// **An order's charges added across its stores**, as the page itemizes them.
+fn summed(o: OrderCharged) -> Charges !{} {
+    Charges {
+        subtotal: sum(List.map(o.parts, p => p.subtotal)),
+        discount: sum(List.map(o.parts, p => p.discount)),
+        delivery: sum(List.map(o.parts, p => p.delivery)),
+        service: sum(List.map(o.parts, p => p.service)),
+        small_order: sum(List.map(o.parts, p => p.small_order)),
+        tax: sum(List.map(o.parts, p => p.tax)),
+        tip: o.tip,
+        total: o.total,
+    }
+}
+
+// --- the promo ----------------------------------------------------------
+
+// **Whether a code applies to these parts, now**, or why not: unknown,
+// expired, used, its store not in the cart, or under its least subtotal.
+fn promo_for(found: Option<PromoFound>, parts: List<CartPart>) -> Result<Promo, PromoError> !{ clock.compare } {
+    match found {
+        None => Err(PromoError.UnknownCode),
+        Some(f) => if clock.passed(f.promo.expires) {
+            Err(PromoError.Expired)
+        } else if f.used {
+            Err(PromoError.AlreadyUsed)
+        } else {
+            match List.find(parts, part => same_store(part.store, f.promo.store)) {
+                None => Err(PromoError.NotInCart),
+                Some(part) => if is_less(subtotal_of(part.lines), f.promo.min_subtotal) {
+                    Err(PromoError.BelowMinimum(f.promo.min_subtotal))
+                } else {
+                    Ok(f.promo)
+                },
+            }
+        },
+    }
+}
+
+// **Why a code does not apply, in words.**
+fn promo_said(e: PromoError) -> String !{} {
+    match e {
+        UnknownCode => "That code isn't one we know.",
+        Expired => "That code has expired.",
+        BelowMinimum(least) => "That code needs a subtotal of at least {least.display}.",
+        AlreadyUsed => "You've already used that code.",
+        NotInCart => "That code is for a store that isn't in your cart.",
+    }
+}
+
+// --- checkout -----------------------------------------------------------
+
+// **The reader's checkout, priced**: the order as it would be charged, its
+// charges added, the code that applies, and what the page says of the code.
+// `any` is whether the cart holds a line, and `discount_said` the discount
+// as the page writes it, taken off: what the page shows without computing.
+type Priced = Priced {
+    charged: OrderCharged,
+    charges: Charges,
+    promo: Option<String>,
+    tip: Tip,
+    said: String,
+    any: Bool,
+    discount_said: String,
+}
+
+fn priced(parts: List<CartPart>, fees: List<FeesOf>, promo: Option<Promo>, code: Option<String>, tip: Tip, said: String) -> Priced !{} {
+    let charged = charged_of(parts, fees, promo, tip)
+    let charges = summed(charged)
+    Priced {
+        charged: charged,
+        charges: charges,
+        promo: code,
+        tip: tip,
+        said: said,
+        any: List.length(parts) > 0,
+        discount_said: display(minus(nothing(), charges.discount)),
+    }
+}
+
+// **The tip a percent names**: none, or one the page offers.
+fn tip_of_percent(p: Int) -> Option<Tip> !{} {
+    if p == 0 {
+        Some(Tip.NoTip)
+    } else if p == 15 {
+        Some(Tip.Fifteen)
+    } else if p == 18 {
+        Some(Tip.Eighteen)
+    } else if p == 20 {
+        Some(Tip.Twenty)
+    } else {
+        None
+    }
+}
+
+// **What the reader's latest order was charged**, or nothing where none
+// was placed: the integrator's ruling of 2026-10-13, until a member read of
+// a match arm's binding is computed, when this is `Option<Money<USD>>`.
+fn total_charged(charged: Option<OrderCharged>) -> Money<USD> !{} {
+    match charged {
+        Some(c) => c.total,
+        None => nothing(),
+    }
+}
+
+// **The reader's cart priced from the store's data**, now: with the code
+// applied where it still applies, or why it does not.
+fn priced_for(reader: User<UserId>) -> Result<Priced, PromoError> !{ database.read<Carts>, database.read<Stores>, database.read<Orders>, clock.compare } {
+    let parts = parts_of_cart(reader)
+    let fees = fees_of_stores(List.map(parts, p => p.store))
+    let chosen = chosen_by(reader)
+    match chosen.promo {
+        None => Ok(priced(parts, fees, None, None, chosen.tip, "")),
+        Some(code) => match promo_for(promo_named(reader, code), parts) {
+            Ok(p) => Ok(priced(parts, fees, Some(p), Some(code), chosen.tip, "Code {code} applied.")),
+            Err(e) => Err(e),
+        },
+    }
+}
+
+// **What the cart page shows**: the charges, and what it says of the code;
+// a code that no longer applies is said, and not taken off.
+fn shown_for(reader: User<UserId>) -> Priced !{ database.read<Carts>, database.read<Stores>, database.read<Orders>, clock.compare } {
+    match priced_for(reader) {
+        Ok(p) => p,
+        Err(e) => {
+            let parts = parts_of_cart(reader)
+            let chosen = chosen_by(reader)
+            priced(parts, fees_of_stores(List.map(parts, p => p.store)), None, None, chosen.tip, promo_said(e))
+        },
+    }
+}
+
+// **An amount the reader typed**, as dollars: "4", "4.5", "$4.50". Digits,
+// and at most two after a point; anything else is none.
+fn dollars_typed(text: String) -> Option<Money<USD>> !{} {
+    let points = String.codepoints(String.trim(text))
+    let digits = match List.get(points, 0) {
+        Some(36) => List.drop(points, 1),
+        _ => points,
+    }
+    let read = List.fold(digits, Some(Typed { cents: 0, after: -1 }), (so_far, c) => match so_far {
+        None => None,
+        Some(t) => if c == 46 {
+            if t.after >= 0 { None } else { Some(Typed { cents: t.cents, after: 0 }) }
+        } else if (c >= 48) & (c <= 57) {
+            if t.after >= 2 { None } else if t.after >= 0 { Some(Typed { cents: t.cents * 10 + (c - 48), after: t.after + 1 }) } else { Some(Typed { cents: t.cents * 10 + (c - 48), after: -1 }) }
+        } else {
+            None
+        },
+    })
+    match read {
+        Some(t) => if List.length(digits) == 0 {
+            None
+        } else if t.after == -1 {
+            Some(cents(t.cents * 100))
+        } else if t.after == 0 {
+            Some(cents(t.cents * 100))
+        } else if t.after == 1 {
+            Some(cents(t.cents * 10))
+        } else {
+            Some(cents(t.cents))
+        },
+        None => None,
+    }
+}
+
+type Typed = Typed { cents: Int, after: Int }
+
+// **Whether a tip is below nothing**: an amount a request made negative.
+// Money carries no invariant, so the command refuses it (the integrator's
+// ruling of 2026-10-13).
+fn negative_tip(tip: Tip) -> Bool !{} {
+    match tip {
+        TipAmount(amount) => is_less(amount, nothing()),
+        NoTip => false,
+        Fifteen => false,
+        Eighteen => false,
+        Twenty => false,
+    }
+}

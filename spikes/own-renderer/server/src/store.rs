@@ -263,6 +263,26 @@ pub(crate) trait Rows {
     /// program relies on it, sorting nothing itself.
     fn hours(&mut self, store: &str) -> Result<Option<crate::hours::Hours>, String>;
     fn set_hours(&mut self, store: &str, hours: &crate::hours::Hours) -> Result<(), String>;
+
+    // TRACK SEAM (order-total): the checkout's rows (`checkout.rs`).
+    /// The fees of a list of stores, in its order, a store without a
+    /// schedule left out: one statement on PostgreSQL.
+    fn fees(&mut self, stores: &[String]) -> Result<Vec<(String, crate::checkout::Fees)>, String>;
+    fn set_fees(&mut self, store: &str, fees: &crate::checkout::Fees) -> Result<(), String>;
+    /// A code, and whether `owner` used it.
+    fn promo(
+        &mut self,
+        owner: &str,
+        code: &str,
+    ) -> Result<Option<(crate::checkout::Promo, bool)>, String>;
+    fn set_promo(&mut self, promo: &crate::checkout::Promo) -> Result<(), String>;
+    /// `owner`'s use of `code` recorded, or `false` where it was already.
+    fn use_promo(&mut self, owner: &str, code: &str) -> Result<bool, String>;
+    fn chosen(&mut self, owner: &str) -> Result<crate::checkout::Chosen, String>;
+    fn set_chosen(&mut self, owner: &str, chosen: &crate::checkout::Chosen) -> Result<(), String>;
+    /// `owner`'s latest order, its charges recorded.
+    fn charge(&mut self, owner: &str, charged: &crate::checkout::Charged) -> Result<(), String>;
+    fn charged(&mut self, owner: &str) -> Result<Option<crate::checkout::Charged>, String>;
 }
 
 /// **Where an operation's rows are**, each layer's: it runs `f` on them, in
@@ -810,6 +830,7 @@ fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
     let mut ops: Ops = BTreeMap::new();
     ops.extend(crate::search::ops(with.clone())); // TRACK SEAM (store-search)
     ops.extend(crate::hours::ops(with.clone())); // TRACK SEAM (store-hours)
+    ops.extend(crate::checkout::ops(with.clone())); // TRACK SEAM (order-total)
     // Charter §15.5's store delay (ADR-0174), and its origin failing once
     // (ADR-0177), as a test set them.
     let store_delay = faults.store_delay_ms.clone();
@@ -1125,9 +1146,15 @@ pub(crate) fn writes(
                 } else {
                     (this.as_str(), own_session(&op, &this, args)?)
                 };
-                if !rest.is_empty() {
+                // TRACK SEAM (order-total): by the reader's handle, with the
+                // order as the program charged it, and the code it used.
+                let charged = if by_reader {
+                    Some(crate::checkout::place_args(rest)?)
+                } else if rest.is_empty() {
+                    None
+                } else {
                     return Err(format!("{op} received {args:?}"));
-                }
+                };
                 w(&mut |r| {
                     let lines = r.cart(owner)?;
                     if lines.is_empty() {
@@ -1139,7 +1166,14 @@ pub(crate) fn writes(
                     if by_reader && !cart_reaches(r, &lines, owner)? {
                         return Ok(declared("no-coverage"));
                     }
-                    r.place(owner, &lines)?;
+                    match &charged {
+                        Some(charged) => {
+                            if !crate::checkout::place_charged(r, owner, &lines, charged)? {
+                                return Ok(crate::checkout::already_used());
+                            }
+                        }
+                        None => r.place(owner, &lines)?,
+                    }
                     r.set_cart(owner, &[])?;
                     let mut written = placed.lock().expect("written");
                     written.wrote = true;
@@ -1269,6 +1303,9 @@ pub(crate) fn writes(
     ops = faulted(&faults.cart_faults, session, ops);
     // TRACK SEAM (store-hours): a store's hours, the host's own write.
     ops.extend(crate::hours::host_writes(with.clone(), written.clone()));
+    // TRACK SEAM (order-total): the checkout's writes, and the host's.
+    ops.extend(crate::checkout::writes(with.clone(), written.clone()));
+    ops.extend(crate::checkout::host_writes(with.clone(), written.clone()));
     ops.extend(host_writes(with, session, written));
     ops
 }
@@ -1593,6 +1630,13 @@ pub(crate) struct State {
     addresses: BTreeMap<String, Vec<AddressRow>>,
     /// TRACK SEAM (store-hours): each store's opening hours (`hours.rs`).
     hours: BTreeMap<String, crate::hours::Hours>,
+    /// TRACK SEAM (order-total): each store's fees, the codes, each code's
+    /// readers, each reader's choices, and each owner's order as charged.
+    fees: BTreeMap<String, crate::checkout::Fees>,
+    promos: BTreeMap<String, crate::checkout::Promo>,
+    promo_uses: std::collections::BTreeSet<(String, String)>,
+    choices: BTreeMap<String, crate::checkout::Chosen>,
+    charged: BTreeMap<String, crate::checkout::Charged>,
 }
 
 impl State {
@@ -1631,6 +1675,17 @@ impl State {
             hours: [STORE_ID, SECOND_STORE.0]
                 .map(|id| (id.to_string(), crate::hours::seed()))
                 .into(),
+            // TRACK SEAM (order-total): as `0013_order_total.sql` seeds them.
+            fees: [STORE_ID, SECOND_STORE.0]
+                .map(|id| (id.to_string(), crate::checkout::seed_fees()))
+                .into(),
+            promos: crate::checkout::seed_promos()
+                .into_iter()
+                .map(|p| (p.code.clone(), p))
+                .collect(),
+            promo_uses: Default::default(),
+            choices: BTreeMap::new(),
+            charged: BTreeMap::new(),
         }
     }
 }
@@ -1731,6 +1786,9 @@ impl Rows for MemRows {
             }
             None => {
                 orders.remove(session);
+                // TRACK SEAM (order-total): its charges with it, as
+                // PostgreSQL's go with the order's row.
+                self.state().charged.remove(session);
             }
         }
         Ok(())
@@ -1773,6 +1831,58 @@ impl Rows for MemRows {
         let held = crate::hours::held(hours);
         self.state().hours.insert(store.to_string(), held);
         Ok(())
+    }
+    // TRACK SEAM (order-total): the checkout's rows, in memory.
+    fn fees(&mut self, stores: &[String]) -> Result<Vec<(String, crate::checkout::Fees)>, String> {
+        Ok(stores
+            .iter()
+            .filter_map(|s| self.state.fees.get(s).map(|f| (s.clone(), f.clone())))
+            .collect())
+    }
+    fn set_fees(&mut self, store: &str, fees: &crate::checkout::Fees) -> Result<(), String> {
+        self.state().fees.insert(store.to_string(), fees.clone());
+        Ok(())
+    }
+    fn promo(
+        &mut self,
+        owner: &str,
+        code: &str,
+    ) -> Result<Option<(crate::checkout::Promo, bool)>, String> {
+        let used = self
+            .state
+            .promo_uses
+            .contains(&(code.to_string(), owner.to_string()));
+        Ok(self.state.promos.get(code).map(|p| (p.clone(), used)))
+    }
+    fn set_promo(&mut self, promo: &crate::checkout::Promo) -> Result<(), String> {
+        self.state()
+            .promos
+            .insert(promo.code.clone(), promo.clone());
+        Ok(())
+    }
+    fn use_promo(&mut self, owner: &str, code: &str) -> Result<bool, String> {
+        Ok(self
+            .state()
+            .promo_uses
+            .insert((code.to_string(), owner.to_string())))
+    }
+    fn chosen(&mut self, owner: &str) -> Result<crate::checkout::Chosen, String> {
+        Ok(self.state.choices.get(owner).cloned().unwrap_or_default())
+    }
+    fn set_chosen(&mut self, owner: &str, chosen: &crate::checkout::Chosen) -> Result<(), String> {
+        self.state()
+            .choices
+            .insert(owner.to_string(), chosen.clone());
+        Ok(())
+    }
+    fn charge(&mut self, owner: &str, charged: &crate::checkout::Charged) -> Result<(), String> {
+        self.state()
+            .charged
+            .insert(owner.to_string(), charged.clone());
+        Ok(())
+    }
+    fn charged(&mut self, owner: &str) -> Result<Option<crate::checkout::Charged>, String> {
+        Ok(self.state.charged.get(owner).cloned())
     }
 }
 

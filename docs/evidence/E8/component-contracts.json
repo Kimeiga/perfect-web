@@ -246,6 +246,12 @@
                 "principal": "User<UserId>",
                 "position": "argument 0",
                 "ty": "UserCart"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "Money<USD>"
               }
             ]
           }
@@ -331,6 +337,12 @@
               {
                 "kind": "preserve_principal",
                 "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "Money<USD>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
                 "position": "result",
                 "ty": "String"
               }
@@ -363,7 +375,15 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "transferable"
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "Money<USD>"
+              }
+            ]
           }
         },
         "component": {
@@ -1182,8 +1202,32 @@
         "kind": "component"
       },
       {
+        "interface": "pw:app/store.page.Checkout",
+        "name": "Checkout",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
         "interface": "pw:app/store.page.Order",
         "name": "Order",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.apply_promo",
+        "name": "apply_promo",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.choose_tip",
+        "name": "choose_tip",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.choose_tip_amount",
+        "name": "choose_tip_amount",
         "owner": "external",
         "kind": "component"
       },
@@ -1214,6 +1258,12 @@
       {
         "interface": "pw:app/store.page.remove_from_cart",
         "name": "remove_from_cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.remove_promo",
+        "name": "remove_promo",
         "owner": "external",
         "kind": "component"
       },
@@ -1259,6 +1309,318 @@
         "component": {
           "interface": "pw:app/store-page-cart-page-api@0.1.0",
           "function": "cart-page"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.Checkout",
+    "capability_mapping": 1,
+    "abi_schema": "2a4f5e5512ea925a",
+    "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "compare"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Carts"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Orders"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/clock",
+        "name": "passed",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/checkout",
+        "name": "chosen",
+        "capability": "database.read<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "store.checkout.Chosen"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/checkout",
+        "name": "parts",
+        "capability": "database.read<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.checkout.CartPart"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "*",
+              "lines",
+              "*",
+              "quantity"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
+      },
+      {
+        "interface": "store:data/fees",
+        "name": "for-stores",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "builtin": {
+                "ctor": "List",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "domain.StoreId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.checkout.FeesOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "*",
+              "fees",
+              "service-rate"
+            ],
+            "type": "domain.Rate",
+            "holds": "value >= 0",
+            "at_least": 0
+          },
+          {
+            "argument": 0,
+            "path": [
+              "*",
+              "fees",
+              "tax-rate"
+            ],
+            "type": "domain.Rate",
+            "holds": "value >= 0",
+            "at_least": 0
+          }
+        ]
+      },
+      {
+        "interface": "store:data/promos",
+        "name": "find",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Orders"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "primitive": "String"
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Option",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.checkout.PromoFound"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "some",
+              "promo",
+              "off",
+              "percent-off"
+            ],
+            "type": "domain.Rate",
+            "holds": "value >= 0",
+            "at_least": 0
+          }
+        ]
+      }
+    ],
+    "exports": [
+      {
+        "name": "Checkout",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "Priced"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-checkout-api@0.1.0",
+          "function": "checkout"
         }
       }
     ]
@@ -1797,6 +2159,12 @@
         "kind": "component"
       },
       {
+        "interface": "pw:app/store.page.OrderTotal",
+        "name": "OrderTotal",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
         "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
@@ -1838,6 +2206,109 @@
         "component": {
           "interface": "pw:app/store-page-order-page-api@0.1.0",
           "function": "order-page"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.OrderTotal",
+    "capability_mapping": 1,
+    "abi_schema": "86fcfe11a02abe0a",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Orders"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/user-orders",
+        "name": "charged",
+        "capability": "database.read<Orders>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Orders"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Option",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.OrderCharged"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "some",
+              "parts",
+              "*",
+              "tax-rate"
+            ],
+            "type": "domain.Rate",
+            "holds": "value >= 0",
+            "at_least": 0
+          }
+        ]
+      }
+    ],
+    "exports": [
+      {
+        "name": "OrderTotal",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "Money<USD>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-order-total-api@0.1.0",
+          "function": "order-total"
         }
       }
     ]
@@ -3017,6 +3488,364 @@
     ]
   },
   {
+    "component_id": "store.page.apply_promo",
+    "capability_mapping": 1,
+    "abi_schema": "5ec827dd0f4f958c",
+    "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "compare"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Carts"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Orders"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      },
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Carts"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/clock",
+        "name": "passed",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-checkout",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Checkout"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "user-cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.UserCartChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/checkout",
+        "name": "parts",
+        "capability": "database.read<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.checkout.CartPart"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "*",
+              "lines",
+              "*",
+              "quantity"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
+      },
+      {
+        "interface": "store:data/checkout",
+        "name": "set-promo",
+        "capability": "database.write<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "builtin": {
+                "ctor": "Option",
+                "args": [
+                  {
+                    "primitive": "String"
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "store.checkout.Chosen"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/promos",
+        "name": "find",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Orders"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "primitive": "String"
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Option",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.checkout.PromoFound"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "some",
+              "promo",
+              "off",
+              "percent-off"
+            ],
+            "type": "domain.Rate",
+            "holds": "value >= 0",
+            "at_least": 0
+          }
+        ]
+      }
+    ],
+    "exports": [
+      {
+        "name": "apply_promo",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "String"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-apply-promo-api@0.1.0",
+          "function": "apply-promo",
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.choose_address",
     "capability_mapping": 1,
     "abi_schema": "336d5d3e75e83603",
@@ -3214,6 +4043,366 @@
         "component": {
           "interface": "pw:app/store-page-choose-address-api@0.1.0",
           "function": "choose-address",
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.choose_tip",
+    "capability_mapping": 1,
+    "abi_schema": "17733c2240e354f0",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Carts"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-checkout",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Checkout"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "user-cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.UserCartChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/checkout",
+        "name": "set-tip",
+        "capability": "database.write<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "domain.Tip"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "store.checkout.Chosen"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "choose_tip",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-choose-tip-api@0.1.0",
+          "function": "choose-tip",
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.choose_tip_amount",
+    "capability_mapping": 1,
+    "abi_schema": "412b648412daec74",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Carts"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-checkout",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Checkout"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "user-cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.UserCartChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/checkout",
+        "name": "set-tip",
+        "capability": "database.write<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "domain.Tip"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "store.checkout.Chosen"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "choose_tip_amount",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "Money<USD>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-choose-tip-amount-api@0.1.0",
+          "function": "choose-tip-amount",
           "idempotent_by": "InteractionId"
         }
       }
@@ -3883,7 +5072,7 @@
   {
     "component_id": "store.page.place_order",
     "capability_mapping": 1,
-    "abi_schema": "b0018e0965e11e9b",
+    "abi_schema": "c303bfed694ff675",
     "required_capabilities": [
       {
         "family": "clock",
@@ -3897,6 +5086,11 @@
         "family": "database",
         "operation": "read",
         "argument": "Carts"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Orders"
       },
       {
         "family": "database",
@@ -4050,6 +5244,39 @@
       },
       {
         "interface": "pw:host/invalidations",
+        "name": "store-page-checkout",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Checkout"
+      },
+      {
+        "interface": "pw:host/invalidations",
         "name": "store-page-order",
         "capability": "outbox.write",
         "capabilities": [
@@ -4080,6 +5307,39 @@
         "owner": "platform",
         "kind": "host_capability",
         "invalidates": "store.page.Order"
+      },
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-order-total",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.OrderTotal"
       },
       {
         "interface": "pw:host/outbox",
@@ -4176,6 +5436,168 @@
         "kind": "host_capability"
       },
       {
+        "interface": "store:data/checkout",
+        "name": "chosen",
+        "capability": "database.read<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "store.checkout.Chosen"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/checkout",
+        "name": "parts",
+        "capability": "database.read<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.checkout.CartPart"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "*",
+              "lines",
+              "*",
+              "quantity"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
+      },
+      {
+        "interface": "store:data/fees",
+        "name": "for-stores",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "builtin": {
+                "ctor": "List",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "domain.StoreId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.checkout.FeesOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "*",
+              "fees",
+              "service-rate"
+            ],
+            "type": "domain.Rate",
+            "holds": "value >= 0",
+            "at_least": 0
+          },
+          {
+            "argument": 0,
+            "path": [
+              "*",
+              "fees",
+              "tax-rate"
+            ],
+            "type": "domain.Rate",
+            "holds": "value >= 0",
+            "at_least": 0
+          }
+        ]
+      },
+      {
         "interface": "store:data/hours",
         "name": "for-cart",
         "capability": "database.read<Stores>",
@@ -4223,6 +5645,70 @@
         "kind": "host_capability"
       },
       {
+        "interface": "store:data/promos",
+        "name": "find",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Orders"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "primitive": "String"
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Option",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.checkout.PromoFound"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "some",
+              "promo",
+              "off",
+              "percent-off"
+            ],
+            "type": "domain.Rate",
+            "holds": "value >= 0",
+            "at_least": 0
+          }
+        ]
+      },
+      {
         "interface": "store:data/user-orders",
         "name": "place",
         "capability": "database.write<Orders>",
@@ -4248,6 +5734,21 @@
                     "declared": {
                       "path": "capability.UserId"
                     }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "domain.OrderCharged"
+              }
+            },
+            {
+              "builtin": {
+                "ctor": "Option",
+                "args": [
+                  {
+                    "primitive": "String"
                   }
                 ]
               }
@@ -4310,7 +5811,15 @@
         "binding": {
           "local": "direct",
           "remote": {
-            "kind": "transferable"
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "Money<USD>"
+              }
+            ]
           }
         },
         "component": {
@@ -4734,6 +6243,187 @@
         "component": {
           "interface": "pw:app/store-page-remove-from-cart-api@0.1.0",
           "function": "remove-from-cart",
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.remove_promo",
+    "capability_mapping": 1,
+    "abi_schema": "5f2f2580405058ba",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Carts"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-checkout",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Checkout"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "user-cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.UserCartChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/checkout",
+        "name": "set-promo",
+        "capability": "database.write<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "builtin": {
+                "ctor": "Option",
+                "args": [
+                  {
+                    "primitive": "String"
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "store.checkout.Chosen"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "remove_promo",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-remove-promo-api@0.1.0",
+          "function": "remove-promo",
           "idempotent_by": "InteractionId"
         }
       }

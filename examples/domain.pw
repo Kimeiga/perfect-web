@@ -129,6 +129,13 @@ fn sum<C>(amounts: List<Money<C>>) -> Money<C> !{} {
     Money(List.fold(amounts, 0, (n, amount) => n + amount.value))
 }
 
+// **Whether `a` is less than `b`** (track `order-total`): a subtotal under
+// a small-order threshold, a fee clamped to its bounds, a discount capped at
+// what it discounts.
+fn is_less<C>(a: Money<C>, b: Money<C>) -> Bool !{} {
+    a.value < b.value
+}
+
 // **A rate, in millionths**: 1,000,000 is the whole, 150,000 is 15%, and
 // 88,750 is 8.875%, New York City's sales tax. A rate is never negative.
 opaque type Rate = Int where value >= 0
@@ -306,6 +313,87 @@ type OrderError =
     // `store-hours`): which, as data the page words (the integrator's
     // ruling of 2026-10-12).
     | Closed(Closing)
+    // The promo code the cart carries no longer applies (track
+    // `order-total`): it expired, or was used, since it was applied. The
+    // order is not placed without the discount the reader saw.
+    | Promo(PromoError)
+    // The total the reader was shown is not the total now (track
+    // `order-total`, the integrator's ruling of 2026-10-13): a fee
+    // schedule, a rate or the clock moved. The reader pays the total they
+    // were shown, or is shown the new one.
+    | TotalChanged(Money<USD>)
+
+// --- checkout (track `order-total`) ---------------------------------------
+
+// **The tip the reader chose**: none unless they choose one, never a
+// default (California's Regulation 1603(h) and New York's TB-ST-320 make
+// an automatic tip a mandatory charge, and taxed); a percent of the
+// subtotal, rounded half up; or an amount. Never taxed.
+type Tip =
+    | NoTip
+    | Fifteen
+    | Eighteen
+    | Twenty
+    | TipAmount(Money<USD>)
+
+// **Why a promo code does not apply**, each by name.
+type PromoError =
+    | UnknownCode
+    | Expired
+    | BelowMinimum(Money<USD>)
+    | AlreadyUsed
+    // Its store has no line in the cart: a code is one store's.
+    | NotInCart
+
+// **Why a tip is refused**: an amount below nothing, or a percent the page
+// does not offer.
+type TipError =
+    | NegativeTip
+    | NotOffered
+
+// **Who pays for a discount.** A store's own lowers what is taxed; one the
+// platform reimburses does not (California's Regulation 1671.1, New York's
+// TB-ST-806).
+type FundedBy =
+    | ByStore
+    | ByPlatform
+
+// **One store's part of an order, as charged** (the integrator's ruling of
+// 2026-10-13): its food's subtotal, its discount and who funds it, its
+// fees, what was taxed, the rate applied and the tax. Recorded with the
+// order, so a later change of rate never rewrites what was charged.
+type PartCharged = PartCharged {
+    store: StoreId,
+    subtotal: Money<USD>,
+    discount: Money<USD>,
+    funded_by: Option<FundedBy>,
+    delivery: Money<USD>,
+    service: Money<USD>,
+    small_order: Money<USD>,
+    taxable: Money<USD>,
+    tax_rate: Rate,
+    tax: Money<USD>,
+}
+
+// **An order as charged**: each store's part, the tip, once, and the total.
+type OrderCharged = OrderCharged {
+    parts: List<PartCharged>,
+    tip: Money<USD>,
+    total: Money<USD>,
+}
+
+// **An order's charges added across its stores**: what the cart page
+// itemizes.
+type Charges = Charges {
+    subtotal: Money<USD>,
+    discount: Money<USD>,
+    delivery: Money<USD>,
+    service: Money<USD>,
+    small_order: Money<USD>,
+    tax: Money<USD>,
+    tip: Money<USD>,
+    total: Money<USD>,
+}
 
 // **Why a store takes no order now** (track `store-hours`): closed, and when
 // it opens where it does within a week; or past its last order, which was at

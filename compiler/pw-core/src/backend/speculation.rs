@@ -232,6 +232,30 @@ pub struct Compiled {
 
 /// **Every page's speculation module.** A page none of whose handlers calls a
 /// command with an optimistic clause has none, and is not listed.
+/// **The names the arms in `part` bind**, at any depth: each `{#match}`
+/// arm's payload, or the fields of a case of several.
+fn arm_names(part: &crate::template_ir::Part) -> BTreeSet<String> {
+    use crate::template_ir::{Chunk, Part};
+    fn walk(p: &Part, out: &mut BTreeSet<String>) {
+        if let Part::Match { arms, .. } = p {
+            for arm in arms {
+                out.extend(arm.binding.iter().cloned());
+                out.extend(arm.fields.iter().cloned());
+            }
+        }
+        for region in p.nested() {
+            for c in region {
+                if let Chunk::Dynamic(inner) = c {
+                    walk(inner, out);
+                }
+            }
+        }
+    }
+    let mut out = BTreeSet::new();
+    walk(part, &mut out);
+    out
+}
+
 pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
     let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
     let ws = Workspace::build(&hirs);
@@ -1021,6 +1045,55 @@ fn page_module(
                     reason: format!(
                         "part {part} of `{page}` reads `{path}` inside part {}, which the \
                          browser renders again with a speculation of `{}`",
+                        region.part, region.binding
+                    ),
+                };
+            }
+        }
+        // **An arm's binding read through a member** (the integrator's,
+        // 2026-10-13): a host computes it into what its block is rendered
+        // with; the browser, rendering this region again from a speculation,
+        // has no such value. Refused, until this module computes it.
+        if let Some(region_part) = part_of(&lowered.template.chunks, region.part) {
+            let arms = arm_names(region_part);
+            let mut typed = BTreeMap::new();
+            let reads_one = lowered
+                .holes
+                .iter()
+                .filter(|h| parts.contains(&h.part.0))
+                .map(|h| {
+                    (
+                        h.part.0,
+                        &h.path,
+                        h.origin,
+                        crate::template_ir::ReadAt::Expr(h.expr),
+                    )
+                })
+                .chain(
+                    lowered
+                        .reads
+                        .iter()
+                        .filter(|r| {
+                            parts.contains(&r.part.0)
+                                && r.kind != crate::template_ir::ReadKind::Captures
+                        })
+                        .map(|r| (r.part.0, &r.path, r.origin, r.at)),
+                )
+                .find(|(_, path, origin, at)| {
+                    let root = path.split('.').next().unwrap_or_default();
+                    path.contains('.')
+                        && arms.contains(root)
+                        && crate::page_values::calls_a_member(
+                            cx.hirs, cx.ws, cx.sigs, &mut typed, *origin, *at,
+                        )
+                });
+            if let Some((part, path, ..)) = reads_one {
+                return Encoding::Unsupported {
+                    construct: "a member read of an arm's binding in a speculated region",
+                    reason: format!(
+                        "part {part} of `{page}` reads `{path}` through a member of an arm's \
+                         binding inside part {}, which the browser renders again with a \
+                         speculation of `{}`",
                         region.part, region.binding
                     ),
                 };

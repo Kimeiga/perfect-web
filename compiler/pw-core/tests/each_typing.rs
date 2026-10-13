@@ -222,10 +222,12 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
     // And the cart's own page's five: a line's three, its clear (ADR-0190)
     // and its place_order (ADR-0193). And the address page's five (track
     // `store-accounts`): an address chosen, renamed, removed, and one saved
-    // from a place.
+    // from a place. And the cart page's checkout's seven (track
+    // `order-total`): a code applied and taken off, four tips by percent and
+    // one by amount.
     assert_eq!(
         pairs.len(),
-        15,
+        24,
         "the store's page declares five resumable handlers, its cart's page five, its address page's five"
     );
     for (m, a) in &pairs {
@@ -249,14 +251,15 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
     // nothing; and on the address page (track `store-accounts`) one captures
     // an address, two an address and the store's id, and one a place and the
     // store's id. If a capture never reached the schema, they would hash the
-    // same.
+    // same. And the cart page's Place order (track `order-total`), which
+    // captures the checkout, the total it passes.
     let schemas: std::collections::BTreeSet<&str> = pairs
         .iter()
         .map(|(m, _)| m.capture_schema.as_str())
         .collect();
     assert_eq!(
         schemas.len(),
-        6,
+        7,
         "a loop-bound capture must reach the schema"
     );
 
@@ -264,10 +267,13 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
         pairs.iter().map(|(m, _)| m.handler.as_str()).collect();
     // The cart's own page's line handlers are the store's, as their code
     // is (ADR-0190); its place_order is a sixth (ADR-0193); and the address
-    // page's five are five more (track `store-accounts`).
+    // page's five are five more (track `store-accounts`); and the cart
+    // page's checkout's nine (track `order-total`): its code's and its typed
+    // tip's bindings, a code applied and taken off, four tips by percent and
+    // one by amount.
     assert_eq!(
         handlers.len(),
-        11,
-        "and eleven handlers are eleven identities"
+        20,
+        "and twenty handlers are twenty identities"
     );
 }
