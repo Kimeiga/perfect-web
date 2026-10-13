@@ -2874,3 +2874,9 @@ an interaction's answer commits with its writes (the integrator's; NEXT 5).
   (`track/train-<n>`), each its own merge commit, verified once; master
   moves to the train when its run is green, and a track whose recipe fails
   leaves it, as GitHub's merge queue does.
+[ADR-0326](DECISIONS/ADR-0326-a-name-imported-by-name-is-the-files-before-a-whole-modules.md):
+a name imported by name is the file's, before a whole module's (the
+integrator's).
+- An explicit import shadows a whole module's import of the same name; a
+  bare call two whole modules declare is refused at check (PW0022), where
+  only the build had refused it.

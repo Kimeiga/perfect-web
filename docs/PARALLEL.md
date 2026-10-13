@@ -1413,3 +1413,8 @@ Each a decision for a track, with its date; a track's ADR records it too.
   week's allowance 46% used at 14 h): W9 takes store-hours on train-2, then
   6b (the order's total, its fee reads by set from the start), then 4b; the
   integrator takes 6a (money, train-2) and 6c (payment); W6 is held.
+- **2026-10-13, a name imported by name is the file's, merged as ADR-0326**
+  on train-2 (the integrator's, found on the way to 6a; track
+  `explicit-imports`, from `267f22d`). To every worker: `import List` beside
+  `import m.{ name }` means `m`'s `name` now; two whole modules that both
+  declare a name you call bare are refused at check (PW0022).

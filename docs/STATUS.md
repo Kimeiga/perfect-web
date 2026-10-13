@@ -23,6 +23,18 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0326, 2026-10-13: a name imported by name is the file's, before a
+whole module's** (the integrator's; found on the way to NEXT 6a; track
+`explicit-imports`, merged from `267f22d`).
+- `import List` beside `import domain.{ sum }` left `sum` ambiguous: `pw
+  check` passed the call and the build refused it ("`sum` names no
+  declaration this program contains").
+- A name imported by name now shadows a whole module's, as Rust's named
+  imports shadow a glob's; a call two whole modules declare is refused
+  where it is written (PW0022), naming both, with the repair. No program in
+  the repository called such a name.
+Verify TRAIN_RUN green, with train-2.
+
 **ADR-0308 amended (2), 2026-10-12: a store's cuisine, the home page's
 search box, and a reader's search by their address** (W9's, track
 `store-search`, merged from `9bc4ff0`).

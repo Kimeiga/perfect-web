@@ -5886,6 +5886,24 @@ e14-related-files:
      } > docs/evidence/E14/related-files.txt
     @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/related-files.txt
 
+# ADR-0326: a name imported by name is the file's, before a whole module's.
+# The resolution's order and the refusal of a call two whole modules declare
+# (compiler/pw-core/tests/explicit_imports.rs), every program checking as
+# before (`just test-compile`), and the mutation controls
+# (scripts/explicit_imports_mutations.py).
+e14-explicit-imports:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0326 - a name imported by name is the file's, before a whole module's"; echo; \
+       echo "produced by: just e14-explicit-imports"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the order, and the refusal (compiler/pw-core/tests/explicit_imports.rs)"; echo; \
+       cargo test --locked -p pw-core --test explicit_imports 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/explicit_imports_mutations.py)"; echo; \
+       python3 scripts/explicit_imports_mutations.py; \
+     } > docs/evidence/E14/explicit-imports.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/explicit-imports.txt
+
 # ADR-0322: `|` and `&` are parenthesized where they mix (W9's finding). The
 # parser's rule (compiler/pw-syntax/src/grammar.rs), every shipped program and
 # the corpus parsing as before, and the mutation controls
