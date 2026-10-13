@@ -32,8 +32,9 @@ them** (W6's ruling of 2026-10-09; track `narrowing-4`, merged from
   nested_lists, menu_categories, query_blocks and query_attributes.
   row_reads and query_blocks were measured again on train-1's tree.
 - The bounds raised to 1800 while the whole suite ran go back to 900 or
-  1200. One script's server command still runs the whole suite per
-  mutant, committed_events', measured next.
+  1200. committed_events', the last script whose server command ran the
+  whole suite per mutant, runs its two killers (batch 5): no mutation script
+  now runs the server's whole suite per mutant.
 Verify TRAIN_RUN green, with train-2.
 
 **ADR-0327, 2026-10-13: money is rounded only where a program names how**

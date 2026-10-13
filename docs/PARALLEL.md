@@ -1425,5 +1425,7 @@ Each a decision for a track, with its date; a track's ADR records it too.
   amount as an `s64` and a browser writes it as a whole number. The
   benchmark's store takes the same money, as one server serves both.
 - **2026-10-13, narrowing batch 4 merged on train-2** (track
-  `narrowing-4`, from `d838954`): thirteen scripts. One remains,
-  committed_events'; the others name the tests they run.
+  `narrowing-4`, from `d838954`): thirteen scripts; and batch 5 (from
+  `a0c794c`), committed_events', the last that ran the server's whole suite
+  per mutant. Every script now names the server tests it runs: W6's ruling
+  of 2026-10-09 is carried out.
