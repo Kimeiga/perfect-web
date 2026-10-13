@@ -2216,6 +2216,13 @@ impl Server {
             );
             // The platform's clock (ADR-0304), for the command's moment.
             host.extend(clock::operations(self.now(), &self.zones));
+            // NEXT 6c: the deployment's payments, keyed by this interaction.
+            if let Some(p) = self.payments.get() {
+                host.extend(payments::operations(
+                    p.clone(),
+                    interaction.map(str::to_string),
+                ));
+            }
 
             // What the command emits (ADR-0208): it computes each event's
             // values itself and hands them to the platform's outbox, which

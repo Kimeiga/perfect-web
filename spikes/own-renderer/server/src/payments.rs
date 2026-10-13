@@ -1599,3 +1599,195 @@ mod configured_tests {
         );
     }
 }
+
+// --- the program's operations ----------------------------------------------
+
+use pw_host::engine::{HostFn, Val};
+
+/// **A POST of JSON to `url`**, with an `Idempotency-Key`: its status and
+/// body.
+fn post_json(url: &str, key: &str, body: &serde_json::Value) -> Result<(u16, String), String> {
+    let rest = url.strip_prefix("http://").ok_or("not an http URL")?;
+    let (authority, path) = rest
+        .split_once('/')
+        .map_or((rest, "/".to_string()), |(a, p)| (a, format!("/{p}")));
+    let body = body.to_string();
+    let mut stream = TcpStream::connect(authority).map_err(|e| e.to_string())?;
+    let head = format!(
+        "POST {path} HTTP/1.1\r\nhost: {authority}\r\ncontent-type: application/json\r\nidempotency-key: {key}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+        body.len()
+    );
+    stream
+        .write_all(head.as_bytes())
+        .map_err(|e| e.to_string())?;
+    stream
+        .write_all(body.as_bytes())
+        .map_err(|e| e.to_string())?;
+    let mut all = String::new();
+    stream.read_to_string(&mut all).map_err(|e| e.to_string())?;
+    let (head, body) = all.split_once("\r\n\r\n").ok_or("no head")?;
+    let code = head
+        .split_whitespace()
+        .nth(1)
+        .and_then(|c| c.parse().ok())
+        .ok_or("no status")?;
+    Ok((code, body.to_string()))
+}
+
+/// A payment as the program's `Payment` is: `{ id, client_secret, status }`.
+fn payment_val(intent: &serde_json::Value) -> Result<Val, String> {
+    let text = |k: &str| {
+        intent[k]
+            .as_str()
+            .map(|s| Val::String(s.to_string()))
+            .ok_or_else(|| format!("the provider's intent has no `{k}`"))
+    };
+    let status = match intent["status"].as_str() {
+        Some("requires_payment_method") => "requires-payment-method",
+        Some("requires_action") => "requires-action",
+        Some("processing") => "processing",
+        Some("succeeded") => "succeeded",
+        Some("canceled") => "canceled",
+        other => return Err(format!("the provider's intent is {other:?}")),
+    };
+    Ok(Val::Record(vec![
+        ("id".into(), text("id")?),
+        ("client-secret".into(), text("client_secret")?),
+        ("status".into(), Val::Variant(status.into(), None)),
+    ]))
+}
+
+/// **The payments' operations, for one command** (NEXT 6c):
+/// `pw:host/payments#begin(key, order, amount)`, an intent for the order's
+/// amount at the provider, keyed by the order and the command's interaction,
+/// so a retried press reaches the intent the first made and never a second.
+/// A provider that cannot be reached is the program's `TransportFailed`.
+pub(crate) fn operations(
+    payments: Arc<Payments>,
+    interaction: Option<String>,
+) -> Vec<(String, HostFn)> {
+    let begin: HostFn = Arc::new(move |args: &[Val]| {
+        let [_key, Val::String(order), Val::S64(amount)] = args else {
+            return Err(format!(
+                "payments#begin(key, order, amount) received {args:?}"
+            ));
+        };
+        let Some(interaction) = interaction.as_deref() else {
+            return Err(
+                "a payment is begun by an interaction: its command is `idempotent_by \
+                 InteractionId`"
+                    .to_string(),
+            );
+        };
+        let asked = serde_json::json!({ "order": order, "amount": amount });
+        let failed = || {
+            Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                "transport-failed".into(),
+                None,
+            )))))])
+        };
+        match post_json(
+            &format!("{}/v1/payment_intents", payments.provider),
+            &format!("{order}:{interaction}"),
+            &asked,
+        ) {
+            Ok((200, body)) => {
+                let intent: serde_json::Value =
+                    serde_json::from_str(&body).map_err(|e| e.to_string())?;
+                Ok(vec![Val::Result(Ok(Some(Box::new(payment_val(&intent)?))))])
+            }
+            // The key sent with other arguments: the program's own error,
+            // as a command's interaction is (ADR-0121).
+            Ok((400, body)) if body.contains("idempotency_error") => Err(format!(
+                "the order's payment was begun with another amount: {body}"
+            )),
+            Ok(_) | Err(_) => failed(),
+        }
+    });
+    vec![("pw:host/payments#begin".to_string(), begin)]
+}
+
+#[cfg(test)]
+mod operation_tests {
+    use super::*;
+
+    fn configured() -> Arc<Payments> {
+        let free = TcpListener::bind("127.0.0.1:0")
+            .expect("bind")
+            .local_addr()
+            .expect("addr")
+            .port()
+            .to_string();
+        configure(
+            true,
+            "http://127.0.0.1:3301",
+            3301,
+            Some("dev"),
+            Some(&free),
+        )
+        .expect("configured")
+        .expect("payments")
+    }
+
+    /// **A payment begun once per interaction**: the same order's press
+    /// sent again reaches the same intent; another interaction is another
+    /// intent; no interaction is refused, as is the same press with another
+    /// amount; a provider that cannot be reached is `TransportFailed`.
+    #[test]
+    fn a_payment_is_begun_once_per_interaction() {
+        let payments = configured();
+        let begin = |interaction: Option<&str>, amount: i64| {
+            let ops = operations(payments.clone(), interaction.map(str::to_string));
+            ops[0].1(&[
+                Val::String("sk_dev".into()),
+                Val::String("order-1".into()),
+                Val::S64(amount),
+            ])
+        };
+        let id = |out: Vec<Val>| match out.as_slice() {
+            [Val::Result(Ok(Some(p)))] => match p.as_ref() {
+                Val::Record(fields) => match &fields[0].1 {
+                    Val::String(id) => id.clone(),
+                    other => panic!("{other:?}"),
+                },
+                other => panic!("{other:?}"),
+            },
+            other => panic!("{other:?}"),
+        };
+        let first = id(begin(Some("press-a"), 1250).expect("begun"));
+        assert_eq!(
+            id(begin(Some("press-a"), 1250).expect("begun again")),
+            first
+        );
+        assert_ne!(id(begin(Some("press-b"), 1250).expect("another")), first);
+        assert!(
+            begin(None, 1250)
+                .expect_err("no interaction")
+                .contains("idempotent_by")
+        );
+        assert!(
+            begin(Some("press-a"), 999)
+                .expect_err("another amount")
+                .contains("another amount")
+        );
+        // A provider that is not there.
+        let gone = Arc::new(Payments {
+            provider: "http://127.0.0.1:9".into(),
+            hearing: Hearing::new(b"x", "http://127.0.0.1:9"),
+            settled: Mutex::new(Vec::new()),
+        });
+        let out = operations(gone, Some("press-a".into()))[0].1(&[
+            Val::String("sk_dev".into()),
+            Val::String("order-1".into()),
+            Val::S64(1250),
+        ])
+        .expect("answered");
+        assert_eq!(
+            out,
+            vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                "transport-failed".into(),
+                None
+            )))))]
+        );
+    }
+}
