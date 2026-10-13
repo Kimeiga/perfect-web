@@ -33,6 +33,13 @@ FETCH = ROOT / "scripts/evidence_fetch.py"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
+    # ADR-0281, amended 2026-10-13: a shell script a recipe runs plans it.
+    (
+        "a shell script a recipe runs is not read",
+        PLAN,
+        "        if rel in changed:\n            return True\n    for name in re.findall(",
+        "        if False:\n            return True\n    for name in re.findall(",
+    ),
     (
         "a file whose recipe reads what changed since its run is copied",
         FETCH,

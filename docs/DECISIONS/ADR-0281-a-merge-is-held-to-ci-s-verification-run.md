@@ -109,6 +109,14 @@ hold.
      run would plan most of what the train's will (a program most recipes
      read changed) goes on with its local `just ci` and its mutation
      controls green.
+   - **A shell script a recipe runs plans it** (the integrator's finding,
+     2026-10-13). The planner read only the `scripts/*.py` a recipe's lines
+     name: train-3's run, and the audit track's own, planned no `e8-host`
+     for a change to `spikes/wasmtime-component/audit.sh`, the script the
+     recipe is, which a dispatch then ran. A path to a `.sh` in a recipe's
+     lines that the range changed plans the recipe, as a changed browser
+     spec does (`ci_plan.py`'s `reads_what_changed`; a test in
+     `test_ci_scripts.py`, a mutant in `dealt_by_time_mutations.py`).
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does

@@ -11,7 +11,8 @@ The recipes are `just`'s own list, kept where they record evidence
   whose tests the range changed, a Rust test or a browser spec (ADR-0281);
   each recipe that runs a browser spec the range changed; each recipe whose
   own script changed or reads a program or a benchmark the range changed
-  (`data_inputs`); and each recipe whose own lines changed;
+  (`data_inputs`), or runs a shell script the range changed; and each
+  recipe whose own lines changed;
 - or those named.
 
 Each is dealt, the longest first, to the shard where it ends soonest
@@ -322,7 +323,12 @@ def reads_what_changed(body: str, changed: dict[str, list[tuple[int, int]]]) -> 
     reads what changed. Until 2026-10-12 neither planned it: holds' merge
     changed the benchmark's baseline store, T11's patches stopped applying
     to it, and no verify planned `e14-diffs`, which applies them (W8's
-    finding)."""
+    finding). And a shell script it runs, by its path: until 2026-10-13 a
+    change to `spikes/wasmtime-component/audit.sh` planned no `e8-host`,
+    whose script it is (train-3's run planned none)."""
+    for rel in re.findall(r"(?<![\w./-])((?:[\w-]+/)+[\w.-]+\.sh)\b", body):
+        if rel in changed:
+            return True
     for name in re.findall(r"scripts/(\w+\.py)", body):
         if name.endswith("_mutations.py"):
             continue
