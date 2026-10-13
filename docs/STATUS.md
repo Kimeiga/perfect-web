@@ -39,7 +39,7 @@ advises against caching its browsers, so they are not cached.
 - Found on the way: PostgreSQL refused a set listing a date twice while
   memory took it (both keep the last now); a mutant had survived on the
   home page's freshness alone (the clock is held between the reads now).
-Verify TRAIN_RUN green, with train-2.
+Verify 38348107940 green, with train-2.
 
 **2026-10-13: thirteen more scripts' server mutants run the tests that see
 them** (W6's ruling of 2026-10-09; track `narrowing-4`, merged from
@@ -53,7 +53,7 @@ them** (W6's ruling of 2026-10-09; track `narrowing-4`, merged from
   1200. committed_events', the last script whose server command ran the
   whole suite per mutant, runs its two killers (batch 5): no mutation script
   now runs the server's whole suite per mutant.
-Verify TRAIN_RUN green, with train-2.
+Verify 38348107940 green, with train-2.
 
 **ADR-0327, 2026-10-13: money is rounded only where a program names how**
 (the integrator's; NEXT 6a; track `money`, merged from `f12656a`).
@@ -69,7 +69,7 @@ Verify TRAIN_RUN green, with train-2.
   ruling of 2026-08-20 amended for that case alone, its controls rewritten.
 - Found on the way: A-001 called a `Money.add` nothing declared and piped
   into an uncalled `sum`, and checked clean.
-Verify TRAIN_RUN green, with train-2.
+Verify 38348107940 green, with train-2.
 
 **ADR-0326, 2026-10-13: a name imported by name is the file's, before a
 whole module's** (the integrator's; found on the way to NEXT 6a; track
@@ -81,7 +81,7 @@ whole module's** (the integrator's; found on the way to NEXT 6a; track
   imports shadow a glob's; a call two whole modules declare is refused
   where it is written (PW0022), naming both, with the repair. No program in
   the repository called such a name.
-Verify TRAIN_RUN green, with train-2.
+Verify 38348107940 green, with train-2.
 
 **ADR-0308 amended (2), 2026-10-12: a store's cuisine, the home page's
 search box, and a reader's search by their address** (W9's, track

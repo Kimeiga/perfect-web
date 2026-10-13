@@ -1,8 +1,8 @@
 ADR-0164 - a menu change drops what declares it, for its store
 
 produced by: just e14-menu-changed
-commit: 25b01345e1a5406a8b977c6c269475aa5b872e60
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38326782630 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 64cc7da190695fa62cadf247d14fd9ebdc24f6e9
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38348107940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the store's graph: what MenuChanged(id) invalidates
@@ -21,7 +21,7 @@ test tests::a_change_to_one_stores_menu_reaches_that_stores_pages_only ... ok
 test tests::a_menu_change_drops_the_menus_kept_values ... ok
 test tests::a_menu_change_drops_that_stores_kept_menu_only ... ok
 test tests::a_menu_change_drops_that_stores_recommendations_only ... ok
-test result: ok. 473 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 355.03s
+test result: ok. 486 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 532.23s
 
 == mutation controls (scripts/menu_changed_mutations.py)
 

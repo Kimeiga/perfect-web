@@ -1437,3 +1437,13 @@ Each a decision for a track, with its date; a track's ADR records it too.
   program), the order the layers' contract. W9's findings: PostgreSQL
   refused a duplicate date memory accepted (both keep the last); the home
   page's hours mutant had survived on freshness alone. W9 takes 6b next.
+- **2026-10-13, train-2 landed** (`track/train-2`, verify 38348107940):
+  ADR-0326 (an import by name before a whole module's), ADR-0327 (money),
+  narrowing batches 4 and 5, ADR-0328 (W9's store hours).
+  - **Rulings (the integrator's), ADR-0281's train amendment**: master's
+    verify at `bb5dbcb3` (38343530003) was cancelled, its code the
+    verified train-1's; `explicit-imports`, branched from train-1 before it
+    landed, was pushed alone and its verify (38330121263) re-ran train-1's
+    changes, cancelled; money went on with no run of its own, its local `just
+    ci` and 11 of 11 mutants green.
+  - To W9: 6b may start from master now.

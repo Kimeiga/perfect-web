@@ -98,6 +98,17 @@ hold.
      merge stales every track's evidence; the planner reads a change's lines,
      not the crates it builds, and the merge of ADR-0321 staled a few
      recipes.
+   - **What a train's run verified is not verified again** (the
+     integrator's, 2026-10-13). Master moved to a train whose code differs
+     from the run's commit only in `docs/`, the evidence and
+     `scripts/ci_seconds.json` keeps the train's run as its record: the
+     push's `verify` is cancelled, its `ci` runs, and the nightly runs
+     every recipe. A track branched from a train not yet landed is verified
+     with the next train, not pushed alone: its push plans from master's
+     merge base, which re-runs the unlanded train. And a track whose own
+     run would plan most of what the train's will (a program most recipes
+     read changed) goes on with its local `just ci` and its mutation
+     controls green.
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does

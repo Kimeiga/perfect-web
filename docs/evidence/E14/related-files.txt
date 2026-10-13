@@ -1,8 +1,8 @@
 ADR-0321 - a related note is shown in its own file
 
 produced by: just e14-related-files
-commit: 25b01345e1a5406a8b977c6c269475aa5b872e60
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38326782630 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 64cc7da190695fa62cadf247d14fd9ebdc24f6e9
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38348107940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == each note in its own file (compiler/pw-core/tests/related_files.rs)
@@ -13,22 +13,22 @@ test a_route_declared_twice_names_the_first_page_where_it_is ... ok
 test a_layouts_note_is_in_the_layouts_file ... ok
 test a_reader_in_another_file_is_named_in_it ... ok
 test every_note_is_text_of_its_own_file ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.56s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.85s
 
 == pw check: a note shown in its own file, and no stop on a span (compiler/pw-cli)
 
 test tests::a_note_in_another_file_is_shown_in_it ... ok
-test tests::a_span_outside_its_file_is_a_note_and_no_panic ... ok
 test tests::check_renders_a_diagnostic_with_a_real_span ... ok
+test tests::a_span_outside_its_file_is_a_note_and_no_panic ... ok
 test tests::explain_flags_a_session_value_in_a_shared_cache ... ok
-test tests::explain_derives_placement_from_effects_alone ... ok
 test tests::explain_never_leaks_generated_paths ... ok
 test tests::unannotated_and_empty_effect_rows_read_differently ... ok
+test tests::explain_derives_placement_from_effects_alone ... ok
 test tests::explain_shows_every_policy_the_compiler_knows_about ... ok
 test tests::the_committed_graph_matches_what_the_compiler_emits ... ok
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
 test a_layouts_note_is_shown_in_the_layouts_file ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test each_file_keeps_its_own_answers_under_one_name ... ok
 test a_file_is_reported_though_another_has_its_name ... ok
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s

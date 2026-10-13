@@ -1,0 +1,29 @@
+ADR-0327 - money is rounded only where a program names how
+
+produced by: just e14-money
+commit: 64cc7da190695fa62cadf247d14fd9ebdc24f6e9
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38348107940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+
+== each rounding, both ways (compiler/pw-conformance/tests/javascript.rs)
+
+test money_is_rounded_as_the_program_names_it ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 1.73s
+
+== mutation controls (scripts/money_mutations.py)
+
+baseline: 1 passed, 0 failed
+half up rounds a half down: KILLED (1 of 1 tests fail)
+half even rounds a half up: KILLED (1 of 1 tests fail)
+toward zero floors a negative amount: KILLED (1 of 1 tests fail)
+away from zero ceils a negative amount: KILLED (1 of 1 tests fail)
+a rate is read in hundred-thousandths: KILLED (1 of 1 tests fail)
+a percent is a thousand millionths: KILLED (1 of 1 tests fail)
+a negative rate is kept: KILLED (1 of 1 tests fail)
+an amount times a count is added to it: KILLED (1 of 1 tests fail)
+a sum starts at a cent: KILLED (1 of 1 tests fail)
+plus subtracts: KILLED (1 of 1 tests fail)
+minus adds: KILLED (1 of 1 tests fail)
+11 of 11 mutants killed
+memory bound: no process was stopped
