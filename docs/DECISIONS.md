@@ -2874,3 +2874,22 @@ an interaction's answer commits with its writes (the integrator's; NEXT 5).
   (`track/train-<n>`), each its own merge commit, verified once; master
   moves to the train when its run is green, and a track whose recipe fails
   leaves it, as GitHub's merge queue does.
+[ADR-0326](DECISIONS/ADR-0326-a-name-imported-by-name-is-the-files-before-a-whole-modules.md):
+a name imported by name is the file's, before a whole module's (the
+integrator's).
+- An explicit import shadows a whole module's import of the same name; a
+  bare call two whole modules declare is refused at check (PW0022), where
+  only the build had refused it.
+[ADR-0327](DECISIONS/ADR-0327-money-is-rounded-only-where-a-program-names-how.md):
+money is rounded only where a program names how (the integrator's; NEXT
+6a).
+- `Money<C>` opaque; exact `cents`, `plus`, `minus`, `times`, `sum`; a part
+  only by `at_rate` with a `Rate` in millionths and a named `Rounding`; a
+  phantom generic opaque type crosses as its representation (the
+  2026-08-20 ruling amended for that case).
+[ADR-0328](DECISIONS/ADR-0328-a-store-is-open-by-its-hours-and-the-clock.md):
+a store is open by its hours, read by the clock (W9's; NEXT 4, step 2).
+- Hours as data on both layers (zone, cut-off, weekly periods as their
+  union, special dates); open or closed computed by the program against the
+  clock and told when it changes; an order refused while closed or past the
+  last order, as data the page words.

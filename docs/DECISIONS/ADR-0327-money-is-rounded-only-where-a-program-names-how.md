@@ -1,4 +1,4 @@
-# ADR-XXXX: money is rounded only where a program names how
+# ADR-0327: money is rounded only where a program names how
 
 Status: accepted under the owner's delegation of 2026-10-02 (the
 integrator's). Date: 2026-10-13. Milestone: E14 (NEXT, the DoorDash customer

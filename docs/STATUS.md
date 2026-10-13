@@ -23,6 +23,66 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0328, 2026-10-13: a store is open by its hours, read by the clock**
+(W9's; NEXT 4, step 2; track `store-hours`, merged from `4f2ffa8`).
+- A store's hours are its data on both layers: its zone, a cut-off before
+  each closing (20 minutes, DoorDash's), weekly periods and special dates.
+  A day's periods are their union; the layers hand them ordered.
+- Whether it is open is the program's, by comparing the clock with each
+  opening and closing (ADR-0304): a page that shows it is told at the
+  instant it changes. "Open until 7:00 pm", "Closed · opens tomorrow at
+  7:00 am", on the store's page, the home page, search results and the
+  cart.
+- An order is refused while closed and past the last order, as data the
+  page words (`OrderError.Closed(Closing)`), across midnight and on a day
+  the clocks go forward.
+- Found on the way: PostgreSQL refused a set listing a date twice while
+  memory took it (both keep the last now); a mutant had survived on the
+  home page's freshness alone (the clock is held between the reads now).
+Verify 38348107940 green, with train-2.
+
+**2026-10-13: thirteen more scripts' server mutants run the tests that see
+them** (W6's ruling of 2026-10-09; track `narrowing-4`, merged from
+`d838954`).
+- Measured by `scripts/mutant_killers.py`, two killers per mutant where two
+  fail: telling, keyed_reads, row_reads, query_values, titles,
+  command_invalidations, document_reads, instance_changes, one_case_name,
+  nested_lists, menu_categories, query_blocks and query_attributes.
+  row_reads and query_blocks were measured again on train-1's tree.
+- The bounds raised to 1800 while the whole suite ran go back to 900 or
+  1200. committed_events', the last script whose server command ran the
+  whole suite per mutant, runs its two killers (batch 5): no mutation script
+  now runs the server's whole suite per mutant.
+Verify 38348107940 green, with train-2.
+
+**ADR-0327, 2026-10-13: money is rounded only where a program names how**
+(the integrator's; NEXT 6a; track `money`, merged from `f12656a`).
+- `Money<C>` is opaque, an amount's cents read in `domain` alone; other
+  modules add, multiply by a count and sum exactly, and take a part only by
+  `at_rate(amount, rate, rounding)`: a `Rate` in millionths and a named
+  `Rounding`, half up as California's, New York's and Texas's taxes round.
+- Each rounding compiled to a component and to JavaScript agrees at halves
+  either side of zero, a third, 8.875% and Texas's $20.625 ($20.63 half up;
+  $20.62 half even); 11 mutants, each killed.
+- A generic opaque type whose representation never mentions its
+  parameters crosses as that representation (`Money<USD>` an `s64`): the
+  ruling of 2026-08-20 amended for that case alone, its controls rewritten.
+- Found on the way: A-001 called a `Money.add` nothing declared and piped
+  into an uncalled `sum`, and checked clean.
+Verify 38348107940 green, with train-2.
+
+**ADR-0326, 2026-10-13: a name imported by name is the file's, before a
+whole module's** (the integrator's; found on the way to NEXT 6a; track
+`explicit-imports`, merged from `267f22d`).
+- `import List` beside `import domain.{ sum }` left `sum` ambiguous: `pw
+  check` passed the call and the build refused it ("`sum` names no
+  declaration this program contains").
+- A name imported by name now shadows a whole module's, as Rust's named
+  imports shadow a glob's; a call two whole modules declare is refused
+  where it is written (PW0022), naming both, with the repair. No program in
+  the repository called such a name.
+Verify 38348107940 green, with train-2.
+
 **ADR-0308 amended (2), 2026-10-12: a store's cuisine, the home page's
 search box, and a reader's search by their address** (W9's, track
 `store-search`, merged from `9bc4ff0`).
@@ -38,7 +98,7 @@ search box, and a reader's search by their address** (W9's, track
   the layer counts its statements, as Django's `assertNumQueries` counts
   queries, and the mutant that searched as memory does is killed by it
   (the integrator's ruling: it was no equivalent mutant).
-Verify TRAIN_RUN green, with the train.
+Verify 38326782630 green, with the train.
 
 **ADR-0325, 2026-10-12: an interaction's answer commits with its writes**
 (the integrator's; NEXT 5; track `interactions-committed`, merged from
@@ -53,7 +113,7 @@ Verify TRAIN_RUN green, with the train.
   it before running; a second host's commit that meets it rolls back and
   answers what the first recorded; a record answers a day, as Stripe's
   keys do.
-Verify TRAIN_RUN green, with the train.
+Verify 38326782630 green, with the train.
 
 **ADR-0324, 2026-10-12: `private` says a declaration is not importable,
 and nothing more** (the integrator's; NEXT 3a, W8's finding; track
@@ -69,7 +129,7 @@ and nothing more** (the integrator's; NEXT 3a, W8's finding; track
   read as everyone's data. PW0023 says "drop `private`".
 - Found on the way: a `user` that opens a declaration after one with no body
   was read as that declaration's unknown policy (PW0005).
-Verify TRAIN_RUN green, with the train.
+Verify 38326782630 green, with the train.
 
 **ADR-0323, 2026-10-12: a member read is computed wherever a page reads
 it** (the integrator's; NEXT 3c; track `member-in-block`, merged from
@@ -84,7 +144,7 @@ it** (the integrator's; NEXT 3c; track `member-in-block`, merged from
   member read in a view that contains itself, are refused by name.
 - The store's page names its cart link "Checkout" with the subtotal while
   the cart holds a line.
-Verify TRAIN_RUN green, with the train.
+Verify 38326782630 green, with the train.
 
 **ADR-0322, 2026-10-12: `|` and `&` are parenthesized where they mix** (the
 integrator's; W9's finding; track `and-or`, merged from `22a325c`).
@@ -98,7 +158,7 @@ integrator's; W9's finding; track `and-or`, merged from `22a325c`).
 - Every shipped program already parenthesized its mixes; two tests'
   programs did not, found by CI and the local run (PARALLEL.md). `just
   test-unit` runs every test binary since, so one failure hides no other.
-Verify TRAIN_RUN green, with the train.
+Verify 38326782630 green, with the train.
 
 **2026-10-12: nine more scripts' mutants run the tests that see them**
 (W6's ruling of 2026-10-09; track `narrowing-3`, merged from `25bfad5`).
@@ -109,7 +169,7 @@ Verify TRAIN_RUN green, with the train.
 - The nine recipes: 39,463 s of master's latest runs to 13,041 s (verify
   38315832945, 14 of 14 green, at `25bfad5`), every mutant still killed. A
   bound raised to 1800 while the whole suite ran goes back to 900 or 1200.
-Verified again with the train (TRAIN_RUN).
+Verified again with the train (38326782630).
 
 **ADR-0321, 2026-10-12: a related note is shown in its own file** (the
 integrator's; W8's finding; track `related-files`, merged from `87010c1`).

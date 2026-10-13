@@ -1,5 +1,5 @@
 //! **A name a file imports by name is the file's, before a whole module's**
-//! (ADR-XXXX; found by NEXT 6a's money, 2026-10-12).
+//! (ADR-0326; found by NEXT 6a's money, 2026-10-12).
 //!
 //! `import List` beside `import domain.{ sum }` left `sum` ambiguous between
 //! `List`'s and `domain`'s: `pw check` passed the call, and the build refused
@@ -88,7 +88,7 @@ fn a_name_imported_by_name_is_the_files_before_a_whole_modules() {
 
 /// **Two whole modules that both declare it leave it ambiguous**, and the
 /// call is refused where it is written, naming both, with the repair.
-/// Until ADR-XXXX it checked clean and the build refused it.
+/// Until ADR-0326 it checked clean and the build refused it.
 #[test]
 fn a_call_two_whole_modules_declare_is_refused_where_it_is_written() {
     let src = m("import a\nimport b", "sum(1)");

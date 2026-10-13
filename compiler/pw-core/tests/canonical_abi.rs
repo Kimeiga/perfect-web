@@ -428,7 +428,7 @@ fn a_privacy_qualifier_is_transparent_to_the_type_it_qualifies() {
 ///
 /// So the rule above is about **privacy qualifiers** and nothing else: a
 /// generic opaque type is never its *argument's* representation, as a
-/// qualifier is. Since ADR-XXXX (money, `opaque type Money<C> = Int`), one
+/// qualifier is. Since ADR-0327 (money, `opaque type Money<C> = Int`), one
 /// whose representation never mentions its parameters crosses as that
 /// representation, as every opaque type that is not generic does and as a
 /// phantom generic record does; one whose representation mentions them has

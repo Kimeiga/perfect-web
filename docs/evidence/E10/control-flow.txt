@@ -1,8 +1,8 @@
 ADR-0051 - an early return, ?, and for loops compile
 
 produced by: just e10-control-flow
-commit: 661c8a0b2294e82f23e01740a66e760d88114966
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/37911914095 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 64cc7da190695fa62cadf247d14fd9ebdc24f6e9
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38348107940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 
@@ -10,12 +10,12 @@ node: v22.21.1
 
 test a_branch_that_returns_takes_the_other_branchs_type ... ok
 test a_callee_that_returns_early_returns_from_itself ... ok
-test a_loop_updates_a_mutable_binding ... ok
 test a_read_is_a_copy_a_later_assignment_does_not_change ... ok
+test a_loop_updates_a_mutable_binding ... ok
 test a_question_mark_returns_the_failure ... ok
 test a_return_leaves_a_loop_and_the_body ... ok
 test a_return_leaves_the_body_early ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.97s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.95s
 
 == what may be assigned (compiler/pw-core/tests/assignments.rs)
 
@@ -36,20 +36,20 @@ javascript: 91 queries, 18200 calls, component and module agree (1196 trapped in
 
 == mutation controls (scripts/control_flow_mutations.py)
 
-baseline: 31 passed, 0 failed
-a `return` does not leave the component's function: KILLED (7 of 31 tests fail)
-a `return` leaves without its value: KILLED (7 of 31 tests fail)
-a module's `return` is dropped: KILLED (1 of 31 tests fail)
-`?` returns its failure without the failure's payload: KILLED (2 of 31 tests fail)
-a callee that returns early is inlined: KILLED (1 of 31 tests fail)
-a read of a variable is the variable itself: KILLED (1 of 31 tests fail)
-the component's read is not a copy: KILLED (1 of 31 tests fail)
-a `for` body runs once: KILLED (3 of 31 tests fail)
-a module's `for` runs over the first element only: KILLED (1 of 31 tests fail)
-a branch that returns keeps its placeholder's type: KILLED (1 of 31 tests fail)
-an assignment to a binding that is not `mut` is not refused: KILLED (4 of 31 tests fail)
-a module-level `let mut` is not assignable: KILLED (1 of 31 tests fail)
-an assignment's value is not related to the binding: KILLED (1 of 31 tests fail)
+baseline: 32 passed, 0 failed
+a `return` does not leave the component's function: KILLED (7 of 32 tests fail)
+a `return` leaves without its value: KILLED (7 of 32 tests fail)
+a module's `return` is dropped: KILLED (1 of 32 tests fail)
+`?` returns its failure without the failure's payload: KILLED (2 of 32 tests fail)
+a callee that returns early is inlined: KILLED (1 of 32 tests fail)
+a read of a variable is the variable itself: KILLED (1 of 32 tests fail)
+the component's read is not a copy: KILLED (1 of 32 tests fail)
+a `for` body runs once: KILLED (3 of 32 tests fail)
+a module's `for` runs over the first element only: KILLED (1 of 32 tests fail)
+a branch that returns keeps its placeholder's type: KILLED (1 of 32 tests fail)
+an assignment to a binding that is not `mut` is not refused: KILLED (4 of 32 tests fail)
+a module-level `let mut` is not assignable: KILLED (1 of 32 tests fail)
+an assignment's value is not related to the binding: KILLED (1 of 32 tests fail)
 13 of 13 mutants killed
 memory bound: no process was stopped
 

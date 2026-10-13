@@ -1180,7 +1180,7 @@ fn the_modules_entry_check_is_the_components() {
     assert_eq!((queries, calls, traps), (1, 2, 0));
 }
 
-/// **Money is rounded only where a program names how** (ADR-XXXX):
+/// **Money is rounded only where a program names how** (ADR-0327):
 /// `domain`'s `at_rate` in each rounding.
 const MONEY: &str = r#"module money
 
@@ -1214,7 +1214,7 @@ public query Percent(c: Int, p: Int) -> Option<Money<USD>> {
 "#;
 
 /// **Each rounding at halves of a cent either side of zero, at a third, at
-/// New York City's 8.875% and at Texas's half cent** (ADR-XXXX), compiled
+/// New York City's 8.875% and at Texas's half cent** (ADR-0327), compiled
 /// both ways and agreeing, and each the amount its rounding says. Texas's
 /// Comptroller writes a tax of $20.625 as $20.63: half up, where half even
 /// would collect $20.62. A negative rate is no rate.

@@ -21,6 +21,7 @@ import 'just/messages.just'
 import 'just/kiokun.just'
 import 'just/store-accounts.just'
 import 'just/store-search.just'
+import 'just/store-hours.just'
 
 default:
     @just --list
@@ -386,7 +387,7 @@ e9-values:
 # `evidence_is_current`.
 e10-component:
     @mkdir -p docs/evidence/E10
-    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart store.page.Reach UserCarts.line_count domain.display domain.count domain.total UserCarts.subtotal store.page.MenuSize store.page.MenuLine; do \
+    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart store.page.Reach UserCarts.line_count domain.display domain.count domain.total UserCarts.subtotal store.page.MenuSize store.page.MenuLine store.hours.StoreStatus store.hours.StoresOpen store.hours.CartHours; do \
       cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
         --out "docs/evidence/E10/$id.wasm" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
@@ -5886,13 +5887,13 @@ e14-related-files:
      } > docs/evidence/E14/related-files.txt
     @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/related-files.txt
 
-# ADR-XXXX: money is rounded only where a program names how (NEXT 6a). Each
+# ADR-0327: money is rounded only where a program names how (NEXT 6a). Each
 # rounding, compiled to a component and to JavaScript, agreeing, at the
 # amounts each rounding says (compiler/pw-conformance/tests/javascript.rs),
 # and the mutation controls (scripts/money_mutations.py).
 e14-money:
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - money is rounded only where a program names how"; echo; \
+    @{ echo "ADR-0327 - money is rounded only where a program names how"; echo; \
        echo "produced by: just e14-money"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; echo; \
@@ -5903,14 +5904,14 @@ e14-money:
      } > docs/evidence/E14/money.txt
     @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/money.txt
 
-# ADR-XXXX: a name imported by name is the file's, before a whole module's.
+# ADR-0326: a name imported by name is the file's, before a whole module's.
 # The resolution's order and the refusal of a call two whole modules declare
 # (compiler/pw-core/tests/explicit_imports.rs), every program checking as
 # before (`just test-compile`), and the mutation controls
 # (scripts/explicit_imports_mutations.py).
 e14-explicit-imports:
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - a name imported by name is the file's, before a whole module's"; echo; \
+    @{ echo "ADR-0326 - a name imported by name is the file's, before a whole module's"; echo; \
        echo "produced by: just e14-explicit-imports"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo; \

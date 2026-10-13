@@ -1,30 +1,35 @@
 ADR-0044 - pure computation as JavaScript modules, against the components
 
 produced by: just e10-javascript
-commit: 35f476bb7ec49b0f22c010abbdfa65b91c907fa5
+commit: 64cc7da190695fa62cadf247d14fd9ebdc24f6e9
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38348107940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 
 == the component and the module, on the same arguments
 
-javascript: 32 queries, 6400 calls, component and module agree (418 trapped in both)
+javascript: 3 queries over cases written alone, 600 calls, component and module agree (57 trapped in both)
+javascript: 5 queries over trees, 1000 calls, component and module agree (155 trapped in both)
+javascript: 5 queries over values held in place, 1000 calls, component and module agree (132 trapped in both)
+javascript: 91 queries, 18200 calls, component and module agree (1196 trapped in both)
 javascript: kiokun's 2 shard queries, 400 calls, component and module agree
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.24s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 76.72s
 
 == mutation controls (scripts/javascript_mutations.py)
 
-baseline: 2 passed, 0 failed
-a String is ordered by UTF-16 unit, as JavaScript's `<` is: KILLED (1 of 2 tests fail)
-String.trim is ECMAScript's trim: KILLED (1 of 2 tests fail)
-String.length counts UTF-16 units: KILLED (1 of 2 tests fail)
-an Int does not trap on overflow: KILLED (1 of 2 tests fail)
-`/` truncates toward zero, as BigInt's does: KILLED (1 of 2 tests fail)
-`%` takes the dividend's sign, as BigInt's does: KILLED (1 of 2 tests fail)
-from_codepoints accepts surrogates: KILLED (1 of 2 tests fail)
-sort_by puts the left element first on a positive comparison: KILLED (1 of 2 tests fail)
-List.get reads one past the end: KILLED (1 of 2 tests fail)
-List.take reads a negative count from the end: KILLED (1 of 2 tests fail)
+baseline: 8 passed, 0 failed
+a String is ordered by UTF-16 unit, as JavaScript's `<` is: KILLED (1 of 8 tests fail)
+String.trim is ECMAScript's trim: KILLED (1 of 8 tests fail)
+String.length counts UTF-16 units: KILLED (1 of 8 tests fail)
+an Int does not trap on overflow: KILLED (5 of 8 tests fail)
+`/` truncates toward zero, as BigInt's does: KILLED (2 of 8 tests fail)
+`%` takes the dividend's sign, as BigInt's does: KILLED (4 of 8 tests fail)
+from_codepoints accepts surrogates: KILLED (1 of 8 tests fail)
+sort_by puts the left element first on a positive comparison: KILLED (1 of 8 tests fail)
+List.get reads one past the end: KILLED (1 of 8 tests fail)
+List.take reads a negative count from the end: KILLED (1 of 8 tests fail)
 10 of 10 mutants killed
+memory bound: no process was stopped
 
 NOT CLAIMED: a handler that computes, Wasm in the browser, or the modules
 in a browser engine. They run under Node.

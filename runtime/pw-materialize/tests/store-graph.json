@@ -140,6 +140,41 @@
       ]
     },
     {
+      "path": "store.hours.CartHours",
+      "name": "CartHours",
+      "node": "resource",
+      "partition": "private",
+      "privacy": "user",
+      "key": [
+        "reader"
+      ],
+      "params": [
+        "reader"
+      ]
+    },
+    {
+      "path": "store.hours.StoreStatus",
+      "name": "StoreStatus",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "key": [
+        "id"
+      ],
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "store.hours.StoresOpen",
+      "name": "StoresOpen",
+      "node": "resource",
+      "partition": "shared",
+      "privacy": "public",
+      "key": [],
+      "params": []
+    },
+    {
       "path": "store.menu_fragment.MenuFragment",
       "name": "MenuFragment",
       "node": "materialization",
@@ -471,6 +506,38 @@
       ]
     },
     {
+      "from": "store.hours.CartHours",
+      "to": "Events.StoreChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "_"
+      ]
+    },
+    {
+      "from": "store.hours.CartHours",
+      "to": "Events.UserCartChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "reader"
+      ]
+    },
+    {
+      "from": "store.hours.StoreStatus",
+      "to": "Events.StoreChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "from": "store.hours.StoresOpen",
+      "to": "Events.StoreChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "_"
+      ]
+    },
+    {
       "from": "store.menu_fragment.MenuFragment",
       "to": "Events.InventoryChanged",
       "kind": "invalidated_by",
@@ -543,6 +610,14 @@
     },
     {
       "from": "store.page.CartPage",
+      "to": "store.hours.CartHours",
+      "kind": "reads",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.CartPage",
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
@@ -567,17 +642,17 @@
     },
     {
       "from": "store.page.HomePage",
+      "to": "store.hours.StoresOpen",
+      "kind": "reads",
+      "key": []
+    },
+    {
+      "from": "store.page.HomePage",
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
         "current_user()"
       ]
-    },
-    {
-      "from": "store.page.HomePage",
-      "to": "store.page.StoreList",
-      "kind": "reads",
-      "key": []
     },
     {
       "from": "store.page.Menu",
@@ -675,6 +750,14 @@
       "kind": "invalidated_by",
       "key": [
         "reader"
+      ]
+    },
+    {
+      "from": "store.page.StorePage",
+      "to": "store.hours.StoreStatus",
+      "kind": "reads",
+      "key": [
+        "id"
       ]
     },
     {
@@ -914,6 +997,14 @@
     {
       "from": "store.search.Search",
       "to": "Events.MenuChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "_"
+      ]
+    },
+    {
+      "from": "store.search.Search",
+      "to": "Events.StoreChanged",
       "kind": "invalidated_by",
       "key": [
         "_"

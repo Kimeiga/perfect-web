@@ -102,7 +102,7 @@ fn same_spelled_user_type_does_not_impersonate_the_privacy_constructor() {
         "a spelling is not a platform privacy declaration"
     );
     let refs: Vec<_> = hirs.iter().collect();
-    // Its own representation, a string, since ADR-XXXX: never the platform
+    // Its own representation, a string, since ADR-0327: never the platform
     // qualifier's erasure to its argument, which would make it an `s64`.
     let rendered = pw_core::wit::host_signatures(&refs, &ws);
     let cs = pw_core::contract::contracts(&refs, &sigs, &ws);

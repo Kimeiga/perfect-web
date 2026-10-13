@@ -91,7 +91,15 @@ MUTANTS = [
 
 CARGO = {
     "typer": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "query_values"],
-    "server": ["cargo", "test", "--quiet", "-p", "pw-dev-server"],
+    # The tests that fail under its mutants, measured against the whole suite
+    # by `scripts/mutant_killers.py` on 2026-10-12 and 2026-10-13 (W6's
+    # ruling of 2026-10-09), two per mutant where two fail.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_failed_origin_is_answered_with_the_last_public_value_kept",
+        "tests::a_page_whose_values_cannot_be_read_is_answered_and_the_server_goes_on",
+        "tests::a_served_page_whose_values_fail_is_told_to_read_itself_again",
+    ],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render", "--test", "plan_lists"],
 }
 

@@ -1,4 +1,4 @@
-# ADR-XXXX: a name imported by name is the file's, before a whole module's
+# ADR-0326: a name imported by name is the file's, before a whole module's
 
 Status: accepted under the owner's delegation of 2026-10-02 (the
 integrator's). Date: 2026-10-12. Milestone: E14 (the language). Found on the

@@ -23,7 +23,7 @@ module domain
 // `line_count` sums a cart's quantities (ADR-0048).
 import List
 // When a delivery estimate was made (ADR-0180).
-import clock.{ Instant }
+import clock.{ Instant, LocalTime, Weekday }
 
 // --- identities -----------------------------------------------------------
 //
@@ -95,7 +95,7 @@ fn fewer(n: PositiveInt) -> Option<PositiveInt> !{} {
 
 // --- money ----------------------------------------------------------------
 //
-// **Money is rounded only where a program names how** (ADR-XXXX). An amount
+// **Money is rounded only where a program names how** (ADR-0327). An amount
 // is its minor units, cents for US dollars, read in this module alone
 // (ADR-0048). Another module adds amounts, multiplies one by a count, sums
 // and compares them, all exactly, and takes a part of one only at a `Rate`,
@@ -143,7 +143,7 @@ fn millionths(n: Int) -> Option<Rate> !{} {
     if n >= 0 { Some(Rate(n)) } else { None }
 }
 
-// **How a part of a minor unit is rounded** (ADR-XXXX):
+// **How a part of a minor unit is rounded** (ADR-0327):
 // - `HalfUp`: to the nearer unit, a half away from zero. A half cent or more
 //   is a cent, as California's, New York's and Texas's sales taxes ask.
 // - `HalfEven`: to the nearer unit, a half to the even one (banker's).
@@ -302,6 +302,25 @@ type OrderError =
     // A store an item is from does not deliver to the reader's chosen address
     // (track `store-accounts`, ADR-0319).
     | NoCoverage
+    // A store an item is from is closed, or past its last order (track
+    // `store-hours`): which, as data the page words (the integrator's
+    // ruling of 2026-10-12).
+    | Closed(Closing)
+
+// **Why a store takes no order now** (track `store-hours`): closed, and when
+// it opens where it does within a week; or past its last order, which was at
+// the time it carries, in the store's zone.
+type Closing =
+    | ClosedNow(Option<Opening>)
+    | PastLastOrder(LocalTime)
+
+// **When a store opens**: its day, seen from the store's today, and its time.
+type Opening = Opening { day: OpeningDay, at: LocalTime }
+
+type OpeningDay =
+    | Today
+    | Tomorrow
+    | On(Weekday)
 
 type OrderDraft = OrderDraft {
     id: OrderId,
@@ -405,3 +424,6 @@ type SyncError =
 // Whether two ids name one item. The representation is readable only here
 // (ADR-0048), so the comparison is written here (ADR-0122).
 fn same_item(a: MenuItemId, b: MenuItemId) -> Bool !{} { a.value == b.value }
+
+// Whether two ids name one store (track `store-hours`).
+fn same_store(a: StoreId, b: StoreId) -> Bool !{} { a.value == b.value }

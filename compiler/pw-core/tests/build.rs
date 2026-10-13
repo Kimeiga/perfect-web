@@ -75,6 +75,11 @@ fn the_store_builds_every_artifact_from_source() {
             "domain.display",
             // A cart's line, priced (ADR-0172).
             "domain.total",
+            // A store's hours (track `store-hours`): whether the cart's
+            // stores are open, whether one store is, and every store's.
+            "store.hours.CartHours",
+            "store.hours.StoreStatus",
+            "store.hours.StoresOpen",
             "store.page.Cart",
             // The store's slots, since ADR-0165: each stream's query.
             "store.page.Estimate",

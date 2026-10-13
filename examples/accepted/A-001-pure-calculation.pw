@@ -28,7 +28,7 @@ type Cart = Cart {
 fn line_total(line: CartLine) -> Money<USD> !{} {
     // `PositiveInt` and `Money` are opaque here: `.value` is `domain`'s
     // alone, and `count`, `times` and `sum` are what `domain` gives other
-    // modules (ADR-0048, ADR-XXXX). An amount is multiplied and added
+    // modules (ADR-0048, ADR-0327). An amount is multiplied and added
     // exactly; it is never divided here.
     times(line.unit_price, line.quantity.count)
 }

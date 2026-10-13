@@ -159,7 +159,7 @@ MUTANTS = [
         "a line's total is its price once",
         "conformance",
         DOMAIN,
-        # Re-anchored by ADR-XXXX: an amount is multiplied by `times`.
+        # Re-anchored by ADR-0327: an amount is multiplied by `times`.
         "    times(line.unit_price, line.quantity.value)\n",
         "    line.unit_price\n",
     ),
@@ -169,7 +169,7 @@ MUTANTS = [
         USER_CARTS,
         # Re-anchored by track store-accounts: the store's cart is a user's,
         # its transitions UserCarts'.
-        # And by ADR-XXXX: amounts are added by `sum`.
+        # And by ADR-0327: amounts are added by `sum`.
         "    sum(List.map(cart.lines, total))\n",
         "    sum(List.drop(List.map(cart.lines, total), List.length(cart.lines) - 1))\n",
     ),

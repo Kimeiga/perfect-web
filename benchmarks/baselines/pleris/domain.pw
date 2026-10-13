@@ -60,7 +60,7 @@ fn added(a: PositiveInt, b: PositiveInt) -> PositiveInt !{} { PositiveInt(a.valu
 
 type USD = USD { code: String }
 
-// An amount, its minor units, read here alone (ADR-XXXX): the store's money,
+// An amount, its minor units, read here alone (ADR-0327): the store's money,
 // as the host that serves both stores passes it.
 opaque type Money<C> = Int
 

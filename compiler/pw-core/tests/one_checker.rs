@@ -86,6 +86,9 @@ fn a_program_that_checks_builds() {
         "examples/store/app.pw",
         "examples/store/menu.pw",
         "examples/store/search.pw",
+        // And its hours, which its pages and its order read (track
+        // `store-hours`).
+        "examples/store/hours.pw",
     ]);
     if let Err(e) = build(&units(&files)) {
         panic!("the store does not build: {e}");

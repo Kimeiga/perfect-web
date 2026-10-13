@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-XXXX: a name a file imports by name is the
+"""Mutation controls for ADR-0326: a name a file imports by name is the
 file's, before a whole module's.
 
 Each mutant undoes one piece: the name's imports and the whole modules' read

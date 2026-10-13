@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-XXXX: money is rounded only where a program
+"""Mutation controls for ADR-0327: money is rounded only where a program
 names how.
 
 Each mutant undoes one piece of `domain`'s money: a rounding's tie or sign;

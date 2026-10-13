@@ -1,8 +1,8 @@
 ADR-0136 - a view is written where it is used
 
 produced by: just e14-views-compose
-commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 25b01345e1a5406a8b977c6c269475aa5b872e60
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38326782630 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == composition (compiler/pw-core/tests/views_compose.rs)
@@ -18,7 +18,7 @@ test what_cannot_be_composed_is_refused_by_name ... ok
 test what_a_view_captures_is_checked_where_it_is_given ... ok
 test a_view_used_twice_has_parts_of_its_own_each_time ... ok
 test a_view_s_part_and_handler_are_the_page_s_to_speculate ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.60s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.85s
 
 == a view's props (compiler/pw-core/tests/view_elements.rs)
 

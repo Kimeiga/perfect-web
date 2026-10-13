@@ -224,7 +224,7 @@ MUTANTS = [
         "a line is priced 450 whatever its item",
         "server",
         SERVER,
-        # Re-anchored by ADR-XXXX: an amount crosses as its cents.
+        # Re-anchored by ADR-0327: an amount crosses as its cents.
         "(\"unit-price\".into(), Val::S64(line.price)),\n",
         "(\"unit-price\".into(), Val::S64(450)),\n",
     ),
@@ -279,7 +279,16 @@ CARGO = {
         "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
         "--test", "row_reads", "--test", "member_reads_in_blocks",
     ],
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The tests that fail under its mutants, measured against the whole suite
+    # by `scripts/mutant_killers.py` on 2026-10-12 and 2026-10-13 (W6's
+    # ruling of 2026-10-09), two per mutant where two fail.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_change_sends_what_changed_unannounced_with_it",
+        "tests::a_change_to_one_stores_menu_reaches_that_stores_pages_only",
+        "tests::a_line_records_the_stores_name_and_price_not_the_requests",
+        "tests::a_speculating_page_is_sent_its_carts_value",
+    ],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render"],
     "display": [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-host", "--features", "engine",
@@ -299,11 +308,7 @@ PROGRAM = [
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
-# 1800 s while its server command runs the development server's whole
-# suite, about 950 s on CI at 420 tests (the integrator's ruling of
-# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
-# see its mutants, it needs far less (W6's ruling of 2026-10-09).
-BOUND = 1800
+BOUND = 1200
 
 
 def bounded(cmd, **kw):

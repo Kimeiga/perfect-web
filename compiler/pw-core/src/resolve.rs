@@ -530,7 +530,7 @@ impl Workspace {
             return Resolution::Local(*def);
         }
         // **A name the file imports by name, before a whole module's**
-        // (ADR-XXXX). `import domain.{ sum }` beside `import List` means
+        // (ADR-0326). `import domain.{ sum }` beside `import List` means
         // `domain`'s `sum`: the file chose it by name, as an explicit `use`
         // shadows a glob in Rust. Two whole modules that both declare a name
         // the file uses leave it ambiguous, and the use is refused (PW0022).

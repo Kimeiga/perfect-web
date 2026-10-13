@@ -194,17 +194,21 @@ MUTANTS = [
 CARGO = {
     "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "titles"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render", "--test", "titles"],
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The tests that fail under its mutants, measured against the whole suite
+    # by `scripts/mutant_killers.py` on 2026-10-12 and 2026-10-13 (W6's
+    # ruling of 2026-10-09), two per mutant where two fail.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_page_carries_its_data_layers_style_and_no_other",
+        "tests::a_page_that_binds_a_query_is_rendered_with_its_parameters",
+        "tests::a_title_that_changed_is_set_as_its_text",
+    ],
 }
 BROWSER = ["e2e/accessibility.spec.mjs", "--project=chromium"]
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
-# 1800 s while its server command runs the development server's whole
-# suite, about 950 s on CI at 420 tests (the integrator's ruling of
-# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
-# see its mutants, it needs far less (W6's ruling of 2026-10-09).
-BOUND = 1800
+BOUND = 1200
 
 
 def bounded(cmd, **kw):

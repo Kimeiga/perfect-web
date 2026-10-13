@@ -116,3 +116,27 @@ fn time(hour: Int, minute: Int) -> Option<LocalTime> !{} {
 fn next_day(date: LocalDate) -> LocalDate !{} {
     LocalDate(date.value + 1)
 }
+
+// **A date's number**, days since 1970-01-01, ISO 8601's proleptic
+// Gregorian calendar (track `store-hours`): what a store's special dates are
+// stored by, and how two dates are compared and counted apart.
+fn day_number(date: LocalDate) -> Int !{} {
+    date.value
+}
+
+// **The date numbered `days`**, days since 1970-01-01, ISO 8601's
+// proleptic Gregorian calendar (track `store-hours`).
+fn numbered_day(days: Int) -> LocalDate !{} {
+    LocalDate(days)
+}
+
+// **Midnight**, a day's first minute (track `store-hours`).
+fn midnight() -> LocalTime !{} {
+    LocalTime(0)
+}
+
+// **A time's minute of its day**, 0 to 1439 (track `store-hours`): how a page
+// words a time a command answered.
+fn minute_of_day(t: LocalTime) -> Int !{} {
+    t.value
+}

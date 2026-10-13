@@ -38,6 +38,8 @@ BOTH_DESCRIPTIONS = (
     # Re-anchored by ADR-0308's amendment: the store's cuisine, before its
     # description, which says more of the store too.
     "            <p id=\"store-cuisine\">{store.cuisine}</p>\n"
+    # And whether it is open (track store-hours).
+    "            <p id=\"store-open\">{open.said}</p>\n"
     "            <p id=\"store-description\">{store.description}</p>\n"
     "            <p id=\"menu-line\">{line}</p>\n"
     "\n"
@@ -160,6 +162,8 @@ MUTANTS = [
         )
         # And the store's cuisine (ADR-0308, amended), likewise.
         .replace("            <p id=\"store-cuisine\">{store.cuisine}</p>\n", "")
+        # And whether it is open (track store-hours), likewise.
+        .replace("            <p id=\"store-open\">{open.said}</p>\n", "")
         .replace("            <p id=\"menu-line\">{line}</p>\n", "")
         .replace("                                    <p>{item.description}</p>\n", "")
         # And where deliveries go (track store-accounts), which says more of

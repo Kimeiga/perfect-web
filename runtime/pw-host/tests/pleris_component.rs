@@ -655,7 +655,7 @@ fn json_arguments_are_typed_by_the_export_they_are_for() {
             "arg0`).price: expected an integer",
         ),
         (
-            // An amount is its cents (ADR-XXXX), not a record of them.
+            // An amount is its cents (ADR-0327), not a record of them.
             vec![
                 sent(serde_json::json!({ "minor_units": 375 })),
                 serde_json::json!(1),

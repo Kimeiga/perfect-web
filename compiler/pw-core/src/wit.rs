@@ -321,7 +321,7 @@ impl Types {
                 }
                 // A generic declaration whose representation never mentions
                 // its parameters has one layout: a record's, a variant's, and
-                // since ADR-XXXX an opaque type's, `Money<C> = Int`, which
+                // since ADR-0327 an opaque type's, `Money<C> = Int`, which
                 // crosses as its representation as every opaque type does.
                 // One whose representation mentions them still has no WIT
                 // form: its layout would be its argument's, a privacy

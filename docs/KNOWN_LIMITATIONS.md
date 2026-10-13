@@ -659,7 +659,13 @@ awaited in order. What remains:
   finding, 2026-10-12; NEXT 4b): the store's logic reads the layer's rows a
   store's or a menu's at a time, and on PostgreSQL each is a statement.
   `place_order`'s reach runs one per cart line and store, a reader's search
-  one per store it found, each reading every store.
+  one per store it found, each reading every store, and the hours one per
+  store (ADR-0328).
+- **A store's hours look a week ahead** (ADR-0328): a store that next opens
+  later says "Closed". A special date replaces its day's hours, never only
+  extends them; item-level hours are not kept. On a day a transition skips
+  a period's minute, the instant is RFC 5545's (02:30 read as 03:30) and
+  the page says the minute as written.
 - **The store's places are a fixture, not a geocoder** (ADR-0319): eleven
   places with approximate coordinates; a courier's minutes are four a
   kilometre in a straight line; an address's label is checked for its

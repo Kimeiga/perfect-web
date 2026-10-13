@@ -724,8 +724,7 @@ E14 comes before E11-E13. Its plan, controls and task list are
           4. **store hours**: open and closed by the platform's clock
              effect, ordering refused while closed, and orders scheduled.
              In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
-             the store's hours (**W9's** `track/store-hours`, after W8's
-             merge, on the integrator's design: PARALLEL.md, 2026-10-11);
+             ~~the store's hours~~ (ADR-0328, merged 2026-10-13, W9's);
              orders scheduled;
           4a. ~~**typed page query parameters**~~ (ADR-0309, merged
              2026-10-12): a route's query part, `route "/search{?q}"`,
@@ -744,11 +743,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
              `assert_queries_count` count them) at the seed and with fifty
              stores more, pinned and equal at both; rows read by set
              (`= ANY($1)`), a scan in memory; mutants restore each loop.
-             W9's, after store-hours, on the counter W9's search brings;
+             W9's, after 6b, on the counter W9's search brings;
           5. ~~**idempotency committed with the writes**~~ (ADR-0325,
              merged 2026-10-12): an interaction's answer commits in its
              command's transaction, on both layers, and answers a day;
-          6. **checkout**: fees, taxes, a tip and promo codes, in money that
+          6. **checkout**, in steps: ~~6a, money rounded only where named~~
+             (ADR-0327, merged 2026-10-13); 6b the order's total (W9's, after
+             store-hours); 6c payment (the integrator's); 6d a Stripe adapter
+             (the owner's approval of each crate). Fees, taxes, a tip and
+             promo codes, in money that
              cannot round silently (`Money` is USD's alone, so no other
              currency, conversion or locale's format, said where it
              limits); payment through a deployment's payment capability

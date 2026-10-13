@@ -49,6 +49,8 @@ import domain.{ StoreId, Store, StoreError, CartError, MenuItem, MenuSection, In
     EstimateError, OrderStatus, OrderError, TrackingError }
 import capability.{ Session, SessionId, User, UserId }
 import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged, AddressesChanged }
+// TRACK SEAM (store-hours): each store's hours, and whether it is open.
+import store.hours.{ StoreStatus, StoresOpen, CartHours, hours_of_cart, closed_in, closing_said }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -389,7 +391,12 @@ command place_order()
     invalidates   Cart(current_user()), Order(current_user())
     emits         UserCartChanged(current_user()), UserOrderChanged(current_user())
 {
-    UserOrders.place(current_user())
+    // TRACK SEAM (store-hours): refused while a store of the cart is closed
+    // or past its last order, read in this transaction.
+    match closed_in(hours_of_cart(current_user())) {
+        Some(closing) => Err(OrderError.Closed(closing)),
+        None => UserOrders.place(current_user()),
+    }
 }
 
 // **An address saved, and chosen as it is saved** (track `store-accounts`,
@@ -476,6 +483,8 @@ user page StorePage(id: StoreId) {
     let store = query Store(id)
     let menu = query Menu(id)
     let line = query MenuLine(id)
+    // TRACK SEAM (store-hours): whether the store is open.
+    let open = query StoreStatus(id)
     let cart = query Cart(current_user())
     // Whether the store reaches the reader's chosen address (track
     // `store-accounts`).
@@ -499,6 +508,7 @@ user page StorePage(id: StoreId) {
         <main>
             <h1 id="store-name">{store.name}</h1>
             <p id="store-cuisine">{store.cuisine}</p>
+            <p id="store-open">{open.said}</p>
             <p id="store-description">{store.description}</p>
             <p id="menu-line">{line}</p>
 
@@ -653,6 +663,8 @@ user page CartPage() {
     let cart = query Cart(current_user())
     // Its order, once it is placed (ADR-0193).
     let order = query Order(current_user())
+    // TRACK SEAM (store-hours): its stores' hours, where one is closed.
+    let hours = query CartHours(current_user())
     // What the cart last had to say: a line that could not be changed.
     signal notice: String = ""
 
@@ -704,6 +716,7 @@ user page CartPage() {
             </ul>
             <p>Subtotal: <span id="cart-subtotal">{cart.subtotal.display}</span></p>
             {#if cart.lines}<p id="cart-fees">Delivery fee and taxes are added at checkout.</p>{/if}
+            <p id="cart-hours">{hours}</p>
             <p id="cart-notice" role="status">{notice}</p>
             <button
                 id="clear-cart"
@@ -723,6 +736,7 @@ user page CartPage() {
                     Ok(_) => navigate OrderPage(),
                     Err(OrderError.NothingToOrder) => notice = "Your cart is empty: there is nothing to order.",
                     Err(OrderError.NoCoverage) => notice = "A store in your cart doesn't deliver to your address.",
+                    Err(OrderError.Closed(closing)) => notice = "A store in your cart {closing_said(closing)}.",
                 }}
             >
                 Place order
@@ -744,7 +758,8 @@ user page HomePage() {
     placement origin
     cache     private
 
-    let stores = query StoreList()
+    // TRACK SEAM (store-hours): each store with whether it is open.
+    let stores = query StoresOpen()
     let cart = query Cart(current_user())
 
     view {
@@ -760,6 +775,7 @@ user page HomePage() {
                     <li>
                         <h2><a href="/stores/{store.id}">{store.name}</a></h2>
                         <p class="cuisine">{store.cuisine}</p>
+                        <p class="open">{store.said}</p>
                         <p>{store.description}</p>
                     </li>
                 {/each}

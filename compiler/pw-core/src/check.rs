@@ -1209,7 +1209,7 @@ fn unresolved_uses(
                 // CSS value function. `tests/semantic_ownership.rs` is the gate
                 // that made the class small enough to report — it names every
                 // owner, and the residue it leaves is what this reports.
-                // **A bare call two whole modules declare** (ADR-XXXX): the
+                // **A bare call two whole modules declare** (ADR-0326): the
                 // lowering refused it, and nothing here did, so a program
                 // checked clean that did not build. Named where it is
                 // written, with each module.
@@ -6378,7 +6378,7 @@ fn unresolved_in_policy_term(
 /// lexical scope, a declaration the unit can see, language syntax, a policy
 /// head or operator, a value domain. A name none of those claims is a name the
 /// author wrote and the compiler never gave meaning to.
-/// **A bare call whose name two whole modules declare** (ADR-XXXX):
+/// **A bare call whose name two whole modules declare** (ADR-0326):
 /// `import List` and `import domain` both have `sum`, and the file names
 /// neither by name. Refused where it is written, naming each module.
 fn ambiguous_bare_call(
