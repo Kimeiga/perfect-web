@@ -10,7 +10,7 @@ Each mutant undoes one piece:
 - the cart's count read from every binding, so a command asks every query
   its page reads.
 
-A mutant must fail the server's tests, all of them run: ADR-0148's controls
+A mutant must fail the server's tests that see it: ADR-0148's controls
 found tests a name filter left out.
 
 Run from the repository root; `just e14-document-reads` records the output.
@@ -58,7 +58,16 @@ MUTANTS = [
 ]
 
 TESTS = [
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The tests that fail under its mutants, measured against the whole suite
+    # by `scripts/mutant_killers.py` on 2026-10-12 and 2026-10-13 (W6's
+    # ruling of 2026-10-09), two per mutant where two fail.
+    [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_change_that_reaches_a_session_while_its_page_is_read_is_not_lost",
+        "tests::a_longer_read_is_not_applied_over_a_commit_it_did_not_see",
+        "tests::pages_read_at_once_each_ask_when_their_query_says_parallel",
+        "tests::pages_read_at_once_share_an_ask_their_query_says_is_one_per_key",
+    ],
 ]
 
 

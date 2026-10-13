@@ -23,6 +23,19 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-13: thirteen more scripts' server mutants run the tests that see
+them** (W6's ruling of 2026-10-09; track `narrowing-4`, merged from
+`d838954`).
+- Measured by `scripts/mutant_killers.py`, two killers per mutant where two
+  fail: telling, keyed_reads, row_reads, query_values, titles,
+  command_invalidations, document_reads, instance_changes, one_case_name,
+  nested_lists, menu_categories, query_blocks and query_attributes.
+  row_reads and query_blocks were measured again on train-1's tree.
+- The bounds raised to 1800 while the whole suite ran go back to 900 or
+  1200. One script's server command still runs the whole suite per
+  mutant, committed_events', measured next.
+Verify TRAIN_RUN green, with train-2.
+
 **ADR-0327, 2026-10-13: money is rounded only where a program names how**
 (the integrator's; NEXT 6a; track `money`, merged from `f12656a`).
 - `Money<C>` is opaque, an amount's cents read in `domain` alone; other

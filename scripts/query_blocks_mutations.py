@@ -112,7 +112,16 @@ MUTANTS = [
 
 CARGO = {
     "plan": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "page_blocks"],
-    "server": ["cargo", "test", "--quiet", "-p", "pw-dev-server"],
+    # The tests that fail under its mutants, measured against the whole suite
+    # by `scripts/mutant_killers.py` on 2026-10-12 and 2026-10-13 (W6's
+    # ruling of 2026-10-09), two per mutant where two fail.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_block_a_speculation_renders_is_rendered_again_whole",
+        "tests::a_block_that_shows_the_arm_it_showed_is_told_part_by_part",
+        "tests::a_case_is_a_case",
+        "tests::an_insert_and_what_changed_with_it_are_derived_from_the_menu",
+    ],
 }
 BROWSER = [
     "pnpm", "exec", "playwright", "test", "e2e/resource-path.spec.mjs",

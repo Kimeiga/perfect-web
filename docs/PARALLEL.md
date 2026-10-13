@@ -1424,3 +1424,6 @@ Each a decision for a track, with its date; a track's ADR records it too.
   `cents`, `plus`, `minus`, `times`, `sum` and `at_rate`; a host passes an
   amount as an `s64` and a browser writes it as a whole number. The
   benchmark's store takes the same money, as one server serves both.
+- **2026-10-13, narrowing batch 4 merged on train-2** (track
+  `narrowing-4`, from `d838954`): thirteen scripts. One remains,
+  committed_events'; the others name the tests they run.

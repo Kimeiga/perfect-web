@@ -70,15 +70,23 @@ MUTANTS = [
     ),
 ]
 
-TESTS = ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]
+# The tests that fail under its mutants, measured against the whole suite
+# by `scripts/mutant_killers.py` on 2026-10-12 and 2026-10-13 (W6's
+# ruling of 2026-10-09), two per mutant where two fail.
+TESTS = [
+    "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+    "tests::a_burst_of_posts_tells_another_reader_once",
+    "tests::a_commit_while_a_reader_is_told_is_told_after_it",
+    "tests::a_condition_a_host_computes_decides_its_block_and_again_when_it_changes",
+    "tests::a_sessions_changes_wait_for_the_one_in_progress",
+    "tests::a_sessions_turns_are_served_in_the_order_asked",
+    "tests::a_telling_that_panics_does_not_silence_the_reader",
+    "tests::notifications::reading_them_tells_no_other_users_page",
+]
 
 # How long one run may take. Past it, it is killed with everything it
 # started, and counts as failing: a turn served to no one waits for ever.
-# 1800 s while its server command runs the development server's whole
-# suite, about 950 s on CI at 420 tests (the integrator's ruling of
-# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
-# see its mutants, it needs far less (W6's ruling of 2026-10-09).
-BOUND = 1800
+BOUND = 1200
 
 
 def run_tests():
