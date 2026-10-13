@@ -1311,7 +1311,9 @@ impl<'p> Emitter<'p> {
 
     /// **A value sent to a command, as JSON carries it** (ADR-0058): an `Int`
     /// as a number, exact within ±2^53 or a trap; an opaque type as its
-    /// representation (ADR-0033 §4).
+    /// representation (ADR-0033 §4); a case as its WIT name and its payload,
+    /// `{ $case, value }` (the integrator's, 2026-10-13; W9's finding in
+    /// NEXT 6b), as a signal's value is written.
     fn wire(&mut self, v: &str, ty: &Type) -> Result<String, String> {
         match ty {
             Type::Int => Ok(format!("{}({v})", self.uses("exact"))),
@@ -1319,9 +1321,12 @@ impl<'p> Emitter<'p> {
             // A record or a list, as a signal's value is written (ADR-0172):
             // each field by its Pleris name, each `Int` exact or a trap.
             Type::List(_) => self.wire_value(v, ty),
+            // `Option` and `Result`, whose cases are `some` and `none`, `ok`
+            // and `err`.
+            Type::Option(_) | Type::Result(..) => self.wire_value(v, ty),
             Type::Nominal(def, args) => match self.shape(*def, args).cloned() {
                 Some(Shape::Alias(of)) => self.wire(v, &of),
-                Some(Shape::Record { .. }) => self.wire_value(v, ty),
+                Some(Shape::Record { .. } | Shape::Variant { .. }) => self.wire_value(v, ty),
                 _ => Err(format!(
                     "a command argument of type {ty:?}, which a browser cannot send"
                 )),

@@ -134,7 +134,11 @@ MUTANTS = [
         "a record holding what cannot be sent is sent",
         "core",
         LOWER,
+        "                    && matches!(\n"
+        "                        ty_resolution(cx.sigs, f, &Span::default()),\n"
         "                        Lowering::Lowered(field) if sendable_within(cx, &field, on_the_way)\n",
+        "                    && matches!(\n"
+        "                        ty_resolution(cx.sigs, f, &Span::default()),\n"
         "                        Lowering::Lowered(_)\n",
     ),
     (

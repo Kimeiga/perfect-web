@@ -5922,6 +5922,23 @@ e14-explicit-imports:
      } > docs/evidence/E14/explicit-imports.txt
     @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/explicit-imports.txt
 
+# ADR-XXXX: a case crosses from a browser (the integrator's; W9's finding in
+# NEXT 6b). The handler sending a case and the host reading it
+# (compiler/pw-conformance/tests/case_arguments.rs), and the mutation
+# controls (scripts/case_arguments_mutations.py).
+e14-case-arguments:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a case crosses from a browser"; echo; \
+       echo "produced by: just e14-case-arguments"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== a case sent and read (compiler/pw-conformance/tests/case_arguments.rs)"; echo; \
+       cargo test --locked -p pw-conformance --test case_arguments 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/case_arguments_mutations.py)"; echo; \
+       python3 scripts/case_arguments_mutations.py; \
+     } > docs/evidence/E14/case-arguments.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/case-arguments.txt
+
 # ADR-0322: `|` and `&` are parenthesized where they mix (W9's finding). The
 # parser's rule (compiler/pw-syntax/src/grammar.rs), every shipped program and
 # the corpus parsing as before, and the mutation controls
