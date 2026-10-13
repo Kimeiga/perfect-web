@@ -2909,3 +2909,7 @@ an arm's binding is read through a member, as a block's value is (the
 integrator's; W9's finding in NEXT 6b).
 - A case's payload is a step of a planned path; a value of another case
   sets nothing; two arms that would set one path refused.
+[ADR-0331](DECISIONS/ADR-0331-a-case-crosses-from-a-browser.md):
+a case crosses from a browser (the integrator's; W9's finding in NEXT 6b).
+- `Option`, `Result` and declared cases as command arguments, sent as the
+  browser holds them and read by the parameter's type.

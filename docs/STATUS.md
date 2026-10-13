@@ -23,6 +23,16 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0331, 2026-10-13: a case crosses from a browser** (the integrator's;
+W9's finding in NEXT 6b; track `variant-args`, merged from `6054be9`).
+- A handler sends an `Option`, a `Result` or a declared case of what it
+  sends, `{ $case, value }`, and a host reads it by the parameter's own
+  type, refusing what is not a case of it, naming the argument. A case of
+  a type that contains itself is refused where the handler is compiled.
+- Found on the way: the host's enum arm was unreachable (a Pleris sum type
+  is always a WIT variant), and is gone.
+Verify TRAIN_RUN green, with train-4.
+
 **ADR-0330, 2026-10-13: an arm's binding is read through a member, as a
 block's value is** (the integrator's; W9's finding in NEXT 6b; track
 `arm-members`, merged from `c0c3b71`).

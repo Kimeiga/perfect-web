@@ -2225,6 +2225,26 @@ pub mod engine {
         }
     }
 
+    /// **A case a browser sends**: its WIT name and its payload, if any.
+    fn case<'a>(
+        v: &'a serde_json::Value,
+        at: &str,
+    ) -> Result<(&'a str, Option<&'a serde_json::Value>), String> {
+        let o = v
+            .as_object()
+            .ok_or_else(|| format!("{at}: expected a case, `{{ \"$case\": .. }}`, got {v}"))?;
+        let name = o
+            .get("$case")
+            .and_then(|c| c.as_str())
+            .ok_or_else(|| format!("{at}: a case names its `$case`, and {v} does not"))?;
+        if let Some(other) = o.keys().find(|k| *k != "$case" && *k != "value") {
+            return Err(format!(
+                "{at}: a case carries `$case` and `value`, and not `{other}`"
+            ));
+        }
+        Ok((name, o.get("value")))
+    }
+
     /// One JSON value, as a value of this component type, or why not.
     fn from_json(
         ty: &wasmtime::component::types::Type,
@@ -2304,6 +2324,76 @@ pub mod engine {
                         .iter()
                         .enumerate()
                         .map(|(i, x)| from_json(&element, x, &format!("{at}[{i}]")))
+                        .collect::<Result<_, _>>()?,
+                )
+            }
+            // **A case, by its WIT name, and its payload** (the integrator's,
+            // 2026-10-13; W9's finding in NEXT 6b): `{ "$case": "some",
+            // "value": .. }`, as a browser writes a case it sends. A case the
+            // type does not declare, a payload a case has none of, or one it
+            // lacks, is refused; a case of several fields carries an array.
+            // A Pleris sum type is a WIT variant, its cases with no payload
+            // included: no component of a program exports an enum.
+            Type::Option(option) => match case(v, at)? {
+                ("some", Some(x)) => Val::Option(Some(Box::new(from_json(
+                    &option.ty(),
+                    x,
+                    &format!("{at}.some"),
+                )?))),
+                ("none", None) => Val::Option(None),
+                (c, _) => return Err(format!("{at}: no case `{c}` of an option, as sent")),
+            },
+            Type::Result(result) => {
+                let (c, x) = case(v, at)?;
+                let (ty, ok) = match c {
+                    "ok" => (result.ok(), true),
+                    "err" => (result.err(), false),
+                    c => return Err(format!("{at}: no case `{c}` of a result")),
+                };
+                let payload = match (ty, x) {
+                    (Some(ty), Some(x)) => Some(Box::new(from_json(&ty, x, &format!("{at}.{c}"))?)),
+                    (None, None) => None,
+                    _ => {
+                        return Err(format!(
+                            "{at}: case `{c}`'s payload, as sent, is not its type's"
+                        ));
+                    }
+                };
+                Val::Result(if ok { Ok(payload) } else { Err(payload) })
+            }
+            Type::Variant(variant) => {
+                let (c, x) = case(v, at)?;
+                let Some(declared) = variant.cases().find(|k| k.name == c) else {
+                    return Err(format!("{at}: no case `{c}` of its type"));
+                };
+                let payload = match (declared.ty, x) {
+                    (Some(ty), Some(x)) => Some(Box::new(from_json(&ty, x, &format!("{at}.{c}"))?)),
+                    (None, None) => None,
+                    _ => {
+                        return Err(format!(
+                            "{at}: case `{c}`'s payload, as sent, is not its type's"
+                        ));
+                    }
+                };
+                Val::Variant(c.to_string(), payload)
+            }
+            // A case's several fields, in their order.
+            Type::Tuple(tuple) => {
+                let items = v.as_array().ok_or_else(|| expected("an array"))?;
+                let types: Vec<_> = tuple.types().collect();
+                if items.len() != types.len() {
+                    return Err(format!(
+                        "{at}: {} values sent, {} declared",
+                        items.len(),
+                        types.len()
+                    ));
+                }
+                Val::Tuple(
+                    types
+                        .iter()
+                        .zip(items)
+                        .enumerate()
+                        .map(|(i, (t, x))| from_json(t, x, &format!("{at}[{i}]")))
                         .collect::<Result<_, _>>()?,
                 )
             }
