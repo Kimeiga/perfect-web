@@ -23,6 +23,18 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0026 amended, 2026-10-13: a failed artifact audit prints why**
+(the integrator's; found reading the nightly of 2026-10-12; track
+`e8-audit-output`, merged from `cc72bd5`).
+- The nightly's `e8-host` failed with exit code 101 and a log of one line:
+  the audit captured its tests' output and printed it afterwards, and a
+  failing `cargo test` ended the script at the capture (`set -e`). The
+  failure itself was the benchmark's rot fixed that evening (`4813aea0`).
+- The audit now prints the tests' output whatever they answer, then exits
+  with their status and writes no evidence; the gate tests run the real
+  recipe with a failing producer (2 outputs of 3 before).
+Verify TRAIN_RUN green, with train-3.
+
 **ADR-0328, 2026-10-13: a store is open by its hours, read by the clock**
 (W9's; NEXT 4, step 2; track `store-hours`, merged from `4f2ffa8`).
 - A store's hours are its data on both layers: its zone, a cut-off before

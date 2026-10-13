@@ -2893,3 +2893,5 @@ a store is open by its hours, read by the clock (W9's; NEXT 4, step 2).
   union, special dates); open or closed computed by the program against the
   clock and told when it changes; an order refused while closed or past the
   last order, as data the page words.
+- ADR-0026 amended, 2026-10-13: a failed artifact audit prints its tests'
+  output, then exits with their status and writes no evidence.
