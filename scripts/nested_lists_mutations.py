@@ -86,17 +86,20 @@ CARGO = {
     # `scripts/mutant_killers.py` on 2026-10-12, where each ran pw-core's
     # 211 targets, relinked, and the recipe took 3,532 s of a verify.
     "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "nested_lists"],
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The tests that fail under its mutants, measured against the whole suite
+    # by `scripts/mutant_killers.py` on 2026-10-12 and 2026-10-13 (W6's
+    # ruling of 2026-10-09), two per mutant where two fail.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_change_reaches_each_page_that_reads_it_by_its_own_plan",
+        "tests::a_change_reaches_every_document_of_its_session",
+    ],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render"],
 }
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
-# 1800 s while its server command runs the development server's whole
-# suite, about 950 s on CI at 420 tests (the integrator's ruling of
-# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
-# see its mutants, it needs far less (W6's ruling of 2026-10-09).
-BOUND = 1800
+BOUND = 1200
 
 
 def bounded(cmd, **kw):

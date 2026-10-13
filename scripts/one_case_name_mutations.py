@@ -68,7 +68,16 @@ MUTANTS = [
 TESTS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "one_name_for_a_case"],
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-render", "--test", "streams"],
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The tests that fail under its mutants, measured against the whole suite
+    # by `scripts/mutant_killers.py` on 2026-10-12 and 2026-10-13 (W6's
+    # ruling of 2026-10-09), two per mutant where two fail.
+    [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_case_is_a_case",
+        "tests::a_change_reaches_each_page_that_reads_it_by_its_own_plan",
+        "tests::a_declared_error_and_a_host_s_failure_are_shown_apart",
+        "tests::a_declared_error_is_given_and_not_kept",
+    ],
     ["cargo", "test", "--quiet", "--locked", "-p", "kiokun-server"],
 ]
 

@@ -11,7 +11,7 @@ Each mutant undoes one piece:
   `keep`'s reads run at once, and a flight stopped while another reader
   still waits for it.
 
-A mutant must fail `keyed.rs` or the server's tests, all of them run.
+A mutant must fail `keyed.rs` or the server's tests that see it.
 
 Run from the repository root; `just e14-keyed-reads` records the output.
 The source is restored after every mutant, whatever happens.
@@ -95,7 +95,17 @@ MUTANTS = [
 
 TESTS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "keyed"],
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The tests that fail under its mutants, measured against the whole suite
+    # by `scripts/mutant_killers.py` on 2026-10-12 and 2026-10-13 (W6's
+    # ruling of 2026-10-09), two per mutant where two fail.
+    [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_browser_that_leaves_lets_go_of_its_read",
+        "tests::a_flight_another_reader_waits_for_is_not_stopped",
+        "tests::a_read_older_than_the_latest_is_not_applied",
+        "tests::under_cancel_a_newer_key_stops_the_old_keys_read",
+        "tests::under_keep_the_new_key_is_read_after_the_old_one_ends",
+    ],
 ]
 
 

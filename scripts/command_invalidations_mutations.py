@@ -51,7 +51,14 @@ MUTANTS = [
 
 TESTS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-conformance", "--test", "invalidations"],
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The tests that fail under its mutants, measured against the whole suite
+    # by `scripts/mutant_killers.py` on 2026-10-12 and 2026-10-13 (W6's
+    # ruling of 2026-10-09), two per mutant where two fail.
+    [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::every_entry::a_wildcard_may_stand_first",
+        "tests::every_entry::an_entry_written_with_a_wildcard_is_every_entry_at_the_rest",
+    ],
 ]
 
 
