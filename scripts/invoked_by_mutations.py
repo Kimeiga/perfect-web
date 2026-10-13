@@ -97,6 +97,12 @@ MUTANTS = [
         '        "invoked_by" => (&[K::Command, K::Query], "a command"),\n',
     ),
     (
+        "a command the platform invokes need not be idempotent",
+        INVOKED,
+        '        if decl.policy("idempotent_by").is_none() {\n',
+        '        if decl.policy("idempotent_by").is_none() && false {\n',
+    ),
+    (
         "the host takes a reader's press of a command the platform invokes",
         PAYMENTS,
         "        .is_some_and(|e| e.invoked_by.is_some())\n",

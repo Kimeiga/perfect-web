@@ -239,8 +239,14 @@ pub(crate) struct Intent {
     /// may do with it: it names the intent to the provider's own page.
     pub(crate) client_secret: String,
     pub(crate) order: String,
+    /// Who began it: the reader whose command did, as the host names its
+    /// principal. The host settles the payment on their behalf (step seven).
+    pub(crate) owner: String,
     /// In cents: an amount's minor units (ADR-XXXX).
     pub(crate) amount: i64,
+    /// The amount it was begun with. An intent's amount can be changed at a
+    /// provider before it is paid; the host holds a payment to what it began.
+    pub(crate) begun: i64,
     pub(crate) status: Status,
     /// Why the last card was declined, where one was.
     pub(crate) declined: Option<&'static str>,
@@ -305,6 +311,17 @@ impl DevProvider {
         format!("{prefix}_dev{:06}", self.next)
     }
 
+    /// **An intent's amount changed at the provider** (a test's switch), as
+    /// Stripe lets an unpaid intent's amount be updated.
+    pub(crate) fn amend(&mut self, id: &str, amount: i64) -> Result<(), ProviderError> {
+        let intent = self
+            .intents
+            .get_mut(id)
+            .ok_or(ProviderError::UnknownIntent)?;
+        intent.amount = amount;
+        Ok(())
+    }
+
     /// **An intent for `order`'s `amount`, by `key`** (Stripe's
     /// `Idempotency-Key`): the key sent again within a day with the same
     /// order and amount answers the intent it made, and with others is
@@ -313,10 +330,11 @@ impl DevProvider {
         &mut self,
         key: &str,
         order: &str,
+        owner: &str,
         amount: i64,
         now: i64,
     ) -> Result<Intent, ProviderError> {
-        let sent = format!("{order}\u{1f}{amount}");
+        let sent = format!("{order}\u{1f}{owner}\u{1f}{amount}");
         if let Some((first, intent, at)) = self.keys.get(key)
             && now - at < KEY_LIFE
         {
@@ -334,7 +352,9 @@ impl DevProvider {
             client_secret: format!("{id}_secret_{:06}", self.next * 7919 % 1_000_000),
             id: id.clone(),
             order: order.to_string(),
+            owner: owner.to_string(),
             amount,
+            begun: amount,
             status: Status::RequiresPaymentMethod,
             declined: None,
         };
@@ -437,24 +457,24 @@ mod provider_tests {
     fn an_intent_is_made_once_per_key() {
         let mut p = DevProvider::default();
         let first = p
-            .create("order-1:press-a", "order-1", 1250, 0)
+            .create("order-1:press-a", "order-1", "reader-a", 1250, 0)
             .expect("made");
         assert_eq!(first.status, Status::RequiresPaymentMethod);
         let again = p
-            .create("order-1:press-a", "order-1", 1250, 60)
+            .create("order-1:press-a", "order-1", "reader-a", 1250, 60)
             .expect("answered");
         assert_eq!(again, first);
         assert_eq!(
-            p.create("order-1:press-a", "order-1", 1300, 60),
+            p.create("order-1:press-a", "order-1", "reader-a", 1300, 60),
             Err(ProviderError::KeyReused)
         );
         let later = p
-            .create("order-1:press-a", "order-1", 1250, KEY_LIFE)
+            .create("order-1:press-a", "order-1", "reader-a", 1250, KEY_LIFE)
             .expect("made again");
         assert_ne!(later.id, first.id);
         // Another key is another intent.
         let other = p
-            .create("order-2:press-a", "order-2", 1250, 0)
+            .create("order-2:press-a", "order-2", "reader-a", 1250, 0)
             .expect("made");
         assert_ne!(other.id, first.id);
     }
@@ -466,7 +486,9 @@ mod provider_tests {
     #[test]
     fn a_cards_outcome_is_its_test_numbers() {
         let mut p = DevProvider::default();
-        let i = p.create("k1", "order-1", 1250, 0).expect("made");
+        let i = p
+            .create("k1", "order-1", "reader-a", 1250, 0)
+            .expect("made");
         let declined = p
             .pay(&i.client_secret, "4000 0000 0000 0002")
             .expect("answered");
@@ -496,7 +518,7 @@ mod provider_tests {
             ]
         );
 
-        let j = p.create("k2", "order-2", 990, 0).expect("made");
+        let j = p.create("k2", "order-2", "reader-a", 990, 0).expect("made");
         let asked = p
             .pay(&j.client_secret, "4000000000003220")
             .expect("answered");
@@ -520,7 +542,7 @@ mod provider_tests {
     #[test]
     fn an_event_sent_is_signed_for_the_host() {
         let mut p = DevProvider::default();
-        let i = p.create("k", "order-1", 1250, 0).expect("made");
+        let i = p.create("k", "order-1", "reader-a", 1250, 0).expect("made");
         p.pay(&i.client_secret, "4242424242424242").expect("paid");
         let (body, header) = DevProvider::sent(&p.outbox[0], b"whsec_dev", 1_000);
         assert_eq!(
@@ -642,7 +664,9 @@ fn intent_json(i: &Intent) -> String {
         "status": i.status.name(),
         "amount": i.amount,
         "currency": "usd",
-        "metadata": { "order": i.order },
+        // As Stripe's metadata, strings: the order, who began it, and the
+        // amount it was begun with.
+        "metadata": { "order": i.order, "owner": i.owner, "amount": i.begun.to_string() },
         "last_payment_error": i.declined.map(|code| serde_json::json!({ "code": code })),
     })
     .to_string()
@@ -779,14 +803,17 @@ impl Origin {
                 };
                 let asked: serde_json::Value =
                     serde_json::from_slice(&req.body).unwrap_or_default();
-                let (Some(order), Some(amount)) =
-                    (asked["order"].as_str(), asked["amount"].as_i64())
-                else {
-                    return write(&mut stream, 400, json, "", br#"{"error":{"type":"invalid_request_error","message":"an order and an amount are required"}}"#);
+                let (Some(order), Some(owner), Some(amount)) = (
+                    asked["order"].as_str(),
+                    asked["owner"].as_str(),
+                    asked["amount"].as_i64(),
+                ) else {
+                    return write(&mut stream, 400, json, "", br#"{"error":{"type":"invalid_request_error","message":"an order, an owner and an amount are required"}}"#);
                 };
                 let made = self.provider.lock().expect("provider").create(
                     &key,
                     order,
+                    owner,
                     amount,
                     (self.now)(),
                 );
@@ -1023,7 +1050,7 @@ mod origin_tests {
             "POST",
             "/v1/payment_intents",
             key,
-            r#"{"order":"order-1","amount":1250}"#,
+            r#"{"order":"order-1","owner":"reader-a","amount":1250}"#,
         );
         assert_eq!(code, 200, "{made}");
         let made: serde_json::Value = serde_json::from_str(&made).expect("json");
@@ -1033,7 +1060,7 @@ mod origin_tests {
             "POST",
             "/v1/payment_intents",
             key,
-            r#"{"order":"order-1","amount":1250}"#,
+            r#"{"order":"order-1","owner":"reader-a","amount":1250}"#,
         );
         assert_eq!(
             serde_json::from_str::<serde_json::Value>(&again).expect("json")["id"],
@@ -1044,7 +1071,7 @@ mod origin_tests {
             "POST",
             "/v1/payment_intents",
             key,
-            r#"{"order":"order-1","amount":9999}"#,
+            r#"{"order":"order-1","owner":"reader-a","amount":9999}"#,
         );
         assert_eq!(code, 400, "{refused}");
         assert!(refused.contains("idempotency_error"));
@@ -1053,7 +1080,7 @@ mod origin_tests {
             "POST",
             "/v1/payment_intents",
             "",
-            r#"{"order":"order-1","amount":1250}"#,
+            r#"{"order":"order-1","owner":"reader-a","amount":1250}"#,
         );
         assert_eq!(code, 400, "a request without a key is refused");
 
@@ -1120,7 +1147,7 @@ mod origin_tests {
             "POST",
             "/v1/payment_intents",
             "idempotency-key: k\r\n",
-            r#"{"order":"o","amount":500}"#,
+            r#"{"order":"o","owner":"reader-a","amount":500}"#,
         );
         let made: serde_json::Value = serde_json::from_str(&made).expect("json");
         let secret = made["client_secret"].as_str().expect("secret").to_string();
@@ -1195,6 +1222,8 @@ pub(crate) fn get(url: &str) -> Result<(u16, String), String> {
 pub(crate) struct Settled {
     pub(crate) intent: String,
     pub(crate) order: String,
+    /// Who began it, on whose behalf it is settled.
+    pub(crate) owner: String,
     pub(crate) amount: i64,
     pub(crate) status: String,
 }
@@ -1209,6 +1238,9 @@ pub(crate) enum NotActed {
     /// Signed, but no event the host reads, or one naming no intent the
     /// provider has.
     Unreadable(String),
+    /// The intent's amount is not the one it was begun with: settled
+    /// nothing, said.
+    AmountChanged { begun: i64, now: i64 },
 }
 
 /// **What the host hears from its provider** (NEXT 6c). An event is acted
@@ -1236,13 +1268,14 @@ impl Hearing {
     }
 
     /// **A webhook, heard at `now`**: the intent it names, as the provider
-    /// says it now, where the host should act on it.
+    /// says it now, where the host should act on it, with the event's id,
+    /// which [`Hearing::remember`] keeps once the host has acted.
     pub(crate) fn webhook(
         &self,
         header: Option<&str>,
         body: &[u8],
         now: i64,
-    ) -> Result<Settled, NotActed> {
+    ) -> Result<(String, Settled), NotActed> {
         verify(header, body, &self.secret, now).map_err(NotActed::Refused)?;
         let event: serde_json::Value =
             serde_json::from_slice(body).map_err(|e| NotActed::Unreadable(e.to_string()))?;
@@ -1251,7 +1284,9 @@ impl Hearing {
         else {
             return Err(NotActed::Unreadable("no event id or intent".into()));
         };
-        if !self.heard.lock().expect("heard").insert(id.to_string()) {
+        // Remembered only once acted on (step seven): an event the host could
+        // not act on is acted on when the provider sends it again.
+        if self.heard.lock().expect("heard").contains(id) {
             return Err(NotActed::HeardBefore);
         }
         let (code, read) = get(&format!("{}/v1/payment_intents/{intent}", self.api))
@@ -1263,15 +1298,31 @@ impl Hearing {
         }
         let read: serde_json::Value =
             serde_json::from_str(&read).map_err(|e| NotActed::Unreadable(e.to_string()))?;
-        Ok(Settled {
-            intent: intent.to_string(),
-            order: read["metadata"]["order"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string(),
-            amount: read["amount"].as_i64().unwrap_or_default(),
-            status: read["status"].as_str().unwrap_or_default().to_string(),
-        })
+        let text = |v: &serde_json::Value| v.as_str().unwrap_or_default().to_string();
+        let amount = read["amount"].as_i64().unwrap_or_default();
+        let begun = read["metadata"]["amount"]
+            .as_str()
+            .and_then(|a| a.parse::<i64>().ok())
+            .ok_or_else(|| NotActed::Unreadable(format!("{intent} says no amount begun")))?;
+        if amount != begun {
+            return Err(NotActed::AmountChanged { begun, now: amount });
+        }
+        Ok((
+            id.to_string(),
+            Settled {
+                intent: intent.to_string(),
+                order: text(&read["metadata"]["order"]),
+                owner: text(&read["metadata"]["owner"]),
+                amount,
+                status: text(&read["status"]),
+            },
+        ))
+    }
+
+    /// **An event acted on, remembered**: heard again, it is answered and
+    /// nothing is done again.
+    pub(crate) fn remember(&self, event: &str) {
+        self.heard.lock().expect("heard").insert(event.to_string());
     }
 }
 
@@ -1299,13 +1350,54 @@ mod hearing_tests {
     /// signed event is read again; heard twice, ignored the second time;
     /// forged or stale, refused; a failure that arrives after the success
     /// reads as succeeded, which is what the intent is.
+    /// **An intent whose amount is not the one begun settles nothing**, said
+    /// (step seven): the host holds a payment to the amount it began.
+    #[test]
+    fn an_intent_whose_amount_changed_at_the_provider_settles_nothing() {
+        let (base, origin) = provider();
+        let hearing = Hearing::new(b"whsec_t", &base);
+        {
+            let mut p = origin.provider.lock().expect("provider");
+            let i = p
+                .create("k", "order-8", "reader-a", 1250, 5_000)
+                .expect("made");
+            p.amend(&i.id, 1).expect("amended");
+            p.pay(&i.client_secret, "4242424242424242").expect("paid");
+        }
+        let events = std::mem::take(&mut origin.provider.lock().expect("provider").outbox);
+        let (body, header) = DevProvider::sent(&events[0], b"whsec_t", 5_000);
+        assert_eq!(
+            hearing.webhook(Some(&header), body.as_bytes(), 5_000),
+            Err(NotActed::AmountChanged {
+                begun: 1250,
+                now: 1
+            })
+        );
+        // Control: unchanged, it is acted on.
+        let mut p = origin.provider.lock().expect("provider");
+        let i = p
+            .create("k2", "order-9", "reader-a", 1250, 5_000)
+            .expect("made");
+        p.pay(&i.client_secret, "4242424242424242").expect("paid");
+        let events = std::mem::take(&mut p.outbox);
+        drop(p);
+        let (body, header) = DevProvider::sent(&events[0], b"whsec_t", 5_000);
+        assert!(
+            hearing
+                .webhook(Some(&header), body.as_bytes(), 5_000)
+                .is_ok()
+        );
+    }
+
     #[test]
     fn the_host_acts_on_the_intent_as_the_provider_says_it_now() {
         let (base, origin) = provider();
         let hearing = Hearing::new(b"whsec_t", &base);
         let id = {
             let mut p = origin.provider.lock().expect("provider");
-            let i = p.create("k", "order-7", 1250, 5_000).expect("made");
+            let i = p
+                .create("k", "order-7", "reader-a", 1250, 5_000)
+                .expect("made");
             p.pay(&i.client_secret, "4000000000000002")
                 .expect("declined");
             p.pay(&i.client_secret, "4242424242424242").expect("paid");
@@ -1315,7 +1407,7 @@ mod hearing_tests {
         let (failed, succeeded) = (&events[0], &events[1]);
 
         let (body, header) = DevProvider::sent(succeeded, b"whsec_t", 5_000);
-        let settled = hearing
+        let (event, settled) = hearing
             .webhook(Some(&header), body.as_bytes(), 5_000)
             .expect("acted on");
         assert_eq!(
@@ -1323,10 +1415,18 @@ mod hearing_tests {
             Settled {
                 intent: id.clone(),
                 order: "order-7".into(),
+                owner: "reader-a".into(),
                 amount: 1250,
                 status: "succeeded".into()
             }
         );
+        // Not yet acted on, it is heard again; remembered once it is.
+        assert!(
+            hearing
+                .webhook(Some(&header), body.as_bytes(), 5_005)
+                .is_ok()
+        );
+        hearing.remember(&event);
         assert_eq!(
             hearing.webhook(Some(&header), body.as_bytes(), 5_010),
             Err(NotActed::HeardBefore)
@@ -1334,7 +1434,7 @@ mod hearing_tests {
 
         // The failure, delivered late: read again, the intent succeeded.
         let (body, header) = DevProvider::sent(failed, b"whsec_t", 5_000);
-        let late = hearing
+        let (_, late) = hearing
             .webhook(Some(&header), body.as_bytes(), 5_020)
             .expect("acted on");
         assert_eq!(late.status, "succeeded");
@@ -1412,16 +1512,31 @@ impl Payments {
     /// **A webhook, answered**: 200 where it is acted on or was heard
     /// before, as a provider stops sending an event it was answered for; 400
     /// where it is not the provider's word.
-    pub(crate) fn heard(&self, signature: Option<&str>, body: &[u8]) -> (u16, String) {
+    pub(crate) fn heard(
+        &self,
+        signature: Option<&str>,
+        body: &[u8],
+        settle: &dyn Fn(&Settled) -> Result<String, String>,
+    ) -> (u16, String) {
         match self.hearing.webhook(signature, body, wall_seconds()) {
-            Ok(settled) => {
-                let said = format!("{} is {}", settled.intent, settled.status);
-                self.settled.lock().expect("settled").push(settled);
-                (200, said)
-            }
+            Ok((event, settled)) => match settle(&settled) {
+                // Acted on: remembered, and answered so the provider stops.
+                Ok(said) => {
+                    self.hearing.remember(&event);
+                    self.settled.lock().expect("settled").push(settled);
+                    (200, said)
+                }
+                // Not acted on: not remembered, and answered so the
+                // provider sends it again.
+                Err(why) => (500, format!("not settled: {why}")),
+            },
             Err(NotActed::HeardBefore) => (200, "heard before".to_string()),
             Err(NotActed::Refused(why)) => (400, format!("not the provider's word: {why:?}")),
             Err(NotActed::Unreadable(why)) => (400, format!("unreadable: {why}")),
+            Err(NotActed::AmountChanged { begun, now }) => (
+                400,
+                format!("its amount is {now}, and it was begun with {begun}: settled nothing"),
+            ),
         }
     }
 }
@@ -1536,7 +1651,10 @@ mod configured_tests {
             for stream in host.incoming() {
                 let Ok(mut stream) = stream else { continue };
                 if let Some(req) = read_request(&stream) {
-                    let (code, said) = heard.heard(req.header("stripe-signature"), &req.body);
+                    let (code, said) =
+                        heard.heard(req.header("stripe-signature"), &req.body, &|s| {
+                            Ok(format!("{} is {}", s.intent, s.status))
+                        });
                     write(&mut stream, code, "text/plain", "", said.as_bytes());
                 }
             }
@@ -1547,7 +1665,7 @@ mod configured_tests {
                 let rest = url.strip_prefix("http://").expect("http");
                 let (authority, path) = rest.split_once('/').expect("path");
                 let mut stream = TcpStream::connect(authority).expect("connect");
-                let body = r#"{"order":"order-1","amount":1250}"#;
+                let body = r#"{"order":"order-1","owner":"reader-a","amount":1250}"#;
                 let head = format!(
                     "POST /{path} HTTP/1.1\r\nhost: {authority}\r\nidempotency-key: k\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
                     body.len()
@@ -1665,6 +1783,7 @@ fn payment_val(intent: &serde_json::Value) -> Result<Val, String> {
 pub(crate) fn operations(
     payments: Arc<Payments>,
     interaction: Option<String>,
+    owner: String,
 ) -> Vec<(String, HostFn)> {
     let begin: HostFn = Arc::new(move |args: &[Val]| {
         let [_key, Val::String(order), Val::S64(amount)] = args else {
@@ -1679,7 +1798,7 @@ pub(crate) fn operations(
                     .to_string(),
             );
         };
-        let asked = serde_json::json!({ "order": order, "amount": amount });
+        let asked = serde_json::json!({ "order": order, "owner": owner, "amount": amount });
         let failed = || {
             Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
                 "transport-failed".into(),
@@ -1795,7 +1914,11 @@ mod operation_tests {
     fn a_payment_is_begun_once_per_interaction() {
         let payments = configured();
         let begin = |interaction: Option<&str>, amount: i64| {
-            let ops = operations(payments.clone(), interaction.map(str::to_string));
+            let ops = operations(
+                payments.clone(),
+                interaction.map(str::to_string),
+                "reader-a".into(),
+            );
             ops[0].1(&[
                 Val::String("sk_dev".into()),
                 Val::String("order-1".into()),
@@ -1834,7 +1957,7 @@ mod operation_tests {
             hearing: Hearing::new(b"x", "http://127.0.0.1:9"),
             settled: Mutex::new(Vec::new()),
         });
-        let out = operations(gone, Some("press-a".into()))[0].1(&[
+        let out = operations(gone, Some("press-a".into()), "reader-a".into())[0].1(&[
             Val::String("sk_dev".into()),
             Val::String("order-1".into()),
             Val::S64(1250),

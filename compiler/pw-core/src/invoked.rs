@@ -14,6 +14,9 @@
 //! - PW6402: it is given one `payments.Settled`, what the host has to give.
 //! - PW6403: one command answers a payment's outcome in a program.
 //! - PW6404: no page's handler sends it.
+//! - PW6405: it declares `idempotent_by InteractionId`: the provider's word
+//!   arrives more than once, possibly at once (Stripe's "Fulfill orders"),
+//!   and the host keys each outcome so it commits once.
 
 use std::collections::BTreeMap;
 
@@ -137,6 +140,23 @@ pub fn check(
                  outcome would have two answers, and which ran would be the host's choice, \
                  not the program's.",
                 "keep one command `invoked_by` it, and call the other's work from it".to_string(),
+            ));
+        }
+        if decl.policy("idempotent_by").is_none() {
+            out.push(diagnostic(
+                codes::INVOKED_COMMAND_NOT_IDEMPOTENT,
+                "invoked_command_not_idempotent",
+                format!(
+                    "`{}` is invoked by {invoker}, and declares no `idempotent_by`",
+                    decl.name
+                ),
+                at.clone(),
+                Vec::new(),
+                "A provider sends its word again until it is answered, and may send it twice \
+                 at once. The host keys each outcome, the payment and where it stands, as a \
+                 press's interaction (ADR-0325), so it commits once; a command that declares \
+                 no key would run again for each.",
+                format!("declare `idempotent_by InteractionId` on `{}`", decl.name),
             ));
         }
         let def = DefId { unit, decl: id.0 };

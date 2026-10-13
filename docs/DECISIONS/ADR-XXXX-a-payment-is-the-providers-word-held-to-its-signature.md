@@ -58,10 +58,28 @@ A-010 (an origin-only secret operation, `capture_payment`) and the charter's
    `begin(key, order, amount)`, effect `payments.begin`, at the origin alone
    as the key is. The amount is in minor units: only `domain` reads an
    amount's units (ADR-XXXX, money), so only it begins a payment.
-5. To come: the order awaiting payment, placed only from a settled payment
-   in one transaction, the amount held by the host to what was begun; the
-   provider's page in the checkout, framed from its origin alone; the page
-   told.
+5. To come (step seven, designed 2026-10-13):
+   - **On the reader's behalf.** `begin` is called in the reader's command;
+     the host keeps who began each payment, with its order and amount, in
+     the intent's own record (Stripe's `metadata`), and invokes the command
+     `invoked_by Payments` as that reader: its `current_user()` is the
+     order's owner, so it reads and writes the reader's order and emits
+     `UserOrderChanged(current_user())` as `place_order` does. Still no
+     `requires`: no reader acts; the provider's word does.
+   - **The amount is the host's to hold**: an intent whose amount is not the
+     one begun settles nothing, said.
+   - **The order awaits its payment**: where the deployment takes payments,
+     `place_order` writes the order `AwaitingPayment` with its charges and
+     its lines, reserves its promo code, and begins the payment; the order
+     page frames the provider's page (`Payment.page`, the host's) for the
+     reader to pay on. The settled command places it on `Succeeded`
+     (clearing the cart, the code used), leaves it awaiting on a decline (the
+     same intent takes another card), and cancels it on `Canceled` (the code
+     released). A deployment that takes no payments places as before.
+   - Not claimed (so far): the reader's return as a second trigger (Stripe
+     recommends it beside the webhook), and a Content-Security-Policy on the
+     store's pages (`frame-src` the provider alone; SAQ A's 2025 criterion
+     for the page that frames the hosted fields).
 
 ## Not claimed (so far)
 

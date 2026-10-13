@@ -1681,6 +1681,51 @@ impl Server {
         payments::invoked_by_platform(&self.contracts, component_id)
     }
 
+    /// **A payment the provider's word settled, acted on** (NEXT 6c, step
+    /// seven): the command the program declares `invoked_by Payments`, run
+    /// on behalf of the reader who began the payment, in a hold of its own
+    /// never a browser's, with what the host has from the provider. Keyed by
+    /// the payment and its status (ADR-0325), so an outcome heard twice, or
+    /// by two hosts, commits once. A declared error is the program's answer,
+    /// and acted on; a refusal or a trap is not, and the provider is answered
+    /// so it sends the outcome again.
+    fn settle_payment(&self, settled: &payments::Settled) -> Result<String, String> {
+        let component_id = self
+            .contracts
+            .iter()
+            .find(|c| {
+                c.exports
+                    .first()
+                    .and_then(|e| e.component.as_ref())
+                    .is_some_and(|e| e.invoked_by.as_deref() == Some("Payments"))
+            })
+            .map(|c| c.component_id.clone())
+            .ok_or("the program declares no command invoked by Payments")?;
+        let session = format!("payment-{}", settled.intent);
+        let _behalf = self
+            .identity
+            .principals()
+            .on_behalf(&session, &settled.owner);
+        let status = settled.status.replace('_', "-");
+        let sent = serde_json::json!({
+            "payment": settled.intent,
+            "order": settled.order,
+            "status": { "$case": status },
+        });
+        let interaction = format!("settle-{}-{status}", settled.intent);
+        let answered = self.command_answer(&component_id, &session, &[sent], Some(&interaction))?;
+        match (answered.committed, answered.why) {
+            (true, _) => Ok(format!("{} is {}: settled", settled.intent, settled.status)),
+            (false, Some(why)) => Err(why),
+            (false, None) => Ok(format!(
+                "{} is {}: the program answered {}",
+                settled.intent,
+                settled.status,
+                answered.result.unwrap_or_default()
+            )),
+        }
+    }
+
     /// **May this component run here, and with what?**
     ///
     /// One `admit` call, and no other source of truth. The command path calls
@@ -2253,11 +2298,15 @@ impl Server {
             );
             // The platform's clock (ADR-0304), for the command's moment.
             host.extend(clock::operations(self.now(), &self.zones));
-            // NEXT 6c: the deployment's payments, keyed by this interaction.
+            // NEXT 6c: the deployment's payments, keyed by this interaction,
+            // each begun by this session's reader, on whose behalf it is
+            // settled (step seven).
             if let Some(p) = self.payments.get() {
+                let reader = self.identity.principals().user_of(session);
                 host.extend(payments::operations(
                     p.clone(),
                     interaction.map(str::to_string),
+                    reader,
                 ));
             }
 
@@ -7664,7 +7713,11 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
     // the provider, not this origin, and carries no session.
     if method == "POST" && route == "/payments/webhook" {
         let (code, said) = match server.payments.get() {
-            Some(p) => p.heard(payments::header_value(&headers, "stripe-signature"), &body),
+            Some(p) => p.heard(
+                payments::header_value(&headers, "stripe-signature"),
+                &body,
+                &|settled| server.settle_payment(settled),
+            ),
             None => (404, "this deployment takes no payments".to_string()),
         };
         respond_build(

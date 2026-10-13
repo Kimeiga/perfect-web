@@ -56,7 +56,7 @@ fn command(name: &str, params: &str, clauses: &str) -> String {
     format!("command {name}({params}) -> Result<Int, String>\n{clauses}{{\n    Ok(1)\n}}\n\n")
 }
 
-const BY: &str = "    invoked_by    Payments\n";
+const BY: &str = "    invoked_by    Payments\n    idempotent_by InteractionId\n";
 
 /// The contract of `id`.
 fn contract_of(decls: &str, id: &str) -> pw_core::contract::ComponentContract {
@@ -114,7 +114,11 @@ fn a_command_the_platform_invokes_says_so_in_its_contract() {
 /// is a command's is refused on a query.
 #[test]
 fn only_the_platforms_invokers_and_only_on_a_command() {
-    let unknown = command("settle", "settled: Settled", "    invoked_by    Stripe\n");
+    let unknown = command(
+        "settle",
+        "settled: Settled",
+        "    invoked_by    Stripe\n    idempotent_by InteractionId\n",
+    );
     assert!(
         reported(&unknown).iter().any(|d| d.contains("Stripe")),
         "{:?}",
@@ -128,13 +132,27 @@ fn only_the_platforms_invokers_and_only_on_a_command() {
     );
 }
 
+/// **PW6405: it declares `idempotent_by`**: the provider's word arrives more
+/// than once, and the host keys each outcome so it commits once.
+#[test]
+fn a_command_the_platform_invokes_is_idempotent() {
+    let once = command("settle", "settled: Settled", "    invoked_by    Payments\n");
+    assert_eq!(
+        with("PW6405", &reported(&once)),
+        ["PW6405 `settle` is invoked by Payments, and declares no `idempotent_by`"],
+    );
+    // Control: keyed, it is clean.
+    let keyed = command("settle", "settled: Settled", BY);
+    assert!(with("PW6405", &reported(&keyed)).is_empty());
+}
+
 /// **PW6401: it declares no `requires`**, since no reader acts.
 #[test]
 fn a_command_the_platform_invokes_holds_no_reader_to_a_predicate() {
     let held = command(
         "settle",
         "settled: Settled",
-        "    invoked_by    Payments\n    requires      SignedIn\n",
+        "    invoked_by    Payments\n    idempotent_by InteractionId\n    requires      SignedIn\n",
     );
     assert_eq!(
         with("PW6401", &reported(&held)),

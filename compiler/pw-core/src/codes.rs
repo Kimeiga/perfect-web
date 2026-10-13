@@ -867,6 +867,8 @@ codes! {
         "one command answers a payment's outcome: a second would leave the host two answers";
     INVOKED_COMMAND_PRESSED = "PW6404" / invoked_command_pressed / 1, Payments,
         "no page presses a command the platform invokes";
+    INVOKED_COMMAND_NOT_IDEMPOTENT = "PW6405" / invoked_command_not_idempotent / 1, Payments,
+        "a command the platform invokes is idempotent: the provider's word arrives more than once";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must

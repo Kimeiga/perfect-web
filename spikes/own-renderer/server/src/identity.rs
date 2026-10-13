@@ -281,6 +281,18 @@ struct PrincipalsInner {
     sessions: RwLock<HashMap<String, Principal>>,
 }
 
+/// **A session open on a reader's behalf**, closed when it goes.
+pub(crate) struct OnBehalf {
+    principals: Principals,
+    session: String,
+}
+
+impl Drop for OnBehalf {
+    fn drop(&mut self) {
+        self.principals.close(&self.session);
+    }
+}
+
 /// **Each session's principal**, shared by the identity and the data layer
 /// that maps a session to its user (`DataLayer::identified_by`).
 #[derive(Debug, Clone, Default)]
@@ -317,6 +329,26 @@ impl Principals {
 
     fn close(&self, session: &str) {
         self.0.sessions.write().expect("principals").remove(session);
+    }
+
+    /// **A session the platform opens on a reader's behalf** (NEXT 6c, step
+    /// seven): a payment settled as the reader who began it, its
+    /// `current_user()` theirs. Never a browser's: its id is the host's own,
+    /// and it is closed when the guard goes, whatever the command answered.
+    pub(crate) fn on_behalf(&self, session: &str, user: &str) -> OnBehalf {
+        self.open(
+            session,
+            Principal {
+                user: user.to_string(),
+                handle: String::new(),
+                name: String::new(),
+                issuer: "payments".to_string(),
+            },
+        );
+        OnBehalf {
+            principals: self.clone(),
+            session: session.to_string(),
+        }
     }
 
     fn set_accounts(&self, on: bool) {
