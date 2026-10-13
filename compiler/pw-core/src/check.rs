@@ -1209,6 +1209,20 @@ fn unresolved_uses(
                 // CSS value function. `tests/semantic_ownership.rs` is the gate
                 // that made the class small enough to report — it names every
                 // owner, and the residue it leaves is what this reports.
+                // **A bare call two whole modules declare** (ADR-XXXX): the
+                // lowering refused it, and nothing here did, so a program
+                // checked clean that did not build. Named where it is
+                // written, with each module.
+                if !bound
+                    && matches!(body.expr(*callee), Expr::Name(_))
+                    && let Resolution::Ambiguous(defs) =
+                        workspace.resolve_in(unit, crate::resolve::Namespace::Term, &path)
+                {
+                    out.push(ambiguous_bare_call(
+                        workspace, hir, decl, body, id, &path, &defs,
+                    ));
+                    continue;
+                }
                 let unowned = match &lexical {
                     // A local in scope where the call is written is the value
                     // it holds; any other name must be a declaration's.
@@ -6364,6 +6378,56 @@ fn unresolved_in_policy_term(
 /// lexical scope, a declaration the unit can see, language syntax, a policy
 /// head or operator, a value domain. A name none of those claims is a name the
 /// author wrote and the compiler never gave meaning to.
+/// **A bare call whose name two whole modules declare** (ADR-XXXX):
+/// `import List` and `import domain` both have `sum`, and the file names
+/// neither by name. Refused where it is written, naming each module.
+fn ambiguous_bare_call(
+    workspace: &crate::resolve::Workspace,
+    hir: &Hir,
+    decl: &crate::hir::Decl,
+    body: &crate::hir::Body,
+    id: crate::hir::ExprId,
+    name: &str,
+    defs: &[crate::resolve::DefId],
+) -> Diagnostic {
+    let modules: Vec<String> = defs
+        .iter()
+        .filter_map(|d| workspace.module_of(d.unit).map(|m| m.name.clone()))
+        .collect();
+    let named = modules
+        .iter()
+        .map(|m| format!("`{m}`"))
+        .collect::<Vec<_>>()
+        .join(" and ");
+    let qualified = modules
+        .iter()
+        .map(|m| format!("`{m}.{name}`"))
+        .collect::<Vec<_>>()
+        .join(" or ");
+    Diagnostic {
+        code: crate::codes::AMBIGUOUS_NAME.id,
+        invariant: crate::codes::AMBIGUOUS_NAME.invariant,
+        reason: "ambiguous_name",
+        detector: Detector::DeclarationRule,
+        severity: Severity::Error,
+        message: format!(
+            "`{name}` is declared by {named}, each imported whole, and the file names neither"
+        ),
+        primary_span: body.expr_span(id),
+        related: vec![Related::new(
+            hir.decl_span(decl_id_of(hir, decl)),
+            format!("used inside `{}`", decl.name),
+        )],
+        explanation: None,
+        repairs: vec![Repair {
+            description: format!(
+                "write {qualified}, or import `{name}` by name from the module meant"
+            ),
+            replacement: None,
+        }],
+    }
+}
+
 fn bare_call_is_unowned(
     workspace: &crate::resolve::Workspace,
     unit: usize,
