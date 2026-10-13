@@ -812,6 +812,24 @@ class VerifiedBase(unittest.TestCase):
             got = vbase.base(self.sha["before"], "0" * 40, lambda _s: self.PASSED, self.root)
         self.assertEqual(got, self.sha["before"])
 
+    def test_the_browser_suites_run_again_only_where_more_than_records_changed(self) -> None:
+        # Master's verify after train-3 ran the train's browser suites again,
+        # on the same code (amended 2026-10-13).
+        (self.root / "docs").mkdir()
+        (self.root / "docs/STATUS.md").write_text("status")
+        (self.root / "scripts").mkdir()
+        (self.root / "scripts/ci_seconds.json").write_text("{}")
+        self.git("checkout", "-q", "train")
+        self.git("add", "docs", "scripts")
+        self.git("commit", "-q", "-m", "records")
+        records = self.git("rev-parse", "HEAD")
+        self.assertFalse(vbase.browsers(self.sha["merged"], records, self.root))
+        # Code since: run them.
+        self.assertTrue(vbase.browsers(self.sha["before"], records, self.root))
+        # An error runs them.
+        with mock.patch("sys.stderr", new_callable=lambda: __import__("io").StringIO()):
+            self.assertTrue(vbase.browsers("0" * 40, records, self.root))
+
     def test_the_runs_are_read_through_gh_by_their_commit(self) -> None:
         bin_dir = self.root / "bin"
         bin_dir.mkdir()

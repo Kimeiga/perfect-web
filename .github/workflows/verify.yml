@@ -58,6 +58,7 @@ jobs:
       actions: read
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
+      browsers: ${{ steps.plan.outputs.browsers }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -88,6 +89,13 @@ jobs:
                 base=$(python3 scripts/verified_base.py "$BEFORE" "$GITHUB_SHA")
                 echo "planned from $base (the push's before: $BEFORE)"
                 python3 scripts/ci_plan.py --shards 17 --changed "$base" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+                # And the browser suites, not again where only records
+                # changed since the run that passed (the same amendment).
+                if [ "$base" != "$BEFORE" ]; then
+                  browsers=$(python3 scripts/verified_base.py --browsers "$base" "$GITHUB_SHA")
+                  echo "browser suites: $browsers"
+                  echo "browsers=$browsers" >> "$GITHUB_OUTPUT"
+                fi
               else
                 python3 scripts/ci_plan.py --shards 17 --all >> "$GITHUB_OUTPUT"
               fi ;;
@@ -200,6 +208,10 @@ jobs:
 
   browser:
     name: browser ${{ matrix.engine }}
+    # Every push's, unless a run passed at the code it pushed and only the
+    # records changed since (ADR-0281, amended 2026-10-13).
+    needs: plan
+    if: needs.plan.outputs.browsers != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:

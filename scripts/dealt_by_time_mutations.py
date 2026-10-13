@@ -88,6 +88,18 @@ MUTANTS = [
         "    except ZeroDivisionError as error:\n",
     ),
     (
+        "the browser suites run again where only records changed",
+        VBASE,
+        "    return not all(n.startswith(RECORDS) for n in names)\n",
+        "    return True\n",
+    ),
+    (
+        "the browser suites are skipped whatever changed",
+        VBASE,
+        "    return not all(n.startswith(RECORDS) for n in names)\n",
+        "    return False\n",
+    ),
+    (
         "the runs are read by no commit",
         VBASE,
         'f"?head_sha={sha}&status=success&per_page=100",',
