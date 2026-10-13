@@ -2895,3 +2895,6 @@ a store is open by its hours, read by the clock (W9's; NEXT 4, step 2).
   last order, as data the page words.
 - ADR-0026 amended, 2026-10-13: a failed artifact audit prints its tests'
   output, then exits with their status and writes no evidence.
+- ADR-0281 amended (4), 2026-10-13: a push to master plans from the newest
+  commit on its first-parent line a push's or the nightly's verify run passed
+  at; a train's evidence then plans nothing.

@@ -23,6 +23,19 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0281 amended (4), 2026-10-13: a push to master plans from what a
+run passed at** (the integrator's; track `verified-base`, merged from
+`284d93f`).
+- Master's verify re-ran every recipe a train's run had passed, its code
+  the train's, until it was cancelled by hand. Now a push to `master` plans
+  from the newest commit on its first-parent line that a push's or the
+  nightly's verify run passed at (`scripts/verified_base.py`, read through
+  `gh`), and from the commit before the push where none did or on any
+  error: more, never less. Both trains' evidence commits plan nothing.
+- Seven tests; eight mutants in `dealt_by_time_mutations.py`, 30 of 30
+  killed.
+Verify TRAIN_RUN green, with train-3.
+
 **ADR-0026 amended, 2026-10-13: a failed artifact audit prints why**
 (the integrator's; found reading the nightly of 2026-10-12; track
 `e8-audit-output`, merged from `cc72bd5`).
