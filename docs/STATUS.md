@@ -23,6 +23,15 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-13: a flight test that fails says the query runtime's trace**
+(the integrator's finding; NEXT 3d; track `flight-wait`, merged from
+`46f7c93`).
+- `a_flight_another_reader_waits_for_is_not_stopped` failed once in
+  train-3's first `just ci`, at a load of 20, and not since (20 of 20 alone,
+  40 of 40 eight at once); neither cause tried explains it. Held open as a
+  race until shown otherwise; its assertion prints the runtime's trace.
+Verify TRAIN_RUN green, with train-4.
+
 **ADR-0331, 2026-10-13: a case crosses from a browser** (the integrator's;
 W9's finding in NEXT 6b; track `variant-args`, merged from `6054be9`).
 - A handler sends an `Option`, a `Result` or a declared case of what it
