@@ -802,10 +802,10 @@ fn immutable_target(hir: &Hir, id: DeclId, decl: &Decl, span: Span, name: &str) 
         severity: Severity::Error,
         message: format!("`{name}` is assigned, and it is not a `let mut` binding"),
         primary_span: span,
-        related: vec![Related {
-            span: hir.decl_span(id),
-            label: format!("in `{}`", decl.name),
-        }],
+        related: vec![Related::new(
+            hir.decl_span(id),
+            format!("in `{}`", decl.name),
+        )],
         explanation: Some(
             "a binding holds one value unless it is declared `let mut`; a parameter, a \
              pattern's name and a declaration are never assigned"
@@ -830,10 +830,10 @@ fn unseparated(head: Span, second: Span, src: &str) -> Diagnostic {
         severity: Severity::Error,
         message: "two statements on one line are separated by `;`".to_string(),
         primary_span: second,
-        related: vec![Related {
-            span: head,
-            label: format!("`{word}` is no clause's head here"),
-        }],
+        related: vec![Related::new(
+            head,
+            format!("`{word}` is no clause's head here"),
+        )],
         explanation: Some(
             "A clause written in a block is its head's word and its value on one line, \
              `scope component`. Where the word names a binding, or stands in a \
@@ -879,10 +879,10 @@ fn diagnostic(hir: &Hir, id: DeclId, decl: &Decl, span: Span, name: &str) -> Dia
         severity: Severity::Error,
         message,
         primary_span: span,
-        related: vec![Related {
-            span: hir.decl_span(id),
-            label: format!("used inside `{}`", decl.name),
-        }],
+        related: vec![Related::new(
+            hir.decl_span(id),
+            format!("used inside `{}`", decl.name),
+        )],
         explanation: Some(explanation),
         repairs: vec![Repair {
             description: repair,

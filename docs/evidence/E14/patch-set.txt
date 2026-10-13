@@ -1,8 +1,8 @@
 ADR-0145 - a page keeps every part and list its queries decide current
 
 produced by: just e14-patch-set
-commit: bd5c64242c0b19efa798fc3fa7e07edb486b105a
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38283022346 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 25b01345e1a5406a8b977c6c269475aa5b872e60
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38326782630 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
@@ -46,13 +46,13 @@ test notifications::tests::a_users_notifications_are_theirs_alone_newest_first .
 test notifications::tests::ones_own_act_notifies_no_one ... ok
 test notifications::tests::the_principal_operation_answers_the_sessions_user_and_a_guests_where_none_signed_in ... ok
 test order::tests::a_command_still_here_is_kept_past_the_bound ... ok
-test accounts::tests::a_password_is_kept_only_as_its_argon2id_hash ... ok
 test order::tests::a_command_that_vanished_is_waited_for_again ... ok
+test accounts::tests::a_password_is_kept_only_as_its_argon2id_hash ... ok
 test order::tests::a_command_waits_for_the_one_it_names_to_arrive_and_run ... ok
 test order::tests::a_command_whose_named_one_was_answered_early_is_answered_early ... ok
 test order::tests::a_command_whose_named_one_was_answered_runs ... ok
 test order::tests::a_command_whose_named_one_never_comes_is_answered_early_after_the_wait ... ok
-test accounts::tests::a_code_is_exchanged_once_by_its_verifier ... ok
+test order::tests::a_session_forgotten_takes_its_fates ... ok
 test places::tests::a_store_delivers_within_its_radius_and_not_past_it ... ok
 test places::tests::each_place_is_one_and_in_the_bay_area ... ok
 test places::tests::the_distance_is_the_great_circle_one ... ok
@@ -66,6 +66,7 @@ test search::tests::found_lists_the_first_and_counts_the_rest ... ok
 test search::tests::in_memory_the_layer_answers_the_programs_cases ... ok
 test search::tests::in_memory_the_seed_is_searched ... ok
 test search::tests::in_memory_the_table_is_answered ... ok
+test search::tests::on_postgres_a_search_is_two_statements_whatever_the_stores ... ok
 test search::tests::on_postgres_each_stores_cuisine_is_memorys ... ok
 test search::tests::on_postgres_every_character_is_lowered_alike ... ok
 test search::tests::on_postgres_the_seed_is_searched_through_the_layer ... ok
@@ -73,12 +74,12 @@ test search::tests::on_postgres_the_table_is_answered_alike ... ok
 test search::tests::stores_and_dishes_are_ordered_by_rank_then_name_then_id ... ok
 test store::joins::a_guests_lines_are_summed_into_the_users_or_appended ... ok
 test store::joins::a_sum_past_a_bigint_is_refused_and_nothing_moves ... ok
-test order::tests::a_session_forgotten_takes_its_fates ... ok
 test order::tests::another_sessions_command_of_the_same_name_is_not_the_one_named ... ok
-test tests::a_block_a_query_decides_is_rendered ... ok
+test accounts::tests::a_code_is_exchanged_once_by_its_verifier ... ok
 test tests::a_block_a_speculation_renders_is_rendered_again_whole ... ok
-test tests::a_block_that_shows_the_arm_it_showed_is_told_part_by_part ... ok
+test tests::a_block_a_query_decides_is_rendered ... ok
 test accounts::tests::signing_in_takes_the_password_and_says_nothing_of_who_exists ... ok
+test tests::a_block_that_shows_the_arm_it_showed_is_told_part_by_part ... ok
 test tests::a_browsers_arguments_are_typed_by_the_components_own_parameters ... ok
 test tests::a_block_whose_rendering_changed_is_rendered_again ... ok
 test tests::a_browser_that_leaves_lets_go_of_its_read ... ok
@@ -101,8 +102,8 @@ test tests::a_change_to_one_stores_menu_reaches_that_stores_pages_only ... ok
 test tests::a_command_that_emits_nothing_tells_nothing ... ok
 test tests::a_declared_error_and_a_host_s_failure_are_shown_apart ... ok
 test tests::a_commit_while_a_reader_is_told_is_told_after_it ... ok
-test tests::a_condition_a_host_computes_decides_its_block_and_again_when_it_changes ... ok
 test tests::a_declared_error_is_given_and_not_kept ... ok
+test tests::a_condition_a_host_computes_decides_its_block_and_again_when_it_changes ... ok
 test tests::a_delay_slows_what_it_names_and_nothing_else ... ok
 test tests::a_delivery_estimate_is_a_range ... ok
 test tests::a_document_changed_at_every_attempt_is_still_told ... ok
@@ -116,31 +117,33 @@ test tests::a_failing_command_commits_neither_state_nor_event ... ok
 test tests::a_document_no_page_asks_for_is_told_when_one_asks ... ok
 test tests::a_document_read_behind_a_change_shows_what_the_open_pages_show ... ok
 test tests::a_forgotten_page_that_polls_is_told_to_reload ... ok
-test tests::a_flight_another_reader_waits_for_is_not_stopped ... ok
 test tests::a_documents_trail_says_what_happened_to_its_frames ... ok
 test tests::a_forced_reconnect_ends_a_subscription_and_refuses_new_ones_for_its_window ... ok
+test tests::a_flight_another_reader_waits_for_is_not_stopped ... ok
 test tests::a_frame_a_stream_wrote_to_a_dropped_connection_still_reaches_its_page ... ok
 test tests::a_kept_answer_is_the_answer_it_kept ... ok
 test tests::a_handlers_captures_at_the_top_of_the_page_are_set_again ... ok
 test tests::a_guests_post_names_the_guest_to_every_reader ... ok
-test tests::a_host_serves_its_build_by_its_name ... ok
-test tests::a_line_records_the_stores_name_and_price_not_the_requests ... ok
-test tests::a_lines_steps_reach_the_data_layer ... ok
 test tests::a_kept_value_past_its_instant_is_read_again ... ok
+test tests::a_line_records_the_stores_name_and_price_not_the_requests ... ok
+test tests::a_host_serves_its_build_by_its_name ... ok
+test tests::a_lines_steps_reach_the_data_layer ... ok
 test tests::a_keyed_read_is_applied_as_one_patch_set ... ok
-test tests::a_list_a_session_s_query_fills_is_rendered ... ok
 test tests::a_list_inside_a_querys_value_is_rendered_and_patched_where_it_is ... ok
+test tests::a_list_a_session_s_query_fills_is_rendered ... ok
 test tests::a_list_moves_what_moved_and_sets_what_changed_where_it_is ... ok
+test tests::a_member_read_inside_a_block_is_computed_and_told_where_it_is ... ok
+test tests::a_member_read_inside_a_speculated_block_is_rendered_with_it ... ok
 test tests::a_keyed_read_whose_document_changed_while_it_derived_is_derived_again ... ok
 test tests::a_menu_change_drops_the_menus_kept_values ... ok
-test tests::a_menu_change_drops_that_stores_kept_menu_only ... ok
 test tests::a_menu_changed_at_its_source_shows_once_its_value_is_read_again ... ok
-test tests::a_menu_change_drops_that_stores_recommendations_only ... ok
 test tests::a_longer_read_is_not_applied_over_a_commit_it_did_not_see ... ok
+test tests::a_menu_change_drops_that_stores_kept_menu_only ... ok
+test tests::a_menu_change_drops_that_stores_recommendations_only ... ok
 test tests::a_one_shot_read_error_fails_the_next_read_once ... ok
 test tests::a_one_shot_write_error_fails_the_next_write_once ... ok
-test tests::a_notice_is_kept_as_its_freshness_says_and_each_ask_is_counted ... ok
 test tests::a_new_item_goes_after_the_one_before_it ... ok
+test tests::a_notice_is_kept_as_its_freshness_says_and_each_ask_is_counted ... ok
 test tests::a_menu_is_grouped_by_its_category ... ok
 test tests::a_page_and_its_layout_show_one_entry_by_one_value ... ok
 test tests::a_page_is_told_when_the_instant_it_compared_passes ... ok
@@ -173,14 +176,14 @@ test tests::a_quantity_that_is_no_positive_int_is_refused_at_the_boundary ... ok
 test tests::a_region_past_its_budget_is_given_the_host_s_failure_when_its_budget_is_spent ... ok
 test tests::a_retried_interaction_runs_its_command_once ... ok
 test tests::a_reader_is_told_while_another_readers_telling_takes_its_time ... ok
-test tests::a_served_page_whose_values_fail_is_told_to_read_itself_again ... ok
+test tests::a_rename_sets_every_part_that_reads_the_name ... ok
 test tests::a_session_forgotten_takes_its_commands_order ... ok
 test tests::a_session_is_forgotten_with_its_last_document ... ok
-test tests::a_rename_sets_every_part_that_reads_the_name ... ok
-test tests::a_session_s_change_reaches_its_own_document_alone ... ok
-test tests::a_session_s_estimate_is_its_estimator_s ... ok
-test tests::a_sessions_changes_wait_for_the_one_in_progress ... ok
+test tests::a_served_page_whose_values_fail_is_told_to_read_itself_again ... ok
 test tests::a_reply_is_its_threads_to_every_reader_and_no_timelines ... ok
+test tests::a_session_s_change_reaches_its_own_document_alone ... ok
+test tests::a_sessions_changes_wait_for_the_one_in_progress ... ok
+test tests::a_session_s_estimate_is_its_estimator_s ... ok
 test tests::a_sessions_turns_are_served_in_the_order_asked ... ok
 test tests::a_shared_query_is_run_once_for_its_readers_and_a_private_one_for_each ... ok
 test tests::a_signal_page_holds_its_announcer ... ok
@@ -195,15 +198,15 @@ test tests::a_stock_change_drops_the_menu_and_not_the_recommendations ... ok
 test tests::a_speculated_value_that_did_not_change_is_not_sent_again ... ok
 test tests::a_speculating_document_carries_its_parameters ... ok
 test tests::a_stock_change_told_renders_its_row_again_where_it_is ... ok
-test tests::a_store_page_is_shown_in_its_layout_and_its_count_is_told ... ok
 test tests::a_store_s_page_describes_itself_in_its_head ... ok
+test tests::a_store_page_is_shown_in_its_layout_and_its_count_is_told ... ok
 test tests::a_stream_drops_what_its_page_says_it_applied ... ok
 test tests::a_streamed_region_follows_its_document_in_the_same_response ... ok
 test tests::a_subscriber_that_falls_behind_is_told_to_reload ... ok
 test tests::a_stored_line_of_nothing_is_a_failed_read ... ok
 test tests::a_store_s_page_is_titled_by_its_name ... ok
-test tests::a_title_that_changed_is_set_as_its_text ... ok
 test tests::a_telling_that_panics_does_not_silence_the_reader ... ok
+test tests::a_title_that_changed_is_set_as_its_text ... ok
 test tests::a_value_computed_in_a_row_is_each_rows_and_sent_with_it ... ok
 test tests::a_store_that_is_not_there_is_not_found ... ok
 test tests::a_value_that_contains_itself_is_written_as_its_nodes ... ok
@@ -218,12 +221,13 @@ test tests::addresses::the_places_are_the_fixed_tables ... ok
 test tests::an_entry_key_is_scoped_by_session_only_when_private ... ok
 test tests::an_empty_cart_places_no_order ... ok
 test tests::an_attributes_computed_value_is_the_hosts_and_set_again ... ok
-test tests::an_insert_and_what_changed_with_it_are_derived_from_the_menu ... ok
+test tests::an_interactions_record_answers_it_for_a_day ... ok
 test tests::addresses::the_page_the_estimate_and_the_commands_read_one_rule ... ok
-test tests::an_inserted_item_arrives_with_its_price ... ok
+test tests::an_insert_and_what_changed_with_it_are_derived_from_the_menu ... ok
 test tests::an_item_that_leaves_is_removed ... ok
-test tests::an_item_that_stays_is_set_in_place ... ok
+test tests::an_inserted_item_arrives_with_its_price ... ok
 test tests::an_invalidated_entry_is_dropped_by_the_key_the_command_computed ... ok
+test tests::an_item_that_stays_is_set_in_place ... ok
 test tests::an_item_sold_out_since_the_page_is_refused_by_name ... ok
 test tests::an_order_the_kitchen_sets_is_the_order_query_s_value ... ok
 test tests::an_unknown_component_is_refused_rather_than_defaulted ... ok
@@ -243,6 +247,7 @@ test tests::feed_pg::on_postgres_a_command_refused_at_its_commit_leaves_nothing 
 test tests::feed_pg::on_postgres_a_like_counts_and_reaches_an_open_thread ... ok
 test tests::feed_pg::on_postgres_a_post_commits_with_its_event_in_one_transaction ... ok
 test tests::feed_pg::on_postgres_a_post_reaches_another_session ... ok
+test tests::feed_pg::on_postgres_a_posts_interaction_outlives_its_host ... ok
 test tests::feed_pg::on_postgres_a_reply_is_in_its_thread_as_deep_as_it_goes ... ok
 test tests::feed_pg::on_postgres_a_stated_change_feed_the_layer_cannot_deliver_is_refused ... ok
 test tests::feed_pg::on_postgres_an_entry_written_with_a_wildcard_is_every_entry ... ok
@@ -273,10 +278,10 @@ test tests::kiokun::a_stub_of_several_traditional_forms_shows_each_ones_words ..
 test tests::kiokun::a_stubs_card_heads_the_page_it_names ... ok
 test tests::kiokun::a_stubs_page_shows_its_targets_forms_and_its_own ... ok
 test tests::kiokun::a_word_kiokun_lacks_is_not_found ... ok
-test tests::kiokun::a_word_too_long_to_be_a_file_name_is_not_found ... ok
-test tests::kiokun::an_app_without_its_label_table_is_refused ... ok
 test tests::kiokun::a_stubs_redirect_is_followed_to_the_entry_it_names ... ok
+test tests::kiokun::an_app_without_its_label_table_is_refused ... ok
 test tests::kiokun::an_equivalent_forms_words_are_shown_on_the_canonical_page ... ok
+test tests::kiokun::a_word_too_long_to_be_a_file_name_is_not_found ... ok
 test tests::kiokun::an_equivalent_simplified_form_is_moved_to_its_traditional_page ... ok
 test tests::kiokun::appears_in_ranks_each_languages_words_ten_at_a_time ... ok
 test tests::kiokun::a_page_with_edrdg_data_acknowledges_the_group ... ok
@@ -306,11 +311,11 @@ test tests::kiokun::the_japanese_examples_match_kiokuns_answers_for_the_sample .
 test tests::kiokun::the_page_head_matches_kiokuns_own_on_a_sample ... ignored, reads kiokun.com's own answers, made locally by `just e14-kiokun-seo`
 test tests::kiokun::the_search_box_sends_its_query_to_the_search_page ... ok
 test tests::kiokun::the_word_page_names_its_entrys_page_canonical ... ok
-test tests::kiokun::the_moves_match_kiokuns_answers_for_the_sample ... ok
-test tests::kiokun::the_page_head_matches_kiokuns_answers_for_the_sample ... ok
 test tests::kiokun::the_word_page_shows_each_languages_words_as_kiokun_does ... ok
-test tests::kiokun::word_pages_with_long_lists_are_timed ... ignored, reads a kiokun-data checkout named by KIOKUN_DATA; a measurement, run by `just e14-kiokun-contains`
+test tests::kiokun::the_moves_match_kiokuns_answers_for_the_sample ... ok
 test tests::kiokun::what_kiokun_com_leaves_out_is_left_out ... ok
+test tests::kiokun::word_pages_with_long_lists_are_timed ... ignored, reads a kiokun-data checkout named by KIOKUN_DATA; a measurement, run by `just e14-kiokun-contains`
+test tests::kiokun::the_page_head_matches_kiokuns_answers_for_the_sample ... ok
 test tests::kiokun::what_kiokun_com_does_not_show_is_not_shown ... ok
 test tests::materializations::a_change_makes_the_chain_again_in_its_order_and_tells_its_readers ... ok
 test tests::materializations::a_document_that_reads_another_key_is_told_nothing ... ok
@@ -318,6 +323,7 @@ test tests::materializations::a_page_is_served_what_a_chain_derives_every_reader
 test tests::materializations::what_could_not_be_made_again_is_served_its_last_good_value ... ok
 test tests::materializations::an_entry_made_again_with_its_value_tells_no_one ... ok
 test tests::messages::a_follow_opens_the_composer_of_the_open_conversation ... ok
+test tests::kiokun::deinflection_matches_kiokuns_answers_for_the_sample has been running for over 60 seconds
 test tests::messages::a_message_drops_both_users_entries_alone ... ok
 test tests::messages::a_message_is_shown_on_both_sides_and_counted_for_its_recipient ... ok
 test tests::messages::a_message_reaches_both_users_sessions_and_no_third_users ... ok
@@ -331,9 +337,8 @@ test tests::messages::on_postgres_who_may_message_whom_is_xs_rule ... ok
 test tests::messages::a_messages_text_is_held_to_its_length_where_it_arrives ... ok
 test tests::messages::a_third_user_signed_in_and_not_sees_none_of_it ... ok
 test tests::messages::reading_a_conversation_reaches_each_of_the_readers_sessions ... ok
-test tests::kiokun::deinflection_matches_kiokuns_answers_for_the_sample has been running for over 60 seconds
-test tests::messages::who_may_message_whom_is_xs_rule ... ok
 test tests::notifications::a_deleted_posts_notifications_go_with_it ... ok
+test tests::messages::who_may_message_whom_is_xs_rule ... ok
 test tests::notifications::a_like_a_reply_and_a_follow_each_tell_the_user_they_involve ... ok
 test tests::notifications::a_like_reaches_each_of_its_users_open_pages ... ok
 test tests::notifications::on_postgres_a_deleted_posts_notifications_go_with_it ... ok
@@ -353,15 +358,15 @@ test tests::pages_read_at_once_each_ask_when_their_query_says_parallel ... ok
 test tests::pages_read_at_once_share_an_ask_their_query_says_is_one_per_key ... ok
 test tests::kiokun::deinflection_matches_kiokuns_answers_for_the_sample ... ok
 test tests::redirects::a_case_the_page_does_not_name_is_a_failure_like_any_other ... ok
+test tests::redirects::a_route_with_a_query_part_is_moved_by_its_path ... ok
 test tests::redirects::a_move_to_itself_or_to_no_segment_is_the_programs_fault ... ok
 test tests::redirects::a_page_at_another_address_of_the_page_is_moved_there_for_good ... ok
-test tests::redirects::a_route_with_a_query_part_is_moved_by_its_path ... ok
 test tests::sign_in::a_callback_another_browser_started_is_refused ... ok
 test tests::sign_in::a_command_from_another_origin_is_refused ... ok
 test tests::sign_in::a_control_is_shown_where_its_commands_predicate_holds ... ok
-test tests::redirects::a_temporary_move_is_answered_307 ... ok
-test tests::redirects::the_plan_carries_the_move_on_the_binding_that_can_answer_it ... ok
 test tests::sign_in::a_documents_answers_are_its_own_for_its_life ... ok
+test tests::redirects::the_plan_carries_the_move_on_the_binding_that_can_answer_it ... ok
+test tests::redirects::a_temporary_move_is_answered_307 ... ok
 test tests::sign_in::a_fresh_sessions_cookie_is_http_only_and_unguessable ... ok
 test tests::sign_in::a_page_holds_its_announcer_from_the_first_byte ... ok
 test tests::sign_in::a_post_and_a_reply_are_their_signed_in_authors ... ok
@@ -382,12 +387,12 @@ test tests::sign_in::the_guest_models_reader_is_its_sessions_guest ... ok
 test tests::sign_in::the_relying_party_answers_the_routes_the_compiler_knows ... ok
 test tests::store_accounts::a_command_is_answered_for_the_reader_its_page_was_shown_to ... ok
 test tests::store_accounts::a_guests_cart_follows_them_in ... ok
-test tests::store_accounts::a_join_past_a_bigint_is_refused_and_the_sign_in_completes ... ok
-test tests::sign_in::two_users_pages_never_share_private_parts ... ok
 test tests::sign_in::a_token_not_this_sign_ins_is_refused ... ok
+test tests::sign_in::two_users_pages_never_share_private_parts ... ok
 test tests::store_accounts::a_session_keyed_carts_change_reaches_no_other_session ... ok
-test tests::store_accounts::a_signed_in_sessions_cart_is_not_joined_to_the_next_user ... ok
+test tests::store_accounts::a_join_past_a_bigint_is_refused_and_the_sign_in_completes ... ok
 test tests::store_accounts::a_retry_of_a_press_that_committed_is_answered_from_what_was_kept ... ok
+test tests::store_accounts::a_signed_in_sessions_cart_is_not_joined_to_the_next_user ... ok
 test tests::store_accounts::a_shared_entry_still_reaches_every_reader ... ok
 test tests::store_accounts::a_stale_press_is_refused_before_the_order_waits ... ok
 test tests::store_commands_carry_and_enforce_their_signed_in_precondition ... ok
@@ -396,7 +401,10 @@ test tests::store_pg::on_postgres_a_cart_change_reaches_the_sessions_open_page .
 test tests::store_pg::on_postgres_a_refused_commit_commits_neither_its_state_nor_its_event ... ok
 test tests::store_pg::on_postgres_a_retried_interaction_runs_its_command_once ... ok
 test tests::store_pg::on_postgres_a_routes_change_commits_with_its_event_in_one_transaction ... ok
+test tests::store_pg::on_postgres_a_second_hosts_commit_answers_what_the_first_committed ... ok
 test tests::store_pg::on_postgres_a_stated_change_feed_the_layer_cannot_deliver_is_refused ... ok
+test tests::store_pg::on_postgres_an_interactions_answer_outlives_its_host ... ok
+test tests::store_pg::on_postgres_an_interactions_record_answers_a_day ... ok
 test tests::store_pg::on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_nothing ... ok
 test tests::store_pg::on_postgres_eight_sessions_adding_five_times_each_commit_all_forty ... ok
 test tests::store_pg::on_postgres_serializable_against_a_read_committed_default_is_refused ... ok
@@ -409,12 +417,14 @@ test tests::store_accounts::two_users_carts_never_share_a_line ... ok
 test tests::store_search::a_menu_change_reaches_a_kept_search ... ok
 test tests::store_search::a_menu_change_tells_the_stores_page_once ... ok
 test tests::store_search::a_search_lists_the_stores_and_dishes_that_match ... ok
+test tests::store_search::a_search_lists_the_stores_that_reach_the_chosen_address ... ok
 test tests::store_search::an_open_search_page_is_told_of_a_menu_change ... ok
+test tests::store_search::a_stores_cuisine_is_shown_on_the_home_page_and_its_page ... ok
 test tests::store_search::case_is_ignored_and_accents_are_not ... ok
-test tests::store_search::no_text_fails_the_page ... ok
+test tests::store_search::the_search_is_at_its_routes_query ... ok
 test tests::the_commands_and_handlers_are_the_compilers ... ok
 test tests::the_compiled_command_carries_its_arguments_to_the_data_layer ... ok
-test tests::store_search::the_search_is_at_its_routes_query ... ok
+test tests::store_search::no_text_fails_the_page ... ok
 test tests::store_search::the_sentence_inside_its_arm_is_told_where_it_is ... ok
 test tests::the_hosts_clock_moves_forward_as_a_test_says ... ok
 test tests::the_menu_is_no_session_s_list ... ok
@@ -425,15 +435,15 @@ test tests::the_feeds_page_opening_its_stream_is_not_told_to_reload ... ok
 test tests::the_store_renders_its_signals_at_their_first_values ... ok
 test tests::the_store_s_document_carries_its_signals ... ok
 test tests::the_store_and_each_item_say_what_they_are ... ok
-test tests::the_store_moving_an_order_along_reaches_its_open_page ... ok
-test tests::the_store_sends_its_slots_after_its_own_content ... ok
 test tests::the_stores_are_the_home_page ... ok
+test tests::the_store_sends_its_slots_after_its_own_content ... ok
+test tests::the_store_moving_an_order_along_reaches_its_open_page ... ok
 test tests::under_cancel_a_newer_key_stops_the_old_keys_read ... ok
-test tests::the_table_is_free_while_a_keyed_read_derives ... ok
-test tests::under_keep_the_new_key_is_read_after_the_old_one_ends ... ok
-test tests::the_table_is_free_while_a_telling_derives ... ok
-test tests::under_supersede_the_old_keys_read_runs_on_unshown ... ok
 test tests::sustained_load_leaves_the_server_bounded ... ok
+test tests::under_keep_the_new_key_is_read_after_the_old_one_ends ... ok
+test tests::under_supersede_the_old_keys_read_runs_on_unshown ... ok
+test tests::the_table_is_free_while_a_keyed_read_derives ... ok
+test tests::the_table_is_free_while_a_telling_derives ... ok
 test tests::uploads::a_command_that_does_not_commit_gives_its_claim_back ... ok
 test tests::uploads::a_deleted_posts_image_is_not_served_and_its_blob_is_collected ... ok
 test tests::uploads::on_postgres_a_deleted_posts_image_is_not_served_and_its_blob_is_collected ... ok
@@ -479,22 +489,22 @@ test uploads::tests::the_dimensions_are_held ... ok
 test uploads::tests::the_kind_is_sniffed_and_never_the_senders ... ok
 test uploads::tests::the_size_is_held_before_and_after_the_body_is_read ... ok
 test tests::uploads::what_is_not_an_image_is_refused_whatever_it_is_called ... ok
-test tests::what_a_shared_cache_keeps_holds_nothing_a_session_put_in_it ... ok
 test tests::what_a_page_computes_from_a_signal_is_rendered_at_its_first_value ... ok
-test result: ok. 463 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 519.93s
+test tests::what_a_shared_cache_keeps_holds_nothing_a_session_put_in_it ... ok
+test result: ok. 473 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 685.93s
 
 == the protocol (runtime/pw-protocol)
 
-test tests::a_basis_that_moves_backward_is_not ... ok
 test tests::a_basis_that_advances_is_newer ... ok
+test tests::a_basis_that_moves_backward_is_not ... ok
 test tests::a_frame_from_another_protocol_version_is_incomparable ... ok
-test tests::a_frame_round_trips ... ok
 test tests::a_multi_resource_basis_is_refused_if_any_entry_moves_backward ... ok
+test tests::a_frame_round_trips ... ok
+test tests::a_resource_change_carries_no_patch ... ok
+test tests::a_frame_larger_than_the_limit_is_refused_before_decoding ... ok
 test tests::an_empty_basis_has_no_causal_claim ... ok
 test tests::an_unheld_entry_is_new_state_rather_than_stale ... ok
-test tests::a_resource_change_carries_no_patch ... ok
 test tests::garbage_is_refused_with_a_reason ... ok
-test tests::a_frame_larger_than_the_limit_is_refused_before_decoding ... ok
 test tests::one_change_s_patches_travel_together ... ok
 test tests::the_protocol_carries_no_transport ... ok
 test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
@@ -512,11 +522,11 @@ test a_private_list_the_values_do_not_give_is_empty ... ok
 test a_block_a_private_query_decides_renders_nothing_for_no_session ... ok
 test a_streamed_region_is_pending_and_one_waited_for_is_nothing_for_no_session ... ok
 test a_text_part_a_private_query_decides_is_empty_for_no_session ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 == the browser (e2e/resource-path.spec.mjs, e2e/store.spec.mjs), three engines
 
-  84 passed (2.0m)
+  84 passed (2.7m)
 
 == mutation controls (scripts/patch_set_mutations.py)
 

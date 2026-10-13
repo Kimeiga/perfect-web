@@ -1,8 +1,8 @@
 ADR-0143 - what names a form control
 
 produced by: just e14-labels
-commit: d65f2785ad21bf9bd599e639aec2c156d25c0a51
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38203954490 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the rule (compiler/pw-core/tests/labels.rs)
@@ -10,15 +10,15 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test a_label_names_the_first_element_with_its_id ... ok
 test a_reference_to_an_id_every_row_has_is_its_ids_defect_alone ... ok
 test a_blank_aria_label_names_nothing ... ok
-test a_wrapping_label_names_only_its_first_control ... ok
 test a_label_names_its_control_only_when_it_has_text ... ok
+test a_wrapping_label_names_only_its_first_control ... ok
 test a_label_that_wraps_its_control_names_it ... ok
 test an_id_inside_each_names_no_one_row ... ok
 test which_control_a_label_names_must_not_depend_on_what_renders ... ok
-test an_id_names_nothing_by_itself ... ok
 test hidden_submit_and_button_inputs_need_no_label ... ok
+test an_id_names_nothing_by_itself ... ok
 test aria_labelledby_must_reach_an_element_with_text ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.40s
 
 == each witness (examples/generality/control_without_label)
 
@@ -31,7 +31,7 @@ wrapped.pw               NEIGHBOUR  no diagnostics
 
 == the generality suite (compiler/pw-core/tests/generality.rs)
 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.21s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 92.06s
 
 == mutation controls (scripts/labels_mutations.py)
 

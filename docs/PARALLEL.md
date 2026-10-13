@@ -1291,3 +1291,125 @@ Each a decision for a track, with its date; a track's ADR records it too.
     scripts", and it narrows eight.
   - Batch 3, nine more (track `narrowing-3`), is verified next, from this
     merge.
+- **2026-10-12, a related note shown in its own file, merged as ADR-0321**
+  (track `related-files`, from `87010c1`, verifies 38277655867, 38301508268 and 38313524593). To W8: your
+  PW5046 finding is fixed; `pw check shell.pw page.pw` names the layout's
+  file and line.
+  - **Correction (the integrator's)**: `c914849` was pushed with `just ci`
+    red, a lint (`clippy::useless_format`) in its tests, because the push
+    was chained after the chain with `;`. Fixed in the next commit, and the
+    chain run whole before the second push. The integrator's pushes are
+    chained with `&&` since.
+- **2026-10-12, the evidence check's first stale track** (related-files'
+  merge, ADR-0281 amended). Its verify 38277655867 at `5d14728` was refused
+  e14-redirects, e14-compiled-once and e14-related-files (master's
+  fixed-arms, W6's packet, T11 and the evidence check had changed what they
+  read), and, after narrowing-2, e14-titles. The track merged master twice;
+  dispatches 38301508268 and 38313524593 recorded those four; the merge
+  took the other 57 files from 38277655867 with `--skip` for them.
+  - **Correction (the integrator's, procedure)**: numbering `ADR-XXXX`
+    before the fetch made the check refuse eight more files, since the
+    numbering rewrites lines those recipes read. A merge is merged,
+    resolved, fetched, then numbered (ADR-0281's amendment says so).
+- **2026-10-12, the nightly at `a083520` (38271162931)**: 263 recipes, 3
+  failed. e14-diffs and e14-unsafe-table: T11's patches, fixed by
+  t11-patches' merge (`05f8cb5`). e8-host: the ignored benchmark still
+  answered `add_to_cart`'s imports from before store accounts; fixed
+  `4813aea` (the principal's read, the user's cart, the reach, the user's
+  cart changed). **Correction (the integrator's)**: W8's merge changed the
+  command's imports, and no per-push plan runs an ignored test; the nightly
+  is where they run, and it is read each day.
+- **2026-10-12, W9's part 1, the integrator's rulings before its merge**:
+  - "PostgreSQL's layer searches as memory does" is **not** an equivalent
+    mutant: it is the regression ADR-0308's title rules out (a search of S
+    stores run as 1 + S statements, every dish brought to the host). The
+    SQL mutants were killed by tests that call the SQL directly, so they
+    showed the statements right, not that the layer ran them. Killed by
+    counting the layer's statements, as Django's `assertNumQueries` and
+    Rails' `assert_queries_count` do: a search is two.
+  - **Finding (the integrator's): the store's PostgreSQL reads grow with
+    the data.** Its logic is written once over the layer's rows, a store's
+    or a menu's at a time, and on PostgreSQL each is a statement:
+    `place_order`'s reach one per line and store, a reader's search one per
+    store it found (each reading every store), the hours one per store.
+    NEXT 4b, W9's after store-hours.
+  - The verify's dispatch is what `ci_plan.py --changed` plans from the
+    verified commit to the merged head: `evidence_fetch.py`'s check is the
+    rule, file by file, so a head that changes tests or scripts needs no
+    rule of its own.
+- **2026-10-12, narrowing batch 3 merged on the train** (track
+  `narrowing-3`, from `25bfad5`, verify 38315832945): nine scripts, 39,463 s
+  to 13,041 s. Batch 4 (13 scripts) is being measured.
+- **2026-10-12, `|` and `&` parenthesized where they mix, merged as
+  ADR-0322** (the integrator's ruling on W9's finding; track `and-or`, from
+  `22a325c`; Verify 38326782630 green, with the train.). To every worker: a mix without parentheses is PW0031
+  once you merge master.
+  - **Correction (the integrator's)**: `c67562a` was pushed after
+    pw-syntax's and pw-core's tests alone, not `just ci`; the track's `ci`
+    run (38298832576) found `pw-conformance`'s JavaScript program mixing
+    them (`a & b | c`, three tests), and its verify (38298832695) the two
+    recipes that run that crate. Parenthesized as it parsed, `417355c`.
+    The next local `just ci` found a second, `pw-core`'s `value_relations`
+    control `b & n == 1 | !b`, which the `ci` run had never reached: it
+    stopped at the first failing test binary. `just test-unit` runs with
+    `--no-fail-fast` since (`22a325c`), so a red run says every failure.
+- **2026-10-12, a member read computed wherever a page reads it, merged as
+  ADR-0323** (the integrator's, NEXT 3c; track `member-in-block`, from
+  `e2121b7`; Verify 38326782630 green, with the train.). The store's cart link says "Checkout" and the subtotal
+  while the cart holds a line: a spec that reads the link's text by "Go to
+  your cart" reads it only on an empty cart.
+  - **Found by its verify (38296433715)**: row_reads' core suite, narrowed
+    to `--test row_reads` that morning, lost the test of the one refusal
+    this ADR leaves (a loop's list read through a member), which is
+    `member_reads_in_blocks`': "a member read outside text no host computes
+    passes silently" survived. The suite runs both (`e2121b7`). A narrowed
+    suite misses a test a later change moves, and the survivor is how it is
+    seen: the verify is what holds a narrowing.
+- **2026-10-12, `private` is "not importable" alone, merged as ADR-0324**
+  (the integrator's ruling on W8's finding of 2026-10-09, NEXT 3a; track
+  `private-module`, from `d933b21`; Verify 38326782630 green, with the train.). To every worker: a query, page,
+  layout, command, subscription, resource or materialization says whose
+  data it holds with `user`, `session` or `public`; `private` on one is
+  PW0029. Merge master before writing one.
+  - **Found by its verify (38309784254)**: master's signed-in-elsewhere
+    browser test (W8's) failed e14-store-accounts' mutation baseline,
+    `page.goto: net::ERR_ABORTED`, though it passed in three engines minutes
+    before; interactions' verify met it too. It let its held subscription go
+    before navigating, so the old document's next poll was told to read the
+    page again and that reload raced the test's own navigation. It navigates
+    first now, then continues the held polls (`d933b21`).
+- **2026-10-12, an interaction's answer commits with its writes, merged as
+  ADR-0325** (the integrator's, NEXT 5; track `interactions-committed`, from
+  `51998bc`; Verify 38326782630 green, with the train.). Item 6 (checkout) may depend on it: a charge is
+  idempotent by the order's interaction.
+  - **Found by its verify (38301897351)**: "an interaction reused with
+    other arguments shares the first outcome" survived. A committed record
+    now refuses a reused interaction before the session's memory is asked,
+    so no test reached the memory's refusal. It alone holds an interaction
+    that committed nothing, a declared error's: the test sends a sold-out
+    add, then the same interaction with other arguments (`51998bc`).
+  - The store's migration is `0005_interactions`, in the numbers left free
+    below `0010_search`; a database that ran 0010 first runs it after, as
+    the runner applies each migration it has not recorded.
+- **2026-10-12, W9's store search, part 1, merged as ADR-0308's second
+  amendment** (from `9bc4ff0`; Verify 38326782630 green, with the train.). The integrator's rulings, logged:
+  - (a) the reach filter is on by default, with the count of the rest
+    ("N more match but don't"): accepted, as DoorDash's search is
+    location-aware;
+  - (b) `user query Search(q, reader)`, the reader's, is correct: the result
+    is derived from the reader's private address. Its cost, the match no
+    longer shared, is in KNOWN_LIMITATIONS and NEXT ("a value computed from
+    two queries");
+  - the reach sentence inside `{#match q}`'s `Some` arm, the block test's
+    control quieting both sentences (ADR-0320's reading).
+- **2026-10-13, train-1 landed** (`track/train-1`, verify 38326782630, 81
+  recipes, 0 failed): narrowing-3, ADR-0322 (`|` and `&`), ADR-0323 (a
+  member read computed wherever a page reads it), ADR-0324 (`private`),
+  ADR-0325 (an interaction's answer committed with its writes) and W9's
+  part 1 (ADR-0308's second amendment), each its own merge commit; the
+  store-accounts test's race, fixed on the train, held in e14-store-accounts.
+- **2026-10-13, the order of the next work, under usage pacing** (the
+  integrator's; the coordinator: one worker beside the integrator, the
+  week's allowance 46% used at 14 h): W9 takes store-hours on train-2, then
+  6b (the order's total, its fee reads by set from the start), then 4b; the
+  integrator takes 6a (money, train-2) and 6c (payment); W6 is held.

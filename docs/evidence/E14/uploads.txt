@@ -1,8 +1,8 @@
 ADR-0260 (track uploads) - an image on a post: a typed upload, a deployment's blob storage, served safely
 
 produced by: just e14-uploads
-commit: 718bbfd2f928348a9f2f473986d0ef62ce959e47
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38196213688 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
+commit: 25b01345e1a5406a8b977c6c269475aa5b872e60
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38326782630 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -15,15 +15,15 @@ test blob::tests::a_blob_in_memory_is_kept_by_its_key_once_and_forgotten ... ok
 test blob::tests::a_key_is_the_sha256_of_the_bytes ... ok
 test blob::tests::a_blob_is_kept_by_its_key_once_and_forgotten ... ok
 test blob::tests::a_blob_changed_where_it_is_kept_is_not_given_out ... ok
-test tests::uploads::a_command_that_does_not_commit_gives_its_claim_back ... ok
-test tests::uploads::an_image_attached_is_posted_with_its_post_and_served ... ok
-test tests::uploads::a_deleted_posts_image_is_not_served_and_its_blob_is_collected ... ok
 test tests::uploads::an_attached_image_removed_is_forgotten ... ok
+test tests::uploads::a_command_that_does_not_commit_gives_its_claim_back ... ok
+test tests::uploads::a_deleted_posts_image_is_not_served_and_its_blob_is_collected ... ok
+test tests::uploads::an_image_attached_is_posted_with_its_post_and_served ... ok
 test tests::uploads::an_upload_is_read_within_its_own_limits_not_a_commands ... ok
 test tests::uploads::on_postgres_an_attached_image_removed_is_forgotten ... ok
 test tests::uploads::on_postgres_a_deleted_posts_image_is_not_served_and_its_blob_is_collected ... ok
 test tests::uploads::on_postgres_an_image_is_kept_with_its_post ... ok
-test tests::uploads::on_postgres_posting_an_image_with_none_attached_commits_nothing ... ok
+test tests::uploads::one_signed_out_attaches_nothing ... ok
 test uploads::multipart::tests::a_boundary_is_the_media_types_parameter ... ok
 test uploads::multipart::tests::a_forms_parts_are_its_fields ... ok
 test uploads::multipart::tests::a_part_is_a_files_by_its_filename_whatever_it_is_called ... ok
@@ -40,27 +40,27 @@ test uploads::sniff::tests::crc32_is_iso_3309s ... ok
 test uploads::sniff::tests::every_kind_is_named_by_its_word ... ok
 test uploads::sniff::tests::real_encoders_files_are_read_as_they_are_shown ... ok
 test uploads::sniff::tests::the_kind_is_the_bytes_and_nothing_else ... ok
+test tests::uploads::posting_an_image_with_none_attached_commits_nothing ... ok
 test uploads::tests::a_blob_no_post_names_is_collected_unless_a_claim_holds_it ... ok
 test uploads::tests::a_build_declares_its_uploads_and_a_server_starts_with_no_lease ... ok
 test uploads::tests::a_claim_no_transaction_commits_is_given_back ... ok
 test uploads::tests::a_declarations_routes_are_claimed_and_no_other ... ok
 test uploads::tests::a_deployment_lowers_a_limit_and_never_raises_one ... ok
 test uploads::tests::a_kind_the_declaration_does_not_allow_is_refused ... ok
-test uploads::tests::a_lease_is_claimed_once_and_ended_once ... ok
 test uploads::tests::a_lease_nothing_claims_ends_when_its_time_does ... ok
 test uploads::tests::a_refusal_goes_back_to_this_origin_alone ... ok
+test uploads::tests::a_lease_is_claimed_once_and_ended_once ... ok
 test uploads::tests::a_request_without_a_session_length_or_origin_is_refused ... ok
 test uploads::tests::a_second_upload_ends_the_first_lease_and_its_blob ... ok
-test uploads::tests::a_user_attaches_within_an_hours_budget ... ok
 test uploads::tests::an_image_is_leased_to_its_session_and_shown_to_it_alone ... ok
 test uploads::tests::nothing_is_claimed_where_nothing_is_declared ... ok
 test uploads::tests::the_dimensions_are_held ... ok
 test uploads::tests::the_kind_is_sniffed_and_never_the_senders ... ok
 test uploads::tests::the_size_is_held_before_and_after_the_body_is_read ... ok
-test tests::uploads::posting_an_image_with_none_attached_commits_nothing ... ok
-test tests::uploads::one_signed_out_attaches_nothing ... ok
+test uploads::tests::a_user_attaches_within_an_hours_budget ... ok
+test tests::uploads::on_postgres_posting_an_image_with_none_attached_commits_nothing ... ok
 test tests::uploads::what_is_not_an_image_is_refused_whatever_it_is_called ... ok
-test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 346 filtered out; finished in 55.09s
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 432 filtered out; finished in 26.32s
 
 == the declaration and its checks (compiler/pw-core/tests/uploads.rs)
 
@@ -74,11 +74,11 @@ test its_paths_are_literal_paths ... ok
 test its_types_are_a_closed_set ... ok
 test two_uploads_are_at_two_paths ... ok
 test its_paths_are_no_pages ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.45s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
 
 == an image on a post in three engines (e2e/uploads.spec.mjs)
 
-  15 passed (2.5m)
+  15 passed (1.6m)
 
 == mutation controls (scripts/uploads_mutations.py)
 

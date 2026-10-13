@@ -509,7 +509,7 @@ awaited in order. What remains:
   a `conflict` strategy's field.
 - **A `replicated` declaration is parsed, and nothing else** (A-011): no
   syntax reads one, no runtime keeps one, and its `privacy` clause labels
-  nothing. A declaration's label comes from its `session` or `private`
+  nothing. A declaration's label comes from its `session` or `user`
   keyword alone, so `privacy User(consumer)` leaves `OrderDraft` public to
   every analysis. Its values are checked by their domains (ADR-0089).
 - **Which declarations a policy belongs to is checked for the four graph
@@ -626,6 +626,12 @@ awaited in order. What remains:
   continuation and a literal query part are refused, and `navigate` gives
   no query parameter. A page whose parameter is a query's is reached by a
   link or a GET form.
+- **A reader's store search is computed for that reader** (ADR-0308's
+  second amendment): filtered by the stores that reach their chosen
+  address, its full-text match is no longer shared between readers. It
+  splits into a shared `Search(q)` and a per-reader reach once a page can
+  compute from two queries (ADR-0226 reads one) or key a query by another's
+  value (NEXT). No toggle shows every store, and none is ranked by distance.
 - **The store's search folds nothing, and matches each record by its own
   fields** (ADR-0308): no accent or stem is folded, no word is corrected,
   and a store's dishes do not make its own name match. Its meaning is
@@ -648,9 +654,12 @@ awaited in order. What remains:
   - a private entry keyed by a user's id that no binding fills with
     `current_user()` reaches every reader of it;
   - a guest's lines whose join failed are reachable by no one;
-  - a user's order is their latest;
-  - `private` still means the user's and not importable (the integrator's
-    ruling, queued).
+  - a user's order is their latest.
+- **The store's PostgreSQL reads grow with the data** (the integrator's
+  finding, 2026-10-12; NEXT 4b): the store's logic reads the layer's rows a
+  store's or a menu's at a time, and on PostgreSQL each is a statement.
+  `place_order`'s reach runs one per cart line and store, a reader's search
+  one per store it found, each reading every store.
 - **The store's places are a fixture, not a geocoder** (ADR-0319): eleven
   places with approximate coordinates; a courier's minutes are four a
   kilometre in a straight line; an address's label is checked for its
@@ -755,9 +764,9 @@ awaited in order. What remains:
   committing host's, so a second host on the same database hears nothing
   of the first's commits; a host's commands are serialized by its layer's
   lock, so a serialization failure between concurrent writers is refused
-  as any refused commit, and never measured; an interaction's idempotency
-  is remembered in the host's memory, not committed with its writes; and
-  the browser suite runs on the in-memory layer.
+  as any refused commit, and never measured; and the browser suite runs on
+  the in-memory layer. An interaction's answer commits with its writes
+  since ADR-0325.
 - **A `style` attribute's value is escaped by refusing what executes**
   (`expression(`, a script scheme in `url(`), then as an attribute. A style
   can still load a URL the value names. A `<style>` element holds text only
@@ -857,8 +866,9 @@ failed, but a recipe's zero exit status alone was insufficient evidence.
 
 **`optimistic` and `idempotent_by` are executed since 2026-10-02**, each
 within stated bounds (ADR-0120 found both unexecuted):
-- `idempotent_by` (ADR-0121): once per interaction, in memory, for the last
-  64 interactions of a session;
+- `idempotent_by` (ADR-0121, ADR-0325): once per interaction, its answer
+  committed with its writes and answering a day; a retry a day later is a
+  new request, and a replayed answer is not marked as one;
 - `optimistic` (ADR-0122): in the own renderer only, for a part outside any
   block, where the page binding's key is an invocation-context call. A new
   cart line takes the name and price the page showed (ADR-0172), and the

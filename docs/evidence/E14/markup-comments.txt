@@ -1,8 +1,8 @@
 ADR-0167 - markup text is text, and a comment in markup is <!-- -->
 
 produced by: just e14-markup-comments
-commit: 31eeb3ca0a008e189ec581febf3ed7f3002361cd
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38013103417 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the parser (compiler/pw-syntax)
@@ -14,21 +14,21 @@ test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 90 filtered out; fin
 
 == the checker and what a page sends (compiler/pw-core/tests/markup_comments.rs)
 
-test an_unquoted_attribute_value_is_sent_whole ... ok
 test a_comment_is_not_sent_and_text_with_slashes_is ... ok
+test an_unquoted_attribute_value_is_sent_whole ... ok
 test a_line_that_reads_as_a_comment_is_refused ... ok
 test text_that_holds_slashes_and_a_comment_in_markup_are_the_controls ... ok
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 == the corpus: each rejected fixture emits its own defect, and no other
 
-test no_accepted_corpus_file_reports_a_body_level_error ... ok
 test every_rejected_fixture_emits_only_its_own_defect ... ok
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 48.54s
+test no_accepted_corpus_file_reports_a_body_level_error ... ok
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 55.18s
 
 == the store checks
 
-pw check: 53 file(s), no diagnostics
+pw check: 60 file(s), no diagnostics
 
 == mutation controls (scripts/markup_comments_mutations.py)
 

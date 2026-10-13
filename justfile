@@ -100,8 +100,11 @@ verify-plan *args:
 
 test: test-unit test-compile
 
+# Every test binary runs, so one failure hides no other: a red run says
+# all it found (2026-10-12: `pw-conformance` failing first left
+# `pw-core`'s `value_relations` unrun, and a second round found it).
 test-unit:
-    cargo test --workspace
+    cargo test --workspace --no-fail-fast
 
 # Validates the accepted/rejected corpus. Four phases since E2:
 #   0. pw fmt --check — the corpus is canonically formatted (ADR-0013)
@@ -3119,6 +3122,34 @@ e14-store-postgres:
      } > docs/evidence/E14/store-postgres.txt; \
      grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/store-postgres.txt
 
+# ADR-0325: an interaction's answer commits with its writes (NEXT 5). The
+# host's records in memory, the store's and the feed's on PostgreSQL, a host
+# started after another, and two hosts at once; the materializer's own; and
+# the mutation controls (scripts/interactions_mutations.py). Needs
+# PW_STORE_DATABASE_URL, a throwaway database (each test uses a schema of its
+# own and drops it), or PW_FEED_DATABASE_URL; skips without one.
+e14-interactions:
+    @url="${PW_STORE_DATABASE_URL:-${PW_FEED_DATABASE_URL:-}}"; \
+     if [ -z "$url" ]; then \
+       echo "e14-interactions: skipped, PW_STORE_DATABASE_URL is not set (a throwaway PostgreSQL database, e.g. postgresql://localhost/pw_store_test)"; \
+       exit 0; \
+     fi; \
+     export PW_STORE_DATABASE_URL="$url" PW_FEED_DATABASE_URL="$url"; \
+     mkdir -p docs/evidence/E14; \
+     { echo "ADR-0325 - an interaction's answer commits with its writes"; echo; \
+       echo "produced by: just e14-interactions"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; \
+       echo "postgres: $(psql "$url" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)')"; echo; \
+       echo "== the materializer's record (runtime/pw-materialize)"; echo; \
+       cargo test --locked -p pw-materialize 2>&1 | grep -E '^test result|panicked at'; \
+       echo; echo "== the host's records, in memory, and on PostgreSQL (store_pg.rs, feed_pg.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- interactions_kept_are_bounded_per_session an_interactions_record_answers_it_for_a_day on_postgres_an_interactions_answer_outlives_its_host on_postgres_a_second_hosts_commit_answers_what_the_first_committed on_postgres_an_interactions_record_answers_a_day on_postgres_a_retried_interaction_runs_its_command_once on_postgres_a_posts_interaction_outlives_its_host 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/interactions_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/interactions_mutations.py; \
+     } > docs/evidence/E14/interactions.txt; \
+     grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/interactions.txt
+
 # ADR-0219: what a commit drops reaches every session that reads it
 e14-cross-session:
     @mkdir -p docs/evidence/E14
@@ -5814,6 +5845,66 @@ e14-compiled-once:
        python3 scripts/compiled_once_mutations.py; \
      } > docs/evidence/E14/compiled-once.txt
     @grep -E "^test result|mutants killed|panicked at|peak resident|within the bound|OVER THE BOUND|^wall" docs/evidence/E14/compiled-once.txt
+# ADR-0324: `private` says a declaration is not importable, and nothing more
+# (NEXT 3a). A module's own helper is not the user's data, a `private`
+# declaration is not imported, and `private` on one that holds data is
+# refused by name (compiler/pw-core/tests/private_is_not_importable.rs,
+# user_visibility.rs); a `user` that opens a declaration after one with no
+# body is its own (pw-syntax); and the mutation controls
+# (scripts/private_module_mutations.py).
+e14-private-module:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0324 - private says a declaration is not importable, and nothing more"; echo; \
+       echo "produced by: just e14-private-module"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the ruling (compiler/pw-core/tests/private_is_not_importable.rs, user_visibility.rs)"; echo; \
+       cargo test --locked -p pw-core --test private_is_not_importable --test user_visibility 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== a user declaration after one with no body (compiler/pw-syntax)"; echo; \
+       cargo test --locked -p pw-syntax --lib a_user_declaration_after_one_with_no_body_is_its_own 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/private_module_mutations.py)"; echo; \
+       python3 scripts/private_module_mutations.py; \
+     } > docs/evidence/E14/private-module.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/private-module.txt
+
+
+# ADR-0321: a related note is shown in its own file. The checker's notes in
+# another file name it (compiler/pw-core/tests/related_files.rs); `pw check`
+# shows each in its own file, and never stops on a span (pw-cli's tests and
+# tests/related_files.rs, W8's program); and the mutation controls.
+e14-related-files:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0321 - a related note is shown in its own file"; echo; \
+       echo "produced by: just e14-related-files"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== each note in its own file (compiler/pw-core/tests/related_files.rs)"; echo; \
+       cargo test --locked -p pw-core --test related_files 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== pw check: a note shown in its own file, and no stop on a span (compiler/pw-cli)"; echo; \
+       cargo test --locked -p pw-cli 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== mutation controls (scripts/related_files_mutations.py)"; echo; \
+       python3 scripts/related_files_mutations.py; \
+     } > docs/evidence/E14/related-files.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/related-files.txt
+
+# ADR-0322: `|` and `&` are parenthesized where they mix (W9's finding). The
+# parser's rule (compiler/pw-syntax/src/grammar.rs), every shipped program and
+# the corpus parsing as before, and the mutation controls
+# (scripts/logical_mixed_mutations.py).
+e14-logical-mixed:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0322 - | and & are parenthesized where they mix"; echo; \
+       echo "produced by: just e14-logical-mixed"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo; \
+       echo "== the parser's rule (compiler/pw-syntax/src/grammar.rs)"; echo; \
+       cargo test --locked -p pw-syntax --lib or_and_and_mixed_without_parentheses_is_refused 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== every shipped program and the corpus parse as before (pw-syntax's corpus tests)"; echo; \
+       cargo test --locked -p pw-syntax --test corpus_grammar --test corpus_lossless 2>&1 | grep -E '^test result|panicked at'; \
+       echo; echo "== mutation controls (scripts/logical_mixed_mutations.py)"; echo; \
+       python3 scripts/logical_mixed_mutations.py; \
+     } > docs/evidence/E14/logical-mixed.txt
+    @grep -E "^test result|mutants killed|panicked at" docs/evidence/E14/logical-mixed.txt
 
 # ADR-0320: a block is told part by part while its arm stays. The plan names
 # each block at the top of a page that renders a query's value, whatever
@@ -5846,3 +5937,32 @@ e14-block-parts:
        python3 scripts/block_parts_mutations.py; \
      } > docs/evidence/E14/block-parts.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/block-parts.txt
+
+# ADR-0323: a member read is computed wherever a page reads it (NEXT 3c). The
+# plan's member reads inside a block, in an attribute, a block's subject, the
+# title and the metadata, and in a speculated block
+# (compiler/pw-core/tests/member_reads_in_blocks.rs); the host's count inside
+# a block, told where it is; the store's checkout link, its subtotal shown
+# before the server answers, in three engines (e2e/cart.spec.mjs); and the
+# mutation controls (scripts/member_reads_mutations.py).
+e14-member-reads:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0323 - a member read is computed wherever a page reads it"; echo; \
+       echo "produced by: just e14-member-reads"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the plan's member reads (compiler/pw-core/tests/member_reads_in_blocks.rs)"; echo; \
+       cargo test --locked -p pw-core --test member_reads_in_blocks 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host: a count inside a block, told where it is, and in a block a speculation renders"; echo; \
+       cargo test --locked -p pw-dev-server -- a_member_read_inside_a_block_is_computed_and_told_where_it_is a_member_read_inside_a_speculated_block_is_rendered_with_it 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the checkout link's subtotal before the server answers, in three engines (e2e/cart.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/cart.spec.mjs -g "a line shows before the server answers|remove takes the line away" --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/member_reads_mutations.py)"; echo; \
+       python3 scripts/member_reads_mutations.py; \
+     } > docs/evidence/E14/member-reads.txt
+    @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/member-reads.txt

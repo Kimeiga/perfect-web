@@ -2632,6 +2632,12 @@ track `store-search`, accepted at the merge).
   tells each open page that reads what it dropped. The verify found a
   survivor whose dish moved tier on PostgreSQL alone, which the test's table
   did not show: the test now compares every record whole.
+- Amended 2026-10-12 (2, W9's): a store's cuisine is its own field, shown on
+  its page and the home page's; the home page has a GET search box; and a
+  reader's search lists the stores that reach their chosen address, by
+  default, saying how many more match and don't (`user query Search(q,
+  reader)`); a search is two statements on PostgreSQL whatever the number
+  of stores, the layer's statements counted.
 
 [ADR-0309](DECISIONS/ADR-0309-a-pages-query-parameters-are-typed.md): a page's
 query parameters are typed, and a GET form makes them (the integrator's; for
@@ -2834,4 +2840,37 @@ finding, ADR-0308's amendment; ADR-0146 amended).
     and fields with it;
   - the feed's unread counts were sent as their whole block;
   - a member read inside any block is refused (NEXT 3c).
-
+[ADR-0321](DECISIONS/ADR-0321-a-related-note-is-shown-in-its-own-file.md):
+a related note is shown in its own file (the integrator's; W8's finding).
+- A note names its file where it is not the diagnostic's own (`Related::
+  in_unit`, resolved to its path by the checker), and `pw check` shows it by
+  that file's lines. A span outside its file is told as a note, never an
+  internal error. PW5046, PW0338, PW5106, PW0351 and PW0341 note what they
+  found in another file; five explanations read as written.
+[ADR-0322](DECISIONS/ADR-0322-or-and-and-are-parenthesized-where-they-mix.md):
+`|` and `&` are parenthesized where they mix (the integrator's; W9's
+finding).
+- A chain mixing them without parentheses is refused at parse (PW0031),
+  naming both groupings; a chain of one is left to right, as before.
+[ADR-0323](DECISIONS/ADR-0323-a-member-read-is-computed-wherever-a-page-reads-it.md):
+a member read is computed wherever a page reads it (the integrator's; NEXT
+3c).
+- A member read of a query's value outside a loop's list is a part a host
+  computes once a change, by its path, at the top and inside a block, and
+  the browser computes it where it renders a speculated block again.
+[ADR-0324](DECISIONS/ADR-0324-private-says-a-declaration-is-not-importable-and-nothing-more.md):
+`private` says a declaration is not importable, and nothing more (the
+integrator's; W8's finding, NEXT 3a).
+- The user's scope is `user`'s alone; `private` on a declaration that holds
+  data is refused by name (PW0029); PW0023's repair drops `private`; a
+  `user` opening a declaration ends the clause before it.
+[ADR-0325](DECISIONS/ADR-0325-an-interactions-answer-commits-with-its-writes.md):
+an interaction's answer commits with its writes (the integrator's; NEXT 5).
+- The record of an idempotent command's interaction (its key, the arguments
+  first sent, its answer) commits in the command's transaction, on both
+  layers; a command recalls it before running, a second host's commit that
+  meets it answers what the first recorded, and a record answers a day.
+- ADR-0281 amended (3), 2026-10-12: tracks ready at once go on a train
+  (`track/train-<n>`), each its own merge commit, verified once; master
+  moves to the train when its run is green, and a track whose recipe fails
+  leaves it, as GitHub's merge queue does.

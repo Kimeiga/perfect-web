@@ -147,10 +147,7 @@ fn results_are_handled(
             severity: Severity::Error,
             message,
             primary_span: body.expr_span(e),
-            related: vec![Related {
-                span: at.clone(),
-                label: format!("inside `{}`", decl.name),
-            }],
+            related: vec![Related::new(at.clone(), format!("inside `{}`", decl.name))],
             explanation: Some(explanation.to_string()),
             repairs: vec![Repair {
                 description: repair.to_string(),
@@ -358,14 +355,11 @@ fn optional_used_as_present(
             message: format!("`{written}` cannot be used where `{inner}` is expected"),
             primary_span: body.expr_span(id),
             related: vec![
-                Related {
-                    span: origin.clone(),
-                    label: format!("`{base_name}` is `{written}` here"),
-                },
-                Related {
-                    span: at.clone(),
-                    label: format!("`{}` assumes the lookup succeeded", decl.name),
-                },
+                Related::new(origin.clone(), format!("`{base_name}` is `{written}` here")),
+                Related::new(
+                    at.clone(),
+                    format!("`{}` assumes the lookup succeeded", decl.name),
+                ),
             ],
             explanation: Some(format!(
                 "`.{field}` is a field of `{inner}`, and `{base_name}` is not an \
@@ -422,10 +416,10 @@ fn unchecked_cast(
             severity: Severity::Error,
             message: format!("`Unknown` cannot be cast to `{target}`"),
             primary_span: body.expr_span(id),
-            related: vec![Related {
-                span: at.clone(),
-                label: format!("`{}` receives external data", decl.name),
-            }],
+            related: vec![Related::new(
+                at.clone(),
+                format!("`{}` receives external data", decl.name),
+            )],
             explanation: Some(format!(
                 "`{name}` came from outside the program, so nothing has checked it \
                  yet. A cast asserts the shape without looking; external values must \
@@ -591,10 +585,10 @@ fn handler_matches_event(
                      taking `{actual}`"
                 ),
                 primary_span: body.expr_span(e),
-                related: vec![Related {
-                    span: at.clone(),
-                    label: format!("`{}` binds the handler here", decl.name),
-                }],
+                related: vec![Related::new(
+                    at.clone(),
+                    format!("`{}` binds the handler here", decl.name),
+                )],
                 explanation: Some(format!(
                     "Form submission and pointer activation are different events, and \
                      `{handler}` is written for `{actual}`. Without this check the \
@@ -711,10 +705,10 @@ fn not_a_handler(
             "`on:{event}` names `{handler}`, {what}, which is no function or command to call"
         ),
         primary_span: body.expr_span(e),
-        related: vec![Related {
-            span: at.clone(),
-            label: format!("`{}` binds the handler here", decl.name),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            format!("`{}` binds the handler here", decl.name),
+        )],
         explanation: Some(
             "An event attribute is given a lambda, its handler, or names a function or a \
              command the program declares, which is `(e) => save(e)` (ADR-0199). A \
@@ -753,10 +747,10 @@ fn lambda_takes_another_event(
             "`on:{event}` expects a handler taking `{expected}`, or nothing, found {found}"
         ),
         primary_span: body.expr_span(e),
-        related: vec![Related {
-            span: at.clone(),
-            label: format!("`{}` binds the handler here", decl.name),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            format!("`{}` binds the handler here", decl.name),
+        )],
         explanation: Some(format!(
             "An event gives its handler one record of plain data, `{expected}` for \
              `on:{event}`, read in the browser when the event happens (ADR-0131). A \
@@ -791,10 +785,10 @@ fn unknown_modifier(
             crate::check::listed(crate::hir::EVENT_MODIFIERS)
         ),
         primary_span: attr.span.clone(),
-        related: vec![Related {
-            span: at.clone(),
-            label: format!("`{}` binds a handler to it here", decl.name),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            format!("`{}` binds a handler to it here", decl.name),
+        )],
         explanation: Some(
             "A modifier is what the runtime does in the listener, before the handler's \
              code has loaded: `prevent` stops the browser's own action, a form's \
@@ -829,10 +823,10 @@ fn unknown_event(
             crate::check::listed(declared)
         ),
         primary_span: attr.span.clone(),
-        related: vec![Related {
-            span: at.clone(),
-            label: format!("`{}` binds a handler to it here", decl.name),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            format!("`{}` binds a handler to it here", decl.name),
+        )],
         explanation: Some(
             "Which event an `on:` attribute delivers is declared by the platform, in \
              `events`. An attribute naming no declared event binds its handler to nothing. \

@@ -213,6 +213,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // And each command a page's handler calls (ADR-0154): what a browser
     // sends, and can send twice.
     let sent = crate::resume::sent_commands(&hirs, &sigs);
+    let paths: Vec<&str> = units.iter().map(|u| u.path.as_str()).collect();
     units
         .iter()
         .enumerate()
@@ -268,6 +269,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
                 u,
             ));
             out.sort_by_key(|d| d.primary_span.start);
+            // A note found in another file names it (ADR-0321).
+            crate::diagnostics::resolve_files(&mut out, i, &paths);
             (u.path.clone(), out)
         })
         .collect()
@@ -280,7 +283,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
 fn sent_without_idempotency(
     hir: &Hir,
     unit: usize,
-    sent: &BTreeMap<crate::resolve::DefId, Vec<hir::Span>>,
+    sent: &BTreeMap<crate::resolve::DefId, Vec<(usize, hir::Span)>>,
 ) -> Vec<Diagnostic> {
     let code = crate::codes::SENT_WITHOUT_IDEMPOTENCY;
     let mut out = Vec::new();
@@ -305,9 +308,9 @@ fn sent_without_idempotency(
             primary_span: hir.decl_span(id),
             related: calls
                 .iter()
-                .map(|span| Related {
-                    span: span.clone(),
-                    label: "a press sends it from here".to_string(),
+                // Each in its own file, a page's (ADR-0321).
+                .map(|(at, span)| {
+                    Related::in_unit(*at, span.clone(), "a press sends it from here".to_string())
                 })
                 .collect(),
             explanation: Some(
@@ -352,10 +355,10 @@ fn not_found_names_a_case(
             severity: Severity::Error,
             message,
             primary_span: p.span.clone(),
-            related: vec![Related {
-                span: hir.decl_span(id),
-                label: format!("a policy of `{}`", decl.name),
-            }],
+            related: vec![Related::new(
+                hir.decl_span(id),
+                format!("a policy of `{}`", decl.name),
+            )],
             explanation: Some(
                 "A page whose queries fail is answered 503: it cannot be shown now. A page \
                  whose address names nothing is answered 404, and only the page can say \
@@ -433,10 +436,10 @@ fn redirect_names_a_case(
             severity: Severity::Error,
             message,
             primary_span: p.span.clone(),
-            related: vec![Related {
-                span: hir.decl_span(id),
-                label: format!("a policy of `{}`", decl.name),
-            }],
+            related: vec![Related::new(
+                hir.decl_span(id),
+                format!("a policy of `{}`", decl.name),
+            )],
             explanation: Some(
                 "A page whose address is another address of the page, as a dictionary's \
                  simplified form is its traditional one's, answers a redirect there: 308 \
@@ -1280,10 +1283,10 @@ fn unresolved_uses(
                 severity: Severity::Error,
                 message: format!("`{path}` does not resolve"),
                 primary_span: body.expr_span(id),
-                related: vec![Related {
-                    span: hir.decl_span(decl_id_of(hir, decl)),
-                    label: format!("used inside `{}`", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(decl_id_of(hir, decl)),
+                    format!("used inside `{}`", decl.name),
+                )],
                 explanation: Some(format!(
                     "`{head}` is not a module this file can see. Names are visible \
                      through lexical scope, module membership, or an explicit import \
@@ -1384,10 +1387,10 @@ fn not_a_term(
         severity: Severity::Error,
         message: format!("`{path}` is {what}, which a call cannot name"),
         primary_span: body.expr_span(id),
-        related: vec![Related {
-            span: hir.decl_span(decl_id_of(hir, decl)),
-            label: format!("called inside `{}`", decl.name),
-        }],
+        related: vec![Related::new(
+            hir.decl_span(decl_id_of(hir, decl)),
+            format!("called inside `{}`", decl.name),
+        )],
         explanation: Some(format!(
             "A call names a function, a data operation, or a type it builds. \
              {how} Until 2026-09-26 such a call checked: every analysis \
@@ -1588,10 +1591,10 @@ fn policy_value(
         severity: Severity::Error,
         message: format!("`{written}`: {why}"),
         primary_span: span.clone(),
-        related: vec![Related {
-            span: hir.decl_span(id),
-            label: format!("{of} `{}`", decl.name),
-        }],
+        related: vec![Related::new(
+            hir.decl_span(id),
+            format!("{of} `{}`", decl.name),
+        )],
         explanation: Some(
             "A policy's value is one its domain has: a word the policy lists, a \
              duration, a length, a world, a parameter of the declaration, a type, an \
@@ -1642,10 +1645,10 @@ fn clauses_in_place(hir: &Hir) -> Vec<Diagnostic> {
                     p.name
                 ),
                 primary_span: p.span.clone(),
-                related: vec![Related {
-                    span: hir.decl_span(id),
-                    label: format!("`{}` is declared here", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(id),
+                    format!("`{}` is declared here", decl.name),
+                )],
                 explanation: Some(
                     "A clause is read by the declarations it is written for: a command \
                      emits and invalidates, a cached read is kept for its freshness and \
@@ -1670,7 +1673,8 @@ struct Reader {
     path: String,
     name: String,
     unit: usize,
-    id: hir::DeclId,
+    /// Its declaration's span, in its own unit's file (ADR-0321).
+    span: hir::Span,
     /// The domains it reads: `Carts` for `database.read<Carts>`.
     reads: BTreeSet<String>,
     /// A materialization, rebuilt only when an event reaches it (ADR-0103).
@@ -1724,7 +1728,7 @@ fn cached_readers(
                 path,
                 name: decl.name.clone(),
                 unit,
-                id,
+                span: hir.decl_span(id),
                 reads,
                 fragment: false,
                 built_from: Vec::new(),
@@ -1800,7 +1804,7 @@ fn cached_readers(
                 path,
                 name: decl.name.clone(),
                 unit,
-                id,
+                span: hir.decl_span(id),
                 reads,
                 fragment: true,
                 built_from,
@@ -1884,10 +1888,10 @@ fn writes_invalidated(
                 .find(|s| crate::effects::database_domain(&s.effect, "write") == Some(shared[0]))
                 .map(|s| s.span.clone())
                 .unwrap_or_else(|| decl.name_span.clone());
-            let mut related = vec![Related {
-                span: hir.decl_span(id),
-                label: format!("`{}` is the command", decl.name),
-            }];
+            let mut related = vec![Related::new(
+                hir.decl_span(id),
+                format!("`{}` is the command", decl.name),
+            )];
             if fragment {
                 let via: Vec<&str> = r
                     .built_from
@@ -1901,21 +1905,22 @@ fn writes_invalidated(
                 } else {
                     format!("which is built from `{}`", via.join("`, `"))
                 };
-                if r.unit == unit {
-                    related.push(Related {
-                        span: hir.decl_span(r.id),
-                        label: if via.is_empty() {
-                            format!("`{}` reads `{}`", r.name, shared.join("`, `"))
-                        } else {
-                            format!(
-                                "`{}` is built from `{}`, which reads `{}`",
-                                r.name,
-                                via.join("`, `"),
-                                shared.join("`, `")
-                            )
-                        },
-                    });
-                }
+                // In its own file, which may be another module's (ADR-0321):
+                // until 2026-10-12 a reader in another file had no note.
+                related.push(Related::in_unit(
+                    r.unit,
+                    r.span.clone(),
+                    if via.is_empty() {
+                        format!("`{}` reads `{}`", r.name, shared.join("`, `"))
+                    } else {
+                        format!(
+                            "`{}` is built from `{}`, which reads `{}`",
+                            r.name,
+                            via.join("`, `"),
+                            shared.join("`, `")
+                        )
+                    },
+                ));
                 let events: Vec<String> = graph
                     .nodes
                     .iter()
@@ -1960,12 +1965,11 @@ fn writes_invalidated(
                 });
                 continue;
             }
-            if r.unit == unit {
-                related.push(Related {
-                    span: hir.decl_span(r.id),
-                    label: format!("`{}` reads `{}`", r.name, shared.join("`, `")),
-                });
-            }
+            related.push(Related::in_unit(
+                r.unit,
+                r.span.clone(),
+                format!("`{}` reads `{}`", r.name, shared.join("`, `")),
+            ));
             let events: Vec<String> = graph
                 .edges
                 .iter()
@@ -2150,14 +2154,11 @@ fn speculation_reconciled(
             ),
             primary_span: s.at.clone(),
             related: vec![
-                Related {
-                    span: s.clause.clone(),
-                    label: "the speculation".to_string(),
-                },
-                Related {
-                    span: hir.decl_span(s.decl),
-                    label: format!("`{}` is the command", decl.name),
-                },
+                Related::new(s.clause.clone(), "the speculation".to_string()),
+                Related::new(
+                    hir.decl_span(s.decl),
+                    format!("`{}` is the command", decl.name),
+                ),
             ],
             explanation: Some(format!(
                 "An optimistic transition shows a speculative value until the command \
@@ -2260,10 +2261,10 @@ fn keys_name_what_is_read(hir: &Hir) -> Vec<Diagnostic> {
                         decl.name, param.name
                     ),
                     primary_span: p.span.clone(),
-                    related: vec![Related {
-                        span: body.expr_span(at),
-                        label: format!("`{}` is read here", param.name),
-                    }],
+                    related: vec![Related::new(
+                        body.expr_span(at),
+                        format!("`{}` is read here", param.name),
+                    )],
                     explanation: Some(format!(
                         "Every call whose `{head}` is equal shares one entry: a cached \
                          answer, or one stream. `{}` reads `{}`, so two calls that differ \
@@ -2365,10 +2366,10 @@ fn handlers_read_their_captures(hir: &Hir) -> Vec<Diagnostic> {
                             decl.name
                         ),
                         primary_span: at,
-                        related: vec![Related {
-                            span: body.expr_span(*d),
-                            label: "what the handler captures".to_string(),
-                        }],
+                        related: vec![Related::new(
+                            body.expr_span(*d),
+                            "what the handler captures".to_string(),
+                        )],
                         explanation: Some(format!(
                             "A resumable handler runs later, in the browser, with what it \
                          captured and nothing else: its captures are written into the \
@@ -2541,10 +2542,10 @@ fn handlers_run_in_the_browser(
                         decl.name, s.effect
                     ),
                     primary_span: s.span.clone(),
-                    related: vec![Related {
-                        span: body.expr_span(lambda),
-                        label: "a resumable handler runs in the browser".to_string(),
-                    }],
+                    related: vec![Related::new(
+                        body.expr_span(lambda),
+                        "a resumable handler runs in the browser".to_string(),
+                    )],
                     explanation: Some(format!(
                         "A resumable handler is loaded and run in the browser when its \
                          element is pressed. It reaches the origin through a command, \
@@ -2604,10 +2605,10 @@ fn built_pages_read_no_parameter(hir: &Hir) -> Vec<Diagnostic> {
                     decl.name, param.name
                 ),
                 primary_span: body.expr_span(e),
-                related: vec![Related {
-                    span: hir.decl_span(id),
-                    label: format!("`{}` is placed at build", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(id),
+                    format!("`{}` is placed at build", decl.name),
+                )],
                 explanation: Some(format!(
                     "`placement build` makes `{}`'s output a file produced before any \
                      request exists, and served as it is to every one. `{}` is supplied by \
@@ -3316,10 +3317,7 @@ fn listener_keys(hir: &Hir, src: &str) -> Vec<Diagnostic> {
                             decl.name, key.name
                         ),
                         primary_span: body.expr_span(arg.value),
-                        related: vec![Related {
-                            span: key.span.clone(),
-                            label: format!("what `{}` is listened for with", key.name),
-                        }],
+                        related: vec![Related::new(key.span.clone(), format!("what `{}` is listened for with", key.name))],
                         explanation: Some(format!(
                             "A listener's argument says which part of `{}`'s key an event's \
                              value must equal: one of its parameters, or `_` for any value. \
@@ -3462,10 +3460,10 @@ fn declared_once(hir: &Hir) -> Vec<Diagnostic> {
                 severity: Severity::Error,
                 message,
                 primary_span: span,
-                related: vec![Related {
-                    span: hir.decl_span(id),
-                    label: format!("`{}` is declared here", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(id),
+                    format!("`{}` is declared here", decl.name),
+                )],
                 explanation: Some(
                     "A name written twice where it is declared says two things, and one of \
                      them is dropped: a body sees one of two parameters, a field access one of \
@@ -3775,10 +3773,10 @@ fn duplicate_ids(
                 out.push(diagnostic(
                     n,
                     format!("`{id}` names every row of a list in `{}`", decl.name),
-                    vec![Related {
-                        span: hir.decl_span(decl_id),
-                        label: format!("`{}` renders this", decl.name),
-                    }],
+                    vec![Related::new(
+                        hir.decl_span(decl_id),
+                        format!("`{}` renders this", decl.name),
+                    )],
                 ));
                 continue;
             }
@@ -3802,10 +3800,10 @@ fn duplicate_ids(
                 out.push(diagnostic(
                     n,
                     format!("`{id}` names two elements of `{}`", decl.name),
-                    vec![Related {
-                        span: body.node_span(first),
-                        label: format!("`{id}` is this element's too"),
-                    }],
+                    vec![Related::new(
+                        body.node_span(first),
+                        format!("`{id}` is this element's too"),
+                    )],
                 ));
             }
         }
@@ -3886,10 +3884,10 @@ fn references(
                     severity: Severity::Error,
                     message,
                     primary_span: attribute,
-                    related: vec![Related {
-                        span: hir.decl_span(decl_id),
-                        label: format!("`{}` renders this", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        hir.decl_span(decl_id),
+                        format!("`{}` renders this", decl.name),
+                    )],
                     explanation: Some(
                         "A browser drops a reference to an id the page does not have, and \
                          says nothing: a field loses its description, a section its name, a \
@@ -4162,10 +4160,10 @@ fn aria_values(
             severity: Severity::Error,
             message,
             primary_span: span,
-            related: vec![Related {
-                span: hir.decl_span(decl_id),
-                label: format!("`{}` renders this", decl.name),
-            }],
+            related: vec![Related::new(
+                hir.decl_span(decl_id),
+                format!("`{}` renders this", decl.name),
+            )],
             explanation: Some(
                 "A browser ignores an ARIA attribute it does not know, a value its \
                  attribute does not take, and a role WAI-ARIA does not define, and says \
@@ -4456,10 +4454,10 @@ fn metadata(hir: &Hir) -> Vec<Diagnostic> {
                 severity: Severity::Error,
                 message,
                 primary_span: body.node_span(n),
-                related: vec![Related {
-                    span: hir.decl_span(decl_id),
-                    label: format!("`{}` renders this", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(decl_id),
+                    format!("`{}` renders this", decl.name),
+                )],
                 explanation: Some(
                     "A page's metadata is what it says of itself to what reads it without \
                      showing it: a search engine's result, a link's preview. The host writes \
@@ -4624,10 +4622,10 @@ fn links(hir: &Hir) -> Vec<Diagnostic> {
                 severity: Severity::Error,
                 message,
                 primary_span: body.node_span(n),
-                related: vec![Related {
-                    span: hir.decl_span(decl_id),
-                    label: format!("`{}` renders this", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(decl_id),
+                    format!("`{}` renders this", decl.name),
+                )],
                 explanation: Some(
                     "Markup is written into the document's body. HTML allows a `<link>` there \
                      only when each of its relations is body-ok: `stylesheet`, `preload`, \
@@ -4696,10 +4694,10 @@ fn canonical_addresses(
                 severity: Severity::Error,
                 message,
                 primary_span: at,
-                related: vec![Related {
-                    span: hir.decl_span(decl_id),
-                    label: format!("`{}`'s canonical address", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(decl_id),
+                    format!("`{}`'s canonical address", decl.name),
+                )],
                 explanation: Some(
                     "A page's canonical address is the one a search engine takes for it \
                      and a link's preview names. It is a page's, named by its declaration \
@@ -4916,10 +4914,10 @@ fn titles(hir: &Hir) -> Vec<Diagnostic> {
                 severity: Severity::Error,
                 message,
                 primary_span: body.node_span(n),
-                related: vec![Related {
-                    span: hir.decl_span(decl_id),
-                    label: format!("`{}` renders this", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(decl_id),
+                    format!("`{}` renders this", decl.name),
+                )],
                 explanation: Some(
                     "A page's title is the page's statement of what it is, and the \
                      host writes it into the document's head from the page's values. \
@@ -4968,10 +4966,10 @@ fn titles(hir: &Hir) -> Vec<Diagnostic> {
                 Some(t) => body.node_span(t),
                 None => hir.decl_span(decl_id),
             },
-            related: vec![Related {
-                span: view,
-                label: format!("`{}`'s view, at whose top its title is written", decl.name),
-            }],
+            related: vec![Related::new(
+                view,
+                format!("`{}`'s view, at whose top its title is written", decl.name),
+            )],
             explanation: Some(
                 "A screen reader says a page's title first, and a person tells pages \
                  apart by it, in tabs, history and bookmarks. A page that states none is \
@@ -5038,10 +5036,10 @@ fn comment_as_text(hir: &Hir) -> Vec<Diagnostic> {
                     severity: Severity::Error,
                     message: format!("`{shown}` reads as a comment, and the page would show it"),
                     primary_span: at.start + start..at.start + start + shown.len(),
-                    related: vec![Related {
-                        span: hir.decl_span(decl_id),
-                        label: format!("`{}` renders this", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        hir.decl_span(decl_id),
+                        format!("`{}` renders this", decl.name),
+                    )],
                     explanation: Some(
                         "In markup, `//` and `/*` begin no comment: what follows is the \
                          page's text, as in HTML and JSX. Until 2026-10-03 such a line \
@@ -5152,10 +5150,10 @@ fn code_in_markup(hir: &Hir) -> Vec<Diagnostic> {
                     severity: Severity::Error,
                     message,
                     primary_span: span,
-                    related: vec![Related {
-                        span: hir.decl_span(decl_id),
-                        label: format!("`{}` renders this", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        hir.decl_span(decl_id),
+                        format!("`{}` renders this", decl.name),
+                    )],
                     explanation: Some(
                         "A view renders into a page that loads the platform's runtime after \
                          the view's markup, by a relative URL; a `<base>` element anywhere in \
@@ -5240,10 +5238,10 @@ fn code_in_markup(hir: &Hir) -> Vec<Diagnostic> {
                     severity: Severity::Error,
                     message,
                     primary_span: span,
-                    related: vec![Related {
-                        span: hir.decl_span(decl_id),
-                        label: format!("`{}` renders this", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        hir.decl_span(decl_id),
+                        format!("`{}` renders this", decl.name),
+                    )],
                     explanation: Some(
                         "The renderer escapes a value by where it sits: text, an attribute, a \
                          URL, a style. A script, an inline handler, a `srcdoc` document and a \
@@ -5377,10 +5375,10 @@ fn view_elements(
                     severity: Severity::Error,
                     message,
                     primary_span: body.node_span(n),
-                    related: vec![Related {
-                        span: hir.decl_span(decl_id),
-                        label: format!("`{}` renders this", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        hir.decl_span(decl_id),
+                        format!("`{}` renders this", decl.name),
+                    )],
                     explanation: Some(
                         "A view used in another is composed when the page is built: its \
                          markup is written where it is used, and its parameters read as the \
@@ -5428,10 +5426,10 @@ fn view_elements(
                 severity: Severity::Error,
                 message,
                 primary_span: body.node_span(n),
-                related: vec![Related {
-                    span: hir.decl_span(decl_id),
-                    label: format!("`{}` renders this", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(decl_id),
+                    format!("`{}` renders this", decl.name),
+                )],
                 explanation: Some(
                     "HTML lowercases every tag it parses, so an element named with a capital \
                      letter is a view. Until 2026-09-26 one built as an unknown HTML element: \
@@ -5601,10 +5599,10 @@ fn sources_give_what_is_asked(
         severity: Severity::Error,
         message,
         primary_span: span,
-        related: vec![Related {
-            span: source.span.clone(),
-            label: format!("`{}` states what it guarantees here", source.name),
-        }],
+        related: vec![Related::new(
+            source.span.clone(),
+            format!("`{}` states what it guarantees here", source.name),
+        )],
         explanation: Some(explanation.to_string()),
         repairs: vec![Repair {
             description: repair,
@@ -5930,10 +5928,10 @@ fn named_roots_respect_their_context(
                     performed.join(", ")
                 ),
                 primary_span: body.expr_span(root.root),
-                related: vec![Related {
-                    span: policy.span.clone(),
-                    label: "declared here".to_string(),
-                }],
+                related: vec![Related::new(
+                    policy.span.clone(),
+                    "declared here".to_string(),
+                )],
                 explanation: Some(
                     "An optimistic transition is a pure function from a resource's current \
                      value to its speculative one. It runs on the client, before the round \
@@ -6007,10 +6005,7 @@ fn derived_values_are_pure(
                     decl.name, source.effect
                 ),
                 primary_span: source.span.clone(),
-                related: vec![Related {
-                    span: region,
-                    label: "this value is `derived`".to_string(),
-                }],
+                related: vec![Related::new(region, "this value is `derived`".to_string())],
                 explanation: Some(format!(
                     "A `derived` value is computed from other values, and recomputed when \
                      they change, so it performs nothing (charter §7.5). {}.",
@@ -6164,10 +6159,10 @@ fn target_is_not_a_resource_entry(
             decl.name
         ),
         primary_span: body.expr_span(target.root),
-        related: vec![Related {
-            span: policy.span.clone(),
-            label: "declared here".to_string(),
-        }],
+        related: vec![Related::new(
+            policy.span.clone(),
+            "declared here".to_string(),
+        )],
         explanation: Some(
             "An optimistic clause names the resource ENTRY it speculatively updates — \
              `Cart(current_session())`, not `Cart`. Two entries can have the same type, so a \
@@ -6260,10 +6255,10 @@ fn emitted_no_value(
         severity: Severity::Error,
         message: format!("`emits {event}` is given no value{at}: `_` is none"),
         primary_span: body.expr_span(e),
-        related: vec![Related {
-            span: hir.decl_span(decl_id_of(hir, decl)),
-            label: format!("written in `emits` on `{}`", decl.name),
-        }],
+        related: vec![Related::new(
+            hir.decl_span(decl_id_of(hir, decl)),
+            format!("written in `emits` on `{}`", decl.name),
+        )],
         explanation: Some(
             "A listener matches an event by the values it carries, so `emits` gives it \
              one at each of its parameters, as the command computes it. `_` is a value \
@@ -6341,10 +6336,10 @@ fn unresolved_in_policy_term(
         severity: Severity::Error,
         message: format!("`{name}` does not resolve"),
         primary_span: body.expr_span(id),
-        related: vec![Related {
-            span: hir.decl_span(decl_id_of(hir, decl)),
-            label: format!("written in `{policy}` on `{}`", decl.name),
-        }],
+        related: vec![Related::new(
+            hir.decl_span(decl_id_of(hir, decl)),
+            format!("written in `{policy}` on `{}`", decl.name),
+        )],
         explanation: Some(format!(
             "An `{policy}` value is executable code: it runs on the client, and \
              its names come from lexical scope like any other term's. `{name}` \
@@ -6410,10 +6405,10 @@ fn unresolved_bare_call(hir: &Hir, decl: &Decl, body: &Body, id: ExprId, path: &
         severity: Severity::Error,
         message: format!("`{path}` does not resolve"),
         primary_span: body.expr_span(id),
-        related: vec![Related {
-            span: hir.decl_span(decl_id_of(hir, decl)),
-            label: format!("called inside `{}`", decl.name),
-        }],
+        related: vec![Related::new(
+            hir.decl_span(decl_id_of(hir, decl)),
+            format!("called inside `{}`", decl.name),
+        )],
         explanation: Some(format!(
             "`{path}` names nothing this file can see. Assumption A-009: term \
              names are not ambient — only the Effect namespace is — so a \
@@ -6455,7 +6450,16 @@ fn resolve_diagnostic(e: &crate::resolve::ResolveError) -> Diagnostic {
         ),
         K::PrivateAccess { module, name } => (
             codes::PRIVATE_ACCESS,
-            format!("make `{name}` public in `{module}`, or stop importing it"),
+            // Not "make it public": `public` says whose data a declaration
+            // holds, and a user's query made public would be everyone's
+            // (ADR-0324).
+            format!("drop `private` from `{name}` in `{module}`, or stop importing it"),
+        ),
+        K::PrivateData { .. } => (
+            codes::PRIVATE_DATA,
+            "write `user` for the user's, `session` for the session's, or `public` for \
+             everyone's; each is importable"
+                .to_string(),
         ),
         K::ImportCycle { .. } => (
             codes::IMPORT_CYCLE,
@@ -6471,10 +6475,10 @@ fn resolve_diagnostic(e: &crate::resolve::ResolveError) -> Diagnostic {
         severity: Severity::Error,
         message: e.kind.message(),
         primary_span: e.span.clone(),
-        related: vec![Related {
-            span: e.span.clone(),
-            label: "resolved against the workspace module graph".to_string(),
-        }],
+        related: vec![Related::new(
+            e.span.clone(),
+            "resolved against the workspace module graph".to_string(),
+        )],
         explanation: Some(
             "Names are visible through lexical scope, module membership, or an \
              explicit import — and through nothing else. External implementation \
@@ -7274,10 +7278,10 @@ fn exhaustiveness(
                 "no `{ty_name}` reaches this arm: the arms before it take every value it matches"
             ),
             primary_span: arm.clone(),
-            related: vec![Related {
-                span: body.expr_span(scrutinee),
-                label: format!("this has type `{ty_name}`"),
-            }],
+            related: vec![Related::new(
+                body.expr_span(scrutinee),
+                format!("this has type `{ty_name}`"),
+            )],
             explanation: Some(
                 "A match tries its arms in order, so an arm whose values the arms before it \
                  already take never runs."
@@ -7309,10 +7313,10 @@ fn exhaustiveness(
         severity: Severity::Error,
         message: format!("match on `{ty_name}` is not exhaustive"),
         primary_span: span.clone(),
-        related: vec![Related {
-            span: body.expr_span(scrutinee),
-            label: format!("this has type `{ty_name}`"),
-        }],
+        related: vec![Related::new(
+            body.expr_span(scrutinee),
+            format!("this has type `{ty_name}`"),
+        )],
         explanation: Some(match subject.program.ctors_of(&subject.ty) {
             Some(ctors) if !subject.ty.is_infinite() => format!(
                 "`{ty_name}` has {} constructor(s), and {} value(s) no arm takes. \
@@ -7364,10 +7368,10 @@ fn constructor_arity(body: &Body, match_id: ExprId, subject: &Subject, a: Arity)
             a.ctor, a.written, a.declared
         ),
         primary_span: a.span,
-        related: vec![Related {
-            span: body.expr_span(match_id),
-            label: format!("matching on `{}`", subject.name),
-        }],
+        related: vec![Related::new(
+            body.expr_span(match_id),
+            format!("matching on `{}`", subject.name),
+        )],
         explanation: Some(format!(
             "A constructor pattern binds its constructor's fields, so the count \
              is not a style choice — `{}` carries {} of them. Writing a different \
@@ -7399,10 +7403,10 @@ fn foreign_constructor(body: &Body, match_id: ExprId, subject: &Subject, f: Fore
         severity: Severity::Error,
         message: format!("`{}` is not a constructor of `{}`", f.constructor, f.ty),
         primary_span: f.span,
-        related: vec![Related {
-            span: body.expr_span(match_id),
-            label: format!("matching on `{}`", subject.name),
-        }],
+        related: vec![Related::new(
+            body.expr_span(match_id),
+            format!("matching on `{}`", subject.name),
+        )],
         explanation: Some(format!(
             "A constructor pattern matches the values its constructor builds, and \
              no value of `{}` is built by `{}`. The arm can never match. Read as \
@@ -7707,10 +7711,10 @@ fn unread(hir: &Hir, src: &str) -> Vec<Diagnostic> {
                 severity: Severity::Error,
                 message: format!("`{text}` is {what} this compiler does not read"),
                 primary_span: span,
-                related: vec![Related {
-                    span: hir.decl_span(id),
-                    label: format!("in `{}`", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(id),
+                    format!("in `{}`", decl.name),
+                )],
                 explanation: Some(
                     "The parser accepted this text, and the compiler has no meaning for it. \
                      Until ADR-0200 such an expression was typed as any type at all, and \
@@ -7904,10 +7908,10 @@ fn to_diagnostic(v: ScopeViolation, clause: Option<String>) -> Diagnostic {
         severity: Severity::Error,
         message: v.message,
         primary_span: v.span,
-        related: vec![Related {
-            span: v.origin_span,
-            label: "the handle is created here".to_string(),
-        }],
+        related: vec![Related::new(
+            v.origin_span,
+            "the handle is created here".to_string(),
+        )],
         // The explanation says WHY the invariant exists; the repair says what
         // to do instead. Emitting the same sentence twice reads as a bug.
         explanation: Some(match v.code {
@@ -7949,8 +7953,9 @@ pub(crate) fn label_of(decl: &Decl) -> Label {
     // the developer must be shown.
     match decl.visibility.as_deref() {
         Some("session") => Label::session("SessionId"),
-        // `user`, importable, and `private`, not: each the user's.
-        Some("private") | Some("user") => Label::user("UserId"),
+        // `user`, the user's (track `store-accounts`). `private` says only
+        // that a declaration is not importable (ADR-0324).
+        Some("user") => Label::user("UserId"),
         _ => Label::public(),
     }
 }
@@ -8076,17 +8081,17 @@ fn privacy_and_placement(
                 message: format!("`{}` is {label} and declares a shared cache", decl.name),
                 primary_span: cache.span.clone(),
                 related: vec![match param {
-                    Some(p) => Related {
-                        span: p.span.clone(),
-                        label: format!(
+                    Some(p) => Related::new(
+                        p.span.clone(),
+                        format!(
                             "`{}` is {label}, so what `{}` makes from it is",
                             p.name, decl.name
                         ),
-                    },
-                    None => Related {
-                        span: hir.decl_span(decl_id_of(hir, decl)),
-                        label: format!("`{}` is labelled {label} here", decl.name),
-                    },
+                    ),
+                    None => Related::new(
+                        hir.decl_span(decl_id_of(hir, decl)),
+                        format!("`{}` is labelled {label} here", decl.name),
+                    ),
                 }],
                 explanation: Some(format!(
                     "A shared cache may contain only `Public` values, because every \
@@ -8297,10 +8302,10 @@ fn privacy_and_placement(
         severity: Severity::Error,
         message: format!("`{}` cannot run in any world: {because}", decl.name),
         primary_span: span,
-        related: vec![Related {
-            span: hir.decl_span(decl_id_of(hir, decl)),
-            label: because.trim_start_matches("it ").to_string(),
-        }],
+        related: vec![Related::new(
+            hir.decl_span(decl_id_of(hir, decl)),
+            because.trim_start_matches("it ").to_string(),
+        )],
         explanation: Some(format!(
             "Placement is derived from what a body does, not chosen. Each world \
              was ruled out:\n{}",
@@ -8964,14 +8969,8 @@ fn privacy_sinks(
                 message: format!("cannot log a `{label}` value at privacy level `Public`"),
                 primary_span: span,
                 related: vec![
-                    Related {
-                        span: origin,
-                        label: format!("`{name}` becomes {label} here"),
-                    },
-                    Related {
-                        span: level.1.clone(),
-                        label: format!("`{}` is declared here", level.0),
-                    },
+                    Related::new(origin, format!("`{name}` becomes {label} here")),
+                    Related::new(level.1.clone(), format!("`{}` is declared here", level.0)),
                 ],
                 explanation: Some(explanation),
                 repairs: vec![Repair {
@@ -9003,16 +9002,11 @@ fn privacy_sinks(
             ),
             primary_span: body.expr_span(*callee),
             related: vec![
-                Related {
-                    span: body.expr_span(*cause),
-                    label: format!(
-                        "this is {condition}, and whether the line is logged depends on it"
-                    ),
-                },
-                Related {
-                    span: level.1.clone(),
-                    label: format!("`{}` is declared here", level.0),
-                },
+                Related::new(
+                    body.expr_span(*cause),
+                    format!("this is {condition}, and whether the line is logged depends on it"),
+                ),
+                Related::new(level.1.clone(), format!("`{}` is declared here", level.0)),
             ],
             explanation: Some(format!(
                 "A public log's contents may be read by anyone, and so may the \
@@ -9142,10 +9136,10 @@ fn privacy_flow(
                 severity: Severity::Error,
                 message: format!("`{name}` is Secret<{cap}> and is rendered into markup"),
                 primary_span: body.expr_span(*part),
-                related: vec![Related {
-                    span: origin.clone(),
-                    label: format!("`{name}` becomes Secret<{cap}> here"),
-                }],
+                related: vec![Related::new(
+                    origin.clone(),
+                    format!("`{name}` becomes Secret<{cap}> here"),
+                )],
                 explanation: Some(format!(
                     "Markup is sent to the browser. Secret<{cap}> may exist only in \
                      the origin world, so rendering it moves it across a boundary \
@@ -9231,10 +9225,10 @@ fn privacy_flow(
             missing.join(" and ")
         ),
         primary_span: span,
-        related: vec![Related {
-            span: hir.decl_span(decl_id_of(hir, decl)),
-            label: format!("the result depends on {label}"),
-        }],
+        related: vec![Related::new(
+            hir.decl_span(decl_id_of(hir, decl)),
+            format!("the result depends on {label}"),
+        )],
         explanation: Some(format!(
             "Two callers with different {} produce different results, and this key \
              cannot tell them apart — so the first caller's value is served to the \
@@ -9332,10 +9326,10 @@ fn nesting(
                     severity: Severity::Error,
                     message,
                     primary_span: body.node_span(c),
-                    related: vec![Related {
-                        span: body.node_span(id),
-                        label: format!("`<{tag}>` starts here"),
-                    }],
+                    related: vec![Related::new(
+                        body.node_span(id),
+                        format!("`<{tag}>` starts here"),
+                    )],
                     explanation: Some(format!(
                         "`<{tag}>` accepts only {}: HTML's content model, which validators and \
                          assistive technology read a page by. A block's rows are the element's \
@@ -9482,10 +9476,10 @@ fn loop_keys(hir: &Hir, id: crate::hir::DeclId, decl: &Decl, out: &mut Vec<Diagn
             ),
             // The key, where it is written (ADR-0242).
             primary_span: key_span.clone(),
-            related: vec![Related {
-                span: hir.decl_span(id),
-                label: format!("`{}` renders this", decl.name),
-            }],
+            related: vec![Related::new(
+                hir.decl_span(id),
+                format!("`{}` renders this", decl.name),
+            )],
             explanation: Some(
                 "A key identifies each element of the list, so it is read from the element. \
                  Until 2026-09-26 a key whose head was another name keyed on a field of the \
@@ -9652,10 +9646,10 @@ fn template_blocks(
     let types = crate::infer::Types::of_decl(sigs, hir, id, body);
     let at = hir.decl_span(id);
     let related = || {
-        vec![Related {
-            span: at.clone(),
-            label: format!("`{}` renders this", decl.name),
-        }]
+        vec![Related::new(
+            at.clone(),
+            format!("`{}` renders this", decl.name),
+        )]
     };
     let malformed = |span: hir::Span, message: String| Diagnostic {
         code: crate::codes::MALFORMED_TEMPLATE_BLOCK.id,
@@ -10097,10 +10091,10 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
                         "`{keyword}` is attributed to `{target}`, which names no declaration"
                     ),
                     primary_span: body.expr_span(id),
-                    related: vec![Related {
-                        span: hir.decl_span(decl_id_of(hir, decl)),
-                        label: format!("`{}` opens the escape hatch here", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        hir.decl_span(decl_id_of(hir, decl)),
+                        format!("`{}` opens the escape hatch here", decl.name),
+                    )],
                     explanation: Some(
                         "An attribution target names who is answerable for the \
                          consequence. One that resolves to nothing reads as reviewed \
@@ -10139,10 +10133,10 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
             severity: Severity::Error,
             message: format!("`{keyword}` requires {}", missing.join(" and ")),
             primary_span: body.expr_span(id),
-            related: vec![Related {
-                span: hir.decl_span(decl_id_of(hir, decl)),
-                label: format!("`{}` opens an escape hatch here", decl.name),
-            }],
+            related: vec![Related::new(
+                hir.decl_span(decl_id_of(hir, decl)),
+                format!("`{}` opens an escape hatch here", decl.name),
+            )],
             explanation: Some(
                 "An escape hatch is a promise that the compiler's rule is wrong here \
                  and someone checked. The audit record has two halves: a written \
@@ -10192,10 +10186,10 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
                     message: "`#each` over a mutable collection requires a key expression"
                         .to_string(),
                     primary_span: body.node_span(id),
-                    related: vec![Related {
-                        span: hir.decl_span(decl_id_of(hir, decl)),
-                        label: format!("`{}` renders this list", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        hir.decl_span(decl_id_of(hir, decl)),
+                        format!("`{}` renders this list", decl.name),
+                    )],
                     explanation: Some(
                         "Without a stable key, reordering cannot preserve element identity, \
                          focus, or state: the renderer matches by position, so the third row \
@@ -10253,10 +10247,10 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
                                 h.name
                             ),
                             primary_span: h.span.clone(),
-                            related: vec![Related {
-                                span: body.node_span(id),
-                                label: format!("`<{tag}>` is not an interactive element"),
-                            }],
+                            related: vec![Related::new(
+                                body.node_span(id),
+                                format!("`<{tag}>` is not an interactive element"),
+                            )],
                             explanation: Some(
                                 "A pointer handler on an inert element is unreachable by \
                                  keyboard and invisible to assistive technology. The element \
@@ -10303,10 +10297,10 @@ fn markup_rules(hir: &Hir, decl: &Decl, out: &mut Vec<Diagnostic>) {
                     if labelled_but_for_its_id(body, &order, id, attrs) {
                         continue;
                     }
-                    let mut related = vec![Related {
-                        span: hir.decl_span(decl_id_of(hir, decl)),
-                        label: format!("`{}` renders this control", decl.name),
-                    }];
+                    let mut related = vec![Related::new(
+                        hir.decl_span(decl_id_of(hir, decl)),
+                        format!("`{}` renders this control", decl.name),
+                    )];
                     related.extend(unnamed_because(body, &order, id, &decl.name));
                     out.push(Diagnostic {
                         code: "PW5014",
@@ -10632,12 +10626,7 @@ fn unnamed_because(
         return None;
     };
     let attr = |k: &str| attrs.iter().find(|a| a.name == k);
-    let note = |a: &hir::Attr, label: String| {
-        Some(Related {
-            span: a.span.clone(),
-            label,
-        })
-    };
+    let note = |a: &hir::Attr, label: String| Some(Related::new(a.span.clone(), label));
     if let Some(a) = attr("aria-label") {
         return note(a, "this `aria-label` is blank".to_string());
     }
@@ -10675,10 +10664,7 @@ fn unnamed_because(
             Some(_) => "this `<label>` names the first control inside it, which is another",
             None => "which control this `<label>` names depends on what renders inside it",
         };
-        return Some(Related {
-            span: body.node_span(l),
-            label: why.to_string(),
-        });
+        return Some(Related::new(body.node_span(l), why.to_string()));
     }
     let a = attr("id")?;
     let Some(id) = static_attr(attrs, "id") else {
@@ -10707,10 +10693,10 @@ fn unnamed_because(
             if tag == "label" && static_attr(attrs, "for") == Some(id))
     });
     match empty {
-        Some(l) => Some(Related {
-            span: body.node_span(l),
-            label: format!("this `<label for=\"{id}\">` has no text"),
-        }),
+        Some(l) => Some(Related::new(
+            body.node_span(l),
+            format!("this `<label for=\"{id}\">` has no text"),
+        )),
         None => note(
             a,
             format!("no `<label for=\"{id}\">` in `{decl}` names this `id`"),
@@ -10829,10 +10815,10 @@ fn effect_rows(
                 source.effect
             ),
             primary_span: source.span.clone(),
-            related: vec![Related {
-                span: hir.decl_span(decl_id_of(hir, decl)),
-                label: format!("`{}` declares this frame", decl.name),
-            }],
+            related: vec![Related::new(
+                hir.decl_span(decl_id_of(hir, decl)),
+                format!("`{}` declares this frame", decl.name),
+            )],
             explanation: Some(format!("{why}. The chain: {}.", source.via.describe())),
             repairs: vec![Repair {
                 description: "move it to the phase that owns it — read in `measure`, \
@@ -10891,10 +10877,10 @@ fn effect_rows(
                 ),
             },
             primary_span: source.span.clone(),
-            related: vec![Related {
-                span: hir.decl_span(decl_id_of(hir, decl)),
-                label: format!("`{}` is a {}", decl.name, context_noun(decl)),
-            }],
+            related: vec![Related::new(
+                hir.decl_span(decl_id_of(hir, decl)),
+                format!("`{}` is a {}", decl.name, context_noun(decl)),
+            )],
             explanation: Some(format!(
                 "{why}. The chain: {}. Declaring the effect would not help — the \
                  restriction is about where this runs, not about what it admits to.",
@@ -10944,10 +10930,10 @@ fn effect_rows(
                     decl.name, source.effect
                 ),
                 primary_span: source.span.clone(),
-                related: vec![Related {
-                    span: region.clone(),
-                    label: "the template computes this value".to_string(),
-                }],
+                related: vec![Related::new(
+                    region.clone(),
+                    "the template computes this value".to_string(),
+                )],
                 explanation: Some(format!(
                     "A value a template computes is a function of the values it reads: the \
                      compiler lifts it out, and a host runs it when the page renders and \
@@ -10992,10 +10978,10 @@ fn effect_rows(
                     source.effect
                 ),
                 primary_span: source.span.clone(),
-                related: vec![Related {
-                    span: hir.decl_span(decl_id_of(hir, decl)),
-                    label: format!("`{}` declares no capability", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(decl_id_of(hir, decl)),
+                    format!("`{}` declares no capability", decl.name),
+                )],
                 explanation: Some(format!(
                     "Escaping is the default, so reaching `{}` is a decision rather \
                      than a detail — untrusted input reaching `{}` is an XSS sink. \
@@ -11090,10 +11076,10 @@ fn effect_rows(
                     source.effect
                 ),
                 primary_span: source.span.clone(),
-                related: vec![Related {
-                    span: hir.decl_span(decl_id_of(hir, decl)),
-                    label: format!("`{}` is placed in {world:?}", decl.name),
-                }],
+                related: vec![Related::new(
+                    hir.decl_span(decl_id_of(hir, decl)),
+                    format!("`{}` is placed in {world:?}", decl.name),
+                )],
                 explanation: Some(format!(
                     "The {world} world grants no {family} capabilities; only {} can. \
                      {}. The row does not name this effect, so nothing said so \
@@ -11134,10 +11120,10 @@ fn effect_rows(
                 decl.name, source.effect
             ),
             primary_span: source.span.clone(),
-            related: vec![Related {
-                span: hir.decl_span(decl_id_of(hir, decl)),
-                label: format!("`{}` declares its effects here", decl.name),
-            }],
+            related: vec![Related::new(
+                hir.decl_span(decl_id_of(hir, decl)),
+                format!("`{}` declares its effects here", decl.name),
+            )],
             explanation: Some(format!(
                 "An effect row is a claim about what a body does, and a caller \
                  relies on it. {}. An effect that reaches a caller through a \

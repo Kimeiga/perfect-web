@@ -62,7 +62,7 @@ public query Trimmed(text: String) -> String { String.trim(text) }
 public query Lower(text: String) -> String { String.to_lower_ascii(text) }
 
 public query Inside(text: String, part: String) -> Bool {
-    String.contains(text, part) & String.starts_with(text, part) | String.ends_with(text, part)
+    (String.contains(text, part) & String.starts_with(text, part)) | String.ends_with(text, part)
 }
 
 public query Joined(parts: List<String>, separator: String) -> String { String.join(parts, separator) }

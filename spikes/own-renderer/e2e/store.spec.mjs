@@ -74,9 +74,10 @@ test.describe("the document the server produced", () => {
     // the cart in the layout the page is shown in (ADR-0303): 2. And where
     // deliveries go (track `store-accounts`): whether an address is chosen,
     // its block 2, and whether the store reaches it, its block 2 = 4. And
-    // the store's cuisine (track store-search): 2. And whether it is open
-    // (track store-hours): 2. 82 in all.
-    expect(shape.anchors).toBe(82);
+    // the cart's link, "Checkout" with its subtotal while the cart holds a
+    // line (ADR-0323): its block 2. And the store's cuisine (ADR-0308,
+    // amended): 2. And whether it is open (track store-hours): 2. 84 in all.
+    expect(shape.anchors).toBe(84);
     // Three Add buttons and one Clear button. The Clear button exists so that
     // E7-L has two handlers to tell apart — see `lazy-handler.spec.mjs`. And
     // the cart's empty message, whose `hidden` reads the cart (ADR-0172).
@@ -166,9 +167,16 @@ test.describe("the update touches only what changed", () => {
     // is `PartAddress::key` — schema, path, part — because the browser index
     // and `pw_document` must spell it the same way or a patch finds nothing.
     const at = (id) => `${pw.parts.schema}/|${id}`;
+    // Each block its lines decide: the fees, and the link to the cart's page,
+    // which says "Checkout" with the subtotal once the cart holds a line
+    // (ADR-0323). Each shows another arm, so each is rendered again whole.
+    const blocks = pw.parts.parts
+      .filter((p) => p.kind === "conditional" && p.value === "cart.lines")
+      .map((p) => `${at(p.id)}:replace_range`);
+    expect(blocks).toHaveLength(2);
     // The cart's parts, each what reads the cart (ADR-0172): its count, its
-    // subtotal, its first line, its empty message hidden, its fees shown;
-    // and the count the page's layout shows of it (ADR-0303).
+    // subtotal, its first line, its empty message hidden, its blocks; and
+    // the count the page's layout shows of it (ADR-0303).
     expect([...pw.updated].sort(), "exactly the cart's parts").toEqual(
       [
         at(part("text", "cart~StoreLayout.line_count")),
@@ -176,7 +184,7 @@ test.describe("the update touches only what changed", () => {
         at(part("text", "cart.subtotal.display")),
         `${at(part("each", "cart.lines"))}:insert_before`,
         `${at(part("boolean_attribute", "cart.lines"))}:hidden`,
-        `${at(part("conditional", "cart.lines"))}:replace_range`,
+        ...blocks,
       ].sort(),
     );
   });

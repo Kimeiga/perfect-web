@@ -1036,6 +1036,9 @@ impl<'a> P<'a> {
         }
         let cp = self.b.checkpoint();
         self.expr_lhs(cp);
+        // The operator a chain's `|` or `&` is, the first one written, and
+        // whether its mixing is already refused: see below.
+        let mut logical: Option<(Kind, bool)> = None;
         loop {
             if self.at_eof() {
                 break;
@@ -1082,6 +1085,26 @@ impl<'a> P<'a> {
             };
             if lbp < min_bp {
                 break;
+            }
+            // **`|` and `&` have no precedence between them** (ADR-0322): a
+            // chain that mixes them is refused, once, where the mix begins,
+            // as Carbon refuses `and` beside `or`. Parsed left to right, as
+            // one power, `a | b & c` was `(a | b) & c`, where most languages
+            // read `a | (b & c)`: W9's "open until" read one way and ran the
+            // other (track store-hours, 2026-10-12).
+            if matches!(k, Kind::Amp | Kind::Pipe) {
+                match logical {
+                    Some((first, false)) if first != k => {
+                        self.error_help(
+                            "PW0031",
+                            "`|` and `&` are mixed without parentheses, and neither binds tighter",
+                            "write `(a | b) & c` or `a | (b & c)`, whichever is meant",
+                        );
+                        logical = Some((first, true));
+                    }
+                    Some(_) => {}
+                    None => logical = Some((k, false)),
+                }
             }
             self.b.start_at(cp, K::BinaryExpr);
             self.bump(); // operator
@@ -2415,6 +2438,15 @@ impl<'a> P<'a> {
         {
             return false;
         }
+        // **`user` before a declaration's keyword begins the declaration**
+        // (ADR-0318's contextual visibility; ADR-0324): until 2026-10-12, after
+        // a declaration with no body, `fn owner(..) host ".."`, it was read as
+        // that declaration's unknown policy `user`, and the query it opened
+        // as the function's clauses. No program had written one there: the
+        // feed's queries said `private`, which is reserved.
+        if self.at_visibility() {
+            return false;
+        }
         // A value must follow, on this line. An operator is not one: `a + b`
         // in a query's body is an expression. Until 2026-09-25 only `<` was
         // excluded, so `{ a + b }` was an unknown policy `a` with the value
@@ -2610,7 +2642,10 @@ impl<'a> P<'a> {
                         // whose value was `none impakt layout_write`, so the
                         // clause the parser was supposed to reject disappeared
                         // into the one it accepted.
-                        || self.at_unknown_policy())
+                        || self.at_unknown_policy()
+                        // And a declaration a contextual `user` opens
+                        // (ADR-0324): `user query` after `host ".."`.
+                        || self.at_visibility())
                 {
                     break;
                 }
@@ -4045,6 +4080,67 @@ mod tests {
         parse_ok(
             "fn f(b: Bool) -> Int {\n    match b {\n        true => 1,\n        false => 0,\n    }\n}\n",
         );
+    }
+
+    #[test]
+    fn or_and_and_mixed_without_parentheses_is_refused() {
+        // ADR-0322: `|` and `&` have no precedence between them. Until
+        // 2026-10-12 they were one power, left to right, and `a | b & c` was
+        // `(a | b) & c` (W9's finding). Refused once a chain, where the mix
+        // begins.
+        let query = |body: &str| {
+            format!(
+                "public query Q(a: Bool, b: Bool, c: Bool, d: Bool, e: Bool) -> Bool {{ {body} }}\n"
+            )
+        };
+        for (body, mix) in [
+            ("a | b & c", " & "),
+            ("a & b | c", " | "),
+            ("a == b | c > d & e", " & "),
+            ("a | b | c & d", " & "),
+            ("a | b & c | d", " & "),
+            ("a | b & c & d", " & "),
+        ] {
+            let src = query(body);
+            let p = parse_tree(&src);
+            assert_lossless(&src, &p);
+            let found: Vec<_> = p.errors.iter().map(|e| (e.code, e.span.start)).collect();
+            let at = src.find(mix).expect("the mix") + 1;
+            assert_eq!(found, vec![("PW0031", at)], "{body}");
+        }
+        // Each grouping written out, a chain of one, a comparison inside one,
+        // and a lambda's body of its own.
+        for body in [
+            "(a | b) & c",
+            "a | (b & c)",
+            "a | b | c",
+            "a & b & c",
+            "!(a & b) | c",
+            "a == b | c",
+            "List.any([a], x => x & b) | c",
+        ] {
+            let src = query(body);
+            let p = parse_ok(&src);
+            assert_lossless(&src, &p);
+        }
+    }
+
+    #[test]
+    fn a_user_declaration_after_one_with_no_body_is_its_own() {
+        // ADR-0324: `user` before a declaration's keyword begins the
+        // declaration, after a function with no body too. Until 2026-10-12 it
+        // was that function's unknown policy `user`, and the query it opened
+        // the `host` clause's value (the feed, once its queries said `user`).
+        let src = "fn owner(post: Int) -> Int !{}\n    host \"feed:data/posts#author\"\n\n\
+                   // the reader's\nuser query Mine(reader: Int) -> Int\n    freshness 0.seconds\n\
+                   {\n    reader\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let decls: Vec<_> = p.green.children().map(|n| n.kind()).collect();
+        assert_eq!(decls.len(), 2, "two declarations: {decls:?}");
+        // Control: the same after `private`, which is reserved.
+        let src = src.replace("user query", "private query");
+        parse_ok(&src);
     }
 
     #[test]

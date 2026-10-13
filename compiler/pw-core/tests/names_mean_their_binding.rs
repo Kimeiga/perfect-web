@@ -185,12 +185,13 @@ fn a_handlers_call_through_a_local_is_no_commands_request() {
     assert!(browser(&found), "{found:#?}");
 }
 
-/// A shared query whose body calls `mine`: the module's `private fn mine`,
-/// a value only its reader may see, or a local of that name.
+/// A shared query whose body calls `mine`: the module's `user fn mine`,
+/// a value only its reader may see (`private` until ADR-0324), or a local
+/// of that name.
 fn shared_private(local: bool) -> String {
     let own = if local { "    let mine = fn() 2\n" } else { "" };
     format!(
-        "module t\n\nprivate fn mine() -> Int {{\n    1\n}}\n\n\
+        "module t\n\nuser fn mine() -> Int {{\n    1\n}}\n\n\
          public query Shown() -> Int\n    freshness   0.seconds\n    \
          consistency snapshot\n    cache       shared\n{{\n{own}    mine()\n}}\n"
     )
@@ -199,7 +200,7 @@ fn shared_private(local: bool) -> String {
 #[test]
 fn a_call_through_a_local_is_labelled_as_the_local() {
     // A declaration's label joins the labels its body's calls declare: a
-    // local `mine` is not the module's `private fn mine`.
+    // local `mine` is not the module's `user fn mine`.
     let private = |found: &[String]| found.iter().any(|d| d.starts_with("PW5001"));
     let found = reported(&[("t.pw", &shared_private(true))]);
     assert!(!private(&found), "{found:#?}");

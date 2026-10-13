@@ -710,20 +710,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
              engines. The integrator's own items here (1, 4, 5, 6) come
              before kiokun's and the infrastructure follow-ups (the owner,
              2026-10-09);
-          3a. **`private` means two things** (W8's finding, 2026-10-09): the
-             user's scope (resume, boundary, the checks) and "not importable"
-             (resolve, PW0023). W8 adds `user`, importable and the user's, as
-             `session` is the session's; whether `private` goes on implying
-             the user's scope or becomes "not importable" alone is the
-             integrator's ruling, a change to every program that says it
-             (the feed's notifications and messages);
-          3c. **a member read inside a block at the top of the page**
-             (found on the way to ADR-0320, 2026-10-12): `{cart.line_count}`
-             in `{#if cart.lines}` is refused at build ("which a host would
-             call per instance"), though a host renders a block at the top
-             once. A host computes such a member once per change, into what
-             the block is rendered with, as a top-level part's; one in a
-             loop's row stays a row read;
+          3a. ~~**`private` means two things**~~ (ADR-0324, merged
+             2026-10-12): `private` is "not importable" alone; the user's
+             scope is `user`'s, and `private` on a declaration that holds
+             data is refused by name (PW0029);
+          3c. ~~**a member read inside a block at the top of the page**~~
+             (ADR-0323, merged 2026-10-12): computed by a host once a
+             change, by its path, into what the block is rendered with;
           3b. ~~**benchmark task T11's patches apply again**~~ (merged
              2026-10-12, track `t11-patches`): each patch made again against
              the store holds' merge changed, and a script that names a
@@ -740,10 +733,21 @@ E14 comes before E11-E13. Its plan, controls and task list are
              text; a plain `<form method="get">` and a link make the
              address. W6's kiokun search box and W9's store search move to
              it;
-          5. **idempotency committed with the writes** (PW0348, ADR-0246's
-             Not claimed), before a payment depends on it: an interaction's
-             answer kept in the transaction that commits its command, in
-             both layers;
+          4b. **a read is a bounded number of statements on PostgreSQL**
+             (the integrator's finding, 2026-10-12): the store's logic is
+             written once over the layer's rows, a store's or a menu's at a
+             time, and on PostgreSQL each is a statement. `place_order`'s
+             reach runs one per line and store, a reader's search one per
+             store it found (each reading every store), and the hours one
+             per store. Every read and command counted (the layer's
+             statements, as Django's `assertNumQueries` and Rails'
+             `assert_queries_count` count them) at the seed and with fifty
+             stores more, pinned and equal at both; rows read by set
+             (`= ANY($1)`), a scan in memory; mutants restore each loop.
+             W9's, after 6b, on the counter W9's search brings;
+          5. ~~**idempotency committed with the writes**~~ (ADR-0325,
+             merged 2026-10-12): an interaction's answer commits in its
+             command's transaction, on both layers, and answers a day;
           6. **checkout**: fees, taxes, a tip and promo codes, in money that
              cannot round silently (`Money` is USD's alone, so no other
              currency, conversion or locale's format, said where it
@@ -777,6 +781,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
             recursive `Json` from a query across the component boundary
             (ADR-0205), so it waits for a page that asks for it; kiokun's
             Difference 13 meanwhile;
+          - **a value computed from two queries** (found by W9's reader's
+            search, 2026-10-12): a page computes from one query's value
+            (ADR-0226), so the store's search, filtered by the reader's
+            reach, is a `user` query whose full-text match is no longer
+            shared. With two, it splits into a shared `Search(q)` and the
+            reader's reach, and the match is kept once for every reader;
           - **one telling path for every page a change reaches** (W9's
             finding, 2026-10-11): a menu change tells the store's pages by
             `broadcast_menu`'s own patches, and every other page by what

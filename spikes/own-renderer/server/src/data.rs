@@ -70,6 +70,21 @@ pub(crate) trait DataLayer: Send + Sync {
         Ok(false)
     }
 
+    /// **Whether it keeps a command's interactions in its own transactions**
+    /// (ADR-0325): a layer whose writes outlive the host, which a restarted
+    /// host or a second one reads, keeps their records beside them. By
+    /// default the host's materializer keeps them, with the rows it commits.
+    fn keeps_interactions(&self) -> bool {
+        false
+    }
+
+    /// **An interaction's committed record** (ADR-0325), recorded at
+    /// `since_ms` or later: the arguments it was sent with, and what it
+    /// answered. A layer that keeps none has none.
+    fn recalled(&self, _key: &str, _since_ms: u64) -> Result<Option<(String, String)>, String> {
+        Ok(None)
+    }
+
     /// **Every operation it supplies**, read from the functions it builds,
     /// not from a list kept beside them.
     fn operations(&self) -> BTreeSet<String> {
@@ -101,13 +116,32 @@ pub(crate) trait Staged {
     /// An error is a commit refused, and nothing of the command is kept.
     ///
     /// [`rows`]: Staged::rows
+    ///
+    /// **An interaction's record** (ADR-0325), where the command has one, is
+    /// committed in the same transaction by a layer that keeps its own
+    /// ([`DataLayer::keeps_interactions`]), and by the host's materializer
+    /// with [`rows`] otherwise.
     fn commit(
         &mut self,
         _events: &[Handed],
         _invalidated: &[Dropped],
+        _interaction: Option<&Recorded<'_>>,
     ) -> Result<Option<Outboxed>, String> {
         Ok(None)
     }
+}
+
+/// **An interaction's record, committed with its command's writes**
+/// (ADR-0325, PW0348): its key (the session, the command and the
+/// interaction), the arguments it was sent with, and what it answered as
+/// ADR-0121 keeps it, at `at_ms` on the host's clock. Those recorded before
+/// `forget_before_ms` are forgotten in the same transaction.
+pub(crate) struct Recorded<'a> {
+    pub key: &'a str,
+    pub sent: &'a str,
+    pub answer: &'a str,
+    pub at_ms: u64,
+    pub forget_before_ms: u64,
 }
 
 /// One thing a command handed the outbox: its declaration's path, and the

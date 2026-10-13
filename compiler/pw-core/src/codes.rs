@@ -195,6 +195,10 @@ codes! {
     // dropped, and checked. PW002x is name resolution's.
     STATEMENTS_SEPARATED = "PW0030" / statements_separated / 1, Syntax,
         "a block's statements are separated by `;` or a line";
+    // ADR-0322: `a | b & c` was `(a | b) & c`, one power left to right, where
+    // most languages read `a | (b & c)` (W9's finding, track store-hours).
+    LOGICAL_MIXED = "PW0031" / logical_mixed / 1, Syntax,
+        "`|` and `&` mixed in one chain are parenthesized: neither binds tighter";
     NO_PROGRESS = "PW0099" / no_progress / 1, Syntax, "the parser made no progress";
 
     // --- name resolution (PW002x) -----------------------------------------
@@ -210,6 +214,10 @@ codes! {
         "a name must resolve to exactly one declaration";
     PRIVATE_ACCESS = "PW0023" / private_access / 1, Resolution,
         "a private declaration is not visible outside its module";
+    // ADR-0324: `private` says a declaration is not importable, and nothing
+    // of whose data it holds; until 2026-10-12 it meant the user's too.
+    PRIVATE_DATA = "PW0029" / private_data / 1, Resolution,
+        "a declaration that holds data says whose with `user`, `session` or `public`, not `private`";
     DUPLICATE_DECLARATION = "PW0024" / duplicate_declaration / 1, Resolution,
         "a module may declare each name once per namespace";
     IMPORT_CYCLE = "PW0025" / import_cycle / 1, Resolution,

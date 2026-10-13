@@ -1692,6 +1692,15 @@ pub(crate) fn shows_a_stream(body: &crate::hir::Body) -> bool {
 /// directive, a stream's query and the name its part binds, and a mounted
 /// resource's arguments, as the value relations read them (ADR-0074).
 pub(crate) fn computed_values(body: &Body) -> Vec<ExprId> {
+    let mut out = template_values(body);
+    out.retain(|e| value_path(body, *e).is_none());
+    out
+}
+
+/// **Each value a template's markup reads**: a text part's, a block's
+/// subject, a branch's condition, and each attribute's that is no directive,
+/// each part of an interpolated one.
+fn template_values(body: &Body) -> Vec<ExprId> {
     let mut roots = Vec::new();
     for e in body.walk() {
         if let Expr::Template { roots: r, .. } = body.expr(e) {
@@ -1732,8 +1741,25 @@ pub(crate) fn computed_values(body: &Body) -> Vec<ExprId> {
             _ => {}
         }
     }
-    out.retain(|e| value_path(body, *e).is_none());
     out
+}
+
+/// **The first value a view's markup reads through a member function**, by
+/// its path (ADR-0169): `None` where it reads each by field.
+fn member_read(ctx: &Lowering<'_>, def: DefId, body: &Body) -> Option<String> {
+    let mut typed = BTreeMap::new();
+    template_values(body).into_iter().find_map(|e| {
+        let path = value_path(body, e)?;
+        crate::page_values::calls_a_member(
+            ctx.hirs,
+            ctx.ws,
+            ctx.sigs,
+            &mut typed,
+            (def.unit, DeclId(def.decl)),
+            ReadAt::Expr(e),
+        )
+        .then_some(path)
+    })
 }
 
 /// **Does a view contain itself** (ADR-0203), through the views it uses?
@@ -2796,6 +2822,16 @@ fn compose(
             out.push(blocked(format!(
                 "`<{tag}>` contains itself and computes a value in its template, and a view \
                  that contains itself computes none yet (ruling 0073-a)"
+            )));
+            return;
+        }
+        // Nor what it reads through a member, which a host computes from a
+        // query's value and a row's item, and never from an instance's
+        // (ADR-0323). Until 2026-10-12 one built, and nothing computed it.
+        if let Some(read) = member_read(ctx, def, view) {
+            out.push(blocked(format!(
+                "`<{tag}>` contains itself and reads `{read}` through a member function, and a \
+                 view that contains itself computes none yet (ruling 0073-a)"
             )));
             return;
         }

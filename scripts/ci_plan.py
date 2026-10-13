@@ -122,6 +122,7 @@ NEEDS_DATABASE = {
     "e14-store-accounts",
     "e14-store-search",
     "e14-store-hours",
+    "e14-interactions",
 }
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")

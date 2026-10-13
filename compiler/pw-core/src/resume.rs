@@ -296,8 +296,11 @@ pub(crate) fn handler_events(body: &crate::hir::Body) -> Vec<(String, ExprId)> {
 
 /// **Each command a page's or a view's handler calls** (ADR-0154), with
 /// where each call is written: what a browser sends, and can send twice.
-pub fn sent_commands(hirs: &[&Hir], sigs: &Signatures) -> BTreeMap<DefId, Vec<crate::hir::Span>> {
-    let mut out: BTreeMap<DefId, Vec<crate::hir::Span>> = BTreeMap::new();
+pub fn sent_commands(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+) -> BTreeMap<DefId, Vec<(usize, crate::hir::Span)>> {
+    let mut out: BTreeMap<DefId, Vec<(usize, crate::hir::Span)>> = BTreeMap::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (_, decl) in hir.all_decls() {
             let Some(b) = decl.body else { continue };
@@ -329,7 +332,9 @@ pub fn sent_commands(hirs: &[&Hir], sigs: &Signatures) -> BTreeMap<DefId, Vec<cr
                         continue;
                     };
                     if sigs.kind_of(def) == Some(crate::hir::DeclKind::Command) {
-                        out.entry(def).or_default().push(body.expr_span(e));
+                        // With its unit: a page in another file than the
+                        // command's calls it (ADR-0321).
+                        out.entry(def).or_default().push((unit, body.expr_span(e)));
                     }
                 }
             }
@@ -493,7 +498,7 @@ pub(crate) fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::L
     // the scope belongs to, which is what a flow relation needs.
     let by_visibility = match decl.visibility.as_deref() {
         Some("session") => Some(Restriction::Session("SessionId".into())),
-        Some("user") | Some("private") => Some(Restriction::User("UserId".into())),
+        Some("user") => Some(Restriction::User("UserId".into())),
         Some("organization") => Some(Restriction::Organization("OrganizationId".into())),
         _ => None,
     };
@@ -607,10 +612,10 @@ pub fn check(
                     severity: Severity::Error,
                     message: format!("`{name}` has no type the resume manifest can name"),
                     primary_span: span,
-                    related: vec![Related {
-                        span: at.clone(),
-                        label: format!("`{}` declares the handler", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        at.clone(),
+                        format!("`{}` declares the handler", decl.name),
+                    )],
                     explanation: Some(format!(
                         "A resume manifest carries a schema hash derived from what a \
                          handler captures, and the running code compares it against \
@@ -918,10 +923,10 @@ fn unserializable(
         severity: Severity::Error,
         message: format!("handler captures `{name}: {ty}`, which is not serializable"),
         primary_span: span,
-        related: vec![Related {
-            span: at.clone(),
-            label: format!("`{}` declares the handler", decl.name),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            format!("`{}` declares the handler", decl.name),
+        )],
         explanation: Some(format!(
             "A resumable handler may capture only serializable immutable values and \
              resource keys. `{ty}` is a resource — `{producer}` declares \
@@ -949,10 +954,10 @@ fn captured_function(decl: &Decl, name: &str, ty: &str, span: Span, at: &Span) -
         severity: Severity::Error,
         message: format!("handler captures `{name}: {ty}`, which is not serializable"),
         primary_span: span,
-        related: vec![Related {
-            span: at.clone(),
-            label: format!("`{}` declares the handler", decl.name),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            format!("`{}` declares the handler", decl.name),
+        )],
         explanation: Some(
             "A resumable handler's captures are written onto the element as data, and \
              read back when the handler runs. A function is code, not data: nothing \
@@ -999,10 +1004,10 @@ fn unknown_destination(
             decl.name
         ),
         primary_span: span,
-        related: vec![Related {
-            span: at.clone(),
-            label: format!("`{}` declares the handler", decl.name),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            format!("`{}` declares the handler", decl.name),
+        )],
         explanation: Some(format!(
             "`{name}` carries {written}, and a resume manifest may hold a \
              restricted value only when the region it ships with carries the \
@@ -1043,10 +1048,10 @@ fn private_value(decl: &Decl, name: &str, r: &Restriction, span: Span, at: &Span
             decl.name
         ),
         primary_span: span,
-        related: vec![Related {
-            span: at.clone(),
-            label: format!("`{}` declares the handler", decl.name),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            format!("`{}` declares the handler", decl.name),
+        )],
         explanation: Some(format!(
             "The resume manifest is served with the public shell and may contain only \
              `Public` values. `{name}` is `{written}`, and anything in the manifest \

@@ -23,17 +23,105 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
-**ADR-0281 amended, 2026-10-12: a fetch takes no file of code the tree it
-joins does not hold** (the integrator's; track `evidence-current`, merged
-from `668e369`).
-- The day's ruling, made mechanical. `just evidence-fetch` refuses a run's
-  file whose recipe reads what changed between the run's commit and the tree
-  it writes into, by the planner's own rule, and copies nothing. The branch
-  merges master and is verified again. `--skip RECIPE` copies none of a
-  recipe's files, where another run records it.
-- Its first use refused all 19 files of narrowing-2's first run (at
-  `853674f`) on master's tree: the case found by hand that morning.
-Verify 38287219825 green: 22 of 22 mutants.
+**ADR-0308 amended (2), 2026-10-12: a store's cuisine, the home page's
+search box, and a reader's search by their address** (W9's, track
+`store-search`, merged from `9bc4ff0`).
+- A store's cuisine is its own field, on both layers (migration 0011), shown
+  under its name on its page and on the home page, and matched by the
+  search.
+- The home page has the search's box, a plain GET form to `/search{?q}`.
+- A reader's search lists the stores that reach their chosen address, by
+  default, as DoorDash's does, and says the rest: "Showing the stores that
+  deliver to Home; 1 more matches but doesn't." With no address chosen,
+  every store is listed.
+- A search on PostgreSQL is two statements whatever the number of stores:
+  the layer counts its statements, as Django's `assertNumQueries` counts
+  queries, and the mutant that searched as memory does is killed by it
+  (the integrator's ruling: it was no equivalent mutant).
+Verify 38326782630 green, with the train.
+
+**ADR-0325, 2026-10-12: an interaction's answer commits with its writes**
+(the integrator's; NEXT 5; track `interactions-committed`, merged from
+`51998bc`).
+- PW0348 promised a record of the interaction committed with its writes, and
+  the host kept it in memory: on PostgreSQL, a host started after another,
+  or a second host, ran a retried interaction again (two cart lines, two
+  posts).
+- The record (the key, the arguments first sent, the answer) commits in the
+  command's transaction: `interactions` in each PostgreSQL schema (store
+  0005, feed 0008), the materializer's table in memory. A command recalls
+  it before running; a second host's commit that meets it rolls back and
+  answers what the first recorded; a record answers a day, as Stripe's
+  keys do.
+Verify 38326782630 green, with the train.
+
+**ADR-0324, 2026-10-12: `private` says a declaration is not importable,
+and nothing more** (the integrator's; NEXT 3a, W8's finding; track
+`private-module`, merged from `d933b21`).
+- `private` meant the user's scope and "not importable" at once. A module's
+  own helper that said `private` to stay its own made what read it the
+  user's data: a public page computing its title through one was refused
+  for keeping the user's data in a shared cache.
+- Now `private` is access alone, as in every other language. The user's
+  scope is `user`'s (ADR-0318). A declaration that holds data says whose
+  with `user`, `session` or `public`, and `private` on one is refused by
+  name (PW0029), so no program written when `private` meant the user's is
+  read as everyone's data. PW0023 says "drop `private`".
+- Found on the way: a `user` that opens a declaration after one with no body
+  was read as that declaration's unknown policy (PW0005).
+Verify 38326782630 green, with the train.
+
+**ADR-0323, 2026-10-12: a member read is computed wherever a page reads
+it** (the integrator's; NEXT 3c; track `member-in-block`, merged from
+`e2121b7`).
+- `{cart.line_count}` inside `{#if cart.lines}` was refused at build, "which
+  a host would call per instance", though a host renders a block at the top
+  once.
+- A member read of a query's value, outside a loop's list, is now a part a
+  host computes once a change, by its path, into what the page and its
+  blocks are rendered with; a block the browser renders again from a
+  speculation computes it there. A loop's list read through a member, and a
+  member read in a view that contains itself, are refused by name.
+- The store's page names its cart link "Checkout" with the subtotal while
+  the cart holds a line.
+Verify 38326782630 green, with the train.
+
+**ADR-0322, 2026-10-12: `|` and `&` are parenthesized where they mix** (the
+integrator's; W9's finding; track `and-or`, merged from `22a325c`).
+- The two had one power, left to right, so `a | b & c` was `(a | b) & c`,
+  where C, Rust, Java, Python and SQL read `a | (b & c)`. W9's "open until"
+  read one way and ran the other.
+- A chain that mixes them without parentheses is refused at parse, once,
+  where the mix begins: PW0031, with "write `(a | b) & c` or `a | (b & c)`,
+  whichever is meant", as Carbon leaves `and` and `or` unranked. A chain of
+  one stays left to right; a comparison inside binds tighter.
+- Every shipped program already parenthesized its mixes; two tests'
+  programs did not, found by CI and the local run (PARALLEL.md). `just
+  test-unit` runs every test binary since, so one failure hides no other.
+Verify 38326782630 green, with the train.
+
+**2026-10-12: nine more scripts' mutants run the tests that see them**
+(W6's ruling of 2026-10-09; track `narrowing-3`, merged from `25bfad5`).
+- Measured by `scripts/mutant_killers.py`, two killers kept per mutant where
+  two fail: the server's suite for slots, menu_changed, stores, cart_lines,
+  invariants, last_known_good and not_found; pw-core's for command_retry and
+  availability.
+- The nine recipes: 39,463 s of master's latest runs to 13,041 s (verify
+  38315832945, 14 of 14 green, at `25bfad5`), every mutant still killed. A
+  bound raised to 1800 while the whole suite ran goes back to 900 or 1200.
+Verified again with the train (38326782630).
+
+**ADR-0321, 2026-10-12: a related note is shown in its own file** (the
+integrator's; W8's finding; track `related-files`, merged from `87010c1`).
+- W8's PW5046 stopped `pw check` with an internal error: its note's span,
+  the layout's name in the layout's file, was read in the page's file.
+- A note now names its file where it is not the diagnostic's own, and `pw
+  check` shows it there. A span outside its file is told as a note naming
+  the file and its bytes, never as an internal error.
+- Found by reading every place a note is made: PW0338 read a press's span
+  in the command's file; PW5106 left out a reader in another file; PW0351
+  and PW0341 named the first declaration only in their message.
+Verify verifies 38277655867, 38301508268 and 38313524593 green: 18 tests and 10 of 10 mutants.
 
 **2026-10-12: eight more mutation scripts' server mutants run the server
 tests that see them** (W6's ruling of 2026-10-09; track `narrowing-2`, merged
@@ -55,6 +143,18 @@ from `bd5c642`).
   2026-10-12).
 Verify 38283022346 green, over master's code: the branch merged master and was
 verified again (PARALLEL.md, 2026-10-12).
+
+**ADR-0281 amended, 2026-10-12: a fetch takes no file of code the tree it
+joins does not hold** (the integrator's; track `evidence-current`, merged
+from `668e369`).
+- The day's ruling, made mechanical. `just evidence-fetch` refuses a run's
+  file whose recipe reads what changed between the run's commit and the tree
+  it writes into, by the planner's own rule, and copies nothing. The branch
+  merges master and is verified again. `--skip RECIPE` copies none of a
+  recipe's files, where another run records it.
+- Its first use refused all 19 files of narrowing-2's first run (at
+  `853674f`) on master's tree: the case found by hand that morning.
+Verify 38287219825 green: 22 of 22 mutants.
 
 **2026-10-12: benchmark task T11's patches apply again, and a verify plans
 the recipe that applies them** (the integrator's; NEXT 3b; track

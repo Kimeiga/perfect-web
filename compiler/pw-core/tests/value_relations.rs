@@ -960,7 +960,7 @@ fn an_operator_takes_operands_of_the_types_it_takes() {
         "s >= \"a\"",
         "(n + n * 2 - n / 3 % 4) > 0",
         "(x + x * 2.0 - x / 3.0) > 0.0",
-        "b & n == 1 | !b",
+        "(b & n == 1) | !b",
         "-n < 0",
         "w == w",
         "if b { n > 0 } else { false }",

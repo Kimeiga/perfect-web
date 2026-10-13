@@ -1,8 +1,8 @@
 ADR-0053 - a lambda's parameters take the types its use declares
 
 produced by: just e10-callbacks
-commit: 3fdcf929ad57be351ef24cb1ac59a7cbe9a981ab
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38233018418 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 25b01345e1a5406a8b977c6c269475aa5b872e60
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38326782630 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the callback tests (compiler/pw-core/tests/callback_parameters.rs)
@@ -20,12 +20,12 @@ test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 == an effect through a callback (compiler/pw-core/tests/causal_evidence.rs)
 
-test a_receiver_with_no_such_member_produces_no_chain ... ok
 test a_folds_accumulator_is_not_its_lists_element ... ok
+test a_receiver_with_no_such_member_produces_no_chain ... ok
 test no_conclusion_was_reached_by_a_program_wide_name ... ok
+test the_effect_travelled_through_the_callback ... ok
 test the_effect_is_caused_by_a_receiver_type_resolution ... ok
 test a_callbacks_later_parameter_is_typed_by_the_callees_declaration ... ok
-test the_effect_travelled_through_the_callback ... ok
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 == what must stay clean: errors reported

@@ -1,16 +1,16 @@
 ADR-0166 - the store and its items say what they are
 
 produced by: just e14-descriptions
-commit: bd5c64242c0b19efa798fc3fa7e07edb486b105a
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38283022346 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 25b01345e1a5406a8b977c6c269475aa5b872e60
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38326782630 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
 == a host's answer, read through the declared type (runtime/pw-host/tests/host_answers.rs)
 
 test a_field_in_another_order_is_read_by_its_name ... ok
-test a_field_under_neither_name_is_refused_by_both ... ok
 test a_field_the_type_does_not_declare_is_not_passed_in ... ok
+test a_field_under_neither_name_is_refused_by_both ... ok
 test a_field_the_type_declares_and_the_answer_lacks_is_refused ... ok
 test a_field_written_as_the_program_names_it_is_read ... ok
 test an_answer_as_the_type_declares_it_is_passed_as_it_is ... ok
@@ -24,7 +24,7 @@ pw check: 60 file(s), no diagnostics
 == the development server (pw-dev-server), the benchmark's store among its tests
 
 test tests::the_store_and_each_item_say_what_they_are ... ok
-test result: ok. 463 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 680.88s
+test result: ok. 473 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 686.36s
 
 == the slots, three engines, WebKit painting the store before them (e2e/slots.spec.mjs)
 

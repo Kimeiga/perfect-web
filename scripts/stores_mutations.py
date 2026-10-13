@@ -9,8 +9,8 @@ Each mutant undoes one piece:
   address says, the second store not held, one menu fragment for every
   store, and a change to one store's menu sent to every store's pages.
 
-A mutant must fail the server's tests, all of them run, or the stores'
-browser test in Chromium.
+A mutant must fail the server's tests that see it (measured, below), or the
+stores' browser test in Chromium.
 
 Run from the repository root; `just e14-stores` records the output. The
 source is restored after every mutant, whatever happens.
@@ -82,17 +82,29 @@ MUTANTS = [
     ),
 ]
 
-CARGO = [["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"]]
+# The development server's tests that see its mutants' rules (W6's ruling of
+# 2026-10-09: a mutant that takes long is given the tests that can see its
+# rule), measured by `scripts/mutant_killers.py` on 2026-10-12 against its
+# whole suite: two of the six are failed by one test alone, and these five see
+# each, two where two fail. The whole suite ran for every mutant, and the
+# recipe took 5,132 s of a verify.
+CARGO = [[
+    "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+    "tests::a_change_to_one_stores_menu_reaches_that_stores_pages_only",
+    "tests::a_page_without_the_menu_is_told_nothing_of_it",
+    "tests::a_path_gives_a_route_its_parameters",
+    "tests::a_store_s_page_is_titled_by_its_name",
+    "tests::each_store_is_served_at_its_route",
+]]
 BROWSER = ["e2e/stores.spec.mjs"]
 
 # How long one command may run. A mutant can make a test wait for ever (a
 # lock taken twice); past the bound it is killed with everything it started,
 # and the run counts as failing.
-# 1800 s while its server command runs the development server's whole
-# suite, about 950 s on CI at 420 tests (the integrator's ruling of
-# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
-# see its mutants, it needs far less (W6's ruling of 2026-10-09).
-BOUND = 1800
+# 1800 from 2026-10-12 while its server command ran the development
+# server's whole suite, about 950 s on CI at 420 tests (the integrator's
+# ruling, PARALLEL.md); it runs the tests that see its mutants since.
+BOUND = 900
 
 
 def bounded(cmd, **kw):

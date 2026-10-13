@@ -842,10 +842,10 @@ pub fn check(
                         decl.name, d.name
                     ),
                     primary_span: key.name_span.clone(),
-                    related: vec![Related {
-                        span: at.clone(),
-                        label: format!("`{}` is the node with the edge", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        at.clone(),
+                        format!("`{}` is the node with the edge", decl.name),
+                    )],
                     explanation: Some(format!(
                         "Invalidation is driven by this graph, so an edge to nothing is not \
                          an error at run time — it is silence. `{}` would never regenerate on \
@@ -902,10 +902,10 @@ pub fn check(
                         severity: Severity::Error,
                         message: format!("`{}` {what} `{name}`, which is not {wanted}", decl.name),
                         primary_span: p.span.clone(),
-                        related: vec![Related {
-                            span: at.clone(),
-                            label: format!("`{}` is the node with the edge", decl.name),
-                        }],
+                        related: vec![Related::new(
+                            at.clone(),
+                            format!("`{}` is the node with the edge", decl.name),
+                        )],
                         explanation: Some(format!(
                             "`{policy}` names {wanted}: a node of the dependency graph, \
                              which invalidation runs through. `{name}` is a declaration of \
@@ -940,10 +940,10 @@ pub fn check(
                         decl.name, node.name
                     ),
                     primary_span: p.span.clone(),
-                    related: vec![Related {
-                        span: at.clone(),
-                        label: format!("`{}` is the node with the edge", decl.name),
-                    }],
+                    related: vec![Related::new(
+                        at.clone(),
+                        format!("`{}` is the node with the edge", decl.name),
+                    )],
                     explanation: Some(format!(
                         "`{policy}` names {wanted}. A command invalidates a resource's \
                          entries and emits events; a materialization depends on resources \
@@ -991,10 +991,10 @@ pub fn check(
                     .policy("depends_on")
                     .map(|p| p.span.clone())
                     .unwrap_or_else(|| at.clone()),
-                related: vec![Related {
-                    span: at.clone(),
-                    label: format!("`{}` is rebuilt from what it reads", decl.name),
-                }],
+                related: vec![Related::new(
+                    at.clone(),
+                    format!("`{}` is rebuilt from what it reads", decl.name),
+                )],
                 explanation: Some(
                     "A materialization is rebuilt from what it reads, once what it reads \
                      is rebuilt (ADR-0195's ruling 10). Around a cycle nothing is first: \
@@ -1105,10 +1105,10 @@ fn shared_reads_restricted(decl: &Decl, dep: &str, why: &str, at: &Span) -> Diag
             .policy("depends_on")
             .map(|p| p.span.clone())
             .unwrap_or_else(|| at.clone()),
-        related: vec![Related {
-            span: at.clone(),
-            label: "`partition public` makes one entry serve every reader".to_string(),
-        }],
+        related: vec![Related::new(
+            at.clone(),
+            "`partition public` makes one entry serve every reader".to_string(),
+        )],
         explanation: Some(format!(
             "A shared materialization is computed for whoever asks first and served \
              to everyone after. `{dep}` {why}, so the first reader's data would be \

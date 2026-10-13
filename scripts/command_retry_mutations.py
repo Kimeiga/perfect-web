@@ -12,8 +12,8 @@ Each mutant undoes one piece:
 - the browser runtime: nothing sent again; an answer sent again; no bound;
   a request sent again under another interaction.
 
-A checker, compiler or program mutant must fail `pw-core`'s tests, all of
-them run; a runtime mutant, `e2e/retry.spec.mjs` in Chromium.
+A checker, compiler or program mutant must fail `pw-core`'s tests that see it
+(measured, below); a runtime mutant, `e2e/retry.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-command-retry` records the output.
 The source is restored after every mutant, whatever happens.
@@ -117,7 +117,16 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core"],
+    # The tests that see the core mutants' rules (W6's ruling of 2026-10-09:
+    # a mutant that takes long is given the tests that can see its rule),
+    # measured by `scripts/mutant_killers.py` on 2026-10-12 against pw-core's
+    # whole suite: PW0312's two by `policy_values`; the clause, the policy
+    # and the store's retry by `evidence_is_current` and `handlers`. The
+    # whole suite ran for each, and the recipe took 3,746 s of a verify.
+    "core": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
+        "--test", "evidence_is_current", "--test", "handlers", "--test", "policy_values",
+    ],
 }
 BROWSER = ["e2e/retry.spec.mjs", "--project=chromium"]
 

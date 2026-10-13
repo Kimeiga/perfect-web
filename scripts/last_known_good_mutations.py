@@ -12,9 +12,9 @@ Each mutant undoes one piece:
 - the server: the manifest not reading it; the store's control not
   expiring what was kept; the store's origin not failing.
 
-A runtime mutant must fail `pw-resource`'s tests, all of them run; a
-checker or compiler mutant, `pw-core`'s; a server mutant, the development
-server's.
+A runtime mutant must fail `pw-resource`'s tests, all of them run; a checker
+or compiler mutant, `pw-core`'s that see it; a server mutant, the development
+server's that see it (each measured, below).
 
 Run from the repository root; `just e14-last-known-good` records the
 output. The source is restored after every mutant, whatever happens.
@@ -132,16 +132,23 @@ CARGO = {
         "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
         "--lib", "--test", "evidence_is_current",
     ],
-    "server": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server"],
+    # The development server's tests that see its mutants' rules (W6's ruling
+    # of 2026-10-09: a mutant that takes long is given the tests that can see
+    # its rule), measured by `scripts/mutant_killers.py` on 2026-10-12 against
+    # its whole suite: each of the three is failed by this test alone. The
+    # whole suite ran for each, and the recipe took 3,958 s of a verify.
+    "server": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "--exact",
+        "tests::a_failed_origin_is_answered_with_the_last_public_value_kept",
+    ],
 }
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
-# 1800 s while its server command runs the development server's whole
-# suite, about 950 s on CI at 420 tests (the integrator's ruling of
-# 2026-10-12, PARALLEL.md): narrowed, by measurement, to the tests that
-# see its mutants, it needs far less (W6's ruling of 2026-10-09).
-BOUND = 1800
+# 1800 from 2026-10-12 while its server command ran the development
+# server's whole suite, about 950 s on CI at 420 tests (the integrator's
+# ruling, PARALLEL.md); it runs the tests that see its mutants since.
+BOUND = 1200
 
 
 def bounded(cmd, **kw):

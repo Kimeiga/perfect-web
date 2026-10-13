@@ -2,7 +2,7 @@
 //! `notifications`, ADR-0270).
 //!
 //! `context.current_user()` is the host's operation `pw:host/principal#read`,
-//! a handle, `User<UserId>`. A private query keyed by one serves its reader
+//! a handle, `User<UserId>`. A user query keyed by one serves its reader
 //! alone. ADR-0091 related a listener's argument to its event's value by
 //! type; this amends it in one place: in `invalidates_on` alone, a parameter
 //! of the platform's `User<T>` binds an event's value of type `T`, so an
@@ -61,7 +61,7 @@ fn program(listens: &str, clauses: &str, body: &str, extra: &str) -> String {
          fn bump(reader: User<UserId>) -> Int !{{ database.write<Count> }}\n    \
              host \"m:data/counts#bump\"\n\n\
          {extra}\n\
-         private query Counted(reader: User<UserId>) -> Int\n    \
+         user query Counted(reader: User<UserId>) -> Int\n    \
              freshness      0.seconds\n    \
              consistency    read_your_writes\n    \
              cache          private\n    \
@@ -124,7 +124,7 @@ fn nothing_else_turns_an_id_into_a_handle_or_a_handle_into_an_id() {
         "Noted(reader)",
         "emits Noted(UserId(\"u-1\"))",
         "bump(current_user())",
-        "private query Visits(s: Session<SessionId>) -> Int\n    \
+        "user query Visits(s: Session<SessionId>) -> Int\n    \
              cache          private\n    \
              key            s\n    \
              invalidates_on Visited(s)\n\

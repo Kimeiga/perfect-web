@@ -407,15 +407,16 @@ page Checkout(id: StoreId) {
 }
 
 #[test]
-fn a_private_querys_record_is_its_users_and_no_public_manifest_holds_it() {
-    // R-064's fact (track `store-accounts`): a `private` query is a user's
-    // (ADR-0270), so a record only it produces is the user's, as a record
-    // only a `session query` produces is the session's (R-030). Until
-    // 2026-10-09 `private` gave the type no scope, and a view's parameter of
-    // it crossed into the public shell unrefused.
+fn a_user_querys_record_is_its_users_and_no_public_manifest_holds_it() {
+    // R-064's fact (track `store-accounts`): a `user` query is a user's
+    // (ADR-0318; written `private` until ADR-0324), so a record only it
+    // produces is the user's, as a record only a `session query` produces is
+    // the session's (R-030). Until 2026-10-09 the user's scope gave the type
+    // none, and a view's parameter of it crossed into the public shell
+    // unrefused.
     let refused = codes(&program(
         "\
-private query Basket(s: SessionId) -> Result<Cart, CartError>
+user query Basket(s: SessionId) -> Result<Cart, CartError>
     cache private
 {
     todo
@@ -430,13 +431,13 @@ view Summary(cart: Cart) !{} {
     // And a page that states the user's scope holds it.
     let accepted = codes(&program(
         "\
-private query Basket(s: SessionId) -> Result<Cart, CartError>
+user query Basket(s: SessionId) -> Result<Cart, CartError>
     cache private
 {
     todo
 }
 
-private page Checkout(cart: Cart) {
+user page Checkout(cart: Cart) {
     cache private
     view { <button on:press={resumable(captures = { cart }) => cart.line_count}>go</button> }
 }
@@ -461,7 +462,7 @@ session query Basket(s: SessionId) -> Result<Cart, CartError>
 }
 ";
     let user = "\
-private query Mine(s: SessionId) -> Result<Cart, CartError>
+user query Mine(s: SessionId) -> Result<Cart, CartError>
     cache private
 {
     todo
@@ -472,7 +473,7 @@ private query Mine(s: SessionId) -> Result<Cart, CartError>
             "{scope} page Checkout(cart: Cart) {{\n    cache private\n    view {{ <button on:press={{resumable(captures = {{ cart }}) => cart.line_count}}>go</button> }}\n}}\n"
         )
     };
-    for scope in ["session", "private"] {
+    for scope in ["session", "user"] {
         // In either order: the join does not depend on which is written first.
         for producers in [format!("{session}\n{user}"), format!("{user}\n{session}")] {
             let found = codes(&program(&format!("{producers}\n{}", page(scope))));
@@ -486,6 +487,6 @@ private query Mine(s: SessionId) -> Result<Cart, CartError>
     // produces.
     let found = codes(&program(&format!("{session}\n{}", page("session"))));
     assert!(!found.contains("PW5007"), "{found:?}");
-    let found = codes(&program(&format!("{user}\n{}", page("private"))));
+    let found = codes(&program(&format!("{user}\n{}", page("user"))));
     assert!(!found.contains("PW5007"), "{found:?}");
 }

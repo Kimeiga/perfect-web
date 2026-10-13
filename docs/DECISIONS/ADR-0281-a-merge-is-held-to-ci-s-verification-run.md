@@ -70,6 +70,34 @@ hold.
      its run at `853674f` recorded scripts that run the server's tests by
      name, and W8, fixed-arms and W6's packet had changed that server on
      master since. A file no recipe of the run wrote is refused too.
+   - **The fetch comes before an ADR is numbered** (the integrator's
+     correction, 2026-10-12). Numbering `ADR-XXXX` rewrites lines of the
+     branch's tests, scripts and recipes, which those recipes read, so a
+     fetch after it refused eight more files at related-files' merge. A
+     merge is merged, resolved, fetched, then numbered.
+   - **Tracks ready at once go on a train** (the integrator's, 2026-10-12).
+     Each merge stales, by the rule above, the recipes of every other track
+     that read what it changed: narrowing-2 changed nineteen scripts that
+     three tracks' runs had read. Merged one at a time, each track is
+     dispatched again, and each later merge can stale it again. So the
+     integrator merges them, each as its own merge commit with
+     its ADR numbered and its documents, on a branch from master
+     (`track/train-<n>`); runs `just ci` there once; and verifies the train
+     once, which plans every recipe the train's changes reach. Its evidence
+     is the train's last commit, master moves to the train when its run is
+     green, and each merge names the train's run. A recipe that fails names
+     its track: that track leaves the train, which is built again without
+     it, as GitHub's merge queue removes a pull request whose changes failed
+     its merge group (docs.github.com, "Managing a merge queue", read
+     2026-10-12). A track goes on a train with its own run green, or with
+     what that run found fixed and checked where it failed. The train's run
+     verifies the tree master will hold, the tracks' interactions with it,
+     and plans each track's whole recipe set, not only what was stale: its
+     cost is one run, not less work in every case. **Correction (the
+     integrator's, 2026-10-13)**: this amendment first said a compiler's
+     merge stales every track's evidence; the planner reads a change's lines,
+     not the crates it builds, and the merge of ADR-0321 staled a few
+     recipes.
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does

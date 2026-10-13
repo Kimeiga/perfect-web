@@ -161,8 +161,9 @@ const REJECTED_CATEGORIES: &[&str] = &[
     // ADR-0311, corpus C19: PW5051.
     "a canonical address written as text",
     // ADR-0318 (track `store-accounts`), corpus C20: PW5007, a `private`
-    // query's record the user's.
-    "a private query's record captured into a public manifest from a view's parameter",
+    // query's record the user's; a `user` query's since ADR-0324, corpus
+    // C21, which made `private` say only "not importable".
+    "a user query's record captured into a public manifest from a view's parameter",
     "a user's query's record captured into a public page's manifest",
 ];
 

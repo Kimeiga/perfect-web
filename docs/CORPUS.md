@@ -924,3 +924,29 @@ Generality at open:        45/45 invariants generality-tested
 | R-064 | added: a `private` query's record captured into the public shell from a view's parameter (`PW5007`) | new category |
 | A-034 | added: a `user` query imported from the library and read, and captured, on a `user page` | new category |
 | R-065 | added: the same `user` query's record captured into a public page's manifest (`PW5007`) | new category |
+
+## C21: `private` says a declaration is not importable, 2026-10-12
+
+Opened because the specification changed, by the integrator's ruling of
+2026-10-12 (NEXT 3a, W8's finding; ADR-0324): `private` says a declaration
+is not importable, and nothing more. A declaration that holds data says
+whose with `user`, `session` or `public`, and `private` on one is refused
+(`PW0029`). No invariant is retired. One fixture changed:
+
+- **R-064**: its query says `user` where it said `private` for the user's.
+  Its case, a record carried into the public shell by a view's parameter,
+  is unchanged, and is R-065's at a view's parameter rather than a page's.
+  Its `@category` names a `user` query; its `@expect-error` line is
+  unchanged.
+
+```text
+Corpus version:            C21
+Accepted programs:         34
+Rejected programs:         65
+Charter categories:        34/34 accepted, 65/65 rejected
+Generality at open:        45/45 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| R-064 | changed: its query says `user` (`PW5007`) | its category kept |

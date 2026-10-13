@@ -17,10 +17,10 @@ Each mutant undoes one piece:
   (ADR-0150's rule);
 - the control: `/bench/stock?tell=true` telling nothing.
 
-A value-analysis mutant must fail `pw-core`'s tests, all of them run; a
-renderer mutant, `pw-render`'s or the development server's; a data-layer,
-page or server mutant, the development server's that see its rule
-(measured, below); the control's,
+A value-analysis mutant must fail `pw-core`'s `value_relations`, the target
+that sees it (measured, below); a renderer mutant, `pw-render`'s or the
+development server's; a data-layer, page or server mutant, the development
+server's that see its rule (measured, below); the control's,
 `e2e/availability.spec.mjs` in Chromium.
 
 Run from the repository root; `just e14-availability` records the output.
@@ -178,7 +178,10 @@ MUTANTS = [
 ]
 
 CARGO = {
-    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core"],
+    # The test target that sees the value analysis's mutants (W6's ruling of
+    # 2026-10-09), measured by `scripts/mutant_killers.py` on 2026-10-12
+    # against pw-core's whole suite: both are failed by it alone.
+    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "value_relations"],
     "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render"],
     # The development server's tests that see the server mutants' rules
     # (W6's ruling of 2026-10-09), measured by `scripts/mutant_killers.py` on

@@ -997,7 +997,7 @@
     "params": [
       "id"
     ],
-    "schema": "13659e693cb3a544",
+    "schema": "ade2980a1cd6f8a1",
     "chunks": [
       {
         "chunk": "static",
@@ -1677,13 +1677,50 @@
       },
       {
         "chunk": "static",
-        "value": ">\n                    Clear\n                </button>\n                \n                <p><a id=\"cart-page\" href=\"/cart\">Go to your cart</a></p>\n            </section>\n\n            <section aria-label=\"Recommendations\">\n                "
+        "value": ">\n                    Clear\n                </button>\n                \n                <p>"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "conditional",
+          "id": 40,
+          "value": "cart.lines",
+          "then": [
+            {
+              "chunk": "static",
+              "value": "<a id=\"checkout\" href=\"/cart\">Checkout "
+            },
+            {
+              "chunk": "dynamic",
+              "value": {
+                "part": "text",
+                "id": 41,
+                "value": "cart.subtotal.display",
+                "context": "text"
+              }
+            },
+            {
+              "chunk": "static",
+              "value": "</a>"
+            }
+          ],
+          "otherwise": [
+            {
+              "chunk": "static",
+              "value": "<a id=\"cart-page\" href=\"/cart\">Go to your cart</a>"
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</p>\n            </section>\n\n            <section aria-label=\"Recommendations\">\n                "
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "stream",
-          "id": 40,
+          "id": 42,
           "query": "store.page.Recommendations",
           "args": [
             "id"
@@ -1706,7 +1743,7 @@
                 "chunk": "dynamic",
                 "value": {
                   "part": "each",
-                  "id": 41,
+                  "id": 43,
                   "collection": "items",
                   "binding": "item",
                   "key": "id",
@@ -1719,7 +1756,7 @@
                       "chunk": "dynamic",
                       "value": {
                         "part": "text",
-                        "id": 42,
+                        "id": 44,
                         "value": "item.name",
                         "context": "text"
                       }
@@ -1755,7 +1792,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 43,
+          "id": 45,
           "pieces": [
             {
               "piece": "value",
@@ -1768,7 +1805,7 @@
         "chunk": "dynamic",
         "value": {
           "part": "meta",
-          "id": 44,
+          "id": 46,
           "attribute": "name",
           "key": "description",
           "content": [
