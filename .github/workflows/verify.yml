@@ -51,6 +51,11 @@ env:
 jobs:
   plan:
     runs-on: ubuntu-24.04
+    # `actions: read`: a push to `master` reads which runs passed at what it
+    # pushed (scripts/verified_base.py).
+    permissions:
+      contents: read
+      actions: read
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
     steps:
@@ -64,6 +69,7 @@ jobs:
           BEFORE: ${{ github.event.before }}
           RECIPES: ${{ inputs.recipes }}
           SHARDS: ${{ inputs.shards || '17' }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           case "$EVENT" in
             push)
@@ -74,10 +80,14 @@ jobs:
               if [ "${GITHUB_REF_NAME#track/}" != "$GITHUB_REF_NAME" ]; then
                 base=$(git merge-base origin/master "$GITHUB_SHA")
                 python3 scripts/ci_plan.py --shards 9 --changed "$base" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-              # The chain's choice; a first push, with no commit before it, is
-              # planned whole.
+              # The chain's choice, from the newest commit pushed that a run
+              # passed at: a train verified at its head is not verified again
+              # when `master` moves to it (ADR-0281, amended 2026-10-13). A
+              # first push, with no commit before it, is planned whole.
               elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-                python3 scripts/ci_plan.py --shards 17 --changed "$BEFORE" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+                base=$(python3 scripts/verified_base.py "$BEFORE" "$GITHUB_SHA")
+                echo "planned from $base (the push's before: $BEFORE)"
+                python3 scripts/ci_plan.py --shards 17 --changed "$base" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
               else
                 python3 scripts/ci_plan.py --shards 17 --all >> "$GITHUB_OUTPUT"
               fi ;;

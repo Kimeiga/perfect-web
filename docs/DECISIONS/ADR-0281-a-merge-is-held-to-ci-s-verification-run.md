@@ -103,7 +103,17 @@ hold.
      from the run's commit only in `docs/`, the evidence and
      `scripts/ci_seconds.json` keeps the train's run as its record: the
      push's `verify` is cancelled, its `ci` runs, and the nightly runs
-     every recipe. A track branched from a train not yet landed is verified
+     every recipe. **Automated the same day**: a push to `master` plans
+     from the newest commit on its first-parent line that a push's or the
+     nightly's verify run passed at, and from the commit before the push
+     where none did (`scripts/verified_base.py`, read through `gh` with
+     the run's token, `actions: read`). A train's evidence commit then
+     plans nothing: neither landing's evidence reaches a recipe (`ci_plan.py
+     --changed 64cc7da1 f3bc4d21` and `25b01345 bb5dbcb3` each plan none). A
+     merge made on master is not its track's head and is planned as before;
+     a dispatch's run, which runs only the recipes it names, does not
+     count; any error plans from the commit before the push, more and
+     never less. A track branched from a train not yet landed is verified
      with the next train, not pushed alone: its push plans from master's
      merge base, which re-runs the unlanded train. And a track whose own
      run would plan most of what the train's will (a program most recipes
@@ -139,6 +149,16 @@ hold.
   commit to the tree here; the tree here is what is staged and what is
   not), and five mutants in `scripts/dealt_by_time_mutations.py`, each
   killed (`just e14-dealt-by-time`).
+- **Amended 2026-10-13 (master plans from what a run passed at)**: seven
+  tests in `test_ci_scripts.py`'s `VerifiedBase`: the newest commit a run
+  passed at is the base; none, the commit before the push; a pushed commit
+  a run passed at plans nothing again; a dispatch's run or one that did not
+  pass does not count, the nightly's does; a merge's second parent does not
+  count; an error, or a commit git does not know, plans from the commit
+  before; and the runs are read through `gh` by their commit. Eight
+  mutants in `scripts/dealt_by_time_mutations.py`, 30 of 30 killed (`just
+  e14-dealt-by-time`). The workflow's lines are exercised by master's next
+  push, whose plan step names its base.
 
 ## Not claimed
 
