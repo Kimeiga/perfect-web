@@ -191,3 +191,17 @@ the command now takes the item (ADR-0178), and a cart line without its name
 It answers each import the contract declares, or names the one it does not.
 It passes the item and the line as their types declare them. All of
 `pw-host`'s tests pass with the guests built, ignored ones included.
+
+## Amended, 2026-10-13: a failed audit prints why
+
+The nightly verify of 2026-10-12 (38271162931) failed `e8-host` with exit
+code 101, and its log held one line: just's, saying the recipe failed. The
+audit captured its tests' output in a variable and printed it afterwards; a
+failing `cargo test` ended the script at the capture (`set -e`), and nothing
+was printed. That failure was the benchmark's rot this ADR's amendment of
+2026-10-11 names, fixed the same evening (`4813aea0`), and was found by
+running the tests again locally. The audit now prints the tests' output
+whatever they answer, then exits with their status and writes no evidence
+(`scripts/tests/test_evidence_gates.py`: a failure at the tests shows their
+output and writes nothing; tests that pass write the evidence with their
+lines).

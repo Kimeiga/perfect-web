@@ -23,6 +23,33 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0281 amended (4), 2026-10-13: a push to master plans from what a
+run passed at** (the integrator's; track `verified-base`, merged from
+`284d93f`).
+- Master's verify re-ran every recipe a train's run had passed, its code
+  the train's, until it was cancelled by hand. Now a push to `master` plans
+  from the newest commit on its first-parent line that a push's or the
+  nightly's verify run passed at (`scripts/verified_base.py`, read through
+  `gh`), and from the commit before the push where none did or on any
+  error: more, never less. Both trains' evidence commits plan nothing.
+- Seven tests; eight mutants in `dealt_by_time_mutations.py`, 30 of 30
+  killed.
+Verify 38436632504 green, with train-3.
+
+**ADR-0026 amended, 2026-10-13: a failed artifact audit prints why**
+(the integrator's; found reading the nightly of 2026-10-12; track
+`e8-audit-output`, merged from `cc72bd5`).
+- The nightly's `e8-host` failed with exit code 101 and a log of one line:
+  the audit captured its tests' output and printed it afterwards, and a
+  failing `cargo test` ended the script at the capture (`set -e`). The
+  failure itself was the benchmark's rot fixed that evening (`4813aea0`).
+- The audit now prints the tests' output whatever they answer, then exits
+  with their status and writes no evidence; the gate tests run the real
+  recipe with a failing producer (2 outputs of 3 before).
+Verify 38436632504 green, with train-3; `e8-host` by dispatch 38438359393:
+the planner planned none for its script's change (the integrator's finding,
+fixed on track `plan-shell`).
+
 **ADR-0328, 2026-10-13: a store is open by its hours, read by the clock**
 (W9's; NEXT 4, step 2; track `store-hours`, merged from `4f2ffa8`).
 - A store's hours are its data on both layers: its zone, a cut-off before

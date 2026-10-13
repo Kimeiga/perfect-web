@@ -36,8 +36,18 @@ mkdir -p "$EVIDENCE"
 # `--include-ignored`: every test that reads a guest is ignored in an ordinary
 # `cargo test --workspace`, which has not built the guests (tests/artifact.rs
 # says why). This script checked above that they are built.
-out="$(cd "$REPO_ROOT" && cargo test -p pw-host --features engine -- --include-ignored --nocapture --test-threads=1 2>&1)"
+#
+# Printed whatever the tests answer, then their status is this script's. Until
+# 2026-10-13 a failure ended the script at the assignment (`set -e`), before
+# its output was printed: the nightly verify of 2026-10-12 (38271162931) said
+# only that the recipe failed with exit code 101.
+status=0
+out="$(cd "$REPO_ROOT" && cargo test -p pw-host --features engine -- --include-ignored --nocapture --test-threads=1 2>&1)" || status=$?
 echo "$out"
+if [ "$status" -ne 0 ]; then
+  echo "the audit's tests failed (exit $status): no evidence written" >&2
+  exit "$status"
+fi
 
 {
   echo "E8 — the artifact audit"

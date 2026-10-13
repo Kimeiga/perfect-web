@@ -15,7 +15,10 @@
   refuses a file of another commit, a file whose recipe reads what changed
   since the run, against the tree here, and a run that failed anywhere but
   in the jobs it is told are known; and keeps the seconds of each recipe
-  that ran to its end.
+  that ran to its end;
+- `verified_base.py` plans a push to `master` from the newest commit on its
+  first-parent line that a push's or the nightly's verify run passed at,
+  and from the commit before the push where none did, or on any error.
 """
 
 import importlib.util
@@ -42,6 +45,7 @@ def load(name: str):
 plan = load("ci_plan")
 recipes = load("ci_recipes")
 fetch = load("evidence_fetch")
+vbase = load("verified_base")
 
 
 class Plan(unittest.TestCase):
@@ -728,6 +732,109 @@ class Summary(unittest.TestCase):
 
         self.assertEqual(one([self.result(wrote=["a.txt"])], {"a.txt": "3 of 3 mutants killed\n"}), 0)
         self.assertEqual(one([self.result(wrote=["a.txt"])], {"a.txt": "x: SURVIVED\n"}), 1)
+
+
+class VerifiedBase(unittest.TestCase):
+    """ADR-0281, amended 2026-10-13: a train verified at its head is not
+    verified again when `master` moves to it."""
+
+    PASSED = [{"event": "push", "conclusion": "success"}]
+
+    def setUp(self) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = pathlib.Path(directory.name)
+        self.env = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1", "PATH": "/usr/bin:/bin"}
+        self.git("init", "-q", "-b", "master")
+        self.sha = {"before": self.commit("before")}
+        # A train: its merges on one line, its head, then its evidence.
+        self.git("checkout", "-q", "-b", "train")
+        for name in ("merge", "head", "evidence"):
+            self.sha[name] = self.commit(name)
+        # A track merged on `master` itself, not fast-forwarded to.
+        self.git("checkout", "-q", "-b", "side", self.sha["before"])
+        self.sha["side"] = self.commit("side")
+        self.git("checkout", "-q", "train")
+        self.git("merge", "-q", "--no-ff", "-m", "side", "side")
+        self.sha["merged"] = self.git("rev-parse", "HEAD")
+
+    def git(self, *args: str) -> str:
+        return subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", *args],
+            cwd=self.root, env=self.env, check=True, capture_output=True, text=True,
+        ).stdout.strip()
+
+    def commit(self, name: str) -> str:
+        (self.root / name).write_text(name)
+        self.git("add", name)
+        self.git("commit", "-q", "-m", name)
+        return self.git("rev-parse", "HEAD")
+
+    def base(self, head: str, runs: dict[str, list[dict]]) -> str:
+        return vbase.base(self.sha["before"], self.sha[head], lambda sha: runs.get(sha, []), self.root)
+
+    def test_master_plans_from_the_newest_commit_a_run_passed_at(self) -> None:
+        runs = {self.sha["merge"]: self.PASSED, self.sha["head"]: self.PASSED}
+        self.assertEqual(self.base("evidence", runs), self.sha["head"])
+
+    def test_where_no_run_passed_master_plans_from_the_commit_before(self) -> None:
+        self.assertEqual(self.base("evidence", {}), self.sha["before"])
+
+    def test_a_pushed_commit_a_run_passed_at_plans_nothing_again(self) -> None:
+        runs = {self.sha["evidence"]: self.PASSED}
+        self.assertEqual(self.base("evidence", runs), self.sha["evidence"])
+
+    def test_a_dispatch_or_a_run_that_did_not_pass_does_not_count(self) -> None:
+        runs = {self.sha["head"]: [
+            {"event": "workflow_dispatch", "conclusion": "success"},
+            {"event": "push", "conclusion": "failure"},
+            {"event": "push", "conclusion": "cancelled"},
+        ]}
+        self.assertEqual(self.base("evidence", runs), self.sha["before"])
+        # The nightly's run counts: it ran every recipe.
+        runs = {self.sha["head"]: [{"event": "schedule", "conclusion": "success"}]}
+        self.assertEqual(self.base("evidence", runs), self.sha["head"])
+
+    def test_a_merges_second_parent_does_not_count(self) -> None:
+        self.assertEqual(self.base("merged", {self.sha["side"]: self.PASSED}), self.sha["before"])
+        # Its first-parent line does: what the merge brought is planned since.
+        self.assertEqual(self.base("merged", {self.sha["head"]: self.PASSED}), self.sha["head"])
+
+    def test_an_error_plans_from_the_commit_before(self) -> None:
+        def broken(_sha: str) -> list[dict]:
+            raise RuntimeError("the API answered 403")
+        with mock.patch("sys.stderr", new_callable=lambda: __import__("io").StringIO()) as err:
+            got = vbase.base(self.sha["before"], self.sha["evidence"], broken, self.root)
+        self.assertEqual(got, self.sha["before"])
+        self.assertIn("the API answered 403", err.getvalue())
+        # And a commit git does not know.
+        with mock.patch("sys.stderr", new_callable=lambda: __import__("io").StringIO()):
+            got = vbase.base(self.sha["before"], "0" * 40, lambda _s: self.PASSED, self.root)
+        self.assertEqual(got, self.sha["before"])
+
+    def test_the_runs_are_read_through_gh_by_their_commit(self) -> None:
+        bin_dir = self.root / "bin"
+        bin_dir.mkdir()
+        log = self.root / "gh.log"
+        gh = bin_dir / "gh"
+        gh.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, os, sys\n"
+            f"open({str(log)!r}, 'a').write(' '.join(sys.argv[1:]) + '\\n')\n"
+            "passed = 'head_sha=' + os.environ['PASSED_AT'] in sys.argv[2]\n"
+            "print(json.dumps([{'event': 'push', 'conclusion': 'success'}] if passed else []))\n"
+        )
+        gh.chmod(0o755)
+        env = {"PATH": f"{bin_dir}:/usr/bin:/bin", "GITHUB_REPOSITORY": "o/r", "PASSED_AT": self.sha["head"]}
+        with mock.patch.dict("os.environ", env):
+            got = vbase.base(self.sha["before"], self.sha["evidence"], root=self.root)
+        self.assertEqual(got, self.sha["head"])
+        calls = log.read_text().splitlines()
+        self.assertEqual(len(calls), 2, "the evidence's runs, then the head's")
+        self.assertIn(
+            f"api repos/o/r/actions/workflows/verify.yml/runs?head_sha={self.sha['head']}&status=success",
+            calls[1],
+        )
 
 
 if __name__ == "__main__":
