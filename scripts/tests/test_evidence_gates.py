@@ -36,6 +36,8 @@ RECIPES = {
     "robustness": 1,
     "generality": 1,
     "evidence-corpus": 1,
+    # The two guests' builds, then the audit's tests.
+    "e8-host": 3,
 }
 
 PRODUCER = r'''#!/usr/bin/env python3
@@ -102,6 +104,16 @@ class EvidenceGates(unittest.TestCase):
                     root / "spikes" / name / "run.sh",
                     f'#!/usr/bin/env bash\nexec cargo renderer {name}\n',
                 )
+            # `e8-host`'s own script, its guests' directories, and the built
+            # minimal guest it refuses to run without: the producer builds
+            # nothing.
+            audit = root / "spikes/wasmtime-component"
+            audit.mkdir(parents=True, exist_ok=True)
+            shutil.copy(ROOT / "spikes/wasmtime-component/audit.sh", audit / "audit.sh")
+            (audit / "guest").mkdir()
+            minimal = audit / "guest-minimal/target/wasm32-wasip2/release/spike_wasmtime_guest_minimal.wasm"
+            minimal.parent.mkdir(parents=True)
+            minimal.write_bytes(b"")
             for name in ("E8", "E9", "E2D"):
                 (root / "docs/evidence" / name).mkdir(parents=True)
             (root / "runtime/pw-materialize/tests").mkdir(parents=True)
@@ -183,6 +195,21 @@ class EvidenceGates(unittest.TestCase):
         self.assertEqual(len(calls), 1, result.stderr)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("17", result.stderr, "the producer failure, not SIGPIPE, must reach just")
+
+    def test_a_failed_audit_prints_its_tests_output(self) -> None:
+        # ADR-0026, amended 2026-10-13: the tests are the third call.
+        result, calls, reports = self.run_recipe("e8-host", fail_at=3)
+        self.assertEqual(len(calls), 3, result.stderr)
+        self.assertNotEqual(result.returncode, 0)
+        # The guests' builds print theirs; the tests' is the third.
+        self.assertEqual(result.stdout.count("test fixture ... ok"), 3, result.stdout)
+        self.assertIn("injected producer failure", result.stdout)
+        self.assertIn("exit 17", result.stderr)
+        self.assertNotIn("docs/evidence/E8/artifact-audit.txt", reports)
+        # Control: tests that pass write the evidence, with their lines.
+        result, calls, reports = self.run_recipe("e8-host")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("test fixture ... ok", reports["docs/evidence/E8/artifact-audit.txt"])
 
     def test_control_without_pipefail_reproduces_false_success(self) -> None:
         source = JUSTFILE.read_text()

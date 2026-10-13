@@ -4533,9 +4533,10 @@ e10-browser engines="chromium firefox webkit" out="docs/evidence/E10/browser-sui
 
 # E8. The artifact audit, against real Wasm components.
 #
-# Needs the guests from `just spike-wasmtime` and the wasmtime engine, so it is
-# not part of `just ci` — the DECISIONS it exercises are, in
-# `runtime/pw-host/tests/admission.rs`, and those need no engine.
+# Builds the guests (wasm32-wasip2) and the wasmtime engine, so it is not part
+# of `just ci` — the DECISIONS it exercises are, in
+# `runtime/pw-host/tests/admission.rs`, and those need no engine. Its tests'
+# output is printed when they fail (scripts/tests/test_evidence_gates.py).
 e8-host:
     @bash spikes/wasmtime-component/audit.sh
 
