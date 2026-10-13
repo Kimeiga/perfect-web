@@ -199,14 +199,24 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
             "",
             "add_to_cart",
             "address_label",
+            // The cart's code applied (track `order-total`).
+            "apply_promo",
             "choose_address",
+            // Its tip: none, 15, 18 or 20 percent, four modules of one name;
+            // and an amount, typed, which the handler reads as dollars first
+            // (`dollars_typed`) (track `order-total`).
+            "choose_tip",
             "clear_cart",
             "decrease_in_cart",
+            "dollars_typed",
             "increase_in_cart",
-            // The cart's own page places it as an order (ADR-0193).
+            // The cart's own page places it as an order (ADR-0193), passing
+            // the total it shows (track `order-total`).
             "place_order",
             "remove_address",
-            "remove_from_cart"
+            "remove_from_cart",
+            // The cart's code taken off (track `order-total`).
+            "remove_promo"
         ]
     );
 
@@ -383,7 +393,10 @@ fn a_module_and_its_event_part_name_one_handler() {
     // The store's page's five, and its cart's page's five (ADR-0190,
     // ADR-0193), and the address page's five (track `store-accounts`): its
     // label's binding, an address chosen, renamed and removed, and one saved.
-    assert_eq!(parts.len(), 15, "{parts:?}");
+    // And the cart page's checkout (track `order-total`): the code's and the
+    // typed tip's bindings, the code applied and taken off, four tips by
+    // percent and one by amount.
+    assert_eq!(parts.len(), 24, "{parts:?}");
     // By identity: two of the address page's handlers have one name (both
     // test the label first, `address_label`), and each is its own module.
     let _ = &modules;

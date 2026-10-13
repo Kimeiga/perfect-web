@@ -22,6 +22,7 @@ import 'just/kiokun.just'
 import 'just/store-accounts.just'
 import 'just/store-search.just'
 import 'just/store-hours.just'
+import 'just/order-total.just'
 
 default:
     @just --list

@@ -463,7 +463,12 @@ fn the_trusted_platform_contract_is_hashed() {
     // `times` and `sum`, and a part of an amount only at a `Rate` and a named
     // `Rounding` (`at_rate`; ADR-0327, NEXT 6a); with store-hours' change
     // beside it on train-2.
-    const EXPECTED: u64 = 0x3560_2c0f_096d_968b;
+    // 2026-10-13: `domain.pw` gains `is_less`, which ADR-0327 named and no
+    // module declared, `OrderError.Promo(PromoError)` and
+    // `OrderError.TotalChanged(Money<USD>)`, and the checkout's `Tip`,
+    // `PromoError`, `TipError`, `FundedBy`, `PartCharged`, `OrderCharged` and
+    // `Charges` (track `order-total`, NEXT 6b).
+    const EXPECTED: u64 = 0x3da6_468c_8f20_7209;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

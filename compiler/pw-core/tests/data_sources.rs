@@ -345,7 +345,9 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     // once for each resource it reads, the estimates and the reader's
     // addresses (track `store-accounts`); and the search (track
     // `store-search`) once for each of the three it reads, the stores, their
-    // menus and the reader's addresses (ADR-0308, amended).
+    // menus and the reader's addresses (ADR-0308, amended). And the
+    // checkout (track `order-total`) once for each of the three it reads,
+    // the carts, the stores and the orders, and what an order was charged.
     assert_eq!(
         named("PW0344"),
         [
@@ -359,6 +361,10 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "Places",
             "Reach",
             "Order",
+            "Checkout",
+            "Checkout",
+            "Checkout",
+            "OrderTotal",
             // A store's hours (track `store-hours`): the stores' rows, and
             // for the cart's, the cart's too.
             "StoreStatus",
@@ -377,6 +383,11 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "add_to_cart",
             "increase_in_cart",
             "place_order",
+            // The checkout's choices (track `order-total`).
+            "choose_tip",
+            "choose_tip_amount",
+            "apply_promo",
+            "remove_promo",
             "add_address"
         ]
     );
@@ -389,6 +400,11 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
         "remove_from_cart",
         "clear_cart",
         "place_order",
+        // The checkout's choices (track `order-total`).
+        "choose_tip",
+        "choose_tip_amount",
+        "apply_promo",
+        "remove_promo",
         // A reader's addresses (track `store-accounts`).
         "add_address",
         "rename_address",
@@ -397,5 +413,7 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     ];
     assert_eq!(named("PW0347"), commands);
     assert_eq!(named("PW0348"), commands);
-    assert_eq!(found.len(), 41, "{found:#?}");
+    // Track `order-total`: the checkout's four, three times, and its
+    // query's four reads.
+    assert_eq!(found.len(), 57, "{found:#?}");
 }

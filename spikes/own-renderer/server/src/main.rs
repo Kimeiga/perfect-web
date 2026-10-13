@@ -719,6 +719,8 @@ mod order;
 mod search;
 // TRACK SEAM (store-hours): a store's opening hours (W9).
 mod hours;
+// TRACK SEAM (order-total): an order's total, the store's data for it.
+mod checkout;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -1826,6 +1828,20 @@ impl Server {
             .collect()
     }
 
+    /// **The total the reader's cart page shows** (track `order-total`):
+    /// what `place_order` is passed, as the page passes it, the
+    /// `Checkout` query's total for the session's reader.
+    #[cfg(test)]
+    fn shown_total(&self, session: &str) -> Val {
+        let owner = self.owner(session);
+        let priced = self
+            .query("store.page.Checkout", session, &[Val::String(owner)])
+            .expect("the checkout");
+        val_at(&priced, &["charges", "total"])
+            .cloned()
+            .unwrap_or_else(|| panic!("no total: {priced:?}"))
+    }
+
     /// **The session's order, read through the layer** (ADR-0193, track
     /// `store-pg`): its status's case and the lines it was placed with, or
     /// none before one is placed.
@@ -1916,11 +1932,17 @@ impl Server {
     /// `arg`.
     #[cfg(test)]
     fn layer_read(&self, session: &str, op: &str, arg: &str) -> Val {
+        self.layer_read_args(session, op, &[Val::String(arg.to_string())])
+    }
+
+    /// [`layer_read`], with its arguments (track `order-total`).
+    #[cfg(test)]
+    fn layer_read_args(&self, session: &str, op: &str, args: &[Val]) -> Val {
         let ops = self.data.reads(session, None);
         let read = ops
             .get(op)
             .unwrap_or_else(|| panic!("the layer has no `{op}`"));
-        let mut out = read(&[Val::String(arg.to_string())]).expect(op);
+        let mut out = read(args).expect(op);
         assert_eq!(out.len(), 1, "{op}: {out:?}");
         out.remove(0)
     }
@@ -12253,6 +12275,12 @@ public query Store(",
         let body = serde_json::json!([shown("espresso"), 1]).to_string();
         let added = posted(&s, &format!("/command/{ADD}"), session, "press-0", &body);
         assert!(added.contains("\"committed\":true"), "{added}");
+        // The total the cart page shows, which the press passes (track
+        // `order-total`).
+        let Val::S64(total) = s.shown_total(session) else {
+            panic!("a total")
+        };
+        let to_place = format!("[{total}]");
         std::thread::scope(|scope| {
             let clear = scope.spawn(|| {
                 let path = format!("/command/{CLEAR}");
@@ -12265,7 +12293,13 @@ public query Store(",
                 [("espresso".to_string(), 1)],
                 "and has not run"
             );
-            let placed = posted(&s, &format!("/command/{PLACE}"), session, "press-1", "[]");
+            let placed = posted(
+                &s,
+                &format!("/command/{PLACE}"),
+                session,
+                "press-1",
+                &to_place,
+            );
             assert!(placed.contains("\"$case\":\"ok\""), "placed: {placed}");
             let cleared = clear.join().expect("answered");
             assert!(cleared.starts_with("HTTP/1.1 202"), "{cleared}");
@@ -12327,6 +12361,12 @@ public query Store(",
         let body = serde_json::json!([shown("espresso"), 1]).to_string();
         let added = posted(&s, &format!("/command/{ADD}"), session, "press-0", &body);
         assert!(added.contains("\"committed\":true"), "{added}");
+        // The total the cart page shows, which the press passes (track
+        // `order-total`).
+        let Val::S64(total) = s.shown_total(session) else {
+            panic!("a total")
+        };
+        let to_place = format!("[{total}]");
         s.connection_faults
             .lock()
             .unwrap()
@@ -12335,7 +12375,7 @@ public query Store(",
             .drop_command = Some(DropAt::Before);
         let place = format!("/command/{PLACE}");
         assert_eq!(
-            posted(&s, &place, session, "press-1", "[]"),
+            posted(&s, &place, session, "press-1", &to_place),
             "",
             "no answer"
         );
@@ -12346,7 +12386,7 @@ public query Store(",
             });
             std::thread::sleep(std::time::Duration::from_millis(300));
             assert!(!clear.is_finished(), "the clear waits for the order");
-            let placed = posted(&s, &place, session, "press-1", "[]");
+            let placed = posted(&s, &place, session, "press-1", &to_place);
             assert!(placed.contains("\"$case\":\"ok\""), "placed: {placed}");
             let cleared = clear.join().expect("answered");
             assert!(cleared.starts_with("HTTP/1.1 202"), "{cleared}");
@@ -13317,6 +13357,8 @@ public query Store(",
 
     // TRACK SEAM (store-hours): a store's opening hours, served (W9).
     mod store_hours;
+    // TRACK SEAM (order-total): an order's total.
+    mod order_total;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
@@ -15063,12 +15105,13 @@ public query Store(",
             |app| {
                 // `add_to_cart`'s, the first command's. And what a cart's
                 // change would drop that it then says nothing of: the cart's
-                // hours (track `store-hours`), which read the cart too.
+                // hours (track `store-hours`) and its checkout (track
+                // `order-total`), which read the cart too.
                 let emits = "    emits         UserCartChanged(current_user())\n";
                 assert!(app.contains(emits), "the store's add_to_cart emits");
                 app.replacen(emits, "", 1).replacen(
                     "    invalidates   Cart(current_user())\n",
-                    "    invalidates   Cart(current_user()), CartHours(current_user())\n",
+                    "    invalidates   Cart(current_user()), CartHours(current_user()), Checkout(current_user())\n",
                     1,
                 )
             },
@@ -15111,10 +15154,12 @@ public query Store(",
         // The cart's own page's handlers are the store's, as their code is
         // (ADR-0190); placing an order is one more (ADR-0193); and the
         // address page's five, an address chosen, renamed, removed and saved
-        // (track `store-accounts`).
+        // (track `store-accounts`); and the cart page's checkout, a code
+        // applied and taken off, four tips by percent, one by amount, and the
+        // code's and the typed tip's bindings (track `order-total`).
         assert_eq!(
             named.len(),
-            11,
+            20,
             "add_to_cart, clear_cart, a line's three (ADR-0172), place_order and an address's five: {named:?}"
         );
         assert_eq!(
@@ -15848,12 +15893,13 @@ public query Store(",
         let s = served_from_patches_in(
             "examples",
             |app| {
-                let page = "    // What the cart last had to say: a line that could not be changed.\n    signal notice: String = \"\"\n\n    view {\n        <title>Your cart</title>\n        <main>\n";
+                // Track `order-total`: after the promo code's and the tip's.
+                let page = "    signal tip_typed: String = \"\"\n\n    view {\n        <title>Your cart</title>\n        <main>\n";
                 assert!(app.contains(page), "the cart's page");
                 app.replacen("import domain.{ ", "import domain.{ CartLine, ", 1)
                     .replacen(
                     page,
-                    "    // What the cart last had to say: a line that could not be changed.\n    signal notice: String = \"\"\n    signal kept: List<CartLine> = []\n\n    view {\n        <title>Your cart</title>\n        <main>\n            <button type=\"button\" id=\"keep\" on:press={resumable(captures = { cart }) => kept = cart.lines}>Keep</button>\n",
+                    "    signal tip_typed: String = \"\"\n    signal kept: List<CartLine> = []\n\n    view {\n        <title>Your cart</title>\n        <main>\n            <button type=\"button\" id=\"keep\" on:press={resumable(captures = { cart }) => kept = cart.lines}>Keep</button>\n",
                     1,
                 )
             },
@@ -15898,7 +15944,8 @@ public query Store(",
             .expect("added");
         s.command(ADD, "a", &add_shown("cortado", 1), false)
             .expect("added");
-        s.command(PLACE, "a", &[], false).expect("placed");
+        s.command(PLACE, "a", &[s.shown_total("a")], false)
+            .expect("placed");
         // The order is the cart's lines and a status (ADR-0193). Until
         // 2026-10-08 it kept the status alone, and its lines went with the
         // emptied cart.
@@ -15930,7 +15977,9 @@ public query Store(",
     #[test]
     fn an_empty_cart_places_no_order() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
-        let answered = s.command_answered(PLACE, "a", &[], None).expect("answered");
+        let answered = s
+            .command_answered(PLACE, "a", &[s.shown_total("a")], None)
+            .expect("answered");
         assert!(!answered.committed, "{:?}", answered.result);
         assert!(
             answered
@@ -15951,7 +16000,8 @@ public query Store(",
     fn moved_along(s: &Served) {
         s.command(ADD, "a", &add_shown("espresso", 1), false)
             .expect("added");
-        s.command(PLACE, "a", &[], false).expect("placed");
+        s.command(PLACE, "a", &[s.shown_total("a")], false)
+            .expect("placed");
         s.serve_document_settled("a", ORDER_PAGE, &Params::new(), &[])
             .expect("served");
         let order = latest(&s.pending.lock().expect("pending"), "a");
@@ -16009,7 +16059,8 @@ public query Store(",
         for round in 0..3 {
             s.command(ADD, "a", &add_shown("espresso", 1), false)
                 .expect("added");
-            s.command(PLACE, "a", &[], false).expect("placed");
+            s.command(PLACE, "a", &[s.shown_total("a")], false)
+                .expect("placed");
             let answer = posted(&s, "/bench/order?status=preparing", "a", "", "");
             assert!(answer.starts_with("HTTP/1.1 200"), "{round}: {answer}");
         }

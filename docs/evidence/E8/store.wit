@@ -91,6 +91,11 @@ interface store-page-cart-page-api {
     cart-page: func();
 }
 
+interface store-page-checkout-api {
+    use pw:types/types.{capability-user-id, store-checkout-priced};
+    checkout: func(arg0: capability-user-id) -> store-checkout-priced;
+}
+
 interface store-page-estimate-api {
     use pw:types/types.{capability-user-id, domain-delivery-estimate, domain-estimate-error, domain-store-id};
     estimate: func(arg0: domain-store-id, arg1: capability-user-id) -> result<domain-delivery-estimate, domain-estimate-error>;
@@ -122,6 +127,11 @@ interface store-page-order-api {
 
 interface store-page-order-page-api {
     order-page: func();
+}
+
+interface store-page-order-total-api {
+    use pw:types/types.{capability-user-id, domain-money};
+    order-total: func(arg0: capability-user-id) -> domain-money;
 }
 
 interface store-page-places-api {
@@ -173,9 +183,24 @@ interface store-page-add-to-cart-api {
     add-to-cart: func(arg0: domain-menu-item, arg1: domain-positive-int) -> result<user-carts-user-cart, domain-cart-error>;
 }
 
+interface store-page-apply-promo-api {
+    use pw:types/types.{domain-promo-error, store-checkout-chosen};
+    apply-promo: func(arg0: string) -> result<store-checkout-chosen, domain-promo-error>;
+}
+
 interface store-page-choose-address-api {
     use pw:types/types.{addresses-address, addresses-address-error, addresses-address-id};
     choose-address: func(arg0: addresses-address-id) -> result<list<addresses-address>, addresses-address-error>;
+}
+
+interface store-page-choose-tip-api {
+    use pw:types/types.{domain-tip, domain-tip-error};
+    choose-tip: func(arg0: s64) -> result<domain-tip, domain-tip-error>;
+}
+
+interface store-page-choose-tip-amount-api {
+    use pw:types/types.{domain-money, domain-tip, domain-tip-error};
+    choose-tip-amount: func(arg0: domain-money) -> result<domain-tip, domain-tip-error>;
 }
 
 interface store-page-clear-cart-api {
@@ -194,8 +219,8 @@ interface store-page-increase-in-cart-api {
 }
 
 interface store-page-place-order-api {
-    use pw:types/types.{domain-order-error, domain-order-status};
-    place-order: func() -> result<domain-order-status, domain-order-error>;
+    use pw:types/types.{domain-money, domain-order-error, domain-order-status};
+    place-order: func(arg0: domain-money) -> result<domain-order-status, domain-order-error>;
 }
 
 interface store-page-remove-address-api {
@@ -206,6 +231,11 @@ interface store-page-remove-address-api {
 interface store-page-remove-from-cart-api {
     use pw:types/types.{user-carts-user-cart, domain-cart-error, domain-menu-item-id};
     remove-from-cart: func(arg0: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
+}
+
+interface store-page-remove-promo-api {
+    use pw:types/types.{domain-promo-error, store-checkout-chosen};
+    remove-promo: func() -> result<store-checkout-chosen, domain-promo-error>;
 }
 
 interface store-page-rename-address-api {
@@ -300,14 +330,27 @@ world store-page-cart {
 world store-page-cart-page {
     import pw:host/principal;
     import store-hours-cart-hours-api;
+    import store-page-apply-promo-api;
     import store-page-cart-api;
+    import store-page-checkout-api;
+    import store-page-choose-tip-amount-api;
+    import store-page-choose-tip-api;
     import store-page-clear-cart-api;
     import store-page-decrease-in-cart-api;
     import store-page-increase-in-cart-api;
     import store-page-order-api;
     import store-page-place-order-api;
     import store-page-remove-from-cart-api;
+    import store-page-remove-promo-api;
     export store-page-cart-page-api;
+}
+
+world store-page-checkout {
+    import pw:host/clock;
+    import store:data/checkout;
+    import store:data/fees;
+    import store:data/promos;
+    export store-page-checkout-api;
 }
 
 world store-page-estimate {
@@ -347,7 +390,13 @@ world store-page-order {
 world store-page-order-page {
     import pw:host/principal;
     import store-page-order-api;
+    import store-page-order-total-api;
     export store-page-order-page-api;
+}
+
+world store-page-order-total {
+    import store:data/user-orders;
+    export store-page-order-total-api;
 }
 
 world store-page-places {
@@ -422,12 +471,38 @@ world store-page-add-to-cart {
     export store-page-add-to-cart-api;
 }
 
+world store-page-apply-promo {
+    import pw:host/clock;
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/checkout;
+    import store:data/promos;
+    export store-page-apply-promo-api;
+}
+
 world store-page-choose-address {
     import pw:host/invalidations;
     import pw:host/outbox;
     import pw:host/principal;
     import store:data/addresses;
     export store-page-choose-address-api;
+}
+
+world store-page-choose-tip {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/checkout;
+    export store-page-choose-tip-api;
+}
+
+world store-page-choose-tip-amount {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/checkout;
+    export store-page-choose-tip-amount-api;
 }
 
 world store-page-clear-cart {
@@ -460,7 +535,10 @@ world store-page-place-order {
     import pw:host/invalidations;
     import pw:host/outbox;
     import pw:host/principal;
+    import store:data/checkout;
+    import store:data/fees;
     import store:data/hours;
+    import store:data/promos;
     import store:data/user-orders;
     export store-page-place-order-api;
 }
@@ -479,6 +557,14 @@ world store-page-remove-from-cart {
     import pw:host/principal;
     import store:data/user-carts;
     export store-page-remove-from-cart-api;
+}
+
+world store-page-remove-promo {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/checkout;
+    export store-page-remove-promo-api;
 }
 
 world store-page-rename-address {
@@ -542,6 +628,7 @@ package pw:types {
         }
         type domain-positive-int = s64;
         type domain-money = s64;
+        type domain-rate = s64;
         record domain-store-hours {
             opens-minute: s64,
             closes-minute: s64,
@@ -583,6 +670,57 @@ package pw:types {
             nothing-to-order,
             no-coverage,
             closed(domain-closing),
+            promo(domain-promo-error),
+            total-changed(domain-money),
+        }
+        variant domain-tip {
+            no-tip,
+            fifteen,
+            eighteen,
+            twenty,
+            tip-amount(domain-money),
+        }
+        variant domain-promo-error {
+            unknown-code,
+            expired,
+            below-minimum(domain-money),
+            already-used,
+            not-in-cart,
+        }
+        variant domain-tip-error {
+            negative-tip,
+            not-offered,
+        }
+        variant domain-funded-by {
+            by-store,
+            by-platform,
+        }
+        record domain-part-charged {
+            store: domain-store-id,
+            subtotal: domain-money,
+            discount: domain-money,
+            funded-by: option<domain-funded-by>,
+            delivery: domain-money,
+            service: domain-money,
+            small-order: domain-money,
+            taxable: domain-money,
+            tax-rate: domain-rate,
+            tax: domain-money,
+        }
+        record domain-order-charged {
+            parts: list<domain-part-charged>,
+            tip: domain-money,
+            total: domain-money,
+        }
+        record domain-charges {
+            subtotal: domain-money,
+            discount: domain-money,
+            delivery: domain-money,
+            service: domain-money,
+            small-order: domain-money,
+            tax: domain-money,
+            tip: domain-money,
+            total: domain-money,
         }
         variant domain-closing {
             closed-now(option<domain-opening>),
@@ -658,6 +796,54 @@ package pw:types {
         record store-page-menu-count {
             sections: s64,
             items: s64,
+        }
+        record store-checkout-fee-schedule {
+            delivery-fee: domain-money,
+            service-rate: domain-rate,
+            service-min: domain-money,
+            service-max: domain-money,
+            small-order-under: domain-money,
+            small-order-fee: domain-money,
+            tax-rate: domain-rate,
+            tax-delivery: bool,
+            tax-service: bool,
+        }
+        record store-checkout-fees-of {
+            store: domain-store-id,
+            fees: store-checkout-fee-schedule,
+        }
+        variant store-checkout-promo-off {
+            percent-off(domain-rate),
+            amount-off(domain-money),
+        }
+        record store-checkout-promo {
+            code: string,
+            store: domain-store-id,
+            off: store-checkout-promo-off,
+            min-subtotal: domain-money,
+            expires: clock-instant,
+            funded-by: domain-funded-by,
+        }
+        record store-checkout-promo-found {
+            promo: store-checkout-promo,
+            used: bool,
+        }
+        record store-checkout-cart-part {
+            store: domain-store-id,
+            lines: list<domain-cart-line>,
+        }
+        record store-checkout-chosen {
+            tip: domain-tip,
+            promo: option<string>,
+        }
+        record store-checkout-priced {
+            charged: domain-order-charged,
+            charges: domain-charges,
+            promo: option<string>,
+            tip: domain-tip,
+            said: string,
+            any: bool,
+            discount-said: string,
         }
         record store-hours-weekly-period {
             weekday: s64,
@@ -758,6 +944,8 @@ package pw:host {
     interface invalidations {
         use pw:types/types.{capability-user-id};
         store-page-cart: func(arg0: capability-user-id);
+        store-page-checkout: func(arg0: capability-user-id);
+        store-page-order-total: func(arg0: capability-user-id);
         store-page-order: func(arg0: capability-user-id);
         store-page-saved-addresses: func(arg0: capability-user-id);
     }
@@ -787,10 +975,21 @@ package store:data {
         remove: func(arg0: capability-user-id, arg1: addresses-address-id) -> result<list<addresses-address>, addresses-address-error>;
         rename: func(arg0: capability-user-id, arg1: addresses-address-id, arg2: addresses-address-label) -> result<list<addresses-address>, addresses-address-error>;
     }
+    interface checkout {
+        use pw:types/types.{capability-user-id, domain-tip, store-checkout-cart-part, store-checkout-chosen};
+        chosen: func(arg0: capability-user-id) -> store-checkout-chosen;
+        parts: func(arg0: capability-user-id) -> list<store-checkout-cart-part>;
+        set-promo: func(arg0: capability-user-id, arg1: option<string>) -> store-checkout-chosen;
+        set-tip: func(arg0: capability-user-id, arg1: domain-tip) -> store-checkout-chosen;
+    }
     interface coverage {
         use pw:types/types.{addresses-coverage, capability-user-id, domain-store-id};
         for-store: func(arg0: domain-store-id, arg1: capability-user-id) -> addresses-coverage;
         reaches: func(arg0: domain-store-id, arg1: capability-user-id) -> bool;
+    }
+    interface fees {
+        use pw:types/types.{domain-store-id, store-checkout-fees-of};
+        for-stores: func(arg0: list<domain-store-id>) -> list<store-checkout-fees-of>;
     }
     interface hours {
         use pw:types/types.{capability-user-id, domain-store-error, domain-store-id, store-hours-opening-hours, store-hours-opening-hours-of};
@@ -806,6 +1005,10 @@ package store:data {
     interface places {
         use pw:types/types.{addresses-place};
         %list: func() -> list<addresses-place>;
+    }
+    interface promos {
+        use pw:types/types.{capability-user-id, store-checkout-promo-found};
+        find: func(arg0: capability-user-id, arg1: string) -> option<store-checkout-promo-found>;
     }
     interface recommendations {
         use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};
@@ -833,9 +1036,10 @@ package store:data {
         for-store: func(arg0: domain-store-id, arg1: capability-user-id) -> result<domain-delivery-estimate, domain-estimate-error>;
     }
     interface user-orders {
-        use pw:types/types.{capability-user-id, domain-order-error, domain-order-status, domain-tracking-error};
+        use pw:types/types.{capability-user-id, domain-order-charged, domain-order-error, domain-order-status, domain-tracking-error};
+        charged: func(arg0: capability-user-id) -> option<domain-order-charged>;
         current: func(arg0: capability-user-id) -> result<option<domain-order-status>, domain-tracking-error>;
-        place: func(arg0: capability-user-id) -> result<domain-order-status, domain-order-error>;
+        place: func(arg0: capability-user-id, arg1: domain-order-charged, arg2: option<string>) -> result<domain-order-status, domain-order-error>;
     }
 }
 

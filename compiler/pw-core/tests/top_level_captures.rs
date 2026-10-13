@@ -30,13 +30,14 @@ fn store(keep: bool) -> Vec<Unit> {
         for p in files {
             let mut src = std::fs::read_to_string(&p).expect("read");
             if keep && p.ends_with("examples/store/app.pw") {
-                let page = "    signal notice: String = \"\"\n\n    view {\n        <title>Your cart</title>\n        <main>\n";
+                // Track `order-total`: after the code's and the typed tip's.
+                let page = "    signal tip_typed: String = \"\"\n\n    view {\n        <title>Your cart</title>\n        <main>\n";
                 assert!(src.contains(page), "the cart's page");
                 src = src
                     .replacen("import domain.{ ", "import domain.{ CartLine, ", 1)
                     .replacen(
                         page,
-                        "    signal notice: String = \"\"\n    signal kept: List<CartLine> = []\n\n    view {\n        <title>Your cart</title>\n        <main>\n            <button type=\"button\" id=\"keep\" on:press={resumable(captures = { cart }) => kept = cart.lines}>Keep</button>\n",
+                        "    signal tip_typed: String = \"\"\n    signal kept: List<CartLine> = []\n\n    view {\n        <title>Your cart</title>\n        <main>\n            <button type=\"button\" id=\"keep\" on:press={resumable(captures = { cart }) => kept = cart.lines}>Keep</button>\n",
                         1,
                     );
             }

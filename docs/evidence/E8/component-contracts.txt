@@ -112,14 +112,32 @@ store.page.CartPage  abi f00a4fe14eeded6f
   needs     session.read
   component pw:app/store.hours.CartHours#CartHours
   component pw:app/store.page.Cart#Cart
+  component pw:app/store.page.Checkout#Checkout
   component pw:app/store.page.Order#Order
+  component pw:app/store.page.apply_promo#apply_promo
+  component pw:app/store.page.choose_tip#choose_tip
+  component pw:app/store.page.choose_tip_amount#choose_tip_amount
   component pw:app/store.page.clear_cart#clear_cart
   component pw:app/store.page.decrease_in_cart#decrease_in_cart
   component pw:app/store.page.increase_in_cart#increase_in_cart
   component pw:app/store.page.place_order#place_order
   component pw:app/store.page.remove_from_cart#remove_from_cart
+  component pw:app/store.page.remove_promo#remove_promo
   host      pw:host/principal#read  (session.read)
   exports   page CartPage
+
+store.page.Checkout  abi 2a4f5e5512ea925a
+  runs at   origin
+  needs     clock.compare
+  needs     database.read<Carts>
+  needs     database.read<Orders>
+  needs     database.read<Stores>
+  host      pw:host/clock#passed  (clock.compare)
+  host      store:data/checkout#chosen  (database.read<Carts>)
+  host      store:data/checkout#parts  (database.read<Carts>)
+  host      store:data/fees#for-stores  (database.read<Stores>)
+  host      store:data/promos#find  (database.read<Stores>)
+  exports   query Checkout
 
 store.page.Estimate  abi 94da90c7ccd7e563
   runs at   origin
@@ -164,8 +182,15 @@ store.page.OrderPage  abi ba1334c5a2f7dee7
   runs at   origin
   needs     session.read
   component pw:app/store.page.Order#Order
+  component pw:app/store.page.OrderTotal#OrderTotal
   host      pw:host/principal#read  (session.read)
   exports   page OrderPage
+
+store.page.OrderTotal  abi 86fcfe11a02abe0a
+  runs at   origin
+  needs     database.read<Orders>
+  host      store:data/user-orders#charged  (database.read<Orders>)
+  exports   query OrderTotal
 
 store.page.Places  abi ba2d7c89e5f43181
   runs at   origin
@@ -255,6 +280,24 @@ store.page.add_to_cart  abi 092247a3cf92e683
   host      store:data/user-carts#add  (database.write<Carts>)
   exports   command add_to_cart
 
+store.page.apply_promo  abi 5ec827dd0f4f958c
+  runs at   origin
+  needs     clock.compare
+  needs     database.read<Carts>
+  needs     database.read<Orders>
+  needs     database.read<Stores>
+  needs     database.write<Carts>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/clock#passed  (clock.compare)
+  host      pw:host/invalidations#store-page-checkout  (outbox.write)
+  host      pw:host/outbox#user-cart-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/checkout#parts  (database.read<Carts>)
+  host      store:data/checkout#set-promo  (database.write<Carts>)
+  host      store:data/promos#find  (database.read<Stores>)
+  exports   command apply_promo
+
 store.page.choose_address  abi 336d5d3e75e83603
   runs at   origin
   needs     database.write<Addresses>
@@ -265,6 +308,28 @@ store.page.choose_address  abi 336d5d3e75e83603
   host      pw:host/principal#read  (session.read)
   host      store:data/addresses#choose  (database.write<Addresses>)
   exports   command choose_address
+
+store.page.choose_tip  abi 17733c2240e354f0
+  runs at   origin
+  needs     database.write<Carts>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-page-checkout  (outbox.write)
+  host      pw:host/outbox#user-cart-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/checkout#set-tip  (database.write<Carts>)
+  exports   command choose_tip
+
+store.page.choose_tip_amount  abi 412b648412daec74
+  runs at   origin
+  needs     database.write<Carts>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-page-checkout  (outbox.write)
+  host      pw:host/outbox#user-cart-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/checkout#set-tip  (database.write<Carts>)
+  exports   command choose_tip_amount
 
 store.page.clear_cart  abi e46a1824e8426ac2
   runs at   origin
@@ -301,11 +366,12 @@ store.page.increase_in_cart  abi ea834328e33999c3
   host      store:data/user-carts#add  (database.write<Carts>)
   exports   command increase_in_cart
 
-store.page.place_order  abi b0018e0965e11e9b
+store.page.place_order  abi c303bfed694ff675
   runs at   origin
   needs     clock.compare
   needs     clock.zone
   needs     database.read<Carts>
+  needs     database.read<Orders>
   needs     database.read<Stores>
   needs     database.write<Carts>
   needs     database.write<Orders>
@@ -315,11 +381,17 @@ store.page.place_order  abi b0018e0965e11e9b
   host      pw:host/clock#passed  (clock.compare)
   host      pw:host/clock#today  (clock.compare)
   host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/invalidations#store-page-checkout  (outbox.write)
   host      pw:host/invalidations#store-page-order  (outbox.write)
+  host      pw:host/invalidations#store-page-order-total  (outbox.write)
   host      pw:host/outbox#user-cart-changed  (outbox.write)
   host      pw:host/outbox#user-order-changed  (outbox.write)
   host      pw:host/principal#read  (session.read)
+  host      store:data/checkout#chosen  (database.read<Carts>)
+  host      store:data/checkout#parts  (database.read<Carts>)
+  host      store:data/fees#for-stores  (database.read<Stores>)
   host      store:data/hours#for-cart  (database.read<Stores>)
+  host      store:data/promos#find  (database.read<Stores>)
   host      store:data/user-orders#place  (database.write<Orders>)
   exports   command place_order
   requires  SignedIn
@@ -345,6 +417,17 @@ store.page.remove_from_cart  abi d68c7826ead9ab7e
   host      pw:host/principal#read  (session.read)
   host      store:data/user-carts#remove  (database.write<Carts>)
   exports   command remove_from_cart
+
+store.page.remove_promo  abi 5f2f2580405058ba
+  runs at   origin
+  needs     database.write<Carts>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-page-checkout  (outbox.write)
+  host      pw:host/outbox#user-cart-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/checkout#set-promo  (database.write<Carts>)
+  exports   command remove_promo
 
 store.page.rename_address  abi 7e1a5f55cd7ee9c6
   runs at   origin

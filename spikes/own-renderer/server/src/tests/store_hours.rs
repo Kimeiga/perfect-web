@@ -123,12 +123,16 @@ fn an_order_is_refused_past_the_last_order_and_while_closed() {
     clock_to(&s, at(2027, 3, 1, 18, 39));
     s.command(ADD, "a", &add_shown("espresso", 1), false)
         .expect("added");
-    let placed = s.command_answered(PLACE, "a", &[], None).expect("answered");
+    let placed = s
+        .command_answered(PLACE, "a", &[s.shown_total("a")], None)
+        .expect("answered");
     assert!(placed.committed, "18:39: before the last order");
     s.command(ADD, "a", &add_shown("espresso", 1), false)
         .expect("added");
     clock_to(&s, at(2027, 3, 1, 18, 41));
-    let refused = s.command_answered(PLACE, "a", &[], None).expect("answered");
+    let refused = s
+        .command_answered(PLACE, "a", &[s.shown_total("a")], None)
+        .expect("answered");
     assert!(!refused.committed, "18:41: past the last order");
     // Data the page words (the integrator's ruling of 2026-10-12): past
     // the last order, which was at 18:40, minute 1120.
@@ -142,7 +146,9 @@ fn an_order_is_refused_past_the_last_order_and_while_closed() {
     clock_to(&s, at(2027, 3, 1, 20, 0));
     s.command(ADD, "a", &add_shown("cortado", 1), false)
         .expect("added while closed: browsing");
-    let refused = s.command_answered(PLACE, "a", &[], None).expect("answered");
+    let refused = s
+        .command_answered(PLACE, "a", &[s.shown_total("a")], None)
+        .expect("answered");
     assert!(!refused.committed);
     // Closed, and it opens tomorrow at 07:00, minute 420.
     assert_eq!(
@@ -352,17 +358,23 @@ fn a_cut_off_across_midnight_and_a_store_that_never_closes() {
     clock_to(&s, at(2027, 3, 1, 23, 49));
     s.command(ADD, "a", &add_shown("espresso", 1), false)
         .expect("added");
-    let placed = s.command_answered(PLACE, "a", &[], None).expect("answered");
+    let placed = s
+        .command_answered(PLACE, "a", &[s.shown_total("a")], None)
+        .expect("answered");
     assert!(placed.committed, "23:49: before the last order");
     s.command(ADD, "a", &add_shown("espresso", 1), false)
         .expect("added");
     clock_to(&s, at(2027, 3, 1, 23, 55));
-    let refused = s.command_answered(PLACE, "a", &[], None).expect("answered");
+    let refused = s
+        .command_answered(PLACE, "a", &[s.shown_total("a")], None)
+        .expect("answered");
     assert!(!refused.committed, "23:55: past the last order, 23:50");
     // Store 48 is open the day round, as it is first.
     s.command(ADD, "b", &add_shown("drip", 1), false)
         .expect("added");
-    let placed = s.command_answered(PLACE, "b", &[], None).expect("answered");
+    let placed = s
+        .command_answered(PLACE, "b", &[s.shown_total("b")], None)
+        .expect("answered");
     assert!(placed.committed, "23:55 at a store that never closes");
 }
 
@@ -435,12 +447,16 @@ fn overlapping_periods_are_open_as_their_union() {
     clock_to(&s, at(2027, 3, 1, 14, 45));
     s.command(ADD, "a", &add_shown("espresso", 1), false)
         .expect("added");
-    let placed = s.command_answered(PLACE, "a", &[], None).expect("answered");
+    let placed = s
+        .command_answered(PLACE, "a", &[s.shown_total("a")], None)
+        .expect("answered");
     assert!(placed.committed, "14:45: open until 22:00");
     clock_to(&s, at(2027, 3, 1, 22, 30));
     s.command(ADD, "a", &add_shown("espresso", 1), false)
         .expect("added");
-    let refused = s.command_answered(PLACE, "a", &[], None).expect("answered");
+    let refused = s
+        .command_answered(PLACE, "a", &[s.shown_total("a")], None)
+        .expect("answered");
     assert!(!refused.committed, "22:30: closed");
 }
 

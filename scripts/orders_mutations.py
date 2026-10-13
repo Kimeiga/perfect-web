@@ -27,6 +27,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
+CHECKOUT_RS = ROOT / "spikes/own-renderer/server/src/checkout.rs"
 
 # (what, file, anchor, replacement)
 MUTANTS = [
@@ -52,11 +53,13 @@ MUTANTS = [
     ),
     (
         "a placed order is not recorded",
-        STORE_DATA,
+        CHECKOUT_RS,
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
         # Re-anchored by track store-accounts: an owner's, a session's or a user's.
-        "                    r.place(owner, &lines)?;\n",
+        # Re-anchored by track order-total: a user's order is placed with its
+        # charges (`checkout.rs`), which the store's `place_order` calls.
+        "    r.place(owner, lines)?;\n",
         "",
     ),
     (

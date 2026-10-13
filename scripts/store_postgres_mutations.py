@@ -36,16 +36,19 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 STORE = ROOT / "spikes/own-renderer/server/src/store.rs"
+CHECKOUT_RS = ROOT / "spikes/own-renderer/server/src/checkout.rs"
 LAYER = ROOT / "spikes/own-renderer/server/src/store_pg.rs"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
     (
         "an order is placed without its lines",
-        STORE,
+        CHECKOUT_RS,
         # Re-anchored by track store-accounts: an owner's, a session's or a user's.
-        "                    r.place(owner, &lines)?;\n",
-        "                    r.place(owner, &[])?;\n",
+        # Re-anchored by track order-total: a user's order is placed with its
+        # charges (`checkout.rs`), which the store's `place_order` calls.
+        "    r.place(owner, lines)?;\n",
+        "    r.place(owner, &[])?;\n",
     ),
     (
         "on PostgreSQL, an order's lines are not written",
