@@ -532,3 +532,636 @@ mod provider_tests {
         assert_eq!(json["data"]["object"]["id"], i.id.as_str());
     }
 }
+
+// --- the development provider, on its own origin ---------------------------
+
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+
+/// A request as the provider reads one: bounded, as a card number and a
+/// few fields are all it takes.
+struct Request {
+    method: String,
+    path: String,
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
+}
+
+impl Request {
+    fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// A form field of the body (`application/x-www-form-urlencoded`).
+    fn field(&self, name: &str) -> Option<String> {
+        String::from_utf8_lossy(&self.body)
+            .split('&')
+            .find_map(|pair| {
+                let (k, v) = pair.split_once('=')?;
+                (k == name).then(|| v.replace('+', " "))
+            })
+    }
+}
+
+const MAX_BODY: usize = 16 * 1024;
+
+fn read_request(stream: &TcpStream) -> Option<Request> {
+    let mut reader = BufReader::new(stream.try_clone().ok()?);
+    let mut line = String::new();
+    reader.read_line(&mut line).ok()?;
+    let mut parts = line.split_whitespace();
+    let (method, path) = (parts.next()?.to_string(), parts.next()?.to_string());
+    let mut headers = Vec::new();
+    loop {
+        let mut h = String::new();
+        if reader.read_line(&mut h).ok()? == 0 || h == "\r\n" {
+            break;
+        }
+        if let Some((k, v)) = h.split_once(':') {
+            headers.push((k.trim().to_string(), v.trim().to_string()));
+        }
+    }
+    let length = headers
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("content-length"))
+        .and_then(|(_, v)| v.parse::<usize>().ok())
+        .unwrap_or(0);
+    if length > MAX_BODY {
+        return None;
+    }
+    let mut body = vec![0; length];
+    reader.read_exact(&mut body).ok()?;
+    Some(Request {
+        method,
+        path,
+        headers,
+        body,
+    })
+}
+
+fn write(stream: &mut TcpStream, code: u16, mime: &str, extra: &str, body: &[u8]) {
+    let reason = match code {
+        200 => "OK",
+        400 => "Bad Request",
+        404 => "Not Found",
+        409 => "Conflict",
+        _ => "Error",
+    };
+    let head = format!(
+        "HTTP/1.1 {code} {reason}\r\ncontent-type: {mime}\r\ncontent-length: {}\r\n{extra}cache-control: no-store\r\nconnection: close\r\n\r\n",
+        body.len()
+    );
+    let _ = stream.write_all(head.as_bytes());
+    let _ = stream.write_all(body);
+    let _ = stream.flush();
+}
+
+/// `1250` as `$12.50`, for the hosted fields' button.
+fn dollars(cents: i64) -> String {
+    let sign = if cents < 0 { "-" } else { "" };
+    let c = cents.unsigned_abs();
+    format!("{sign}${}.{:02}", c / 100, c % 100)
+}
+
+fn escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+fn intent_json(i: &Intent) -> String {
+    serde_json::json!({
+        "id": i.id,
+        "client_secret": i.client_secret,
+        "status": i.status.name(),
+        "amount": i.amount,
+        "currency": "usd",
+        "metadata": { "order": i.order },
+        "last_payment_error": i.declined.map(|code| serde_json::json!({ "code": code })),
+    })
+    .to_string()
+}
+
+/// **The development provider, served on its own origin** (a port of its
+/// own): the API a host calls, the hosted card fields a page embeds, and the
+/// webhooks it sends the host, each signed.
+pub(crate) struct Origin {
+    provider: Mutex<DevProvider>,
+    secret: Vec<u8>,
+    /// Where the host hears the provider: its `/payments/webhook`.
+    webhook: String,
+    /// The host's origin, the one page that may embed the hosted fields.
+    host: String,
+    now: fn() -> i64,
+    /// A test's: each event sent twice, as a provider may.
+    pub(crate) twice: AtomicBool,
+    /// A test's: events held, and sent in reverse when let go.
+    held: Mutex<Option<Vec<Event>>>,
+}
+
+/// The wall clock in seconds since 1970.
+pub(crate) fn wall_seconds() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+impl Origin {
+    pub(crate) fn new(secret: &[u8], webhook: &str, host: &str, now: fn() -> i64) -> Origin {
+        Origin {
+            provider: Mutex::new(DevProvider::default()),
+            secret: secret.to_vec(),
+            webhook: webhook.to_string(),
+            host: host.to_string(),
+            now,
+            twice: AtomicBool::new(false),
+            held: Mutex::new(None),
+        }
+    }
+
+    /// A test's: events held from now until [`Origin::release_reversed`].
+    pub(crate) fn hold(&self) {
+        *self.held.lock().expect("held") = Some(Vec::new());
+    }
+
+    /// A test's: the held events sent, the last first.
+    pub(crate) fn release_reversed(&self) {
+        let held = self.held.lock().expect("held").take().unwrap_or_default();
+        for e in held.iter().rev() {
+            self.send(e);
+        }
+    }
+
+    fn send(&self, e: &Event) {
+        let (body, header) = DevProvider::sent(e, &self.secret, (self.now)());
+        let times = if self.twice.load(Ordering::SeqCst) {
+            2
+        } else {
+            1
+        };
+        for _ in 0..times {
+            if let Err(why) = post(&self.webhook, &body, &header) {
+                eprintln!(
+                    "development payments: the webhook to {}: {why}",
+                    self.webhook
+                );
+            }
+        }
+    }
+
+    /// Each event the provider has not yet told the host, told, in order;
+    /// or held, where a test holds them.
+    fn deliver(&self) {
+        let events = std::mem::take(&mut self.provider.lock().expect("provider").outbox);
+        let mut held = self.held.lock().expect("held");
+        if let Some(h) = held.as_mut() {
+            h.extend(events);
+            return;
+        }
+        drop(held);
+        for e in &events {
+            self.send(e);
+        }
+    }
+
+    fn page(&self, intent: &Intent, said: &str) -> String {
+        let secret = escape(&intent.client_secret);
+        let form = match intent.status {
+            Status::RequiresPaymentMethod => format!(
+                "<form method=\"post\" action=\"/pay/{secret}\"><label>Card number \
+                 <input name=\"card\" inputmode=\"numeric\" autocomplete=\"cc-number\" required></label> \
+                 <button>Pay {}</button></form>",
+                dollars(intent.amount)
+            ),
+            Status::RequiresAction => format!(
+                "<p>Your bank asks you to confirm this payment.</p>\
+                 <form method=\"post\" action=\"/pay/{secret}/authenticate\">\
+                 <button name=\"passed\" value=\"yes\">Confirm</button> \
+                 <button name=\"passed\" value=\"no\">Decline</button></form>"
+            ),
+            Status::Succeeded => "<p>Paid.</p>".to_string(),
+            Status::Processing => "<p>Processing.</p>".to_string(),
+            Status::Canceled => "<p>This payment was canceled.</p>".to_string(),
+        };
+        format!(
+            "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
+             <title>Card details</title></head><body><main>{form}\
+             <p role=\"status\">{}</p></main></body></html>",
+            escape(said)
+        )
+    }
+
+    fn answer(&self, mut stream: TcpStream) {
+        let Some(req) = read_request(&stream) else {
+            return;
+        };
+        let path = req.path.split('?').next().unwrap_or("/").to_string();
+        let segments: Vec<&str> = path.trim_matches('/').split('/').collect();
+        // The hosted fields: embedded by the host's page alone, and running
+        // no script at all.
+        let framed = format!(
+            "content-security-policy: default-src 'none'; form-action 'self'; frame-ancestors {}\r\n",
+            self.host
+        );
+        let html = "text/html; charset=utf-8";
+        let json = "application/json";
+        match (req.method.as_str(), segments.as_slice()) {
+            ("POST", ["v1", "payment_intents"]) => {
+                let Some(key) = req.header("idempotency-key").map(str::to_string) else {
+                    return write(&mut stream, 400, json, "", br#"{"error":{"type":"invalid_request_error","message":"an Idempotency-Key is required"}}"#);
+                };
+                let asked: serde_json::Value =
+                    serde_json::from_slice(&req.body).unwrap_or_default();
+                let (Some(order), Some(amount)) =
+                    (asked["order"].as_str(), asked["amount"].as_i64())
+                else {
+                    return write(&mut stream, 400, json, "", br#"{"error":{"type":"invalid_request_error","message":"an order and an amount are required"}}"#);
+                };
+                let made = self.provider.lock().expect("provider").create(
+                    &key,
+                    order,
+                    amount,
+                    (self.now)(),
+                );
+                match made {
+                    Ok(i) => write(&mut stream, 200, json, "", intent_json(&i).as_bytes()),
+                    Err(_) => write(&mut stream, 400, json, "", br#"{"error":{"type":"idempotency_error","message":"the key was sent with other parameters"}}"#),
+                }
+            }
+            ("GET", ["v1", "payment_intents", id]) => {
+                match self.provider.lock().expect("provider").read(id) {
+                    Ok(i) => write(&mut stream, 200, json, "", intent_json(&i).as_bytes()),
+                    Err(_) => write(
+                        &mut stream,
+                        404,
+                        json,
+                        "",
+                        br#"{"error":{"type":"invalid_request_error","message":"no such intent"}}"#,
+                    ),
+                }
+            }
+            ("GET", ["pay", secret]) => {
+                let found = self
+                    .provider
+                    .lock()
+                    .expect("provider")
+                    .intents
+                    .values()
+                    .find(|i| i.client_secret == *secret)
+                    .cloned();
+                match found {
+                    Some(i) => write(
+                        &mut stream,
+                        200,
+                        html,
+                        &framed,
+                        self.page(&i, "").as_bytes(),
+                    ),
+                    None => write(
+                        &mut stream,
+                        404,
+                        html,
+                        &framed,
+                        b"<!doctype html><title>Not found</title>",
+                    ),
+                }
+            }
+            ("POST", ["pay", secret]) => {
+                let card = req.field("card").unwrap_or_default();
+                let paid = self.provider.lock().expect("provider").pay(secret, &card);
+                match paid {
+                    Ok(i) => {
+                        let said = match i.declined {
+                            Some("insufficient_funds") => "Your card has insufficient funds.",
+                            Some(_) => "Your card was declined.",
+                            None => "",
+                        };
+                        write(
+                            &mut stream,
+                            200,
+                            html,
+                            &framed,
+                            self.page(&i, said).as_bytes(),
+                        );
+                        self.deliver();
+                    }
+                    Err(_) => write(
+                        &mut stream,
+                        409,
+                        html,
+                        &framed,
+                        b"<!doctype html><title>Not payable</title>",
+                    ),
+                }
+            }
+            ("POST", ["pay", secret, "authenticate"]) => {
+                let passed = req.field("passed").as_deref() == Some("yes");
+                let answered = self
+                    .provider
+                    .lock()
+                    .expect("provider")
+                    .authenticate(secret, passed);
+                match answered {
+                    Ok(i) => {
+                        let said = if passed {
+                            ""
+                        } else {
+                            "The payment was not confirmed."
+                        };
+                        write(
+                            &mut stream,
+                            200,
+                            html,
+                            &framed,
+                            self.page(&i, said).as_bytes(),
+                        );
+                        self.deliver();
+                    }
+                    Err(_) => write(
+                        &mut stream,
+                        409,
+                        html,
+                        &framed,
+                        b"<!doctype html><title>Not payable</title>",
+                    ),
+                }
+            }
+            _ => write(&mut stream, 404, "text/plain", "", b"not found"),
+        }
+    }
+}
+
+/// **The provider's origin, listening**: a thread per connection.
+pub(crate) fn serve(listener: TcpListener, origin: Arc<Origin>) {
+    for stream in listener.incoming() {
+        let Ok(stream) = stream else { continue };
+        let origin = origin.clone();
+        std::thread::spawn(move || origin.answer(stream));
+    }
+}
+
+/// **A POST of `body` to `url`** (`http://host:port/path`), with the
+/// provider's signature: the webhook, over a connection of its own.
+pub(crate) fn post(url: &str, body: &str, signature: &str) -> Result<u16, String> {
+    let rest = url.strip_prefix("http://").ok_or("not an http URL")?;
+    let (authority, path) = rest
+        .split_once('/')
+        .map_or((rest, "/".to_string()), |(a, p)| (a, format!("/{p}")));
+    let mut stream = TcpStream::connect(authority).map_err(|e| e.to_string())?;
+    let head = format!(
+        "POST {path} HTTP/1.1\r\nhost: {authority}\r\ncontent-type: application/json\r\nstripe-signature: {signature}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+        body.len()
+    );
+    stream
+        .write_all(head.as_bytes())
+        .map_err(|e| e.to_string())?;
+    stream
+        .write_all(body.as_bytes())
+        .map_err(|e| e.to_string())?;
+    let mut answer = String::new();
+    BufReader::new(stream)
+        .read_line(&mut answer)
+        .map_err(|e| e.to_string())?;
+    answer
+        .split_whitespace()
+        .nth(1)
+        .and_then(|c| c.parse().ok())
+        .ok_or_else(|| format!("no status: {answer:?}"))
+}
+
+#[cfg(test)]
+mod origin_tests {
+    use super::*;
+
+    /// Each request a test's webhook endpoint heard: its signature header,
+    /// and its body.
+    type Heard = Arc<Mutex<Vec<(String, String)>>>;
+
+    /// A host's webhook endpoint, for a test: it answers 200 and keeps each
+    /// request's signature header and body.
+    fn webhook_listener() -> (String, Heard) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let url = format!(
+            "http://{}/payments/webhook",
+            listener.local_addr().expect("addr")
+        );
+        let heard = Arc::new(Mutex::new(Vec::new()));
+        let kept = heard.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                if let Some(req) = read_request(&stream) {
+                    let sig = req.header("stripe-signature").unwrap_or("").to_string();
+                    kept.lock()
+                        .expect("heard")
+                        .push((sig, String::from_utf8_lossy(&req.body).into_owned()));
+                }
+                write(&mut stream, 200, "text/plain", "", b"ok");
+            }
+        });
+        (url, heard)
+    }
+
+    fn started(webhook: &str) -> (String, Arc<Origin>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let base = format!("http://{}", listener.local_addr().expect("addr"));
+        let origin = Arc::new(Origin::new(
+            b"whsec_test",
+            webhook,
+            "http://127.0.0.1:3301",
+            || 1_000_000,
+        ));
+        let served = origin.clone();
+        std::thread::spawn(move || serve(listener, served));
+        (base, origin)
+    }
+
+    /// A request to the provider, answered: its status and body.
+    fn ask(
+        base: &str,
+        method: &str,
+        path: &str,
+        headers: &str,
+        body: &str,
+    ) -> (u16, String, String) {
+        let authority = base.strip_prefix("http://").expect("http");
+        let mut stream = TcpStream::connect(authority).expect("connect");
+        let head = format!(
+            "{method} {path} HTTP/1.1\r\nhost: {authority}\r\n{headers}content-length: {}\r\nconnection: close\r\n\r\n",
+            body.len()
+        );
+        stream.write_all(head.as_bytes()).expect("write");
+        stream.write_all(body.as_bytes()).expect("write");
+        let mut all = String::new();
+        stream.read_to_string(&mut all).expect("read");
+        let (head, body) = all.split_once("\r\n\r\n").expect("a head");
+        let code = head
+            .split_whitespace()
+            .nth(1)
+            .and_then(|c| c.parse().ok())
+            .expect("status");
+        (code, head.to_string(), body.to_string())
+    }
+
+    /// **The provider's API, its hosted fields and its webhook, over the
+    /// wire**: an intent made once per key, a card paid in the hosted fields,
+    /// and the host told, signed.
+    #[test]
+    fn a_card_paid_in_the_hosted_fields_is_told_to_the_host_signed() {
+        let (webhook, heard) = webhook_listener();
+        let (base, _origin) = started(&webhook);
+        let key = "idempotency-key: order-1:press-a\r\n";
+        let (code, _, made) = ask(
+            &base,
+            "POST",
+            "/v1/payment_intents",
+            key,
+            r#"{"order":"order-1","amount":1250}"#,
+        );
+        assert_eq!(code, 200, "{made}");
+        let made: serde_json::Value = serde_json::from_str(&made).expect("json");
+        assert_eq!(made["status"], "requires_payment_method");
+        let (_, _, again) = ask(
+            &base,
+            "POST",
+            "/v1/payment_intents",
+            key,
+            r#"{"order":"order-1","amount":1250}"#,
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&again).expect("json")["id"],
+            made["id"]
+        );
+        let (code, _, refused) = ask(
+            &base,
+            "POST",
+            "/v1/payment_intents",
+            key,
+            r#"{"order":"order-1","amount":9999}"#,
+        );
+        assert_eq!(code, 400, "{refused}");
+        assert!(refused.contains("idempotency_error"));
+        let (code, _, _) = ask(
+            &base,
+            "POST",
+            "/v1/payment_intents",
+            "",
+            r#"{"order":"order-1","amount":1250}"#,
+        );
+        assert_eq!(code, 400, "a request without a key is refused");
+
+        // The hosted fields: a form, embedded by the host alone, no script.
+        let secret = made["client_secret"].as_str().expect("secret");
+        let (code, head, page) = ask(&base, "GET", &format!("/pay/{secret}"), "", "");
+        assert_eq!(code, 200);
+        assert!(page.contains("Pay $12.50"), "{page}");
+        assert!(
+            head.contains("frame-ancestors http://127.0.0.1:3301"),
+            "{head}"
+        );
+        assert!(head.contains("default-src 'none'"), "{head}");
+
+        // Declined, then paid: two events, signed for the host.
+        let form = "content-type: application/x-www-form-urlencoded\r\n";
+        let (_, _, declined) = ask(
+            &base,
+            "POST",
+            &format!("/pay/{secret}"),
+            form,
+            "card=4000+0000+0000+0002",
+        );
+        assert!(declined.contains("Your card was declined."), "{declined}");
+        let (_, _, paid) = ask(
+            &base,
+            "POST",
+            &format!("/pay/{secret}"),
+            form,
+            "card=4242424242424242",
+        );
+        assert!(paid.contains("Paid."), "{paid}");
+        let heard = heard.lock().expect("heard").clone();
+        assert_eq!(heard.len(), 2, "{heard:?}");
+        for (sig, body) in &heard {
+            assert_eq!(
+                verify(Some(sig), body.as_bytes(), b"whsec_test", 1_000_000),
+                Ok(())
+            );
+        }
+        assert!(heard[0].1.contains("payment_intent.payment_failed"));
+        assert!(heard[1].1.contains("payment_intent.succeeded"));
+        let (_, _, read) = ask(
+            &base,
+            "GET",
+            &format!("/v1/payment_intents/{}", made["id"].as_str().expect("id")),
+            "",
+            "",
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&read).expect("json")["status"],
+            "succeeded"
+        );
+    }
+
+    /// **A provider may send an event twice, and out of order**: the test
+    /// switches the host is held to.
+    #[test]
+    fn the_provider_can_send_twice_and_out_of_order() {
+        let (webhook, heard) = webhook_listener();
+        let (base, origin) = started(&webhook);
+        let (_, _, made) = ask(
+            &base,
+            "POST",
+            "/v1/payment_intents",
+            "idempotency-key: k\r\n",
+            r#"{"order":"o","amount":500}"#,
+        );
+        let made: serde_json::Value = serde_json::from_str(&made).expect("json");
+        let secret = made["client_secret"].as_str().expect("secret").to_string();
+        let form = "content-type: application/x-www-form-urlencoded\r\n";
+        origin.hold();
+        ask(
+            &base,
+            "POST",
+            &format!("/pay/{secret}"),
+            form,
+            "card=4000000000000002",
+        );
+        ask(
+            &base,
+            "POST",
+            &format!("/pay/{secret}"),
+            form,
+            "card=4242424242424242",
+        );
+        assert!(heard.lock().expect("heard").is_empty(), "held");
+        origin.twice.store(true, Ordering::SeqCst);
+        origin.release_reversed();
+        let kinds: Vec<String> = heard
+            .lock()
+            .expect("heard")
+            .iter()
+            .map(|(_, b)| {
+                serde_json::from_str::<serde_json::Value>(b).expect("json")["type"]
+                    .as_str()
+                    .expect("type")
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(
+            kinds,
+            [
+                "payment_intent.succeeded",
+                "payment_intent.succeeded",
+                "payment_intent.payment_failed",
+                "payment_intent.payment_failed"
+            ]
+        );
+    }
+}
