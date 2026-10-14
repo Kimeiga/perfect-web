@@ -196,7 +196,7 @@ const FEED_WHY = !existsSync(new URL("./dist-feed/build", import.meta.url))
 if (FEED_WHY !== null) {
   console.warn(`${FEED_WHY}: e2e/feed.spec.mjs is not run; run feed.sh again`);
 }
-const FEED_BUILT = existsSync(new URL("./dist-feed/build", import.meta.url)) && FEED_WHY === null;
+export const FEED_BUILT = existsSync(new URL("./dist-feed/build", import.meta.url)) && FEED_WHY === null;
 // kiokun's build (track `kiokun`), held to the same: its runtime and its
 // sources (`kiokun-site.sh`).
 const KIOKUN_WHY = !existsSync(new URL("./dist-kiokun/build", import.meta.url))
@@ -207,7 +207,7 @@ const KIOKUN_WHY = !existsSync(new URL("./dist-kiokun/build", import.meta.url))
 if (KIOKUN_WHY !== null) {
   console.warn(`${KIOKUN_WHY}: e2e/kiokun-site.spec.mjs is not run; run kiokun-site.sh again`);
 }
-const KIOKUN_BUILT =
+export const KIOKUN_BUILT =
   existsSync(new URL("./dist-kiokun/build", import.meta.url)) && KIOKUN_WHY === null;
 
 const HOSTS = process.env.PW_PERFORMANCE

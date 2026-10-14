@@ -162,6 +162,14 @@ fn a_page_at_another_address_of_the_page_is_moved_there_for_good() {
         moved.contains("<a href=\"/word/%E9%AD%9A\">/word/%E9%AD%9A</a>"),
         "{moved}"
     );
+    // A note that runs nothing (`csp::BARE`).
+    assert!(
+        h.contains(&format!(
+            "content-security-policy: {}\r\n",
+            crate::csp::BARE
+        )),
+        "{h}"
+    );
     // The address's query is kept, as kiokun.com keeps it.
     let kept = fetched(&s, "/word/old?from=x&y=%20z");
     assert!(

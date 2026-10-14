@@ -664,10 +664,11 @@ pub const NESTED_ELEMENTS: u32 = 500;
 /// press is told, a `role="status"` read by ear and seen by no one. Written
 /// into every document that ships the runtime, so it is the same node from
 /// the page's first byte (ADR-0182): a live region added with its words is
-/// not reliably said.
-pub const ANNOUNCER: &str = "<div role=\"status\" class=\"pw-announcer\" style=\"position:absolute;\
-width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);\
-white-space:nowrap\"></div>";
+/// not reliably said. Empty as it is served, so seen by no one; the runtime
+/// hides it through the CSSOM before it says anything. A `style` attribute
+/// would be one the page's policy allows only by `'unsafe-hashes'` (CSP
+/// Level 3, §6.7.3.3), and a policy whose host writes none needs none.
+pub const ANNOUNCER: &str = "<div role=\"status\" class=\"pw-announcer\"></div>";
 
 /// **Markup being written, and each instance inside it, written later**
 /// (ADR-0203). A view that contains itself goes as deep as its data, and a

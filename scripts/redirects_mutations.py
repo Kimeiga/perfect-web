@@ -123,8 +123,8 @@ MUTANTS = [
     (
         "a move may be kept by a cache",
         SERVER,
-        '        &format!("{PRIVATE}{cookie}location: {location}\\r\\n"),\n',
-        '        &format!("{cookie}location: {location}\\r\\n"),\n',
+        '            "{PRIVATE}{cookie}location: {location}\\r\\n{}",\n',
+        '            "{cookie}location: {location}\\r\\n{}",\n',
     ),
     (
         "a move to the address asked for is answered",
