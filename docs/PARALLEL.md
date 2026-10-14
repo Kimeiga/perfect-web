@@ -1617,3 +1617,12 @@ Each a decision for a track, with its date; a track's ADR records it too.
   NEXT holds the rest. The witness library holds every accepted program,
   so a rule over the whole program (as PW6403's "one command answers a
   payment") can have no accepted fixture beside its rejected ones.
+- **2026-10-14, mutant-programs merged** on train-7 (the integrator's finding;
+  from `6a30b2f5`): `just ci` now refuses a mutant of a `.pw` source whose
+  program the checker refuses, unless its script names the rule that is
+  the protection the mutant takes away. To every worker: **a mutant of a
+  program must leave a program** (well-typed, checking), or declare
+  `CHECKED = {"what": {"PW5001"}}` beside `MUTANTS`; a "KILLED (13 of 13
+  tests fail)" can be the build failing. Three such kills were rewritten:
+  store-hours, command-answers and kiokun-word each have one mutant that
+  now meets its tests.

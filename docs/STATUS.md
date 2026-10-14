@@ -23,6 +23,23 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-14: a mutant of a program's source is still a program** (the
+integrator's finding; track `mutant-programs`, merged from `6a30b2f5`).
+- Of the 237 mutants of a `.pw` source the mutation scripts plant, the
+  checker refused the program 14 left: each "killed" by the build, whatever
+  the tests hold, its verdict reading as a test's. Three were refused for
+  another reason than what they undo: store-hours' "an order is placed
+  whatever the hours" called `UserOrders.place` with one argument since
+  order-total gave it three; command-answers' wrote `&&`, which the
+  language does not have; kiokun's read a list of another type. Each is
+  well-typed now and killed by its own script's tests (3 of 13, 1 of 42, 2
+  of 2). The other eleven take away a protection the checker holds, and
+  their scripts say which rule (`CHECKED`).
+- `just ci` holds it (`mutant-programs`, `scripts/mutant_programs.py`):
+  237 mutants, 11 refused by their named rule, none failing; on the tree
+  before, all 14 fail. Its logic is held with a stand-in checker (4 tests).
+Verify TRAIN_RUN green, with train-7.
+
 **2026-10-14: the corpus specifies `invoked_by`** (the integrator's finding;
 corpus C24; track `corpus-invoked`, merged from `64e5ee4e`).
 - NEXT 6c's five codes (PW6401 to PW6405, a command the platform invokes)
