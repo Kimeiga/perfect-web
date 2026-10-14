@@ -346,11 +346,13 @@ impl Principals {
     }
 
     /// **A session the platform opens on a reader's behalf** (NEXT 6c, step
-    /// seven), named [`ON_BEHALF`] and then `name`: a payment settled as the
-    /// reader who began it, its `current_user()` theirs. Never a browser's:
-    /// no cookie is let name it, and it is closed when the guard goes,
-    /// whatever the command answered.
-    pub(crate) fn on_behalf(&self, name: &str, user: &str) -> OnBehalf {
+    /// seven), named [`ON_BEHALF`] and then `name`, its principal issued by
+    /// the `invoker`: a payment settled as the reader who began it, or a run
+    /// as the user whose command scheduled it (the scheduled-commands
+    /// track), its `current_user()` theirs. Never a browser's: no cookie is
+    /// let name it, and it is closed when the guard goes, whatever the
+    /// command answered.
+    pub(crate) fn on_behalf(&self, invoker: &str, name: &str, user: &str) -> OnBehalf {
         let session = format!("{ON_BEHALF}{name}");
         self.open(
             &session,
@@ -358,7 +360,7 @@ impl Principals {
                 user: user.to_string(),
                 handle: String::new(),
                 name: String::new(),
-                issuer: "payments".to_string(),
+                issuer: invoker.to_string(),
             },
         );
         OnBehalf {

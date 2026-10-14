@@ -79,22 +79,38 @@ checks its arguments as a call's).
 4. **Written with the scheduling command's writes**, in its transaction: a
    command that answers a declared error, or fails, schedules nothing.
 5. **Run once.** The host runs what is due one at a time, in the order of
-   its instants, each in a transaction of its own, keyed by its schedule
-   (ADR-0325), on behalf of its scheduler (`identity::on_behalf`). The
-   schedule's row is removed in that transaction, so a run commits once
-   even where its command writes nothing: a host stopped before the commit
-   runs it again, after it never. A declared error is the program's
-   answer, and done. A trap or a refusal runs again, after 2 s, doubling to
-   a minute, five times at most; then the schedule is kept, failed, and said
-   in the host's log and its `/metrics`.
-6. **Durable**: the program's database holds the schedules (the
-   materializer's for the in-memory layers; a migration for each PostgreSQL
-   layer). A host started arms its timer at the earliest pending; two hosts
-   on one database commit a run once, as two commit an answer once.
-7. **The first use, ADR-0332's sweep**: an order awaiting its payment past
-   thirty minutes is taken back, its payment canceled at the provider, as
-   its reader's cancel takes it back; a settlement or a cancel unschedules
-   it. Orders scheduled (NEXT 4's third step) use the same statement, in a
+   its instants, each as a press is run, in a transaction of its own, on
+   behalf of its scheduler (`identity::on_behalf`, its principal issued by
+   the clock), and keyed by its scheduling (ADR-0325): `schedule-<id>`, the
+   same on every host. Once it is answered its scheduling is removed. A
+   host stopped after a run's commit and before the removal leaves it
+   pending, and the next run of it meets the first's record and is answered
+   as it was; two hosts running it commit it once, as two commit an answer
+   once. A declared error is the program's answer, and done. A trap or a
+   refusal runs again, after 2 s, doubling to a minute, five times at most;
+   then the scheduling is kept, failed, never run again, and said in the
+   host's log and its `/metrics` (`runs`: `ran`, `retried`, `failed`).
+6. **Kept where the program's data is**: each PostgreSQL layer's database
+   holds its schedules (a migration of each, `schedules`), written in the
+   command's own transaction with its writes and its interaction's record;
+   the in-memory layers', the host's materializer, as long as the host
+   runs, as it holds their data. A host started reads the earliest pending,
+   and is woken by a commit that schedules or by its clock moved.
+7. **What the contract says**: a schedule is a call of the platform's
+   `pw:host/schedules`, a function by the command's whole path and how,
+   `<path>-at` and `<path>-after` given the command's arguments and then the
+   time as the `Int` it is, `<path>-cancel` given the arguments; the
+   import's `schedules` names the command's component and how, so the host
+   reads what it does and never parses a name. The origin grants
+   `clock.schedule`.
+8. **The first use, ADR-0332's sweep**: `place_order` schedules
+   `expire_order(order) after minutes(30)` where it begins a payment; at
+   thirty minutes an order still awaiting it is taken back, its payment
+   canceled at the provider, as its reader's cancel takes it back (one
+   `take_back`). The reader's cancel, and a payment settled for good (paid,
+   or canceled), unschedule it; a payment declined keeps it, the order still
+   awaiting a card. A sweep takes back only the order it was scheduled for.
+   Orders scheduled (NEXT 4's third step) use the same statements, in a
    track of their own.
 
 ## Not claimed
@@ -104,6 +120,9 @@ checks its arguments as a call's).
   of a host that is running; a host stopped runs what is past due when it
   starts.
 - A program reading the time (`now`): `after` is resolved by the host.
+- An effect outside the run's transaction asked once: two hosts running one
+  run both ask the provider to cancel its payment, as a press sent twice
+  does; the provider's cancel is idempotent, and one commit records it.
 
 ## Alternatives
 
@@ -115,11 +134,32 @@ checks its arguments as a call's).
   ADR-0304 holds back; a duration the host resolves needs none.
 - **A clause, `schedules cmd(args) after d`**: a clause sees only the
   command's parameters, and an order's reference is made in its body.
+- **The scheduling removed in the run's own transaction**: the layer's
+  commit would carry the run it consumes, for a guarantee the run's record
+  already gives (decision 5); a run that writes nothing commits nothing,
+  and is run again as harmlessly as it ran.
+- **The host parsing an import's name for its command**: a second
+  derivation of what the contract can say (decision 7), as `event`,
+  `invalidates` and `reads` say theirs.
 
 ## Acceptance
 
-To come with the track: the checker's tests and the corpus; the host's, on
-each layer (a run at its instant and not before, once across a restart, a
-schedule moved and canceled, nothing scheduled by a command that fails, a
-run on its scheduler's behalf, a trapping run retried then failed, a press
-refused); the sweep end to end; mutation controls.
+`just e14-scheduled`, which needs a database:
+
+- the checker (`compiler/pw-core/tests/scheduled.rs`, 9 tests) and the
+  corpus (A-036, R-067 to R-069, three generality pairs);
+- the host's runs and the store's sweep (`tests/store_scheduled.rs`), the
+  store in memory and on PostgreSQL: the sweep at thirty minutes and not a
+  minute before, on its reader's behalf; a payment paid cancelling it and
+  one declined keeping it; the reader's cancel cancelling it; a press of
+  the sweep refused; a sweep of another order taking nothing back; a
+  command that answers an error scheduling nothing, and one that writes
+  nothing else committing its run; a run at its time, not a second before,
+  once, as its scheduler; a run scheduled again moving; a run refused run
+  again after 2 s doubling, then kept failed and counted;
+- the database's own (`tests/store_pg.rs`, `tests/feed_pg.rs`): a run and
+  its command's record written by one transaction; a run outliving the
+  host that scheduled it; a run committed and not removed committing once;
+  two hosts committing a run once; the feed's layer keeping its runs;
+- mutation controls (`scripts/scheduled_mutations.py`): the language's,
+  the host's in memory and on PostgreSQL.

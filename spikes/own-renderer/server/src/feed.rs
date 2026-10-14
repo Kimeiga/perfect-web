@@ -508,6 +508,7 @@ impl crate::data::Staged for Staging<'_> {
         _events: &[crate::data::Handed],
         _invalidated: &[crate::data::Dropped],
         _interaction: Option<&crate::data::Recorded<'_>>,
+        _scheduled: &[crate::schedules::Scheduled],
     ) -> Result<Option<crate::data::Outboxed>, String> {
         self.claims.lock().expect("claims").keep()?;
         Ok(None)

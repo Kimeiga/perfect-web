@@ -3916,8 +3916,12 @@
   {
     "component_id": "store.page.cancel_order",
     "capability_mapping": 1,
-    "abi_schema": "18b3c1b8eab814e8",
+    "abi_schema": "997dea91592137f5",
     "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "schedule"
+      },
       {
         "family": "database",
         "operation": "read",
@@ -4212,6 +4216,33 @@
         },
         "owner": "platform",
         "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/schedules",
+        "name": "store-page-expire-order-cancel",
+        "capability": "clock.schedule",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "schedule"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "primitive": "String"
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "schedules": {
+          "command": "store.page.expire_order",
+          "how": "cancel"
+        }
       },
       {
         "interface": "store:data/user-orders",
@@ -5162,6 +5193,464 @@
     ]
   },
   {
+    "component_id": "store.page.expire_order",
+    "capability_mapping": 1,
+    "abi_schema": "773978126174b1e0",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Orders"
+      },
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Carts"
+      },
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Orders"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "payments",
+        "operation": "cancel"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-cart",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Cart"
+      },
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-checkout",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Checkout"
+      },
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-order",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Order"
+      },
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-order-total",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.OrderTotal"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "user-cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.UserCartChanged"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "user-order-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.UserOrderChanged"
+      },
+      {
+        "interface": "pw:host/payments",
+        "name": "cancel",
+        "capability": "payments.cancel",
+        "capabilities": [
+          {
+            "family": "payments",
+            "operation": "cancel"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "primitive": "String"
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "payments.PaymentStatus"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "payments.CancelError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/user-orders",
+        "name": "awaited",
+        "capability": "database.read<Orders>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Orders"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Option",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.AwaitedPayment"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/user-orders",
+        "name": "settle",
+        "capability": "database.write<Orders>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Orders"
+          },
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "primitive": "String"
+            },
+            {
+              "declared": {
+                "path": "payments.PaymentStatus"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.OrderStatus"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.OrderError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "err",
+              "closed",
+              "closed-now",
+              "some",
+              "at"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          },
+          {
+            "argument": 0,
+            "path": [
+              "err",
+              "closed",
+              "past-last-order"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          }
+        ]
+      }
+    ],
+    "exports": [
+      {
+        "name": "expire_order",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "String"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-expire-order-api@0.1.0",
+          "function": "expire-order",
+          "idempotent_by": "InteractionId",
+          "invoked_by": "Clock"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.increase_in_cart",
     "capability_mapping": 1,
     "abi_schema": "ea834328e33999c3",
@@ -5410,11 +5899,15 @@
   {
     "component_id": "store.page.place_order",
     "capability_mapping": 1,
-    "abi_schema": "336265f353707f23",
+    "abi_schema": "e428270e6485b6f2",
     "required_capabilities": [
       {
         "family": "clock",
         "operation": "compare"
+      },
+      {
+        "family": "clock",
+        "operation": "schedule"
       },
       {
         "family": "clock",
@@ -5816,6 +6309,36 @@
         },
         "owner": "platform",
         "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/schedules",
+        "name": "store-page-expire-order-after",
+        "capability": "clock.schedule",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "schedule"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "primitive": "String"
+            },
+            {
+              "primitive": "Int"
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "schedules": {
+          "command": "store.page.expire_order",
+          "how": "after"
+        }
       },
       {
         "interface": "store:data/checkout",
@@ -7201,8 +7724,12 @@
   {
     "component_id": "store.page.settle_payment",
     "capability_mapping": 1,
-    "abi_schema": "39bcda995b964ea4",
+    "abi_schema": "8ac6e1f4e1759bef",
     "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "schedule"
+      },
       {
         "family": "database",
         "operation": "write",
@@ -7451,6 +7978,33 @@
         },
         "owner": "platform",
         "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/schedules",
+        "name": "store-page-expire-order-cancel",
+        "capability": "clock.schedule",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "schedule"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "primitive": "String"
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "schedules": {
+          "command": "store.page.expire_order",
+          "how": "cancel"
+        }
       },
       {
         "interface": "store:data/user-orders",

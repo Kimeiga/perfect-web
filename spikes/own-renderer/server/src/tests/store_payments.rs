@@ -18,8 +18,16 @@ const APPLY: &str = "store.page.apply_promo";
 /// webhook served by the server's own [`handle`] while `test` runs: the
 /// provider tells the host what a card did as it would in a deployment. The
 /// test is given the provider too, to hold its word back (step eight).
-fn paying(test: impl FnOnce(&Served, &payments::Origin)) {
-    let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+pub(super) fn paying(test: impl FnOnce(&Served, &payments::Origin)) {
+    paying_with(|app| app.to_string(), test)
+}
+
+/// [`paying`], the store's `app.pw` changed by `change`.
+pub(super) fn paying_with(
+    change: fn(&str) -> String,
+    test: impl FnOnce(&Served, &payments::Origin),
+) {
+    let s = served_from_patches_in("examples", change, &[]);
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
     let port = listener.local_addr().expect("address").port();
     let provider_port = TcpListener::bind(("127.0.0.1", 0))
@@ -54,7 +62,7 @@ fn paying(test: impl FnOnce(&Served, &payments::Origin)) {
 
 /// The reader's order's status as the layer reads it: its case, and the
 /// provider's page an awaiting one is paid on.
-fn status_of(s: &Server, session: &str) -> Option<(String, Option<String>)> {
+pub(super) fn status_of(s: &Server, session: &str) -> Option<(String, Option<String>)> {
     let owner = s.owner(session);
     match s.layer_read(session, "store:data/user-orders#current", &owner) {
         Val::Result(Ok(Some(v))) => match *v {
@@ -80,7 +88,7 @@ fn status_of(s: &Server, session: &str) -> Option<(String, Option<String>)> {
 
 /// **A card paid in the provider's page**, as the reader's browser posts
 /// its form there: the page the provider answers with.
-fn pay(page: &str, card: &str) -> String {
+pub(super) fn pay(page: &str, card: &str) -> String {
     sent(
         page,
         "application/x-www-form-urlencoded",
@@ -107,7 +115,7 @@ fn sent(url: &str, kind: &str, body: &str) -> String {
 
 /// The reader's cart, of an espresso and a cortado, placed: its order
 /// awaiting its payment, on the provider's page.
-fn placed_awaiting(s: &Server) -> String {
+pub(super) fn placed_awaiting(s: &Server) -> String {
     s.command(ADD, "a", &add_shown("espresso", 2), false)
         .expect("added");
     s.command(ADD, "a", &add_shown("cortado", 1), false)
@@ -338,10 +346,10 @@ fn a_readers_press_of_the_settling_command_is_not_a_command() {
 fn a_session_opened_on_a_readers_behalf_is_no_browsers_to_present() {
     paying(|s, _| {
         placed_awaiting(s);
-        let behalf = s
-            .identity
-            .principals()
-            .on_behalf("payment-pi_dev000001", &s.owner("a"));
+        let behalf =
+            s.identity
+                .principals()
+                .on_behalf("payments", "payment-pi_dev000001", &s.owner("a"));
         let (taken, fresh) = session_of(&format!("Cookie: pw-session={}\r\n", behalf.session()));
         assert!(fresh, "{taken}");
         assert_ne!(taken, behalf.session());

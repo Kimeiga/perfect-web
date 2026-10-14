@@ -275,8 +275,8 @@ MUTANTS = [
         "the settling command runs as no reader",
         MEMORY,
         SERVER,
-        '            .on_behalf(&format!("payment-{}", settled.intent), &settled.owner);\n',
-        '            .on_behalf(&format!("payment-{}", settled.intent), "");\n',
+        '            &format!("payment-{}", settled.intent),\n            &settled.owner,\n',
+        '            &format!("payment-{}", settled.intent),\n            "",\n',
     ),
     (
         "the settling command is keyed by the payment alone",

@@ -124,6 +124,9 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.clear_cart",
             // A line's controls (ADR-0172).
             "store.page.decrease_in_cart",
+            // An order no one paid, taken back by the clock (the
+            // scheduled-commands track).
+            "store.page.expire_order",
             "store.page.increase_in_cart",
             // The cart, placed as an order (ADR-0193).
             "store.page.place_order",

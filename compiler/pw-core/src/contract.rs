@@ -321,6 +321,22 @@ pub struct Import {
     /// answers from that resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reads: Option<String>,
+    /// **The run this import schedules, or cancels** (the
+    /// scheduled-commands track): the command's component, which the host
+    /// runs, and how. The host writes it with the scheduling command's
+    /// writes, or not at all.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedules: Option<Schedules>,
+}
+
+/// **What a schedules' import does** (the scheduled-commands track): for
+/// the command `command`, a component id, `at` an instant or `after` a
+/// duration, each given after the command's arguments as the `Int` it is,
+/// or `cancel` the one run pending for those arguments.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct Schedules {
+    pub command: String,
+    pub how: String,
 }
 
 /// **One place a value from outside must hold an invariant** (ADR-0179):
@@ -1080,6 +1096,7 @@ fn host_calls(
             invalidates: None,
             every: Vec::new(),
             reads: None,
+            schedules: None,
         });
     }
     // **And the invalidations' function for each entry it invalidates**
@@ -1126,7 +1143,78 @@ fn host_calls(
             invalidates: Some(signature.path.clone()),
             every,
             reads: None,
+            schedules: None,
         });
+    }
+    // **And the schedules' function for each run a command schedules or
+    // cancels** (the scheduled-commands track): the scheduled command's
+    // parameters, and its time, an instant or a duration, as the `Int` it
+    // is; under `clock.schedule`, since the host writes it with the
+    // command's writes, or not at all.
+    if hir.decl(id).kind == crate::hir::DeclKind::Command {
+        for e in body.walk() {
+            let crate::hir::Expr::Keyword {
+                keyword, modifiers, ..
+            } = body.expr(e)
+            else {
+                continue;
+            };
+            let how = match (keyword.as_str(), modifiers.get(1).map(String::as_str)) {
+                ("schedule", Some(how @ ("at" | "after"))) => how,
+                ("unschedule", None) => "cancel",
+                _ => continue,
+            };
+            let Some(name) = modifiers.first() else {
+                continue;
+            };
+            let (crate::resolve::Resolution::Local(def)
+            | crate::resolve::Resolution::Imported { def, .. }) =
+                sigs.workspace()
+                    .resolve_in(unit, crate::resolve::Namespace::Term, name)
+            else {
+                continue;
+            };
+            let Some(signature) = sigs.by_def(def) else {
+                continue;
+            };
+            let Some(mut params) = signature
+                .params
+                .iter()
+                .map(|p| sigs.stable_type(p.as_ref()?.resolved()?))
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            if how != "cancel" {
+                params.push(crate::resolved::StableTypeId::Primitive("Int".into()));
+            }
+            let import = crate::backend::schedule_binding(&signature.path, how);
+            if !seen.insert((import.interface.clone(), import.name.clone())) {
+                continue;
+            }
+            let scheduling = Capability::parse(crate::signatures::CLOCK_SCHEDULE);
+            out.push(Import {
+                interface: import.interface,
+                name: import.name,
+                capability: scheduling.name(),
+                capabilities: vec![scheduling],
+                signature: Some(Signature {
+                    params,
+                    result: crate::resolved::StableTypeId::Primitive("Unit".into()),
+                }),
+                owner: Ownership::Platform,
+                kind: ImportKind::HostCapability,
+                bounded: Vec::new(),
+                event: None,
+                invalidates: None,
+                every: Vec::new(),
+                reads: None,
+                schedules: Some(Schedules {
+                    command: component_id(hirs[def.unit], crate::hir::DeclId(def.decl)),
+                    how: how.to_string(),
+                }),
+            });
+        }
     }
     // **And the reads' function for each resource a materialization's body
     // reads** (ADR-0277): its parameters, answering its value, the platform's
@@ -1186,6 +1274,7 @@ fn host_calls(
                 invalidates: None,
                 every: Vec::new(),
                 reads: Some(signature.path.clone()),
+                schedules: None,
             });
         }
     }
@@ -1277,6 +1366,7 @@ fn component_calls(
                 invalidates: None,
                 every: Vec::new(),
                 reads: None,
+                schedules: None,
             });
         }
     }
