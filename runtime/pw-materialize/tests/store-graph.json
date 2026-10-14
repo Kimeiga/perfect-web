@@ -456,15 +456,7 @@
       "name": "choose_tip",
       "node": "command",
       "params": [
-        "percent"
-      ]
-    },
-    {
-      "path": "store.page.choose_tip_amount",
-      "name": "choose_tip_amount",
-      "node": "command",
-      "params": [
-        "amount"
+        "tip"
       ]
     },
     {
@@ -1043,22 +1035,6 @@
     },
     {
       "from": "store.page.choose_tip",
-      "to": "store.page.Checkout",
-      "kind": "invalidates",
-      "key": [
-        "current_user()"
-      ]
-    },
-    {
-      "from": "store.page.choose_tip_amount",
-      "to": "Events.UserCartChanged",
-      "kind": "emits",
-      "key": [
-        "current_user()"
-      ]
-    },
-    {
-      "from": "store.page.choose_tip_amount",
       "to": "store.page.Checkout",
       "kind": "invalidates",
       "key": [

@@ -116,7 +116,6 @@ store.page.CartPage  abi f00a4fe14eeded6f
   component pw:app/store.page.Order#Order
   component pw:app/store.page.apply_promo#apply_promo
   component pw:app/store.page.choose_tip#choose_tip
-  component pw:app/store.page.choose_tip_amount#choose_tip_amount
   component pw:app/store.page.clear_cart#clear_cart
   component pw:app/store.page.decrease_in_cart#decrease_in_cart
   component pw:app/store.page.increase_in_cart#increase_in_cart
@@ -191,9 +190,9 @@ store.page.OrderPage.derived_3  abi 23ce3b89fcf1ed87
   runs at   origin
   exports   derived derived$3
 
-store.page.OrderPage.derived_6  abi 90abafb9a9249b63
+store.page.OrderPage.derived_8  abi 1eb10587a8b0b5db
   runs at   origin
-  exports   derived derived$6
+  exports   derived derived$8
 
 store.page.OrderTotal  abi 86fcfe11a02abe0a
   runs at   origin
@@ -349,17 +348,6 @@ store.page.choose_tip  abi 17733c2240e354f0
   host      pw:host/principal#read  (session.read)
   host      store:data/checkout#set-tip  (database.write<Carts>)
   exports   command choose_tip
-
-store.page.choose_tip_amount  abi 412b648412daec74
-  runs at   origin
-  needs     database.write<Carts>
-  needs     outbox.write
-  needs     session.read
-  host      pw:host/invalidations#store-page-checkout  (outbox.write)
-  host      pw:host/outbox#user-cart-changed  (outbox.write)
-  host      pw:host/principal#read  (session.read)
-  host      store:data/checkout#set-tip  (database.write<Carts>)
-  exports   command choose_tip_amount
 
 store.page.clear_cart  abi e46a1824e8426ac2
   runs at   origin

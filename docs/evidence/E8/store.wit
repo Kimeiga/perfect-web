@@ -134,14 +134,14 @@ interface store-page-order-page-derived-3-api {
     derived3: func(arg0: option<domain-order-status>) -> store-page-order-charge;
 }
 
-interface store-page-order-page-derived-6-api {
+interface store-page-order-page-derived-8-api {
     use pw:types/types.{domain-order-status, domain-payment-page};
-    derived6: func(arg0: option<domain-order-status>) -> option<domain-payment-page>;
+    derived8: func(arg0: option<domain-order-status>) -> option<domain-payment-page>;
 }
 
 interface store-page-order-total-api {
     use pw:types/types.{capability-user-id, domain-money};
-    order-total: func(arg0: capability-user-id) -> domain-money;
+    order-total: func(arg0: capability-user-id) -> option<domain-money>;
 }
 
 interface store-page-places-api {
@@ -210,12 +210,7 @@ interface store-page-choose-address-api {
 
 interface store-page-choose-tip-api {
     use pw:types/types.{domain-tip, domain-tip-error};
-    choose-tip: func(arg0: s64) -> result<domain-tip, domain-tip-error>;
-}
-
-interface store-page-choose-tip-amount-api {
-    use pw:types/types.{domain-money, domain-tip, domain-tip-error};
-    choose-tip-amount: func(arg0: domain-money) -> result<domain-tip, domain-tip-error>;
+    choose-tip: func(arg0: domain-tip) -> result<domain-tip, domain-tip-error>;
 }
 
 interface store-page-clear-cart-api {
@@ -353,7 +348,6 @@ world store-page-cart-page {
     import store-page-apply-promo-api;
     import store-page-cart-api;
     import store-page-checkout-api;
-    import store-page-choose-tip-amount-api;
     import store-page-choose-tip-api;
     import store-page-clear-cart-api;
     import store-page-decrease-in-cart-api;
@@ -419,8 +413,8 @@ world store-page-order-page-derived-3 {
     export store-page-order-page-derived-3-api;
 }
 
-world store-page-order-page-derived-6 {
-    export store-page-order-page-derived-6-api;
+world store-page-order-page-derived-8 {
+    export store-page-order-page-derived-8-api;
 }
 
 world store-page-order-total {
@@ -533,14 +527,6 @@ world store-page-choose-tip {
     import pw:host/principal;
     import store:data/checkout;
     export store-page-choose-tip-api;
-}
-
-world store-page-choose-tip-amount {
-    import pw:host/invalidations;
-    import pw:host/outbox;
-    import pw:host/principal;
-    import store:data/checkout;
-    export store-page-choose-tip-amount-api;
 }
 
 world store-page-clear-cart {
@@ -778,7 +764,6 @@ package pw:types {
         }
         variant domain-tip-error {
             negative-tip,
-            not-offered,
         }
         variant domain-funded-by {
             by-store,

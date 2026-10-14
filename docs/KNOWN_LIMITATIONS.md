@@ -1114,8 +1114,3 @@ preserved, not replaced with invented results.
   change.
 - **A cart's lines are mapped to their stores by a read per store**
   (`checkout#parts`, as `hours#for-cart`), until NEXT 4b bounds every read.
-- **The store has not yet switched** to what ADR-0330 and ADR-0331 allow
-  (train-4): the tip is still chosen by two commands, `choose_tip(percent)`
-  refusing an unoffered percent at run time, and `OrderTotal` still answers
-  `cents(0)` where no order is placed, shown only inside the order's arm.
-  The switch is the integrator's next track.

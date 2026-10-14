@@ -480,7 +480,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // `payments.cancel`, and its `CancelError`; `domain.pw`'s `OrderStatus`
     // gains `Canceled`, and it declares `CancelOrderError` and
     // `AwaitedPayment`.
-    const EXPECTED: u64 = 0x7ec9_a8b1_5d51_bc1c;
+    // 2026-10-13: `domain.pw`'s `TipError` loses `NotOffered`: the tip is
+    // one `choose_tip(Tip)`, a case a browser sends (ADR-0331, track
+    // `store-switch`).
+    const EXPECTED: u64 = 0xef49_0b16_51db_51d8;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

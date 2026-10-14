@@ -56,7 +56,7 @@ import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged
 import store.hours.{ StoreStatus, StoresOpen, CartHours, hours_of_cart, closed_in, closing_said }
 // TRACK SEAM (order-total): the order's total, priced from the store's data.
 import store.checkout.{ Priced, Chosen, priced_for, shown_for, promo_for, promo_named, parts_of_cart,
-    promo_said, set_tip, set_promo, negative_tip, dollars_typed, tip_of_percent, total_charged }
+    promo_said, set_tip, set_promo, negative_tip, dollars_typed, total_charged }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -297,9 +297,9 @@ user query Checkout(reader: User<UserId>) -> Priced
 }
 
 // **What the reader's order was charged** (track `order-total`): its total,
-// or nothing where none is placed, which the order page shows only in the
-// order's arm (the integrator's ruling of 2026-10-13).
-user query OrderTotal(reader: User<UserId>) -> Money<USD>
+// or none where none is placed, read through the order's arm (ADR-0330,
+// track `store-switch`).
+user query OrderTotal(reader: User<UserId>) -> Option<Money<USD>>
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
@@ -500,10 +500,11 @@ command cancel_order()
     }
 }
 
-// **The tip the reader chooses** (track `order-total`): none, or 15, 18 or
-// 20 percent of the subtotal, each a percent a browser sends. None until
-// they choose.
-command choose_tip(percent: Int)
+// **The tip the reader chooses** (track `order-total`): none, 15, 18 or 20
+// percent of the subtotal, or an amount, a case a browser sends (ADR-0331,
+// track `store-switch`). None until they choose. An amount below nothing is
+// refused: Money carries no invariant.
+command choose_tip(tip: Tip)
     -> Result<Tip, TipError>
     idempotent_by InteractionId
     retry         transport_only(max = 2, jitter = true)
@@ -511,26 +512,10 @@ command choose_tip(percent: Int)
     invalidates   Checkout(current_user())
     emits         UserCartChanged(current_user())
 {
-    match tip_of_percent(percent) {
-        Some(tip) => Ok(set_tip(current_user(), tip).tip),
-        None => Err(TipError.NotOffered),
-    }
-}
-
-// **A tip of an amount** (track `order-total`), never below nothing: Money
-// carries no invariant, so a request's negative amount is refused here.
-command choose_tip_amount(amount: Money<USD>)
-    -> Result<Tip, TipError>
-    idempotent_by InteractionId
-    retry         transport_only(max = 2, jitter = true)
-    transaction   serializable
-    invalidates   Checkout(current_user())
-    emits         UserCartChanged(current_user())
-{
-    if negative_tip(Tip.TipAmount(amount)) {
+    if negative_tip(tip) {
         return Err(TipError.NegativeTip)
     }
-    Ok(set_tip(current_user(), Tip.TipAmount(amount)).tip)
+    Ok(set_tip(current_user(), tip).tip)
 }
 
 // **A promo code applied to the cart** (track `order-total`), or why not,
@@ -927,25 +912,25 @@ user page CartPage() {
             {/match}
             <fieldset id="tips">
                 <legend>Tip your courier</legend>
-                <button type="button" id="tip-none" on:press={resumable() => match choose_tip(0) {
+                <button type="button" id="tip-none" on:press={resumable() => match choose_tip(Tip.NoTip) {
                     Ok(_) => notice = "",
                     Err(_) => notice = "That tip could not be chosen.",
                 }}>No tip</button>
-                <button type="button" id="tip-15" on:press={resumable() => match choose_tip(15) {
+                <button type="button" id="tip-15" on:press={resumable() => match choose_tip(Tip.Fifteen) {
                     Ok(_) => notice = "",
                     Err(_) => notice = "That tip could not be chosen.",
                 }}>15%</button>
-                <button type="button" id="tip-18" on:press={resumable() => match choose_tip(18) {
+                <button type="button" id="tip-18" on:press={resumable() => match choose_tip(Tip.Eighteen) {
                     Ok(_) => notice = "",
                     Err(_) => notice = "That tip could not be chosen.",
                 }}>18%</button>
-                <button type="button" id="tip-20" on:press={resumable() => match choose_tip(20) {
+                <button type="button" id="tip-20" on:press={resumable() => match choose_tip(Tip.Twenty) {
                     Ok(_) => notice = "",
                     Err(_) => notice = "That tip could not be chosen.",
                 }}>20%</button>
                 <label>Other amount <input id="tip-amount" type="text" inputmode="decimal" bind:value={tip_typed} /></label>
                 <button type="button" id="tip-other" on:press={resumable() => match dollars_typed(tip_typed) {
-                    Some(amount) => match choose_tip_amount(amount) {
+                    Some(amount) => match choose_tip(Tip.TipAmount(amount)) {
                         Ok(_) => notice = "",
                         Err(_) => notice = "That tip could not be chosen.",
                     },
@@ -1092,8 +1077,8 @@ user page OrderPage() {
                          nothing has charged yet; nothing, taken back before
                          it was paid (step eight); charged, once it is placed. -->
                     {#match charge_of(order)}
-                    {:ToPay}<p id="order-total">Total to pay: {charged.display}</p>
-                    {:Charged}<p id="order-total">Total charged: {charged.display}</p>
+                    {:ToPay}{#match charged}{:Some(to_pay)}<p id="order-total">Total to pay: {to_pay.display}</p>{:None}{/match}
+                    {:Charged}{#match charged}{:Some(paid)}<p id="order-total">Total charged: {paid.display}</p>{:None}{/match}
                     {:NotCharged}<p id="order-total">Nothing was charged.</p>
                     {/match}
                 {:None}<p id="order-status">You have no order yet.</p>
