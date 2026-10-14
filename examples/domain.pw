@@ -24,6 +24,8 @@ module domain
 import List
 // When a delivery estimate was made (ADR-0180).
 import clock.{ Instant, LocalTime, Weekday }
+// NEXT 6c: a payment begun at the deployment's provider.
+import payments.{ Payment, BeginError }
 
 // --- identities -----------------------------------------------------------
 //
@@ -203,6 +205,12 @@ fn display(price: Money<USD>) -> String !{} {
     "{sign}${grouped(dollars)}.{pad}{cents}"
 }
 
+// **A payment begun for `order`'s `total`** (NEXT 6c): only `domain` reads
+// an amount's minor units (ADR-0327), so only it says one to the provider.
+fn begin_payment(order: String, total: Money<USD>) -> Result<Payment, BeginError> !{ payments.begin } {
+    payments.begin(order, total.value)
+}
+
 // `1234567` as `1,234,567`: a comma before each three digits, from the
 // right, of a count that is not negative.
 fn grouped(n: Int) -> String !{} {
@@ -296,14 +304,26 @@ type CartError =
 // --- orders ---------------------------------------------------------------
 
 // **Where a customer's order is** (ADR-0193): what the store last said of
-// it.
+// it, or, where the deployment takes payments, that it awaits its payment
+// on the provider's page, or was taken back before it was paid (NEXT 6c).
 type OrderStatus =
     | Placed
     | Preparing
     | OnTheWay
     | Delivered
+    | AwaitingPayment(PaymentPage)
+    | Canceled
 
-// **Why an order was not placed** (ADR-0193).
+// **The provider's page an order's payment is made on** (NEXT 6c): what the
+// order page frames, the provider's own origin.
+type PaymentPage = PaymentPage { url: String }
+
+// **The payment an order awaits** (NEXT 6c, step eight): the order's
+// reference and the payment's id at the provider.
+type AwaitedPayment = AwaitedPayment { order: String, payment: String }
+
+// **Why an order was not placed** (ADR-0193). `AwaitingPayment`: an order
+// of the reader's awaits its payment, which the order page frames (NEXT 6c).
 type OrderError =
     | NothingToOrder
     // A store an item is from does not deliver to the reader's chosen address
@@ -322,6 +342,23 @@ type OrderError =
     // schedule, a rate or the clock moved. The reader pays the total they
     // were shown, or is shown the new one.
     | TotalChanged(Money<USD>)
+    // An order of the reader's awaits its payment (NEXT 6c): a second is not
+    // begun beside it, whose payment the first's settling would not reach.
+    | AwaitingPayment
+    // The deployment's provider could not be reached to begin the payment
+    // (NEXT 6c): nothing is written, and the reader may press again.
+    | PaymentUnavailable
+
+// **Why an order was not taken back** (NEXT 6c, step eight).
+type CancelOrderError =
+    // No order of the reader's awaits its payment: none to take back.
+    | NotAwaitingPayment
+    // Its payment is past canceling, paid or being paid: the order stands,
+    // and the provider's word places it.
+    | Paid
+    // The provider could not be reached to cancel the payment: the order
+    // awaits still, and the reader may press again.
+    | PaymentUnavailable
 
 // --- checkout (track `order-total`) ---------------------------------------
 
@@ -345,11 +382,9 @@ type PromoError =
     // Its store has no line in the cart: a code is one store's.
     | NotInCart
 
-// **Why a tip is refused**: an amount below nothing, or a percent the page
-// does not offer.
+// **Why a tip is refused**: an amount below nothing.
 type TipError =
     | NegativeTip
-    | NotOffered
 
 // **Who pays for a discount.** A store's own lowers what is taxed; one the
 // platform reimburses does not (California's Regulation 1671.1, New York's

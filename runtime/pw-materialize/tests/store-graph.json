@@ -438,6 +438,12 @@
       ]
     },
     {
+      "path": "store.page.cancel_order",
+      "name": "cancel_order",
+      "node": "command",
+      "params": []
+    },
+    {
       "path": "store.page.choose_address",
       "name": "choose_address",
       "node": "command",
@@ -450,15 +456,7 @@
       "name": "choose_tip",
       "node": "command",
       "params": [
-        "percent"
-      ]
-    },
-    {
-      "path": "store.page.choose_tip_amount",
-      "name": "choose_tip_amount",
-      "node": "command",
-      "params": [
-        "amount"
+        "tip"
       ]
     },
     {
@@ -520,6 +518,14 @@
       "params": [
         "id",
         "label"
+      ]
+    },
+    {
+      "path": "store.page.settle_payment",
+      "name": "settle_payment",
+      "node": "command",
+      "params": [
+        "settled"
       ]
     },
     {
@@ -956,6 +962,54 @@
       ]
     },
     {
+      "from": "store.page.cancel_order",
+      "to": "Events.UserCartChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.cancel_order",
+      "to": "Events.UserOrderChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.cancel_order",
+      "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.cancel_order",
+      "to": "store.page.Checkout",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.cancel_order",
+      "to": "store.page.Order",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.cancel_order",
+      "to": "store.page.OrderTotal",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
       "from": "store.page.choose_address",
       "to": "Events.AddressesChanged",
       "kind": "emits",
@@ -981,22 +1035,6 @@
     },
     {
       "from": "store.page.choose_tip",
-      "to": "store.page.Checkout",
-      "kind": "invalidates",
-      "key": [
-        "current_user()"
-      ]
-    },
-    {
-      "from": "store.page.choose_tip_amount",
-      "to": "Events.UserCartChanged",
-      "kind": "emits",
-      "key": [
-        "current_user()"
-      ]
-    },
-    {
-      "from": "store.page.choose_tip_amount",
       "to": "store.page.Checkout",
       "kind": "invalidates",
       "key": [
@@ -1158,6 +1196,54 @@
     {
       "from": "store.page.rename_address",
       "to": "store.page.SavedAddresses",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "Events.UserCartChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "Events.UserOrderChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "store.page.Checkout",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "store.page.Order",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.settle_payment",
+      "to": "store.page.OrderTotal",
       "kind": "invalidates",
       "key": [
         "current_user()"

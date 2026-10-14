@@ -1,24 +1,25 @@
 ADR-0216 - every clause belongs to a declaration that reads it, and a code body admits none
 
 produced by: just e14-clause-heads
-commit: 292d193ca33eb4303531a9eec90d3e386b4a75f2
+commit: 850c4b7feaa70f84c0d9eea1be9a93dd6417cafa
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38504714384 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the rule (compiler/pw-core/tests/clause_places.rs)
 
-test every_head_the_grammar_knows_has_a_place ... ok
 test a_clause_word_in_a_functions_body_is_a_name ... ok
-test a_resource_listens ... ok
 test a_materialization_depends ... ok
+test every_head_the_grammar_knows_has_a_place ... ok
+test a_resource_listens ... ok
 test a_head_on_a_declaration_that_does_not_read_it_is_refused ... ok
 test a_command_emits_and_invalidates ... ok
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 == the store, kiokun and the accepted corpus
 
-pw check: 44 file(s), no diagnostics
-pw check: 26 file(s), no diagnostics
-pw check: 72 file(s), no diagnostics
+pw check: 52 file(s), no diagnostics
+pw check: 27 file(s), no diagnostics
+pw check: 81 file(s), no diagnostics
 
 == mutation controls (scripts/clause_heads_mutations.py)
 
@@ -29,3 +30,4 @@ a cached read's heads belong to a command too: KILLED (1 of 24 tests fail)
 a code body admits clauses: KILLED (1 of 24 tests fail)
 no feasible placement speaks over the declared placement's refusal: KILLED (1 of 18 tests fail)
 5 of 5 mutants killed
+memory bound: no process was stopped

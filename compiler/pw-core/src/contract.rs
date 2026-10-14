@@ -652,6 +652,12 @@ pub struct ComponentExport {
     /// defect: `idempotent_by InteractionId` was checked and never held.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub idempotent_by: Option<String>,
+    /// **Who invokes it, where no reader does** (NEXT 6c): `Payments`, for
+    /// the command a payment's outcome invokes. On the export for the reason
+    /// `authorization` is: the host answers a press naming it as a command
+    /// that is not there, and invokes it only on its provider's word.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invoked_by: Option<String>,
     /// **Where an argument must hold an invariant** (ADR-0179): a browser's
     /// request is a claim, and a host checks it before the component runs.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1602,6 +1608,9 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             component.idempotent_by = decl
                 .policy("idempotent_by")
                 .map(|p| p.value.trim().to_string());
+            component.invoked_by = decl
+                .policy("invoked_by")
+                .map(|p| p.value.trim().to_string());
             component.bounded = sigs
                 .by_def(crate::resolve::DefId { unit, decl: id.0 })
                 .map(|s| {
@@ -1736,6 +1745,11 @@ fn schema_of(
             if let Some(key) = &component.idempotent_by {
                 text.push_str("|idempotent_by:");
                 text.push_str(key);
+            }
+            // Who may invoke it is its interface, as who must hold what is.
+            if let Some(invoker) = &component.invoked_by {
+                text.push_str("|invoked_by:");
+                text.push_str(invoker);
             }
             // What the host checks of an argument before the component runs
             // (ADR-0179), as authorization is.

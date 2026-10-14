@@ -721,6 +721,10 @@ mod search;
 mod hours;
 // TRACK SEAM (order-total): an order's total, the store's data for it.
 mod checkout;
+// NEXT 6c: a deployment's payments, a provider's webhooks held to their
+// signature.
+#[allow(dead_code)]
+mod payments;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -962,6 +966,10 @@ struct Server {
     /// Set once, as the server starts; a page that states its canonical
     /// address cannot be served without it.
     origin: std::sync::OnceLock<String>,
+    /// NEXT 6c: **the deployment's payments**, as its configuration states
+    /// them (`PW_PAYMENTS`), set once as the server starts; none where it
+    /// names none.
+    payments: std::sync::OnceLock<Arc<payments::Payments>>,
 }
 
 /// How many interactions' outcomes one session keeps (ADR-0121). A retry of
@@ -1276,6 +1284,12 @@ fn topology_for(layer: &[&'static str]) -> Topology {
                 "clock.compare",
                 // And its tz database (ADR-0304), read from the host's own.
                 "clock.zone",
+                // NEXT 6c: a payment begun, at the origin alone (step seven):
+                // the deployment's key is this host's, never the program's.
+                // Where the deployment takes none, `begin` answers `NotTaken`.
+                "payments.begin",
+                // Step eight: a payment canceled, by its reader alone.
+                "payments.cancel",
             ]
             .iter()
             .chain(layer)
@@ -1616,6 +1630,7 @@ impl Server {
             slow: Mutex::new(std::collections::VecDeque::new()),
             tellings: Mutex::new(std::collections::VecDeque::new()),
             origin: std::sync::OnceLock::new(),
+            payments: std::sync::OnceLock::new(),
             shown: Mutex::new(BTreeMap::new()),
             documents: std::sync::atomic::AtomicU64::new(1),
             params: Mutex::new(BTreeMap::new()),
@@ -1661,6 +1676,59 @@ impl Server {
             // TRACK SEAM (identity): built above, its principals the layer's.
             identity,
             uploads: uploads::Uploads::default(),
+        }
+    }
+
+    /// **Whether the platform invokes `component_id`, and no reader** (NEXT
+    /// 6c): a command `invoked_by Payments`. A press naming it is answered
+    /// as a command that is not there; the host invokes it on its provider's
+    /// word alone.
+    fn invoked_by_platform(&self, component_id: &str) -> bool {
+        payments::invoked_by_platform(&self.contracts, component_id)
+    }
+
+    /// **A payment the provider's word settled, acted on** (NEXT 6c, step
+    /// seven): the command the program declares `invoked_by Payments`, run
+    /// on behalf of the reader who began the payment, in a hold of its own
+    /// never a browser's, with what the host has from the provider. Keyed by
+    /// the payment and its status (ADR-0325), so an outcome heard twice, or
+    /// by two hosts, commits once. A declared error is the program's answer,
+    /// and acted on; a refusal or a trap is not, and the provider is answered
+    /// so it sends the outcome again.
+    fn settle_payment(&self, settled: &payments::Settled) -> Result<String, String> {
+        let component_id = self
+            .contracts
+            .iter()
+            .find(|c| {
+                c.exports
+                    .first()
+                    .and_then(|e| e.component.as_ref())
+                    .is_some_and(|e| e.invoked_by.as_deref() == Some("Payments"))
+            })
+            .map(|c| c.component_id.clone())
+            .ok_or("the program declares no command invoked by Payments")?;
+        let behalf = self
+            .identity
+            .principals()
+            .on_behalf(&format!("payment-{}", settled.intent), &settled.owner);
+        let session = behalf.session().to_string();
+        let status = settled.status.replace('_', "-");
+        let sent = serde_json::json!({
+            "payment": settled.intent,
+            "order": settled.order,
+            "status": { "$case": status },
+        });
+        let interaction = format!("settle-{}-{status}", settled.intent);
+        let answered = self.command_answer(&component_id, &session, &[sent], Some(&interaction))?;
+        match (answered.committed, answered.why) {
+            (true, _) => Ok(format!("{} is {}: settled", settled.intent, settled.status)),
+            (false, Some(why)) => Err(why),
+            (false, None) => Ok(format!(
+                "{} is {}: the program answered {}",
+                settled.intent,
+                settled.status,
+                answered.result.unwrap_or_default()
+            )),
         }
     }
 
@@ -2236,6 +2304,22 @@ impl Server {
             );
             // The platform's clock (ADR-0304), for the command's moment.
             host.extend(clock::operations(self.now(), &self.zones));
+            // NEXT 6c: the deployment's payments, keyed by this interaction,
+            // each begun by this session's reader, on whose behalf it is
+            // settled (step seven).
+            match self.payments.get() {
+                Some(p) => {
+                    let reader = self.identity.principals().user_of(session);
+                    host.extend(payments::operations(
+                        p.clone(),
+                        interaction.map(str::to_string),
+                        reader,
+                    ));
+                }
+                // None taken: `begin` says so, and the order is placed as
+                // before (step seven).
+                None => host.extend(payments::not_taken()),
+            }
 
             // What the command emits (ADR-0208): it computes each event's
             // values itself and hands them to the platform's outbox, which
@@ -7503,6 +7587,25 @@ fn main() {
             eprintln!("pw dev server: {e}");
             std::process::exit(1);
         });
+    // NEXT 6c: the deployment's payments, as its configuration states them,
+    // refused at start where they may not run.
+    match payments::configure(
+        deployment.development && deployment.loopback(),
+        &deployment.origin,
+        port,
+        std::env::var("PW_PAYMENTS").ok().as_deref(),
+        std::env::var("PW_PAYMENTS_PORT").ok().as_deref(),
+    ) {
+        Ok(Some(p)) => {
+            println!("pw dev server payments: {}", p.describe());
+            let _ = server.payments.set(p);
+        }
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("pw dev server: {e}");
+            std::process::exit(1);
+        }
+    }
     // A page's canonical address is written with the public origin
     // (ADR-0311), or the server does not start.
     let stated = std::env::var("PW_ORIGIN").is_ok_and(|o| !o.is_empty());
@@ -7569,8 +7672,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         }
         headers.push_str(&line);
     }
-    let session = session_of(&headers);
-    let fresh = !headers.contains("pw-session=");
+    let (session, fresh) = session_of(&headers);
 
     // TRACK SEAM (uploads, ADR-0253): an upload reads its own body, within
     // its own limits, before the bound a command's body is held to.
@@ -7614,6 +7716,26 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
     }
     let mut body = vec![0; length];
     if reader.read_exact(&mut body).is_err() {
+        return;
+    }
+
+    // NEXT 6c: the provider's webhook, held to its signature. It comes from
+    // the provider, not this origin, and carries no session.
+    if method == "POST" && route == "/payments/webhook" {
+        let (code, said) = match server.payments.get() {
+            Some(p) => p.heard(
+                payments::header_value(&headers, "stripe-signature"),
+                &body,
+                &|settled| server.settle_payment(settled),
+            ),
+            None => (404, "this deployment takes no payments".to_string()),
+        };
+        respond_build(
+            &mut stream,
+            code,
+            "text/plain; charset=utf-8",
+            said.as_bytes(),
+        );
         return;
     }
 
@@ -7667,11 +7789,14 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // `dist/handlers/<identity>.mjs`). The body is the arguments, as a JSON
         // array, typed here by the component's own parameters; the guard admits
         // only components this server hosts, so an unknown id falls through to
-        // the 404 below rather than to a default.
+        // the 404 below rather than to a default. A command the platform
+        // invokes (NEXT 6c, `invoked_by Payments`) is not a reader's to press,
+        // and falls through with them, as a Convex client's call of an
+        // internal function finds no public one.
         ("POST", route)
-            if route
-                .strip_prefix("/command/")
-                .is_some_and(|id| server.components.contains_key(id)) =>
+            if route.strip_prefix("/command/").is_some_and(|id| {
+                server.components.contains_key(id) && !server.invoked_by_platform(id)
+            }) =>
         {
             let id = &route["/command/".len()..];
             let args = match serde_json::from_slice::<Vec<serde_json::Value>>(&body) {
@@ -9868,14 +9993,21 @@ fn speculation_manifests(dist: &std::path::Path) -> BTreeMap<String, serde_json:
         .collect()
 }
 
-fn session_of(headers: &str) -> String {
-    headers
+/// **The request's session, and whether it is new**: its cookie's, or a
+/// new one where it carries none. A cookie naming a session the platform
+/// opens on a reader's behalf (NEXT 6c, `identity::ON_BEHALF`) is a new
+/// session too: those are never a browser's to present, though their names
+/// are no secret.
+fn session_of(headers: &str) -> (String, bool) {
+    match headers
         .split("pw-session=")
         .nth(1)
         .and_then(|rest| rest.split([';', '\r', '\n']).next())
-        .map(str::to_string)
+    {
+        Some(id) if !id.starts_with(identity::ON_BEHALF) => (id.to_string(), false),
         // TRACK SEAM (identity): a fresh session's id, 128 random bits.
-        .unwrap_or_else(identity::new_session_id)
+        _ => (identity::new_session_id(), true),
+    }
 }
 
 /// **A change to the store's data refused** (track `store-pg`): 409, and
@@ -13468,6 +13600,8 @@ public query Store(",
     mod store_hours;
     // TRACK SEAM (order-total): an order's total.
     mod order_total;
+    // TRACK SEAM (payments): an order awaiting its payment, and settled.
+    mod store_payments;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
@@ -15265,10 +15399,11 @@ public query Store(",
         // address page's five, an address chosen, renamed, removed and saved
         // (track `store-accounts`); and the cart page's checkout, a code
         // applied and taken off, four tips by percent, one by amount, and the
-        // code's and the typed tip's bindings (track `order-total`).
+        // code's and the typed tip's bindings (track `order-total`); and the
+        // order page's, an order awaiting its payment taken back (NEXT 6c).
         assert_eq!(
             named.len(),
-            20,
+            21,
             "add_to_cart, clear_cart, a line's three (ADR-0172), place_order and an address's five: {named:?}"
         );
         assert_eq!(

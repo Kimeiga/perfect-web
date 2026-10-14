@@ -26,8 +26,8 @@ MUTANTS = [
     (
         "the contract does not carry idempotent_by",
         CONTRACT,
-        "                .map(|p| p.value.trim().to_string());\n",
-        "                .map(|p| p.value.trim().to_string()).filter(|_| false);\n",
+        '                .policy("idempotent_by")\n                .map(|p| p.value.trim().to_string());\n',
+        '                .policy("idempotent_by")\n                .map(|p| p.value.trim().to_string()).filter(|_| false);\n',
     ),
     (
         "the host runs a keyed command every time",

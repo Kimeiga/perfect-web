@@ -108,7 +108,8 @@ MUTANTS = [
         "                    this.as_str()\n"
         "                };\n"
         "                w(&mut |r| {\n"
-        "                    let status = r\n",
+        # Re-anchored by NEXT 6c: an awaiting order's status carries its page.
+        "                    let status = match r.order(owner)? {\n",
         "                let owner = if by_reader {\n"
         "                    reader_of(&op, args)?;\n"
         "                    \"ada\"\n"
@@ -117,7 +118,7 @@ MUTANTS = [
         "                    this.as_str()\n"
         "                };\n"
         "                w(&mut |r| {\n"
-        "                    let status = r\n",
+        "                    let status = match r.order(owner)? {\n",
     ),
     (
         "the store keys a session's cart by the session where the program reads it by the reader",
@@ -264,8 +265,11 @@ MUTANTS = [
         "an order a store out of reach is in is placed",
         "server",
         STORE,
-        "                    if by_reader && !cart_reaches(r, &lines, owner)? {\n",
-        "                    if by_reader && !cart_reaches(r, &lines, owner)? && false {\n",
+        # Re-anchored by ADR-0332: the store places an order through
+        # `#await-payment`, and no program reaches `#place` since (train-5's
+        # run found this surviving there).
+        "                if !cart_reaches(r, &lines, owner)? {\n",
+        "                if !cart_reaches(r, &lines, owner)? && false {\n",
     ),
     (
         "a saved address is not chosen",

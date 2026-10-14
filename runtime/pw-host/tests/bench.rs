@@ -245,6 +245,7 @@ fn a_hand_written_rust_guest_through_the_host() {
                 function: "lookup".into(),
                 authorization: Vec::new(),
                 idempotent_by: None,
+                invoked_by: None,
                 bounded: Vec::new(),
             }),
         }],

@@ -11,7 +11,6 @@ use crate::checkout::{Fees, Off, Promo};
 const ADD: &str = "store.page.add_to_cart";
 const PLACE: &str = "store.page.place_order";
 const TIP: &str = "store.page.choose_tip";
-const TIP_AMOUNT: &str = "store.page.choose_tip_amount";
 const APPLY: &str = "store.page.apply_promo";
 
 fn served() -> Served {
@@ -276,8 +275,9 @@ fn each_promo_refusal_is_by_name() {
 }
 
 /// **A tip is never taxed, and never chosen for the reader**: none until
-/// they choose; 20% of $7.00 is $1.40, the tax the same as without it; a
-/// percent the page does not offer, and an amount below nothing, refused.
+/// they choose; 20% of $7.00 is $1.40, the tax the same as without it; an
+/// amount below nothing refused. Each pressed as a browser sends its case
+/// (ADR-0331).
 #[test]
 fn a_tip_is_never_taxed_and_never_a_default() {
     let s = served();
@@ -292,8 +292,10 @@ fn a_tip_is_never_taxed_and_never_a_default() {
     add(&s, "a", "espresso", 2);
     let none = checkout(&s, "a");
     assert_eq!(charge(&none, "tip"), 0, "no tip until one is chosen");
-    let twenty = answered(&s, TIP, "a", &[Val::S64(20)]);
-    assert_eq!(twenty["$case"], "ok", "{twenty}");
+    // The case as a browser sends it (ADR-0331).
+    let tip = format!("/command/{TIP}");
+    let twenty = posted(&s, &tip, "a", "tip-1", r#"[{ "$case": "twenty" }]"#);
+    assert!(twenty.contains("\"$case\":\"ok\""), "{twenty}");
     let tipped = checkout(&s, "a");
     assert_eq!(charge(&tipped, "tip"), 140);
     assert_eq!(
@@ -302,14 +304,23 @@ fn a_tip_is_never_taxed_and_never_a_default() {
         "the tip untaxed"
     );
     assert_eq!(charge(&tipped, "total"), charge(&none, "total") + 140);
-    assert_eq!(answered(&s, TIP, "a", &[Val::S64(17)]), err("not-offered"));
-    assert_eq!(
-        answered(&s, TIP_AMOUNT, "a", &[Val::S64(-100)]),
-        err("negative-tip")
+    let negative = posted(
+        &s,
+        &tip,
+        "a",
+        "tip-2",
+        r#"[{ "$case": "tip-amount", "value": -100 }]"#,
     );
+    assert!(negative.contains("\"negative-tip\""), "{negative}");
     assert_eq!(charge(&checkout(&s, "a"), "tip"), 140, "unchanged");
-    let three = answered(&s, TIP_AMOUNT, "a", &[Val::S64(300)]);
-    assert_eq!(three["$case"], "ok", "{three}");
+    let three = posted(
+        &s,
+        &tip,
+        "a",
+        "tip-3",
+        r#"[{ "$case": "tip-amount", "value": 300 }]"#,
+    );
+    assert!(three.contains("\"$case\":\"ok\""), "{three}");
     assert_eq!(charge(&checkout(&s, "a"), "tip"), 300);
 }
 

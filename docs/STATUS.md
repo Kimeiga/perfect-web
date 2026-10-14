@@ -23,6 +23,39 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0329 amended, 2026-10-13: the store switches to what ADR-0330 and
+ADR-0331 allow** (W9's; track `store-switch`, merged from `1d217edc`, on
+the payments track).
+- The tip is one command, `choose_tip(Tip)`: a case sent from the browser
+  (ADR-0331), and a typed amount refused by name where it is negative
+  (`NegativeTip`). `choose_tip_amount`, `tip_of_percent` and
+  `TipError.NotOffered` are gone, so no percent is refused at run time.
+- `OrderTotal` answers an `Option<Money<USD>>`, read through its arm
+  (ADR-0330) inside the order page's own wording of its total (ADR-0332's:
+  to pay, charged); `cents(0)` where no order is placed is gone.
+Verify 38504714384 green, with train-5.
+
+**ADR-0332, 2026-10-13: a payment is the provider's word, held to its
+signature** (the integrator's; NEXT 6c; track `payments`, merged from
+`9a7a094f`).
+- A webhook is the provider's word only as it signed it (HMAC-SHA256 held
+  to RFC 4231, five minutes either way, every `v1` tried, compared whole),
+  and is read again from the provider before the host acts; a development
+  provider charges nothing and behaves as Stripe's API does.
+- A command `invoked_by Payments` settles a payment on the reader's behalf,
+  once the provider's word says so, and no reader presses it (PW6401 to
+  PW6405). The key is the host's, never a value a program holds.
+- Where the deployment takes payments, an order awaits its payment on the
+  provider's page, which the order page frames; the provider's word places
+  it; its reader, or the provider, takes it back, its lines back in the cart
+  and its code released. A deployment that takes none places as before.
+- Found on the way: a cookie naming the session a payment is settled in
+  was the reader's; an outcome the host could not settle was remembered
+  and never settled; a provider that never answered held the host's layer;
+  the host read a provider's answer to the connection's close; and
+  `secrets.payments()` does not build (not claimed, the reason recorded).
+Verify 38504714384 green, with train-5.
+
 **ADR-0281 amended (5), 2026-10-13: a shell script a recipe runs plans
 it, and master's verify runs no browser suite again on the same code**
 (the integrator's; track `plan-shell`, merged from `f289fc9`).

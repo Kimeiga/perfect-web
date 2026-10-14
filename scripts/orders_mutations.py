@@ -37,10 +37,13 @@ MUTANTS = [
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
         # Re-anchored by track store-accounts: an owner's, a session's or a user's.
-        "                    if lines.is_empty() {\n"
-        '                        return Ok(declared("nothing-to-order"));\n',
-        "                    if false {\n"
-        '                        return Ok(declared("nothing-to-order"));\n',
+        # Re-anchored by ADR-0332: the store places an order through
+        # `#await-payment`, and no program reaches `#place` since (train-5's
+        # run found these two surviving there).
+        "                if lines.is_empty() {\n"
+        '                    return Ok(declared("nothing-to-order"));\n',
+        "                if false {\n"
+        '                    return Ok(declared("nothing-to-order"));\n',
     ),
     (
         "a placed order leaves the cart as it was",
@@ -48,8 +51,9 @@ MUTANTS = [
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
         # Re-anchored by track store-accounts: an owner's, a session's or a user's.
-        "                    r.set_cart(owner, &[])?;\n",
-        "",
+        # Re-anchored by ADR-0332, as the one above.
+        "                r.set_status(owner, Some(AWAITING))?;\n                r.set_cart(owner, &[])?;\n",
+        "                r.set_status(owner, Some(AWAITING))?;\n",
     ),
     (
         "a placed order is not recorded",

@@ -116,7 +116,6 @@ store.page.CartPage  abi f00a4fe14eeded6f
   component pw:app/store.page.Order#Order
   component pw:app/store.page.apply_promo#apply_promo
   component pw:app/store.page.choose_tip#choose_tip
-  component pw:app/store.page.choose_tip_amount#choose_tip_amount
   component pw:app/store.page.clear_cart#clear_cart
   component pw:app/store.page.decrease_in_cart#decrease_in_cart
   component pw:app/store.page.increase_in_cart#increase_in_cart
@@ -183,8 +182,17 @@ store.page.OrderPage  abi ba1334c5a2f7dee7
   needs     session.read
   component pw:app/store.page.Order#Order
   component pw:app/store.page.OrderTotal#OrderTotal
+  component pw:app/store.page.cancel_order#cancel_order
   host      pw:host/principal#read  (session.read)
   exports   page OrderPage
+
+store.page.OrderPage.derived_3  abi 23ce3b89fcf1ed87
+  runs at   origin
+  exports   derived derived$3
+
+store.page.OrderPage.derived_8  abi 1eb10587a8b0b5db
+  runs at   origin
+  exports   derived derived$8
 
 store.page.OrderTotal  abi 86fcfe11a02abe0a
   runs at   origin
@@ -298,6 +306,27 @@ store.page.apply_promo  abi 5ec827dd0f4f958c
   host      store:data/promos#find  (database.read<Stores>)
   exports   command apply_promo
 
+store.page.cancel_order  abi 18b3c1b8eab814e8
+  runs at   origin
+  needs     database.read<Orders>
+  needs     database.write<Carts>
+  needs     database.write<Orders>
+  needs     outbox.write
+  needs     payments.cancel
+  needs     session.read
+  host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/invalidations#store-page-checkout  (outbox.write)
+  host      pw:host/invalidations#store-page-order  (outbox.write)
+  host      pw:host/invalidations#store-page-order-total  (outbox.write)
+  host      pw:host/outbox#user-cart-changed  (outbox.write)
+  host      pw:host/outbox#user-order-changed  (outbox.write)
+  host      pw:host/payments#cancel  (payments.cancel)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/user-orders#awaited  (database.read<Orders>)
+  host      store:data/user-orders#settle  (database.write<Orders>)
+  exports   command cancel_order
+  requires  SignedIn
+
 store.page.choose_address  abi 336d5d3e75e83603
   runs at   origin
   needs     database.write<Addresses>
@@ -319,17 +348,6 @@ store.page.choose_tip  abi 17733c2240e354f0
   host      pw:host/principal#read  (session.read)
   host      store:data/checkout#set-tip  (database.write<Carts>)
   exports   command choose_tip
-
-store.page.choose_tip_amount  abi 412b648412daec74
-  runs at   origin
-  needs     database.write<Carts>
-  needs     outbox.write
-  needs     session.read
-  host      pw:host/invalidations#store-page-checkout  (outbox.write)
-  host      pw:host/outbox#user-cart-changed  (outbox.write)
-  host      pw:host/principal#read  (session.read)
-  host      store:data/checkout#set-tip  (database.write<Carts>)
-  exports   command choose_tip_amount
 
 store.page.clear_cart  abi e46a1824e8426ac2
   runs at   origin
@@ -366,7 +384,7 @@ store.page.increase_in_cart  abi ea834328e33999c3
   host      store:data/user-carts#add  (database.write<Carts>)
   exports   command increase_in_cart
 
-store.page.place_order  abi c303bfed694ff675
+store.page.place_order  abi 336265f353707f23
   runs at   origin
   needs     clock.compare
   needs     clock.zone
@@ -376,6 +394,7 @@ store.page.place_order  abi c303bfed694ff675
   needs     database.write<Carts>
   needs     database.write<Orders>
   needs     outbox.write
+  needs     payments.begin
   needs     session.read
   host      pw:host/clock#at  (clock.zone)
   host      pw:host/clock#passed  (clock.compare)
@@ -386,13 +405,16 @@ store.page.place_order  abi c303bfed694ff675
   host      pw:host/invalidations#store-page-order-total  (outbox.write)
   host      pw:host/outbox#user-cart-changed  (outbox.write)
   host      pw:host/outbox#user-order-changed  (outbox.write)
+  host      pw:host/payments#begin  (payments.begin)
   host      pw:host/principal#read  (session.read)
   host      store:data/checkout#chosen  (database.read<Carts>)
   host      store:data/checkout#parts  (database.read<Carts>)
   host      store:data/fees#for-stores  (database.read<Stores>)
   host      store:data/hours#for-cart  (database.read<Stores>)
   host      store:data/promos#find  (database.read<Stores>)
-  host      store:data/user-orders#place  (database.write<Orders>)
+  host      store:data/user-orders#await-payment  (database.write<Orders>)
+  host      store:data/user-orders#paying  (database.write<Orders>)
+  host      store:data/user-orders#settle  (database.write<Orders>)
   exports   command place_order
   requires  SignedIn
 
@@ -439,6 +461,22 @@ store.page.rename_address  abi 7e1a5f55cd7ee9c6
   host      pw:host/principal#read  (session.read)
   host      store:data/addresses#rename  (database.write<Addresses>)
   exports   command rename_address
+
+store.page.settle_payment  abi 39bcda995b964ea4
+  runs at   origin
+  needs     database.write<Carts>
+  needs     database.write<Orders>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/invalidations#store-page-checkout  (outbox.write)
+  host      pw:host/invalidations#store-page-order  (outbox.write)
+  host      pw:host/invalidations#store-page-order-total  (outbox.write)
+  host      pw:host/outbox#user-cart-changed  (outbox.write)
+  host      pw:host/outbox#user-order-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/user-orders#settle  (database.write<Orders>)
+  exports   command settle_payment
 
 store.search.Search  abi 9c8a7f1e53e7f531
   runs at   origin

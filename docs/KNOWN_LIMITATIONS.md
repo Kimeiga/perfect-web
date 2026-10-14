@@ -1114,8 +1114,11 @@ preserved, not replaced with invented results.
   change.
 - **A cart's lines are mapped to their stores by a read per store**
   (`checkout#parts`, as `hours#for-cart`), until NEXT 4b bounds every read.
-- **The store has not yet switched** to what ADR-0330 and ADR-0331 allow
-  (train-4): the tip is still chosen by two commands, `choose_tip(percent)`
-  refusing an unoffered percent at run time, and `OrderTotal` still answers
-  `cents(0)` where no order is placed, shown only inside the order's arm.
-  The switch is the integrator's next track.
+- **Payments** (ADR-0332): an order no one pays or takes back awaits for
+  good (no sweep of abandoned ones); the provider is asked inside the
+  command's transaction, so the host's commands wait while it answers (ten
+  seconds at most); the reader's return is no second trigger; the store's
+  pages send no Content-Security-Policy (SAQ A's 2025 criterion); a
+  taken-back order's tip and code are chosen again; and a secret does not
+  build in a program (`Secret<C>` is laid out as its tag, as a scope
+  qualifier is): no program holds one.

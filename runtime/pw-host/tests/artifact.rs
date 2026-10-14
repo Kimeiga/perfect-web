@@ -92,6 +92,7 @@ fn contract(imports: Vec<Import>) -> ComponentContract {
                 function: "lookup".into(),
                 authorization: vec![],
                 idempotent_by: None,
+                invoked_by: None,
                 bounded: vec![],
             }),
         }],

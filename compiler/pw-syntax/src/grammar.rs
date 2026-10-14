@@ -277,6 +277,9 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     "concurrency",
     "timeout",
     "requires",
+    // NEXT 6c: a command the platform invokes, never a reader: `invoked_by
+    // Payments`, a payment's outcome the host has from its provider.
+    "invoked_by",
     "idempotent_by",
     "transaction",
     "optimistic",

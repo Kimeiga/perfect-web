@@ -1,0 +1,40 @@
+NEXT 6c - a command the platform invokes, which no reader presses
+
+produced by: just e14-invoked-by
+commit: d59647b12b3ddee41b97fec853e6d1c3cf4b3392
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38528566737 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the clause and its refusals (compiler/pw-core/tests/invoked_by.rs)
+
+test a_command_the_platform_invokes_is_idempotent ... ok
+test a_command_the_platform_invokes_holds_no_reader_to_a_predicate ... ok
+test one_command_answers_a_payments_outcome ... ok
+test no_page_presses_a_command_the_platform_invokes ... ok
+test a_command_the_platform_invokes_is_given_what_the_host_has ... ok
+test a_command_the_platform_invokes_says_so_in_its_contract ... ok
+test only_the_platforms_invokers_and_only_on_a_command ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+== a reader's press refused (spikes/own-renderer/server/src/payments.rs)
+
+test payments::invoked_tests::a_command_the_platform_invokes_is_told_by_its_contract ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 537 filtered out; finished in 0.00s
+
+== mutation controls (scripts/invoked_by_mutations.py)
+
+baseline: 8 passed, 0 failed
+a command the platform invokes may hold a reader to a predicate: KILLED (1 of 8 tests fail)
+a command the platform invokes may take any parameters: KILLED (1 of 8 tests fail)
+the program's own `Settled` is taken for the platform's: KILLED (1 of 8 tests fail)
+two commands may answer a payment's outcome: KILLED (1 of 8 tests fail)
+the first command is refused rather than the second: KILLED (2 of 8 tests fail)
+a page may press a command the platform invokes: KILLED (1 of 8 tests fail)
+the contract does not say who invokes the command: KILLED (1 of 8 tests fail)
+who invokes a command is not part of its interface: KILLED (1 of 8 tests fail)
+a word the platform does not invoke by is taken: KILLED (1 of 8 tests fail)
+the clause is taken on a query: KILLED (1 of 8 tests fail)
+a command the platform invokes need not be idempotent: KILLED (1 of 8 tests fail)
+the host takes a reader's press of a command the platform invokes: KILLED (1 of 8 tests fail)
+12 of 12 mutants killed
+memory bound: no process was stopped

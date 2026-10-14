@@ -75,6 +75,8 @@ pub mod template_ir;
 pub mod types;
 // Track `uploads` (ADR-0260): a file a form posts, and its limits.
 pub mod uploads;
+// NEXT 6c: a command the platform invokes, which no reader presses.
+pub mod invoked;
 pub mod values;
 pub mod wit;
 

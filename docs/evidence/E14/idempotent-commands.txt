@@ -1,14 +1,14 @@
 ADR-0121 - an idempotent command runs once per interaction
 
 produced by: just e14-idempotent-commands
-commit: 25b01345e1a5406a8b977c6c269475aa5b872e60
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38326782630 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 850c4b7feaa70f84c0d9eea1be9a93dd6417cafa
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38504714384 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the contract carries it (compiler/pw-core/tests/component_contract.rs)
 
 test idempotent_by_is_an_export_property_and_part_of_the_abi ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.01s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s
 
 == the reservation keeps what must not run twice (runtime/pw-resource)
 
@@ -18,37 +18,38 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 27 filtered out; fin
 == the server (spikes/own-renderer/server)
 
 test tests::feed_pg::on_postgres_a_posts_interaction_outlives_its_host ... ok
+test payments::operation_tests::a_payment_is_begun_once_per_interaction ... ok
 test tests::store_pg::on_postgres_a_retried_interaction_runs_its_command_once ... ok
 test tests::store_pg::on_postgres_an_interactions_answer_outlives_its_host ... ok
 test tests::store_pg::on_postgres_an_interactions_record_answers_a_day ... ok
 test tests::a_retried_interaction_runs_its_command_once ... ok
 test tests::an_interactions_record_answers_it_for_a_day ... ok
 test tests::interactions_kept_are_bounded_per_session ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 475 filtered out; finished in 0.74s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 530 filtered out; finished in 1.65s
 
 == the browser, each engine alone (e2e/idempotent-command.spec.mjs)
 
-  ✓  2 [chromium] › e2e/idempotent-command.spec.mjs:40:1 › two presses are two interactions (1.6s)
-  ✓  3 [chromium] › e2e/idempotent-command.spec.mjs:49:1 › a command request without an interaction is refused (531ms)
-  ✓  1 [chromium] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (2.2s)
-  3 passed (1.9m)
-  ✓  1 [firefox] › e2e/idempotent-command.spec.mjs:40:1 › two presses are two interactions (2.9s)
-  ✓  2 [firefox] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (3.0s)
-  ✓  3 [firefox] › e2e/idempotent-command.spec.mjs:49:1 › a command request without an interaction is refused (821ms)
-  3 passed (1.9m)
-  ✓  1 [webkit] › e2e/idempotent-command.spec.mjs:40:1 › two presses are two interactions (6.0s)
-  ✓  2 [webkit] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (6.6s)
-  ✓  3 [webkit] › e2e/idempotent-command.spec.mjs:49:1 › a command request without an interaction is refused (772ms)
-  3 passed (2.0m)
+  ✓  2 [chromium] › e2e/idempotent-command.spec.mjs:40:1 › two presses are two interactions (1.5s)
+  ✓  1 [chromium] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (2.1s)
+  ✓  3 [chromium] › e2e/idempotent-command.spec.mjs:49:1 › a command request without an interaction is refused (529ms)
+  3 passed (3.9m)
+  ✓  2 [firefox] › e2e/idempotent-command.spec.mjs:40:1 › two presses are two interactions (2.0s)
+  ✓  3 [firefox] › e2e/idempotent-command.spec.mjs:49:1 › a command request without an interaction is refused (683ms)
+  ✓  1 [firefox] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (3.2s)
+  3 passed (4.0m)
+  ✓  2 [webkit] › e2e/idempotent-command.spec.mjs:40:1 › two presses are two interactions (1.9s)
+  ✓  1 [webkit] › e2e/idempotent-command.spec.mjs:17:1 › a request sent twice is one add (2.5s)
+  ✓  3 [webkit] › e2e/idempotent-command.spec.mjs:49:1 › a command request without an interaction is refused (714ms)
+  3 passed (3.9m)
 
 == mutation controls (scripts/idempotent_commands_mutations.py)
 
-baseline: 64 passed, 0 failed
-the contract does not carry idempotent_by: KILLED (1 of 64 tests fail)
-the host runs a keyed command every time: KILLED (3 of 64 tests fail)
-a request without an interaction runs unkeyed: KILLED (1 of 64 tests fail)
-an interaction reused with other arguments shares the first outcome: KILLED (1 of 64 tests fail)
-every interaction is kept: KILLED (2 of 64 tests fail)
-an unknown outcome is forgotten: KILLED (1 of 64 tests fail)
+baseline: 65 passed, 0 failed
+the contract does not carry idempotent_by: KILLED (1 of 65 tests fail)
+the host runs a keyed command every time: KILLED (3 of 65 tests fail)
+a request without an interaction runs unkeyed: KILLED (1 of 65 tests fail)
+an interaction reused with other arguments shares the first outcome: KILLED (1 of 65 tests fail)
+every interaction is kept: KILLED (2 of 65 tests fail)
+an unknown outcome is forgotten: KILLED (1 of 65 tests fail)
 6 of 6 mutants killed
 memory bound: no process was stopped
