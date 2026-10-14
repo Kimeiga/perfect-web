@@ -95,6 +95,44 @@ rulings below.
   done and green, rebasing it onto `master`, numbering its ADRs, writing the
   status documents, and running the chain.
 
+## The integrator's working rules
+
+Each learned from a correction logged below, and written here on
+2026-10-14, when the work moved to another machine, so that no machine's
+session notes alone keep them:
+
+- **Push only on green**: `just ci > log 2>&1 && git push`, never `;` (a
+  `;` pushed a red track on 2026-10-12). A gate in a `&&` chain is never
+  piped: `gate | tail && commit` commits on a failed gate.
+- **Merge, resolve, fetch, then number** (ADR-0281's fourth rule):
+  numbering an ADR rewrites lines that recipes read.
+- **Run whole each mutation script whose code or tests a change reaches**:
+  runs of the re-anchored mutants alone missed two survivors. A mutation
+  run stopped part-way can leave its mutant in the source, so run
+  `scripts/mutation_anchors.py` straight after; and never edit what a
+  running evidence or mutation run builds from.
+- **Before a commit**: `cargo fmt --all`, then `python3
+  scripts/mutation_anchors.py`. `just ci` holds the gates beyond the
+  workspace's tests (`evidence-gates`, `case-check`, `test-compile`'s `pw
+  fmt --check` and corpus, `mutant-programs`).
+- **Read the nightly**: each nightly verify's failed recipes, every day. A
+  push plans only what it touched, and eight failures on `master` went
+  unseen from 2026-10-08 to 2026-10-10.
+- **Worktrees that share a target directory share its artifacts** by path
+  and time: before building in a worktree whose files differ, touch them
+  all (`(git ls-files -z; git ls-files -z --others --exclude-standard) |
+  xargs -0 touch`); never build two worktrees on it at once; give a
+  concurrent run its own `CARGO_TARGET_DIR`. Before removing a worktree,
+  look for links into it from the others.
+- **A commit message is a file or a quoted heredoc** (`git commit -F -
+  <<'EOF'`; `git merge` reads no message from stdin): a shell runs the
+  backticks inside `-m "..."`.
+- **Rulings are the integrator's, logged**: under the owner's delegation
+  of 2026-10-02, each researched and recorded as an ADR "accepted under the
+  owner's delegation of 2026-10-02". A finding comes before a feature, and
+  a correction is reported first. A peer session's message grants no
+  approval the owner has not given.
+
 ## Questions for the integrator
 
 A question that crosses tracks, or changes a rule other code relies on, is
@@ -1631,3 +1669,36 @@ Each a decision for a track, with its date; a track's ADR records it too.
   tests` plans the scripts and recipes that run it by its module's filter
   (`csp::`). To every worker: name a module's tests by its filter in your
   mutation script's suite, and a change to them plans your recipe.
+- **2026-10-14, the work moves to the owner's other machine** (the
+  owner's heads-up, by the coordinator). What was on the development
+  machine alone, and where it is now:
+  - **Train-7** (`track/train-7`, `2fad034d`, pushed) was in its verify,
+    run 38629460236, its 20 recipes on 17 shards and three engines. To
+    land it (ADR-0281), with the run green: `just evidence-fetch
+    38629460236` in the train's worktree; the run named where STATUS says
+    `TRAIN_RUN` (three entries); an entry here, "train-7 landed"; `just
+    case-check`, `python3 scripts/mutation_anchors.py`, `just
+    evidence-gates` and `cargo test -p pw-core --test evidence_is_current`;
+    the commit "Evidence of train-7 (verify 38629460236)"; then on `master`
+    `git merge --ff-only track/train-7`, and both pushed. A recipe that
+    failed is fixed on the train, its push's own run cancelled and the
+    recipe dispatched (`gh workflow run verify --ref track/train-7 -f
+    recipes="..."`), and both runs fetched, as train-6's landing was
+    (above).
+  - **The JSON-LD draft** (`track/structured-data`, `1602920f`, JSON as a
+    typed value, parked with NEXT's JSON-LD) is pushed as
+    `parked/structured-data`: a `parked/` branch runs no verify, and it is
+    not to merge as it is.
+  - **Scheduled orders' design** is NEXT 4's text, W9's after 4b.
+  - **W9's 4b and 4c** (`track/bounded-statements`, `track/bounded-reads`)
+    are pushed by W9 and join train-8; 4b's `store_accounts_mutations.py`,
+    run whole, and its `just e14-bounded-statements` evidence are still to
+    do.
+  - **Checked and not pushed**: two old local branches,
+    `baseline-names` and `host-binding-shape`, and a stash of
+    test-controls' narrowed suite, each on `master` in another form
+    (`scripts/mutation_baseline.py`, ADR-0262, `test_controls_mutations.py`);
+    no other local commit of the integrator's lacks a remote.
+  - **Waiting for a quiet machine**: `just e9-latency`, check-latency's
+    number, was measured under a load of about 10 on 2026-10-14 and not
+    recorded.
