@@ -183,6 +183,7 @@ store.page.OrderPage  abi ba1334c5a2f7dee7
   needs     session.read
   component pw:app/store.page.Order#Order
   component pw:app/store.page.OrderTotal#OrderTotal
+  component pw:app/store.page.cancel_order#cancel_order
   host      pw:host/principal#read  (session.read)
   exports   page OrderPage
 
@@ -305,6 +306,27 @@ store.page.apply_promo  abi 5ec827dd0f4f958c
   host      store:data/checkout#set-promo  (database.write<Carts>)
   host      store:data/promos#find  (database.read<Stores>)
   exports   command apply_promo
+
+store.page.cancel_order  abi 18b3c1b8eab814e8
+  runs at   origin
+  needs     database.read<Orders>
+  needs     database.write<Carts>
+  needs     database.write<Orders>
+  needs     outbox.write
+  needs     payments.cancel
+  needs     session.read
+  host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/invalidations#store-page-checkout  (outbox.write)
+  host      pw:host/invalidations#store-page-order  (outbox.write)
+  host      pw:host/invalidations#store-page-order-total  (outbox.write)
+  host      pw:host/outbox#user-cart-changed  (outbox.write)
+  host      pw:host/outbox#user-order-changed  (outbox.write)
+  host      pw:host/payments#cancel  (payments.cancel)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/user-orders#awaited  (database.read<Orders>)
+  host      store:data/user-orders#settle  (database.write<Orders>)
+  exports   command cancel_order
+  requires  SignedIn
 
 store.page.choose_address  abi 336d5d3e75e83603
   runs at   origin
@@ -452,8 +474,9 @@ store.page.rename_address  abi 7e1a5f55cd7ee9c6
   host      store:data/addresses#rename  (database.write<Addresses>)
   exports   command rename_address
 
-store.page.settle_payment  abi 4bc435e70318dccb
+store.page.settle_payment  abi 39bcda995b964ea4
   runs at   origin
+  needs     database.write<Carts>
   needs     database.write<Orders>
   needs     outbox.write
   needs     session.read

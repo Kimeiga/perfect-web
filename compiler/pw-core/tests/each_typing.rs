@@ -224,10 +224,11 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
     // `store-accounts`): an address chosen, renamed, removed, and one saved
     // from a place. And the cart page's checkout's seven (track
     // `order-total`): a code applied and taken off, four tips by percent and
-    // one by amount.
+    // one by amount. And the order page's one (NEXT 6c, step eight): an
+    // order awaiting its payment taken back.
     assert_eq!(
         pairs.len(),
-        24,
+        25,
         "the store's page declares five resumable handlers, its cart's page five, its address page's five"
     );
     for (m, a) in &pairs {
@@ -270,10 +271,11 @@ fn the_store_demo_generates_a_resume_manifest_for_its_loop_handler() {
     // page's five are five more (track `store-accounts`); and the cart
     // page's checkout's nine (track `order-total`): its code's and its typed
     // tip's bindings, a code applied and taken off, four tips by percent and
-    // one by amount.
+    // one by amount; and the order page's (NEXT 6c, step eight), an order
+    // awaiting its payment taken back.
     assert_eq!(
         handlers.len(),
-        20,
-        "and twenty handlers are twenty identities"
+        21,
+        "and twenty-one handlers are twenty-one identities"
     );
 }

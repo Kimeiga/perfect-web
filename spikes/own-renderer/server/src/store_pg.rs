@@ -323,6 +323,9 @@ impl Rows for PgRows<'_> {
     fn use_promo(&mut self, owner: &str, code: &str) -> Result<bool, String> {
         crate::checkout::pg_use_promo(&mut self.0, owner, code)
     }
+    fn release_promo(&mut self, owner: &str, code: &str) -> Result<(), String> {
+        crate::checkout::pg_release_promo(&mut self.0, owner, code)
+    }
     fn chosen(&mut self, owner: &str) -> Result<crate::checkout::Chosen, String> {
         crate::checkout::pg_chosen(&mut self.0, owner)
     }

@@ -47,9 +47,9 @@ import context.{ current_session, current_user }
 import domain.{ StoreId, Store, StoreError, CartError, MenuItem, MenuSection, InteractionId,
     MenuItemId, PositiveInt, Recommendation, RecommendationError, DeliveryEstimate,
     EstimateError, OrderStatus, OrderError, TrackingError, Tip, TipError, PromoError,
-    Money, USD, is_less, begin_payment, PaymentPage }
+    Money, USD, is_less, begin_payment, PaymentPage, CancelOrderError }
 // NEXT 6c: a payment begun, and settled on the provider's word.
-import payments.{ Settled, PaymentStatus, BeginError }
+import payments.{ Settled, PaymentStatus, BeginError, CancelError }
 import capability.{ Session, SessionId, User, UserId }
 import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged, AddressesChanged, StoreChanged }
 // TRACK SEAM (store-hours): each store's hours, and whether it is open.
@@ -471,6 +471,33 @@ command settle_payment(settled: Settled)
     emits         UserCartChanged(current_user()), UserOrderChanged(current_user())
 {
     UserOrders.settle(current_user(), settled.order, settled.status)
+}
+
+// **An order awaiting its payment, taken back by its reader** (NEXT 6c, step
+// eight): its payment canceled at the provider, then the order canceled, its
+// lines back in the cart and its code's use released. Where the provider
+// says the payment is past canceling, the order stands, and the provider's
+// word places it.
+command cancel_order()
+    -> Result<OrderStatus, CancelOrderError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    transaction   serializable
+    invalidates   Cart(current_user()), Order(current_user()), Checkout(current_user()), OrderTotal(current_user())
+    emits         UserCartChanged(current_user()), UserOrderChanged(current_user())
+{
+    match UserOrders.awaited(current_user()) {
+        None => Err(CancelOrderError.NotAwaitingPayment),
+        Some(awaited) => match payments.cancel(awaited.payment) {
+            Ok(_) => match UserOrders.settle(current_user(), awaited.order, PaymentStatus.Canceled) {
+                Ok(status) => Ok(status),
+                // Its order gone since it was read: none to take back.
+                Err(_) => Err(CancelOrderError.NotAwaitingPayment),
+            },
+            Err(CancelError.Past(_)) => Err(CancelOrderError.Paid),
+            Err(CancelError.TransportFailed) => Err(CancelOrderError.PaymentUnavailable),
+        },
+    }
 }
 
 // **The tip the reader chooses** (track `order-total`): none, or 15, 18 or
@@ -1012,6 +1039,25 @@ fn awaited_page(order: Option<OrderStatus>) -> Option<PaymentPage> {
     }
 }
 
+// **What an order's total says** (NEXT 6c): to pay, while it awaits its
+// payment; nothing, once it was taken back before it was paid (step eight);
+// charged, otherwise.
+type OrderCharge =
+    | ToPay
+    | NotCharged
+    | Charged
+
+fn charge_of(order: Option<OrderStatus>) -> OrderCharge {
+    match order {
+        Some(status) => match status {
+            OrderStatus.AwaitingPayment(_) => OrderCharge.ToPay,
+            OrderStatus.Canceled => OrderCharge.NotCharged,
+            _ => OrderCharge.Charged,
+        },
+        None => OrderCharge.Charged,
+    }
+}
+
 // **The session's order, as the store moves it along** (ADR-0193): placed,
 // being prepared, on its way, delivered. What the store says next reaches the
 // page while it is open, and a screen reader says it.
@@ -1024,6 +1070,8 @@ user page OrderPage() {
     let order = query Order(current_user())
     // TRACK SEAM (order-total): what it was charged.
     let charged = query OrderTotal(current_user())
+    // Step eight: why an order was not taken back.
+    signal notice: String = ""
 
     view {
         <title>Your order</title>
@@ -1038,12 +1086,15 @@ user page OrderPage() {
                     {:OnTheWay}<p id="order-status">On its way to you.</p>
                     {:Delivered}<p id="order-status">Delivered.</p>
                     {:AwaitingPayment(_)}<p id="order-status">Awaiting your payment: pay below, on the provider's page.</p>
+                    {:Canceled}<p id="order-status">Canceled: its items are back in your cart.</p>
                     {/match}
                     <!-- NEXT 6c: to pay, while it awaits its payment, which
-                         nothing has charged yet; charged, once it is placed. -->
-                    {#match awaited_page(order)}
-                    {:Some(_)}<p id="order-total">Total to pay: {charged.display}</p>
-                    {:None}<p id="order-total">Total charged: {charged.display}</p>
+                         nothing has charged yet; nothing, taken back before
+                         it was paid (step eight); charged, once it is placed. -->
+                    {#match charge_of(order)}
+                    {:ToPay}<p id="order-total">Total to pay: {charged.display}</p>
+                    {:Charged}<p id="order-total">Total charged: {charged.display}</p>
+                    {:NotCharged}<p id="order-total">Nothing was charged.</p>
                     {/match}
                 {:None}<p id="order-status">You have no order yet.</p>
                 {/match}
@@ -1051,9 +1102,28 @@ user page OrderPage() {
             <!-- NEXT 6c: the provider's page, framed outside the status's
                  live region, which a change has read again whole. -->
             {#match awaited_page(order)}
-            {:Some(pay)}<section aria-label="Payment"><iframe id="payment" src={pay.url} title="Pay for your order"></iframe></section>
+            {:Some(pay)}<section aria-label="Payment">
+                <iframe id="payment" src={pay.url} title="Pay for your order"></iframe>
+                <!-- Step eight: taken back, its items back in the cart. -->
+                {#if SignedIn}<button
+                    id="cancel-order"
+                    type="button"
+                    on:press={resumable() => match cancel_order() {
+                        Ok(_) => navigate CartPage(),
+                        Err(CancelOrderError.Paid) => notice = "It is paid: the store has your order.",
+                        Err(CancelOrderError.PaymentUnavailable) => notice = "Your order could not be canceled just now. Try again in a moment.",
+                        Err(CancelOrderError.NotAwaitingPayment) => notice = "There is no order awaiting its payment.",
+                    }}
+                >
+                    Cancel this order
+                </button>{/if}
+            </section>
             {:None}
             {/match}
+            <!-- Why an order was not taken back: in the page from the first
+                 byte, as a live region is, outside what a server value
+                 decides, which the browser does not render again. -->
+            <p id="order-notice" role="status">{notice}</p>
             <p><a href="/">Order from a store</a></p>
         </main>
     }

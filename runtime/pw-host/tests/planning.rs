@@ -67,6 +67,8 @@ fn full() -> Topology {
                     // A payment begun at the deployment's provider (NEXT 6c),
                     // at the origin alone, as the deployment's key is.
                     "payments.begin".to_string(),
+                    // And canceled, by its reader alone (step eight).
+                    "payments.cancel".to_string(),
                 ]),
             },
         ],

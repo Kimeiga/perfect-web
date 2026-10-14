@@ -50,3 +50,16 @@ type Settled = Settled { payment: String, order: String, status: PaymentStatus }
 // reads an amount's units can say one (ADR-0327: `domain`).
 fn begin(order: String, amount: Int) -> Result<Payment, BeginError> !{ payments.begin }
     host "pw:host/payments#begin"
+// **Why a payment was not canceled** (step eight): it is past canceling,
+// paid or being paid, where the provider says it stands; or the provider
+// could not be reached.
+type CancelError =
+    | Past(PaymentStatus)
+    | TransportFailed
+
+// **A payment canceled at the deployment's provider** (step eight): no card
+// is taken for it after. A payment is its reader's to cancel alone: the host
+// refuses one the command's reader did not begin. One canceled already is
+// `Canceled`.
+fn cancel(payment: String) -> Result<PaymentStatus, CancelError> !{ payments.cancel }
+    host "pw:host/payments#cancel"

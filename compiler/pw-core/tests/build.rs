@@ -114,6 +114,8 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.add_to_cart",
             // The cart's code applied (track `order-total`).
             "store.page.apply_promo",
+            // An order awaiting its payment, taken back (NEXT 6c, step eight).
+            "store.page.cancel_order",
             "store.page.choose_address",
             // Its tip, by percent and by amount (track `order-total`).
             "store.page.choose_tip",
@@ -177,13 +179,14 @@ fn the_store_builds_every_artifact_from_source() {
     );
     assert_eq!(
         b.handlers.len(),
-        24,
+        25,
         "add_to_cart, clear_cart, and a line's three (ADR-0172); the cart \
          page's clear and a line's three (ADR-0190), its place_order, and \
          its checkout's seven: a code applied and taken off, four tips by \
          percent and one by amount (track `order-total`) \
          (ADR-0193); the address page's label and its four (track \
-         `store-accounts`)"
+         `store-accounts`); the order page's cancel_order (NEXT 6c, step \
+         eight)"
     );
     assert_eq!(
         b.contracts.len(),

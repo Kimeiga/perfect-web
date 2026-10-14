@@ -1288,6 +1288,8 @@ fn topology_for(layer: &[&'static str]) -> Topology {
                 // the deployment's key is this host's, never the program's.
                 // Where the deployment takes none, `begin` answers `NotTaken`.
                 "payments.begin",
+                // Step eight: a payment canceled, by its reader alone.
+                "payments.cancel",
             ]
             .iter()
             .chain(layer)
@@ -15397,10 +15399,11 @@ public query Store(",
         // address page's five, an address chosen, renamed, removed and saved
         // (track `store-accounts`); and the cart page's checkout, a code
         // applied and taken off, four tips by percent, one by amount, and the
-        // code's and the typed tip's bindings (track `order-total`).
+        // code's and the typed tip's bindings (track `order-total`); and the
+        // order page's, an order awaiting its payment taken back (NEXT 6c).
         assert_eq!(
             named.len(),
-            20,
+            21,
             "add_to_cart, clear_cart, a line's three (ADR-0172), place_order and an address's five: {named:?}"
         );
         assert_eq!(

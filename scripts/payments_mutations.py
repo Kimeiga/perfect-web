@@ -47,11 +47,89 @@ PAYMENTS = ROOT / "spikes/own-renderer/server/src/payments.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 STORE = ROOT / "spikes/own-renderer/server/src/store.rs"
 LAYER = ROOT / "spikes/own-renderer/server/src/store_pg.rs"
+CHECKOUT = ROOT / "spikes/own-renderer/server/src/checkout.rs"
 
 MEMORY, POSTGRES = "memory", "postgres"
 
 # (what is undone, the layer whose tests kill it, file, anchor, replacement)
 MUTANTS = [
+    (
+        "an intent paid is canceled at the provider",
+        MEMORY,
+        PAYMENTS,
+        "            Status::RequiresPaymentMethod | Status::RequiresAction\n        ) {\n",
+        "            Status::RequiresPaymentMethod | Status::RequiresAction | Status::Succeeded\n        ) {\n",
+    ),
+    (
+        "another reader's payment is canceled",
+        MEMORY,
+        PAYMENTS,
+        '        if read["metadata"]["owner"].as_str() != Some(reader.as_str()) {\n',
+        '        if read["metadata"]["owner"].as_str() != Some(reader.as_str()) && false {\n',
+    ),
+    (
+        "a payment canceled already is refused as past canceling",
+        MEMORY,
+        PAYMENTS,
+        '                    Some("canceled") => answer(Ok(canceled)),\n',
+        '                    Some("canceled_") => answer(Ok(canceled)),\n',
+    ),
+    (
+        "an answer is read to the connection's close",
+        MEMORY,
+        PAYMENTS,
+        '    match header_value(&head, "content-length").and_then(|l| l.parse::<usize>().ok()) {\n',
+        '    match header_value(&head, "content-length")\n        .and_then(|l| l.parse::<usize>().ok())\n        .filter(|_| false)\n    {\n',
+    ),
+    (
+        "the host waits for its provider without end",
+        MEMORY,
+        PAYMENTS,
+        "        .set_read_timeout(Some(wait))\n",
+        "        .set_read_timeout(None)\n",
+    ),
+    (
+        "a canceled outcome leaves the order awaiting",
+        MEMORY,
+        STORE,
+        '                if awaits && status == "canceled" {\n',
+        '                if awaits && status == "canceled" && false {\n',
+    ),
+    (
+        "an order taken back keeps its lines",
+        MEMORY,
+        STORE,
+        "    r.set_cart(owner, &cart)?;\n    if let Some(code)",
+        "    let _ = &cart;\n    if let Some(code)",
+    ),
+    (
+        "a line taken back replaces the cart's of its item",
+        MEMORY,
+        STORE,
+        "            Some(held) => held.quantity += line.quantity,\n",
+        "            Some(held) => held.quantity = line.quantity,\n",
+    ),
+    (
+        "an order taken back keeps its code's use",
+        MEMORY,
+        STORE,
+        "        r.release_promo(owner, &code)?;\n",
+        "        let _ = code;\n",
+    ),
+    (
+        "an order no longer awaiting is taken back",
+        MEMORY,
+        STORE,
+        "                    Some(a) if awaits && !a.payment.is_empty() => {\n",
+        "                    Some(a) if !a.payment.is_empty() => {\n",
+    ),
+    (
+        "on PostgreSQL, an order taken back keeps its code's use",
+        POSTGRES,
+        CHECKOUT,
+        '        "DELETE FROM promo_uses WHERE code = $1 AND owner = $2",\n',
+        '        "DELETE FROM promo_uses WHERE code = $1 AND owner = $2 AND false",\n',
+    ),
     (
         "a key longer than a block is not hashed first",
         MEMORY,

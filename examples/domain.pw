@@ -305,17 +305,22 @@ type CartError =
 
 // **Where a customer's order is** (ADR-0193): what the store last said of
 // it, or, where the deployment takes payments, that it awaits its payment
-// on the provider's page (NEXT 6c).
+// on the provider's page, or was taken back before it was paid (NEXT 6c).
 type OrderStatus =
     | Placed
     | Preparing
     | OnTheWay
     | Delivered
     | AwaitingPayment(PaymentPage)
+    | Canceled
 
 // **The provider's page an order's payment is made on** (NEXT 6c): what the
 // order page frames, the provider's own origin.
 type PaymentPage = PaymentPage { url: String }
+
+// **The payment an order awaits** (NEXT 6c, step eight): the order's
+// reference and the payment's id at the provider.
+type AwaitedPayment = AwaitedPayment { order: String, payment: String }
 
 // **Why an order was not placed** (ADR-0193). `AwaitingPayment`: an order
 // of the reader's awaits its payment, which the order page frames (NEXT 6c).
@@ -342,6 +347,17 @@ type OrderError =
     | AwaitingPayment
     // The deployment's provider could not be reached to begin the payment
     // (NEXT 6c): nothing is written, and the reader may press again.
+    | PaymentUnavailable
+
+// **Why an order was not taken back** (NEXT 6c, step eight).
+type CancelOrderError =
+    // No order of the reader's awaits its payment: none to take back.
+    | NotAwaitingPayment
+    // Its payment is past canceling, paid or being paid: the order stands,
+    // and the provider's word places it.
+    | Paid
+    // The provider could not be reached to cancel the payment: the order
+    // awaits still, and the reader may press again.
     | PaymentUnavailable
 
 // --- checkout (track `order-total`) ---------------------------------------

@@ -201,6 +201,9 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
             "address_label",
             // The cart's code applied (track `order-total`).
             "apply_promo",
+            // The order page takes back an order awaiting its payment (NEXT
+            // 6c, step eight).
+            "cancel_order",
             "choose_address",
             // Its tip: none, 15, 18 or 20 percent, four modules of one name;
             // and an amount, typed, which the handler reads as dollars first
@@ -395,8 +398,9 @@ fn a_module_and_its_event_part_name_one_handler() {
     // label's binding, an address chosen, renamed and removed, and one saved.
     // And the cart page's checkout (track `order-total`): the code's and the
     // typed tip's bindings, the code applied and taken off, four tips by
-    // percent and one by amount.
-    assert_eq!(parts.len(), 24, "{parts:?}");
+    // percent and one by amount. And the order page's (NEXT 6c, step
+    // eight): an order awaiting its payment taken back.
+    assert_eq!(parts.len(), 25, "{parts:?}");
     // By identity: two of the address page's handlers have one name (both
     // test the label first, `address_label`), and each is its own module.
     let _ = &modules;

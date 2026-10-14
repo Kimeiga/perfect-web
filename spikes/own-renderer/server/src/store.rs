@@ -286,6 +286,9 @@ pub(crate) trait Rows {
     fn set_promo(&mut self, promo: &crate::checkout::Promo) -> Result<(), String>;
     /// `owner`'s use of `code` recorded, or `false` where it was already.
     fn use_promo(&mut self, owner: &str, code: &str) -> Result<bool, String>;
+    /// `owner`'s use of `code` released (NEXT 6c, step eight): an order taken
+    /// back before it was paid used none.
+    fn release_promo(&mut self, owner: &str, code: &str) -> Result<(), String>;
     fn chosen(&mut self, owner: &str) -> Result<crate::checkout::Chosen, String>;
     fn set_chosen(&mut self, owner: &str, chosen: &crate::checkout::Chosen) -> Result<(), String>;
     /// `owner`'s latest order, its charges recorded.
@@ -327,6 +330,8 @@ impl Written {
 /// An order's status as the program reads it (NEXT 6c): its case, and an
 /// awaiting one's provider's page.
 const AWAITING: &str = "awaiting-payment";
+/// An order taken back before it was paid (step eight).
+const CANCELED: &str = "canceled";
 
 fn order_status(r: &mut dyn Rows, owner: &str, status: String) -> Result<Val, String> {
     if status != AWAITING {
@@ -340,6 +345,30 @@ fn order_status(r: &mut dyn Rows, owner: &str, status: String) -> Result<Val, St
             Val::String(page),
         )]))),
     ))
+}
+
+/// **An awaiting order taken back** (NEXT 6c, step eight): canceled, its
+/// lines back in the reader's cart beside what the cart holds now (a line of
+/// the same item gains its quantity), its code's use released, and the
+/// payment it awaited forgotten. The checkout's choices are the reader's to
+/// make again.
+fn take_back(r: &mut dyn Rows, owner: &str) -> Result<(), String> {
+    let Some(order) = r.order(owner)? else {
+        return Ok(());
+    };
+    let mut cart = r.cart(owner)?;
+    for line in order.lines {
+        match cart.iter_mut().find(|held| held.item == line.item) {
+            Some(held) => held.quantity += line.quantity,
+            None => cart.push(line),
+        }
+    }
+    r.set_cart(owner, &cart)?;
+    if let Some(code) = r.charged(owner)?.and_then(|c| c.promo) {
+        r.release_promo(owner, &code)?;
+    }
+    r.set_status(owner, Some(CANCELED))?;
+    r.set_awaiting(owner, None)
 }
 
 fn ok(v: Val) -> Vec<Val> {
@@ -620,6 +649,29 @@ fn unfaulted(with: With, session: &str, faults: &Faults) -> Ops {
             }),
         );
     }
+    // **The payment the reader's order awaits** (NEXT 6c, step eight): the
+    // order's reference and the payment's id, where an order of theirs
+    // awaits one the provider has begun.
+    let w = with.clone();
+    ops.insert(
+        "store:data/user-orders#awaited".to_string(),
+        Arc::new(move |args: &[Val]| {
+            let (owner, _) = reader_of("user-orders#awaited", args)?;
+            w(&mut |r| {
+                let awaits = r.order(owner)?.is_some_and(|o| o.status == AWAITING);
+                let awaited = match r.awaiting(owner)? {
+                    Some(a) if awaits && !a.payment.is_empty() => {
+                        Some(Box::new(Val::Record(vec![
+                            ("order".into(), Val::String(a.reference)),
+                            ("payment".into(), Val::String(a.payment)),
+                        ])))
+                    }
+                    _ => None,
+                };
+                Ok(vec![Val::Option(awaited)])
+            })
+        }),
+    );
     // The session's delivery estimate (E14, T10), after the estimator's
     // delay: a slow source, which a streamed region does not wait for.
     let estimator = faults
@@ -1307,6 +1359,12 @@ pub(crate) fn writes(
                 if awaits && status == "succeeded" {
                     r.set_status(owner, Some("placed"))?;
                     r.set_awaiting(owner, None)?;
+                    wrote.lock().expect("written").wrote = true;
+                }
+                // Step eight: taken back where it was canceled, by its reader
+                // or by the provider.
+                if awaits && status == "canceled" {
+                    take_back(r, owner)?;
                     wrote.lock().expect("written").wrote = true;
                 }
                 match r.order(owner)? {
@@ -2021,6 +2079,12 @@ impl Rows for MemRows {
             .state()
             .promo_uses
             .insert((code.to_string(), owner.to_string())))
+    }
+    fn release_promo(&mut self, owner: &str, code: &str) -> Result<(), String> {
+        self.state()
+            .promo_uses
+            .remove(&(code.to_string(), owner.to_string()));
+        Ok(())
     }
     fn chosen(&mut self, owner: &str) -> Result<crate::checkout::Chosen, String> {
         Ok(self.state.choices.get(owner).cloned().unwrap_or_default())

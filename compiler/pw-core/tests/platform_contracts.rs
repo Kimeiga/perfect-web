@@ -476,7 +476,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // `BeginError` gains `NotTaken`. `domain.pw`'s `OrderStatus` gains
     // `AwaitingPayment(PaymentPage)`, its `OrderError` `AwaitingPayment` and
     // `PaymentUnavailable`, and it begins a payment (`begin_payment`).
-    const EXPECTED: u64 = 0x2bc2_0d27_6da1_ded6;
+    // 2026-10-13: step eight. `payments` gains `cancel`, effect
+    // `payments.cancel`, and its `CancelError`; `domain.pw`'s `OrderStatus`
+    // gains `Canceled`, and it declares `CancelOrderError` and
+    // `AwaitedPayment`.
+    const EXPECTED: u64 = 0x7ec9_a8b1_5d51_bc1c;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

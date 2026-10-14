@@ -296,6 +296,8 @@ pub(crate) enum ProviderError {
     UnknownIntent,
     /// A card given to an intent that takes none now.
     NotPayable(Status),
+    /// An intent past canceling (step eight): paid, or canceled already.
+    NotCancelable(Status),
 }
 
 /// **The development payment provider** (NEXT 6c): what a provider such as
@@ -440,6 +442,27 @@ impl DevProvider {
         self.read(&id)
     }
 
+    /// **An intent canceled** (step eight), as Stripe cancels one: while it
+    /// waits for a card or for the reader's bank, and not once it is paid or
+    /// canceled (docs.stripe.com "Cancel a PaymentIntent", read 2026-10-13:
+    /// it "Returns an error if the PaymentIntent is already canceled or isn't
+    /// in a cancelable state").
+    pub(crate) fn cancel(&mut self, id: &str) -> Result<Intent, ProviderError> {
+        let intent = self
+            .intents
+            .get_mut(id)
+            .ok_or(ProviderError::UnknownIntent)?;
+        if !matches!(
+            intent.status,
+            Status::RequiresPaymentMethod | Status::RequiresAction
+        ) {
+            return Err(ProviderError::NotCancelable(intent.status));
+        }
+        intent.status = Status::Canceled;
+        self.emit("payment_intent.canceled", id.to_string());
+        self.read(id)
+    }
+
     /// **An event as the provider sends it**: its body, and the signature
     /// header for it at `now` under `secret`.
     pub(crate) fn sent(event: &Event, secret: &[u8], now: i64) -> (String, String) {
@@ -457,6 +480,36 @@ impl DevProvider {
 #[cfg(test)]
 mod provider_tests {
     use super::*;
+
+    /// **An intent is canceled until it is paid** (step eight): while it
+    /// waits for a card or for the reader's bank, with an event; not once it
+    /// is paid, nor again.
+    #[test]
+    fn an_intent_is_canceled_until_it_is_paid() {
+        let mut p = DevProvider::default();
+        let waiting = p.create("k1", "o-1", "reader-a", 1250, 0).expect("made");
+        let canceled = p.cancel(&waiting.id).expect("canceled");
+        assert_eq!(canceled.status, Status::Canceled);
+        assert_eq!(
+            p.outbox.last().map(|e| e.kind),
+            Some("payment_intent.canceled")
+        );
+        assert_eq!(
+            p.cancel(&waiting.id),
+            Err(ProviderError::NotCancelable(Status::Canceled))
+        );
+        let asked = p.create("k2", "o-2", "reader-a", 1250, 0).expect("made");
+        p.pay(&asked.client_secret, "4000000000003220")
+            .expect("asked to authenticate");
+        assert_eq!(p.cancel(&asked.id).map(|i| i.status), Ok(Status::Canceled));
+        let paid = p.create("k3", "o-3", "reader-a", 1250, 0).expect("made");
+        p.pay(&paid.client_secret, "4242424242424242")
+            .expect("paid");
+        assert_eq!(
+            p.cancel(&paid.id),
+            Err(ProviderError::NotCancelable(Status::Succeeded))
+        );
+    }
 
     /// **One intent per key**: sent again within a day with the same order
     /// and amount, the same intent; with another amount, refused; after a
@@ -566,7 +619,7 @@ mod provider_tests {
 // --- the development provider, on its own origin ---------------------------
 
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -833,6 +886,37 @@ impl Origin {
             ("GET", ["v1", "payment_intents", id]) => {
                 match self.provider.lock().expect("provider").read(id) {
                     Ok(i) => write(&mut stream, 200, json, "", intent_json(&i).as_bytes()),
+                    Err(_) => write(
+                        &mut stream,
+                        404,
+                        json,
+                        "",
+                        br#"{"error":{"type":"invalid_request_error","message":"no such intent"}}"#,
+                    ),
+                }
+            }
+            // Step eight: an intent canceled, as Stripe's API cancels one, its
+            // event sent once the answer is written, as a provider's webhook
+            // comes after the request that made it.
+            ("POST", ["v1", "payment_intents", id, "cancel"]) => {
+                let canceled = self.provider.lock().expect("provider").cancel(id);
+                match canceled {
+                    Ok(i) => {
+                        write(&mut stream, 200, json, "", intent_json(&i).as_bytes());
+                        self.deliver();
+                    }
+                    Err(ProviderError::NotCancelable(_)) => {
+                        let read = self.provider.lock().expect("provider").read(id);
+                        let intent: serde_json::Value = read
+                            .map(|i| serde_json::from_str(&intent_json(&i)).unwrap_or_default())
+                            .unwrap_or_default();
+                        let refused = serde_json::json!({ "error": {
+                            "type": "invalid_request_error",
+                            "code": "payment_intent_unexpected_state",
+                            "payment_intent": intent,
+                        } });
+                        write(&mut stream, 400, json, "", refused.to_string().as_bytes());
+                    }
                     Err(_) => write(
                         &mut stream,
                         404,
@@ -1209,20 +1293,12 @@ pub(crate) fn get(url: &str) -> Result<(u16, String), String> {
     let (authority, path) = rest
         .split_once('/')
         .map_or((rest, "/".to_string()), |(a, p)| (a, format!("/{p}")));
-    let mut stream = TcpStream::connect(authority).map_err(|e| e.to_string())?;
+    let mut stream = provider_stream(authority, PROVIDER_WAIT)?;
     let head = format!("GET {path} HTTP/1.1\r\nhost: {authority}\r\nconnection: close\r\n\r\n");
     stream
         .write_all(head.as_bytes())
         .map_err(|e| e.to_string())?;
-    let mut all = String::new();
-    stream.read_to_string(&mut all).map_err(|e| e.to_string())?;
-    let (head, body) = all.split_once("\r\n\r\n").ok_or("no head")?;
-    let code = head
-        .split_whitespace()
-        .nth(1)
-        .and_then(|c| c.parse().ok())
-        .ok_or("no status")?;
-    Ok((code, body.to_string()))
+    answer_of(stream)
 }
 
 /// **The payment an owner's order awaits** (step seven): the order's
@@ -1639,29 +1715,41 @@ pub(crate) fn configure(
                     .checked_add(100)
                     .ok_or("no port 100 above this server's")?,
             };
-            let mut secret = [0u8; 32];
-            getrandom::fill(&mut secret).map_err(|e| format!("a webhook secret: {e}"))?;
-            let listener = TcpListener::bind(("127.0.0.1", provider_port)).map_err(|e| {
-                format!("the development payment provider's port {provider_port}: {e}")
-            })?;
-            let provider = format!("http://127.0.0.1:{provider_port}");
-            let origin = Arc::new(Origin::new(
-                &secret,
-                &format!("http://127.0.0.1:{port}/payments/webhook"),
-                host_origin,
-                wall_seconds,
-            ));
-            std::thread::spawn(move || serve(listener, origin));
-            Ok(Some(Arc::new(Payments {
-                hearing: Hearing::new(&secret, &provider),
-                provider,
-                settled: Mutex::new(Vec::new()),
-            })))
+            Ok(Some(development(host_origin, port, provider_port)?.0))
         }
         other => Err(format!(
             "PW_PAYMENTS is `{other}`: this server knows `dev`, or none"
         )),
     }
+}
+
+/// **The development provider, started** on an origin of its own at
+/// `provider_port`, telling the host at `port` (NEXT 6c): the deployment's
+/// payments, and the provider, which a test holds to send its events late.
+pub(crate) fn development(
+    host_origin: &str,
+    port: u16,
+    provider_port: u16,
+) -> Result<(Arc<Payments>, Arc<Origin>), String> {
+    let mut secret = [0u8; 32];
+    getrandom::fill(&mut secret).map_err(|e| format!("a webhook secret: {e}"))?;
+    let listener = TcpListener::bind(("127.0.0.1", provider_port))
+        .map_err(|e| format!("the development payment provider's port {provider_port}: {e}"))?;
+    let provider = format!("http://127.0.0.1:{provider_port}");
+    let origin = Arc::new(Origin::new(
+        &secret,
+        &format!("http://127.0.0.1:{port}/payments/webhook"),
+        host_origin,
+        wall_seconds,
+    ));
+    let served = origin.clone();
+    std::thread::spawn(move || serve(listener, served));
+    let payments = Arc::new(Payments {
+        hearing: Hearing::new(&secret, &provider),
+        provider,
+        settled: Mutex::new(Vec::new()),
+    });
+    Ok((payments, origin))
 }
 
 #[cfg(test)]
@@ -1790,6 +1878,64 @@ mod configured_tests {
 
 use pw_host::engine::{HostFn, Val};
 
+/// **How long the host waits for its provider** (step eight): to connect,
+/// to send and to be answered. A host's commands wait while the provider
+/// answers one of them, its layer held, so a provider that does not answer
+/// in ten seconds is one that cannot be reached (`TransportFailed`).
+const PROVIDER_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// **A connection to the provider at `authority`**, held to `wait` for
+/// connecting, sending and answering.
+fn provider_stream(authority: &str, wait: std::time::Duration) -> Result<TcpStream, String> {
+    let address = authority
+        .to_socket_addrs()
+        .map_err(|e| e.to_string())?
+        .next()
+        .ok_or_else(|| format!("no address for `{authority}`"))?;
+    let stream = TcpStream::connect_timeout(&address, wait).map_err(|e| e.to_string())?;
+    stream
+        .set_read_timeout(Some(wait))
+        .map_err(|e| e.to_string())?;
+    stream
+        .set_write_timeout(Some(wait))
+        .map_err(|e| e.to_string())?;
+    Ok(stream)
+}
+
+/// **An answer read off `stream`**: its status, and its body as long as its
+/// head says (RFC 9112 §6.3), so it is read once it is sent, whether or not
+/// the connection then stays open (step eight). A provider sends an event
+/// before it closes, and a reader's command that waited for the close would
+/// hold the host's layer while the event waited for it.
+fn answer_of(stream: TcpStream) -> Result<(u16, String), String> {
+    let mut reader = BufReader::new(stream);
+    let mut head = String::new();
+    loop {
+        let mut line = String::new();
+        let n = reader.read_line(&mut line).map_err(|e| e.to_string())?;
+        if n == 0 || line == "\r\n" {
+            break;
+        }
+        head.push_str(&line);
+    }
+    let code = head
+        .split_whitespace()
+        .nth(1)
+        .and_then(|c| c.parse().ok())
+        .ok_or_else(|| format!("no status: {head:?}"))?;
+    let mut body = Vec::new();
+    match header_value(&head, "content-length").and_then(|l| l.parse::<usize>().ok()) {
+        Some(length) => {
+            body.resize(length, 0);
+            reader.read_exact(&mut body).map_err(|e| e.to_string())?;
+        }
+        None => {
+            reader.read_to_end(&mut body).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok((code, String::from_utf8_lossy(&body).into_owned()))
+}
+
 /// **A POST of JSON to `url`**, with an `Idempotency-Key`: its status and
 /// body.
 fn post_json(url: &str, key: &str, body: &serde_json::Value) -> Result<(u16, String), String> {
@@ -1798,7 +1944,7 @@ fn post_json(url: &str, key: &str, body: &serde_json::Value) -> Result<(u16, Str
         .split_once('/')
         .map_or((rest, "/".to_string()), |(a, p)| (a, format!("/{p}")));
     let body = body.to_string();
-    let mut stream = TcpStream::connect(authority).map_err(|e| e.to_string())?;
+    let mut stream = provider_stream(authority, PROVIDER_WAIT)?;
     let head = format!(
         "POST {path} HTTP/1.1\r\nhost: {authority}\r\ncontent-type: application/json\r\nidempotency-key: {key}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
         body.len()
@@ -1809,15 +1955,7 @@ fn post_json(url: &str, key: &str, body: &serde_json::Value) -> Result<(u16, Str
     stream
         .write_all(body.as_bytes())
         .map_err(|e| e.to_string())?;
-    let mut all = String::new();
-    stream.read_to_string(&mut all).map_err(|e| e.to_string())?;
-    let (head, body) = all.split_once("\r\n\r\n").ok_or("no head")?;
-    let code = head
-        .split_whitespace()
-        .nth(1)
-        .and_then(|c| c.parse().ok())
-        .ok_or("no status")?;
-    Ok((code, body.to_string()))
+    answer_of(stream)
 }
 
 /// A payment as the program's `Payment` is: `{ id, client_secret, status }`.
@@ -1860,7 +1998,15 @@ pub(crate) fn not_taken() -> Vec<(String, HostFn)> {
             None,
         )))))])
     });
-    vec![("pw:host/payments#begin".to_string(), begin)]
+    // A program that cancels a payment where none is taken has named one no
+    // payment was begun for.
+    let cancel: HostFn = Arc::new(|_args: &[Val]| {
+        Err("this deployment takes no payments: there is none to cancel".to_string())
+    });
+    vec![
+        ("pw:host/payments#begin".to_string(), begin),
+        ("pw:host/payments#cancel".to_string(), cancel),
+    ]
 }
 
 /// **The payments' operations, for one command** (NEXT 6c):
@@ -1873,6 +2019,7 @@ pub(crate) fn operations(
     interaction: Option<String>,
     owner: String,
 ) -> Vec<(String, HostFn)> {
+    let (provider, reader) = (payments.provider.clone(), owner.clone());
     let begin: HostFn = Arc::new(move |args: &[Val]| {
         let [Val::String(order), Val::S64(amount)] = args else {
             return Err(format!("payments#begin(order, amount) received {args:?}"));
@@ -1912,7 +2059,58 @@ pub(crate) fn operations(
             Ok(_) | Err(_) => failed(),
         }
     });
-    vec![("pw:host/payments#begin".to_string(), begin)]
+    // **A payment canceled, by its reader alone** (step eight): read first,
+    // and refused where another reader began it, as no program of this
+    // reader's could name one; canceled already, what was asked holds.
+    let cancel: HostFn = Arc::new(move |args: &[Val]| {
+        let [Val::String(payment)] = args else {
+            return Err(format!("payments#cancel(payment) received {args:?}"));
+        };
+        let answer = |r: Result<Val, Val>| -> Result<Vec<Val>, String> {
+            Ok(vec![Val::Result(match r {
+                Ok(v) => Ok(Some(Box::new(v))),
+                Err(e) => Err(Some(Box::new(e))),
+            })])
+        };
+        let unreached = Val::Variant("transport-failed".into(), None);
+        let canceled = Val::Variant("canceled".into(), None);
+        let intent = format!("{provider}/v1/payment_intents/{payment}");
+        let read: serde_json::Value = match get(&intent) {
+            Ok((200, body)) => serde_json::from_str(&body).map_err(|e| e.to_string())?,
+            Ok((404, _)) => return Err(format!("no payment `{payment}` at the provider")),
+            Ok(_) | Err(_) => return answer(Err(unreached)),
+        };
+        if read["metadata"]["owner"].as_str() != Some(reader.as_str()) {
+            return Err(format!(
+                "payment `{payment}` is not this reader's to cancel"
+            ));
+        }
+        let asked = serde_json::json!({ "cancellation_reason": "requested_by_customer" });
+        match post_json(
+            &format!("{intent}/cancel"),
+            &format!("cancel-{payment}"),
+            &asked,
+        ) {
+            Ok((200, _)) => answer(Ok(canceled)),
+            Ok((400, body)) => {
+                let said: serde_json::Value =
+                    serde_json::from_str(&body).map_err(|e| e.to_string())?;
+                match said["error"]["payment_intent"]["status"].as_str() {
+                    Some("canceled") => answer(Ok(canceled)),
+                    Some(status) => answer(Err(Val::Variant(
+                        "past".into(),
+                        Some(Box::new(Val::Variant(status.replace('_', "-"), None))),
+                    ))),
+                    None => Err(format!("the provider refused the cancel: {body}")),
+                }
+            }
+            Ok(_) | Err(_) => answer(Err(unreached)),
+        }
+    });
+    vec![
+        ("pw:host/payments#begin".to_string(), begin),
+        ("pw:host/payments#cancel".to_string(), cancel),
+    ]
 }
 
 /// **Whether the platform invokes `component_id`, and no reader** (NEXT
@@ -2048,6 +2246,154 @@ mod operation_tests {
                 "transport-failed".into(),
                 None
             )))))]
+        );
+    }
+}
+#[cfg(test)]
+mod answer_tests {
+    use super::*;
+
+    /// **An answer is read by its length** (step eight): its body read once
+    /// it is sent, while the connection stays open. Read to the close, a
+    /// provider that sends its event before closing held a reader's
+    /// command, which held the host's layer the event waited for.
+    #[test]
+    fn an_answer_is_read_by_its_length_not_its_close() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let url = format!("http://{}/v1/x", listener.local_addr().expect("addr"));
+        let (done, held) = std::sync::mpsc::channel::<()>();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let _ = read_request(&stream);
+            write(&mut stream, 200, "application/json", "", br#"{"ok":true}"#);
+            // Open until the answer is read, or thirty seconds.
+            let _ = held.recv_timeout(std::time::Duration::from_secs(30));
+        });
+        let started = std::time::Instant::now();
+        let answered = get(&url);
+        let took = started.elapsed();
+        let _ = done.send(());
+        assert_eq!(answered, Ok((200, r#"{"ok":true}"#.to_string())));
+        assert!(took < std::time::Duration::from_secs(5), "{took:?}");
+    }
+
+    /// **A provider that does not answer in time is one that cannot be
+    /// reached** (step eight): the host's commands wait while it answers, so
+    /// they wait no longer than `PROVIDER_WAIT`. Here a tenth of a second,
+    /// against a provider that never answers.
+    #[test]
+    fn a_provider_that_does_not_answer_in_time_is_not_reached() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let authority = listener.local_addr().expect("addr").to_string();
+        let (done, held) = std::sync::mpsc::channel::<()>();
+        std::thread::spawn(move || {
+            let (_stream, _) = listener.accept().expect("accept");
+            let _ = held.recv_timeout(std::time::Duration::from_secs(30));
+        });
+        let started = std::time::Instant::now();
+        let stream =
+            provider_stream(&authority, std::time::Duration::from_millis(100)).expect("connected");
+        let answered = answer_of(stream);
+        let took = started.elapsed();
+        let _ = done.send(());
+        assert!(answered.is_err(), "{answered:?}");
+        assert!(took < std::time::Duration::from_secs(5), "{took:?}");
+        assert_eq!(PROVIDER_WAIT, std::time::Duration::from_secs(10));
+    }
+}
+
+#[cfg(test)]
+mod cancel_tests {
+    use super::*;
+
+    /// The operations of a command of `reader`'s, with an interaction.
+    fn of(payments: &Arc<Payments>, reader: &str, press: &str) -> Vec<(String, HostFn)> {
+        operations(payments.clone(), Some(press.into()), reader.into())
+    }
+
+    fn begun(payments: &Arc<Payments>, reader: &str, order: &str) -> String {
+        let out =
+            of(payments, reader, "press-a")[0].1(&[Val::String(order.into()), Val::S64(1250)])
+                .expect("begun");
+        match out.as_slice() {
+            [Val::Result(Ok(Some(p)))] => match p.as_ref() {
+                Val::Record(fields) => match &fields[0].1 {
+                    Val::String(id) => id.clone(),
+                    other => panic!("{other:?}"),
+                },
+                other => panic!("{other:?}"),
+            },
+            other => panic!("{other:?}"),
+        }
+    }
+
+    fn canceled(payments: &Arc<Payments>, reader: &str, id: &str) -> Result<Vec<Val>, String> {
+        of(payments, reader, "press-b")[1].1(&[Val::String(id.into())])
+    }
+
+    /// **A payment is canceled by its reader alone** (step eight): canceled,
+    /// and again, `Canceled`; another reader's refused before the provider
+    /// is asked; one paid, `Past(Succeeded)`; a provider not there,
+    /// `TransportFailed`.
+    #[test]
+    fn a_payment_is_canceled_by_its_reader_alone() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let host_port = listener.local_addr().expect("addr").port();
+        drop(listener);
+        let free = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let provider_port = free.local_addr().expect("addr").port();
+        drop(free);
+        let (payments, origin) =
+            development("http://127.0.0.1:3301", host_port, provider_port).expect("started");
+        // Its events go to no host here.
+        origin.hold();
+        let ok_canceled = vec![Val::Result(Ok(Some(Box::new(Val::Variant(
+            "canceled".into(),
+            None,
+        )))))];
+        let id = begun(&payments, "reader-a", "o-1");
+        assert_eq!(
+            canceled(&payments, "reader-a", &id),
+            Ok(ok_canceled.clone())
+        );
+        assert_eq!(canceled(&payments, "reader-a", &id), Ok(ok_canceled));
+        let other = begun(&payments, "reader-a", "o-2");
+        assert!(
+            canceled(&payments, "reader-b", &other)
+                .expect_err("another reader's")
+                .contains("not this reader's")
+        );
+        assert_eq!(
+            origin
+                .provider
+                .lock()
+                .expect("provider")
+                .read(&other)
+                .map(|i| i.status),
+            Ok(Status::RequiresPaymentMethod),
+            "refused before the provider was asked"
+        );
+        let paid = begun(&payments, "reader-a", "o-3");
+        {
+            let mut p = origin.provider.lock().expect("provider");
+            let secret = p.read(&paid).expect("read").client_secret;
+            p.pay(&secret, "4242424242424242").expect("paid");
+        }
+        assert_eq!(
+            canceled(&payments, "reader-a", &paid),
+            Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                "past".into(),
+                Some(Box::new(Val::Variant("succeeded".into(), None))),
+            )))))])
+        );
+        assert_eq!(
+            operations(unreachable(), Some("press-a".into()), "reader-a".into())[1].1(&[
+                Val::String(id.clone())
+            ]),
+            Ok(vec![Val::Result(Err(Some(Box::new(Val::Variant(
+                "transport-failed".into(),
+                None
+            )))))])
         );
     }
 }

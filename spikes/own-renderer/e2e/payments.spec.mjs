@@ -107,3 +107,20 @@ test("a reader's press of the command the provider's word invokes is a command t
   });
   expect(await pressed.json()).toMatchObject({ committed: true });
 });
+test("an order awaiting its payment is taken back, its items back in the cart", async ({ page }) => {
+  await anEspresso(page);
+  await page.getByRole("button", { name: "Place order" }).click();
+  await page.waitForURL(/\/order$/);
+  await expect(page.locator("#order-status")).toHaveText(AWAITING);
+  const taken = page.waitForResponse("**/command/store.page.cancel_order");
+  await page.getByRole("button", { name: "Cancel this order" }).click();
+  await taken;
+  await page.waitForURL(/\/cart$/);
+  await expect(page.locator("#cart-count")).toHaveText("1");
+  await ready(page, "/order");
+  await expect(page.locator("#order-status")).toHaveText(
+    "Canceled: its items are back in your cart.",
+  );
+  await expect(page.locator("#order-total")).toHaveText("Nothing was charged.");
+  await expect(page.locator("#payment")).toHaveCount(0);
+});

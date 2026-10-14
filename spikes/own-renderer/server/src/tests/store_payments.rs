@@ -11,11 +11,14 @@ use super::*;
 
 const ADD: &str = "store.page.add_to_cart";
 const PLACE: &str = "store.page.place_order";
+const CANCEL: &str = "store.page.cancel_order";
+const APPLY: &str = "store.page.apply_promo";
 
 /// **The store, taking payments from the development provider**, its
 /// webhook served by the server's own [`handle`] while `test` runs: the
-/// provider tells the host what a card did as it would in a deployment.
-fn paying(test: impl FnOnce(&Served)) {
+/// provider tells the host what a card did as it would in a deployment. The
+/// test is given the provider too, to hold its word back (step eight).
+fn paying(test: impl FnOnce(&Served, &payments::Origin)) {
     let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
     let port = listener.local_addr().expect("address").port();
@@ -23,15 +26,9 @@ fn paying(test: impl FnOnce(&Served)) {
         .and_then(|l| l.local_addr())
         .expect("a free port")
         .port();
-    let configured = payments::configure(
-        true,
-        &format!("http://127.0.0.1:{port}"),
-        port,
-        Some("dev"),
-        Some(&provider_port.to_string()),
-    )
-    .expect("configured")
-    .expect("payments");
+    let (configured, origin) =
+        payments::development(&format!("http://127.0.0.1:{port}"), port, provider_port)
+            .expect("the development provider");
     assert!(s.payments.set(configured).is_ok(), "set once");
     let done = std::sync::atomic::AtomicBool::new(false);
     std::thread::scope(|scope| {
@@ -45,7 +42,7 @@ fn paying(test: impl FnOnce(&Served)) {
                 }
             }
         });
-        let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| test(&s)));
+        let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| test(&s, &origin)));
         done.store(true, std::sync::atomic::Ordering::SeqCst);
         // The listener's last connection, so it sees it is done.
         let _ = TcpStream::connect(("127.0.0.1", port));
@@ -84,12 +81,21 @@ fn status_of(s: &Server, session: &str) -> Option<(String, Option<String>)> {
 /// **A card paid in the provider's page**, as the reader's browser posts
 /// its form there: the page the provider answers with.
 fn pay(page: &str, card: &str) -> String {
-    let rest = page.strip_prefix("http://").expect("an http page");
+    sent(
+        page,
+        "application/x-www-form-urlencoded",
+        &format!("card={card}"),
+    )
+}
+
+/// A POST of `body` to `url` at the provider, and its whole answer, read to
+/// the close: once the provider has told the host what the request did.
+fn sent(url: &str, kind: &str, body: &str) -> String {
+    let rest = url.strip_prefix("http://").expect("an http URL");
     let (authority, path) = rest.split_once('/').expect("a path");
-    let body = format!("card={card}");
     let mut stream = TcpStream::connect(authority).expect("the provider");
     let head = format!(
-        "POST /{path} HTTP/1.1\r\nhost: {authority}\r\ncontent-type: application/x-www-form-urlencoded\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+        "POST /{path} HTTP/1.1\r\nhost: {authority}\r\ncontent-type: {kind}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
         body.len()
     );
     stream.write_all(head.as_bytes()).expect("write");
@@ -127,7 +133,7 @@ fn placed_awaiting(s: &Server) -> String {
 /// reaches_its_open_page`).
 #[test]
 fn an_order_awaits_its_payment_on_the_providers_page() {
-    paying(|s| {
+    paying(|s, _| {
         let page = placed_awaiting(s);
         let provider = &s.payments.get().expect("payments").provider;
         assert!(page.starts_with(&format!("{provider}/pay/")), "{page}");
@@ -174,7 +180,7 @@ fn an_order_awaits_its_payment_on_the_providers_page() {
 /// program's `settle_payment` as the reader who began it.
 #[test]
 fn a_card_paid_places_the_order_and_its_open_page_is_told() {
-    paying(|s| {
+    paying(|s, _| {
         let page = placed_awaiting(s);
         s.serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
             .expect("served");
@@ -231,7 +237,7 @@ fn a_card_paid_places_the_order_and_its_open_page_is_told() {
 /// reader pays on stays the same.
 #[test]
 fn a_card_declined_leaves_the_order_awaiting_and_the_payment_takes_another() {
-    paying(|s| {
+    paying(|s, _| {
         let page = placed_awaiting(s);
         let declined = pay(&page, "4000000000000002");
         assert!(declined.contains("Your card was declined."), "{declined}");
@@ -250,7 +256,7 @@ fn a_card_declined_leaves_the_order_awaiting_and_the_payment_takes_another() {
 /// leaves the order awaiting. The control: its own reference places it.
 #[test]
 fn a_payment_for_an_order_the_reader_has_not_placed_changes_nothing() {
-    paying(|s| {
+    paying(|s, _| {
         let page = placed_awaiting(s);
         let owner = s.owner("a");
         let other = payments::Settled {
@@ -303,7 +309,7 @@ fn a_provider_that_cannot_be_reached_places_nothing() {
 /// route takes a command a reader presses.
 #[test]
 fn a_readers_press_of_the_settling_command_is_not_a_command() {
-    paying(|s| {
+    paying(|s, _| {
         let page = placed_awaiting(s);
         let forged = posted(
             s,
@@ -330,7 +336,7 @@ fn a_readers_press_of_the_settling_command_is_not_a_command() {
 /// control: a cookie's own session is its.
 #[test]
 fn a_session_opened_on_a_readers_behalf_is_no_browsers_to_present() {
-    paying(|s| {
+    paying(|s, _| {
         placed_awaiting(s);
         let behalf = s
             .identity
@@ -354,5 +360,149 @@ fn a_session_opened_on_a_readers_behalf_is_no_browsers_to_present() {
         // The control: the reader's own cookie is the reader's order.
         let own = get_as(s, "a", "/order");
         assert!(visible(&own).contains("Awaiting your payment"), "{own}");
+    });
+}
+/// The payment the reader's awaiting order is paid on, by its id, read from
+/// the provider's page for it (`<provider>/pay/<id>_secret_<n>`).
+fn payment_of(page: &str) -> String {
+    let secret = page.rsplit('/').next().expect("a secret");
+    secret.split("_secret_").next().expect("an id").to_string()
+}
+
+/// A command pressed by the reader, as a page presses it, with `interaction`.
+fn pressed(s: &Server, command: &str, args: &[Val], interaction: &str) -> Answered {
+    s.command_answered(command, "a", args, Some(interaction))
+        .expect("answered")
+}
+
+fn refused_as(answered: &Answered, case: &str) -> bool {
+    !answered.committed
+        && answered
+            .result
+            .as_ref()
+            .is_some_and(|r| r.to_string().contains(&format!("\"{case}\"")))
+}
+
+/// **A reader takes back an order awaiting its payment** (step eight): its
+/// payment canceled at the provider, the order canceled and its lines back
+/// in the cart beside what the cart holds now; the provider's page takes no
+/// card for it after; a second press finds no order awaiting one. The
+/// control: an order not taken back awaits still
+/// (`an_order_awaits_its_payment_on_the_providers_page`).
+#[test]
+fn a_reader_takes_back_an_order_awaiting_its_payment() {
+    paying(|s, _| {
+        let page = placed_awaiting(s);
+        s.command(ADD, "a", &add_shown("espresso", 1), false)
+            .expect("added");
+        let taken = pressed(s, CANCEL, &[], "cancel-1");
+        assert!(taken.committed, "{:?}", taken.result);
+        assert_eq!(status_of(s, "a"), Some(("canceled".to_string(), None)));
+        assert_eq!(
+            s.cart_lines("a"),
+            vec![("espresso".to_string(), 3), ("cortado".to_string(), 1)]
+        );
+        let (html, _, _, _) = s
+            .serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+            .expect("served");
+        assert!(
+            visible(&html).contains("Canceled: its items are back in your cart."),
+            "{html}"
+        );
+        assert!(visible(&html).contains("Nothing was charged."), "{html}");
+        assert!(!html.contains("id=\"payment\""), "{html}");
+        let paid = pay(&page, "4242424242424242");
+        assert!(paid.starts_with("HTTP/1.1 409"), "{paid}");
+        let again = pressed(s, CANCEL, &[], "cancel-2");
+        assert!(
+            refused_as(&again, "not-awaiting-payment"),
+            "{:?}",
+            again.result
+        );
+    });
+}
+
+/// **A code an order taken back used is the reader's again** (step eight):
+/// its use released, it applies again. The control: one used by an order
+/// that stands is refused (`order_total::each_promo_refusal_is_by_name`).
+#[test]
+fn a_code_an_order_taken_back_used_is_the_readers_again() {
+    paying(|s, _| {
+        // `WELCOME10`, the seed's: 10% off store 47's orders of $15.00 or
+        // more.
+        s.command(ADD, "a", &add_shown("espresso", 5), false)
+            .expect("added");
+        let code = [Val::String("WELCOME10".into())];
+        let applied = pressed(s, APPLY, &code, "apply-1");
+        assert!(applied.committed, "{:?}", applied.result);
+        let placed = pressed(s, PLACE, &[s.shown_total("a")], "place-1");
+        assert!(placed.committed, "{:?}", placed.result);
+        let taken = pressed(s, CANCEL, &[], "cancel-1");
+        assert!(taken.committed, "{:?}", taken.result);
+        let again = pressed(s, APPLY, &code, "apply-2");
+        assert!(again.committed, "{:?}", again.result);
+    });
+}
+
+/// **A payment paid before it is canceled stands** (step eight): the
+/// provider says it is past canceling, so the order stands, answered
+/// `Paid`, and the provider's word places it. Its word held back here, as
+/// it is late in a deployment.
+#[test]
+fn a_payment_paid_before_it_is_canceled_stands() {
+    paying(|s, origin| {
+        let page = placed_awaiting(s);
+        origin.hold();
+        let paid = pay(&page, "4242424242424242");
+        assert!(paid.contains("Paid."), "{paid}");
+        assert_eq!(
+            status_of(s, "a").map(|(case, _)| case),
+            Some("awaiting-payment".to_string())
+        );
+        let refused = pressed(s, CANCEL, &[], "cancel-1");
+        assert!(refused_as(&refused, "paid"), "{:?}", refused.result);
+        assert!(s.cart_lines("a").is_empty(), "no line came back");
+        origin.release_reversed();
+        assert_eq!(status_of(s, "a"), Some(("placed".to_string(), None)));
+    });
+}
+
+/// **A provider's own cancel takes the order back** (step eight), as its
+/// reader's does: its canceled word settled by `settle_payment` on the
+/// reader's behalf. Its dashboard's, here its API asked directly.
+#[test]
+fn a_providers_own_cancel_takes_the_order_back() {
+    paying(|s, _| {
+        let page = placed_awaiting(s);
+        let provider = s.payments.get().expect("payments").provider.clone();
+        let canceled = sent(
+            &format!("{provider}/v1/payment_intents/{}/cancel", payment_of(&page)),
+            "application/json",
+            "{}",
+        );
+        assert!(canceled.starts_with("HTTP/1.1 200"), "{canceled}");
+        assert_eq!(status_of(s, "a"), Some(("canceled".to_string(), None)));
+        assert_eq!(
+            s.cart_lines("a"),
+            vec![("espresso".to_string(), 2), ("cortado".to_string(), 1)]
+        );
+    });
+}
+
+/// **An order no longer awaiting its payment is not taken back** (step
+/// eight): moved along by the store, its payment is not asked for again.
+/// The control: one awaiting is taken back (above).
+#[test]
+fn an_order_no_longer_awaiting_its_payment_is_not_taken_back() {
+    paying(|s, _| {
+        placed_awaiting(s);
+        s.order_set_untold("a", "preparing");
+        let refused = pressed(s, CANCEL, &[], "cancel-1");
+        assert!(
+            refused_as(&refused, "not-awaiting-payment"),
+            "{:?}",
+            refused.result
+        );
+        assert!(s.cart_lines("a").is_empty(), "no line came back");
     });
 }
