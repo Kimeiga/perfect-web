@@ -756,6 +756,17 @@ E14 comes before E11-E13. Its plan, controls and task list are
              stores more, pinned and equal at both; rows read by set
              (`= ANY($1)`), a scan in memory; mutants restore each loop.
              W9's, after 6b, on the counter W9's search brings;
+          4c. **a read is bounded by construction** (the owner's proposal,
+             the integrator's ruling of 2026-10-13, PARALLEL.md): a page's
+             and a command's source calls bounded by its text, a read keyed
+             by a loop's element refused with its set read as the repair,
+             the host coalescing its own sibling bindings; each source
+             operation's cost per call stated with its guarantees
+             (ADR-0207) and measured by a conformance suite every layer
+             runs at two data sizes; the budget, calls times cost, recorded
+             as evidence and checked against the host's counter. W9's,
+             after 4b, a design note first, its shape an ADR; before the
+             capability matrix's apps;
           5. ~~**idempotency committed with the writes**~~ (ADR-0325,
              merged 2026-10-12): an interaction's answer commits in its
              command's transaction, on both layers, and answers a day;
@@ -763,7 +774,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
              (ADR-0327, merged 2026-10-13); ~~6b the order's total~~ (ADR-0329,
              merged 2026-10-13, W9's); ~~6c payment~~ (ADR-0332, merged 2026-10-13);
              6d a Stripe adapter
-             (the owner's approval of each crate). Fees, taxes, a tip and
+             (the owner's approval of each crate, asked 2026-10-14). Fees,
+             taxes, a tip and
              promo codes, in money that
              cannot round silently (`Money` is USD's alone, so no other
              currency, conversion or locale's format, said where it
@@ -773,6 +785,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
              charged at most once, under `secret<Payments>`; a Stripe
              adapter in test mode only with the owner's approval of each
              crate, and with test keys only.
+          6e. **`orders#place` and `user-orders#place` reached by no
+             program** (train-5's finding): the store places through
+             `user-orders#await-payment` since ADR-0332. Removed with their
+             pins, the libraries' `Orders.place` and `UserOrders.place`
+             and the rows they alone use, or kept for a program that places
+             without paying, said why; until then no mutant guards them;
 
           Then the language's, found on the way:
           - ~~**a template's bindings shadow module members**~~ (ADR-0310,

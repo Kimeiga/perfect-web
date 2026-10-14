@@ -1490,9 +1490,46 @@ Each a decision for a track, with its date; a track's ADR records it too.
   on the train (its run failed in one recipe, fixed and re-run by dispatch,
   the fix's own push run cancelled for the dispatch). `verified_base.py`
   does not count a dispatch; NEXT has the item.
-\n- **2026-10-13, W9's store switch merged** on train-5 (track
+- **2026-10-13, W9's store switch merged** on train-5 (track
   `store-switch`, from `1d217edc`, on the payments track): ADR-0329 amended,
   one `choose_tip(Tip)` and `OrderTotal` an `Option`. It went on with its
   own local checks green and no run of its own (its push's verify cancelled
   by the coordinator, the integrator's ruling for small tracks); train-5's
   run verifies it. W9 takes NEXT 4b from master once train-5 lands.
+- **2026-10-14, train-5 landed** (`track/train-5`, verify 38504714384): ADR-0332
+  (payments, NEXT 6c) and W9's store switch (ADR-0329 amended). W9 takes
+  NEXT 4b from master.
+  - **Found by the train's run, the payments track's three survivors**
+    (40 recipes, 37 green): `e14-orders` (two) and `e14-store-accounts`
+    (one) undid code no program reaches since ADR-0332 moved `place_order`
+    to `user-orders#await-payment` (`orders#place`, `user-orders#place`);
+    `e14-invoked-by`'s control differed from its command by
+    `idempotent_by`, which step seven added, so it held nothing of
+    `invoked_by`. **Correction (the integrator's)**: the payments track
+    re-anchored mutants in scripts its change reached and did not run them
+    whole, against the rule it was given on 2026-10-12 (re-run whole each
+    script whose code or tests a change reaches). Fixed on the train
+    (`d59647b1`): the mutants anchored on the path an order takes, the control
+    differing by `invoked_by` alone; the three recipes ran by dispatch
+    (38528566737).
+  - **Ruling (the integrator's, 2026-10-13), the owner's proposal on N+1
+    reads**, relayed by the coordinator: 4b proceeds as specified (set methods,
+    statements counted per read and command, and per source operation
+    where cheap), and the platform's track follows it as NEXT 4c, before
+    the capability matrix's apps. Today's N+1s are all below the seam,
+    inside the host's store operations (the search's scan, `place_order`'s
+    `hours_of_cart` and `priced_for`, the hours store by store), and a
+    set-keyed program contract alone removes none of them. The guarantee
+    is two halves. Above the seam the compiler bounds a page's and a
+    command's source calls by its text: a read keyed by a loop's element is
+    refused, its set read the repair, as Rails' `strict_loading` raises on
+    a lazy load; later rewritten into one set read, as Haxl's rounds batch
+    a `mapM` (Marlow et al., ICFP 2014); the host coalesces its own sibling
+    bindings as DataLoader coalesces a tick's loads. Below it each source
+    operation states its cost per call with its guarantees (ADR-0207), never
+    assumed to be one: DynamoDB's `BatchGetItem` takes at most 100 keys and
+    may leave `UnprocessedKeys`, PostgreSQL's `= ANY($1)` is one statement;
+    a conformance suite every layer runs measures it at two data sizes, as
+    4b does. A loop that awaits each read in turn reads one row per round
+    trip whatever the component model's async allows, so the coalescing is
+    the compiler's, not a tick's.

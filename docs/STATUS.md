@@ -33,7 +33,7 @@ the payments track).
 - `OrderTotal` answers an `Option<Money<USD>>`, read through its arm
   (ADR-0330) inside the order page's own wording of its total (ADR-0332's:
   to pay, charged); `cents(0)` where no order is placed is gone.
-Verify TRAIN_RUN green, with train-5.
+Verify 38504714384 green, with train-5.
 
 **ADR-0332, 2026-10-13: a payment is the provider's word, held to its
 signature** (the integrator's; NEXT 6c; track `payments`, merged from
@@ -54,7 +54,7 @@ signature** (the integrator's; NEXT 6c; track `payments`, merged from
   and never settled; a provider that never answered held the host's layer;
   the host read a provider's answer to the connection's close; and
   `secrets.payments()` does not build (not claimed, the reason recorded).
-Verify TRAIN_RUN green, with train-5.
+Verify 38504714384 green, with train-5.
 
 **ADR-0281 amended (5), 2026-10-13: a shell script a recipe runs plans
 it, and master's verify runs no browser suite again on the same code**

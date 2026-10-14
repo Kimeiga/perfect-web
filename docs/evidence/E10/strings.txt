@@ -1,8 +1,8 @@
 ADR-0049 - a string's escapes are the language's
 
 produced by: just e10-strings
-commit: e9e6a49f26a95b0b4f54f705c269fbce69869563
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38483504682 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 850c4b7feaa70f84c0d9eea1be9a93dd6417cafa
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38504714384 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the decoder (compiler/pw-syntax/src/strings.rs)
@@ -15,7 +15,7 @@ test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 == compiled components through the host (pw-conformance/tests/strings.rs)
 
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
 
 == the component and the JavaScript module, on the same arguments
 

@@ -203,6 +203,24 @@ origin-only secret operation, `capture_payment`) and the charter's
   approval of each crate it needs (NEXT 6d).
 - Refunds, captures held for later (`requires_capture`), disputes.
 
+## Correction, 2026-10-14 (found by train-5's run)
+
+The train's run (verify 38504714384) found three mutants surviving, each this
+track's:
+- `orders_mutations.py`'s "an empty cart places an order" and "a placed
+  order leaves the cart as it was", and `store_accounts_mutations.py`'s "an
+  order a store out of reach is in is placed", undid `orders#place` and
+  `user-orders#place`, which no program reaches since this ADR moved
+  `place_order` to `user-orders#await-payment`. The track re-anchored
+  neighbouring mutants and did not run these scripts whole. They undo
+  `#await-payment` now, the path an order takes (`d59647b1`).
+- `invoked_by_mutations.py`'s "who invokes a command is not part of its
+  interface": step seven added `idempotent_by` to the test's commands
+  (PW6405), and the control lacked it too, so it held nothing of
+  `invoked_by`. The control keeps `idempotent_by` now.
+The three recipes ran again by dispatch (38528566737). The two operations no
+program reaches are NEXT 6e.
+
 ## Alternatives
 
 - **The key as a value the program passes** (the charter's first sketch,
