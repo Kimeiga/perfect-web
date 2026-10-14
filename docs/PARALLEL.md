@@ -1626,3 +1626,8 @@ Each a decision for a track, with its date; a track's ADR records it too.
   tests fail)" can be the build failing. Three such kills were rewritten:
   store-hours, command-answers and kiokun-word each have one mutant that
   now meets its tests.
+- **2026-10-14, planner-test-modules merged** on train-7 (the integrator's
+  finding at train-6; from `80802a46`): a change to a source's own `mod
+  tests` plans the scripts and recipes that run it by its module's filter
+  (`csp::`). To every worker: name a module's tests by its filter in your
+  mutation script's suite, and a change to them plans your recipe.

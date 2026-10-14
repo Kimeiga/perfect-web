@@ -23,6 +23,20 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-14: a change to a source's own tests plans what runs them** (the
+integrator's finding at train-6; track `planner-test-modules`, merged from
+`80802a46`).
+- Train-6's survivor in `e14-page-policy` was killed by a test in
+  `csp.rs`'s own `mod tests`, and its push planned no `e14-page-policy`:
+  no test file, far from every mutant, while the script runs those tests by
+  the filter `csp::`. A change after a source's `#[cfg(test)] mod tests {`
+  now reaches the scripts and recipes that name the module's filter, as
+  train-6's fix made a server test module's reach those that name
+  `tests::<name>::`.
+- Held by a test whose change is far from every mutant, and three mutants
+  (`dealt_by_time_mutations.py`, 48 of 48).
+Verify TRAIN_RUN green, with train-7.
+
 **2026-10-14: a mutant of a program's source is still a program** (the
 integrator's finding; track `mutant-programs`, merged from `6a30b2f5`).
 - Of the 237 mutants of a `.pw` source the mutation scripts plant, the
