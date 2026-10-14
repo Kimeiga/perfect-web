@@ -137,6 +137,29 @@ class Plan(unittest.TestCase):
             plan.touched_scripts({grammar: [(1, 1)]}, 30),
         )
 
+    def test_a_changed_server_test_module_reaches_what_runs_it_by_its_filter(self) -> None:
+        # Train-6's finding, 2026-10-14: the server's test modules run by a
+        # filter, `tests::store_scheduled::`, never by `--test`, and a change
+        # to one planned nothing: the push of a fix to two of its tests would
+        # have run no recipe of them, and the fetch would have taken their
+        # old evidence as current.
+        module = "spikes/own-renderer/server/src/tests/store_scheduled.rs"
+        self.assertIn("scheduled_mutations.py", plan.touched_scripts({module: [(1, 1)]}, 30))
+        planned = plan.recipes_for({module: [(1, 1)]}, 30, plan.recipes())
+        self.assertIn("e14-scheduled", planned)
+        # And a recipe that runs it by its filter with no script of its own:
+        # today every such recipe runs a script that names the filter too.
+        saved = plan.bodies
+        try:
+            plan.bodies = lambda: {"e14-direct": "cargo test -- tests::store_scheduled::"}
+            self.assertEqual(plan.recipes_for({module: [(1, 1)]}, 30, ["e14-direct"]), ["e14-direct"])
+        finally:
+            plan.bodies = saved
+        # The control: a module nothing runs plans nothing by it.
+        nothing = "spikes/own-renderer/server/src/tests/nothing_runs_this.rs"
+        self.assertNotIn("scheduled_mutations.py", plan.touched_scripts({nothing: [(1, 1)]}, 30))
+        self.assertNotIn("e14-scheduled", plan.recipes_for({nothing: [(1, 1)]}, 30, plan.recipes()))
+
     def test_a_changed_browser_spec_reaches_the_scripts_and_recipes_that_run_it(self) -> None:
         # ADR-0281: a spec a script runs is its test, as a Rust test file is;
         # a change to `accessibility.spec.mjs` planned nothing before.

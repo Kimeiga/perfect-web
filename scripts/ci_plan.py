@@ -270,7 +270,9 @@ def changed_specs(changed: dict[str, list[tuple[int, int]]]) -> set[str]:
 def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set[str]:
     """The mutation scripts a change reaches: the script itself, a mutant
     within `near` lines of a changed line, or a test file it runs, a Rust
-    test or a browser spec (ADR-0281)."""
+    test or a browser spec (ADR-0281): a test target by `--test`, or one of
+    the server's test modules by its filter, `tests::store_scheduled::`,
+    which planned nothing until train-6's fix to one."""
     tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
     specs = changed_specs(changed)
     out = set()
@@ -280,7 +282,10 @@ def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set
             out.add(path.name)
             continue
         text = path.read_text()
-        if any(f'"--test", "{t}"' in text or f"--test {t}" in text for t in tests):
+        if any(
+            f'"--test", "{t}"' in text or f"--test {t}" in text or f"tests::{t}::" in text
+            for t in tests
+        ):
             out.add(path.name)
             continue
         # A browser spec it runs: the mutants it plants are killed there.
@@ -390,12 +395,16 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
     scripts = touched_scripts(changed, near)
     body = bodies()
     specs = changed_specs(changed)
+    tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
     out = {
         name
         for name in names
         if any(f"scripts/{s}" in body.get(name, "") for s in scripts)
         # A recipe that runs a browser spec the range changed (ADR-0281).
         or any(s in body.get(name, "") for s in specs)
+        # And one that runs a server test module the range changed, by its
+        # filter (train-6's finding).
+        or any(f"tests::{t}::" in body.get(name, "") for t in tests)
         # A recipe whose own script changed, or reads what changed.
         or reads_what_changed(body.get(name, ""), changed)
     }

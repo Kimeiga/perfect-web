@@ -46,6 +46,20 @@ VERIFY = ROOT / ".github/workflows/verify.yml"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
+    # Train-6's finding: a server test module is run by its filter, and a
+    # change to one plans what runs it.
+    (
+        "a server test module plans no script that runs it by its filter",
+        PLAN,
+        ' or f"tests::{t}::" in text\n            for t in tests\n',
+        "\n            for t in tests\n",
+    ),
+    (
+        "a server test module plans no recipe that runs it by its filter",
+        PLAN,
+        '        or any(f"tests::{t}::" in body.get(name, "") for t in tests)\n',
+        "        or False\n",
+    ),
     # ADR-0281, amended 2026-10-13 (6): a push does not run a recipe whose
     # committed evidence is current at its head.
     (
